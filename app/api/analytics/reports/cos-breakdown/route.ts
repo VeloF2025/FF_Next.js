@@ -1,20 +1,21 @@
 /**
  * GET /api/analytics/reports/cos-breakdown
  *
- * Reads the "Cost of Sales" section from the Fin Summary worksheet and
- * returns a monthly pivot of COS sub-categories.
+ * COS Breakdown — pivot of Expenses by Category from the Data tab.
+ * Source: Data worksheet, Type=Expense
+ * Groups by Category (col 10), pivots by Date-M serial (col 1).
+ * FY26 = Apr 2025 – Mar 2026 | FY27 = Apr 2026 – Mar 2027
  *
- * Access restricted via RBAC (analytics.reports / view) or user allowlist.
+ * 🟢 WORKING
  */
+export const dynamic = 'force-dynamic';
 
-// 🟢 WORKING: COS Breakdown GET handler — reads live SharePoint data
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createLogger } from '@/lib/logger';
 import { verifyToken } from '@/lib/auth/jwt';
 import { userHasPermission } from '@/lib/permissions';
 import { getWorksheetRange } from '@/lib/graph/sharepoint-excel';
-import type { IncomeStatementData, IncomeStatementRow } from '@/modules/analytics/reports/income-statement/useIncomeStatementData';
 
 const logger = createLogger('analytics:api:cos-breakdown');
 
@@ -23,157 +24,129 @@ const ALLOWED_USERS = new Set([
   '7d84184b-2a2b-4fbb-a52e-9815d0e92237', // Lew
 ]);
 
-function excelSerialToLabel(serial: number): string {
-  const date = new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * 86400000);
-  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+export interface CosBreakdownRow {
+  category: string;
+  fy26: number;
+  fy27: number;
+  monthly: Record<string, number>; // key: "Jul '25"
+  isTotal?: boolean;
 }
 
-function toNumber(cell: unknown): number {
-  if (typeof cell === 'number') return cell;
-  if (typeof cell === 'string') return parseFloat(cell.replace(/,/g, '')) || 0;
+export interface CosBreakdownData {
+  rows: CosBreakdownRow[];
+  months: string[];
+  totals: { fy26: number; fy27: number; monthly: Record<string, number> };
+}
+
+// Excel date serial → "Mon 'YY" label
+function serialToMonthLabel(serial: number): string {
+  const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * 86400000);
+  const mon = d.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
+  const yr = String(d.getUTCFullYear()).slice(2);
+  return `${mon} '${yr}`;
+}
+
+// Apr–Mar fiscal year
+function fyLabel(serial: number): 'FY26' | 'FY27' | 'FY28' | null {
+  const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * 86400000);
+  const yr = d.getUTCFullYear();
+  const mo = d.getUTCMonth() + 1; // 1=Jan
+  const fy = mo >= 4 ? yr + 1 : yr; // Apr onwards → next year
+  if (fy === 2026) return 'FY26';
+  if (fy === 2027) return 'FY27';
+  if (fy === 2028) return 'FY28';
+  return null;
+}
+
+// Month key for sort: YYYYMM
+function monthSortKey(label: string): number {
+  const MONTHS: Record<string, string> = { Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12' };
+  const m = label.match(/^(\w{3}) '(\d{2})$/);
+  if (!m) return 0;
+  return parseInt(`20${m[2]}${MONTHS[m[1]] ?? '00'}`);
+}
+
+function toNum(v: unknown): number {
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') return parseFloat(v.replace(/[^0-9.\-]/g, '')) || 0;
   return 0;
 }
 
-function toStr(cell: unknown): string {
-  if (typeof cell === 'string') return cell.trim();
-  if (cell == null) return '';
-  return String(cell).trim();
-}
-
 export async function GET(_req: NextRequest): Promise<NextResponse> {
-  // --- Authentication ---
   const cookieStore = await cookies();
   const token = cookieStore.get('ff_auth_token')?.value;
-
-  if (!token) {
-    return NextResponse.json(
-      { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
-      { status: 401 }
-    );
-  }
-
+  if (!token) return NextResponse.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Auth required' } }, { status: 401 });
   const payload = await verifyToken(token);
-  if (!payload?.sub) {
-    return NextResponse.json(
-      { success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid token' } },
-      { status: 401 }
-    );
+  if (!payload?.sub) return NextResponse.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid token' } }, { status: 401 });
+  const hasAccess = await userHasPermission(payload.sub, 'analytics.reports', 'view');
+  if (!hasAccess && !ALLOWED_USERS.has(payload.sub)) {
+    return NextResponse.json({ success: false, error: { code: 'FORBIDDEN', message: 'Access restricted' } }, { status: 403 });
   }
 
-  const userId = payload.sub;
-
-  const hasAccess = await userHasPermission(userId, 'analytics.reports', 'view');
-  if (!hasAccess && !ALLOWED_USERS.has(userId)) {
-    return NextResponse.json(
-      { success: false, error: { code: 'FORBIDDEN', message: 'Access restricted to authorised users' } },
-      { status: 403 }
-    );
-  }
-
-  logger.info('COS breakdown requested', { userId });
+  logger.info('COS breakdown (Data tab) requested', { userId: payload.sub });
 
   try {
-    const { values } = await getWorksheetRange('Fin Summary');
+    const { values } = await getWorksheetRange('Data');
+    if (!values || values.length < 2) throw new Error('Data sheet returned insufficient data');
 
-    if (!values || values.length < 2) {
-      throw new Error('Fin Summary sheet returned insufficient data');
-    }
+    // Col indices (confirmed 2026-03-26):
+    // 0=Date, 1=Date-M, 2=Type, 6=Amount Excl VAT, 10=Category
+    const catMap = new Map<string, { fy26: number; fy27: number; monthly: Map<string, number> }>();
+    const monthSet = new Set<string>();
 
-    // Fin Summary layout (confirmed live 2026-03-26):
-    // Col A (0) = empty, Col B (1) = label, Col C (2) = FY26, Col D (3) = FY27
-    // Monthly date serials from col E (4) onwards in the header row
-    // The "Cost of Sales" sub-section header is at row ~26 (0-based index 25)
-
-    // Find the header row that contains month date serials (look for row with many numbers > 40000)
-    let monthColumns: { col: number; label: string }[] = [];
-    for (let i = 0; i < Math.min(10, values.length); i++) {
+    for (let i = 1; i < values.length; i++) {
       const row = values[i] as unknown[];
-      const candidate: { col: number; label: string }[] = [];
-      for (let col = 4; col < row.length; col++) {
-        const cell = row[col];
-        if (typeof cell === 'number' && cell > 40_000) {
-          candidate.push({ col, label: excelSerialToLabel(cell) });
-        }
+      const type = String(row[2] ?? '').trim();
+      if (type !== 'Expense') continue;
+
+      const serial = toNum(row[1]);
+      if (serial <= 0) continue;
+
+      const category = String(row[10] ?? '').trim() || '(Uncategorised)';
+      const amount = toNum(row[6]);
+      const monthLabel = serialToMonthLabel(serial);
+      const fy = fyLabel(serial);
+
+      monthSet.add(monthLabel);
+
+      if (!catMap.has(category)) {
+        catMap.set(category, { fy26: 0, fy27: 0, monthly: new Map() });
       }
-      if (candidate.length > 6) { monthColumns = candidate; break; }
-    }
-    const months = monthColumns.map((m) => m.label);
+      const entry = catMap.get(category)!;
 
-    // Locate "Cost of Sales" section — labels are in col B (index 1)
-    let cosStart = -1;
-    for (let i = 0; i < values.length; i++) {
-      const row = values[i] as unknown[];
-      const label = toStr(row[1]); // col B
-      if (label === 'Cost of Sales') {
-        cosStart = i;
-        break;
-      }
+      if (fy === 'FY26') entry.fy26 += amount;
+      else if (fy === 'FY27') entry.fy27 += amount;
+
+      entry.monthly.set(monthLabel, (entry.monthly.get(monthLabel) ?? 0) + amount);
     }
 
-    if (cosStart < 0) {
-      throw new Error('Could not locate "Cost of Sales" section in Fin Summary');
-    }
+    // Sort months chronologically
+    const months = Array.from(monthSet).sort((a, b) => monthSortKey(a) - monthSortKey(b));
 
-    // Section header row
-    const headerEntry: IncomeStatementRow = {
-      label: 'Cost of Sales',
-      fy26: 0, fy27: 0, fy28: 0,
-      monthly: {},
-      isHeader: true,
+    // Build rows sorted by FY26 total desc
+    const rows: CosBreakdownRow[] = Array.from(catMap.entries())
+      .map(([category, data]) => ({
+        category,
+        fy26: data.fy26,
+        fy27: data.fy27,
+        monthly: Object.fromEntries(months.map(m => [m, data.monthly.get(m) ?? 0])),
+      }))
+      .filter(r => r.fy26 > 0 || r.fy27 > 0 || Object.values(r.monthly).some(v => v > 0))
+      .sort((a, b) => (b.fy26 + b.fy27) - (a.fy26 + a.fy27));
+
+    // Totals row
+    const totals: CosBreakdownData['totals'] = {
+      fy26: rows.reduce((s, r) => s + r.fy26, 0),
+      fy27: rows.reduce((s, r) => s + r.fy27, 0),
+      monthly: Object.fromEntries(months.map(m => [m, rows.reduce((s, r) => s + (r.monthly[m] ?? 0), 0)])),
     };
 
-    // Parse COS sub-rows — stop at blank label OR next major section header
-    const STOP_LABELS = new Set([
-      'Revenue', 'Cost Of Sales', 'Gross Profit/(Loss)', 'Income',
-      'Operational Expenses', 'Operations Expenses', 'Net Profit/(Loss)',
-      'Net Profit/(Loss) - Running', 'Cash In', 'Cash Out', 'Cash Movement',
-      'Income Statement', 'Income Statememt', 'VAT',
-    ]);
+    logger.info('COS breakdown fetched', { userId: payload.sub, categories: rows.length });
 
-    const subRows: IncomeStatementRow[] = [];
-    let foundData = false;
-
-    for (let i = cosStart + 1; i < values.length; i++) {
-      const row = values[i] as unknown[];
-      const label = toStr(row[1]); // col B
-      if (!label) {
-        if (foundData) break; // blank row after data = end of section
-        continue;
-      }
-      if (STOP_LABELS.has(label)) break;
-
-      foundData = true;
-      const fy26 = toNumber(row[2]); // col C
-      const fy27 = toNumber(row[3]); // col D
-      const fy28 = 0;
-      const monthly: Record<string, number> = {};
-      for (const { col, label: mLabel } of monthColumns) {
-        monthly[mLabel] = toNumber(row[col]);
-      }
-
-      const isTotal = label.toLowerCase().startsWith('total');
-      subRows.push({ label, fy26, fy27, fy28, monthly, isTotal, isIndented: !isTotal });
-    }
-
-    const rows: IncomeStatementRow[] = [headerEntry, ...subRows];
-    const result: IncomeStatementData = { rows, months };
-
-    logger.info('COS breakdown fetched', { userId, rowCount: rows.length });
-
-    return NextResponse.json({
-      success: true,
-      data: result,
-      meta: {
-        generatedAt: new Date().toISOString(),
-        sources: ['Fin Summary'],
-      },
-    });
+    return NextResponse.json({ success: true, data: { rows, months, totals } satisfies CosBreakdownData });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error('COS breakdown fetch failed', { error: message });
-    return NextResponse.json(
-      { success: false, error: { code: 'INTERNAL_ERROR', message } },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: { code: 'INTERNAL_ERROR', message } }, { status: 500 });
   }
 }
