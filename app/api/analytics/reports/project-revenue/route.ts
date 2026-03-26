@@ -69,16 +69,40 @@ function norm(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-/** Match FT_Revenue project name to Project_Costing name (fuzzy) */
-function matchProject(ftName: string, pcNames: string[]): string | null {
-  const n = norm(ftName);
-  // Exact match
+/**
+ * Explicit ordered project list — confirmed by Lew 2026-03-26.
+ * FibreTime projects come from Project_Costing; BU projects appended at bottom.
+ * DO NOT add dynamic rows from the Data tab.
+ */
+const PC_PROJECTS = [
+  'Lawley',
+  'Mohadin',
+  'Mamelodi POP 1',
+  'Etwatwa POP 2',
+  'Grabouw',
+  'Ivory Park',
+  "Thembisa POP 1 (P1/2)",
+  "Thembisa POP 2 (P1/2)",
+  "Thembisa POP 3  (P1/2)",
+  "Themb'elihle",
+  'Mamelodi POP 2',
+  'Mamelodi POP 3',
+  'Tonga',
+];
+
+const BU_PROJECTS = ['BritelinkMCT', 'BICT-US', 'MDU'];
+
+/** Map FT_Revenue or Data T2 name to canonical PC_PROJECTS name */
+function matchProject(name: string, pcNames: string[]): string | null {
+  const n = norm(name);
   const exact = pcNames.find(p => norm(p) === n);
   if (exact) return exact;
-  // Prefix match (e.g. "Thembisa POP 1" vs "Thembisa POP 1 (P1/2)")
-  const prefix = pcNames.find(p => norm(p).startsWith(n) || n.startsWith(norm(p).split(' (')[0]));
-  if (prefix) return prefix;
-  return null;
+  // Prefix match: "Thembisa POP 1" → "Thembisa POP 1 (P1/2)"
+  const prefix = pcNames.find(p => {
+    const pn = norm(p).split(' (')[0];
+    return n === pn || n.startsWith(pn) || pn.startsWith(n);
+  });
+  return prefix ?? null;
 }
 
 export async function GET(_req: NextRequest): Promise<NextResponse> {
@@ -105,28 +129,24 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
     const ftValues = ftResult.values ?? [];
     const dataValues = dataResult.values ?? [];
 
-    // ── 1. Project_Costing: forecast per project ──────────────────────────
+    // ── 1. Project_Costing: forecast per project (keyed by canonical name) ──
     const forecastMap = new Map<string, { forecastRevenue: number; forecastCos: number }>();
-    // header at row index 2, data from row 3
     for (let i = 3; i < pcValues.length; i++) {
       const row = pcValues[i] as unknown[];
-      const name = String(row[3] ?? '').trim();
-      if (!name || typeof row[3] !== 'string') continue;
-      if (norm(name) === 'total') continue;
-      forecastMap.set(name, {
-        forecastRevenue: toNum(row[8]),
-        forecastCos: toNum(row[9]),
-      });
+      const rawName = String(row[3] ?? '').trim();
+      if (!rawName || typeof row[3] !== 'string' || norm(rawName) === 'total') continue;
+      const canonical = matchProject(rawName, PC_PROJECTS) ?? rawName;
+      if (!forecastMap.has(canonical)) {
+        forecastMap.set(canonical, { forecastRevenue: toNum(row[8]), forecastCos: toNum(row[9]) });
+      }
     }
-    const pcProjectNames = Array.from(forecastMap.keys());
-    logger.info('PC projects', { count: pcProjectNames.length });
+    logger.info('PC forecast map', { projects: Array.from(forecastMap.keys()) });
 
     // ── 2. FT_Revenue: actual revenue for FibreTime projects ──────────────
     const ftRevMap = new Map<string, number>();
     const ftHeaders = (ftValues[0] ?? []) as unknown[];
     let projCol = 6;
-    const projH = String(ftHeaders[6] ?? '').toLowerCase();
-    if (!projH.includes('project')) {
+    if (!String(ftHeaders[6] ?? '').toLowerCase().includes('project')) {
       const idx = ftHeaders.findIndex(h => String(h ?? '').toLowerCase().includes('project'));
       if (idx >= 0) projCol = idx;
     }
@@ -137,15 +157,15 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
       const row = ftValues[i] as unknown[];
       const name = String(row[projCol] ?? '').trim();
       if (!name) continue;
-      const matched = matchProject(name, pcProjectNames) ?? name;
-      ftRevMap.set(matched, (ftRevMap.get(matched) ?? 0) + toNum(row[debitCol]));
+      const canonical = matchProject(name, PC_PROJECTS);
+      if (!canonical) continue; // only accumulate known PC projects
+      ftRevMap.set(canonical, (ftRevMap.get(canonical) ?? 0) + toNum(row[debitCol]));
     }
 
     // ── 3. Data tab: actual revenue + COS ─────────────────────────────────
-    // Indexes: col2=Type, col6=AmountExclVAT, col10=Category, col15=T1, col16=T2
-    const dataCosT2 = new Map<string, number>();   // T2-keyed (FibreTime project COS)
-    const dataIncT1 = new Map<string, number>();   // T1-keyed (BritelinkMCT / BICT-US income)
-    const dataCosT1T2 = new Map<string, number>(); // "T1|T2" keyed (MDU, BritelinkMCT COS)
+    const dataCosT2 = new Map<string, number>();   // canonical PC project → COS
+    const dataIncT1 = new Map<string, number>();   // BU T1 → income
+    const dataCosT1T2 = new Map<string, number>(); // BU project → COS
 
     for (let i = 1; i < dataValues.length; i++) {
       const row = dataValues[i] as unknown[];
@@ -154,29 +174,26 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
       const t2 = String(row[16] ?? '').trim();
       const amt = toNum(row[6]);
 
-      if (type === 'Income') {
-        if (t1 && !['', 'Loan', 'Liabilities', 'Transfer', 'Opex', 'Correction', 'Refund', 'Leave', 'Unallocated Income', 'VAT Control', 'Rent'].includes(t1)) {
-          dataIncT1.set(t1, (dataIncT1.get(t1) ?? 0) + amt);
-        }
+      if (type === 'Income' && BU_PROJECTS.includes(t1)) {
+        dataIncT1.set(t1, (dataIncT1.get(t1) ?? 0) + amt);
       }
 
       if (type === 'Expense') {
-        // T2-based COS (FibreTime projects)
-        if (t2 && !['OPEX', 'CAPEX', 'Loan', 'Liabilities', 'Business Development', 'Fixed Assets', 'BritelinkMCT', 'BICT-US'].includes(t2)) {
-          const matchedT2 = matchProject(t2, pcProjectNames) ?? t2;
-          dataCosT2.set(matchedT2, (dataCosT2.get(matchedT2) ?? 0) + amt);
+        // FibreTime project COS — only for known PC projects matched via T2
+        const canonicalT2 = matchProject(t2, PC_PROJECTS);
+        if (canonicalT2) {
+          dataCosT2.set(canonicalT2, (dataCosT2.get(canonicalT2) ?? 0) + amt);
         }
-        // T1-based COS (BritelinkMCT, BICT-US, MDU)
-        if (['BritelinkMCT', 'BICT-US', 'MDU'].includes(t1)) {
+        // BU project COS (BritelinkMCT, BICT-US, MDU)
+        if (BU_PROJECTS.includes(t1)) {
           const key = t2 === 'MDU' ? 'MDU' : t1;
           dataCosT1T2.set(key, (dataCosT1T2.get(key) ?? 0) + amt);
         }
       }
     }
 
-    // ── 4. Build project rows ──────────────────────────────────────────────
-    const EXTRA_PROJECTS = ['BritelinkMCT', 'BICT-US', 'MDU'];
-    const allProjects = [...pcProjectNames, ...EXTRA_PROJECTS];
+    // ── 4. Build project rows — FIXED ordered list, no dynamic discovery ───
+    const allProjects = [...PC_PROJECTS, ...BU_PROJECTS];
 
     const rows: ProjectProfitabilityRow[] = allProjects.map(project => {
       const fc = forecastMap.get(project);
@@ -188,12 +205,12 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
       let actualRevenue = 0;
       let actualCos = 0;
 
-      if (EXTRA_PROJECTS.includes(project)) {
+      if (BU_PROJECTS.includes(project)) {
         actualRevenue = dataIncT1.get(project) ?? 0;
         actualCos = dataCosT1T2.get(project) ?? 0;
       } else {
         actualRevenue = ftRevMap.get(project) ?? 0;
-        actualCos = dataCosT2.get(project) ?? (dataCosT2.get(norm(project)) ?? 0);
+        actualCos = dataCosT2.get(project) ?? 0;
       }
 
       const actualGP = actualRevenue - actualCos;
@@ -202,9 +219,9 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
       return { project, forecastRevenue, forecastCos, forecastGP, forecastMargin, actualRevenue, actualCos, actualGP, actualMargin };
     });
 
-    // Filter: keep rows with at least some data
+    // Filter: keep only rows with at least some data (no empty placeholder rows)
     const filtered = rows.filter(r => r.forecastRevenue > 0 || r.actualRevenue > 0 || r.actualCos > 0);
-    filtered.sort((a, b) => b.forecastRevenue - a.forecastRevenue || b.actualRevenue - a.actualRevenue);
+    // Order is preserved from allProjects (explicit list) — no sort
 
     // Totals
     const totals = filtered.reduce(
