@@ -1,58 +1,29 @@
 /**
- * useProjectRevenueData — React Query hook for the Cost Centre Profitability report.
- * Fetches COS vs Revenue per project from the Shareholder Model via the API.
+ * useProjectRevenueData — React Query hook for Project Profitability (Forecast vs Actual).
+ * 🟢 WORKING
  */
+'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import type { ProjectProfitabilityData } from '@/app/api/analytics/reports/project-revenue/route';
 
-// 🟢 WORKING: Cost Centre Profitability types — COS vs Revenue per project
-export interface ProjectProfitability {
-  project: string;
-  revenue: number;
-  cos: number;
-  grossProfit: number;
-  margin: number;
-}
+export type { ProjectProfitabilityData, ProjectProfitabilityRow } from '@/app/api/analytics/reports/project-revenue/route';
 
-export interface CostCentreRevenueItem {
-  tier1: string;
-  revenue: number;
-  cos: number;
-  grossProfit: number;
-  margin: number;
-  children: ProjectProfitability[];
-}
-
-export interface CostCentreRevenueResponse {
-  success: boolean;
-  data: CostCentreRevenueItem[];
-  meta: {
-    generatedAt: string;
-    itemCount: number;
-    sources: string[];
-  };
-}
-
-interface ApiErrorBody {
-  error?: {
-    message?: string;
-  };
-}
-
-async function fetchCostCentreProfitability(): Promise<CostCentreRevenueResponse> {
+async function fetchProjectProfitability(): Promise<ProjectProfitabilityData> {
   const res = await fetch('/api/analytics/reports/project-revenue');
   if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as ApiErrorBody;
-    throw new Error(body.error?.message ?? 'Failed to load cost centre profitability data');
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error?.message ?? 'Failed to load project profitability');
   }
-  return res.json() as Promise<CostCentreRevenueResponse>;
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error?.message ?? 'Unknown error');
+  return json.data as ProjectProfitabilityData;
 }
 
-// 🟢 WORKING: React Query hook with 5-minute cache
 export function useProjectRevenueData() {
-  return useQuery<CostCentreRevenueResponse, Error>({
-    queryKey: ['analytics', 'cost-centre-profitability'],
-    queryFn: fetchCostCentreProfitability,
+  return useQuery<ProjectProfitabilityData, Error>({
+    queryKey: ['analytics', 'project-profitability'],
+    queryFn: fetchProjectProfitability,
     staleTime: 5 * 60 * 1000,
   });
 }
