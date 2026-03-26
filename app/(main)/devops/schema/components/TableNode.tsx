@@ -1,6 +1,6 @@
 'use client';
 
-import { Handle, Position } from 'reactflow';
+import { Handle, Position } from '@xyflow/react';
 
 interface TableNodeData {
   label: string;
