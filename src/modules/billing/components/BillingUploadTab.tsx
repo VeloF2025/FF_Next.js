@@ -19,6 +19,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { log } from '@/lib/logger';
 
 type Project = 'Lawley' | 'Mohadin' | 'Mamelodi';
 
@@ -62,6 +63,7 @@ export function BillingUploadTab() {
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [parseWarnings, setParseWarnings] = useState<string[]>([]);
 
   // ── Drag & Drop handlers ──────────────────────────────────────────────────
 
@@ -108,6 +110,7 @@ export function BillingUploadTab() {
     }
     setUploadState('previewing');
     setError(null);
+    setParseWarnings([]);
 
     try {
       const formData = new FormData();
@@ -120,27 +123,51 @@ export function BillingUploadTab() {
         method: 'POST',
         body: formData,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error) || 'Preview failed');
 
-      const s = data.summary;
+      // Parse JSON first so we can read error body on non-2xx responses
+      const data: Record<string, unknown> = await res.json();
+
+      if (!res.ok) {
+        const errMsg =
+          typeof data.error === 'string'
+            ? data.error
+            : data.error != null
+              ? JSON.stringify(data.error)
+              : 'Preview failed';
+        throw new Error(errMsg);
+      }
+
+      // API returns { success: true, action: 'preview', summary: ParsedPaymentSummary, ... }
+      const s = data.summary as Record<string, unknown>;
+      if (!s || typeof s !== 'object') {
+        log.error('upload-weekly preview: unexpected response shape', { data });
+        throw new Error('Unexpected response from server — no summary returned');
+      }
+
+      const totalClaimable = Number(s.totalClaimableForPayment ?? 0);
+
       setPreview({
-        weekEnding: s.weekEnding,
-        project: s.project,
-        totalOnts: s.totalOnts,
-        claimable: s.claimable,
-        note1Count: s.note1Count,
-        note2Count: s.note2Count,
-        note3Count: s.note3Count,
-        note4Count: s.note4Count,
-        note5Count: s.note5Count,
-        preProviCount: s.preProvisionsCount,
-        totalClaimable: s.totalClaimableForPayment,
-        pricePerDrop: null,
-        taxRate: 15,
-        invoiceSubtotal: s.totalClaimableForPayment * 2700,
-        invoiceTotal: s.totalClaimableForPayment * 2700 * 1.15,
-      } as BillingPreview);
+        weekEnding:    String(s.weekEnding ?? ''),
+        project:       String(s.project ?? ''),
+        totalOnts:     Number(s.totalOnts ?? 0),
+        claimable:     Number(s.claimable ?? 0),
+        note1Count:    Number(s.note1Count ?? 0),
+        note2Count:    Number(s.note2Count ?? 0),
+        note3Count:    Number(s.note3Count ?? 0),
+        note4Count:    Number(s.note4Count ?? 0),
+        note5Count:    Number(s.note5Count ?? 0),
+        preProviCount: Number(s.preProvisionsCount ?? 0),
+        totalClaimable,
+        // Price is only known at import time (needs DB lookup); show null until then
+        pricePerDrop:    null,
+        taxRate:         15,
+        invoiceSubtotal: null,
+        invoiceTotal:    null,
+      });
+
+      const warnings = Array.isArray(data.parseWarnings) ? (data.parseWarnings as string[]) : [];
+      setParseWarnings(warnings);
+
       setUploadState('previewed');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Preview failed');
@@ -154,6 +181,7 @@ export function BillingUploadTab() {
     if (!pdfFile || !preview) return;
     setUploadState('importing');
     setError(null);
+    setParseWarnings([]);
 
     try {
       const formData = new FormData();
@@ -166,16 +194,49 @@ export function BillingUploadTab() {
         method: 'POST',
         body: formData,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error) || 'Import failed');
+
+      // Parse JSON first so we can read error body on non-2xx responses
+      const data: Record<string, unknown> = await res.json();
+
+      if (!res.ok) {
+        const errMsg =
+          typeof data.error === 'string'
+            ? data.error
+            : data.error != null
+              ? JSON.stringify(data.error)
+              : 'Import failed';
+        throw new Error(errMsg);
+      }
+
+      // API returns { success: true, action: 'import', billingWeekId, weekEnding,
+      //               project, deductionCount, invoiceSubtotal, invoiceTotal, parseWarnings }
+      if (!data.billingWeekId || typeof data.billingWeekId !== 'string') {
+        log.error('upload-weekly import: unexpected response shape', { data });
+        throw new Error('Unexpected response from server — no billingWeekId returned');
+      }
 
       const result: ImportResult = {
-        id: data.billingWeekId,
-        weekEnding: data.weekEnding,
-        project: data.project,
-        totalClaimable: preview?.totalClaimable ?? 0,
-        invoiceTotal: data.invoiceTotal,
+        id:             String(data.billingWeekId),
+        weekEnding:     String(data.weekEnding ?? preview.weekEnding),
+        project:        String(data.project ?? preview.project),
+        totalClaimable: preview.totalClaimable,
+        invoiceTotal:   data.invoiceTotal != null ? Number(data.invoiceTotal) : null,
       };
+
+      // Update preview with real invoice figures from DB-backed price_per_drop
+      setPreview((prev) =>
+        prev
+          ? {
+              ...prev,
+              invoiceSubtotal: data.invoiceSubtotal != null ? Number(data.invoiceSubtotal) : null,
+              invoiceTotal:    data.invoiceTotal != null ? Number(data.invoiceTotal) : null,
+            }
+          : prev
+      );
+
+      const warnings = Array.isArray(data.parseWarnings) ? (data.parseWarnings as string[]) : [];
+      setParseWarnings(warnings);
+
       setImportResult(result);
       setUploadState('imported');
       toast.success(`Week ending ${result.weekEnding} imported successfully`);
@@ -198,8 +259,19 @@ export function BillingUploadTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: importResult.id }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Reconciliation failed');
+
+      // Parse JSON first so we can read error body on non-2xx responses
+      const data: Record<string, unknown> = await res.json();
+
+      if (!res.ok) {
+        const errMsg =
+          typeof data.error === 'string'
+            ? data.error
+            : data.error != null
+              ? JSON.stringify(data.error)
+              : 'Reconciliation failed';
+        throw new Error(errMsg);
+      }
 
       setUploadState('done');
       toast.success('Reconciliation complete');
@@ -218,6 +290,7 @@ export function BillingUploadTab() {
     setImportResult(null);
     setUploadState('idle');
     setError(null);
+    setParseWarnings([]);
   };
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -351,6 +424,21 @@ export function BillingUploadTab() {
           <div>
             <p className="font-medium text-red-400">Error</p>
             <p className="text-sm text-red-300">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Parse Warnings */}
+      {parseWarnings.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-amber-400">Parse warnings ({parseWarnings.length})</p>
+            <ul className="mt-1 space-y-0.5">
+              {parseWarnings.map((w, i) => (
+                <li key={i} className="text-sm text-amber-300">{w}</li>
+              ))}
+            </ul>
           </div>
         </div>
       )}

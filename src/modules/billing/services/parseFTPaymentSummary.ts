@@ -401,7 +401,8 @@ const DR_PATTERN = /^DR\d+/i;
 const SERIAL_PATTERN = /^(ALCL|ALHN|HWTC|ZTEG|DSAN)/i;
 
 /** Pattern to identify team codes used in the field (e.g., law, moh, mam) */
-const TEAM_PATTERN = /^(law|moh|mam|vel|mid|sow|bel|kwa|dev|lan)/i;
+// Match team codes like law12, moh5, mam1 — require digit suffix to avoid matching zone "LAW"
+const TEAM_PATTERN = /^(law|moh|mam|moa|vel|mid|sow|bel|kwa|dev|lan)\d+$/i;
 
 /**
  * Coerce an XLSX cell value to a trimmed string, or empty string if null/undefined.
@@ -517,8 +518,14 @@ export async function parseNotesXlsx(buffer: Buffer): Promise<NotesParseResult> 
         team = s.toLowerCase();
         continue;
       }
-      // Anything else that is longer than 5 chars and not already assigned is likely a reason
-      if (!reason && s.length > 5 && !DR_PATTERN.test(s) && !SERIAL_PATTERN.test(s)) {
+      // Anything else that is longer than 5 chars, not numeric, and not already assigned is likely a reason
+      // Exclude: numbers (Excel date serials like 46093.344), OLT addresses (law.olt.*), short codes
+      if (!reason && s.length > 5
+        && !DR_PATTERN.test(s) && !SERIAL_PATTERN.test(s)
+        && !/^-?\d+(\.\d+)?$/.test(s)          // pure numbers (Excel date serials)
+        && !/^law\.olt\./i.test(s)              // OLT addresses
+        && !/^\d{4}-\d{2}-\d{2}/.test(s)       // ISO date strings
+      ) {
         reason = s;
       }
     }
