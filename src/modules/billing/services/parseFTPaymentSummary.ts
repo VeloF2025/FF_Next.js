@@ -208,7 +208,6 @@ export async function parseFTPaymentPdf(
   log.info('Parsing FT payment PDF', {
     filename,
     project,
-    pages: parsed.numpages,
     textLength: rawText.length,
   }, 'billing-pdf');
 
