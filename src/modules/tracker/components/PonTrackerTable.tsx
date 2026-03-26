@@ -17,7 +17,7 @@ const COLS = [
   { key: 'cwc_qa', label: 'CWC QA', type: 'checkbox', width: 70 },
   { key: 'optical_splicing_date', label: 'Opt. Splicing', type: 'date', width: 120 },
   { key: 'optical_submitted_date', label: 'Opt. Submitted', type: 'date', width: 125 },
-  { key: 'optical_activated_date', label: 'Opt. Activated', type: 'date', width: 125 },
+  { key: 'optical_activated_date', label: 'ATP', type: 'date', width: 125 },
   { key: 'atp_qa', label: 'ATP QA', type: 'checkbox', width: 70 },
   { key: 'sign_ups', label: 'Sign-ups', type: 'number', width: 80 },
   { key: 'homes_po', label: 'Homes PO', type: 'number', width: 85 },
