@@ -46,19 +46,24 @@ const ScopeTable = ({ rows, totals }: { rows: BuildMilestoneRow[]; totals: Build
           <th className="px-3 py-2 text-center font-semibold" style={{ minWidth: 150 }}>RFO %</th>
           <th className="px-3 py-2 text-right font-semibold">ATP Done</th>
           <th className="px-3 py-2 text-center font-semibold" style={{ minWidth: 150 }}>ATP %</th>
+          <th className="px-3 py-2 text-right font-semibold text-orange-400" title="RFO Done minus ATP Done — PONs awaiting ATP">Lag (RFO−ATP)</th>
         </tr>
       </thead>
       <tbody>
-        {rows.map((row, idx) => (
-          <tr key={row.projectId} className={idx % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'}>
-            <td className="px-3 py-2 text-white font-medium">{row.projectName}</td>
-            <td className="px-3 py-2 text-right text-gray-300">{row.ponScope.toLocaleString()}</td>
-            <td className="px-3 py-2 text-right text-gray-300">{row.rfoDone.toLocaleString()}</td>
-            <td className="px-3 py-2"><ProgressCell pct={row.rfoPct} /></td>
-            <td className="px-3 py-2 text-right text-gray-300">{row.atpDone.toLocaleString()}</td>
-            <td className="px-3 py-2"><ProgressCell pct={row.atpPct} /></td>
-          </tr>
-        ))}
+        {rows.map((row, idx) => {
+          const lag = row.rfoDone - row.atpDone;
+          return (
+            <tr key={row.projectId} className={idx % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'}>
+              <td className="px-3 py-2 text-white font-medium">{row.projectName}</td>
+              <td className="px-3 py-2 text-right text-gray-300">{row.ponScope.toLocaleString()}</td>
+              <td className="px-3 py-2 text-right text-gray-300">{row.rfoDone.toLocaleString()}</td>
+              <td className="px-3 py-2"><ProgressCell pct={row.rfoPct} /></td>
+              <td className="px-3 py-2 text-right text-gray-300">{row.atpDone.toLocaleString()}</td>
+              <td className="px-3 py-2"><ProgressCell pct={row.atpPct} /></td>
+              <td className="px-3 py-2 text-right font-semibold" style={{ color: lag > 0 ? '#f97316' : '#6b7280' }}>{lag}</td>
+            </tr>
+          );
+        })}
         <tr className="bg-gray-900 text-white font-semibold border-t-2 border-gray-600">
           <td className="px-3 py-2">Total</td>
           <td className="px-3 py-2 text-right">{totals.ponScope.toLocaleString()}</td>
@@ -66,6 +71,7 @@ const ScopeTable = ({ rows, totals }: { rows: BuildMilestoneRow[]; totals: Build
           <td className="px-3 py-2"><ProgressCell pct={totals.rfoPct} /></td>
           <td className="px-3 py-2 text-right">{totals.atpDone.toLocaleString()}</td>
           <td className="px-3 py-2"><ProgressCell pct={totals.atpPct} /></td>
+          <td className="px-3 py-2 text-right font-semibold text-orange-400">{totals.rfoDone - totals.atpDone}</td>
         </tr>
       </tbody>
     </table>
@@ -80,6 +86,7 @@ const ScopeChart = ({ rows }: { rows: BuildMilestoneRow[] }) => {
     'PON Scope': hidden.has('PON Scope') ? 0 : r.ponScope,
     'RFO Done': hidden.has('RFO Done') ? 0 : r.rfoDone,
     'ATP Done': hidden.has('ATP Done') ? 0 : r.atpDone,
+    'Lag (RFO−ATP)': hidden.has('Lag (RFO−ATP)') ? 0 : r.rfoDone - r.atpDone,
   }));
   return (
     <ResponsiveContainer width="100%" height={320}>
@@ -97,6 +104,9 @@ const ScopeChart = ({ rows }: { rows: BuildMilestoneRow[] }) => {
         </Bar>
         <Bar dataKey="ATP Done" fill="#22c55e" isAnimationActive={false}>
           <LabelList dataKey="ATP Done" position="top" fill="#22c55e" fontSize={11} />
+        </Bar>
+        <Bar dataKey="Lag (RFO−ATP)" fill="#f97316" isAnimationActive={false}>
+          <LabelList dataKey="Lag (RFO−ATP)" position="top" fill="#f97316" fontSize={11} />
         </Bar>
       </BarChart>
     </ResponsiveContainer>
