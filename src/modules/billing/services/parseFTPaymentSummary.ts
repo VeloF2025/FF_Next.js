@@ -183,27 +183,24 @@ export async function parseFTPaymentPdf(
   const warnings: string[] = [];
   const project = extractProjectFromFilename(filename);
 
-  // ── Load pdf-parse at runtime (CommonJS module) ──────────────────────────
-  let pdfParse: PdfParseFunction;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    pdfParse = require('pdf-parse') as PdfParseFunction;
-  } catch {
-    log.error('pdf-parse module unavailable', {}, 'billing-pdf');
-    throw new Error('PDF parsing library (pdf-parse) is not installed.');
-  }
+  // ── Load pdf-parse v2 at runtime (CommonJS module) ─────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const pdfParseModule = require('pdf-parse') as { PDFParse: new (data: Uint8Array) => { getText(): Promise<{ pages: { text: string }[] }> } };
+  const { PDFParse } = pdfParseModule;
 
   // ── Extract raw text ─────────────────────────────────────────────────────
-  let parsed: PdfParseResult;
+  let rawText: string;
   try {
-    parsed = await pdfParse(buffer);
+    const uint8 = new Uint8Array(buffer);
+    const parser = new PDFParse(uint8);
+    const result = await parser.getText();
+    rawText = result.pages.map((p: { text: string }) => p.text).join('\n');
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.error('Failed to parse FT payment PDF', { filename, error: msg }, 'billing-pdf');
     throw new Error(`Could not read PDF "${filename}": ${msg}`);
   }
 
-  const rawText = parsed.text;
   if (!rawText || rawText.trim().length === 0) {
     throw new Error(`No text content in "${filename}". The PDF may be image-based (scanned).`);
   }
