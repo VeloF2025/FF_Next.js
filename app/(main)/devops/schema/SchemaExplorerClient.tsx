@@ -3,7 +3,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { RefreshCw, AlertCircle } from 'lucide-react';
-import { SchemaGraph } from './components/SchemaGraph';
+import dynamic from 'next/dynamic';
+
+const SchemaGraph = dynamic(() => import('./components/SchemaGraph').then(m => m.SchemaGraph), {
+  ssr: false,
+  loading: () => <div className="w-full h-full flex items-center justify-center text-[var(--ff-text-secondary)]">Loading graph...</div>,
+});
 import { SearchFilter } from './components/SearchFilter';
 import { StatsBar } from './components/StatsBar';
 import { TablePanel } from './components/TablePanel';
