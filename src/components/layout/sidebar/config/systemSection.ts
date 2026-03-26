@@ -96,7 +96,7 @@ export const systemSection: NavSection = {
       icon: Grid3x3,
       label: 'Schema Explorer',
       shortLabel: 'Schema',
-      permissions: [Permission.SYSTEM_ADMIN],
+      permissions: [],
       rbacKey: 'devops.schema',
     },
     {
@@ -104,7 +104,7 @@ export const systemSection: NavSection = {
       icon: TableProperties,
       label: 'Field Mapping',
       shortLabel: 'Mapping',
-      permissions: [Permission.SYSTEM_ADMIN],
+      permissions: [],
       rbacKey: 'devops.field-mapping',
     },
     {
