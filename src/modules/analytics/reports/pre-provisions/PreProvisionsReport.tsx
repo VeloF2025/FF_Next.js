@@ -48,7 +48,7 @@ const PreProvisionsTable = ({
             ))}
             <th className="px-3 py-2 text-right font-semibold" style={{ minWidth: 80 }}>Logged</th>
             <th className="px-3 py-2 text-right font-semibold text-green-400" style={{ minWidth: 90 }}>Activated</th>
-            <th className="px-3 py-2 text-right font-semibold text-yellow-400 border-l-2 border-red-700" style={{ minWidth: 80 }}>Open</th>
+            <th className="px-3 py-2 text-right font-semibold text-yellow-400 border-l-2 border-gray-500" style={{ minWidth: 80 }}>Open</th>
             <th className="px-3 py-2 text-right font-semibold text-red-400" style={{ minWidth: 90 }}>Not Found</th>
             <th className="px-3 py-2 text-right font-semibold text-orange-400 border-l-2 border-gray-500" style={{ minWidth: 110 }}>Not Activated</th>
           </tr>
@@ -70,7 +70,7 @@ const PreProvisionsTable = ({
                   ))}
                   <td className="px-3 py-2 text-right text-white font-semibold">{year.logged}</td>
                   <td className="px-3 py-2 text-right text-green-400 font-semibold">{year.activated}</td>
-                  <td className="px-3 py-2 text-right text-yellow-400 font-semibold border-l-2 border-red-700">{year.open || '—'}</td>
+                  <td className="px-3 py-2 text-right text-yellow-400 font-semibold border-l-2 border-gray-500">{year.open || '—'}</td>
                   <td className="px-3 py-2 text-right text-red-400 font-semibold">{year.notFound || '—'}</td>
                   <td className="px-3 py-2 text-right text-orange-400 font-semibold border-l-2 border-gray-500">{(year.open + year.notFound) || '—'}</td>
                 </tr>
@@ -82,7 +82,7 @@ const PreProvisionsTable = ({
                     ))}
                     <td className="px-3 py-1.5 text-right text-gray-300 text-xs">{month.logged}</td>
                     <td className="px-3 py-1.5 text-right text-green-400 text-xs">{month.activated || '—'}</td>
-                    <td className="px-3 py-1.5 text-right text-yellow-400 text-xs border-l-2 border-red-700">{month.open || '—'}</td>
+                    <td className="px-3 py-1.5 text-right text-yellow-400 text-xs border-l-2 border-gray-500">{month.open || '—'}</td>
                     <td className="px-3 py-1.5 text-right text-red-400 text-xs">{month.notFound || '—'}</td>
                     <td className="px-3 py-1.5 text-right text-orange-400 text-xs border-l-2 border-gray-500">{(month.open + month.notFound) || '—'}</td>
                   </tr>
@@ -99,7 +99,7 @@ const PreProvisionsTable = ({
             ))}
             <td className="px-3 py-2 text-right">{totals.logged}</td>
             <td className="px-3 py-2 text-right text-green-400">{totals.activated}</td>
-            <td className="px-3 py-2 text-right text-yellow-400 border-l-2 border-red-700">{totals.open || '—'}</td>
+            <td className="px-3 py-2 text-right text-yellow-400 border-l-2 border-gray-500">{totals.open || '—'}</td>
             <td className="px-3 py-2 text-right text-red-400">{totals.notFound || '—'}</td>
             <td className="px-3 py-2 text-right text-orange-400 font-semibold border-l-2 border-gray-500">{(totals.open + totals.notFound) || '—'}</td>
           </tr>
