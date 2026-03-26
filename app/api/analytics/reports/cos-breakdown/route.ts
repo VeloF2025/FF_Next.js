@@ -79,22 +79,31 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
       throw new Error('Fin Summary sheet returned insufficient data');
     }
 
-    // Extract month columns from header row (index 1)
-    const headerRow = values[1] as unknown[];
-    const monthColumns: { col: number; label: string }[] = [];
-    for (let col = 4; col < headerRow.length; col++) {
-      const cell = headerRow[col];
-      if (typeof cell === 'number' && cell > 40_000) {
-        monthColumns.push({ col, label: excelSerialToLabel(cell) });
+    // Fin Summary layout (confirmed live 2026-03-26):
+    // Col A (0) = empty, Col B (1) = label, Col C (2) = FY26, Col D (3) = FY27
+    // Monthly date serials from col E (4) onwards in the header row
+    // The "Cost of Sales" sub-section header is at row ~26 (0-based index 25)
+
+    // Find the header row that contains month date serials (look for row with many numbers > 40000)
+    let monthColumns: { col: number; label: string }[] = [];
+    for (let i = 0; i < Math.min(10, values.length); i++) {
+      const row = values[i] as unknown[];
+      const candidate: { col: number; label: string }[] = [];
+      for (let col = 4; col < row.length; col++) {
+        const cell = row[col];
+        if (typeof cell === 'number' && cell > 40_000) {
+          candidate.push({ col, label: excelSerialToLabel(cell) });
+        }
       }
+      if (candidate.length > 6) { monthColumns = candidate; break; }
     }
     const months = monthColumns.map((m) => m.label);
 
-    // Locate "Cost of Sales" section
+    // Locate "Cost of Sales" section — labels are in col B (index 1)
     let cosStart = -1;
     for (let i = 0; i < values.length; i++) {
       const row = values[i] as unknown[];
-      const label = toStr(row[0]);
+      const label = toStr(row[1]); // col B
       if (label === 'Cost of Sales') {
         cosStart = i;
         break;
@@ -113,36 +122,37 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
       isHeader: true,
     };
 
-    // Parse sub-rows until blank or next major section
-    const INCOME_STAT_LABELS = new Set([
-      'Revenue', 'Cost Of Sales', 'Gross Profit/(Loss)',
-      'Operational Expenses', 'Net Profit/(Loss)', 'Net Profit/(Loss) - Running',
-      'Cash In', 'Cash Out', 'Cash Movement',
+    // Parse COS sub-rows — stop at blank label OR next major section header
+    const STOP_LABELS = new Set([
+      'Revenue', 'Cost Of Sales', 'Gross Profit/(Loss)', 'Income',
+      'Operational Expenses', 'Operations Expenses', 'Net Profit/(Loss)',
+      'Net Profit/(Loss) - Running', 'Cash In', 'Cash Out', 'Cash Movement',
+      'Income Statement', 'Income Statememt', 'VAT',
     ]);
 
     const subRows: IncomeStatementRow[] = [];
+    let foundData = false;
 
     for (let i = cosStart + 1; i < values.length; i++) {
       const row = values[i] as unknown[];
-      const label = toStr(row[0]);
-      if (!label) continue;
-      if (INCOME_STAT_LABELS.has(label)) break;
+      const label = toStr(row[1]); // col B
+      if (!label) {
+        if (foundData) break; // blank row after data = end of section
+        continue;
+      }
+      if (STOP_LABELS.has(label)) break;
 
-      const fy26 = toNumber(row[1]);
-      const fy27 = toNumber(row[2]);
-      const fy28 = toNumber(row[3]);
+      foundData = true;
+      const fy26 = toNumber(row[2]); // col C
+      const fy27 = toNumber(row[3]); // col D
+      const fy28 = 0;
       const monthly: Record<string, number> = {};
       for (const { col, label: mLabel } of monthColumns) {
         monthly[mLabel] = toNumber(row[col]);
       }
 
       const isTotal = label.toLowerCase().startsWith('total');
-      subRows.push({
-        label,
-        fy26, fy27, fy28, monthly,
-        isTotal,
-        isIndented: !isTotal,
-      });
+      subRows.push({ label, fy26, fy27, fy28, monthly, isTotal, isIndented: !isTotal });
     }
 
     const rows: IncomeStatementRow[] = [headerEntry, ...subRows];
