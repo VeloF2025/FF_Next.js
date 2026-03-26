@@ -1,13 +1,17 @@
-// 🟢 WORKING: React Query hook for COS Breakdown report (Data tab source)
+// 🟢 WORKING: React Query hook for COS Breakdown report
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
 import type { CosBreakdownData } from '@/app/api/analytics/reports/cos-breakdown/route';
 
-export type { CosBreakdownData, CosBreakdownRow } from '@/app/api/analytics/reports/cos-breakdown/route';
+export type { CosBreakdownData, CosBreakdownCategory, CosBreakdownRow } from '@/app/api/analytics/reports/cos-breakdown/route';
 
-async function fetchCosBreakdown(): Promise<CosBreakdownData> {
-  const res = await fetch('/api/analytics/reports/cos-breakdown');
+async function fetchCosBreakdown(bu: string, proj: string): Promise<CosBreakdownData> {
+  const params = new URLSearchParams();
+  if (bu) params.set('businessUnit', bu);
+  if (proj) params.set('project', proj);
+  const url = `/api/analytics/reports/cos-breakdown${params.size ? '?' + params.toString() : ''}`;
+  const res = await fetch(url);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error?.message ?? 'Failed to load COS breakdown');
@@ -17,10 +21,10 @@ async function fetchCosBreakdown(): Promise<CosBreakdownData> {
   return json.data as CosBreakdownData;
 }
 
-export function useCosBreakdownData() {
+export function useCosBreakdownData(businessUnit = '', project = '') {
   return useQuery<CosBreakdownData, Error>({
-    queryKey: ['analytics', 'cos-breakdown'],
-    queryFn: fetchCosBreakdown,
+    queryKey: ['analytics', 'cos-breakdown', businessUnit, project],
+    queryFn: () => fetchCosBreakdown(businessUnit, project),
     staleTime: 5 * 60 * 1000,
   });
 }
