@@ -62,7 +62,7 @@ export function DRPaymentStatusTab() {
       if (!weeklyRes.ok) throw new Error('Failed to load weekly billing records');
 
       const weeklyData = await weeklyRes.json();
-      const rows: Array<{ id: string; week_ending: string }> = weeklyData.rows ?? [];
+      const rows: Array<{ id: string; week_ending: string }> = weeklyData.data ?? [];
 
       if (rows.length === 0) {
         setLoading(false);
@@ -84,7 +84,7 @@ export function DRPaymentStatusTab() {
       if (!deductRes.ok) throw new Error('Failed to load deduction detail');
 
       const deductData = await deductRes.json();
-      setDeductions(deductData.deductions ?? []);
+      setDeductions(deductData.data?.deductions ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {

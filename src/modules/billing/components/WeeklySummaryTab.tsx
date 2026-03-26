@@ -60,8 +60,13 @@ export function WeeklySummaryTab() {
         const statusData = await statusRes.json();
 
         if (!cancelled) {
-          setRows(weeklyData.rows ?? []);
-          setMetrics(statusData.metrics ?? null);
+          setRows(weeklyData.data ?? []);
+          const totals = statusData.data?.totals;
+          setMetrics(totals ? {
+            currentlyExcluded: totals.currently_excluded ?? 0,
+            ppOutstanding: totals.pp_outstanding ?? 0,
+            recoveredThisMonth: totals.recovered_this_month ?? 0,
+          } : null);
         }
       } catch (err) {
         if (!cancelled) {
