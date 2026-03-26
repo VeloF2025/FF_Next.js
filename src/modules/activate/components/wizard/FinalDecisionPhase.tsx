@@ -502,7 +502,7 @@ export function FinalDecisionPhase({
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Photo Coverage:</span>
-              <span>{getStatusIcon(wizardState.photoReview.stepsMissing.length === 0)} {10 - wizardState.photoReview.stepsMissing.length}/10</span>
+              <span>{getStatusIcon(wizardState.photoReview.stepsMissing.length === 0)} {12 - wizardState.photoReview.stepsMissing.length}/12</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Power Meter:</span>

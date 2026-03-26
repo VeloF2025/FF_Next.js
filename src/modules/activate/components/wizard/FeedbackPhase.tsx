@@ -173,7 +173,7 @@ export function FeedbackPhase({
 
     // Photo coverage summary
     const coveredSteps = 10 - missingSteps.length;
-    lines.push(`*Photo Coverage:* ${coveredSteps}/10 steps`);
+    lines.push(`*Photo Coverage:* ${coveredSteps}/12 steps`);
 
     if (missingSteps.length > 0) {
       const missingLabels = missingSteps
@@ -255,7 +255,7 @@ export function FeedbackPhase({
           qaFindings: {
             photoCoverage: {
               covered: 10 - (wizardState.photoReview.stepsMissing?.length || 0),
-              total: 10,
+              total: 12,
               missing: wizardState.photoReview.stepsMissing || [],
             },
             powerMeter: wizardState.dataValidation.powerMeter,
@@ -416,7 +416,7 @@ export function FeedbackPhase({
             </div>
             <div className="text-sm font-medium">Photo Coverage</div>
             <div className="text-xs text-muted-foreground">
-              {10 - (wizardState.photoReview.stepsMissing?.length || 0)}/10 steps
+              {12 - (wizardState.photoReview.stepsMissing?.length || 0)}/12 steps
             </div>
           </div>
 

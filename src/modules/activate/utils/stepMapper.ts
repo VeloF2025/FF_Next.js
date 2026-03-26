@@ -444,8 +444,8 @@ export function getStepCoverage(results: CategorizationResult[]): {
   const covered: number[] = [];
   const missing: number[] = [];
 
-  // Only steps 1-10 are required; 11-12 (dome joint) are optional
-  for (let step = 1; step <= 10; step++) {
+  // All 12 steps are required
+  for (let step = 1; step <= 12; step++) {
     const stepPhotos = coverageMap[step];
     if (stepPhotos && stepPhotos.length > 0) {
       covered.push(step);

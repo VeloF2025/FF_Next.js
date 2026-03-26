@@ -277,7 +277,7 @@ export function QaWizardContainer({
             // Calculate step coverage from photos
             const stepCounts = new Map<number, number>();
             fetchedPhotos.forEach((photo: Photo) => {
-              if (photo.step && photo.step >= 1 && photo.step <= 10) {
+              if (photo.step && photo.step >= 1 && photo.step <= 12) {
                 stepCounts.set(photo.step, (stepCounts.get(photo.step) || 0) + 1);
               }
             });

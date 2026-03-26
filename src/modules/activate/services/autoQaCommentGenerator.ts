@@ -140,7 +140,7 @@ export function generateFeedbackMessage(
 
   // Photo coverage
   const { covered, missing } = validations.stepCoverage;
-  lines.push(`*Photo Coverage:* ${covered.length}/10 steps`);
+  lines.push(`*Photo Coverage:* ${covered.length}/12 steps`);
   if (missing.length > 0) {
     const missingLabels = missing
       .map((s) => STEP_LABELS[s] || `Step ${s}`)

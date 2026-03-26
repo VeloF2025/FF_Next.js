@@ -319,7 +319,7 @@ export function PhotoReviewPhase({
       // Skip explicitly rejected photos
       if (approval?.approved === false) return;
       const step = approval?.overrideStep ?? result.human_override_step ?? result.vlm_predicted_step;
-      if (step >= 1 && step <= 10) {
+      if (step >= 1 && step <= 12) {
         stepCounts.set(step, (stepCounts.get(step) || 0) + 1);
       }
     });
@@ -451,7 +451,7 @@ export function PhotoReviewPhase({
       // Skip explicitly rejected photos
       if (approval?.approved === false) return;
       const step = approval?.overrideStep ?? result.human_override_step ?? result.vlm_predicted_step;
-      if (step >= 1 && step <= 10) {
+      if (step >= 1 && step <= 12) {
         stepCounts.set(step, (stepCounts.get(step) || 0) + 1);
       }
     });
@@ -533,7 +533,7 @@ export function PhotoReviewPhase({
                   }`}
                 >
                   <option value="0">❌ Discard (Step 0)</option>
-                  {Array.from({ length: 10 }, (_, i) => i + 1).map((step) => (
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((step) => (
                     <option key={step} value={step}>
                       Step {step}: {STEP_LABELS[step]}
                     </option>
@@ -685,7 +685,7 @@ export function PhotoReviewPhase({
 
         {/* Step coverage summary */}
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-          {Array.from({ length: 10 }, (_, i) => i + 1).map((step) => {
+          {Array.from({ length: 12 }, (_, i) => i + 1).map((step) => {
             const count = stepCounts.get(step) || 0;
             const isMissing = count === 0;
 
@@ -958,7 +958,7 @@ export function PhotoReviewPhase({
                         >
                           <option value="">Step {result.vlm_predicted_step} (AI)</option>
                           <option value="0">❌ Discard</option>
-                          {Array.from({ length: 10 }, (_, i) => i + 1)
+                          {Array.from({ length: 12 }, (_, i) => i + 1)
                             .filter((step) => step !== result.vlm_predicted_step)
                             .map((step) => (
                               <option key={step} value={step}>
