@@ -59,60 +59,72 @@ async function fetchSchemaData(): Promise<SchemaData> {
     return schemaCache;
   }
 
-  // Fetch all tables
-  const tables = await sql`
-    SELECT table_name
-    FROM information_schema.tables
-    WHERE table_schema = 'public'
-    ORDER BY table_name
-  `;
-
-  const tableInfos: TableInfo[] = [];
-  let totalColumns = 0;
-  let totalForeignKeys = 0;
-
-  for (const table of tables) {
-    const tableName = table.table_name as string;
-
-    // Fetch columns
-    const columns = await sql`
-      SELECT
-        column_name,
-        data_type,
-        is_nullable,
-        column_default
+  // Fetch everything in 3 bulk queries instead of per-table loops
+  const [allColumns, allPrimaryKeys, allForeignKeys] = await Promise.all([
+    sql`
+      SELECT table_name, column_name, data_type, is_nullable, column_default, ordinal_position
       FROM information_schema.columns
-      WHERE table_schema = 'public' AND table_name = ${tableName}
-      ORDER BY ordinal_position
-    `;
-
-    // Fetch primary key
-    const pkResult = await sql`
-      SELECT a.attname
+      WHERE table_schema = 'public'
+      ORDER BY table_name, ordinal_position
+    `,
+    sql`
+      SELECT t.relname AS table_name, a.attname AS column_name
       FROM pg_index i
       JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
       JOIN pg_class t ON t.oid = i.indrelid
-      WHERE t.relname = ${tableName} AND i.indisprimary
-      LIMIT 1
-    `;
-
-    const primaryKey = pkResult.length > 0 ? (pkResult[0].attname as string) : null;
-
-    // Fetch foreign keys
-    const foreignKeys = await sql`
+      JOIN pg_namespace n ON n.oid = t.relnamespace
+      WHERE i.indisprimary AND n.nspname = 'public'
+    `,
+    sql`
       SELECT
+        kcu1.table_name,
         kcu1.column_name,
         ccu2.table_name AS referenced_table,
         ccu2.column_name AS referenced_column
       FROM information_schema.referential_constraints rc
       JOIN information_schema.key_column_usage kcu1 ON kcu1.constraint_name = rc.constraint_name
       JOIN information_schema.constraint_column_usage ccu2 ON ccu2.constraint_name = rc.unique_constraint_name
-      WHERE kcu1.table_name = ${tableName}
-    `;
+      WHERE kcu1.table_schema = 'public'
+    `,
+  ]);
+
+  // Index PKs and FKs by table name for fast lookup
+  const pkByTable = new Map<string, string>();
+  for (const pk of allPrimaryKeys) {
+    pkByTable.set(pk.table_name as string, pk.column_name as string);
+  }
+
+  const fkByTable = new Map<string, Array<{ column_name: string; referenced_table: string; referenced_column: string }>>();
+  for (const fk of allForeignKeys) {
+    const tbl = fk.table_name as string;
+    if (!fkByTable.has(tbl)) fkByTable.set(tbl, []);
+    fkByTable.get(tbl)!.push({
+      column_name: fk.column_name as string,
+      referenced_table: fk.referenced_table as string,
+      referenced_column: fk.referenced_column as string,
+    });
+  }
+
+  // Group columns by table
+  const columnsByTable = new Map<string, typeof allColumns>();
+  for (const col of allColumns) {
+    const tbl = col.table_name as string;
+    if (!columnsByTable.has(tbl)) columnsByTable.set(tbl, []);
+    columnsByTable.get(tbl)!.push(col);
+  }
+
+  // Build table infos
+  const tableNames = Array.from(columnsByTable.keys()).sort();
+  let totalColumns = 0;
+  let totalForeignKeys = 0;
+
+  const tableInfos: TableInfo[] = tableNames.map((tableName) => {
+    const columns = columnsByTable.get(tableName) || [];
+    const primaryKey = pkByTable.get(tableName) || null;
+    const foreignKeys = fkByTable.get(tableName) || [];
 
     const columnInfos: ColumnInfo[] = columns.map((col: any) => {
-      const fk = foreignKeys.find((f: any) => f.column_name === col.column_name);
-
+      const fk = foreignKeys.find((f) => f.column_name === col.column_name);
       return {
         name: col.column_name,
         dataType: col.data_type,
@@ -121,10 +133,7 @@ async function fetchSchemaData(): Promise<SchemaData> {
         isPrimaryKey: col.column_name === primaryKey,
         isForeignKey: !!fk,
         foreignKeyReferences: fk
-          ? {
-              table: fk.referenced_table,
-              column: fk.referenced_column,
-            }
+          ? { table: fk.referenced_table, column: fk.referenced_column }
           : undefined,
       };
     });
@@ -132,14 +141,13 @@ async function fetchSchemaData(): Promise<SchemaData> {
     totalColumns += columnInfos.length;
     totalForeignKeys += foreignKeys.length;
 
-    // Extract module from table name (e.g., "procurement_orders" -> "procurement")
     const module = tableName.split('_')[0] || 'other';
 
-    const tableInfo: TableInfo = {
+    return {
       name: tableName,
       columns: columnInfos,
       primaryKey,
-      foreignKeys: foreignKeys.map((fk: any) => ({
+      foreignKeys: foreignKeys.map((fk) => ({
         columnName: fk.column_name,
         referencedTable: fk.referenced_table,
         referencedColumn: fk.referenced_column,
@@ -147,15 +155,12 @@ async function fetchSchemaData(): Promise<SchemaData> {
       module,
       isSingleColumn: columnInfos.length === 1,
     };
-
-    tableInfos.push(tableInfo);
-  }
+  });
 
   // Calculate isolated tables (no FK relationships)
+  const referencedTables = new Set(allForeignKeys.map((fk) => fk.referenced_table as string));
   const isolatedTables = tableInfos.filter(
-    (t) => t.foreignKeys.length === 0 && !tableInfos.some((other) =>
-      other.foreignKeys.some((fk) => fk.referencedTable === t.name)
-    )
+    (t) => t.foreignKeys.length === 0 && !referencedTables.has(t.name)
   ).length;
 
   const schemaData: SchemaData = {
