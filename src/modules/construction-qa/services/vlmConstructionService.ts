@@ -374,8 +374,8 @@ function buildPhotoPrompt(
 You must CLASSIFY which checklist step this photo belongs to.
 
 CIVIL CHECKLIST STEPS:
-  Step 1 - Before Photo: Ground markings visible (circle/square/X painted on ground indicating pole hole location)
-  Step 2 - During Photo: Workers actively digging a hole or pouring concrete — action in progress
+  Step 1 - Before Photo: Undisturbed ground with chalk/spray paint markings (circle, square, or X). NO hole dug yet. Ground surface is INTACT. This is taken BEFORE any digging starts.
+  Step 2 - During Photo: Active excavation — an OPEN HOLE is visible in the ground, workers digging, spade/pick visible, freshly dug earth piled beside hole. Ground has been BROKEN OPEN. No pole installed yet.
   Step 3 - Depth Photo: Measuring tape or ruler placed inside hole showing depth measurement
   Step 4 - End Plates: Metal rectangular end-plates or cap plates bolted to the top or base of the pole, close-up
   Step 5 - Compaction / Backfill: Sand+cement mix packed around pole base, compacted surface — NOT loose heaps
@@ -394,12 +394,19 @@ The following are OPTICAL/FIBRE equipment — they are NOT civil pole installati
 - Any close-up of fibre optic cables, connectors, or equipment
 If you see ANY of the above, classify as Step 0 (Unrelated) immediately.
 
+⚠️ CRITICAL: BEFORE vs DURING — these are the most commonly confused steps:
+  Step 1 (Before): Ground is FLAT and UNBROKEN. You see paint/chalk marks on intact soil. NO hole.
+  Step 2 (During): Ground is BROKEN. You see a DUG HOLE, piled dirt, or active digging. NO pole yet.
+  → If ground is intact with markings → Step 1
+  → If ground is broken with a hole → Step 2
+  → If unsure, look for a HOLE: hole present = Step 2, no hole = Step 1
+
 ⚠️ CLASSIFICATION TIPS:
 - If you see metal plates/caps on a pole → Step 4 (End Plates), NOT Step 2
 - If you see packed/compacted ground around pole base → Step 5 (Compaction), NOT Step 2
 - If you see a wide outdoor shot with a pole standing → Step 7 (After Photo), NOT Step 2
-- If you see ground markings before any digging → Step 1 (Before Photo)
-- Step 2 (During) ONLY if workers are actively digging or there is an open hole being dug
+- If you see ground markings on INTACT ground → Step 1 (Before Photo), NOT Step 2
+- Step 2 (During) ONLY if the ground is broken open with visible hole or active digging
 - If you see fibre optic equipment, domes, splice trays → Step 0 (Unrelated), even if a pole is visible
 - Do NOT default to "Unrelated" unless the photo truly shows nothing related to pole installation OR shows optical/fibre equipment
 
