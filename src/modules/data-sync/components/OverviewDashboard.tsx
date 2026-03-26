@@ -19,6 +19,7 @@ import {
   FileSpreadsheet,
   Upload,
   Map,
+  CreditCard,
 } from 'lucide-react';
 import type { TabGroupId, DataSyncStats } from '../types';
 
@@ -70,6 +71,14 @@ const CATEGORY_CARDS: {
     description: 'QFieldCloud project management, sync configuration, and field data integration',
     color: 'text-emerald-400',
     bgColor: 'bg-emerald-500/10',
+  },
+  {
+    id: 'billing',
+    label: 'Billing',
+    icon: CreditCard,
+    description: 'FiberTime weekly payment reconciliation and DR payment status tracking',
+    color: 'text-violet-400',
+    bgColor: 'bg-violet-500/10',
   },
   {
     id: 'history',
@@ -199,6 +208,25 @@ export function OverviewDashboard({ onGroupSelect, accessibleGroups }: OverviewD
             label: 'Last Sync',
             value: formatRelativeTime(stats.qfield.lastSync),
             icon: Clock,
+          },
+        ] : [];
+      case 'billing':
+        return stats.billing ? [
+          {
+            label: 'Last Upload',
+            value: formatRelativeTime(stats.billing.lastUploadedWeek),
+            icon: Upload,
+          },
+          {
+            label: 'Pending Recon.',
+            value: stats.billing.pendingReconciliation.toString(),
+            icon: Clock,
+            highlight: stats.billing.pendingReconciliation > 0,
+          },
+          {
+            label: 'Paid DRs',
+            value: stats.billing.totalPaid.toLocaleString(),
+            icon: CheckCircle,
           },
         ] : [];
       case 'history':
@@ -393,6 +421,15 @@ export function OverviewDashboard({ onGroupSelect, accessibleGroups }: OverviewD
             >
               <Wrench className="w-4 h-4 text-red-400" />
               Fix OLT Mismatches
+            </button>
+          )}
+          {(!accessibleGroups || accessibleGroups.includes('billing')) && (
+            <button
+              onClick={() => onGroupSelect('billing')}
+              className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg transition-colors border border-[var(--ff-border-light)]"
+            >
+              <CreditCard className="w-4 h-4 text-violet-400" />
+              Upload Billing
             </button>
           )}
           {(!accessibleGroups || accessibleGroups.includes('history')) && (

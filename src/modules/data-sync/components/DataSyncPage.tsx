@@ -29,6 +29,7 @@ import {
   Clock,
   Lock,
   Loader2,
+  CreditCard,
 } from 'lucide-react';
 import type { TabGroupId } from '../types';
 import { OverviewDashboard } from './OverviewDashboard';
@@ -37,6 +38,7 @@ import { ActivateGroup } from './groups/ActivateGroup';
 import { OltReportGroup } from './groups/OltReportGroup';
 import { QFieldGroup } from './groups/QFieldGroup';
 import { HistoryGroup } from './groups/HistoryGroup';
+import { BillingGroup } from './groups/BillingGroup';
 import { usePermission } from '@/hooks/usePermission';
 import { useSystemFeatures } from '../hooks/useSystemFeatures';
 
@@ -47,6 +49,7 @@ const GROUP_PERMISSION_KEYS: Record<TabGroupId, string> = {
   olt: 'system.data-sync.olt',
   qfield: 'system.data-sync.qfield',
   history: 'system.data-sync.history',
+  billing: 'system.data-sync.billing',
 };
 
 // Tab group configuration
@@ -79,6 +82,12 @@ const TAB_GROUPS: {
     label: 'QField',
     icon: MapPin,
     description: 'QFieldCloud projects for OES and data sync targets',
+  },
+  {
+    id: 'billing',
+    label: 'Billing',
+    icon: CreditCard,
+    description: 'FiberTime weekly billing reconciliation',
   },
   {
     id: 'history',
@@ -309,6 +318,13 @@ export function DataSyncPage() {
           <QFieldGroup
             activeTab={activeTab}
             onTabChange={(tab) => handleTabChange('qfield', tab)}
+          />
+        )}
+
+        {activeGroup === 'billing' && (
+          <BillingGroup
+            activeTab={activeTab}
+            onTabChange={(tab) => handleTabChange('billing', tab)}
           />
         )}
 

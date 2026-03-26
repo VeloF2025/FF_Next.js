@@ -6,7 +6,7 @@
 import type { LucideIcon } from 'lucide-react';
 
 // Tab group identifiers
-export type TabGroupId = 'noc' | 'activate' | 'olt' | 'qfield' | 'history';
+export type TabGroupId = 'noc' | 'activate' | 'olt' | 'qfield' | 'history' | 'billing';
 
 // Individual tab within a group
 export interface Tab {
@@ -52,6 +52,13 @@ export interface DataSyncStats {
     activeProjects: number;
     lastSync: string | null;
   };
+  billing: {
+    totalWeeks: number;
+    lastUploadedWeek: string | null;
+    pendingReconciliation: number;
+    totalPaid: number;
+    totalDeducted: number;
+  };
 }
 
 // API response type
@@ -86,6 +93,9 @@ export type QFieldTabId = 'projects';
 
 // History tab IDs
 export type HistoryTabId = 'timeline';
+
+// Billing tab IDs
+export type BillingTabId = 'upload' | 'summary' | 'dr-status';
 
 // Sync operation type for history
 export type SyncOperationType =
@@ -337,3 +347,48 @@ export interface BulkFixResult {
   successCount: number;
   failCount: number;
 }
+
+// ─── Billing Types ─────────────────────────────────────────────────────────
+
+export interface FtWeeklyBilling {
+  id: string;
+  week_ending: string;
+  project: string;
+  ft_total_onts: number;
+  ft_previously_invoiced: number;
+  ft_claimable: number;
+  ft_note1_count: number;
+  ft_note2_count: number;
+  ft_note3_count: number;
+  ft_note4_count: number;
+  ft_note5_count: number;
+  ft_pre_provisions_count: number;
+  ft_total_claimable: number;
+  price_per_drop: number | null;
+  tax_rate: number;
+  invoice_subtotal: number | null;
+  invoice_total: number | null;
+  our_total_activations: number | null;
+  our_claimable: number | null;
+  variance_claimable: number | null;
+  variance_total_onts: number | null;
+  reconciliation_status: 'pending' | 'reconciled' | 'disputed';
+  reconciled_at: string | null;
+  pdf_filename: string | null;
+  notes_xlsx_filename: string | null;
+  uploaded_at: string;
+}
+
+export interface FtBillingDeduction {
+  id: string;
+  billing_week_id: string;
+  week_ending: string;
+  project: string;
+  dr_number: string;
+  deduction_note: 'note1' | 'note2' | 'note3' | 'note4' | 'note5';
+  serial_number: string | null;
+  team: string | null;
+  deduction_reason: string | null;
+}
+
+export type PaymentStatus = 'not_yet_claimed' | 'pre_provisioned' | 'paid' | 'deducted' | 'disputed';

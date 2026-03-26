@@ -33,11 +33,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Fetch QField stats
     const qfieldStats = await getQFieldStats();
 
+    // Fetch Billing stats
+    const billingStats = await getBillingStats();
+
     const stats: DataSyncStats = {
       noc: nocStats,
       activate: activateStats,
       olt: oltStats,
       qfield: qfieldStats,
+      billing: billingStats,
     };
 
     return res.status(200).json({ success: true, data: stats });
@@ -205,6 +209,48 @@ async function getQFieldStats() {
     return { totalProjects, activeProjects, lastSync };
   } catch {
     return { totalProjects: 0, activeProjects: 0, lastSync: null };
+  }
+}
+
+/**
+ * Returns aggregated billing stats for the overview dashboard.
+ * Anchored to ft_weekly_billing table — does not sum across weeks.
+ */
+async function getBillingStats() {
+  try {
+    const result = await sql`
+      SELECT
+        COUNT(*)::int                                                     AS total_weeks,
+        MAX(week_ending)::text                                            AS last_week,
+        COUNT(*) FILTER (WHERE reconciliation_status = 'pending')::int   AS pending_count
+      FROM ft_weekly_billing
+    `;
+    const paidResult = await sql`
+      SELECT COUNT(*)::int AS paid_count
+      FROM oes_activations
+      WHERE payment_status = 'paid'
+    `;
+    const deductedResult = await sql`
+      SELECT COUNT(*)::int AS deducted_count
+      FROM oes_activations
+      WHERE payment_status = 'deducted'
+    `;
+    return {
+      totalWeeks: result[0]?.total_weeks ?? 0,
+      lastUploadedWeek: result[0]?.last_week ?? null,
+      pendingReconciliation: result[0]?.pending_count ?? 0,
+      totalPaid: paidResult[0]?.paid_count ?? 0,
+      totalDeducted: deductedResult[0]?.deducted_count ?? 0,
+    };
+  } catch (error) {
+    log.warn('Error fetching billing stats', { error });
+    return {
+      totalWeeks: 0,
+      lastUploadedWeek: null,
+      pendingReconciliation: 0,
+      totalPaid: 0,
+      totalDeducted: 0,
+    };
   }
 }
 
