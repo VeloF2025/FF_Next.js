@@ -2,7 +2,6 @@
  * Build Milestones data hook
  * 🟢 WORKING
  */
-
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
@@ -16,7 +15,7 @@ export function useBuildMilestonesData() {
       if (!res.ok) throw new Error('Failed to fetch build milestones');
       const json = await res.json();
       if (!json.success) throw new Error(json.error?.message ?? 'Unknown error');
-      return json.data;
+      return json.data as BuildMilestonesData;
     },
     staleTime: 5 * 60 * 1000,
   });
