@@ -1,16 +1,17 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import ReactFlow, {
-  Node,
-  Edge,
+import {
+  ReactFlow,
+  type Node,
+  type Edge,
   Controls,
   Background,
   useNodesState,
   useEdgesState,
   Panel,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import { TableNode } from './TableNode';
 import type { TableInfo } from '../types';
 import { MODULE_COLORS } from '../types';
