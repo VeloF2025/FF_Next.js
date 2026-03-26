@@ -29,11 +29,19 @@ const NOTE_BADGE: Record<FtBillingDeduction['deduction_note'], string> = {
 };
 
 const NOTE_LABELS: Record<FtBillingDeduction['deduction_note'], string> = {
-  note1: 'Note 1',
-  note2: 'Note 2',
-  note3: 'Note 3',
-  note4: 'Note 4',
-  note5: 'Note 5',
+  note1: 'Low Signal',
+  note2: 'No Field App',
+  note3: 'Degraded',
+  note4: 'Serial Mismatch',
+  note5: 'Offline',
+};
+
+const NOTE_TIPS: Record<FtBillingDeduction['deduction_note'], string> = {
+  note1: 'FT Note 1: Below -26dB threshold',
+  note2: 'FT Note 2: No DR submission on field app',
+  note3: 'FT Note 3: Signal degraded >2dB vs budget',
+  note4: 'FT Note 4: Drop# / ONT serial mismatch',
+  note5: 'FT Note 5: Device not active / fiber break',
 };
 
 // 🟢 WORKING: DR deduction list for the latest billing week per project
@@ -142,11 +150,11 @@ export function DRPaymentStatusTab() {
           className="px-3 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-md text-sm text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-transparent"
         >
           <option value="all">All Notes</option>
-          <option value="note1">Note 1</option>
-          <option value="note2">Note 2</option>
-          <option value="note3">Note 3</option>
-          <option value="note4">Note 4</option>
-          <option value="note5">Note 5</option>
+          <option value="note1">Low Signal</option>
+          <option value="note2">No Field App</option>
+          <option value="note3">Degraded</option>
+          <option value="note4">Serial Mismatch</option>
+          <option value="note5">Offline</option>
         </select>
 
         {/* DR / serial search */}
@@ -233,7 +241,8 @@ export function DRPaymentStatusTab() {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${NOTE_BADGE[d.deduction_note]}`}
+                        title={NOTE_TIPS[d.deduction_note]}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border cursor-help ${NOTE_BADGE[d.deduction_note]}`}
                       >
                         {NOTE_LABELS[d.deduction_note]}
                       </span>

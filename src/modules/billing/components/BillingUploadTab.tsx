@@ -506,16 +506,17 @@ export function BillingUploadTab() {
               </p>
               <div className="flex flex-wrap gap-2">
                 {[
-                  { label: 'Note 1', count: preview.note1Count, cls: 'text-orange-400 bg-orange-500/10' },
-                  { label: 'Note 2', count: preview.note2Count, cls: 'text-blue-400 bg-blue-500/10' },
-                  { label: 'Note 3', count: preview.note3Count, cls: 'text-yellow-400 bg-yellow-500/10' },
-                  { label: 'Note 4', count: preview.note4Count, cls: 'text-red-400 bg-red-500/10' },
-                  { label: 'Note 5', count: preview.note5Count, cls: 'text-purple-400 bg-purple-500/10' },
-                  { label: 'Pre-Prov', count: preview.preProviCount, cls: 'text-cyan-400 bg-cyan-500/10' },
+                  { label: 'Low Signal', count: preview.note1Count, cls: 'text-orange-400 bg-orange-500/10', tip: 'FT Note 1: Below -26dB' },
+                  { label: 'No Field App', count: preview.note2Count, cls: 'text-blue-400 bg-blue-500/10', tip: 'FT Note 2: No DR submission' },
+                  { label: 'Degraded', count: preview.note3Count, cls: 'text-yellow-400 bg-yellow-500/10', tip: 'FT Note 3: >2dB degradation' },
+                  { label: 'Serial Mismatch', count: preview.note4Count, cls: 'text-red-400 bg-red-500/10', tip: 'FT Note 4: Drop/ONT serial mismatch' },
+                  { label: 'Offline', count: preview.note5Count, cls: 'text-purple-400 bg-purple-500/10', tip: 'FT Note 5: Device not active' },
+                  { label: 'Pre-Provision', count: preview.preProviCount, cls: 'text-cyan-400 bg-cyan-500/10', tip: 'Pre-provisioned, not yet activated' },
                 ].map((n) => (
                   <span
                     key={n.label}
-                    className={`px-2 py-1 rounded text-xs font-medium ${n.cls}`}
+                    title={n.tip}
+                    className={`px-2 py-1 rounded text-xs font-medium ${n.cls} cursor-help`}
                   >
                     {n.label}: {n.count}
                   </span>
