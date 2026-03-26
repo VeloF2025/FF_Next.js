@@ -9,6 +9,7 @@ import type { PreProvisionsData } from '@/app/api/analytics/reports/pre-provisio
 
 export type { PreProvisionsData, PreProvisionYear, PreProvisionMonth, PreProvisionProject } from '@/app/api/analytics/reports/pre-provisions/route';
 
+
 export function usePreProvisionsData() {
   return useQuery<PreProvisionsData>({
     queryKey: ['preProvisions'],

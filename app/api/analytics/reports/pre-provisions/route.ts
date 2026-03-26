@@ -27,31 +27,34 @@ const ALLOWED_USERS = new Set([
 export interface PreProvisionProject {
   projectName: string;
   logged: number;
-  fixed: number;
-  open: number;
+  activated: number;  // resolution_status = 'activated'
+  open: number;       // resolution_status IN (located_*)
+  notFound: number;   // resolution_status = 'not_found'
 }
 
 export interface PreProvisionMonth {
   monthKey: string;    // 'YYYY-MM'
   monthLabel: string;  // "Jan '26"
   logged: number;
-  fixed: number;
+  activated: number;
   open: number;
+  notFound: number;
   byProject: PreProvisionProject[];
 }
 
 export interface PreProvisionYear {
   year: number;
   logged: number;
-  fixed: number;
+  activated: number;
   open: number;
+  notFound: number;
   byProject: PreProvisionProject[];
   months: PreProvisionMonth[];
 }
 
 export interface PreProvisionsData {
   years: PreProvisionYear[];
-  totals: { logged: number; fixed: number; open: number };
+  totals: { logged: number; activated: number; open: number; notFound: number };
   allProjects: string[];
 }
 
@@ -76,11 +79,12 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
           TO_CHAR(DATE_TRUNC('month', date_registered), 'Mon ''YY')   AS month_label,
           COALESCE(project, 'Unknown')                                  AS project_name,
           COUNT(*)::int                                                  AS logged,
+          COUNT(CASE WHEN resolution_status = 'activated' THEN 1 END)::int AS activated,
           COUNT(CASE WHEN resolution_status IN (
-            'activated','located_1map','located_local','located_oes','located_unified'
-          ) THEN 1 END)::int                                             AS fixed,
+            'located_1map','located_local','located_oes','located_unified'
+          ) THEN 1 END)::int                                             AS open,
           COUNT(CASE WHEN resolution_status = 'not_found'
-            OR resolution_status IS NULL THEN 1 END)::int               AS open
+            OR resolution_status IS NULL THEN 1 END)::int               AS not_found
         FROM oes_pp_data
         WHERE date_registered IS NOT NULL
         GROUP BY year, month_key, month_label, project_name
@@ -96,36 +100,39 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
       for (const row of result.rows) {
         const yr = row.year as number;
         if (!yearMap.has(yr)) {
-          yearMap.set(yr, { year: yr, logged: 0, fixed: 0, open: 0, byProject: [], months: [] });
+          yearMap.set(yr, { year: yr, logged: 0, activated: 0, open: 0, notFound: 0, byProject: [], months: [] });
         }
         const yearObj = yearMap.get(yr)!;
 
         // Month
         let monthObj = yearObj.months.find((m) => m.monthKey === row.month_key);
         if (!monthObj) {
-          monthObj = { monthKey: row.month_key, monthLabel: row.month_label, logged: 0, fixed: 0, open: 0, byProject: [] };
+          monthObj = { monthKey: row.month_key, monthLabel: row.month_label, logged: 0, activated: 0, open: 0, notFound: 0, byProject: [] };
           yearObj.months.push(monthObj);
         }
         monthObj.logged += row.logged;
-        monthObj.fixed += row.fixed;
+        monthObj.activated += row.activated;
         monthObj.open += row.open;
-        monthObj.byProject.push({ projectName: row.project_name, logged: row.logged, fixed: row.fixed, open: row.open });
+        monthObj.notFound += row.not_found;
+        monthObj.byProject.push({ projectName: row.project_name, logged: row.logged, activated: row.activated, open: row.open, notFound: row.not_found });
 
         // Year totals
         yearObj.logged += row.logged;
-        yearObj.fixed += row.fixed;
+        yearObj.activated += row.activated;
         yearObj.open += row.open;
+        yearObj.notFound += row.not_found;
 
         // Year byProject
         let yp = yearObj.byProject.find((p) => p.projectName === row.project_name);
-        if (!yp) { yp = { projectName: row.project_name, logged: 0, fixed: 0, open: 0 }; yearObj.byProject.push(yp); }
+        if (!yp) { yp = { projectName: row.project_name, logged: 0, activated: 0, open: 0, notFound: 0 }; yearObj.byProject.push(yp); }
         yp.logged += row.logged;
-        yp.fixed += row.fixed;
+        yp.activated += row.activated;
         yp.open += row.open;
+        yp.notFound += row.not_found;
       }
 
       const years = Array.from(yearMap.values()).sort((a, b) => a.year - b.year);
-      const totals = years.reduce((acc, y) => ({ logged: acc.logged + y.logged, fixed: acc.fixed + y.fixed, open: acc.open + y.open }), { logged: 0, fixed: 0, open: 0 });
+      const totals = years.reduce((acc, y) => ({ logged: acc.logged + y.logged, activated: acc.activated + y.activated, open: acc.open + y.open, notFound: acc.notFound + y.notFound }), { logged: 0, activated: 0, open: 0, notFound: 0 });
 
       return NextResponse.json({ success: true, data: { years, totals, allProjects } satisfies PreProvisionsData });
     } finally {
