@@ -37,7 +37,7 @@ interface RouteParams {
 export async function GET(_req: Request, { params }: RouteParams) {
   const { projectId } = params;
   try {
-    const rows = await sql\`
+    const rows = await sql`
       SELECT id, zone_no, hld_pon, z_pon, olt_port,
         scope_poles, scope_drops,
         TO_CHAR(pole_permission, 'YYYY-MM-DD')        AS pole_permission,
@@ -52,9 +52,9 @@ export async function GET(_req: Request, { params }: RouteParams) {
         atp_qa, sign_ups, homes_po, homes_recon,
         activated, available, blockage, updated_at
       FROM pon_tracker_entries
-      WHERE project_id = \${projectId}
+      WHERE project_id = ${projectId}
       ORDER BY zone_no ASC NULLS LAST, hld_pon ASC NULLS LAST
-    \`;
+    `;
     const lastSavedAt = rows.length > 0
       ? (rows[rows.length - 1] as Record<string, unknown>).updated_at as string : null;
     return NextResponse.json({ success: true, data: { pons: rows, lastSavedAt, projectId } });
@@ -71,7 +71,7 @@ export async function POST(req: Request, { params }: RouteParams) {
     const pons = body.pons ?? [];
     const n = (v: string | null | undefined) => (v === "" || v == null ? null : v);
     for (const p of pons) {
-      await sql\`
+      await sql`
         INSERT INTO pon_tracker_entries (
           id, project_id, zone_no, hld_pon, z_pon, olt_port,
           scope_poles, scope_drops, pole_permission, poles_planted,
@@ -79,12 +79,12 @@ export async function POST(req: Request, { params }: RouteParams) {
           optical_splicing_date, optical_submitted_date, optical_activated_date, atp_qa,
           sign_ups, homes_po, homes_recon, activated, available, blockage, updated_at
         ) VALUES (
-          \${p.id}::uuid, \${projectId}::uuid, \${p.zone_no}, \${p.hld_pon}, \${p.z_pon}, \${p.olt_port || null},
-          \${p.scope_poles}, \${p.scope_drops}, \${n(p.pole_permission)}, \${p.poles_planted},
-          \${n(p.cwc_poles_date)}, \${n(p.cwc_stringing_date)}, \${n(p.ready_for_optical)}, \${p.cwc_qa},
-          \${n(p.optical_splicing_date)}, \${n(p.optical_submitted_date)}, \${n(p.optical_activated_date)}, \${p.atp_qa},
-          \${p.sign_ups}, \${p.homes_po}, \${p.homes_recon}, \${p.activated}, \${p.available},
-          \${p.blockage || null}, NOW()
+          ${p.id}::uuid, ${projectId}::uuid, ${p.zone_no}, ${p.hld_pon}, ${p.z_pon}, ${p.olt_port || null},
+          ${p.scope_poles}, ${p.scope_drops}, ${n(p.pole_permission)}, ${p.poles_planted},
+          ${n(p.cwc_poles_date)}, ${n(p.cwc_stringing_date)}, ${n(p.ready_for_optical)}, ${p.cwc_qa},
+          ${n(p.optical_splicing_date)}, ${n(p.optical_submitted_date)}, ${n(p.optical_activated_date)}, ${p.atp_qa},
+          ${p.sign_ups}, ${p.homes_po}, ${p.homes_recon}, ${p.activated}, ${p.available},
+          ${p.blockage || null}, NOW()
         )
         ON CONFLICT (project_id, hld_pon) DO UPDATE SET
           zone_no=EXCLUDED.zone_no, z_pon=EXCLUDED.z_pon, olt_port=EXCLUDED.olt_port,
@@ -98,7 +98,7 @@ export async function POST(req: Request, { params }: RouteParams) {
           atp_qa=EXCLUDED.atp_qa, sign_ups=EXCLUDED.sign_ups, homes_po=EXCLUDED.homes_po,
           homes_recon=EXCLUDED.homes_recon, activated=EXCLUDED.activated,
           available=EXCLUDED.available, blockage=EXCLUDED.blockage, updated_at=NOW()
-      \`;
+      `;
     }
     log.info("tracker saved", { projectId, count: pons.length }, "api/tracker");
     return NextResponse.json({ success: true, data: { saved: pons.length } });
