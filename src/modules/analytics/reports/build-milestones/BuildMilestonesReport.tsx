@@ -146,7 +146,7 @@ const ScopeChart = ({ rows }: { rows: BuildMilestoneRow[] }) => {
 
 const TimelineTable = ({ timeline, projectNames }: { timeline: BuildMilestoneMonth[]; projectNames: string[] }) => {
   const getCount = (month: BuildMilestoneMonth, project: string, type: 'rfo' | 'atp') => {
-    const p = month.byProject.find(b => b.projectName === project);
+    const p = month.byProject.find((b: typeof month.byProject[0]) => b.projectName === project);
     return type === 'rfo' ? (p?.rfoCount ?? 0) : (p?.atpCount ?? 0);
   };
 
@@ -221,7 +221,7 @@ const TimelineChart = ({ timeline, projectNames }: { timeline: BuildMilestoneMon
   const data = timeline.map(m => {
     const entry: Record<string, string | number> = { name: m.monthLabel };
     projectNames.forEach(proj => {
-      const p = m.byProject.find(b => b.projectName === proj);
+      const p = m.byProject.find((b: typeof m.byProject[0]) => b.projectName === proj);
       entry[`${proj} RFO`] = hidden.has(`${proj} RFO`) ? 0 : (p?.rfoCount ?? 0);
       entry[`${proj} ATP`] = hidden.has(`${proj} ATP`) ? 0 : (p?.atpCount ?? 0);
     });

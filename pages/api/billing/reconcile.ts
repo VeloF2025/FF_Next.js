@@ -56,11 +56,23 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
     return apiResponse.notFound(res, 'Billing week', id);
   }
 
-  const deductionResult = await pool.query<DeductionRow>(
-    `SELECT id, dr_number, deduction_note, serial_number, team, deduction_reason
-     FROM ft_billing_deductions
-     WHERE billing_week_id = $1
-     ORDER BY deduction_note, dr_number`,
+  const deductionResult = await pool.query(
+    `SELECT
+       d.id, d.dr_number, d.deduction_note, d.serial_number, d.team, d.deduction_reason,
+       CASE WHEN oa.id IS NOT NULL THEN oa.status ELSE NULL END AS oes_status,
+       oa.activation_date AS oes_activation_date,
+       oa.ont_rx_sig_dbm AS oes_signal_dbm,
+       CASE WHEN dr.id IS NOT NULL THEN true ELSE false END AS has_dr_record,
+       dr.human_review_status AS dr_review_status,
+       olt.fix_status AS olt_fix_status,
+       pp.resolution_status AS pp_status
+     FROM ft_billing_deductions d
+     LEFT JOIN oes_activations oa ON oa.drop_number = d.dr_number
+     LEFT JOIN dr_photo_unified_reviews dr ON dr.drop_number = d.dr_number
+     LEFT JOIN olt_mismatch_records olt ON olt.drop_number = d.dr_number
+     LEFT JOIN oes_pp_data pp ON pp.serial_number = d.serial_number AND pp.project = d.project
+     WHERE d.billing_week_id = $1
+     ORDER BY d.deduction_note, d.dr_number`,
     [id]
   );
 

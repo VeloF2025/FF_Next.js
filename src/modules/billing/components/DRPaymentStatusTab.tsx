@@ -226,12 +226,57 @@ export function DRPaymentStatusTab() {
                     Team
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">
-                    Reason
+                    Our Data
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--ff-border-light)]">
-                {filtered.map((d) => (
+                {filtered.map((d) => {
+                  // Build internal status indicators
+                  const indicators: { label: string; cls: string; tip: string }[] = [];
+                  const ext = d as Record<string, unknown>;
+
+                  if (ext.oes_status === 'Active') {
+                    indicators.push({
+                      label: 'OES Active',
+                      cls: 'text-green-400 bg-green-500/10',
+                      tip: `Activated ${ext.oes_activation_date ?? ''}, signal: ${ext.oes_signal_dbm ?? '?'} dBm`,
+                    });
+                  }
+                  if (ext.has_dr_record) {
+                    indicators.push({
+                      label: 'DR Exists',
+                      cls: 'text-blue-400 bg-blue-500/10',
+                      tip: `Review: ${ext.dr_review_status ?? 'pending'}`,
+                    });
+                  }
+                  if (ext.olt_fix_status) {
+                    indicators.push({
+                      label: `OLT: ${ext.olt_fix_status}`,
+                      cls: ext.olt_fix_status === 'fixed'
+                        ? 'text-green-400 bg-green-500/10'
+                        : 'text-amber-400 bg-amber-500/10',
+                      tip: 'OLT mismatch record',
+                    });
+                  }
+                  if (ext.pp_status) {
+                    indicators.push({
+                      label: `PP: ${ext.pp_status}`,
+                      cls: ext.pp_status === 'activated'
+                        ? 'text-green-400 bg-green-500/10'
+                        : 'text-cyan-400 bg-cyan-500/10',
+                      tip: 'Pre-provision record',
+                    });
+                  }
+                  if (indicators.length === 0) {
+                    indicators.push({
+                      label: 'Not found',
+                      cls: 'text-gray-400 bg-gray-500/10',
+                      tip: 'No matching record in our systems',
+                    });
+                  }
+
+                  return (
                   <tr
                     key={d.id}
                     className="hover:bg-[var(--ff-bg-tertiary)] transition-colors"
@@ -253,11 +298,22 @@ export function DRPaymentStatusTab() {
                     <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
                       {d.team ?? '—'}
                     </td>
-                    <td className="px-4 py-3 text-[var(--ff-text-secondary)] text-xs max-w-xs truncate">
-                      {d.deduction_reason ?? '—'}
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {indicators.map((ind, idx) => (
+                          <span
+                            key={idx}
+                            title={ind.tip}
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium cursor-help ${ind.cls}`}
+                          >
+                            {ind.label}
+                          </span>
+                        ))}
+                      </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
