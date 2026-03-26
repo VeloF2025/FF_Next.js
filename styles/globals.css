@@ -75,6 +75,8 @@
     --ff-warning-500: #f59e0b;
     --ff-error-500: #ef4444;
     --ff-info-500: #06b6d4;
+    --ff-danger: #dc2626;
+    --ff-danger-subtle: rgba(220, 38, 38, 0.1);
     
     --ff-neutral-50: #f9fafb;
     --ff-neutral-100: #f3f4f6;
@@ -209,6 +211,9 @@
     --ff-border-medium: #475569;
     --ff-border-strong: #64748b;
     --ff-border-subtle: #1e293b;
+
+    --ff-danger: #ef4444;
+    --ff-danger-subtle: rgba(239, 68, 68, 0.15);
   }
 
   * {

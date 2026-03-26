@@ -61,9 +61,9 @@ export function SchemaExplorerClient() {
 
   if (loading) {
     return (
-      <div className="p-8 text-center">
+      <div className="p-8 text-center" role="status" aria-live="polite" aria-label="Loading database schema">
         <div className="inline-block">
-          <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
+          <RefreshCw className="w-8 h-8 animate-spin text-[var(--ff-primary)]" aria-hidden="true" />
         </div>
         <p className="mt-4 text-[var(--ff-text-secondary)]">Loading schema...</p>
       </div>
@@ -73,12 +73,16 @@ export function SchemaExplorerClient() {
   if (error) {
     return (
       <div className="p-8 max-w-2xl mx-auto">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+        <div
+          className="bg-[var(--ff-danger-subtle)] border border-[var(--ff-danger)] rounded-lg p-6"
+          role="alert"
+          aria-live="assertive"
+        >
           <div className="flex items-start gap-3">
-            <AlertCircle className="w-6 h-6 text-red-600 mt-0.5 flex-shrink-0" />
+            <AlertCircle className="w-6 h-6 text-[var(--ff-danger)] mt-0.5 flex-shrink-0" aria-hidden="true" />
             <div>
-              <h3 className="font-semibold text-red-900">Error</h3>
-              <p className="text-red-700 mt-1">{error}</p>
+              <h3 className="font-semibold text-[var(--ff-text-primary)]">Error loading schema</h3>
+              <p className="text-[var(--ff-danger)] mt-1">{error}</p>
             </div>
           </div>
         </div>
@@ -111,15 +115,21 @@ export function SchemaExplorerClient() {
           <SearchFilter search={search} onSearchChange={setSearch} />
           <div className="flex items-center gap-3">
             {lastRefreshed && (
-              <span className="text-sm text-[var(--ff-text-tertiary)]">
+              <span
+                className="text-sm text-[var(--ff-text-tertiary)]"
+                role="status"
+                aria-live="polite"
+                aria-label={`Schema last refreshed at ${lastRefreshed}`}
+              >
                 Last refreshed: {lastRefreshed}
               </span>
             )}
             <button
               onClick={handleRefresh}
-              className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2 text-sm font-medium"
+              aria-label="Refresh database schema"
+              className="px-3 py-2 bg-[var(--ff-primary)] text-white rounded hover:opacity-90 flex items-center gap-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)] focus:ring-offset-2"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className="w-4 h-4" aria-hidden="true" />
               Refresh
             </button>
           </div>

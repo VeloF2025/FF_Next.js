@@ -37,13 +37,11 @@ export const FieldMappingTable: React.FC<FieldMappingTableProps> = ({ data }) =>
       filtered = [...filtered].sort((a, b) => {
         const aVal = a[sortConfig.key];
         const bVal = b[sortConfig.key];
-
         if (typeof aVal === 'string' && typeof bVal === 'string') {
           return sortConfig.direction === 'asc'
             ? aVal.localeCompare(bVal)
             : bVal.localeCompare(aVal);
         }
-
         return 0;
       });
     }
@@ -53,18 +51,11 @@ export const FieldMappingTable: React.FC<FieldMappingTableProps> = ({ data }) =>
 
   const groupedData = useMemo((): GroupedMapping[] => {
     const groups = new Map<string, FieldMapping[]>();
-
     filteredData.forEach(item => {
-      if (!groups.has(item.concept)) {
-        groups.set(item.concept, []);
-      }
+      if (!groups.has(item.concept)) groups.set(item.concept, []);
       groups.get(item.concept)!.push(item);
     });
-
-    return Array.from(groups.entries()).map(([concept, rows]) => ({
-      concept,
-      rows,
-    }));
+    return Array.from(groups.entries()).map(([concept, rows]) => ({ concept, rows }));
   }, [filteredData]);
 
   const handleSort = (key: keyof FieldMapping): void => {
@@ -75,6 +66,11 @@ export const FieldMappingTable: React.FC<FieldMappingTableProps> = ({ data }) =>
     );
   };
 
+  const getAriaSortValue = (key: keyof FieldMapping): 'ascending' | 'descending' | 'none' => {
+    if (sortConfig?.key !== key) return 'none';
+    return sortConfig.direction === 'asc' ? 'ascending' : 'descending';
+  };
+
   const handleExportCSV = (): void => {
     const headers = ['Concept', 'Table', 'Column Name'];
     const rows = filteredData.map(item => [
@@ -82,7 +78,6 @@ export const FieldMappingTable: React.FC<FieldMappingTableProps> = ({ data }) =>
       `"${item.table.replace(/"/g, '""')}"`,
       `"${item.column.replace(/"/g, '""')}"`,
     ]);
-
     const csv = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -95,82 +90,88 @@ export const FieldMappingTable: React.FC<FieldMappingTableProps> = ({ data }) =>
     URL.revokeObjectURL(url);
   };
 
-  const SortIcon = ({ column }: { column: keyof FieldMapping }): React.ReactNode => {
-    if (sortConfig?.key !== column) {
-      return <ArrowUpDown className="w-4 h-4 text-gray-400" />;
-    }
-    return (
-      <ArrowUpDown className={`w-4 h-4 ${sortConfig.direction === 'asc' ? 'text-blue-400' : 'text-blue-600'}`} />
-    );
-  };
+  const SortIcon = ({ column }: { column: keyof FieldMapping }): React.ReactNode => (
+    <ArrowUpDown
+      className={`w-4 h-4 ${
+        sortConfig?.key === column
+          ? 'text-[var(--ff-primary)]'
+          : 'text-[var(--ff-text-tertiary)]'
+      }`}
+      aria-hidden="true"
+    />
+  );
 
   return (
     <div className="space-y-4">
+      {/* Search + Export */}
       <div className="flex items-center gap-4">
         <input
           type="text"
           placeholder="Search by concept, table, or column..."
           value={searchTerm}
           onChange={e => setSearchTerm(e.target.value)}
-          className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label="Search field mappings"
+          className="flex-1 px-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]"
         />
         <button
           onClick={handleExportCSV}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          aria-label="Export field mappings as CSV"
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-primary)] hover:opacity-90 text-white rounded-lg transition-opacity focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)] focus:ring-offset-2"
         >
-          <Download className="w-4 h-4" />
+          <Download className="w-4 h-4" aria-hidden="true" />
           Export CSV
         </button>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-gray-700">
-        <table className="w-full">
-          <thead className="bg-gray-900 border-b border-gray-700 sticky top-0">
-            <tr>
-              <th className="px-6 py-3 text-left">
-                <button
-                  onClick={() => handleSort('concept')}
-                  className="flex items-center gap-2 font-semibold text-gray-200 hover:text-white"
+      {/* Table */}
+      <div className="overflow-x-auto rounded-lg border border-[var(--ff-border-light)]">
+        <table
+          className="w-full"
+          role="table"
+          aria-label="Database field mappings"
+          aria-rowcount={filteredData.length}
+        >
+          <thead className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] sticky top-0">
+            <tr role="row">
+              {(['concept', 'table', 'column'] as const).map(col => (
+                <th
+                  key={col}
+                  scope="col"
+                  aria-sort={getAriaSortValue(col)}
+                  className="px-6 py-3 text-left"
                 >
-                  Concept
-                  <SortIcon column="concept" />
-                </button>
-              </th>
-              <th className="px-6 py-3 text-left">
-                <button
-                  onClick={() => handleSort('table')}
-                  className="flex items-center gap-2 font-semibold text-gray-200 hover:text-white"
-                >
-                  Table
-                  <SortIcon column="table" />
-                </button>
-              </th>
-              <th className="px-6 py-3 text-left">
-                <button
-                  onClick={() => handleSort('column')}
-                  className="flex items-center gap-2 font-semibold text-gray-200 hover:text-white"
-                >
-                  Column Name
-                  <SortIcon column="column" />
-                </button>
-              </th>
+                  <button
+                    onClick={() => handleSort(col)}
+                    className="flex items-center gap-2 font-semibold text-[var(--ff-text-primary)] hover:text-[var(--ff-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)] rounded"
+                    aria-label={`Sort by ${col}${sortConfig?.key === col ? `, currently ${sortConfig.direction}ending` : ''}`}
+                  >
+                    {col.charAt(0).toUpperCase() + col.slice(1).replace('_', ' ')}
+                    <SortIcon column={col} />
+                  </button>
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {groupedData.map((group, groupIdx) => (
+            {groupedData.map((group) => (
               <React.Fragment key={group.concept}>
                 {group.rows.map((row, rowIdx) => (
                   <tr
                     key={`${group.concept}-${rowIdx}`}
-                    className={rowIdx % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'}
+                    role="row"
+                    className={
+                      rowIdx % 2 === 0
+                        ? 'bg-[var(--ff-bg-primary)]'
+                        : 'bg-[var(--ff-bg-secondary)]'
+                    }
                   >
-                    <td className="px-6 py-3 text-gray-100 border-b border-gray-700">
+                    <td className="px-6 py-3 text-[var(--ff-text-primary)] border-b border-[var(--ff-border-light)]">
                       {rowIdx === 0 ? group.concept : ''}
                     </td>
-                    <td className="px-6 py-3 text-gray-300 border-b border-gray-700 font-mono text-sm">
+                    <td className="px-6 py-3 text-[var(--ff-text-secondary)] border-b border-[var(--ff-border-light)] font-mono text-sm">
                       {row.table}
                     </td>
-                    <td className="px-6 py-3 text-gray-300 border-b border-gray-700 font-mono text-sm">
+                    <td className="px-6 py-3 text-[var(--ff-text-secondary)] border-b border-[var(--ff-border-light)] font-mono text-sm">
                       {row.column}
                     </td>
                   </tr>
@@ -181,7 +182,8 @@ export const FieldMappingTable: React.FC<FieldMappingTableProps> = ({ data }) =>
         </table>
       </div>
 
-      <div className="text-sm text-gray-400">
+      {/* Count */}
+      <div className="text-sm text-[var(--ff-text-tertiary)]" aria-live="polite" role="status">
         Showing {filteredData.length} of {data.length} mappings
       </div>
     </div>
