@@ -1,6 +1,8 @@
 /**
  * Build Milestone Overview API
- * RFO (Civil Work Complete) + ATP progress per project
+ * Source: sp_pon_tracker (synced from SharePoint PON Tracker tab)
+ * RFO = ready_for_optical_date NOT NULL
+ * ATP = optical_activated_date NOT NULL
  * 🟢 WORKING
  */
 
@@ -12,98 +14,124 @@ import pool from '@/lib/db';
 import { verifyToken } from '@/lib/auth/jwt';
 import { userHasPermission } from '@/lib/permissions';
 
+const ALLOWED_USERS = new Set([
+  '28ab98c1-df21-48f8-a30a-489cd09a0d39', // Hein
+  '7d84184b-2a2b-4fbb-a52e-9815d0e92237', // Lew
+]);
+
 export interface BuildMilestoneRow {
   projectId: string;
   projectName: string;
-  rfoTotal: number;
-  rfoComplete: number;
+  ponScope: number;
+  rfoDone: number;
   rfoPct: number;
-  atpTotal: number;
-  atpPassed: number;
+  atpDone: number;
   atpPct: number;
 }
 
-export interface BuildMilestonesData {
-  rows: BuildMilestoneRow[];
-  totals: {
-    rfoTotal: number;
-    rfoComplete: number;
-    rfoPct: number;
-    atpTotal: number;
-    atpPassed: number;
-    atpPct: number;
-  };
+export interface BuildMilestoneMonth {
+  monthKey: string;   // 'YYYY-MM'
+  monthLabel: string; // "Jan '25"
+  rfoCount: number;
+  atpCount: number;
 }
 
-const ALLOWED_USERS = ['28ab98c1-df21-48f8-a30a-489cd09a0d39', '7d84184b-2a2b-4fbb-a52e-9815d0e92237'];
+export interface BuildMilestonesData {
+  // Report 1 — Scope vs Actual
+  rows: BuildMilestoneRow[];
+  totals: { ponScope: number; rfoDone: number; rfoPct: number; atpDone: number; atpPct: number };
+  // Report 2 — Timeline
+  timeline: BuildMilestoneMonth[];
+}
 
-export async function GET(_req: NextRequest): Promise<NextResponse> {
+async function auth(req: NextRequest): Promise<string | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('ff_auth_token')?.value;
+  if (!token) return null;
+  const payload = await verifyToken(token);
+  if (!payload?.sub) return null;
+  const userId = payload.sub;
+  const hasAccess = await userHasPermission(userId, 'analytics.reports', 'view');
+  if (!hasAccess && !ALLOWED_USERS.has(userId)) return null;
+  return userId;
+}
+
+export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('ff_auth_token')?.value;
-    if (!token) {
-      return NextResponse.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } }, { status: 401 });
+    const userId = await auth(req);
+    if (!userId) {
+      return NextResponse.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Access denied' } }, { status: 401 });
     }
-
-    const payload = await verifyToken(token);
-    if (!payload?.sub) {
-      return NextResponse.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid token' } }, { status: 401 });
-    }
-
-    const userId = payload.sub;
-    const hasAccess = await userHasPermission(userId, 'analytics.reports', 'view');
-    if (!hasAccess && !ALLOWED_USERS.includes(userId)) {
-      return NextResponse.json({ success: false, error: { code: 'FORBIDDEN', message: 'Access restricted' } }, { status: 403 });
-    }
-
-    const query = `
-      SELECT
-        p.id as project_id,
-        p.project_name,
-        COALESCE(SUM(pst.cwc_total), 0)     AS rfo_total,
-        COALESCE(SUM(pst.cwc_complete), 0)  AS rfo_complete,
-        COALESCE(SUM(pst.atp_total), 0)     AS atp_total,
-        COALESCE(SUM(pst.atp_passed), 0)    AS atp_passed
-      FROM projects p
-      LEFT JOIN pon_stage_tracking pst ON pst.project_id = p.id
-      WHERE p.status = 'active'
-      GROUP BY p.id, p.project_name
-      ORDER BY p.project_name
-    `;
 
     const client = await pool.connect();
     try {
-      const result = await client.query(query);
-      const rows: BuildMilestoneRow[] = result.rows.map((row) => ({
-        projectId: row.project_id,
-        projectName: row.project_name,
-        rfoTotal: parseInt(row.rfo_total, 10),
-        rfoComplete: parseInt(row.rfo_complete, 10),
-        rfoPct: row.rfo_total > 0 ? Math.round((row.rfo_complete / row.rfo_total) * 1000) / 10 : 0,
-        atpTotal: parseInt(row.atp_total, 10),
-        atpPassed: parseInt(row.atp_passed, 10),
-        atpPct: row.atp_total > 0 ? Math.round((row.atp_passed / row.atp_total) * 1000) / 10 : 0,
+      const [scopeRes, timelineRes] = await Promise.all([
+        client.query(`
+          SELECT
+            p.id AS project_id,
+            p.project_name,
+            COUNT(DISTINCT spt.hld_pon)::int AS pon_scope,
+            COUNT(DISTINCT CASE WHEN spt.ready_for_optical_date IS NOT NULL THEN spt.hld_pon END)::int AS rfo_done,
+            COUNT(DISTINCT CASE WHEN spt.optical_activated_date IS NOT NULL THEN spt.hld_pon END)::int AS atp_done
+          FROM projects p
+          LEFT JOIN sp_pon_tracker spt ON spt.project_id = p.id
+          WHERE p.id IN (
+            SELECT DISTINCT project_id FROM sp_pon_tracker
+          )
+          GROUP BY p.id, p.project_name
+          ORDER BY p.project_name
+        `),
+        client.query(`
+          SELECT
+            TO_CHAR(DATE_TRUNC('month', rfo_dates.d), 'YYYY-MM') AS month_key,
+            TO_CHAR(DATE_TRUNC('month', rfo_dates.d), 'Mon ''YY') AS month_label,
+            SUM(CASE WHEN rfo_dates.type = 'rfo' THEN 1 ELSE 0 END)::int AS rfo_count,
+            SUM(CASE WHEN rfo_dates.type = 'atp' THEN 1 ELSE 0 END)::int AS atp_count
+          FROM (
+            SELECT DISTINCT hld_pon, ready_for_optical_date AS d, 'rfo' AS type
+            FROM sp_pon_tracker
+            WHERE ready_for_optical_date IS NOT NULL AND ready_for_optical_date > '2020-01-01'
+            UNION ALL
+            SELECT DISTINCT hld_pon, optical_activated_date AS d, 'atp' AS type
+            FROM sp_pon_tracker
+            WHERE optical_activated_date IS NOT NULL AND optical_activated_date > '2020-01-01'
+          ) rfo_dates
+          GROUP BY month_key, month_label
+          ORDER BY month_key
+        `),
+      ]);
+
+      const rows: BuildMilestoneRow[] = scopeRes.rows.map((r) => ({
+        projectId: r.project_id,
+        projectName: r.project_name,
+        ponScope: r.pon_scope,
+        rfoDone: r.rfo_done,
+        rfoPct: r.pon_scope > 0 ? Math.round((r.rfo_done / r.pon_scope) * 1000) / 10 : 0,
+        atpDone: r.atp_done,
+        atpPct: r.pon_scope > 0 ? Math.round((r.atp_done / r.pon_scope) * 1000) / 10 : 0,
       }));
 
-      const totals = {
-        rfoTotal: rows.reduce((sum, r) => sum + r.rfoTotal, 0),
-        rfoComplete: rows.reduce((sum, r) => sum + r.rfoComplete, 0),
-        atpTotal: rows.reduce((sum, r) => sum + r.atpTotal, 0),
-        atpPassed: rows.reduce((sum, r) => sum + r.atpPassed, 0),
-      };
+      const totals = rows.reduce(
+        (acc, r) => ({
+          ponScope: acc.ponScope + r.ponScope,
+          rfoDone: acc.rfoDone + r.rfoDone,
+          rfoPct: 0,
+          atpDone: acc.atpDone + r.atpDone,
+          atpPct: 0,
+        }),
+        { ponScope: 0, rfoDone: 0, rfoPct: 0, atpDone: 0, atpPct: 0 }
+      );
+      totals.rfoPct = totals.ponScope > 0 ? Math.round((totals.rfoDone / totals.ponScope) * 1000) / 10 : 0;
+      totals.atpPct = totals.ponScope > 0 ? Math.round((totals.atpDone / totals.ponScope) * 1000) / 10 : 0;
 
-      const data: BuildMilestonesData = {
-        rows,
-        totals: {
-          rfoTotal: totals.rfoTotal,
-          rfoComplete: totals.rfoComplete,
-          rfoPct: totals.rfoTotal > 0 ? Math.round((totals.rfoComplete / totals.rfoTotal) * 1000) / 10 : 0,
-          atpTotal: totals.atpTotal,
-          atpPassed: totals.atpPassed,
-          atpPct: totals.atpTotal > 0 ? Math.round((totals.atpPassed / totals.atpTotal) * 1000) / 10 : 0,
-        },
-      };
+      const timeline: BuildMilestoneMonth[] = timelineRes.rows.map((r) => ({
+        monthKey: r.month_key,
+        monthLabel: r.month_label,
+        rfoCount: r.rfo_count,
+        atpCount: r.atp_count,
+      }));
 
+      const data: BuildMilestonesData = { rows, totals, timeline };
       return NextResponse.json({ success: true, data });
     } finally {
       client.release();
