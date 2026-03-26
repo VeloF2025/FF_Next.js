@@ -208,7 +208,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     for (let i = 1; i < dataRows.length; i++) {
       const row = dataRows[i] as unknown[];
       if (toStr(row[15]) !== projectName) continue;
-      if (toStr(row[13]) !== 'Included') continue;
+      if (toStr(row[14]) !== 'Included') continue;
       if (toStr(row[2]) !== 'Expense') continue;
       const cat = toStr(row[10]);
       if (!cat.startsWith('COS')) continue;
@@ -261,7 +261,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     for (let i = 1; i < dataRows.length; i++) {
       const row = dataRows[i] as unknown[];
       if (toStr(row[15]) !== projectName) continue;
-      if (toStr(row[13]) !== 'Included') continue;
+      if (toStr(row[14]) !== 'Included') continue;
       if (toStr(row[2]) !== 'Expense') continue;
       const cat = toStr(row[10]);
       if (!cat.startsWith('COS')) continue;
@@ -270,7 +270,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       if (serial <= 0) continue;
       const month = serialToMonthLabel(serial);
 
-      const amount = toNumber(row[5]);
+      const amount = toNumber(row[6]);
 
       // Use known category bucket or catch-all
       const bucket = COS_CATEGORIES.includes(cat) ? cat : COS_CATEGORIES[0];

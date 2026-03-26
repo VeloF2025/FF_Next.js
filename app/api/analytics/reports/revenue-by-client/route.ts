@@ -76,19 +76,19 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
     }
 
     // Skip header row (index 0). Data rows from index 1.
-    // Col 2 = Type, Col 9 = Category, Col 5 = Amount Excl. VAT, Col 14 = Cost Centre T1
+    // Col 2=Type, Col 10=Category, Col 6=Amount Excl. VAT, Col 19=Name (client)
     const clientMap = new Map<string, number>();
 
     for (let i = 1; i < values.length; i++) {
       const row = values[i] as unknown[];
       const type = toStr(row[2]);
-      const category = toStr(row[9]);
+      const category = toStr(row[10]);
 
       if (type !== 'Income') continue;
       if (category !== 'Contract Revenue') continue;
 
-      const client = toStr(row[14]) || 'Unknown';
-      const amount = toNumber(row[5]);
+      const client = toStr(row[19]) || 'Unknown';
+      const amount = toNumber(row[6]);
 
       clientMap.set(client, (clientMap.get(client) ?? 0) + amount);
     }
