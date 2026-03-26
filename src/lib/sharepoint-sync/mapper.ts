@@ -18,6 +18,7 @@ export const COL_MAP: Record<string, keyof SpPonRow> = {
   'CWC - Poles': 'cwc_poles_date',
   'CWC - Stringing': 'cwc_stringing_date',
   'Ready For Optical': 'ready_for_optical_date',
+  'Ready For Optical (RFO)': 'ready_for_optical_date',
   'CWC - QA Approved': 'cwc_qa_approved',
   'Optical - Splicing': 'optical_splicing_date',
   'Optical - Submitted': 'optical_submitted_date',
