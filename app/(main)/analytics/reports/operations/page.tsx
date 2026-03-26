@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { BarChart2, ChevronDown, ChevronUp } from 'lucide-react';
 import ActivationsReport from '@/modules/analytics/reports/activations/ActivationsReport';
 import BuildMilestonesReport from '@/modules/analytics/reports/build-milestones/BuildMilestonesReport';
+import PreProvisionsReport from '@/modules/analytics/reports/pre-provisions/PreProvisionsReport';
 
 const OPERATIONS_REPORTS = [
   {
@@ -24,11 +25,17 @@ const OPERATIONS_REPORTS = [
     name: 'Build Milestone Overview',
     description: 'RFO (Civil Work Complete) and ATP progress per project',
   },
+  {
+    id: 'pre-provisions',
+    name: 'Pre-Provisions',
+    description: 'OES pre-provision cases logged vs fixed by project and month',
+  },
 ];
 
 const REPORT_COMPONENTS: Record<string, React.ComponentType> = {
   activations: ActivationsReport,
   'build-milestones': BuildMilestonesReport,
+  'pre-provisions': PreProvisionsReport,
 };
 
 export default function OperationsReportsPage() {
