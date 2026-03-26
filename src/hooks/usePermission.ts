@@ -69,11 +69,17 @@ export function usePermission(): UsePermissionReturn {
   const { currentUser, isAuthenticated } = useAuth();
   const [permissions, setPermissions] = useState<EffectivePermission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Track whether we've successfully fetched permissions at least once
+  const [hasFetched, setHasFetched] = useState(false);
 
   // Check if user is super admin with 'all' permission
+  // Checks both the mapped permissions array and the raw role string
   const isSuperAdmin = useMemo(() => {
     if (!currentUser) return false;
-    return currentUser.permissions?.includes('all') || currentUser.role === 'super_admin';
+    return (
+      currentUser.permissions?.includes('all' as never) ||
+      currentUser.role === 'super_admin'
+    );
   }, [currentUser]);
 
   // Fetch permissions from API
@@ -86,6 +92,7 @@ export function usePermission(): UsePermissionReturn {
 
     // Super admin has all permissions - no need to fetch
     if (isSuperAdmin) {
+      setHasFetched(true);
       setIsLoading(false);
       return;
     }
@@ -97,8 +104,9 @@ export function usePermission(): UsePermissionReturn {
       if (response.ok) {
         const data = await response.json();
         setPermissions(data.data || []);
+        setHasFetched(true);
       } else {
-        // Fallback: if API fails, assume role-based permissions
+        log.error('Permissions API returned non-OK status', { status: response.status }, 'usePermission');
         setPermissions([]);
       }
     } catch (error) {
@@ -128,6 +136,10 @@ export function usePermission(): UsePermissionReturn {
       // Super admin can do everything
       if (isSuperAdmin) return true;
 
+      // While permissions haven't been fetched yet, allow view access
+      // to prevent empty sidebar flash. Once loaded, enforce properly.
+      if (!hasFetched && action === 'view') return true;
+
       const perm = permissionMap.get(permissionKey);
       if (!perm) return false;
 
@@ -144,7 +156,7 @@ export function usePermission(): UsePermissionReturn {
           return false;
       }
     },
-    [isSuperAdmin, permissionMap]
+    [isSuperAdmin, permissionMap, hasFetched]
   );
 
   // Check any permission
