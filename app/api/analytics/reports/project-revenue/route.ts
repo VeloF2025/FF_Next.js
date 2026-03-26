@@ -130,11 +130,20 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
     const dataValues = dataResult.values ?? [];
 
     // ── 1. Project_Costing: forecast per project (keyed by canonical name) ──
+    // Sheet has two sections: "Prospective" (rows 3-21) and "Executable" (rows 23-33).
+    // We use the EXECUTABLE section — find its header row first, then read until blank or "Total".
     const forecastMap = new Map<string, { forecastRevenue: number; forecastCos: number }>();
-    for (let i = 3; i < pcValues.length; i++) {
+    let execHeaderIdx = -1;
+    for (let i = 0; i < pcValues.length; i++) {
+      const cell = String((pcValues[i] as unknown[])[3] ?? '').trim();
+      if (cell === 'Project Scope - Executable') { execHeaderIdx = i; break; }
+    }
+    const execStart = execHeaderIdx >= 0 ? execHeaderIdx + 1 : 23; // fallback row 23
+    for (let i = execStart; i < pcValues.length; i++) {
       const row = pcValues[i] as unknown[];
       const rawName = String(row[3] ?? '').trim();
-      if (!rawName || typeof row[3] !== 'string' || norm(rawName) === 'total') continue;
+      if (!rawName || typeof row[3] !== 'string') continue;
+      if (norm(rawName) === 'total' || rawName.startsWith('Cost/Revenue')) break;
       const canonical = matchProject(rawName, PC_PROJECTS) ?? rawName;
       if (!forecastMap.has(canonical)) {
         forecastMap.set(canonical, { forecastRevenue: toNum(row[8]), forecastCos: toNum(row[9]) });
