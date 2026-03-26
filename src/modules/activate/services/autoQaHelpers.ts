@@ -29,7 +29,7 @@ export async function persistAutoQaResults(
   const reasonDescriptions = reasons.map((r) => ({ check: r, status: 'fail', message: getFailReasonDescription(r) }));
 
   // Compute step booleans from coverage
-  const stepBooleans = Array.from({ length: 10 }, (_, i) =>
+  const stepBooleans = Array.from({ length: 12 }, (_, i) =>
     stepCoverage.covered.includes(i + 1)
   );
 

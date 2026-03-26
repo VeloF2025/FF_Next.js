@@ -90,7 +90,7 @@ export function ReviewTab({
   // Merge photos with QA results and human overrides
   const photosWithQa: PhotoWithQa[] = useMemo(() => {
     return photos
-      .filter((p) => p.step !== null && p.step >= 1 && p.step <= 10)
+      .filter((p) => p.step !== null && p.step >= 1 && p.step <= 12)
       .map((photo) => {
         const step = photo.step as number;
         const qaResult = qaResults?.stepResults?.find((r) => r.step === step);

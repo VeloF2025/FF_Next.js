@@ -102,7 +102,7 @@ export async function getStepAccuracy(): Promise<Map<number, StepAccuracy>> {
     // Build accuracy map from totals
     for (const row of totalResult.rows) {
       const step = parseInt(String(row.step), 10);
-      if (isNaN(step) || step < 1 || step > 10) continue;
+      if (isNaN(step) || step < 1 || step > 12) continue;
 
       accuracyMap.set(step, {
         step,

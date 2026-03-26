@@ -86,7 +86,7 @@ export function PhotoCard({
                 >
                   <option value="-1">Duplicate Photo</option>
                   <option value="0">Discard (Step 0)</option>
-                  {Array.from({ length: 10 }, (_, i) => i + 1).map((step) => (
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((step) => (
                     <option key={step} value={step}>
                       {STEP_LABELS[step]}
                     </option>
