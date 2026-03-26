@@ -280,11 +280,13 @@ describe('stepMapper', () => {
       expect(typeof STEP_TO_PHOTO_TYPES).toBe('object');
     });
 
-    it('should have 20 photo type mappings', () => {
-      expect(Object.keys(PHOTO_TYPE_TO_STEP)).toHaveLength(20);
+    it('should have 26 photo type mappings', () => {
+      // 23 original + ph_conn1 + ph_hh1 + ph_hh2
+      expect(Object.keys(PHOTO_TYPE_TO_STEP)).toHaveLength(26);
     });
 
     it('should have 12 step mappings', () => {
+      // Steps 1-10 (required) + 11-12 (optional dome joint)
       expect(Object.keys(STEP_TO_PHOTO_TYPES)).toHaveLength(12);
     });
   });
