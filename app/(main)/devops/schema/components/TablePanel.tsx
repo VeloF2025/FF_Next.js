@@ -36,8 +36,12 @@ export function TablePanel({ table, schema, onNavigate }: TablePanelProps) {
               >
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-[var(--ff-text-primary)]">{col.name}</span>
-                  {col.isPrimaryKey && <Key className="w-3 h-3 text-blue-600" title="Primary Key" />}
-                  {col.isForeignKey && <Link2 className="w-3 h-3 text-green-600" title="Foreign Key" />}
+                  {col.isPrimaryKey && (
+                    <Key className="w-3 h-3 text-blue-600" aria-label="Primary Key" />
+                  )}
+                  {col.isForeignKey && (
+                    <Link2 className="w-3 h-3 text-green-600" aria-label="Foreign Key" />
+                  )}
                 </div>
                 <div className="text-[var(--ff-text-tertiary)] mt-1">
                   {col.dataType}
