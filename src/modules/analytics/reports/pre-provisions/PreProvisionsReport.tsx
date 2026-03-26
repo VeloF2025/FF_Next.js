@@ -139,17 +139,137 @@ const PreProvisionsChart = ({ years, allProjects }: { years: PreProvisionYear[];
   );
 };
 
+// ─── By Project Table ────────────────────────────────────────────────────────
+
+const ByProjectTable = ({
+  years,
+  allProjects,
+  totals,
+}: {
+  years: PreProvisionYear[];
+  allProjects: string[];
+  totals: { logged: number; activated: number; open: number; notFound: number };
+}) => {
+  const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
+  const toggleYear = (y: number) => setExpandedYears(p => { const n = new Set(p); n.has(y) ? n.delete(y) : n.add(y); return n; });
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm" style={{ minWidth: allProjects.length * 200 + 200 }}>
+        <thead>
+          {/* Project name header */}
+          <tr style={{ backgroundColor: HEADER_BG }} className="text-white">
+            <th className="px-3 py-2 text-left font-semibold sticky left-0" style={{ minWidth: 120, backgroundColor: HEADER_BG }}>Period</th>
+            {allProjects.map(p => (
+              <th key={p} className="px-2 py-2 text-center font-semibold border-l border-gray-600" colSpan={3}>{p}</th>
+            ))}
+            <th className="px-3 py-2 text-right font-semibold border-l border-gray-600">Total Logged</th>
+          </tr>
+          {/* Sub-column headers */}
+          <tr style={{ backgroundColor: '#0f2a38' }} className="text-xs">
+            <th className="px-3 py-1 sticky left-0" style={{ backgroundColor: '#0f2a38' }} />
+            {allProjects.map(p => (
+              <>
+                <th key={`${p}-a`} className="px-2 py-1 text-green-400 text-right border-l border-gray-700">Act</th>
+                <th key={`${p}-o`} className="px-2 py-1 text-yellow-400 text-right">Open</th>
+                <th key={`${p}-n`} className="px-2 py-1 text-red-400 text-right">NF</th>
+              </>
+            ))}
+            <th className="px-3 py-1 text-gray-400 text-right border-l border-gray-700" />
+          </tr>
+        </thead>
+        <tbody>
+          {years.map((year, yi) => {
+            const expanded = expandedYears.has(year.year);
+            return (
+              <>
+                <tr key={year.year} className={yi % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'}>
+                  <td className="px-3 py-2 sticky left-0 bg-inherit">
+                    <button onClick={() => toggleYear(year.year)} className="flex items-center gap-1 text-white font-semibold hover:text-blue-400">
+                      {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      {year.year}
+                    </button>
+                  </td>
+                  {allProjects.map(p => (
+                    <>
+                      <td key={`${p}-a`} className="px-2 py-2 text-right text-green-400 border-l border-gray-700">{getPC(year.byProject, p, 'activated') || '—'}</td>
+                      <td key={`${p}-o`} className="px-2 py-2 text-right text-yellow-400">{getPC(year.byProject, p, 'open') || '—'}</td>
+                      <td key={`${p}-n`} className="px-2 py-2 text-right text-red-400">{getPC(year.byProject, p, 'notFound') || '—'}</td>
+                    </>
+                  ))}
+                  <td className="px-3 py-2 text-right text-white font-semibold border-l border-gray-700">{year.logged}</td>
+                </tr>
+                {expanded && year.months.map(month => (
+                  <tr key={month.monthKey} className="bg-gray-900">
+                    <td className="px-3 py-1.5 pl-9 text-gray-400 text-xs sticky left-0 bg-gray-900">{month.monthLabel}</td>
+                    {allProjects.map(p => (
+                      <>
+                        <td key={`${p}-a`} className="px-2 py-1.5 text-right text-green-400 text-xs border-l border-gray-700">{getPC(month.byProject, p, 'activated') || '—'}</td>
+                        <td key={`${p}-o`} className="px-2 py-1.5 text-right text-yellow-400 text-xs">{getPC(month.byProject, p, 'open') || '—'}</td>
+                        <td key={`${p}-n`} className="px-2 py-1.5 text-right text-red-400 text-xs">{getPC(month.byProject, p, 'notFound') || '—'}</td>
+                      </>
+                    ))}
+                    <td className="px-3 py-1.5 text-right text-gray-300 text-xs border-l border-gray-700">{month.logged}</td>
+                  </tr>
+                ))}
+              </>
+            );
+          })}
+          <tr className="bg-gray-900 text-white font-semibold border-t-2 border-gray-600">
+            <td className="px-3 py-2 sticky left-0 bg-gray-900">Total</td>
+            {allProjects.map(p => (
+              <>
+                <td key={`${p}-a`} className="px-2 py-2 text-right text-green-400 border-l border-gray-700">
+                  {years.reduce((s, y) => s + getPC(y.byProject, p, 'activated'), 0) || '—'}
+                </td>
+                <td key={`${p}-o`} className="px-2 py-2 text-right text-yellow-400">
+                  {years.reduce((s, y) => s + getPC(y.byProject, p, 'open'), 0) || '—'}
+                </td>
+                <td key={`${p}-n`} className="px-2 py-2 text-right text-red-400">
+                  {years.reduce((s, y) => s + getPC(y.byProject, p, 'notFound'), 0) || '—'}
+                </td>
+              </>
+            ))}
+            <td className="px-3 py-2 text-right border-l border-gray-700">{totals.logged}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
 // ─── Main ────────────────────────────────────────────────────────────────────
+
+type SubView = 'summary' | 'by-project';
 
 export default function PreProvisionsReport() {
   const { data, isLoading, error } = usePreProvisionsData();
+  const [subView, setSubView] = useState<SubView>('summary');
 
   if (isLoading) return <div className="flex items-center justify-center h-48 text-gray-400">Loading…</div>;
   if (error || !data) return <div className="flex items-center justify-center h-48 text-red-400">Error loading report</div>;
 
+  const subTabs = (
+    <div className="flex gap-2 mb-4">
+      {(['summary', 'by-project'] as SubView[]).map(v => (
+        <button key={v} onClick={() => setSubView(v)}
+          className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${subView === v ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+          {v === 'summary' ? 'Summary' : 'By Project'}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <ReportTabLayout
-      tableContent={<PreProvisionsTable years={data.years} allProjects={data.allProjects} totals={data.totals} />}
+      tableContent={
+        <div>
+          {subTabs}
+          {subView === 'summary'
+            ? <PreProvisionsTable years={data.years} allProjects={data.allProjects} totals={data.totals} />
+            : <ByProjectTable years={data.years} allProjects={data.allProjects} totals={data.totals} />}
+        </div>
+      }
       chartsContent={<PreProvisionsChart years={data.years} allProjects={data.allProjects} />}
     />
   );
