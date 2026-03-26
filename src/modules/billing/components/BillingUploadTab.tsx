@@ -113,17 +113,34 @@ export function BillingUploadTab() {
       const formData = new FormData();
       formData.append('action', 'preview');
       formData.append('project', project);
-      formData.append('pdf', pdfFile);
-      if (xlsxFile) formData.append('xlsx', xlsxFile);
+      formData.append('pdfFile', pdfFile);
+      if (xlsxFile) formData.append('notesFile', xlsxFile);
 
       const res = await fetch('/api/billing/upload-weekly', {
         method: 'POST',
         body: formData,
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Preview failed');
+      if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error) || 'Preview failed');
 
-      setPreview(data.preview as BillingPreview);
+      const s = data.summary;
+      setPreview({
+        weekEnding: s.weekEnding,
+        project: s.project,
+        totalOnts: s.totalOnts,
+        claimable: s.claimable,
+        note1Count: s.note1Count,
+        note2Count: s.note2Count,
+        note3Count: s.note3Count,
+        note4Count: s.note4Count,
+        note5Count: s.note5Count,
+        preProviCount: s.preProvisionsCount,
+        totalClaimable: s.totalClaimableForPayment,
+        pricePerDrop: null,
+        taxRate: 15,
+        invoiceSubtotal: s.totalClaimableForPayment * 2700,
+        invoiceTotal: s.totalClaimableForPayment * 2700 * 1.15,
+      } as BillingPreview);
       setUploadState('previewed');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Preview failed');
@@ -142,19 +159,26 @@ export function BillingUploadTab() {
       const formData = new FormData();
       formData.append('action', 'import');
       formData.append('project', project);
-      formData.append('pdf', pdfFile);
-      if (xlsxFile) formData.append('xlsx', xlsxFile);
+      formData.append('pdfFile', pdfFile);
+      if (xlsxFile) formData.append('notesFile', xlsxFile);
 
       const res = await fetch('/api/billing/upload-weekly', {
         method: 'POST',
         body: formData,
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Import failed');
+      if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error) || 'Import failed');
 
-      setImportResult(data.result as ImportResult);
+      const result: ImportResult = {
+        id: data.billingWeekId,
+        weekEnding: data.weekEnding,
+        project: data.project,
+        totalClaimable: preview?.totalClaimable ?? 0,
+        invoiceTotal: data.invoiceTotal,
+      };
+      setImportResult(result);
       setUploadState('imported');
-      toast.success(`Week ending ${(data.result as ImportResult).weekEnding} imported successfully`);
+      toast.success(`Week ending ${result.weekEnding} imported successfully`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
       setUploadState('previewed');
