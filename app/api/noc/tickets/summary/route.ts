@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { query } from '@/modules/noc/utils/db';
+import { query, queryOne } from '@/modules/noc/utils/db';
 
 const logger = createLogger('noc:api:tickets:summary');
 
@@ -38,7 +38,19 @@ export async function GET(req: NextRequest) {
     addFilter('ticket_type', 'type');
     addFilter('priority', 'priority');
     addFilter('source', 'source');
-    addFilter('assigned_to', 'assigned_to');
+
+    // assigned_to: column stores staff.id but auth passes users.id — need lookup
+    const assignedTo = searchParams.get('assigned_to');
+    if (assignedTo) {
+      const staffLookup = await queryOne<{ id: string }>(
+        `SELECT id FROM staff WHERE user_id = $1 LIMIT 1`,
+        [assignedTo]
+      );
+      const resolvedId = staffLookup?.id || assignedTo;
+      whereClauses.push(`assigned_to = $${p++}`);
+      values.push(resolvedId);
+    }
+
     addFilter('assigned_team_id', 'assigned_team_id');
     addFilter('project_id', 'project_id');
     addFilter('dr_number', 'dr_number');
