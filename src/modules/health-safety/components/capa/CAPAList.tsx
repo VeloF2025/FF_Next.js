@@ -38,7 +38,7 @@ export function CAPAList({ projectId, contractorId, onSelectCAPA }: CAPAListProp
   const capas = data?.data?.capas || [];
   const stats = data?.data?.stats || {};
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="p-4 text-red-400 text-sm">
         Failed to load CAPAs
