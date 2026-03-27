@@ -61,6 +61,7 @@ export default function ProcurementPage({
     'open-orders': {},
     requisitions: {},
     boq: {},
+    'boq-view': {},
     rfq: {},
     quotes: {},
     'purchase-orders': {},
@@ -290,6 +291,7 @@ export default function ProcurementPage({
               {activeTab === 'overview' && <DashboardTabContent project={selectedProject} aggregateMetrics={aggregateMetrics} isLoading={isLoading} />}
               {activeTab === 'requisitions' && <RequisitionsTabContent />}
               {activeTab === 'boq' && <BOQStockView selectedProject={selectedProject} />}
+              {activeTab === 'boq-view' && <BOQStockView selectedProject={selectedProject} />}
               {activeTab === 'rfq' && <PlaceholderTab title="Request for Quotations" icon={Send} description="Create and manage RFQs" />}
               {activeTab === 'quotes' && <PlaceholderTab title="Quote Evaluation" icon={Quote} description="Evaluate and compare supplier quotes" />}
               {activeTab === 'purchase-orders' && <PurchaseOrdersTabContent />}

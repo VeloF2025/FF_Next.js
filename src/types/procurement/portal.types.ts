@@ -8,6 +8,7 @@ export type ProcurementTabId =
   | 'open-orders'
   | 'requisitions'
   | 'boq'
+  | 'boq-view'
   | 'rfq'
   | 'quotes'
   | 'purchase-orders'
