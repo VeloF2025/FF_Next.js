@@ -39,6 +39,7 @@ export function PonTrackerPage({ projectId, projectName }: Props) {
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<Record<string, Set<string>>>({});
   const importRef = useRef<HTMLInputElement>(null);
 
   const fetchData = useCallback(async () => {
@@ -161,6 +162,11 @@ export function PonTrackerPage({ projectId, projectName }: Props) {
           Import Excel
         </button>
         <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImportFile} />
+        {Object.values(filters).some((s) => s.size > 0) && (
+          <button onClick={() => setFilters({})} className="px-3 py-1.5 rounded text-xs font-semibold bg-amber-700 hover:bg-amber-600 text-white transition-colors">
+            Clear Filters
+          </button>
+        )}
         {lastSaved && <span className="text-xs text-slate-500 ml-2">Saved {new Date(lastSaved).toLocaleTimeString()}</span>}
         {error && <span className="text-xs text-red-400 ml-2">{error}</span>}
       </div>
@@ -169,7 +175,7 @@ export function PonTrackerPage({ projectId, projectName }: Props) {
       {loading ? (
         <div className="py-16 text-center text-slate-500">Loading…</div>
       ) : (
-        <PonTrackerTable rows={rows} editMode={editMode} onChange={setRows} />
+        <PonTrackerTable rows={rows} editMode={editMode} onChange={setRows} filters={filters} onFiltersChange={setFilters} />
       )}
     </div>
   );

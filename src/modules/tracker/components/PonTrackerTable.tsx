@@ -1,6 +1,7 @@
 'use client';
 
 import type { PonRow } from '../types';
+import { ColumnFilter } from './ColumnFilter';
 
 const COLS = [
   { key: 'zone_no', label: 'Zone', type: 'number', width: 60 },
@@ -33,36 +34,63 @@ interface Props {
   rows: PonRow[];
   editMode: boolean;
   onChange: (rows: PonRow[]) => void;
+  filters: Record<string, Set<string>>;
+  onFiltersChange: (filters: Record<string, Set<string>>) => void;
 }
 
 function sumCol(rows: PonRow[], key: string): number {
   return rows.reduce((acc, r) => acc + (Number((r as unknown as Record<string, unknown>)[key]) || 0), 0);
 }
 
-export function PonTrackerTable({ rows, editMode, onChange }: Props) {
+export function PonTrackerTable({ rows, editMode, onChange, filters, onFiltersChange }: Props) {
   function updateCell(idx: number, key: string, value: unknown) {
     const next = rows.map((r, i) => (i === idx ? { ...r, [key]: value } : r));
     onChange(next);
   }
+
+  // Filter visible rows based on active filters
+  const visibleRows = rows.filter((row) =>
+    COLS.every((col) => {
+      const f = filters[col.key];
+      if (!f || f.size === 0) return true;
+      const val = String((row as Record<string, unknown>)[col.key] ?? '');
+      return !f.has(val);
+    })
+  );
 
   return (
     <div className="overflow-x-auto rounded border border-slate-700">
       <table className="text-xs border-collapse" style={{ minWidth: COLS.reduce((a, c) => a + c.width, 0) }}>
         <thead className="sticky top-0 z-10 bg-slate-800 text-slate-300">
           <tr>
-            {COLS.map((c) => (
-              <th
-                key={c.key}
-                style={{ width: c.width, minWidth: c.width }}
-                className="px-2 py-2 text-left font-medium border-b border-slate-700 whitespace-nowrap"
-              >
-                {c.label}
-              </th>
-            ))}
+            {COLS.map((c) => {
+              const frozen = ['zone_no','hld_pon','z_pon'] as const;
+              const offsets: Record<string, number> = { zone_no: 0, hld_pon: 60, z_pon: 140 };
+              const isFrozen = (frozen as readonly string[]).includes(c.key);
+              return (
+                <th
+                  key={c.key}
+                  style={{ width: c.width, minWidth: c.width, ...(isFrozen ? { left: offsets[c.key] } : {}) }}
+                  className={`px-2 py-2 text-left font-medium border-b border-slate-700 whitespace-nowrap ${isFrozen ? 'sticky z-20 bg-slate-800' : ''}`}
+                >
+                  <div className="flex items-center gap-1">
+                    {c.label}
+                    <ColumnFilter
+                      column={c.label}
+                      values={[...new Set(rows.map((r) => String((r as Record<string, unknown>)[c.key] ?? '')))].sort()}
+                      selected={filters[c.key] ?? new Set()}
+                      onChange={(sel) => onFiltersChange({ ...filters, [c.key]: sel })}
+                    />
+                  </div>
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, idx) => (
+          {visibleRows.map((row, visIdx) => {
+            const idx = rows.indexOf(row);
+            return (
             <tr
               key={row.id}
               className={`border-b border-slate-800 hover:bg-slate-800/50 ${row.blockage ? 'border-l-2 border-l-amber-500' : ''}`}
@@ -77,8 +105,13 @@ export function PonTrackerTable({ rows, editMode, onChange }: Props) {
                       </td>
                     );
                   }
+                  const isFrozenCell = (['zone_no','hld_pon','z_pon'] as const).includes(col.key as 'zone_no'|'hld_pon'|'z_pon');
+                  const frozenOffsets: Record<string, number> = { zone_no: 0, hld_pon: 60, z_pon: 140 };
                   return (
-                    <td key={col.key} className="px-2 py-1 text-slate-300 truncate max-w-[200px]" title={String(val ?? '')}>
+                    <td key={col.key}
+                      style={isFrozenCell ? { left: frozenOffsets[col.key] } : {}}
+                      className={`px-2 py-1 text-slate-300 truncate max-w-[200px] ${isFrozenCell ? 'sticky z-10 bg-slate-900' : ''}`}
+                      title={String(val ?? '')}>
                       {val != null && val !== '' ? String(val) : '—'}
                     </td>
                   );
@@ -110,7 +143,8 @@ export function PonTrackerTable({ rows, editMode, onChange }: Props) {
                 );
               })}
             </tr>
-          ))}
+          );
+          })}
         </tbody>
         {rows.length > 0 && (
           <tfoot className="bg-slate-800 font-semibold text-slate-300 sticky bottom-0">
