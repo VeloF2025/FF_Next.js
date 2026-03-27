@@ -1,17 +1,20 @@
 /**
  * Meeting Detail Modal
  * 4 tabs: Summary, Action Items, Transcript, Recording
- * Includes export buttons in footer
+ * Includes export buttons + Generate Minutes in footer
  */
 
 import { useState } from 'react';
-import { X, FileText, MessageSquare, Film, CheckCircle, Loader2, AlertCircle, Download } from 'lucide-react';
+import { X, FileText, MessageSquare, Film, CheckCircle, Loader2, AlertCircle, Download, FileDown } from 'lucide-react';
 import type { Meeting } from '../types/meeting.types';
 import { getSourceColor, getSourceLabel, getProcessingStatusLabel } from '../utils/meetingUtils';
+import { generateMeetingMinutesPdf } from '../utils/generateMeetingMinutesPdf';
 import { TranscriptView } from './TranscriptView';
 import { RecordingPlayer } from './RecordingPlayer';
 import { MeetingSummaryPanel } from './MeetingSummaryPanel';
 import { MeetingActionItemsPanel } from './MeetingActionItemsPanel';
+import { MeetingMinutesPreviewModal } from './MeetingMinutesPreviewModal';
+import { log } from '@/lib/logger';
 
 interface MeetingDetailModalProps {
   meeting: Meeting | null;
@@ -23,6 +26,9 @@ type DetailTab = 'summary' | 'action_items' | 'transcript' | 'recording';
 
 export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailModalProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('summary');
+  const [isGeneratingMinutes, setIsGeneratingMinutes] = useState(false);
+  const [minutesBlob, setMinutesBlob] = useState<Blob | null>(null);
+  const [showMinutesPreview, setShowMinutesPreview] = useState(false);
 
   if (!isOpen || !meeting) return null;
 
@@ -37,105 +43,147 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
     window.open(`/api/meetings/${meeting.id}/export?type=${type}`, '_blank');
   };
 
+  const handleGenerateMinutes = async () => {
+    if (!meeting) return;
+    setIsGeneratingMinutes(true);
+    try {
+      const blob = await generateMeetingMinutesPdf(meeting);
+      setMinutesBlob(blob);
+      setShowMinutesPreview(true);
+    } catch (err) {
+      log.error('Failed to generate meeting minutes PDF', { error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setIsGeneratingMinutes(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--ff-bg-secondary)] rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-[var(--ff-border-light)] flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h2 className="text-xl font-semibold text-[var(--ff-text-primary)]">{meeting.title}</h2>
-            <span className={`px-2 py-1 text-xs rounded-full ${getSourceColor(meeting.source)}`}>
-              {getSourceLabel(meeting.source)}
-            </span>
+    <>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="p-6 border-b border-[var(--ff-border-light)] flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-semibold text-[var(--ff-text-primary)]">{meeting.title}</h2>
+              <span className={`px-2 py-1 text-xs rounded-full ${getSourceColor(meeting.source)}`}>
+                {getSourceLabel(meeting.source)}
+              </span>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-[var(--ff-bg-hover)] rounded"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-[var(--ff-bg-hover)] rounded"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
 
-        {/* Processing Status Banner */}
-        {meeting.processingStatus && meeting.processingStatus !== 'completed' && (
-          <div className={`mx-6 mt-4 p-3 rounded-lg flex items-center gap-2 text-sm ${
-            meeting.processingStatus === 'failed'
-              ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-              : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
-          }`}>
-            {meeting.processingStatus === 'failed' ? (
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            ) : (
-              <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+          {/* Processing Status Banner */}
+          {meeting.processingStatus && meeting.processingStatus !== 'completed' && (
+            <div className={`mx-6 mt-4 p-3 rounded-lg flex items-center gap-2 text-sm ${
+              meeting.processingStatus === 'failed'
+                ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+            }`}>
+              {meeting.processingStatus === 'failed' ? (
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              ) : (
+                <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+              )}
+              {getProcessingStatusLabel(meeting.processingStatus)}
+            </div>
+          )}
+
+          {/* Tab Navigation */}
+          <div className="border-b border-[var(--ff-border-light)] px-6">
+            <nav className="flex gap-6">
+              {tabs.map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => !tab.disabled && setActiveTab(tab.key)}
+                  disabled={tab.disabled}
+                  className={`flex items-center gap-2 py-3 border-b-2 text-sm font-medium transition-colors ${
+                    activeTab === tab.key
+                      ? 'border-blue-500 text-blue-400'
+                      : tab.disabled
+                      ? 'border-transparent text-[var(--ff-text-tertiary)] cursor-not-allowed'
+                      : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
+                  }`}
+                >
+                  <tab.icon className="w-4 h-4" />
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          <div className="p-6">
+            {activeTab === 'summary' && <MeetingSummaryPanel meeting={meeting} />}
+            {activeTab === 'action_items' && <MeetingActionItemsPanel meeting={meeting} />}
+            {activeTab === 'transcript' && (
+              <TranscriptView meetingId={meeting.id} transcriptUrl={meeting.transcriptUrl} />
             )}
-            {getProcessingStatusLabel(meeting.processingStatus)}
+            {activeTab === 'recording' && (
+              <RecordingPlayer meetingId={meeting.id} hasRecording={meeting.hasRecording} source={meeting.source} />
+            )}
           </div>
-        )}
 
-        {/* Tab Navigation */}
-        <div className="border-b border-[var(--ff-border-light)] px-6">
-          <nav className="flex gap-6">
-            {tabs.map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => !tab.disabled && setActiveTab(tab.key)}
-                disabled={tab.disabled}
-                className={`flex items-center gap-2 py-3 border-b-2 text-sm font-medium transition-colors ${
-                  activeTab === tab.key
-                    ? 'border-blue-500 text-blue-400'
-                    : tab.disabled
-                    ? 'border-transparent text-[var(--ff-text-tertiary)] cursor-not-allowed'
-                    : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
-                }`}
-              >
-                <tab.icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        <div className="p-6">
-          {activeTab === 'summary' && <MeetingSummaryPanel meeting={meeting} />}
-          {activeTab === 'action_items' && <MeetingActionItemsPanel meeting={meeting} />}
-          {activeTab === 'transcript' && (
-            <TranscriptView meetingId={meeting.id} transcriptUrl={meeting.transcriptUrl} />
-          )}
-          {activeTab === 'recording' && (
-            <RecordingPlayer meetingId={meeting.id} hasRecording={meeting.hasRecording} source={meeting.source} />
-          )}
-        </div>
-
-        <div className="p-6 border-t border-[var(--ff-border-light)] flex gap-3 justify-between">
-          <div className="flex gap-2">
-            {meeting.summary && (
+          <div className="p-6 border-t border-[var(--ff-border-light)] flex gap-3 justify-between">
+            <div className="flex gap-2">
+              {meeting.summary && (
+                <button
+                  type="button"
+                  onClick={() => handleExport('summary')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Export Summary
+                </button>
+              )}
+              {meeting.hasTranscript && (
+                <button
+                  type="button"
+                  onClick={() => handleExport('transcript')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Export Transcript
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => handleExport('summary')}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+                onClick={handleGenerateMinutes}
+                disabled={isGeneratingMinutes}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[var(--ff-primary)] hover:bg-[var(--ff-primary-hover)] rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <Download className="w-3.5 h-3.5" />
-                Export Summary
+                {isGeneratingMinutes ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <FileDown className="w-3.5 h-3.5" />
+                )}
+                {isGeneratingMinutes ? 'Generating...' : 'Generate Minutes'}
               </button>
-            )}
-            {meeting.hasTranscript && (
-              <button
-                type="button"
-                onClick={() => handleExport('transcript')}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Export Transcript
-              </button>
-            )}
+            </div>
+            <button
+              className="ff-button ff-button-secondary"
+              onClick={onClose}
+            >
+              Close
+            </button>
           </div>
-          <button
-            className="ff-button ff-button-secondary"
-            onClick={onClose}
-          >
-            Close
-          </button>
         </div>
       </div>
-    </div>
+
+      {/* Minutes Preview + Distribute Modal */}
+      {minutesBlob && (
+        <MeetingMinutesPreviewModal
+          meeting={meeting}
+          pdfBlob={minutesBlob}
+          isOpen={showMinutesPreview}
+          onClose={() => {
+            setShowMinutesPreview(false);
+            setMinutesBlob(null);
+          }}
+        />
+      )}
+    </>
   );
 }
