@@ -6,7 +6,7 @@
  * they were deducted, and their internal status.
  *
  * Query params:
- *   project  - required: Lawley | Mohadin | Mamelodi
+ *   project  - optional: Lawley | Mohadin | Mamelodi (omit for all projects)
  *   status   - optional: 'excluded' | 'recovered' | 'all' (default: 'all')
  *   note     - optional: note1..note5 filter
  *   search   - optional: DR number search
@@ -29,7 +29,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   try {
     const project = typeof req.query.project === 'string' ? req.query.project.trim() : null;
-    if (!project) return apiResponse.badRequest(res, 'project is required');
 
     const statusFilter = typeof req.query.status === 'string' ? req.query.status : 'all';
     const noteFilter = typeof req.query.note === 'string' ? req.query.note : null;
@@ -37,19 +36,38 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     const limit = Math.min(parseInt(String(req.query.limit || '100'), 10) || 100, 500);
     const offset = parseInt(String(req.query.offset || '0'), 10) || 0;
 
-    // Get latest billing week for this project
-    const latestWeekResult = await pool.query(
-      `SELECT id FROM ft_weekly_billing WHERE project ILIKE $1 ORDER BY week_ending DESC LIMIT 1`,
-      [project]
-    );
-    const latestWeekId = latestWeekResult.rows[0]?.id;
+    // Get latest billing week ID(s):
+    // - Single project: one latest week ID
+    // - All projects: latest week per project (DISTINCT ON)
+    let latestWeekIds: string[];
 
-    if (!latestWeekId) {
-      return apiResponse.success(res, { rows: [], total: 0, latestWeekId: null });
+    if (project) {
+      const latestWeekResult = await pool.query<{ id: string }>(
+        `SELECT id FROM ft_weekly_billing WHERE project ILIKE $1 ORDER BY week_ending DESC LIMIT 1`,
+        [project]
+      );
+      const id = latestWeekResult.rows[0]?.id;
+      if (!id) {
+        return apiResponse.success(res, { rows: [], total: 0, latestWeekIds: [] });
+      }
+      latestWeekIds = [id];
+    } else {
+      // Latest week per project — used to determine "currently excluded" status
+      const latestWeeksResult = await pool.query<{ id: string }>(
+        `SELECT DISTINCT ON (project) id FROM ft_weekly_billing ORDER BY project, week_ending DESC`
+      );
+      latestWeekIds = latestWeeksResult.rows.map(r => r.id);
+      if (latestWeekIds.length === 0) {
+        return apiResponse.success(res, { rows: [], total: 0, latestWeekIds: [] });
+      }
     }
 
-    // Build the query
-    const params: (string | number)[] = [project, latestWeekId];
+    // Build the query — $1 is always the latestWeekIds UUID array
+    // project filter added as $2 when present
+    const params: (string | number | string[])[] = [latestWeekIds];
+    const projectCondition = project ? `d.project ILIKE $2` : '';
+    if (project) params.push(project);
+
     const conditions: string[] = [];
 
     if (noteFilter && /^note[1-5]$/.test(noteFilter)) {
@@ -72,13 +90,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       ? `WHERE ${conditions.join(' AND ')}`
       : '';
 
+    const allDeductedFilter = projectCondition ? `WHERE ${projectCondition}` : '';
+
     params.push(limit, offset);
 
     const result = await pool.query(`
       WITH latest_excluded AS (
         SELECT DISTINCT dr_number
         FROM ft_billing_deductions
-        WHERE billing_week_id = $2
+        WHERE billing_week_id = ANY($1::uuid[])
       ),
       all_deducted AS (
         SELECT
@@ -89,7 +109,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
           COUNT(DISTINCT d.billing_week_id)::int AS weeks_excluded,
           array_agg(DISTINCT d.deduction_note ORDER BY d.deduction_note) AS note_types
         FROM ft_billing_deductions d
-        WHERE d.project ILIKE $1
+        ${allDeductedFilter}
         GROUP BY d.dr_number, d.project
       )
       SELECT
@@ -123,7 +143,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       WITH latest_excluded AS (
         SELECT DISTINCT dr_number
         FROM ft_billing_deductions
-        WHERE billing_week_id = $2
+        WHERE billing_week_id = ANY($1::uuid[])
       ),
       all_deducted AS (
         SELECT
@@ -132,7 +152,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
           COUNT(DISTINCT d.billing_week_id)::int AS weeks_excluded,
           array_agg(DISTINCT d.deduction_note ORDER BY d.deduction_note) AS note_types
         FROM ft_billing_deductions d
-        WHERE d.project ILIKE $1
+        ${allDeductedFilter}
         GROUP BY d.dr_number, d.project
       )
       SELECT COUNT(*)::int AS total
@@ -142,13 +162,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     `, countParams);
 
     // Summary stats
+    const summaryParams = project ? [latestWeekIds, project] : [latestWeekIds];
     const summaryResult = await pool.query(`
       WITH latest_excluded AS (
-        SELECT DISTINCT dr_number FROM ft_billing_deductions WHERE billing_week_id = $2
+        SELECT DISTINCT dr_number FROM ft_billing_deductions WHERE billing_week_id = ANY($1::uuid[])
       ),
       all_deducted AS (
         SELECT d.dr_number, d.project
-        FROM ft_billing_deductions d WHERE d.project ILIKE $1
+        FROM ft_billing_deductions d
+        ${allDeductedFilter}
         GROUP BY d.dr_number, d.project
       )
       SELECT
@@ -157,10 +179,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
         COUNT(CASE WHEN ce.dr_number IS NULL THEN 1 END)::int AS recovered
       FROM all_deducted ad
       LEFT JOIN latest_excluded ce ON ce.dr_number = ad.dr_number
-    `, [project, latestWeekId]);
+    `, summaryParams);
 
     logger.info('DR history fetched', {
-      project,
+      project: project ?? 'all',
       statusFilter,
       total: countResult.rows[0]?.total || 0,
     });
@@ -169,7 +191,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       rows: result.rows,
       total: countResult.rows[0]?.total || 0,
       summary: summaryResult.rows[0] || { total_unique: 0, still_excluded: 0, recovered: 0 },
-      latestWeekId,
+      latestWeekIds,
     });
 
   } catch (error) {

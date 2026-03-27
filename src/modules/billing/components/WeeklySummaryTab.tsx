@@ -48,9 +48,12 @@ export function WeeklySummaryTab() {
         const params = new URLSearchParams();
         if (projectFilter !== 'All') params.set('project', projectFilter);
 
+        const statusParams = new URLSearchParams();
+        if (projectFilter !== 'All') statusParams.set('project', projectFilter);
+
         const [weeklyRes, statusRes] = await Promise.all([
           fetch(`/api/billing/weekly?${params.toString()}`),
-          fetch('/api/billing/status'),
+          fetch(`/api/billing/status?${statusParams.toString()}`),
         ]);
 
         if (!weeklyRes.ok) throw new Error('Failed to load weekly records');

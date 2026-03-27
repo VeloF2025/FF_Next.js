@@ -13,11 +13,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { CreditCard, Loader2, Search, CheckCircle, XCircle } from 'lucide-react';
 
-type Project = 'Lawley' | 'Mohadin' | 'Mamelodi';
+type Project = 'All' | 'Lawley' | 'Mohadin' | 'Mamelodi';
 type StatusFilter = 'all' | 'excluded' | 'recovered';
 type NoteFilter = 'all' | 'note1' | 'note2' | 'note3' | 'note4' | 'note5';
 
-const PROJECTS: Project[] = ['Lawley', 'Mohadin', 'Mamelodi'];
+const PROJECTS: Project[] = ['All', 'Lawley', 'Mohadin', 'Mamelodi'];
 
 const NOTE_LABELS: Record<string, string> = {
   note1: 'Low Signal',
@@ -65,7 +65,7 @@ interface Summary {
 }
 
 export function DRPaymentStatusTab() {
-  const [project, setProject] = useState<Project>('Lawley');
+  const [project, setProject] = useState<Project>('All');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [noteFilter, setNoteFilter] = useState<NoteFilter>('all');
   const [search, setSearch] = useState('');
@@ -80,7 +80,8 @@ export function DRPaymentStatusTab() {
     setError(null);
 
     try {
-      const params = new URLSearchParams({ project });
+      const params = new URLSearchParams();
+      if (project !== 'All') params.set('project', project);
       if (statusFilter !== 'all') params.set('status', statusFilter);
       if (noteFilter !== 'all') params.set('note', noteFilter);
       if (search.trim()) params.set('search', search.trim());
@@ -119,7 +120,9 @@ export function DRPaymentStatusTab() {
               <span className="text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Total Unique DRs</span>
             </div>
             <p className="text-3xl font-bold text-[var(--ff-text-primary)]">{summary.total_unique}</p>
-            <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">Ever deducted for {project}</p>
+            <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
+              Ever deducted{project !== 'All' ? ` for ${project}` : ' across all projects'}
+            </p>
           </div>
 
           <div
@@ -295,7 +298,7 @@ export function DRPaymentStatusTab() {
       {!loading && !error && rows.length === 0 && (
         <div className="text-center py-12 text-[var(--ff-text-tertiary)]">
           <CreditCard className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p>No deduction history found for {project}</p>
+          <p>No deduction history found{project !== 'All' ? ` for ${project}` : ''}</p>
         </div>
       )}
     </div>
