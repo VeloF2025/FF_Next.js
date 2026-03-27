@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, MessageSquare, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { log } from '@/lib/logger';
 import { nudgeAgent } from '@/lib/mc-nudge';
 import type { MCMessage } from '../types';
 
@@ -57,17 +58,12 @@ export function LiveFeedTab({ messages }: LiveFeedTabProps) {
     
     setNudgingId(msg.id);
     try {
-      const success = await nudgeAgent({
+      await nudgeAgent({
         toAgent: msg.to_agent,
         subject: msg.message.substring(0, 80),
       });
-      
-      if (success) {
-        // Visual feedback: show toast or brief confirmation
-        console.log(`Nudged ${msg.to_agent}`);
-      }
     } catch (error) {
-      console.error('Failed to nudge agent:', error);
+      log.warn('nudge-failed', { toAgent: msg.to_agent, error: error instanceof Error ? error.message : String(error) });
     } finally {
       setNudgingId(null);
     }
@@ -111,7 +107,7 @@ export function LiveFeedTab({ messages }: LiveFeedTabProps) {
           </div>
         ) : (
           messages.map((msg) => {
-            const badge = TYPE_BADGES[msg.type] || TYPE_BADGES.info;
+            const badge = TYPE_BADGES[msg.type] ?? TYPE_BADGES['info']!;
             const isNudging = nudgingId === msg.id;
             return (
               <div
