@@ -27,7 +27,7 @@ async function fetchSummary(filters?: TicketFilters): Promise<TicketSummaryData>
   }
 
   const url = `/api/noc/tickets/summary?${params.toString()}`;
-  const response = await fetch(url);
+  const response = await fetch(url, { cache: 'no-store' });
 
   if (!response.ok) {
     throw new Error('Failed to fetch ticket summary');
