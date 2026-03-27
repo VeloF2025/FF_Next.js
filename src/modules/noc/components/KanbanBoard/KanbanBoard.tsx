@@ -7,12 +7,16 @@
  * Uses @hello-pangea/dnd for drag-and-drop.
  * Quick-move buttons let users advance/revert tickets without dragging.
  * Optimistic updates for instant visual feedback.
+ *
+ * Fetches up to KANBAN_PAGE_SIZE tickets (server-capped at 200).
+ * Column headers show true counts from the summary endpoint.
  */
 
 import { useMemo, useState, useCallback } from 'react';
 import { DragDropContext, Droppable, type DropResult } from '@hello-pangea/dnd';
 import type { Ticket, TicketFilters } from '../../types/ticket';
 import { useTickets } from '../../hooks/useTickets';
+import { useTicketSummary } from '../../hooks/useTicketSummary';
 import { useUpdateTicket } from '../../hooks/useTicket';
 import { KanbanColumn } from './KanbanColumn';
 
@@ -50,9 +54,25 @@ const STATUS_COLUMN_MAP: Record<string, DatabaseStatus> = {
   handed_to_ops: 'resolved',
 };
 
+// Statuses that roll up into each visible column (for summary counts)
+const COLUMN_STATUSES: Record<DatabaseStatus, string[]> = {
+  open: ['new', 'open'],
+  assigned: ['assigned'],
+  in_progress: ['in_progress', 'qa_rejected'],
+  pending_qa: ['pending_qa', 'qa_in_progress'],
+  resolved: ['resolved', 'qa_approved', 'pending_handover', 'handed_to_ops'],
+  closed: ['closed', 'cancelled'],
+  // Not visible but needed for type completeness
+  new: [], qa_in_progress: [], qa_rejected: [], qa_approved: [],
+  pending_handover: [], handed_to_ops: [], cancelled: [],
+};
+
 // Active vs Completed column groups for sub-tab filtering
 const ACTIVE_STATUSES: DatabaseStatus[] = ['open', 'assigned', 'in_progress', 'pending_qa'];
 const COMPLETED_STATUSES: DatabaseStatus[] = ['resolved', 'closed'];
+
+// Max tickets fetched for Kanban (server caps at 200)
+const KANBAN_PAGE_SIZE = 200;
 
 export function KanbanBoard({ filters }: KanbanBoardProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -62,11 +82,14 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
   // Strip meta status filter (active/completed) — Kanban needs all statuses for columns
   const { status: metaStatus, ...apiFilters } = filters || {};
 
-  // Fetch all tickets (no status filter for Kanban view)
+  // Fetch tickets with sane limit
   const { tickets, isLoading, isError, error, refetch } = useTickets({
     ...apiFilters,
-    pageSize: 10000, // Load all tickets for Kanban columns
+    pageSize: KANBAN_PAGE_SIZE,
   });
+
+  // Lightweight summary for accurate column counts
+  const { counts: summaryCounts } = useTicketSummary(apiFilters as TicketFilters);
 
   // Determine which columns to show based on sub-tab filter
   const visibleColumns = useMemo(() => {
@@ -108,6 +131,16 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
 
     return grouped;
   }, [tickets, optimisticMoves]);
+
+  // True counts per visible column from summary endpoint
+  const trueCounts = useMemo(() => {
+    const result: Record<string, number> = {};
+    for (const col of COLUMN_CONFIG) {
+      const mappedStatuses = COLUMN_STATUSES[col.status] || [col.status];
+      result[col.status] = mappedStatuses.reduce((sum, s) => sum + (summaryCounts[s] ?? 0), 0);
+    }
+    return result;
+  }, [summaryCounts]);
 
   // Move a ticket to a new status (shared by drag-and-drop and quick-move)
   const moveTicket = useCallback(async (ticketId: string, newStatus: DatabaseStatus) => {
@@ -193,6 +226,10 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
     );
   }
 
+  const totalVisible = metaStatus
+    ? tickets.filter(t => visibleColumns.some(c => c.status === t.status)).length
+    : tickets.length;
+
   return (
     <div className="flex flex-col h-full">
       {/* Error Toast */}
@@ -218,11 +255,7 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
       {/* Stats Bar */}
       <div className="mb-4 flex items-center gap-4 text-sm">
         <span className="text-[var(--ff-text-secondary)]">
-          <span className="font-medium text-[var(--ff-text-primary)]">
-            {metaStatus
-              ? tickets.filter(t => visibleColumns.some(c => c.status === t.status)).length
-              : tickets.length}
-          </span> tickets total
+          Showing <span className="font-medium text-[var(--ff-text-primary)]">{totalVisible}</span> most recent tickets
         </span>
         <span className="text-[var(--ff-text-muted)]">|</span>
         <span className="text-[var(--ff-text-secondary)]">
@@ -251,6 +284,7 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
                     <KanbanColumn
                       status={status}
                       tickets={ticketsByStatus[status]}
+                      totalCount={trueCounts[status]}
                       isDraggingOver={snapshot.isDraggingOver}
                       isUpdating={updateTicket.isPending}
                       onQuickMove={handleQuickMove}

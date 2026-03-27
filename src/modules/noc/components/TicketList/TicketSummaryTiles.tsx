@@ -1,7 +1,7 @@
 /**
  * TicketSummaryTiles — compact stat tiles shown above the ticket list.
- * Counts are derived from the current filtered ticket set (same filters
- * as the list), so they always reflect what is shown.
+ * Uses the lightweight /api/noc/tickets/summary endpoint (single GROUP BY)
+ * instead of fetching thousands of rows just for counts.
  *
  * 🟢 WORKING: Reactive to all filters — re-fetches on filter change
  */
@@ -9,7 +9,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useTickets } from '../../hooks/useTickets';
+import { useTicketSummary } from '../../hooks/useTicketSummary';
 import { TicketStatus } from '../../types/ticket';
 import type { TicketFilters } from '../../types/ticket';
 
@@ -69,44 +69,28 @@ const STATUS_GROUPS: { label: string; statuses: TicketStatus[]; color: string; b
   },
 ];
 
-/** Fetch all matching tickets (large page) to compute breakdowns client-side */
-const SUMMARY_PAGE_SIZE = 2000;
-
 export function TicketSummaryTiles({ filters }: Props) {
-  const summaryFilters: TicketFilters = useMemo(
-    () => ({ ...filters, page: 1, pageSize: SUMMARY_PAGE_SIZE }),
-    [filters]
-  );
-
-  const { tickets, pagination, isLoading } = useTickets(summaryFilters);
+  const { counts, total, isLoading } = useTicketSummary(filters);
 
   const tiles: Tile[] = useMemo(() => {
-    // Count by status from fetched tickets
-    const counts = new Map<TicketStatus, number>();
-    for (const t of tickets) {
-      const s = t.status as TicketStatus;
-      counts.set(s, (counts.get(s) ?? 0) + 1);
-    }
-
     const statusTiles: Tile[] = STATUS_GROUPS.map((group) => ({
       label: group.label,
-      value: group.statuses.reduce((sum, s) => sum + (counts.get(s) ?? 0), 0),
+      value: group.statuses.reduce((sum, s) => sum + (counts[s] ?? 0), 0),
       color: group.color,
       bg: group.bg,
     }));
 
-    // Total tile (uses pagination for accuracy when >2000 tickets)
-    const total: Tile = {
+    const totalTile: Tile = {
       label: 'Total',
-      value: pagination?.total ?? tickets.length,
+      value: total,
       color: 'text-white',
       bg: 'bg-[var(--ff-bg-tertiary)] border-[var(--ff-border-light)]',
     };
 
-    return [total, ...statusTiles];
-  }, [tickets, pagination]);
+    return [totalTile, ...statusTiles];
+  }, [counts, total]);
 
-  if (isLoading && tickets.length === 0) {
+  if (isLoading && total === 0) {
     return (
       <div className="flex gap-2 mb-3">
         {Array.from({ length: 7 }).map((_, i) => (
