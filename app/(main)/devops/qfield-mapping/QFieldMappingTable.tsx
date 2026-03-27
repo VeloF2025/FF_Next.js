@@ -11,10 +11,11 @@ interface QFieldMappingTableProps {
   overlaps: TableOverlap[];
 }
 
-const STATUS_STYLES: Record<QFieldMapping['status'], { bg: string; text: string; icon: React.ReactNode }> = {
-  mapped: { bg: 'bg-emerald-900/30', text: 'text-emerald-400', icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
-  gap: { bg: 'bg-amber-900/30', text: 'text-amber-400', icon: <AlertTriangle className="w-3.5 h-3.5" /> },
-  planned: { bg: 'bg-blue-900/30', text: 'text-blue-400', icon: <Clock className="w-3.5 h-3.5" /> },
+// Token-based status styles — inline style uses CSS vars for theme compatibility
+const STATUS_STYLES: Record<QFieldMapping['status'], { style: React.CSSProperties; icon: React.ReactNode }> = {
+  mapped:  { style: { background: 'color-mix(in srgb, var(--ff-success) 15%, transparent)', color: 'var(--ff-success)' }, icon: <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> },
+  gap:     { style: { background: 'color-mix(in srgb, var(--ff-warning) 15%, transparent)', color: 'var(--ff-warning)' }, icon: <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" /> },
+  planned: { style: { background: 'color-mix(in srgb, var(--ff-primary) 15%, transparent)', color: 'var(--ff-primary)'  }, icon: <Clock className="w-3.5 h-3.5" aria-hidden="true" /> },
 };
 
 export const QFieldMappingTable: React.FC<QFieldMappingTableProps> = ({ data, overlaps }) => {
@@ -117,15 +118,15 @@ export const QFieldMappingTable: React.FC<QFieldMappingTableProps> = ({ data, ov
       {/* Stats Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: 'Total Attributes', value: stats.total, color: 'text-[var(--ff-text-primary)]' },
-          { label: 'Mapped', value: stats.mapped, color: 'text-emerald-400' },
-          { label: 'Gaps', value: stats.gaps, color: 'text-amber-400' },
-          { label: 'Planned', value: stats.planned, color: 'text-blue-400' },
-          { label: 'Layers', value: stats.layers, color: 'text-purple-400' },
-          { label: 'FF Tables', value: stats.tables, color: 'text-cyan-400' },
+          { label: 'Total Attributes', value: stats.total, tokenColor: 'var(--ff-text-primary)' },
+          { label: 'Mapped',           value: stats.mapped,  tokenColor: 'var(--ff-success)' },
+          { label: 'Gaps',             value: stats.gaps,    tokenColor: 'var(--ff-warning)' },
+          { label: 'Planned',          value: stats.planned, tokenColor: 'var(--ff-primary)' },
+          { label: 'Layers',           value: stats.layers,  tokenColor: 'var(--ff-accent)' },
+          { label: 'FF Tables',        value: stats.tables,  tokenColor: 'var(--ff-info)' },
         ].map(stat => (
           <div key={stat.label} className="bg-[var(--ff-bg-secondary)] rounded-lg p-3 border border-[var(--ff-border-light)]">
-            <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
+            <div className="text-2xl font-bold" style={{ color: stat.tokenColor }}>{stat.value}</div>
             <div className="text-xs text-[var(--ff-text-tertiary)]">{stat.label}</div>
           </div>
         ))}
@@ -194,9 +195,8 @@ export const QFieldMappingTable: React.FC<QFieldMappingTableProps> = ({ data, ov
                   return (
                     <tr
                       key={`${group.layer}-${idx}`}
-                      className={`border-b border-[var(--ff-border-light)] ${
-                        row.status === 'gap' ? 'bg-amber-950/10' : idx % 2 === 0 ? 'bg-[var(--ff-bg-primary)]' : 'bg-[var(--ff-bg-secondary)]'
-                      }`}
+                      className="border-b border-[var(--ff-border-light)]"
+                      style={row.status === 'gap' ? { background: 'color-mix(in srgb, var(--ff-warning) 5%, transparent)' } : undefined}
                     >
                       <td className="px-4 py-2.5 text-sm text-[var(--ff-text-primary)] font-medium">
                         {idx === 0 ? group.layer : ''}
@@ -214,7 +214,10 @@ export const QFieldMappingTable: React.FC<QFieldMappingTableProps> = ({ data, ov
                         {row.importPath}
                       </td>
                       <td className="px-4 py-2.5">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${style.bg} ${style.text}`}>
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                          style={style.style}
+                        >
                           {style.icon}
                           {row.status}
                         </span>
@@ -245,7 +248,11 @@ export const QFieldMappingTable: React.FC<QFieldMappingTableProps> = ({ data, ov
               className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4"
             >
               <div className="flex items-start gap-3">
-                <AlertTriangle className={`w-5 h-5 mt-0.5 flex-shrink-0 ${overlap.tables.length > 0 ? 'text-amber-400' : 'text-red-400'}`} />
+                <AlertTriangle
+                  className="w-5 h-5 mt-0.5 flex-shrink-0"
+                  aria-hidden="true"
+                  style={{ color: overlap.tables.length > 0 ? 'var(--ff-warning)' : 'var(--ff-danger)' }}
+                />
                 <div className="flex-1">
                   <div className="font-semibold text-[var(--ff-text-primary)]">{overlap.concept}</div>
                   {overlap.tables.length > 0 && (
@@ -258,7 +265,7 @@ export const QFieldMappingTable: React.FC<QFieldMappingTableProps> = ({ data, ov
                     </div>
                   )}
                   <p className="text-sm text-[var(--ff-text-tertiary)] mt-1">{overlap.issue}</p>
-                  <p className="text-sm text-emerald-400 mt-1">{overlap.recommendation}</p>
+                  <p className="text-sm mt-1" style={{ color: 'var(--ff-success)' }}>{overlap.recommendation}</p>
                 </div>
               </div>
             </div>

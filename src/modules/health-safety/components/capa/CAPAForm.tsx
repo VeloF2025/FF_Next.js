@@ -98,14 +98,19 @@ export function CAPAForm({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="capa-form-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    >
       <div className="bg-[var(--ff-bg-primary)] rounded-xl border border-[var(--ff-border-light)] w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-4 border-b border-[var(--ff-border-light)]">
-          <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+          <h2 id="capa-form-title" className="text-lg font-semibold text-[var(--ff-text-primary)]">
             New Corrective Action
           </h2>
-          <button onClick={onCancel} className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]">
-            <X className="w-5 h-5" />
+          <button onClick={onCancel} aria-label="Close form" className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]">
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
