@@ -41,7 +41,8 @@ export async function GET(req: NextRequest) {
 
     // assigned_to: column stores staff.id but auth passes users.id — need lookup
     const assignedTo = searchParams.get('assigned_to');
-    if (assignedTo) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (assignedTo && uuidRegex.test(assignedTo)) {
       const staffLookup = await queryOne<{ id: string }>(
         `SELECT id FROM staff WHERE user_id = $1 LIMIT 1`,
         [assignedTo]
@@ -112,7 +113,10 @@ export async function GET(req: NextRequest) {
       meta: { timestamp: new Date().toISOString() },
     });
   } catch (error) {
-    logger.error('Error fetching ticket summary', { error });
+    logger.error('Error fetching ticket summary', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return NextResponse.json(
       {
         success: false,
