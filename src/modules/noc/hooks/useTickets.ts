@@ -130,7 +130,9 @@ export function useTickets(filters?: TicketFilters) {
     queryKey: ticketsKeys.list(filters),
     queryFn: () => fetchTickets(filters),
     staleTime: 30000, // 30 seconds
-    refetchInterval: 60000, // Refresh every minute
+    refetchOnWindowFocus: true, // Refresh when user returns to tab
+    // No refetchInterval — summary endpoint handles live counts.
+    // List data refreshes on window focus or manual refetch.
   });
 
   return {

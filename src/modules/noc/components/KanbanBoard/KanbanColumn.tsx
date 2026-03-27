@@ -15,6 +15,8 @@ import { KanbanCard } from './KanbanCard';
 interface KanbanColumnProps {
   status: DatabaseStatus;
   tickets: Ticket[];
+  /** True total from summary endpoint (may exceed tickets.length when capped) */
+  totalCount?: number;
   isDraggingOver?: boolean;
   isUpdating?: boolean;
   onQuickMove?: (ticketId: string, direction: 'forward' | 'backward') => void;
@@ -34,7 +36,7 @@ const statusConfig: Partial<Record<DatabaseStatus, { label: string; color: strin
 
 const defaultConfig = { label: 'Unknown', color: 'text-gray-400', bgColor: 'bg-gray-500/20', borderColor: 'border-gray-500/40', glowColor: 'ring-gray-500/30' };
 
-export function KanbanColumn({ status, tickets, isDraggingOver, isUpdating, onQuickMove, canMoveForward, canMoveBackward }: KanbanColumnProps) {
+export function KanbanColumn({ status, tickets, totalCount, isDraggingOver, isUpdating, onQuickMove, canMoveForward, canMoveBackward }: KanbanColumnProps) {
   const config = statusConfig[status] || defaultConfig;
 
   return (
@@ -69,8 +71,11 @@ export function KanbanColumn({ status, tickets, isDraggingOver, isUpdating, onQu
               transition-transform duration-150
               ${isDraggingOver ? 'scale-110' : ''}
             `}
+            title={totalCount && totalCount > tickets.length ? `Showing ${tickets.length} of ${totalCount}` : undefined}
           >
-            {tickets.length}
+            {totalCount && totalCount > tickets.length
+              ? `${tickets.length}/${totalCount}`
+              : tickets.length}
           </span>
         </div>
 
