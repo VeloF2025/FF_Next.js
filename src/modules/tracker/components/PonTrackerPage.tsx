@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { PonTrackerTable } from './PonTrackerTable';
 import { emptyRow } from '../types';
 import type { PonRow } from '../types';
@@ -83,24 +84,10 @@ export function PonTrackerPage({ projectId, projectName }: Props) {
   }
 
   function handleExport() {
-    const headers = COLS_ORDER.map((k) => COL_LABELS[k] ?? k);
-    const csvRows = [
-      headers.join(','),
-      ...rows.map((r) =>
-        COLS_ORDER.map((k) => {
-          const v = (r as unknown as Record<string, unknown>)[k];
-          const s = v == null ? '' : String(v);
-          return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
-        }).join(',')
-      ),
-    ];
-    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `pon-tracker-${projectName ?? projectId}-${new Date().toISOString().slice(0,10)}.csv`;
+    a.href = `/api/tracker/export/pon/${projectId}`;
+    a.download = `pon-tracker-${projectName ?? projectId}.xlsx`;
     a.click();
-    URL.revokeObjectURL(url);
   }
 
   function handleImportClick() {
@@ -113,29 +100,25 @@ export function PonTrackerPage({ projectId, projectName }: Props) {
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
-        const text = ev.target?.result as string;
-        const lines = text.split(/\r?\n/).filter(Boolean);
-        if (lines.length < 2) { setError('CSV has no data rows'); return; }
-        const headerLine = lines[0] ?? '';
-        const headers = headerLine.split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
-        // Map header labels back to keys
+        const data = new Uint8Array(ev.target?.result as ArrayBuffer);
+        const wb = XLSX.read(data, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0] ?? ''];
+        if (!ws) { setError('Empty workbook'); return; }
+        const rowData = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' });
         const labelToKey: Record<string, string> = {};
         for (const [k, label] of Object.entries(COL_LABELS)) labelToKey[label] = k;
-        const colKeys = headers.map((h) => labelToKey[h] ?? h.toLowerCase().replace(/\s+/g, '_'));
-
-        const imported: PonRow[] = lines.slice(1).map((line) => {
-          const vals = line.split(',').map((v) => v.trim().replace(/^"|"$/g, ''));
+        const imported: PonRow[] = rowData.map((r) => {
           const row = emptyRow();
-          colKeys.forEach((k, i) => {
-            const v = vals[i] ?? '';
+          for (const [header, val] of Object.entries(r)) {
+            const k = labelToKey[header] ?? header.toLowerCase().replace(/\s+/g, '_');
             if (k === 'cwc_qa' || k === 'atp_qa') {
-              (row as unknown as Record<string, unknown>)[k] = v === 'true' || v === '1' || v === 'TRUE';
+              (row as unknown as Record<string, unknown>)[k] = val === true || val === 1 || val === 'TRUE' || val === 'true';
             } else if (['zone_no','hld_pon','z_pon','scope_poles','scope_drops','poles_planted','sign_ups','homes_po','homes_recon','activated','available'].includes(k)) {
-              (row as unknown as Record<string, unknown>)[k] = v === '' ? null : Number(v);
+              (row as unknown as Record<string, unknown>)[k] = val === '' ? null : Number(val);
             } else {
-              (row as unknown as Record<string, unknown>)[k] = v;
+              (row as unknown as Record<string, unknown>)[k] = val === '' ? null : val;
             }
-          });
+          }
           return row;
         });
         setRows(imported);
@@ -143,50 +126,46 @@ export function PonTrackerPage({ projectId, projectName }: Props) {
         setError(null);
       } catch (err) {
         log.error('Import failed', { err }, 'tracker');
-        setError('Failed to parse CSV — check format');
+        setError('Failed to parse file — check format');
       }
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
     e.target.value = '';
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <p className="text-sm text-slate-400">
-          {rows.length} row{rows.length !== 1 ? 's' : ''} ·{' '}
-          {lastSaved ? `Last saved: ${new Date(lastSaved).toLocaleString('en-ZA')}` : 'Never saved'}
-        </p>
-        <div className="flex gap-2 flex-wrap">
-          <button onClick={handleExport} className="px-3 py-1.5 text-sm rounded bg-slate-700 hover:bg-slate-600 text-slate-200">
-            ↓ Export CSV
+    <div className="flex flex-col gap-3 p-4">
+      {/* Toolbar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {!editMode ? (
+          <button onClick={() => setEditMode(true)} className="px-3 py-1.5 rounded text-xs font-semibold bg-blue-700 hover:bg-blue-600 text-white transition-colors">
+            Edit
           </button>
-          <button onClick={handleImportClick} className="px-3 py-1.5 text-sm rounded bg-slate-700 hover:bg-slate-600 text-slate-200">
-            ↑ Import CSV
-          </button>
-          <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImportFile} />
-          {editMode ? (
-            <>
-              <button onClick={() => setRows((p) => [...p, emptyRow()])} className="px-3 py-1.5 text-sm rounded bg-slate-700 hover:bg-slate-600 text-slate-200">
-                + Add Row
-              </button>
-              <button onClick={() => { setRows(saved); setEditMode(false); }} className="px-3 py-1.5 text-sm rounded bg-slate-700 hover:bg-slate-600 text-slate-200">
-                Discard
-              </button>
-              <button onClick={handleSave} disabled={saving} className="px-3 py-1.5 text-sm rounded bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50">
-                {saving ? 'Saving…' : 'Save All'}
-              </button>
-            </>
-          ) : (
-            <button onClick={() => setEditMode(true)} className="px-3 py-1.5 text-sm rounded bg-blue-600 hover:bg-blue-500 text-white">
-              Edit
+        ) : (
+          <>
+            <button onClick={handleSave} disabled={saving} className="px-3 py-1.5 rounded text-xs font-semibold bg-green-700 hover:bg-green-600 text-white disabled:opacity-50 transition-colors">
+              {saving ? 'Saving…' : 'Save'}
             </button>
-          )}
-        </div>
+            <button onClick={() => { setRows(saved); setEditMode(false); }} className="px-3 py-1.5 rounded text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-white transition-colors">
+              Cancel
+            </button>
+          </>
+        )}
+        <button onClick={() => { if (!editMode) setEditMode(true); setRows((p) => [...p, emptyRow()]); }} className="px-3 py-1.5 rounded text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-white transition-colors">
+          + Add Row
+        </button>
+        <button onClick={handleExport} className="px-3 py-1.5 rounded text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-white transition-colors">
+          Export Excel
+        </button>
+        <button onClick={handleImportClick} className="px-3 py-1.5 rounded text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-white transition-colors">
+          Import Excel
+        </button>
+        <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImportFile} />
+        {lastSaved && <span className="text-xs text-slate-500 ml-2">Saved {new Date(lastSaved).toLocaleTimeString()}</span>}
+        {error && <span className="text-xs text-red-400 ml-2">{error}</span>}
       </div>
 
-      {error && <div className="px-3 py-2 rounded bg-red-900/30 border border-red-700 text-red-400 text-sm">{error}</div>}
-
+      {/* Table */}
       {loading ? (
         <div className="py-16 text-center text-slate-500">Loading…</div>
       ) : (

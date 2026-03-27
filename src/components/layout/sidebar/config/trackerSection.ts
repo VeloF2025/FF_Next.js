@@ -1,13 +1,12 @@
 /**
- * PON Tracker section configuration
- * Standalone editable tracker — replaces SharePoint Excel trackers
+ * Project Tracker section configuration
  */
 
 import { Table2 } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const trackerSection: NavSection = {
-  section: 'PON Tracker',
+  section: 'Project Tracker',
   sectionId: 'tracker',
   sectionLink: '/tracker',
   isCollapsible: false,
@@ -15,7 +14,7 @@ export const trackerSection: NavSection = {
     {
       to: '/tracker',
       icon: Table2,
-      label: 'PON Tracker',
+      label: 'Project Tracker',
       shortLabel: 'Tracker',
       permissions: [],
       rbacKey: 'tracker',
