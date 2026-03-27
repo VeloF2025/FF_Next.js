@@ -167,6 +167,12 @@ export const projectsConfig: ModuleNavigationConfig = {
           icon: AlertCircle,
           path: '/projects/health-safety/capa',
         },
+        {
+          id: 'risks',
+          label: 'Risk Register',
+          icon: AlertTriangle,
+          path: '/projects/health-safety/risks',
+        },
       ],
     },
     {

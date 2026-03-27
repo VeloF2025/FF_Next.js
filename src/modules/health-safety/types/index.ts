@@ -19,3 +19,6 @@ export * from './ticket.types';
 
 // CAPA types
 export * from './capa.types';
+
+// Risk types
+export * from './risk.types';
