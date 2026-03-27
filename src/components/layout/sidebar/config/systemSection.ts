@@ -2,7 +2,7 @@
  * System section configuration
  */
 
-import { Settings, HeartPulse, Server, Database, Brain, Rocket, Grid3x3, TableProperties } from 'lucide-react';
+import { Settings, HeartPulse, Server, Database, Brain, Rocket, Grid3x3, TableProperties, MapPin } from 'lucide-react';
 // Hidden items - uncomment when ready: Download, FileDown, Activity, BarChart3
 import type { NavSection } from './types';
 import { Permission } from '@/types/auth.types';
@@ -106,6 +106,14 @@ export const systemSection: NavSection = {
       shortLabel: 'Mapping',
       permissions: [],
       rbacKey: 'devops.field-mapping',
+    },
+    {
+      to: '/devops/qfield-mapping',
+      icon: MapPin,
+      label: 'QField Mapping',
+      shortLabel: 'QField Map',
+      permissions: [],
+      rbacKey: 'devops.qfield-mapping',
     },
     {
       to: '/settings',
