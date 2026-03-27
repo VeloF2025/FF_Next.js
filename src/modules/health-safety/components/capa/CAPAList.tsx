@@ -38,7 +38,9 @@ export function CAPAList({ projectId, contractorId, onSelectCAPA }: CAPAListProp
   const capas = data?.data?.capas || [];
   const stats = data?.data?.stats || {};
 
-  if (error && !data) {
+  // Skip auth errors from SSR — client-side retry with credentials will succeed
+  const isAuthError = error?.message?.includes('401') || error?.message?.includes('403');
+  if (error && !data && !isAuthError) {
     return (
       <div className="p-4 text-red-400 text-sm">
         Failed to load CAPAs
