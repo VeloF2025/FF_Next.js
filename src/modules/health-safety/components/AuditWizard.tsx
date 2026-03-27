@@ -124,6 +124,38 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
     }));
   }, []);
 
+  // Handle photo upload for audit item
+  const handlePhotoUpload = useCallback(async (itemId: string) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('type', 'health-safety');
+        formData.append('category', 'audits');
+        const res = await fetch('/api/storage/upload', {
+          method: 'POST',
+          credentials: 'include',
+          body: formData,
+        });
+        if (!res.ok) throw new Error('Upload failed');
+        const data = await res.json();
+        const url = data.data?.url || data.url;
+        setResponses((prev) => ({
+          ...prev,
+          [itemId]: { ...prev[itemId], photo_url: url },
+        }));
+      } catch (err) {
+        log.error('Photo upload failed', { error: err }, 'AuditWizard');
+      }
+    };
+    input.click();
+  }, []);
+
   // Save progress
   const saveProgress = useCallback(async () => {
     setIsSaving(true);
@@ -265,6 +297,7 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
               onResponse={(v) => handleResponse(item.id, v)}
               onNotes={(n) => handleNotes(item.id, n)}
               onCA={(r) => handleCA(item.id, r)}
+              onPhoto={() => handlePhotoUpload(item.id)}
             />
           ))}
         </div>
@@ -328,11 +361,13 @@ function ChecklistItemCard({
   onResponse,
   onNotes,
   onCA,
+  onPhoto,
 }: {
   item: AuditResponse;
   onResponse: (value: ResponseValue) => void;
   onNotes: (notes: string) => void;
   onCA: (required: boolean) => void;
+  onPhoto: () => void;
 }) {
   const [showNotes, setShowNotes] = useState(!!item.notes);
 
@@ -410,19 +445,20 @@ function ChecklistItemCard({
             <MinusCircle className="w-6 h-6" />
           </button>
 
-          {/* Photo upload indicator */}
-          {item.requires_photo && (
-            <button
-              className={`p-2 rounded-lg ${
-                item.photo_url
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-secondary text-muted-foreground'
-              }`}
-              title="Photo required"
-            >
-              <Camera className="w-6 h-6" />
-            </button>
-          )}
+          {/* Photo upload */}
+          <button
+            onClick={onPhoto}
+            className={`p-2 rounded-lg transition-colors ${
+              item.photo_url
+                ? 'bg-blue-500 text-white'
+                : item.requires_photo
+                  ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
+                  : 'bg-secondary text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600'
+            }`}
+            title={item.photo_url ? 'Photo attached — click to replace' : item.requires_photo ? 'Photo required — click to upload' : 'Add photo'}
+          >
+            <Camera className="w-6 h-6" />
+          </button>
 
           {/* Notes toggle */}
           <button
@@ -438,6 +474,19 @@ function ChecklistItemCard({
           </button>
         </div>
       </div>
+
+      {/* Photo thumbnail */}
+      {item.photo_url && (
+        <div className="mt-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={item.photo_url}
+            alt="Evidence"
+            className="h-16 rounded border border-border object-cover cursor-pointer hover:opacity-80"
+            onClick={() => window.open(item.photo_url, '_blank')}
+          />
+        </div>
+      )}
 
       {/* Notes section */}
       {showNotes && (

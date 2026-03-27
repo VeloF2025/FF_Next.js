@@ -13,6 +13,7 @@ import type { ContractorProject, ContractorProjectWithDetails } from '@/types/co
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
 import { apiResponse } from '@/lib/apiResponse';
+import { checkContractorGate } from '@/modules/health-safety/services/gateService';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
@@ -223,6 +224,30 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       return res.status(409).json({
         error: 'Assignment already exists for this contractor, project, and role'
       });
+    }
+
+    // H&S Gate Check — block assignment if contractor fails compliance
+    try {
+      const gateResult = await checkContractorGate(parseInt(contractorId));
+      if (!gateResult.can_assign) {
+        log.warn('[Contractor Assignment] Gate check failed', {
+          contractorId,
+          projectId,
+          blockers: gateResult.blockers,
+        });
+        return res.status(403).json({
+          success: false,
+          error: 'H&S compliance requirements not met',
+          gate_check: {
+            can_assign: false,
+            blockers: gateResult.blockers,
+            warnings: gateResult.warnings,
+          },
+        });
+      }
+    } catch (gateError) {
+      // Gate check failure should not block assignment — log and continue
+      log.warn('[Contractor Assignment] Gate check error (non-blocking)', { gateError });
     }
 
     // Create assignment
