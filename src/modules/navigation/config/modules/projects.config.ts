@@ -161,6 +161,12 @@ export const projectsConfig: ModuleNavigationConfig = {
           icon: ClipboardCheck,
           path: '/projects/health-safety/checklists',
         },
+        {
+          id: 'capa',
+          label: 'Corrective Actions',
+          icon: AlertCircle,
+          path: '/projects/health-safety/capa',
+        },
       ],
     },
     {
