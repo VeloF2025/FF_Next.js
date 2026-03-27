@@ -1,58 +1,124 @@
 /**
  * Report New H&S Incident Page
- * /health-safety/incidents/new - Form to report a new H&S incident
+ * /health-safety/incidents/new
+ *
+ * Complete incident reporting form with all hs_ticket_details fields.
  */
 
 import type { NextPage } from 'next';
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
 import { projectsConfig } from '@/modules/navigation';
-import {
-  AlertTriangle,
-  ChevronLeft,
-  MapPin,
-} from 'lucide-react';
+import { AlertTriangle, ChevronLeft } from 'lucide-react';
 import { log } from '@/lib/logger';
+import type { HSIncidentType, HSSeverity, PersonInvolved } from '@/modules/health-safety/types/ticket.types';
+import { SEVERITY_CONFIG } from '@/modules/health-safety/types/ticket.types';
+import {
+  IncidentBasicFields,
+  IncidentLocationFields,
+  IncidentDetailsFields,
+  IncidentPersonsSection,
+  IncidentPhotoUpload,
+  type IncidentPhoto,
+} from '@/modules/health-safety/components/incident-form';
+
+interface FormState {
+  incident_type: HSIncidentType;
+  severity: HSSeverity;
+  incident_date: string;
+  incident_time: string;
+  title: string;
+  description: string;
+  immediate_actions: string;
+  reported_by: string;
+  location: string;
+  project_id: string;
+  contractor_id: string;
+  dol_reportable: boolean;
+}
 
 function NewIncidentContent() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
+  const [error, setError] = useState<string | null>(null);
+  const [projects, setProjects] = useState<{ id: number; project_name: string }[]>([]);
+  const [contractors, setContractors] = useState<{ id: number; company_name: string }[]>([]);
+  const [persons, setPersons] = useState<PersonInvolved[]>([]);
+  const [witnesses, setWitnesses] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<IncidentPhoto[]>([]);
+
+  const [form, setForm] = useState<FormState>({
+    incident_type: 'injury',
     severity: 'moderate',
     incident_date: new Date().toISOString().split('T')[0],
     incident_time: '',
-    location: '',
+    title: '',
+    description: '',
+    immediate_actions: '',
     reported_by: '',
-    is_near_miss: false,
-    is_dol_reportable: false,
+    location: '',
+    project_id: router.query.project_id as string || '',
+    contractor_id: '',
+    dol_reportable: false,
   });
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    const { name, value, type } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
-    }));
-  };
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [projRes, contRes] = await Promise.all([
+          fetch('/api/projects', { credentials: 'include' }),
+          fetch('/api/contractors', { credentials: 'include' }),
+        ]);
+        const projData = await projRes.json();
+        const contData = await contRes.json();
+        if (projData.success) setProjects(projData.data || []);
+        if (contData.success) setContractors(contData.data || []);
+      } catch (err) {
+        log.error('Failed to load form data', err as Error);
+      }
+    };
+    load();
+  }, []);
+
+  const handleChange = useCallback((field: string, value: string | boolean) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setError(null);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setError(null);
+
+    const autoDol = SEVERITY_CONFIG[form.severity]?.dol_reportable ?? false;
+
+    const payload = {
+      title: form.title,
+      incident_type: form.incident_type,
+      severity: form.severity,
+      incident_date: form.incident_date,
+      incident_time: form.incident_time || undefined,
+      location: form.location || undefined,
+      description: form.description,
+      immediate_actions: form.immediate_actions || undefined,
+      dol_reportable: form.dol_reportable || autoDol,
+      project_id: form.project_id || undefined,
+      contractor_id: form.contractor_id || undefined,
+      injured_persons: persons.filter((p) => p.name.trim()),
+      witnesses: witnesses.filter((w) => w.trim()),
+      photos,
+    };
 
     try {
       const res = await fetch('/api/health-safety/incidents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -60,10 +126,11 @@ function NewIncidentContent() {
         throw new Error(err.error || 'Failed to create incident');
       }
 
-      router.push('/health-safety/incidents');
+      router.push('/projects/health-safety/incidents');
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to create incident';
       log.error('Failed to create incident:', err as Error);
-      alert(err instanceof Error ? err.message : 'Failed to create incident');
+      setError(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -74,7 +141,7 @@ function NewIncidentContent() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link
-          href="/health-safety/incidents"
+          href="/projects/health-safety/incidents"
           className="p-2 hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors"
         >
           <ChevronLeft className="w-5 h-5 text-[var(--ff-text-secondary)]" />
@@ -82,189 +149,70 @@ function NewIncidentContent() {
         <div>
           <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Report Incident</h1>
           <p className="text-sm text-[var(--ff-text-secondary)]">
-            Report a new health & safety incident
+            Report a new health &amp; safety incident
           </p>
         </div>
       </div>
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Incident Title */}
-        <div>
-          <label
-            htmlFor="title"
-            className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1"
-          >
-            Incident Title *
-          </label>
-          <input
-            type="text"
-            id="title"
-            name="title"
-            required
-            value={formData.title}
-            onChange={handleChange}
-            placeholder="Brief description of the incident"
-            className="w-full px-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary-500)]"
-          />
+      {error && (
+        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+          {error}
         </div>
+      )}
 
-        {/* Severity & Date */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label
-              htmlFor="severity"
-              className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1"
-            >
-              Severity *
-            </label>
-            <select
-              id="severity"
-              name="severity"
-              required
-              value={formData.severity}
-              onChange={handleChange}
-              className="w-full px-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary-500)]"
-            >
-              <option value="critical">Critical</option>
-              <option value="major">Major</option>
-              <option value="moderate">Moderate</option>
-              <option value="minor">Minor</option>
-            </select>
-          </div>
-          <div>
-            <label
-              htmlFor="incident_date"
-              className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1"
-            >
-              Date *
-            </label>
-            <input
-              type="date"
-              id="incident_date"
-              name="incident_date"
-              required
-              value={formData.incident_date}
-              onChange={handleChange}
-              className="w-full px-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary-500)]"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="incident_time"
-              className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1"
-            >
-              Time
-            </label>
-            <input
-              type="time"
-              id="incident_time"
-              name="incident_time"
-              value={formData.incident_time}
-              onChange={handleChange}
-              className="w-full px-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary-500)]"
-            />
-          </div>
-        </div>
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <IncidentBasicFields
+          incidentType={form.incident_type}
+          severity={form.severity}
+          incidentDate={form.incident_date}
+          incidentTime={form.incident_time}
+          onChange={handleChange}
+        />
 
-        {/* Location */}
-        <div>
-          <label
-            htmlFor="location"
-            className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1"
-          >
-            Location
-          </label>
-          <div className="relative">
-            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
-            <input
-              type="text"
-              id="location"
-              name="location"
-              value={formData.location}
-              onChange={handleChange}
-              placeholder="Where did the incident occur?"
-              className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary-500)]"
-            />
-          </div>
-        </div>
+        <IncidentLocationFields
+          location={form.location}
+          projectId={form.project_id}
+          contractorId={form.contractor_id}
+          projects={projects}
+          contractors={contractors}
+          onChange={handleChange}
+        />
 
-        {/* Reported By */}
-        <div>
-          <label
-            htmlFor="reported_by"
-            className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1"
-          >
-            Reported By
-          </label>
-          <input
-            type="text"
-            id="reported_by"
-            name="reported_by"
-            value={formData.reported_by}
-            onChange={handleChange}
-            placeholder="Name of person reporting"
-            className="w-full px-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary-500)]"
-          />
-        </div>
+        <IncidentDetailsFields
+          title={form.title}
+          description={form.description}
+          immediateActions={form.immediate_actions}
+          reportedBy={form.reported_by}
+          isDolReportable={form.dol_reportable}
+          severity={form.severity}
+          onChange={handleChange}
+        />
 
-        {/* Description */}
-        <div>
-          <label
-            htmlFor="description"
-            className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1"
-          >
-            Description *
-          </label>
-          <textarea
-            id="description"
-            name="description"
-            required
-            rows={5}
-            value={formData.description}
-            onChange={handleChange}
-            placeholder="Detailed description of what happened, injuries, damage, etc."
-            className="w-full px-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary-500)] resize-y"
-          />
-        </div>
+        <IncidentPersonsSection
+          persons={persons}
+          witnesses={witnesses}
+          onPersonsChange={setPersons}
+          onWitnessesChange={setWitnesses}
+        />
 
-        {/* Checkboxes */}
-        <div className="flex flex-wrap gap-6">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              name="is_near_miss"
-              checked={formData.is_near_miss}
-              onChange={handleChange}
-              className="w-4 h-4 rounded border-[var(--ff-border-light)] text-[var(--ff-primary-500)] focus:ring-[var(--ff-primary-500)]"
-            />
-            <span className="text-sm text-[var(--ff-text-primary)]">Near Miss</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              name="is_dol_reportable"
-              checked={formData.is_dol_reportable}
-              onChange={handleChange}
-              className="w-4 h-4 rounded border-[var(--ff-border-light)] text-[var(--ff-primary-500)] focus:ring-[var(--ff-primary-500)]"
-            />
-            <span className="text-sm text-[var(--ff-text-primary)]">DoL Reportable</span>
-          </label>
-        </div>
+        <IncidentPhotoUpload
+          photos={photos}
+          onPhotosChange={setPhotos}
+        />
 
         {/* Actions */}
         <div className="flex items-center gap-4 pt-4 border-t border-[var(--ff-border-light)]">
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex items-center gap-2 px-6 py-2 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white rounded-lg transition-colors"
+            className="flex items-center gap-2 px-6 py-2.5 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
           >
             <AlertTriangle className="w-4 h-4" />
             {isSubmitting ? 'Submitting...' : 'Report Incident'}
           </button>
           <Link
-            href="/health-safety/incidents"
-            className="px-6 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
+            href="/projects/health-safety"
+            className="px-6 py-2.5 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
           >
             Cancel
           </Link>
