@@ -39,8 +39,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 async function handleGet(capaId: string, res: NextApiResponse) {
   const [capa] = await sql`
     SELECT ca.*, p.project_name, c.company_name as contractor_name,
-           u.name as assigned_to_name, cr.name as created_by_name,
-           v.name as verified_by_name, co.name as completed_by_name,
+           CONCAT(u.first_name, ' ', u.last_name) as assigned_to_name, CONCAT(cr.first_name, ' ', cr.last_name) as created_by_name,
+           CONCAT(v.first_name, ' ', v.last_name) as verified_by_name, CONCAT(co.first_name, ' ', co.last_name) as completed_by_name,
            CASE WHEN ca.due_date < CURRENT_DATE AND ca.status NOT IN ('closed') THEN true ELSE false END as is_overdue
     FROM hs_corrective_actions ca
     LEFT JOIN projects p ON p.id = ca.project_id
@@ -58,7 +58,7 @@ async function handleGet(capaId: string, res: NextApiResponse) {
 
   // Get comments
   const comments = await sql`
-    SELECT cc.*, u.name as author_name
+    SELECT cc.*, CONCAT(u.first_name, ' ', u.last_name) as author_name
     FROM hs_capa_comments cc
     LEFT JOIN users u ON u.id = cc.author_id
     WHERE cc.capa_id = ${capaId}
@@ -127,9 +127,9 @@ async function handlePut(capaId: string, req: NextApiRequest, res: NextApiRespon
       verification_notes = ${verification_notes !== undefined ? verification_notes : current.verification_notes},
       verification_outcome = ${verification_outcome || current.verification_outcome},
       root_cause_method = ${root_cause_method || current.root_cause_method},
-      root_cause_analysis = ${root_cause_analysis ? JSON.stringify(root_cause_analysis) + '::jsonb' : current.root_cause_analysis},
+      root_cause_analysis = ${root_cause_analysis ? JSON.stringify(root_cause_analysis) : JSON.stringify(current.root_cause_analysis || [])}::jsonb,
       preventive_actions = ${preventive_actions !== undefined ? preventive_actions : current.preventive_actions},
-      evidence_photos = ${evidence_photos ? JSON.stringify(evidence_photos) + '::jsonb' : current.evidence_photos}
+      evidence_photos = ${evidence_photos ? JSON.stringify(evidence_photos) : JSON.stringify(current.evidence_photos || [])}::jsonb
     WHERE id = ${capaId}
     RETURNING *
   `;

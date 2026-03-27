@@ -52,7 +52,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   if (project_id && status) {
     capas = await sql`
       SELECT ca.*, p.project_name, c.company_name as contractor_name,
-             u.name as assigned_to_name, cr.name as created_by_name,
+             CONCAT(u.first_name, ' ', u.last_name) as assigned_to_name, CONCAT(cr.first_name, ' ', cr.last_name) as created_by_name,
              CASE WHEN ca.due_date < CURRENT_DATE AND ca.status NOT IN ('closed') THEN true ELSE false END as is_overdue
       FROM hs_corrective_actions ca
       LEFT JOIN projects p ON p.id = ca.project_id
@@ -66,7 +66,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (project_id) {
     capas = await sql`
       SELECT ca.*, p.project_name, c.company_name as contractor_name,
-             u.name as assigned_to_name, cr.name as created_by_name,
+             CONCAT(u.first_name, ' ', u.last_name) as assigned_to_name, CONCAT(cr.first_name, ' ', cr.last_name) as created_by_name,
              CASE WHEN ca.due_date < CURRENT_DATE AND ca.status NOT IN ('closed') THEN true ELSE false END as is_overdue
       FROM hs_corrective_actions ca
       LEFT JOIN projects p ON p.id = ca.project_id
@@ -80,7 +80,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (contractor_id && status) {
     capas = await sql`
       SELECT ca.*, p.project_name, c.company_name as contractor_name,
-             u.name as assigned_to_name, cr.name as created_by_name,
+             CONCAT(u.first_name, ' ', u.last_name) as assigned_to_name, CONCAT(cr.first_name, ' ', cr.last_name) as created_by_name,
              CASE WHEN ca.due_date < CURRENT_DATE AND ca.status NOT IN ('closed') THEN true ELSE false END as is_overdue
       FROM hs_corrective_actions ca
       LEFT JOIN projects p ON p.id = ca.project_id
@@ -94,7 +94,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (contractor_id) {
     capas = await sql`
       SELECT ca.*, p.project_name, c.company_name as contractor_name,
-             u.name as assigned_to_name, cr.name as created_by_name,
+             CONCAT(u.first_name, ' ', u.last_name) as assigned_to_name, CONCAT(cr.first_name, ' ', cr.last_name) as created_by_name,
              CASE WHEN ca.due_date < CURRENT_DATE AND ca.status NOT IN ('closed') THEN true ELSE false END as is_overdue
       FROM hs_corrective_actions ca
       LEFT JOIN projects p ON p.id = ca.project_id
@@ -108,7 +108,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (status) {
     capas = await sql`
       SELECT ca.*, p.project_name, c.company_name as contractor_name,
-             u.name as assigned_to_name, cr.name as created_by_name,
+             CONCAT(u.first_name, ' ', u.last_name) as assigned_to_name, CONCAT(cr.first_name, ' ', cr.last_name) as created_by_name,
              CASE WHEN ca.due_date < CURRENT_DATE AND ca.status NOT IN ('closed') THEN true ELSE false END as is_overdue
       FROM hs_corrective_actions ca
       LEFT JOIN projects p ON p.id = ca.project_id
@@ -122,7 +122,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else if (overdue_only === 'true') {
     capas = await sql`
       SELECT ca.*, p.project_name, c.company_name as contractor_name,
-             u.name as assigned_to_name, cr.name as created_by_name,
+             CONCAT(u.first_name, ' ', u.last_name) as assigned_to_name, CONCAT(cr.first_name, ' ', cr.last_name) as created_by_name,
              true as is_overdue
       FROM hs_corrective_actions ca
       LEFT JOIN projects p ON p.id = ca.project_id
@@ -136,7 +136,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   } else {
     capas = await sql`
       SELECT ca.*, p.project_name, c.company_name as contractor_name,
-             u.name as assigned_to_name, cr.name as created_by_name,
+             CONCAT(u.first_name, ' ', u.last_name) as assigned_to_name, CONCAT(cr.first_name, ' ', cr.last_name) as created_by_name,
              CASE WHEN ca.due_date < CURRENT_DATE AND ca.status NOT IN ('closed') THEN true ELSE false END as is_overdue
       FROM hs_corrective_actions ca
       LEFT JOIN projects p ON p.id = ca.project_id
