@@ -251,6 +251,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
          step_08_final_installation = $15,
          step_09_green_lights = $16,
          step_10_signature = $17,
+         step_11_dome_joint_open = $23,
+         step_12_dome_joint_closed = $24,
          updated_at = NOW()
        WHERE drop_number = $7`,
       [
@@ -276,6 +278,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         technicianFeedback || null,
         JSON.stringify(issueClassification || {}),
         nextPhase,
+        !!stepCounts[11],
+        !!stepCounts[12],
       ]
     );
 
