@@ -8,7 +8,11 @@ import { AlertTriangle, Clock, CheckCircle, Filter } from 'lucide-react';
 import { CAPAStatusBadge, CAPASeverityBadge } from './CAPAStatusBadge';
 import type { CAPAStatus } from '@/modules/health-safety/types/capa.types';
 
-const fetcher = (url: string) => fetch(url, { credentials: 'include' }).then((r) => r.json());
+const fetcher = (url: string) =>
+  fetch(url, { credentials: 'include' }).then((r) => {
+    if (!r.ok) throw new Error(`${r.status}`);
+    return r.json();
+  });
 
 interface CAPAListProps {
   projectId?: string;
@@ -28,7 +32,7 @@ export function CAPAList({ projectId, contractorId, onSelectCAPA }: CAPAListProp
   const { data, error, isLoading } = useSWR(
     `/api/health-safety/capa?${params}`,
     fetcher,
-    { refreshInterval: 30000 }
+    { refreshInterval: 30000, revalidateOnFocus: true, errorRetryCount: 3 }
   );
 
   const capas = data?.data?.capas || [];
