@@ -246,9 +246,11 @@ export async function generateMeetingMinutesPdf(meeting: Meeting): Promise<Blob>
   }
 
   // ── 2. MEETING OVERVIEW ─────────────────────────────────────────────────────
-  if (meeting.summary?.overview) {
+  const overviewText = meeting.summary?.overview;
+  const isPlaceholder = !overviewText || /no (transcript|summary|ai)/i.test(overviewText);
+  if (overviewText && !isPlaceholder) {
     sectionHeading('Meeting Overview', sn++);
-    bodyText(meeting.summary.overview);
+    bodyText(overviewText);
     y += 4;
   }
 
