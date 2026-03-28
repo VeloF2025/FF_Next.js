@@ -23,7 +23,8 @@ export async function persistAutoQaResults(
   decision: QaDecision,
   autoFailResult: ReturnType<typeof evaluateAutoFail>,
   autoQaResults: AutoQaResults,
-  stepCoverage: ReturnType<typeof checkStepCoverage>
+  stepCoverage: ReturnType<typeof checkStepCoverage>,
+  discardedPhotos?: Array<{ filename: string; originalStep: number; reason: string }>
 ): Promise<void> {
   const reasons = decision === 'PASS' ? [] : autoFailResult.reasons;
   const reasonDescriptions = reasons.map((r) => ({ check: r, status: 'fail', message: getFailReasonDescription(r) }));
@@ -70,6 +71,56 @@ export async function persistAutoQaResults(
       stepBooleans[10], stepBooleans[11],
     ]
   );
+
+  // Patch photos_metadata and vlm_categorization_results for discarded duplicates
+  // so the feedback UI shows the corrected steps
+  if (discardedPhotos && discardedPhotos.length > 0) {
+    const discardMap = new Map(discardedPhotos.map((d) => [d.filename, d]));
+
+    // Update photos_metadata
+    const metaResult = await pool.query(
+      `SELECT photos_metadata, vlm_categorization_results
+       FROM dr_photo_unified_reviews WHERE drop_number = $1`,
+      [dropNumber]
+    );
+
+    if (metaResult.rows.length > 0) {
+      const row = metaResult.rows[0];
+      const photos = row.photos_metadata || [];
+      const vlmResults = row.vlm_categorization_results || [];
+
+      let patchNeeded = false;
+
+      for (let i = 0; i < photos.length; i++) {
+        const discard = discardMap.get(photos[i].filename);
+        if (discard) {
+          photos[i] = { ...photos[i], step: 0 };
+          patchNeeded = true;
+        }
+      }
+
+      for (let i = 0; i < vlmResults.length; i++) {
+        const discard = discardMap.get(vlmResults[i].photo_filename);
+        if (discard) {
+          vlmResults[i] = {
+            ...vlmResults[i],
+            human_override_step: 0,
+            human_override_reason: discard.reason,
+          };
+          patchNeeded = true;
+        }
+      }
+
+      if (patchNeeded) {
+        await pool.query(
+          `UPDATE dr_photo_unified_reviews
+           SET photos_metadata = $1, vlm_categorization_results = $2, updated_at = NOW()
+           WHERE drop_number = $3`,
+          [JSON.stringify(photos), JSON.stringify(vlmResults), dropNumber]
+        );
+      }
+    }
+  }
 }
 
 /**

@@ -33,6 +33,7 @@ import {
 } from './autoQaCommentGenerator';
 import { logActivity } from './activityLogService';
 import { persistAutoQaResults, makeResult } from './autoQaHelpers';
+import { STEP_LABELS } from '../utils/stepMapper';
 import type { VlmCategorizationResult, QaDecision } from '../types/unified.types';
 
 // ============================================================================
@@ -189,6 +190,33 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
       };
     });
 
+    // --- WITHIN-DR DEDUP: for steps 1-10, keep first photo, discard extras to step 0 ---
+    const seenSteps = new Set<number>();
+    let autoDiscardedCount = 0;
+    const discardedPhotos: Array<{ filename: string; originalStep: number; reason: string }> = [];
+
+    for (const photo of photoResults) {
+      const step = photo.step;
+      if (step >= 1 && step <= 10) {
+        if (seenSteps.has(step)) {
+          const originalLabel = STEP_LABELS[step] || `Step ${step}`;
+          const reason = `Auto-discarded: duplicate of ${originalLabel} — only one photo per step is kept`;
+          discardedPhotos.push({ filename: photo.filename, originalStep: step, reason });
+          photo.step = 0;
+          photo.stepLabel = 'Discard - Rubbish';
+          photo.decision = 'FAIL';
+          photo.comment = reason;
+          autoDiscardedCount++;
+        } else {
+          seenSteps.add(step);
+        }
+      }
+    }
+
+    if (autoDiscardedCount > 0) {
+      log.info('AutoQA', `Auto-discarded ${autoDiscardedCount} within-DR duplicate(s) for ${dropNumber}`);
+    }
+
     // --- PHASE 3: Data Validation ---
     const stepCoverage = checkStepCoverage(validationData.photos);
     const powerMeter = validatePowerMeter(validationData.powerMeterDbm);
@@ -226,7 +254,7 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
     };
 
     // --- PERSIST RESULTS ---
-    await persistAutoQaResults(dropNumber, decision, autoFailResult, autoQaResults, stepCoverage);
+    await persistAutoQaResults(dropNumber, decision, autoFailResult, autoQaResults, stepCoverage, discardedPhotos);
 
     // Log activity
     await logActivity(dropNumber, 'AUTO_QA_COMPLETED', {
