@@ -3,6 +3,8 @@ import { log } from '@/lib/logger';
 interface NudgeOptions {
   toAgent: string;
   subject?: string;
+  /** Display name of the person sending the nudge. Defaults to "Operator". */
+  senderName?: string;
 }
 
 /**
@@ -13,7 +15,7 @@ interface NudgeOptions {
  * @returns true if nudge was sent successfully, false otherwise
  */
 export async function nudgeAgent(options: NudgeOptions): Promise<boolean> {
-  const { toAgent, subject = 'Unread message pending' } = options;
+  const { toAgent, subject = 'Unread message pending', senderName = 'Operator' } = options;
 
   if (!toAgent) {
     log.warn('mc-nudge', { error: 'toAgent is required' });
@@ -22,7 +24,7 @@ export async function nudgeAgent(options: NudgeOptions): Promise<boolean> {
 
   try {
     // POST a nudge message to MC API
-    // The message format: "Nudge from [Hein]: action your pending message: [subject]"
+    // The message format: "Nudge from [sender]: action your pending message: [subject]"
     const now = new Date().toLocaleTimeString('en-ZA', {
       hour: '2-digit',
       minute: '2-digit',
@@ -34,7 +36,7 @@ export async function nudgeAgent(options: NudgeOptions): Promise<boolean> {
       body: JSON.stringify({
         to_agent: toAgent,
         type: 'directive',
-        message: `Nudge from Hein at ${now}: action your pending message — ${subject}`,
+        message: `Nudge from ${senderName} at ${now}: action your pending message — ${subject}`,
         payload: {
           nudge: true,
           nudge_time: new Date().toISOString(),

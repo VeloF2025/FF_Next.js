@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, MessageSquare, Bell } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { log } from '@/lib/logger';
 import { nudgeAgent } from '@/lib/mc-nudge';
+import { useAuth } from '@/contexts/AuthContext';
 import type { MCMessage } from '../types';
 
 interface LiveFeedTabProps {
@@ -46,6 +48,10 @@ export function LiveFeedTab({ messages }: LiveFeedTabProps) {
   const [autoScroll, setAutoScroll] = useState(true);
   const [nudgingId, setNudgingId] = useState<number | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
+  const { currentUser } = useAuth();
+
+  // Resolve sender display name from auth context, fallback to "Operator"
+  const senderName = currentUser?.displayName ?? 'Operator';
 
   useEffect(() => {
     if (autoScroll && feedRef.current) {
@@ -55,15 +61,23 @@ export function LiveFeedTab({ messages }: LiveFeedTabProps) {
 
   const handleNudge = async (msg: MCMessage) => {
     if (!msg.to_agent) return;
-    
+
     setNudgingId(msg.id);
     try {
-      await nudgeAgent({
+      const success = await nudgeAgent({
         toAgent: msg.to_agent,
         subject: msg.message.substring(0, 80),
+        senderName,
       });
+
+      if (success) {
+        toast.success(`Nudged ${msg.to_agent}`);
+      } else {
+        toast.error(`Failed to nudge ${msg.to_agent}`);
+      }
     } catch (error) {
       log.warn('nudge-failed', { toAgent: msg.to_agent, error: error instanceof Error ? error.message : String(error) });
+      toast.error(`Failed to nudge ${msg.to_agent}`);
     } finally {
       setNudgingId(null);
     }
@@ -117,6 +131,7 @@ export function LiveFeedTab({ messages }: LiveFeedTabProps) {
                 <span className="text-lg mt-0.5">{getAgentIcon(msg.from_agent)}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
+                    {/* Left: agent names + type badge */}
                     <span className="text-sm font-semibold capitalize" style={{ color: getAgentColor(msg.from_agent) }}>
                       {msg.from_agent}
                     </span>
@@ -131,7 +146,8 @@ export function LiveFeedTab({ messages }: LiveFeedTabProps) {
                     <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full font-medium', badge.bg, badge.text)}>
                       {msg.type}
                     </span>
-                    <span className="text-[10px]" style={{ color: 'var(--ff-text-tertiary)' }}>
+                    {/* Right: timestamp + optional nudge button — always right-aligned */}
+                    <span className="text-[10px] ml-auto" style={{ color: 'var(--ff-text-tertiary)' }}>
                       {formatTime(msg.ts)}
                     </span>
                     {msg.to_agent && (
@@ -140,13 +156,13 @@ export function LiveFeedTab({ messages }: LiveFeedTabProps) {
                         disabled={isNudging}
                         title="Nudge agent"
                         className={cn(
-                          'ml-auto p-1 rounded transition-all opacity-0 group-hover:opacity-100',
+                          'p-1 rounded transition-all opacity-0 group-hover:opacity-100',
                           isNudging
                             ? 'opacity-100 cursor-wait'
                             : 'hover:bg-yellow-500/20 hover:text-yellow-400'
                         )}
                         style={{
-                          color: isNudging ? 'var(--ff-text-tertiary)' : 'var(--ff-text-tertiary)',
+                          color: 'var(--ff-text-tertiary)',
                         }}
                       >
                         <Bell
