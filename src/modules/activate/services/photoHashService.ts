@@ -66,7 +66,8 @@ export async function fetchAndHashPhoto(photoUrl: string): Promise<string | null
 }
 
 /**
- * Store photo hashes in the database (upsert)
+ * Store photo hashes in the database (bulk upsert).
+ * Uses a single multi-row INSERT with UNNEST to avoid N round-trips.
  */
 export async function storePhotoHashes(
   dropNumber: string,
@@ -75,15 +76,18 @@ export async function storePhotoHashes(
   if (photos.length === 0) return;
 
   try {
-    for (const photo of photos) {
-      await pool.query(
-        `INSERT INTO photo_content_hashes (drop_number, filename, sha256_hash)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (drop_number, filename)
-         DO UPDATE SET sha256_hash = EXCLUDED.sha256_hash`,
-        [dropNumber, photo.filename, photo.hash]
-      );
-    }
+    const filenames = photos.map((p) => p.filename);
+    const hashes = photos.map((p) => p.hash);
+    const dropNumbers = photos.map(() => dropNumber);
+
+    await pool.query(
+      `INSERT INTO photo_content_hashes (drop_number, filename, sha256_hash)
+       SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[])
+       ON CONFLICT (drop_number, filename)
+       DO UPDATE SET sha256_hash = EXCLUDED.sha256_hash`,
+      [dropNumbers, filenames, hashes]
+    );
+
     log.info('PhotoHash', `Stored ${photos.length} hashes for ${dropNumber}`);
   } catch (error) {
     log.error('PhotoHash', 'Error storing photo hashes', { dropNumber, error });
