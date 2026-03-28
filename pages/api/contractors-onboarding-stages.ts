@@ -44,8 +44,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   // Method not allowed
-  res.setHeader('Allow', ['GET']);
-  return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+  return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
 }
 
 export default withAuth(handler);
