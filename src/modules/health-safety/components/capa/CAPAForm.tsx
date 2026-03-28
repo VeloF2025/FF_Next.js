@@ -2,7 +2,7 @@
  * CAPA Form - Create/edit corrective action
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { log } from '@/lib/logger';
 import {
@@ -44,12 +44,14 @@ export function CAPAForm({
     preventive_actions: '',
   });
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   // Set default due date based on severity
   useEffect(() => {
     const days = CAPA_SEVERITY_CONFIG[form.severity].defaultDueDays;
     const d = new Date();
     d.setDate(d.getDate() + days);
-    setForm((prev) => ({ ...prev, due_date: d.toISOString().split('T')[0] }));
+    setForm((prev) => ({ ...prev, due_date: d.toISOString().split('T')[0] ?? '' }));
   }, [form.severity]);
 
   // Load users for assignment
@@ -59,6 +61,53 @@ export function CAPAForm({
       .then((d) => setUsers(d.data || d.users || []))
       .catch((err) => log.error('Failed to load users', err as Error));
   }, []);
+
+  // Focus trap + Escape close
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const focusableSelectors =
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+    // Focus first interactive element on mount
+    const focusable = Array.from(
+      dialog.querySelectorAll<HTMLElement>(focusableSelectors)
+    ).filter((el) => !el.hasAttribute('disabled'));
+    focusable[0]?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCancel();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+
+      const els = Array.from(
+        dialog.querySelectorAll<HTMLElement>(focusableSelectors)
+      ).filter((el) => !el.hasAttribute('disabled'));
+
+      if (els.length === 0) return;
+
+      const first = els[0]!;
+      const last = els[els.length - 1]!;
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onCancel]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,17 +148,26 @@ export function CAPAForm({
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="capa-form-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      onClick={onCancel}
     >
-      <div className="bg-[var(--ff-bg-primary)] rounded-xl border border-[var(--ff-border-light)] w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="capa-dialog-title"
+        className="bg-[var(--ff-bg-primary)] rounded-xl border border-[var(--ff-border-light)] w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between p-4 border-b border-[var(--ff-border-light)]">
-          <h2 id="capa-form-title" className="text-lg font-semibold text-[var(--ff-text-primary)]">
+          <h2 id="capa-dialog-title" className="text-lg font-semibold text-[var(--ff-text-primary)]">
             New Corrective Action
           </h2>
-          <button onClick={onCancel} aria-label="Close form" className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]">
+          <button
+            onClick={onCancel}
+            aria-label="Close dialog"
+            className="p-3 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] rounded-lg transition-colors min-w-[44px] min-h-[44px]"
+          >
             <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>

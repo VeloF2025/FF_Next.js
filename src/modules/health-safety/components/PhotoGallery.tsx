@@ -55,7 +55,7 @@ export function PhotoGallery({
   if (!photos || photos.length === 0) {
     return (
       <div className="flex flex-col items-center py-6 text-[var(--ff-text-tertiary)]">
-        <Camera className="w-8 h-8 mb-2 opacity-40" />
+        <Camera aria-hidden="true" className="w-8 h-8 mb-2 opacity-40" />
         <p className="text-sm">{emptyMessage}</p>
       </div>
     );
@@ -70,6 +70,7 @@ export function PhotoGallery({
           <button
             key={idx}
             type="button"
+            aria-label={photo.caption ? `View photo: ${photo.caption}` : `View photo ${idx + 1}`}
             onClick={() => setLightboxIdx(idx)}
             className="group relative rounded-lg overflow-hidden border border-[var(--ff-border-light)] hover:border-[var(--ff-primary-500)] transition-colors"
           >
@@ -80,7 +81,7 @@ export function PhotoGallery({
               className="w-full h-28 object-cover"
             />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-              <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+              <ZoomIn aria-hidden="true" className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
             {photo.caption && (
               <div className="px-2 py-1 bg-[var(--ff-bg-tertiary)] text-xs text-[var(--ff-text-secondary)] truncate">
@@ -107,7 +108,7 @@ export function PhotoGallery({
             <button
               onClick={closeLightbox}
               aria-label="Close lightbox (Escape)"
-              className="absolute -top-10 right-0 p-2 text-white/80 hover:text-white focus:outline-none focus:ring-2 focus:ring-white rounded"
+              className="absolute -top-10 right-0 p-3 text-white/80 hover:text-white focus:outline-none focus:ring-2 focus:ring-white rounded-lg min-w-[44px] min-h-[44px]"
             >
               <X className="w-6 h-6" aria-hidden="true" />
             </button>
@@ -118,14 +119,14 @@ export function PhotoGallery({
                 <button
                   onClick={prevPhoto}
                   aria-label={`Previous photo (${(lightboxIdx - 1 + photos.length) % photos.length + 1} of ${photos.length})`}
-                  className="pointer-events-auto p-2 text-white/70 hover:text-white focus:outline-none focus:ring-2 focus:ring-white rounded"
+                  className="pointer-events-auto p-3 text-white/70 hover:text-white focus:outline-none focus:ring-2 focus:ring-white rounded min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   <ChevronLeft className="w-6 h-6" aria-hidden="true" />
                 </button>
                 <button
                   onClick={nextPhoto}
                   aria-label={`Next photo (${(lightboxIdx + 1) % photos.length + 1} of ${photos.length})`}
-                  className="pointer-events-auto p-2 text-white/70 hover:text-white focus:outline-none focus:ring-2 focus:ring-white rounded"
+                  className="pointer-events-auto p-3 text-white/70 hover:text-white focus:outline-none focus:ring-2 focus:ring-white rounded min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   <ChevronRight className="w-6 h-6" aria-hidden="true" />
                 </button>
