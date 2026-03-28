@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, MessageSquare } from 'lucide-react';
+import { ArrowDown, ArrowUp, MessageSquare, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { log } from '@/lib/logger';
+import { nudgeAgent } from '@/lib/mc-nudge';
 import type { MCMessage } from '../types';
 
 interface LiveFeedTabProps {
@@ -42,6 +44,7 @@ function formatTime(ts: string): string {
 
 export function LiveFeedTab({ messages }: LiveFeedTabProps) {
   const [autoScroll, setAutoScroll] = useState(true);
+  const [nudgingId, setNudgingId] = useState<number | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -49,6 +52,22 @@ export function LiveFeedTab({ messages }: LiveFeedTabProps) {
       feedRef.current.scrollTop = feedRef.current.scrollHeight;
     }
   }, [messages, autoScroll]);
+
+  const handleNudge = async (msg: MCMessage) => {
+    if (!msg.to_agent) return;
+    
+    setNudgingId(msg.id);
+    try {
+      await nudgeAgent({
+        toAgent: msg.to_agent,
+        subject: msg.message.substring(0, 80),
+      });
+    } catch (error) {
+      log.warn('nudge-failed', { toAgent: msg.to_agent, error: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setNudgingId(null);
+    }
+  };
 
   return (
     <div className="flex flex-col h-[calc(100vh-280px)]">
@@ -88,11 +107,12 @@ export function LiveFeedTab({ messages }: LiveFeedTabProps) {
           </div>
         ) : (
           messages.map((msg) => {
-            const badge = TYPE_BADGES[msg.type] || TYPE_BADGES.info;
+            const badge = TYPE_BADGES[msg.type] ?? TYPE_BADGES['info']!;
+            const isNudging = nudgingId === msg.id;
             return (
               <div
                 key={msg.id}
-                className="flex items-start gap-3 p-2 rounded hover:bg-card/5 transition-colors"
+                className="flex items-start gap-3 p-2 rounded hover:bg-card/5 transition-colors group"
               >
                 <span className="text-lg mt-0.5">{getAgentIcon(msg.from_agent)}</span>
                 <div className="flex-1 min-w-0">
@@ -111,9 +131,32 @@ export function LiveFeedTab({ messages }: LiveFeedTabProps) {
                     <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full font-medium', badge.bg, badge.text)}>
                       {msg.type}
                     </span>
-                    <span className="text-[10px] ml-auto" style={{ color: 'var(--ff-text-tertiary)' }}>
+                    <span className="text-[10px]" style={{ color: 'var(--ff-text-tertiary)' }}>
                       {formatTime(msg.ts)}
                     </span>
+                    {msg.to_agent && (
+                      <button
+                        onClick={() => handleNudge(msg)}
+                        disabled={isNudging}
+                        title="Nudge agent"
+                        className={cn(
+                          'ml-auto p-1 rounded transition-all opacity-0 group-hover:opacity-100',
+                          isNudging
+                            ? 'opacity-100 cursor-wait'
+                            : 'hover:bg-yellow-500/20 hover:text-yellow-400'
+                        )}
+                        style={{
+                          color: isNudging ? 'var(--ff-text-tertiary)' : 'var(--ff-text-tertiary)',
+                        }}
+                      >
+                        <Bell
+                          className={cn(
+                            'w-4 h-4',
+                            isNudging && 'animate-pulse'
+                          )}
+                        />
+                      </button>
+                    )}
                   </div>
                   <p className="text-sm" style={{ color: 'var(--ff-text-secondary)' }}>{msg.message}</p>
                 </div>

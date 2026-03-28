@@ -1,12 +1,26 @@
 /**
  * GET /api/analytics/reports/project-revenue
  *
- * Returns Cost Centre Profitability: COS vs Revenue per project.
- * Sources: "FT_Revenue" (actual invoiced revenue) + "Project_Costing" (COS Total).
- * Both sources are required — 500 if either fails.
+ * Project Profitability — Forecast vs Actual
  *
- * Access restricted to authorised users via RBAC (analytics.reports / view)
- * or direct user-ID allowlist.
+ * Project list: Project_Costing (col 3) + BritelinkMCT + BICT-US + MDU
+ *
+ * Forecast Revenue:  Project_Costing col 8
+ * Forecast COS:      Project_Costing col 9
+ *
+ * Actual Revenue:
+ *   - FibreTime projects → FT_Revenue sheet (col 6 = project, col 9 = amount)
+ *   - BritelinkMCT       → Data tab Type=Income / Cost Centre T1=BritelinkMCT
+ *   - BICT-US            → Data tab Type=Income / Cost Centre T1=BICT-US
+ *   - MDU                → Data tab Type=Income / Cost Centre T1=MDU (none currently)
+ *
+ * Actual COS:
+ *   - FibreTime projects → Data tab Type=Expense / Cost Centre T2=project
+ *   - BritelinkMCT       → Data tab Type=Expense / Cost Centre T1=BritelinkMCT / T2=BritelinkMCT
+ *   - BICT-US            → Data tab Type=Expense / Cost Centre T1=BICT-US
+ *   - MDU                → Data tab Type=Expense / Cost Centre T1=BritelinkMCT / T2=MDU
+ *
+ * 🟢 WORKING
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -16,264 +30,235 @@ import { verifyToken } from '@/lib/auth/jwt';
 import { userHasPermission } from '@/lib/permissions';
 import { getWorksheetRange } from '@/lib/graph/sharepoint-excel';
 
-const logger = createLogger('analytics:api:cost-centre-profitability');
+export const dynamic = 'force-dynamic';
 
-/** Allowlist — fallback guard independent of RBAC table */
+const logger = createLogger('analytics:api:project-profitability');
+
 const ALLOWED_USERS = new Set([
   '28ab98c1-df21-48f8-a30a-489cd09a0d39', // Hein
   '7d84184b-2a2b-4fbb-a52e-9815d0e92237', // Lew
 ]);
 
-// 🟢 WORKING: Cost Centre Profitability response types — COS vs Revenue per project
-export interface ProjectProfitability {
+export interface ProjectProfitabilityRow {
   project: string;
-  revenue: number;
-  cos: number;
-  grossProfit: number;
-  margin: number;
+  forecastRevenue: number;
+  forecastCos: number;
+  forecastGP: number;
+  forecastMargin: number | null; // null if no forecast
+  actualRevenue: number;
+  actualCos: number;
+  actualGP: number;
+  actualMargin: number | null;
 }
 
-export interface CostCentreRevenueItem {
-  tier1: string;
-  revenue: number;
-  cos: number;
-  grossProfit: number;
-  margin: number;
-  children: ProjectProfitability[];
+export interface ProjectProfitabilityData {
+  rows: ProjectProfitabilityRow[];
+  totals: Omit<ProjectProfitabilityRow, 'project' | 'forecastMargin' | 'actualMargin'> & {
+    forecastMargin: number | null;
+    actualMargin: number | null;
+  };
 }
 
-interface ApiResponse {
-  success: true;
-  data: CostCentreRevenueItem[];
-  meta: { generatedAt: string; itemCount: number; sources: string[] };
-}
-
-function toNumber(cell: unknown): number {
+function toNum(cell: unknown): number {
   if (typeof cell === 'number') return cell;
   if (typeof cell === 'string') return parseFloat(cell.replace(/[^0-9.\-]/g, '')) || 0;
   return 0;
 }
 
-function findColContains(headers: unknown[], include: string): number {
-  const incL = include.toLowerCase();
-  return headers.findIndex((h) => String(h ?? '').toLowerCase().includes(incL));
-}
-
-function normalize(s: string): string {
-  return s.trim().toLowerCase();
+function norm(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
 /**
- * Parse "FT_Revenue" worksheet.
- * Header row at index 0.
- * col 6 = "Project Name", col 9 = " Debit Excl VAT" (detect by "debit excl").
- * Returns Map<normalizedProjectName, totalRevenue>.
+ * Explicit ordered project list — confirmed by Lew 2026-03-26.
+ * FibreTime projects come from Project_Costing; BU projects appended at bottom.
+ * DO NOT add dynamic rows from the Data tab.
  */
-function parseFTRevenue(values: unknown[][]): Map<string, { display: string; total: number }> {
-  const headers = (values[0] ?? []) as unknown[];
-  logger.info('FT_Revenue headers', { headers: headers.slice(0, 15) });
+const PC_PROJECTS = [
+  'Lawley',
+  'Mohadin',
+  'Mamelodi POP 1',
+  'Etwatwa POP 2',
+  'Grabouw',
+  'Ivory Park',
+  "Thembisa POP 1 (P1/2)",
+  "Thembisa POP 2 (P1/2)",
+  "Thembisa POP 3  (P1/2)",
+  "Themb'elihle",
+  'Mamelodi POP 2',
+  'Mamelodi POP 3',
+  'Tonga',
+];
 
-  // Project Name — col 6 expected, fallback search
-  let projectCol = 6;
-  const projectHeader = String(headers[6] ?? '').toLowerCase();
-  if (!projectHeader.includes('project')) {
-    projectCol = findColContains(headers, 'project name');
-    if (projectCol < 0) projectCol = findColContains(headers, 'project');
-    if (projectCol < 0) projectCol = 6;
-  }
+const BU_PROJECTS = ['BritelinkMCT', 'BICT-US', 'MDU'];
 
-  // Debit Excl VAT — detect by "debit excl", fallback col 9
-  let debitCol = findColContains(headers, 'debit excl');
-  if (debitCol < 0) debitCol = 9;
-
-  logger.info('FT_Revenue column detection', { projectCol, debitCol });
-
-  const grouped = new Map<string, { display: string; total: number }>();
-
-  for (let i = 1; i < values.length; i++) {
-    const row = values[i] as unknown[];
-    const project = String(row[projectCol] ?? '').trim();
-    const amount = toNumber(row[debitCol]);
-    if (!project && amount === 0) continue;
-    const display = project || '(Unassigned)';
-    const key = normalize(display);
-    const existing = grouped.get(key);
-    if (existing) {
-      existing.total += amount;
-    } else {
-      grouped.set(key, { display, total: amount });
-    }
-  }
-
-  logger.info('FT_Revenue parsed', { projects: grouped.size });
-  return grouped;
-}
-
-/**
- * Parse "Project_Costing" worksheet.
- * Header row at index 2 (rows 0+1 are meta/section headers).
- * col 3 = project name, col 9 = "COS - Total" (detect by cos+total, fallback col 9).
- * Data rows start at index 3, skip rows where col 3 is empty.
- * Returns Map<normalizedProjectName, { display, cos }>.
- */
-function parseProjectCosting(
-  values: unknown[][]
-): Map<string, { display: string; cos: number }> {
-  if (values.length < 4) {
-    logger.warn('Project_Costing: insufficient rows', { rowCount: values.length });
-    return new Map();
-  }
-
-  const headers = (values[2] ?? []) as unknown[];
-  logger.info('Project_Costing headers (row 2)', { headers: headers.slice(0, 15) });
-
-  // COS Total — detect by contains("cos") AND contains("total"), fallback col 9
-  let cosCol = headers.findIndex(
-    (h) =>
-      String(h ?? '').toLowerCase().includes('cos') &&
-      String(h ?? '').toLowerCase().includes('total')
-  );
-  if (cosCol < 0) cosCol = 9;
-
-  logger.info('Project_Costing column detection', { cosCol });
-
-  const cosMap = new Map<string, { display: string; cos: number }>();
-
-  for (let i = 3; i < values.length; i++) {
-    const row = values[i] as unknown[];
-    const project = String(row[3] ?? '').trim();
-    if (!project) continue; // skip empty project name rows
-    const cos = toNumber(row[cosCol]);
-    const key = normalize(project);
-    cosMap.set(key, { display: project, cos });
-  }
-
-  logger.info('Project_Costing parsed', { projects: cosMap.size });
-  return cosMap;
-}
-
-/**
- * Merge FT_Revenue + Project_Costing into a single CostCentreRevenueItem.
- * Case-insensitive name matching via normalized keys.
- * Projects with revenue but no COS → cos=0.
- * Projects with COS but no revenue → revenue=0.
- */
-function buildProfitabilityItem(
-  revenueMap: Map<string, { display: string; total: number }>,
-  cosMap: Map<string, { display: string; cos: number }>
-): CostCentreRevenueItem {
-  // Union of all project keys
-  const allKeys = new Set([...revenueMap.keys(), ...cosMap.keys()]);
-
-  const children: ProjectProfitability[] = Array.from(allKeys).map((key) => {
-    const rev = revenueMap.get(key);
-    const cost = cosMap.get(key);
-    const display = rev?.display ?? cost?.display ?? key;
-    const revenue = rev?.total ?? 0;
-    const cos = cost?.cos ?? 0;
-    const grossProfit = revenue - cos;
-    const margin = revenue !== 0 ? grossProfit / revenue : 0;
-    return { project: display, revenue, cos, grossProfit, margin };
+/** Map FT_Revenue or Data T2 name to canonical PC_PROJECTS name */
+function matchProject(name: string, pcNames: string[]): string | null {
+  const n = norm(name);
+  const exact = pcNames.find(p => norm(p) === n);
+  if (exact) return exact;
+  // Prefix match: "Thembisa POP 1" → "Thembisa POP 1 (P1/2)"
+  const prefix = pcNames.find(p => {
+    const pn = norm(p).split(' (')[0];
+    return n === pn || n.startsWith(pn) || pn.startsWith(n);
   });
-
-  children.sort((a, b) => b.revenue - a.revenue);
-
-  const totalRevenue = children.reduce((s, c) => s + c.revenue, 0);
-  const totalCos = children.reduce((s, c) => s + c.cos, 0);
-  const totalGP = totalRevenue - totalCos;
-  const totalMargin = totalRevenue !== 0 ? totalGP / totalRevenue : 0;
-
-  return {
-    tier1: 'Fibertime',
-    revenue: totalRevenue,
-    cos: totalCos,
-    grossProfit: totalGP,
-    margin: totalMargin,
-    children,
-  };
+  return prefix ?? null;
 }
 
-// 🟢 WORKING: Cost Centre Profitability GET handler — FT_Revenue + Project_Costing (both required)
 export async function GET(_req: NextRequest): Promise<NextResponse> {
-  // --- Authentication ---
   const cookieStore = await cookies();
   const token = cookieStore.get('ff_auth_token')?.value;
-
-  if (!token) {
-    return NextResponse.json(
-      { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
-      { status: 401 }
-    );
-  }
+  if (!token) return NextResponse.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Auth required' } }, { status: 401 });
 
   const payload = await verifyToken(token);
-  if (!payload?.sub) {
-    return NextResponse.json(
-      { success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid token' } },
-      { status: 401 }
-    );
+  if (!payload?.sub) return NextResponse.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid token' } }, { status: 401 });
+
+  const hasAccess = await userHasPermission(payload.sub, 'analytics.reports', 'view');
+  if (!hasAccess && !ALLOWED_USERS.has(payload.sub)) {
+    return NextResponse.json({ success: false, error: { code: 'FORBIDDEN', message: 'Access restricted' } }, { status: 403 });
   }
-
-  const userId = payload.sub;
-
-  // --- Authorisation ---
-  const hasAccess = await userHasPermission(userId, 'analytics.reports', 'view');
-  if (!hasAccess && !ALLOWED_USERS.has(userId)) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: { code: 'FORBIDDEN', message: 'Access restricted to authorised users' },
-      },
-      { status: 403 }
-    );
-  }
-
-  logger.info('Cost centre profitability requested', { userId });
 
   try {
-    // Fetch both sheets in parallel — both required for profitability view
-    const [ftResult, costingResult] = await Promise.allSettled([
-      getWorksheetRange('FT_Revenue'),
+    const [pcResult, ftResult, dataResult] = await Promise.all([
       getWorksheetRange('Project_Costing'),
+      getWorksheetRange('FT_Revenue'),
+      getWorksheetRange('Data'),
     ]);
 
-    if (ftResult.status === 'rejected') {
-      throw new Error(`FT_Revenue fetch failed: ${String(ftResult.reason)}`);
+    const pcValues = pcResult.values ?? [];
+    const ftValues = ftResult.values ?? [];
+    const dataValues = dataResult.values ?? [];
+
+    // ── 1. Project_Costing: forecast per project (keyed by canonical name) ──
+    // Sheet has two sections: "Prospective" (rows 3-21) and "Executable" (rows 23-33).
+    // We use the EXECUTABLE section — find its header row first, then read until blank or "Total".
+    const forecastMap = new Map<string, { forecastRevenue: number; forecastCos: number }>();
+    let execHeaderIdx = -1;
+    for (let i = 0; i < pcValues.length; i++) {
+      const cell = String((pcValues[i] as unknown[])[3] ?? '').trim();
+      if (cell === 'Project Scope - Executable') { execHeaderIdx = i; break; }
     }
-    if (costingResult.status === 'rejected') {
-      throw new Error(`Project_Costing fetch failed: ${String(costingResult.reason)}`);
+    const execStart = execHeaderIdx >= 0 ? execHeaderIdx + 1 : 23; // fallback row 23
+    for (let i = execStart; i < pcValues.length; i++) {
+      const row = pcValues[i] as unknown[];
+      const rawName = String(row[3] ?? '').trim();
+      if (!rawName || typeof row[3] !== 'string') continue;
+      if (norm(rawName) === 'total' || rawName.startsWith('Cost/Revenue')) break;
+      const canonical = matchProject(rawName, PC_PROJECTS) ?? rawName;
+      if (!forecastMap.has(canonical)) {
+        forecastMap.set(canonical, { forecastRevenue: toNum(row[8]), forecastCos: toNum(row[9]) });
+      }
+    }
+    logger.info('PC forecast map', { projects: Array.from(forecastMap.keys()) });
+
+    // ── 2. FT_Revenue: actual revenue for FibreTime projects ──────────────
+    const ftRevMap = new Map<string, number>();
+    const ftHeaders = (ftValues[0] ?? []) as unknown[];
+    let projCol = 6;
+    if (!String(ftHeaders[6] ?? '').toLowerCase().includes('project')) {
+      const idx = ftHeaders.findIndex(h => String(h ?? '').toLowerCase().includes('project'));
+      if (idx >= 0) projCol = idx;
+    }
+    let debitCol = ftHeaders.findIndex(h => String(h ?? '').toLowerCase().includes('debit excl'));
+    if (debitCol < 0) debitCol = 9;
+
+    for (let i = 1; i < ftValues.length; i++) {
+      const row = ftValues[i] as unknown[];
+      const name = String(row[projCol] ?? '').trim();
+      if (!name) continue;
+      const canonical = matchProject(name, PC_PROJECTS);
+      if (!canonical) continue; // only accumulate known PC projects
+      ftRevMap.set(canonical, (ftRevMap.get(canonical) ?? 0) + toNum(row[debitCol]));
     }
 
-    const ftValues = ftResult.value.values ?? [];
-    if (ftValues.length < 2) {
-      throw new Error('FT_Revenue sheet returned no data rows');
+    // ── 3. Data tab: actual revenue + COS ─────────────────────────────────
+    const dataCosT2 = new Map<string, number>();   // canonical PC project → COS
+    const dataIncT1 = new Map<string, number>();   // BU T1 → income
+    const dataCosT1T2 = new Map<string, number>(); // BU project → COS
+
+    for (let i = 1; i < dataValues.length; i++) {
+      const row = dataValues[i] as unknown[];
+      const type = String(row[2] ?? '').trim();
+      const t1 = String(row[15] ?? '').trim();
+      const t2 = String(row[16] ?? '').trim();
+      const amt = toNum(row[6]);
+
+      if (type === 'Income' && BU_PROJECTS.includes(t1)) {
+        dataIncT1.set(t1, (dataIncT1.get(t1) ?? 0) + amt);
+      }
+
+      if (type === 'Expense') {
+        // FibreTime project COS — only for known PC projects matched via T2
+        const canonicalT2 = matchProject(t2, PC_PROJECTS);
+        if (canonicalT2) {
+          dataCosT2.set(canonicalT2, (dataCosT2.get(canonicalT2) ?? 0) + amt);
+        }
+        // BU project COS (BritelinkMCT, BICT-US, MDU)
+        if (BU_PROJECTS.includes(t1)) {
+          const key = t2 === 'MDU' ? 'MDU' : t1;
+          dataCosT1T2.set(key, (dataCosT1T2.get(key) ?? 0) + amt);
+        }
+      }
     }
 
-    const costingValues = costingResult.value.values ?? [];
+    // ── 4. Build project rows — FIXED ordered list, no dynamic discovery ───
+    const allProjects = [...PC_PROJECTS, ...BU_PROJECTS];
 
-    const revenueMap = parseFTRevenue(ftValues);
-    const cosMap = parseProjectCosting(costingValues);
+    const rows: ProjectProfitabilityRow[] = allProjects.map(project => {
+      const fc = forecastMap.get(project);
+      const forecastRevenue = fc?.forecastRevenue ?? 0;
+      const forecastCos = fc?.forecastCos ?? 0;
+      const forecastGP = forecastRevenue - forecastCos;
+      const forecastMargin = forecastRevenue > 0 ? forecastGP / forecastRevenue : null;
 
-    const ft = buildProfitabilityItem(revenueMap, cosMap);
+      let actualRevenue = 0;
+      let actualCos = 0;
 
-    const response: ApiResponse = {
-      success: true,
-      data: [ft],
-      meta: {
-        generatedAt: new Date().toISOString(),
-        itemCount: 1,
-        sources: ['FT_Revenue', 'Project_Costing'],
+      if (BU_PROJECTS.includes(project)) {
+        actualRevenue = dataIncT1.get(project) ?? 0;
+        actualCos = dataCosT1T2.get(project) ?? 0;
+      } else {
+        actualRevenue = ftRevMap.get(project) ?? 0;
+        actualCos = dataCosT2.get(project) ?? 0;
+      }
+
+      const actualGP = actualRevenue - actualCos;
+      const actualMargin = actualRevenue > 0 ? actualGP / actualRevenue : null;
+
+      return { project, forecastRevenue, forecastCos, forecastGP, forecastMargin, actualRevenue, actualCos, actualGP, actualMargin };
+    });
+
+    // Filter: keep only rows with at least some data (no empty placeholder rows)
+    const filtered = rows.filter(r => r.forecastRevenue > 0 || r.actualRevenue > 0 || r.actualCos > 0);
+    // Order is preserved from allProjects (explicit list) — no sort
+
+    // Totals
+    const totals = filtered.reduce(
+      (acc, r) => ({
+        ...acc,
+        forecastRevenue: acc.forecastRevenue + r.forecastRevenue,
+        forecastCos: acc.forecastCos + r.forecastCos,
+        forecastGP: acc.forecastGP + r.forecastGP,
+        actualRevenue: acc.actualRevenue + r.actualRevenue,
+        actualCos: acc.actualCos + r.actualCos,
+        actualGP: acc.actualGP + r.actualGP,
+      }),
+      { forecastRevenue: 0, forecastCos: 0, forecastGP: 0, actualRevenue: 0, actualCos: 0, actualGP: 0 }
+    );
+
+    const data: ProjectProfitabilityData = {
+      rows: filtered,
+      totals: {
+        ...totals,
+        forecastMargin: totals.forecastRevenue > 0 ? totals.forecastGP / totals.forecastRevenue : null,
+        actualMargin: totals.actualRevenue > 0 ? totals.actualGP / totals.actualRevenue : null,
       },
     };
 
-    return NextResponse.json(response);
+    return NextResponse.json({ success: true, data });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.error('Cost centre profitability fetch failed', { error: message });
-
-    return NextResponse.json(
-      { success: false, error: { code: 'INTERNAL_ERROR', message } },
-      { status: 500 }
-    );
+    logger.error('Project profitability failed', { error: message });
+    return NextResponse.json({ success: false, error: { code: 'INTERNAL_ERROR', message } }, { status: 500 });
   }
 }

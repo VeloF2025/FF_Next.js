@@ -74,7 +74,7 @@ function mapApiUser(apiUser: {
 }): { user: User; authUser: AuthUser } {
   const role = mapRole(apiUser.role);
   const permissions = apiUser.permissions.includes('all')
-    ? Object.values(Permission)
+    ? ['all' as Permission, ...Object.values(Permission)]
     : (apiUser.permissions as Permission[]);
 
   // Build display name from firstName/lastName or fall back to name or email

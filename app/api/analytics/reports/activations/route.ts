@@ -24,6 +24,8 @@ const REVENUE_PER_ACTIVATION = 3105;
 const ALLOWED_USERS = new Set([
   '28ab98c1-df21-48f8-a30a-489cd09a0d39', // Hein
   '7d84184b-2a2b-4fbb-a52e-9815d0e92237', // Lew
+  '23c96d45-2d4f-4911-84f9-9f88875cece1', // JP Terblanche
+  '281f2d20-bb60-4ec2-8614-9b785d8e88e4', // Ettiene Janse van Rensburg
 ]);
 
 export interface ActivationWeek {

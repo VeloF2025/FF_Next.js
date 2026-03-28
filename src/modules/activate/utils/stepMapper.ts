@@ -18,7 +18,12 @@
  * - Mappings verified against port 8003 photo types
  * - Test coverage ensures bidirectional consistency
  *
- * NOTE: Steps 11 & 12 (ONT Barcode and UPS Serial) are NOT photo steps - they are
+ * Steps 1-10: Required installation photos (all must be present)
+ * Steps 11-12: Optional dome joint (handhole) photos
+ *   - Step 11: Dome Joint Open (ph_hh1) — before closing
+ *   - Step 12: Dome Joint Closed (ph_hh2) — after closing
+ *
+ * NOTE: ONT Barcode and UPS Serial are NOT photo steps - they are
  * scanned barcodes stored directly in ont_serial_scanned and ups_serial_scanned fields
  */
 
@@ -38,7 +43,7 @@ export interface CategorizationResult {
   /** Photo filename */
   filename: string;
 
-  /** Assigned step number (1-10), null if unknown */
+  /** Assigned step number (1-12), null if unknown */
   step: number | null;
 
   /** Step label for display */
@@ -111,6 +116,7 @@ export const PHOTO_TYPE_TO_STEP: Record<string, number> = {
   'ph_ont': 6,
   'ph_ont_back': 6,
   'ph_cbl_r': 6,
+  'ph_conn1': 6,  // ONT front panel / connections
 
   // Step 7: Power Meter Reading
   'ph_powm': 7,
@@ -131,6 +137,12 @@ export const PHOTO_TYPE_TO_STEP: Record<string, number> = {
   'ph_sign1': 10,
   'ph_sign2': 10,
   'ph_signature': 10,
+
+  // Step 11: Dome Joint Open (Handhole before closing)
+  'ph_hh1': 11,
+
+  // Step 12: Dome Joint Closed (Handhole after closing)
+  'ph_hh2': 12,
 };
 
 /**
@@ -149,6 +161,8 @@ export const STEP_LABELS: Record<number, string> = {
   8: 'Final Installation',
   9: 'Green Lights',
   10: 'Signature',
+  11: 'Dome Joint Open',
+  12: 'Dome Joint Closed',
 };
 
 /**
@@ -167,6 +181,8 @@ export const STEP_DESCRIPTIONS: Record<number, string> = {
   8: 'Completed installation',
   9: 'Green lights on ONT with labels',
   10: 'Customer signature',
+  11: 'Dome joint / handhole open before closing',
+  12: 'Dome joint / handhole closed after sealing',
 };
 
 /**
@@ -199,11 +215,13 @@ export const STEP_TO_PHOTO_TYPES: Record<number, string[]> = {
   3: ['ph_entry_out', 'ph_hm_ln'],
   4: ['ph_entry_in', 'ph_hm_en'],
   5: ['ph_wall'],
-  6: ['ph_ont', 'ph_ont_back', 'ph_cbl_r'],
+  6: ['ph_ont', 'ph_ont_back', 'ph_cbl_r', 'ph_conn1'],
   7: ['ph_powm', 'ph_powm1', 'ph_powm2'],
   8: ['ph_after', 'ph_final'],
   9: ['ph_lights', 'ph_led', 'ph_bl', 'ph_drop'],
   10: ['ph_sign1', 'ph_sign2', 'ph_signature'],
+  11: ['ph_hh1'],
+  12: ['ph_hh2'],
 };
 
 /**
@@ -408,8 +426,8 @@ export function getStepCoverage(results: CategorizationResult[]): {
 } {
   const coverageMap: Record<number, CategorizationResult[]> = {};
 
-  // Initialize empty arrays for all 10 steps
-  for (let step = 1; step <= 10; step++) {
+  // Initialize empty arrays for all steps (1-10 required + 11-12 optional dome joint)
+  for (let step = 1; step <= 12; step++) {
     coverageMap[step] = [];
   }
 
@@ -426,7 +444,8 @@ export function getStepCoverage(results: CategorizationResult[]): {
   const covered: number[] = [];
   const missing: number[] = [];
 
-  for (let step = 1; step <= 10; step++) {
+  // All 12 steps are required
+  for (let step = 1; step <= 12; step++) {
     const stepPhotos = coverageMap[step];
     if (stepPhotos && stepPhotos.length > 0) {
       covered.push(step);

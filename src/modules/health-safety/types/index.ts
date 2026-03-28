@@ -16,3 +16,9 @@ export * from './scoring.types';
 
 // Ticket types (H&S extensions to maintenance)
 export * from './ticket.types';
+
+// CAPA types
+export * from './capa.types';
+
+// Risk types
+export * from './risk.types';

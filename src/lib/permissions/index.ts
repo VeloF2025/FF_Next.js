@@ -221,7 +221,6 @@ export async function userHasPermission(
   permissionKey: string,
   action: PermissionAction = 'view'
 ): Promise<boolean> {
-  // Check for legacy 'all' permission (super admin)
   const userResult = await sql`
     SELECT role, permissions FROM users WHERE id = ${userId}
   `;
@@ -230,23 +229,12 @@ export async function userHasPermission(
 
   const user = userResult[0];
 
-  // Super admin with 'all' permission
-  if (user.permissions && Array.isArray(user.permissions) && user.permissions.includes('all')) {
+  // Only super_admin role bypasses RBAC entirely
+  if (user.role === 'super_admin') {
     return true;
   }
 
-  // Get role-based permission
-  const rolePermResult = await sql`
-    SELECT actions FROM role_permissions
-    WHERE role = ${user.role} AND permission_key = ${permissionKey}
-  `;
-
-  let hasPermission = false;
-  if (rolePermResult.length > 0 && rolePermResult[0].actions) {
-    hasPermission = rolePermResult[0].actions[action] === true;
-  }
-
-  // Check for user override
+  // Check for user override first (overrides take priority over role)
   const overrideResult = await sql`
     SELECT override_type, actions FROM user_permission_overrides
     WHERE user_id = ${userId}
@@ -256,22 +244,32 @@ export async function userHasPermission(
 
   if (overrideResult.length > 0) {
     const override = overrideResult[0];
-    if (override.override_type === 'grant' && override.actions[action]) {
-      return true;
+    if (override.override_type === 'grant') {
+      // Grant override replaces role — return the grant's action value
+      return override.actions[action] === true;
     }
     if (override.override_type === 'revoke' && override.actions[action]) {
       return false;
     }
   }
 
-  return hasPermission;
+  // Get role-based permission
+  const rolePermResult = await sql`
+    SELECT actions FROM role_permissions
+    WHERE role = ${user.role} AND permission_key = ${permissionKey}
+  `;
+
+  if (rolePermResult.length > 0 && rolePermResult[0].actions) {
+    return rolePermResult[0].actions[action] === true;
+  }
+
+  return false;
 }
 
 /**
  * Get user's effective permissions
  */
 export async function getUserEffectivePermissions(userId: string): Promise<EffectivePermission[]> {
-  // Check for super admin
   const userResult = await sql`
     SELECT role, permissions FROM users WHERE id = ${userId}
   `;
@@ -279,10 +277,9 @@ export async function getUserEffectivePermissions(userId: string): Promise<Effec
   if (userResult.length === 0) return [];
 
   const user = userResult[0];
-  const isSuperAdmin = user.permissions && Array.isArray(user.permissions) && user.permissions.includes('all');
 
-  if (isSuperAdmin) {
-    // Super admin gets all permissions
+  // Only super_admin role bypasses RBAC entirely
+  if (user.role === 'super_admin') {
     const allPerms = await sql`
       SELECT key FROM access_permissions WHERE is_active = true
     `;

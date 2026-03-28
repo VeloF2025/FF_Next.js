@@ -34,6 +34,7 @@ import type {
 } from '../../src/types/procurement/portal.types';
 import { ProcurementOverview } from '@/modules/procurement/components/ProcurementOverview';
 import { BOQSpendSummary } from '@/modules/procurement/reports/BOQSpendSummary';
+import { BOQStockView } from '@/components/procurement/boq/BOQStockView';
 
 interface ProcurementPageProps {
   initialProject?: Project;
@@ -60,6 +61,7 @@ export default function ProcurementPage({
     'open-orders': {},
     requisitions: {},
     boq: {},
+    'boq-view': {},
     rfq: {},
     quotes: {},
     'purchase-orders': {},
@@ -288,7 +290,8 @@ export default function ProcurementPage({
             <div className="mt-6">
               {activeTab === 'overview' && <DashboardTabContent project={selectedProject} aggregateMetrics={aggregateMetrics} isLoading={isLoading} />}
               {activeTab === 'requisitions' && <RequisitionsTabContent />}
-              {activeTab === 'boq' && <PlaceholderTab title="Bill of Quantities" icon={FileText} description="Manage project BOQ items" />}
+              {activeTab === 'boq' && <BOQStockView selectedProject={selectedProject} />}
+              {activeTab === 'boq-view' && <BOQStockView selectedProject={selectedProject} />}
               {activeTab === 'rfq' && <PlaceholderTab title="Request for Quotations" icon={Send} description="Create and manage RFQs" />}
               {activeTab === 'quotes' && <PlaceholderTab title="Quote Evaluation" icon={Quote} description="Evaluate and compare supplier quotes" />}
               {activeTab === 'purchase-orders' && <PurchaseOrdersTabContent />}

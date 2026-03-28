@@ -140,7 +140,7 @@ export function getFailReasonDescription(code: FailReasonCode): string {
  * Example output: "8/10 ■■■■■■■■□□"
  */
 export function formatStepCoverage(result: StepCoverageResult): string {
-  const REQUIRED_STEPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const REQUIRED_STEPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
   const progressBar = REQUIRED_STEPS.map((step) =>
     result.covered.includes(step) ? '■' : '□'
   ).join('');

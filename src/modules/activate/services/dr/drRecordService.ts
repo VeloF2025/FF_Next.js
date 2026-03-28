@@ -38,7 +38,8 @@ export async function checkExistingUnifiedRecord(dropNumber: string): Promise<Un
        step_01_house_photo, step_02_cable_from_pole, step_03_entry_outside,
        step_04_entry_inside, step_05_wall, step_06_ont_back,
        step_07_power_meter, step_08_final_installation, step_09_green_lights,
-       step_10_signature, submitted_date, created_at, wa_message_id,
+       step_10_signature, step_11_dome_joint_open, step_12_dome_joint_closed,
+       submitted_date, created_at, wa_message_id,
        wa_received_at, onemap_status
      FROM dr_photo_unified_reviews
      WHERE drop_number = $1`,

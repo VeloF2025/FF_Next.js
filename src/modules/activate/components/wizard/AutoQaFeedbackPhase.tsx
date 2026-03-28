@@ -211,10 +211,10 @@ export function AutoQaFeedbackPhase({
     const coveredSteps = photos.map((p) => p.step).filter((s) => s > 0);
     const coveredSet = new Set(coveredSteps);
     const covered = Array.from(coveredSet).sort((a, b) => a - b);
-    const missing = Array.from({ length: 10 }, (_, i) => i + 1).filter((s) => !coveredSet.has(s));
+    const missing = Array.from({ length: 12 }, (_, i) => i + 1).filter((s) => !coveredSet.has(s));
     const updatedValidations = {
       ...autoQaResults.validations,
-      stepCoverage: { covered, missing, total: 10, coveragePercent: covered.length / 10 },
+      stepCoverage: { covered, missing, total: 12, coveragePercent: covered.length / 12 },
     };
     const newMessage = generateFeedbackMessage(
       dropNumber,
@@ -257,21 +257,21 @@ export function AutoQaFeedbackPhase({
           message: feedbackStale ? (() => {
             const cs = new Set(photos.map((p) => p.step).filter((s) => s > 0));
             const cov = Array.from(cs).sort((a, b) => a - b);
-            const mis = Array.from({ length: 10 }, (_, i) => i + 1).filter((s) => !cs.has(s));
+            const mis = Array.from({ length: 12 }, (_, i) => i + 1).filter((s) => !cs.has(s));
             return generateFeedbackMessage(
               dropNumber, decision,
               [...photos.map((p) => ({
                 filename: p.filename, step: p.step, stepLabel: p.stepLabel,
                 tier: p.tier, decision: p.decision, comment: p.comment, confidence: p.confidence,
               })), ...missingSteps],
-              { ...autoQaResults.validations, stepCoverage: { covered: cov, missing: mis, total: 10, coveragePercent: cov.length / 10 } }
+              { ...autoQaResults.validations, stepCoverage: { covered: cov, missing: mis, total: 12, coveragePercent: cov.length / 12 } }
             );
           })() : feedbackMessage,
           destination: sendDestination,
           qaFindings: {
             photoCoverage: {
               covered: 10 - missingSteps.length,
-              total: 10,
+              total: 12,
               missing: missingSteps.map((s) => s.step),
             },
             powerMeter: autoQaResults.validations.powerMeter,
@@ -386,7 +386,7 @@ export function AutoQaFeedbackPhase({
           <SummaryCard
             label="Coverage"
             icon={missingSteps.length === 0 ? '✅' : '⚠️'}
-            detail={`${10 - missingSteps.length}/10`}
+            detail={`${12 - missingSteps.length}/12`}
           />
           <SummaryCard
             label="Power"

@@ -1474,7 +1474,10 @@
       "Bash(sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git log --oneline -1')",
       "Bash(sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git log --oneline -5')",
       "Bash(sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git fetch origin master && git reset --hard origin/master')",
-      "Bash(sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git pull origin master')"
+      "Bash(sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git pull origin master')",
+      "Bash(while read:*)",
+      "Bash(do date:*)",
+      "Bash(crontab -l)"
     ],
     "deny": [],
     "ask": [],

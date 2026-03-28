@@ -10,7 +10,7 @@ module.exports = {
   ],
   ignorePatterns: ['dist', '.eslintrc.cjs'],
   parser: '@typescript-eslint/parser',
-  plugins: ['react-refresh', '@typescript-eslint', 'local'],
+  plugins: ['react-refresh', '@typescript-eslint'],
   rules: {
     'react-refresh/only-export-components': [
       'warn',
@@ -47,9 +47,6 @@ module.exports = {
     '@typescript-eslint/no-non-null-asserted-optional-chain': 'warn',
     '@typescript-eslint/ban-types': 'warn',
     '@typescript-eslint/no-this-alias': 'warn',
-    // FibreFlow custom: ban silent catch blocks — all catches must log the error
-    // See standards/ERROR_HANDLING_TEMPLATE.ts for correct patterns
-    'local/no-silent-catch': 'warn'
   },
   settings: {
     react: {

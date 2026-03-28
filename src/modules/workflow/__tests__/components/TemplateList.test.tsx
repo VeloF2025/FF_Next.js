@@ -21,8 +21,8 @@ jest.mock('../../services/WorkflowManagementService', () => ({
 
 // Mock router
 const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
+jest.mock('next/router', () => ({
+  ...jest.requireActual('next/router'),
   useNavigate: () => mockNavigate
 }));
 

@@ -9,7 +9,8 @@
 'use client';
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { AlertTriangle, CheckCircle2, RotateCcw, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, RotateCcw, RefreshCw, ChevronDown, ChevronRight, FileDown } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import type { ConduitProject, MonthlyPlanEntry, ConduitActual } from '../types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -237,6 +238,109 @@ interface Props {
   onPlanChange: (plan: MonthlyPlanEntry[]) => void;
 }
 
+// ─── Excel Export ─────────────────────────────────────────────────────────────
+
+interface ExportData {
+  projectName: string;
+  months: string[];
+  plan: MonthlyPlanEntry[];
+  derived: {
+    casuals: number; fuel: number; overheads: number; sales: number; ad_hoc: number;
+    cos_material: number; cos_services: number; cos_wayleave: number; cos_total: number;
+    revenue: number; gross: number;
+  }[];
+  actuals: ConduitActual[];
+  actualsMap: Map<string, ConduitActual>;
+  getMonthKey: (i: number) => string;
+}
+
+function exportForecastToExcel(d: ExportData): void {
+  const { projectName, months, plan, derived, actuals, actualsMap, getMonthKey } = d;
+  const hdr = ['', ...months, 'Total'];
+  const R = (label: string, vals: (number | null)[], total?: number): (string | number | null)[] =>
+    [label, ...vals, total ?? vals.reduce<number>((s, v) => s + (v ?? 0), 0)];
+  const blank = (): (string | number | null)[] => Array(hdr.length).fill(null);
+
+  const rows: (string | number | null)[][] = [];
+
+  // Header
+  rows.push(hdr);
+  rows.push(blank());
+
+  // ── Rollout Plan — Forecast
+  rows.push(['ROLLOUT PLAN — FORECAST', ...Array(months.length + 1).fill(null)]);
+  rows.push(R('Poles',                   plan.map(e => e.poles ?? 0)));
+  rows.push(R('Stringing (m)',            plan.map(e => e.stringing_m ?? 0)));
+  rows.push(R('Ready For Optical (RFO)', plan.map(e => e.rfo ?? 0)));
+  rows.push(R("Optical / PON's (ATP)",   plan.map(e => e.pon ?? 0)));
+  rows.push(R('Activations',             plan.map(e => e.activations ?? 0)));
+  rows.push(blank());
+
+  // ── COS Category — Forecast
+  rows.push(['COS CATEGORY — FORECAST', ...Array(months.length + 1).fill(null)]);
+  rows.push(R('COS — Ad Hoc',    derived.map(d => d.ad_hoc)));
+  rows.push(R('COS — Casuals',   derived.map(d => d.casuals)));
+  rows.push(R('COS — Fuel',      derived.map(d => d.fuel)));
+  rows.push(R('COS — Overheads', derived.map(d => d.overheads)));
+  rows.push(R('COS — Sales',     derived.map(d => d.sales)));
+  rows.push(R('COS — Material',  derived.map(d => d.cos_material)));
+  rows.push(R('COS — Services',  derived.map(d => d.cos_services)));
+  rows.push(R('COS — Wayleaves', derived.map(d => d.cos_wayleave)));
+  rows.push(R('Total COS',       derived.map(d => d.cos_total)));
+  rows.push(blank());
+
+  // ── Revenue — Forecast
+  rows.push(['REVENUE — FORECAST', ...Array(months.length + 1).fill(null)]);
+  rows.push(R('Revenue (Activations × Rate)', derived.map(d => d.revenue)));
+  rows.push(R('Monthly Gross',               derived.map(d => d.gross)));
+  let cumNet = 0;
+  rows.push(R('Running Net', derived.map(d => { cumNet += d.gross; return cumNet; }), cumNet));
+  rows.push(blank());
+
+  // ── Rollout Plan — Actual
+  if (actuals.length > 0) {
+    rows.push(['ROLLOUT PLAN — ACTUAL', ...Array(months.length + 1).fill(null)]);
+    rows.push(R('Activations (actual)', months.map((_, i) => {
+      const act = actualsMap.get(getMonthKey(i));
+      return act ? act.activations : null;
+    })));
+    rows.push(blank());
+
+    // ── COS Actuals
+    const cosKeys = [...new Set(actuals.flatMap(a => Object.keys(a.cos_breakdown ?? {})))].sort();
+    if (cosKeys.length > 0) {
+      rows.push(['COS ACTUALS', ...Array(months.length + 1).fill(null)]);
+      for (const cat of cosKeys) {
+        rows.push(R(cat, months.map((_, i) => {
+          const act = actualsMap.get(getMonthKey(i));
+          return act?.cos_breakdown?.[cat] ?? null;
+        })));
+      }
+      rows.push(R('Total COS Actual', months.map((_, i) => {
+        const act = actualsMap.get(getMonthKey(i));
+        return act ? act.cos_actual : null;
+      })));
+      rows.push(blank());
+    }
+
+    // ── Revenue Actuals
+    rows.push(['REVENUE ACTUALS', ...Array(months.length + 1).fill(null)]);
+    rows.push(R('Revenue Actual', months.map((_, i) => {
+      const act = actualsMap.get(getMonthKey(i));
+      return act ? act.revenue_actual : null;
+    })));
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // Column widths
+  ws['!cols'] = [{ wch: 28 }, ...months.map(() => ({ wch: 14 })), { wch: 14 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Forecast');
+  XLSX.writeFile(wb, `${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_Forecast.xlsx`);
+}
+
 export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
   const { build_duration_months: dur, start_date, inputs_json: inp } = project;
   const { service_rates: sr, material_rates: mr, monthly_opex: mo, lump_costs: lc } = inp;
@@ -411,6 +515,22 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
           ) : (
             <span className="text-xs text-amber-500">⚠️ No FT project mapping — set ft_project_name to enable actuals sync</span>
           )}
+          <button
+            onClick={() => exportForecastToExcel({
+              projectName: project.name,
+              months,
+              plan,
+              derived,
+              actuals,
+              actualsMap,
+              getMonthKey,
+            })}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-emerald-900 hover:bg-emerald-800 text-emerald-200 transition-colors"
+            title="Export forecast to Excel"
+          >
+            <FileDown className="w-3 h-3" />
+            Export Excel
+          </button>
         </div>
       )}
 

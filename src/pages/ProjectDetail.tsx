@@ -41,6 +41,7 @@ import { ProjectDocumentsTab } from './detail/ProjectDocumentsTab';
 import { PonStageTracker } from '@/modules/projects/components/pon-stages/PonStageTracker';
 import { PonProgressTracker } from '@/modules/projects/components/pon-progress/PonProgressTracker';
 import { ProjectPrereqs } from '@/modules/projects/components/prereqs/ProjectPrereqs';
+import SpTrackerSandbox from '@/modules/projects/components/sp-tracker/SpTrackerSandbox';
 
 interface ProjectDetailProps {
   projectId: string;
@@ -323,6 +324,10 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
 
       {activeTab === 'prereqs' && (
         <ProjectPrereqs projectId={id!} />
+      )}
+
+      {activeTab === 'sp-tracker' && (
+        <SpTrackerSandbox projectId={id!} />
       )}
     </div>
   );

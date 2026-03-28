@@ -1,0 +1,275 @@
+'use client';
+
+import React, { useMemo, useState } from 'react';
+import { ArrowUpDown, Download, FileSpreadsheet } from 'lucide-react';
+import type { FieldMapping } from './fieldMappingData';
+
+interface GroupedMapping {
+  concept: string;
+  rows: FieldMapping[];
+}
+
+interface FieldMappingTableProps {
+  data: FieldMapping[];
+}
+
+export const FieldMappingTable: React.FC<FieldMappingTableProps> = ({ data }) => {
+  const [sortConfig, setSortConfig] = useState<{
+    key: keyof FieldMapping;
+    direction: 'asc' | 'desc';
+  } | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredData = useMemo(() => {
+    let filtered = data;
+
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = data.filter(
+        item =>
+          item.concept.toLowerCase().includes(term) ||
+          item.table.toLowerCase().includes(term) ||
+          item.column.toLowerCase().includes(term)
+      );
+    }
+
+    if (sortConfig) {
+      filtered = [...filtered].sort((a, b) => {
+        const aVal = a[sortConfig.key];
+        const bVal = b[sortConfig.key];
+        if (typeof aVal === 'string' && typeof bVal === 'string') {
+          return sortConfig.direction === 'asc'
+            ? aVal.localeCompare(bVal)
+            : bVal.localeCompare(aVal);
+        }
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [data, searchTerm, sortConfig]);
+
+  const groupedData = useMemo((): GroupedMapping[] => {
+    const groups = new Map<string, FieldMapping[]>();
+    filteredData.forEach(item => {
+      if (!groups.has(item.concept)) groups.set(item.concept, []);
+      groups.get(item.concept)!.push(item);
+    });
+    return Array.from(groups.entries()).map(([concept, rows]) => ({ concept, rows }));
+  }, [filteredData]);
+
+  const handleSort = (key: keyof FieldMapping): void => {
+    setSortConfig(current =>
+      current?.key === key && current.direction === 'asc'
+        ? { key, direction: 'desc' }
+        : { key, direction: 'asc' }
+    );
+  };
+
+  const getAriaSortValue = (key: keyof FieldMapping): 'ascending' | 'descending' | 'none' => {
+    if (sortConfig?.key !== key) return 'none';
+    return sortConfig.direction === 'asc' ? 'ascending' : 'descending';
+  };
+
+  const handleExportCSV = (): void => {
+    const headers = ['Concept', 'Table', 'Column Name'];
+    const rows = filteredData.map(item => [
+      `"${item.concept.replace(/"/g, '""')}"`,
+      `"${item.table.replace(/"/g, '""')}"`,
+      `"${item.column.replace(/"/g, '""')}"`,
+    ]);
+    const csv = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `field-mappings-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+
+  const handleExportExcel = async (): Promise<void> => {
+    setIsExportingExcel(true);
+    try {
+      // Lazy-load ExcelJS to keep initial bundle small
+      const ExcelJS = (await import('exceljs')).default;
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'FibreFlow';
+      wb.created = new Date();
+      const ws = wb.addWorksheet('Field Mappings');
+
+      // Column definitions with auto-fit widths
+      ws.columns = [
+        { header: 'Concept',     key: 'concept', width: 45 },
+        { header: 'Table',       key: 'table',   width: 35 },
+        { header: 'Column Name', key: 'column',  width: 35 },
+      ];
+
+      // Bold header row with background
+      const headerRow = ws.getRow(1);
+      headerRow.eachCell(cell => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'left' };
+        cell.border = {
+          bottom: { style: 'thin', color: { argb: 'FF93C5FD' } },
+        };
+      });
+
+      // Data rows with alternating row colours
+      filteredData.forEach((item, idx) => {
+        const row = ws.addRow({
+          concept: item.concept,
+          table:   item.table,
+          column:  item.column,
+        });
+        const isEven = idx % 2 === 0;
+        row.eachCell(cell => {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: isEven ? 'FFF8FAFC' : 'FFEFF6FF' },
+          };
+          cell.font = { name: 'Calibri', size: 11 };
+          cell.alignment = { vertical: 'middle' };
+        });
+        // Concept column: slightly bolder for group header rows
+        const conceptCell = row.getCell('concept');
+        if (conceptCell.value) {
+          conceptCell.font = { name: 'Calibri', size: 11, bold: true };
+        }
+      });
+
+      // Freeze header row
+      ws.views = [{ state: 'frozen', ySplit: 1 }];
+
+      // Trigger download
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `field-mappings-${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
+
+  const SortIcon = ({ column }: { column: keyof FieldMapping }): React.ReactNode => (
+    <ArrowUpDown
+      className={`w-4 h-4 ${
+        sortConfig?.key === column
+          ? 'text-[var(--ff-primary)]'
+          : 'text-[var(--ff-text-tertiary)]'
+      }`}
+      aria-hidden="true"
+    />
+  );
+
+  return (
+    <div className="space-y-4">
+      {/* Search + Export */}
+      <div className="flex items-center gap-4">
+        <input
+          type="text"
+          placeholder="Search by concept, table, or column..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+          aria-label="Search field mappings"
+          className="flex-1 px-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]"
+        />
+        <button
+          onClick={handleExportCSV}
+          aria-label="Export field mappings as CSV"
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-primary)] hover:opacity-90 text-white rounded-lg transition-opacity focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)] focus:ring-offset-2"
+        >
+          <Download className="w-4 h-4" aria-hidden="true" />
+          Export CSV
+        </button>
+        <button
+          onClick={handleExportExcel}
+          disabled={isExportingExcel}
+          aria-label="Export field mappings as Excel (.xlsx)"
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-warning)] hover:opacity-90 text-white rounded-lg transition-opacity focus:outline-none focus:ring-2 focus:ring-[var(--ff-warning)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-wait"
+        >
+          <FileSpreadsheet className="w-4 h-4" aria-hidden="true" />
+          {isExportingExcel ? 'Exporting…' : 'Export Excel'}
+        </button>
+      </div>
+
+      {/* Table */}
+      <div className="overflow-x-auto rounded-lg border border-[var(--ff-border-light)]">
+        <table
+          className="w-full"
+          role="table"
+          aria-label="Database field mappings"
+          aria-rowcount={filteredData.length}
+        >
+          <thead className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] sticky top-0">
+            <tr role="row">
+              {(['concept', 'table', 'column'] as const).map(col => (
+                <th
+                  key={col}
+                  scope="col"
+                  aria-sort={getAriaSortValue(col)}
+                  className="px-6 py-3 text-left"
+                >
+                  <button
+                    onClick={() => handleSort(col)}
+                    className="flex items-center gap-2 font-semibold text-[var(--ff-text-primary)] hover:text-[var(--ff-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)] rounded"
+                    aria-label={`Sort by ${col}${sortConfig?.key === col ? `, currently ${sortConfig.direction}ending` : ''}`}
+                  >
+                    {col.charAt(0).toUpperCase() + col.slice(1).replace('_', ' ')}
+                    <SortIcon column={col} />
+                  </button>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {groupedData.map((group) => (
+              <React.Fragment key={group.concept}>
+                {group.rows.map((row, rowIdx) => (
+                  <tr
+                    key={`${group.concept}-${rowIdx}`}
+                    role="row"
+                    className={
+                      rowIdx % 2 === 0
+                        ? 'bg-[var(--ff-bg-primary)]'
+                        : 'bg-[var(--ff-bg-secondary)]'
+                    }
+                  >
+                    <td className="px-6 py-3 text-[var(--ff-text-primary)] border-b border-[var(--ff-border-light)]">
+                      {rowIdx === 0 ? group.concept : ''}
+                    </td>
+                    <td className="px-6 py-3 text-[var(--ff-text-secondary)] border-b border-[var(--ff-border-light)] font-mono text-sm">
+                      {row.table}
+                    </td>
+                    <td className="px-6 py-3 text-[var(--ff-text-secondary)] border-b border-[var(--ff-border-light)] font-mono text-sm">
+                      {row.column}
+                    </td>
+                  </tr>
+                ))}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Count */}
+      <div className="text-sm text-[var(--ff-text-tertiary)]" aria-live="polite" role="status">
+        Showing {filteredData.length} of {data.length} mappings
+      </div>
+    </div>
+  );
+};

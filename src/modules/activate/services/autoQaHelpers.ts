@@ -30,7 +30,7 @@ export async function persistAutoQaResults(
   const reasonDescriptions = reasons.map((r) => ({ check: r, status: 'fail', message: getFailReasonDescription(r) }));
 
   // Compute step booleans from coverage
-  const stepBooleans = Array.from({ length: 10 }, (_, i) =>
+  const stepBooleans = Array.from({ length: 12 }, (_, i) =>
     stepCoverage.covered.includes(i + 1)
   );
 
@@ -57,6 +57,8 @@ export async function persistAutoQaResults(
        step_08_final_installation = $12,
        step_09_green_lights = $13,
        step_10_signature = $14,
+       step_11_dome_joint_open = $15,
+       step_12_dome_joint_closed = $16,
        updated_at = NOW()
      WHERE drop_number = $4`,
     [
@@ -66,6 +68,7 @@ export async function persistAutoQaResults(
       dropNumber,
       stepBooleans[0], stepBooleans[1], stepBooleans[2], stepBooleans[3], stepBooleans[4],
       stepBooleans[5], stepBooleans[6], stepBooleans[7], stepBooleans[8], stepBooleans[9],
+      stepBooleans[10], stepBooleans[11],
     ]
   );
 

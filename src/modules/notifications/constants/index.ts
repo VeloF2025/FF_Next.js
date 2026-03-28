@@ -20,6 +20,8 @@ export const DEFAULT_CHANNEL_PREFERENCES: Record<string, ChannelPreferences> = {
   'noc.sla_warning':        { in_app: true, email: true,  whatsapp: true  },
   'noc.ticket_closed':      { in_app: true, email: false, whatsapp: false },
   'noc.ticket_team_assigned': { in_app: true, email: true,  whatsapp: true  },
+  'noc.ticket_status_changed': { in_app: true, email: true,  whatsapp: false },
+  'noc.ticket_unassigned':    { in_app: true, email: true,  whatsapp: false },
 
   // -- Activate / QField --
   'activate.qa_rejected':           { in_app: true, email: true,  whatsapp: true  },
@@ -62,6 +64,8 @@ export const EVENT_ICONS: Record<string, string> = {
   'noc.sla_warning':        'clock',
   'noc.ticket_closed':      'check-square',
   'noc.ticket_team_assigned': 'users',
+  'noc.ticket_status_changed': 'refresh-cw',
+  'noc.ticket_unassigned':    'user-minus',
 
   'activate.qa_rejected':           'x-circle',
   'activate.qa_approved':           'check-circle',
@@ -96,6 +100,8 @@ export const EVENT_SEVERITY: Record<string, NotificationSeverity> = {
   'noc.sla_warning':        'warning',
   'noc.ticket_closed':      'success',
   'noc.ticket_team_assigned': 'info',
+  'noc.ticket_status_changed': 'info',
+  'noc.ticket_unassigned':    'warning',
 
   'activate.qa_rejected':           'error',
   'activate.qa_approved':           'success',
@@ -130,6 +136,8 @@ export const EVENT_LABELS: Record<string, string> = {
   'noc.sla_warning':        'SLA Warning',
   'noc.ticket_closed':      'Ticket Closed',
   'noc.ticket_team_assigned': 'Ticket Assigned to Team',
+  'noc.ticket_status_changed': 'Ticket Status Changed',
+  'noc.ticket_unassigned':    'Ticket Unassigned',
 
   'activate.qa_rejected':           'Activate QA Rejected',
   'activate.qa_approved':           'Activate QA Approved',
@@ -164,6 +172,8 @@ export const EVENT_GROUPS: Record<string, string> = {
   'noc.sla_warning':    'NOC',
   'noc.ticket_closed':    'NOC',
   'noc.ticket_team_assigned':    'NOC',
+  'noc.ticket_status_changed':    'NOC',
+  'noc.ticket_unassigned':    'NOC',
 
   'activate.qa_rejected':           'QA / Activate',
   'activate.qa_approved':           'QA / Activate',

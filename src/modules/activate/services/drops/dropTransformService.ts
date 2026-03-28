@@ -46,7 +46,7 @@ export function transformDropRow(row: Record<string, unknown>): UnifiedDrop {
     ...(row as unknown as UnifiedDrop),
     is_complete: isDropComplete(row),
     steps_completed: countCompletedSteps(row),
-    steps_total: 10,
+    steps_total: 12,
     submission_count: (row.submission_count as number) || 1,
     is_resubmission: (row.is_resubmission as boolean) || false,
     previous_photo_count: (row.previous_photo_count as number | null) ?? null,

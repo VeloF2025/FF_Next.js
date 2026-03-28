@@ -3,7 +3,7 @@
  *
  * Returns pivot data: Category T2 rows × month columns, Amount Excl. VAT sums.
  * Query params: ?type=Expense (default) | Income | All
- * Filter: only rows where Split (col 13) === "Included"
+ * Filter: only rows where Split (col 14) === "Included"
  *
  * Access restricted to authorised users via RBAC (analytics.reports / view)
  * or direct user-ID allowlist.
@@ -141,8 +141,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     for (let i = 1; i < values.length; i++) {
       const row = values[i] as unknown[];
 
-      // Skip if Split (col 13) !== "Included"
-      if (toString(row[13]) !== 'Included') continue;
+      // Skip if Split (col 14) !== "Included"
+      if (toString(row[14]) !== 'Included') continue;
 
       // Apply type filter
       const rowType = toString(row[2]);
@@ -158,8 +158,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       // Get Category T2 (col 10)
       const categoryT2 = toString(row[10]) || '(Uncategorised)';
 
-      // Get Amount Excl. VAT (col 5)
-      const amount = toNumber(row[5]);
+      // Get Amount Excl. VAT (col 6)
+      const amount = toNumber(row[6]);
 
       // Accumulate
       monthKeySet.add(monthKey);

@@ -134,6 +134,7 @@ export const getGroupedTabConfig = (): TabGroup[] => [
     tabs: [
       { id: 'pon-stages', label: 'Tracker' },
       { id: 'pon-progress', label: 'Progress' },
+      { id: 'sp-tracker', label: 'SP Data' },
     ],
   },
   {

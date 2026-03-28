@@ -373,35 +373,42 @@ function buildPhotoPrompt(
   const classificationBlock = isClassification ? `
 You must CLASSIFY which checklist step this photo belongs to.
 
-CIVIL CHECKLIST STEPS:
-  Step 1 - Before Photo: Ground markings visible (circle/square/X painted on ground indicating pole hole location)
-  Step 2 - During Photo: Workers actively digging a hole or pouring concrete — action in progress
-  Step 3 - Depth Photo: Measuring tape or ruler placed inside hole showing depth measurement
-  Step 4 - End Plates: Metal rectangular end-plates or cap plates bolted to the top or base of the pole, close-up
-  Step 5 - Compaction / Backfill: Sand+cement mix packed around pole base, compacted surface — NOT loose heaps
-  Step 6 - Level Check: Spirit level (bubble level tool) held against the upright pole
-  Step 7 - After Photo: Wide shot from distance showing the full pole standing upright in the ground
-  Step 0 - Unrelated: Photo does NOT show any civil pole installation activity
+CIVIL CHECKLIST STEPS (in order of the installation process):
+  Step 1 - Before Photo: Ground-level photo BEFORE digging. Shows chalk/spray paint markings (circle, square, X) on INTACT undisturbed ground OR just flat ground where the pole will go. NO hole, NO pole, NO digging yet. Can be a simple photo of the ground/area.
+  Step 2 - During Photo: Active excavation — an OPEN HOLE visible in the ground, workers digging, spade/pick visible, freshly dug earth piled beside hole. Ground has been BROKEN OPEN. NO pole installed yet. The hole is EMPTY (no pole in it).
+  Step 3 - Depth Photo: Measuring tape, ruler, or marked stick placed INSIDE the hole showing depth measurement. The measuring instrument is the key visual element.
+  Step 4 - End Plates: Close-up of metal end-plates, HDPE strapping, cap plates, or metal brackets bolted/attached to the pole. Shows hardware/fittings on the pole itself. Can show metal straps, bolts, or rectangular plates at pole base or top. THIS IS NOT ground — it's metal hardware ON the pole.
+  Step 5 - Compaction / Backfill: Ground AROUND the base of a STANDING pole that has been filled and compacted with sand+cement mix. The pole is already installed and the hole is FILLED (not open). Surface is packed/tamped — NOT a loose heap.
+  Step 6 - Level Check: A spirit level (bubble level tool) held AGAINST the side of an upright pole. The yellow/green bubble tool is the key visual indicator.
+  Step 7 - After Photo: Wide shot taken from a DISTANCE showing the full pole standing upright. You can see the entire pole from base to top, usually with sky/background visible. Taken standing BACK from the pole.
+  Step 0 - Unrelated: ONLY use this for optical/fibre equipment (splice trays, domes, ONTs, fibre cables) or photos completely unrelated to pole installation.
+
+⚠️ CRITICAL RULE: DO NOT classify as "Unrelated" (Step 0) unless the photo shows:
+  - Optical/fibre equipment (splice trays, domes, fibre cables, ONTs, patch panels)
+  - Something completely unrelated to pole installation (vehicles, people posing, documents)
+  If the photo shows ANYTHING related to a pole, ground, hole, or construction → it is NOT Unrelated.
+  Based on 1208 human corrections, 38% of all VLM errors are valid civil photos wrongly classified as Unrelated.
+
+⚠️ TOP CONFUSION PAIRS (from 1208 human corrections — avoid these mistakes):
+  1. During (2) vs Compaction (5): 207 errors. KEY: Is the hole OPEN and EMPTY → Step 2. Is the hole FILLED with pole standing → Step 5.
+  2. Unrelated (0) vs End Plates (4): 200 errors. Close-up of metal hardware on a pole = Step 4, NOT unrelated.
+  3. Unrelated (0) vs Before Photo (1): 152 errors. Ground-level photo without a hole = Step 1, NOT unrelated.
+  4. Compaction (5) vs End Plates (4): 66 errors. Metal fittings/straps = Step 4. Packed earth surface = Step 5.
+  5. Unrelated (0) vs After Photo (7): 62 errors. Wide shot showing a standing pole = Step 7, NOT unrelated.
+  6. During (2) vs After Photo (7): 47 errors. If a pole is STANDING in the photo → Step 7. Step 2 has NO pole.
+
+⚠️ BEFORE vs DURING:
+  Step 1 (Before): Ground is FLAT and UNBROKEN. Paint/chalk marks on intact soil. NO hole.
+  Step 2 (During): Ground is BROKEN. A DUG HOLE, piled dirt, or active digging. NO pole yet.
+  → Intact ground = Step 1. Broken ground with hole = Step 2.
+
+⚠️ DURING vs COMPACTION (most confused pair — 207 errors):
+  Step 2 (During): Hole is OPEN and EMPTY. No pole installed. Workers may be digging.
+  Step 5 (Compaction): Pole is STANDING. Hole is FILLED and PACKED around the pole base.
+  → No pole + open hole = Step 2. Pole standing + filled ground = Step 5.
 
 ⚠️ OPTICAL EQUIPMENT = UNRELATED (Step 0):
-The following are OPTICAL/FIBRE equipment — they are NOT civil pole installation steps:
-- Splice trays, fibre splice closures, fusion splice cassettes
-- Dome joints, dome interiors, dome enclosures
-- Fibre optic splitter boxes, ODF panels, patch panels
-- Fibre labels, fibre identification tags on cables
-- Cable termination boxes, optical network terminals (ONTs)
-- Loose tube fibre, fibre strands, fibre pigtails
-- Any close-up of fibre optic cables, connectors, or equipment
-If you see ANY of the above, classify as Step 0 (Unrelated) immediately.
-
-⚠️ CLASSIFICATION TIPS:
-- If you see metal plates/caps on a pole → Step 4 (End Plates), NOT Step 2
-- If you see packed/compacted ground around pole base → Step 5 (Compaction), NOT Step 2
-- If you see a wide outdoor shot with a pole standing → Step 7 (After Photo), NOT Step 2
-- If you see ground markings before any digging → Step 1 (Before Photo)
-- Step 2 (During) ONLY if workers are actively digging or there is an open hole being dug
-- If you see fibre optic equipment, domes, splice trays → Step 0 (Unrelated), even if a pole is visible
-- Do NOT default to "Unrelated" unless the photo truly shows nothing related to pole installation OR shows optical/fibre equipment
+Only these are unrelated: splice trays, fibre closures, dome joints, dome interiors, ODF panels, patch panels, fibre labels, cable termination boxes, ONTs, loose fibre strands.
 
 Respond with this JSON:
 {

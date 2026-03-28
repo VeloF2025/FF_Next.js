@@ -371,6 +371,7 @@ export interface ApproveCategorizeResponse {
   status: 'approved' | 'partial';
   approved_count: number;
   overridden_count: number;
+  auto_discarded_count?: number;
   photos_metadata: Photo[];
 }
 

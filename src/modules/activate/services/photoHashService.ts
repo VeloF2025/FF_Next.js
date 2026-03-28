@@ -87,7 +87,6 @@ export async function storePhotoHashes(
        DO UPDATE SET sha256_hash = EXCLUDED.sha256_hash`,
       [dropNumbers, filenames, hashes]
     );
-
     log.info('PhotoHash', `Stored ${photos.length} hashes for ${dropNumber}`);
   } catch (error) {
     log.error('PhotoHash', 'Error storing photo hashes', { dropNumber, error });

@@ -16,6 +16,8 @@
  * - ticket.qa_rejected - QA rejects ticket submission
  * - ticket.closed - Ticket successfully closed
  * - ticket.sla_warning - SLA deadline approaching
+ * - ticket.status_changed - Status change (notifies creator)
+ * - ticket.unassigned - Reassignment (notifies old assignee)
  *
  * @module maintenance/services/notificationTriggers
  */
@@ -953,4 +955,229 @@ export async function triggerOnTeamAssignment(
   });
 
   return results;
+}
+
+// ============================================================================
+// Creator Lookup
+// ============================================================================
+
+/**
+ * Lookup the ticket creator's user record.
+ * created_by directly references users.id.
+ */
+async function lookupCreator(createdBy: string): Promise<UserLookup | null> {
+  try {
+    return await queryOne<UserLookup>(
+      `SELECT id, first_name || ' ' || last_name AS name, phone_number AS phone
+       FROM users
+       WHERE id = $1::uuid AND is_active = TRUE
+       LIMIT 1`,
+      [createdBy]
+    );
+  } catch (error) {
+    logger.error('Failed to lookup ticket creator', {
+      error: error instanceof Error ? error.message : 'Unknown',
+      createdBy,
+    });
+    return null;
+  }
+}
+
+// ============================================================================
+// Creator Status Update Notification
+// ============================================================================
+
+/**
+ * Notify the ticket creator when the ticket status changes.
+ * Keeps the reporter in the loop — like a Zendesk requester update.
+ *
+ * @param ticket - The ticket after the status change
+ * @param oldStatus - Previous status
+ * @param newStatus - New status
+ */
+export async function triggerCreatorStatusUpdate(
+  ticket: Ticket,
+  oldStatus: TicketStatus,
+  newStatus: TicketStatus
+): Promise<void> {
+  if (!ticket.created_by) {
+    logger.debug('No created_by on ticket, skipping creator notification', {
+      ticket_id: ticket.id,
+    });
+    return;
+  }
+
+  const creator = await lookupCreator(ticket.created_by);
+  if (!creator) {
+    logger.warn('Creator not found for status notification', {
+      ticket_id: ticket.id,
+      created_by: ticket.created_by,
+    });
+    return;
+  }
+
+  const statusLabel = newStatus.replace(/_/g, ' ');
+  const payload = {
+    event_type: 'noc.ticket_status_changed',
+    title: `Ticket ${ticket.ticket_uid} — status changed to ${statusLabel}`,
+    body: buildStatusChangeEmailBody(ticket, oldStatus, newStatus),
+    action_url: `/noc/tickets/${ticket.id}`,
+    source_module: 'maintenance',
+    source_id: ticket.id,
+    recipient_user_ids: [creator.id],
+  };
+
+  notify(payload).catch((err) => {
+    logger.error('Failed to send creator status notification', {
+      error: err, ticket_id: ticket.id,
+    });
+  });
+
+  deliverEmail(creator.id, payload, null).catch((err) => {
+    logger.error('Failed to send creator status email', {
+      error: err, ticket_id: ticket.id,
+    });
+  });
+
+  logger.info('Creator status notification dispatched', {
+    ticket_id: ticket.id,
+    creator_id: creator.id,
+    old_status: oldStatus,
+    new_status: newStatus,
+  });
+}
+
+function buildStatusChangeEmailBody(
+  ticket: Ticket,
+  oldStatus: TicketStatus,
+  newStatus: TicketStatus
+): string {
+  const lines: string[] = [];
+  lines.push(`Your ticket ${ticket.ticket_uid} has been updated.`);
+  lines.push('');
+  lines.push(`Title: ${ticket.title}`);
+  lines.push(`Status: ${oldStatus.replace(/_/g, ' ')} → ${newStatus.replace(/_/g, ' ')}`);
+  if (ticket.priority) lines.push(`Priority: ${ticket.priority}`);
+  if (ticket.dr_number) lines.push(`DR Number: ${ticket.dr_number}`);
+  lines.push('');
+  lines.push('View the ticket for full details.');
+  return lines.join('\n');
+}
+
+// ============================================================================
+// Reassignment Notification (old assignee + creator)
+// ============================================================================
+
+/**
+ * Notify the old assignee that they have been unassigned, and notify the
+ * creator about the reassignment. The NEW assignee is already notified by
+ * triggerOnTicketAssignment.
+ *
+ * @param ticket - Ticket after reassignment (has new assigned_to)
+ * @param oldAssignedTo - Previous staff.id (may be null for first assignment)
+ */
+export async function triggerOnReassignment(
+  ticket: Ticket,
+  oldAssignedTo: string | null
+): Promise<void> {
+  // Notify old assignee they've been unassigned
+  if (oldAssignedTo) {
+    const oldUserId = await resolveUserIdFromStaff(oldAssignedTo);
+    if (oldUserId) {
+      const unassignPayload = {
+        event_type: 'noc.ticket_unassigned',
+        title: `Ticket ${ticket.ticket_uid} — you have been unassigned`,
+        body: buildUnassignedEmailBody(ticket),
+        action_url: `/noc/tickets/${ticket.id}`,
+        source_module: 'maintenance',
+        source_id: ticket.id,
+        recipient_user_ids: [oldUserId],
+      };
+
+      notify(unassignPayload).catch((err) => {
+        logger.error('Failed to send unassign notification', {
+          error: err, ticket_id: ticket.id,
+        });
+      });
+
+      deliverEmail(oldUserId, unassignPayload, null).catch((err) => {
+        logger.error('Failed to send unassign email', {
+          error: err, ticket_id: ticket.id,
+        });
+      });
+
+      logger.info('Old assignee unassign notification dispatched', {
+        ticket_id: ticket.id,
+        old_staff_id: oldAssignedTo,
+        old_user_id: oldUserId,
+      });
+    }
+  }
+
+  // Notify creator about the reassignment
+  if (ticket.created_by) {
+    const creator = await lookupCreator(ticket.created_by);
+    if (creator) {
+      // Resolve new assignee name for the email
+      let newAssigneeName = 'Unassigned';
+      if (ticket.assigned_to) {
+        const service = getDefaultNotificationTriggerService();
+        const newUser = await service['lookupUserByStaffId'](ticket.assigned_to);
+        if (newUser) newAssigneeName = newUser.name;
+      }
+
+      const reassignPayload = {
+        event_type: 'noc.ticket_status_changed',
+        title: `Ticket ${ticket.ticket_uid} — reassigned to ${newAssigneeName}`,
+        body: buildReassignedEmailBody(ticket, newAssigneeName),
+        action_url: `/noc/tickets/${ticket.id}`,
+        source_module: 'maintenance',
+        source_id: ticket.id,
+        recipient_user_ids: [creator.id],
+      };
+
+      notify(reassignPayload).catch((err) => {
+        logger.error('Failed to send creator reassignment notification', {
+          error: err, ticket_id: ticket.id,
+        });
+      });
+
+      deliverEmail(creator.id, reassignPayload, null).catch((err) => {
+        logger.error('Failed to send creator reassignment email', {
+          error: err, ticket_id: ticket.id,
+        });
+      });
+
+      logger.info('Creator reassignment notification dispatched', {
+        ticket_id: ticket.id,
+        creator_id: creator.id,
+        new_assignee: newAssigneeName,
+      });
+    }
+  }
+}
+
+function buildUnassignedEmailBody(ticket: Ticket): string {
+  const lines: string[] = [];
+  lines.push(`You have been unassigned from ticket ${ticket.ticket_uid}.`);
+  lines.push('');
+  lines.push(`Title: ${ticket.title}`);
+  if (ticket.priority) lines.push(`Priority: ${ticket.priority}`);
+  if (ticket.dr_number) lines.push(`DR Number: ${ticket.dr_number}`);
+  lines.push('');
+  lines.push('The ticket has been reassigned to another person or team.');
+  return lines.join('\n');
+}
+
+function buildReassignedEmailBody(ticket: Ticket, newAssigneeName: string): string {
+  const lines: string[] = [];
+  lines.push(`Your ticket ${ticket.ticket_uid} has been reassigned.`);
+  lines.push('');
+  lines.push(`Title: ${ticket.title}`);
+  lines.push(`Now assigned to: ${newAssigneeName}`);
+  if (ticket.priority) lines.push(`Priority: ${ticket.priority}`);
+  if (ticket.dr_number) lines.push(`DR Number: ${ticket.dr_number}`);
+  lines.push('');
+  lines.push('View the ticket for full details.');
+  return lines.join('\n');
 }

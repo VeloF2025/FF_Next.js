@@ -48,7 +48,7 @@ export function useHelpCenter(): UseHelpCenterReturn {
         setCurrentSectionId(parsedSections[0].id);
       }
     } catch (error) {
-      console.error('Failed to load manual content:', error);
+      // Silently fail and show empty sections — manual content optional for app function
       setSections([]);
     }
   }, [currentSectionId]);

@@ -9,3 +9,13 @@ export { ContractorHSTab } from './ContractorHSTab';
 export { AuditWizard } from './AuditWizard';
 export { ContractorHSGrid } from './ContractorHSGrid';
 export { ProjectIncidentsSection } from './ProjectIncidentsSection';
+export { PhotoGallery, type GalleryPhoto } from './PhotoGallery';
+
+// Incident form sub-components
+export {
+  IncidentBasicFields,
+  IncidentLocationFields,
+  IncidentDetailsFields,
+  IncidentPersonsSection,
+  IncidentPhotoUpload,
+} from './incident-form';

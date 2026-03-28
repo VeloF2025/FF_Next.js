@@ -41,7 +41,7 @@ const POWER_METER_MIN = -24;
 const POWER_METER_MAX = -18;
 
 /** Required steps (all 10 must be present) */
-const REQUIRED_STEPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const REQUIRED_STEPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 // ============================================================================
 // POWER METER
@@ -168,12 +168,12 @@ export function checkStepCoverage(
 ): StepCoverageResult {
   const coverageMap: Record<number, string[]> = {};
 
-  for (let step = 1; step <= 10; step++) {
+  for (let step = 1; step <= 12; step++) {
     coverageMap[step] = [];
   }
 
   for (const photo of photos) {
-    if (photo.step !== null && photo.step >= 1 && photo.step <= 10) {
+    if (photo.step !== null && photo.step >= 1 && photo.step <= 12) {
       const stepArray = coverageMap[photo.step];
       if (stepArray) {
         stepArray.push(photo.filename);

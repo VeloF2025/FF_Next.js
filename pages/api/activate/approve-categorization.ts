@@ -296,6 +296,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       status: 'approved',
       approved_count: approvedCount,
       overridden_count: overriddenCount,
+      auto_discarded_count: autoDiscardedCount,
       photos_metadata: photosToStore,
     };
 
