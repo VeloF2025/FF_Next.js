@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { ArrowUpDown, Download } from 'lucide-react';
+import { ArrowUpDown, Download, FileSpreadsheet } from 'lucide-react';
 import type { FieldMapping } from './fieldMappingData';
 
 interface GroupedMapping {
@@ -90,6 +90,81 @@ export const FieldMappingTable: React.FC<FieldMappingTableProps> = ({ data }) =>
     URL.revokeObjectURL(url);
   };
 
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+
+  const handleExportExcel = async (): Promise<void> => {
+    setIsExportingExcel(true);
+    try {
+      // Lazy-load ExcelJS to keep initial bundle small
+      const ExcelJS = (await import('exceljs')).default;
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'FibreFlow';
+      wb.created = new Date();
+      const ws = wb.addWorksheet('Field Mappings');
+
+      // Column definitions with auto-fit widths
+      ws.columns = [
+        { header: 'Concept',     key: 'concept', width: 45 },
+        { header: 'Table',       key: 'table',   width: 35 },
+        { header: 'Column Name', key: 'column',  width: 35 },
+      ];
+
+      // Bold header row with background
+      const headerRow = ws.getRow(1);
+      headerRow.eachCell(cell => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'left' };
+        cell.border = {
+          bottom: { style: 'thin', color: { argb: 'FF93C5FD' } },
+        };
+      });
+
+      // Data rows with alternating row colours
+      filteredData.forEach((item, idx) => {
+        const row = ws.addRow({
+          concept: item.concept,
+          table:   item.table,
+          column:  item.column,
+        });
+        const isEven = idx % 2 === 0;
+        row.eachCell(cell => {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: isEven ? 'FFF8FAFC' : 'FFEFF6FF' },
+          };
+          cell.font = { name: 'Calibri', size: 11 };
+          cell.alignment = { vertical: 'middle' };
+        });
+        // Concept column: slightly bolder for group header rows
+        const conceptCell = row.getCell('concept');
+        if (conceptCell.value) {
+          conceptCell.font = { name: 'Calibri', size: 11, bold: true };
+        }
+      });
+
+      // Freeze header row
+      ws.views = [{ state: 'frozen', ySplit: 1 }];
+
+      // Trigger download
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `field-mappings-${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
+
   const SortIcon = ({ column }: { column: keyof FieldMapping }): React.ReactNode => (
     <ArrowUpDown
       className={`w-4 h-4 ${
@@ -120,6 +195,15 @@ export const FieldMappingTable: React.FC<FieldMappingTableProps> = ({ data }) =>
         >
           <Download className="w-4 h-4" aria-hidden="true" />
           Export CSV
+        </button>
+        <button
+          onClick={handleExportExcel}
+          disabled={isExportingExcel}
+          aria-label="Export field mappings as Excel (.xlsx)"
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-warning)] hover:opacity-90 text-white rounded-lg transition-opacity focus:outline-none focus:ring-2 focus:ring-[var(--ff-warning)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-wait"
+        >
+          <FileSpreadsheet className="w-4 h-4" aria-hidden="true" />
+          {isExportingExcel ? 'Exporting…' : 'Export Excel'}
         </button>
       </div>
 
