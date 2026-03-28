@@ -44,9 +44,10 @@ export {
 } from './forms.types';
 
 // Type exports that match Drizzle inferred types
-export type { RFQ as DrizzleRFQ, NewRFQ as NewDrizzleRFQ } from '../../../lib/neon/schema';
-export type { RFQItem as DrizzleRFQItem, NewRFQItem as NewDrizzleRFQItem } from '../../../lib/neon/schema';
-export type { SupplierInvitation as DrizzleSupplierInvitation, NewSupplierInvitation as NewDrizzleSupplierInvitation } from '../../../lib/neon/schema';
-export type { Quote as DrizzleQuote, NewQuote as NewDrizzleQuote } from '../../../lib/neon/schema';
-export type { QuoteItem as DrizzleQuoteItem, NewQuoteItem as NewDrizzleQuoteItem } from '../../../lib/neon/schema';
-export type { QuoteDocument as DrizzleQuoteDocument, NewQuoteDocument as NewDrizzleQuoteDocument } from '../../../lib/neon/schema';
+// TODO: Uncomment when RFQ tables are added to src/lib/neon/schema.ts
+// export type { RFQ as DrizzleRFQ, NewRFQ as NewDrizzleRFQ } from '../../../lib/neon/schema';
+// export type { RFQItem as DrizzleRFQItem, NewRFQItem as NewDrizzleRFQItem } from '../../../lib/neon/schema';
+// export type { SupplierInvitation as DrizzleSupplierInvitation, NewSupplierInvitation as NewDrizzleSupplierInvitation } from '../../../lib/neon/schema';
+// export type { Quote as DrizzleQuote, NewQuote as NewDrizzleQuote } from '../../../lib/neon/schema';
+// export type { QuoteItem as DrizzleQuoteItem, NewQuoteItem as NewDrizzleQuoteItem } from '../../../lib/neon/schema';
+// export type { QuoteDocument as DrizzleQuoteDocument, NewQuoteDocument as NewDrizzleQuoteDocument } from '../../../lib/neon/schema';

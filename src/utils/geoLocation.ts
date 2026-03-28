@@ -173,7 +173,8 @@ export function parseGPSCoordinates(input: string): { lat: number; lng: number }
     const coord2 = dmsMatch[3];
     const dir2 = dmsMatch[4];
 
-    if (coord1 && dir1 && coord2 && dir2) {
+    // Type guard: ensure all captures are defined before proceeding
+    if (coord1 !== undefined && dir1 !== undefined && coord2 !== undefined && dir2 !== undefined) {
       const lat = parseCoordinate(coord1.trim(), dir1);
       const lng = parseCoordinate(coord2.trim(), dir2);
 
@@ -222,7 +223,7 @@ function parseCoordinate(coord: string, direction: string): number | null {
   const dmsPattern = /(\d+)[°d]\s*(\d+(?:\.\d+)?)[′'m]\s*(\d+(?:\.\d+)?)[″"s]?/i;
   const dmsMatch = absCoord.match(dmsPattern);
 
-  if (dmsMatch) {
+  if (dmsMatch && dmsMatch[1] !== undefined && dmsMatch[2] !== undefined && dmsMatch[3] !== undefined) {
     const degrees = parseInt(dmsMatch[1]);
     const minutes = parseFloat(dmsMatch[2]) || 0;
     const seconds = parseFloat(dmsMatch[3]) || 0;
@@ -235,7 +236,7 @@ function parseCoordinate(coord: string, direction: string): number | null {
   const dmPattern = /(\d+)[°d]\s*(\d+(?:\.\d+)?)[′'m]?/i;
   const dmMatch = absCoord.match(dmPattern);
 
-  if (dmMatch) {
+  if (dmMatch && dmMatch[1] !== undefined && dmMatch[2] !== undefined) {
     const degrees = parseInt(dmMatch[1]);
     const minutes = parseFloat(dmMatch[2]) || 0;
 
