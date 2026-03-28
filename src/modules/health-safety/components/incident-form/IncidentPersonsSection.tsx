@@ -56,10 +56,11 @@ export function IncidentPersonsSection({
           </h3>
           <button
             type="button"
+            aria-label="Add person involved"
             onClick={addPerson}
-            className="flex items-center gap-1 text-xs text-[var(--ff-primary-500)] hover:text-[var(--ff-primary-400)]"
+            className="flex items-center gap-1 text-xs text-[var(--ff-primary-500)] hover:text-[var(--ff-primary-400)] min-h-[44px] px-2"
           >
-            <Plus className="w-3.5 h-3.5" /> Add Person
+            <Plus aria-hidden="true" className="w-3.5 h-3.5" /> Add Person
           </button>
         </div>
 
@@ -71,36 +72,42 @@ export function IncidentPersonsSection({
 
         <div className="space-y-3">
           {persons.map((person, idx) => (
-            <div
+            <fieldset
               key={idx}
               className="p-3 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] space-y-2"
             >
+              <legend className="sr-only">Person {idx + 1} details</legend>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-[var(--ff-text-secondary)]">
                   Person {idx + 1}
                 </span>
                 <button
                   type="button"
+                  aria-label={`Remove person ${idx + 1}`}
                   onClick={() => removePerson(idx)}
-                  className="text-red-400 hover:text-red-300"
+                  className="p-2 text-red-400 hover:text-red-300 rounded-lg"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 aria-hidden="true" className="w-3.5 h-3.5" />
                 </button>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className={labelClass}>Name *</label>
+                  <label htmlFor={`person-name-${idx}`} className={labelClass}>Name *</label>
                   <input
+                    id={`person-name-${idx}`}
                     type="text"
                     value={person.name}
+                    required
+                    aria-required="true"
                     onChange={(e) => updatePerson(idx, 'name', e.target.value)}
                     placeholder="Full name"
                     className={inputClass}
                   />
                 </div>
                 <div>
-                  <label className={labelClass}>Role</label>
+                  <label htmlFor={`person-role-${idx}`} className={labelClass}>Role</label>
                   <select
+                    id={`person-role-${idx}`}
                     value={person.role}
                     onChange={(e) => updatePerson(idx, 'role', e.target.value)}
                     className={inputClass}
@@ -114,8 +121,9 @@ export function IncidentPersonsSection({
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className={labelClass}>Injuries</label>
+                  <label htmlFor={`person-injuries-${idx}`} className={labelClass}>Injuries</label>
                   <input
+                    id={`person-injuries-${idx}`}
                     type="text"
                     value={person.injuries || ''}
                     onChange={(e) => updatePerson(idx, 'injuries', e.target.value)}
@@ -124,8 +132,9 @@ export function IncidentPersonsSection({
                   />
                 </div>
                 <div>
-                  <label className={labelClass}>Treatment</label>
+                  <label htmlFor={`person-treatment-${idx}`} className={labelClass}>Treatment</label>
                   <input
+                    id={`person-treatment-${idx}`}
                     type="text"
                     value={person.treatment || ''}
                     onChange={(e) => updatePerson(idx, 'treatment', e.target.value)}
@@ -134,7 +143,7 @@ export function IncidentPersonsSection({
                   />
                 </div>
               </div>
-            </div>
+            </fieldset>
           ))}
         </div>
       </div>
@@ -147,10 +156,11 @@ export function IncidentPersonsSection({
           </h3>
           <button
             type="button"
+            aria-label="Add witness"
             onClick={addWitness}
-            className="flex items-center gap-1 text-xs text-[var(--ff-primary-500)] hover:text-[var(--ff-primary-400)]"
+            className="flex items-center gap-1 text-xs text-[var(--ff-primary-500)] hover:text-[var(--ff-primary-400)] min-h-[44px] px-2"
           >
-            <Plus className="w-3.5 h-3.5" /> Add Witness
+            <Plus aria-hidden="true" className="w-3.5 h-3.5" /> Add Witness
           </button>
         </div>
 
@@ -168,14 +178,16 @@ export function IncidentPersonsSection({
                 value={witness}
                 onChange={(e) => updateWitness(idx, e.target.value)}
                 placeholder={`Witness ${idx + 1} name`}
+                aria-label={`Witness ${idx + 1} name`}
                 className={`${inputClass} flex-1`}
               />
               <button
                 type="button"
+                aria-label={`Remove witness ${idx + 1}`}
                 onClick={() => removeWitness(idx)}
-                className="text-red-400 hover:text-red-300 p-1"
+                className="p-2 text-red-400 hover:text-red-300 rounded-lg"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 aria-hidden="true" className="w-3.5 h-3.5" />
               </button>
             </div>
           ))}
