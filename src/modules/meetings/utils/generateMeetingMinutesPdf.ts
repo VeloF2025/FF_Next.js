@@ -14,6 +14,8 @@
  */
 
 import type { Meeting } from '../types/meeting.types';
+import type { ActionItem } from '@/types/action-items.types';
+import { actionItemsService } from '@/services/action-items/actionItemsService';
 import { log } from '@/lib/logger';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -244,9 +246,11 @@ export async function generateMeetingMinutesPdf(meeting: Meeting): Promise<Blob>
   }
 
   // ── 2. MEETING OVERVIEW ─────────────────────────────────────────────────────
-  if (meeting.summary?.overview) {
+  const overviewText = meeting.summary?.overview;
+  const isPlaceholder = !overviewText || /no (transcript|summary|ai)/i.test(overviewText);
+  if (overviewText && !isPlaceholder) {
     sectionHeading('Meeting Overview', sn++);
-    bodyText(meeting.summary.overview);
+    bodyText(overviewText);
     y += 4;
   }
 
@@ -291,15 +295,32 @@ export async function generateMeetingMinutesPdf(meeting: Meeting): Promise<Blob>
   }
 
   // ── 7. ACTION ITEMS ─────────────────────────────────────────────────────────
+  // Fetch real action items from DB (the meeting object often has an empty array)
+  let dbActionItems: ActionItem[] = [];
+  try {
+    dbActionItems = await actionItemsService.getActionItems({ meeting_id: Number(meeting.id) });
+  } catch {
+    // Fall back to meeting.actionItems if API fails
+    log.warn('Could not fetch action items from API, using meeting data', { meetingId: meeting.id });
+  }
+
   const allActions = [
-    ...meeting.actionItems.map(a => ({
+    ...dbActionItems.map(a => ({
+      task: a.description,
+      assignee: a.assignee_name || a.assigned_user_name || '—',
+      dueDate: a.due_date ? fmtDate(a.due_date) : '—',
+      status: a.status === 'completed' ? 'Completed' : a.status === 'in_progress' ? 'In Progress' : 'Pending',
+    })),
+    // Fall back to meeting.actionItems if DB returned nothing
+    ...(dbActionItems.length === 0 ? meeting.actionItems.map(a => ({
       task: a.task,
       assignee: a.assignee || '—',
       dueDate: a.dueDate ? fmtDate(a.dueDate) : '—',
       status: a.completed ? 'Completed' : 'Pending',
-    })),
+    })) : []),
+    // Add AI-detected items not already in DB results
     ...(meeting.summary?.action_items || [])
-      .filter(text => !meeting.actionItems.some(a => a.task === text))
+      .filter(text => !dbActionItems.some(a => a.description === text) && !meeting.actionItems.some(a => a.task === text))
       .map(text => ({
         task: text,
         assignee: '—',

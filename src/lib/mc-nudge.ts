@@ -24,7 +24,7 @@ export async function nudgeAgent(options: NudgeOptions): Promise<boolean> {
 
   try {
     // POST a nudge message to MC API
-    // The message format: "Nudge from [Hein]: action your pending message: [subject]"
+    // The message format: "Nudge from [sender]: action your pending message: [subject]"
     const now = new Date().toLocaleTimeString('en-ZA', {
       hour: '2-digit',
       minute: '2-digit',

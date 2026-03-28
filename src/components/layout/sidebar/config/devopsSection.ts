@@ -2,7 +2,7 @@
  * DevOps section configuration
  */
 
-import { Database } from 'lucide-react';
+import { Database, MapPin } from 'lucide-react';
 import type { NavSection } from './types';
 import { Permission } from '@/types/auth.types';
 
@@ -26,6 +26,14 @@ export const devopsSection: NavSection = {
       shortLabel: 'Mapping',
       permissions: [Permission.SYSTEM_ADMIN],
       rbacKey: 'devops.field-mapping',
+    },
+    {
+      to: '/devops/qfield-mapping',
+      icon: MapPin,
+      label: 'QField Mapping',
+      shortLabel: 'QField',
+      permissions: [Permission.SYSTEM_ADMIN],
+      rbacKey: 'devops.qfield-mapping',
     },
   ],
 };

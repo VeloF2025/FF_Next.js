@@ -21,6 +21,7 @@ import {
   CheckCircle,
   Inbox,
   GitBranch,
+  TableProperties,
 } from 'lucide-react';
 import type {
   ProcurementTabId,
@@ -53,6 +54,7 @@ const tabToCategoryMap: Record<ProcurementTabId, CategoryId> = {
   'open-orders': 'purchasing',
   'suppliers': 'sourcing',
   'boq': 'sourcing',
+  'boq-view': 'sourcing',
   'rfq': 'sourcing',
   'requisitions': 'purchasing',
   'quotes': 'purchasing',
@@ -115,6 +117,7 @@ export function ProcurementTabs({
       subTabs: [
         { id: 'suppliers', label: 'Suppliers', icon: Truck, permission: 'canViewSuppliers', path: '/procurement/sourcing?tab=suppliers' },
         { id: 'boq', label: 'BOQ', icon: FileText, permission: 'canViewBOQ', path: '/procurement/sourcing?tab=boq' },
+        { id: 'boq-view', label: 'BOQ View', icon: TableProperties, permission: 'canViewBOQ', path: '/procurement?tab=boq-view' },
         { id: 'rfq', label: 'RFQ', icon: Send, permission: 'canViewRFQ', path: '/procurement/sourcing?tab=rfq' },
       ]
     },

@@ -758,9 +758,9 @@ export async function listTickets(
       ? `WHERE ${whereClauses.join(' AND ')}`
       : '';
 
-    // 🟢 WORKING: Pagination (default: page 1, pageSize 50)
+    // 🟢 WORKING: Pagination (default: page 1, pageSize 50, max 200)
     const page = filters.page || 1;
-    const pageSize = filters.pageSize || 50;
+    const pageSize = Math.min(filters.pageSize || 50, 200);
     const offset = (page - 1) * pageSize;
 
     // Add LIMIT and OFFSET as last parameters
