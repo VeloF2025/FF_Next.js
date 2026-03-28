@@ -166,6 +166,8 @@ export function AutoQaFeedbackPhase({
             vlmPredictedStep: originalStep,
             vlmPredictedCategory: STEP_LABELS[originalStep] || `Step ${originalStep}`,
             vlmConfidence: currentPhoto.confidence,
+            vlmReasoning: currentPhoto.reasoning,
+            photoDescription: currentPhoto.identifiedAs || currentPhoto.reasoning,
             correctStep: isDuplicate ? 0 : newStep, // Store duplicates as step 0 in corrections table
             correctCategory: isDuplicate ? 'Duplicate Photo' : (STEP_LABELS[newStep] || `Step ${newStep}`),
             correctionReason: isDuplicate ? 'Photo is a duplicate of another photo in this DR' : undefined,

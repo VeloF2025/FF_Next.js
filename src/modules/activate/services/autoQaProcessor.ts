@@ -187,6 +187,8 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
         decision,
         comment: generatePhotoComment(step, tierValue, confidence, decision, cat.vlm_reasoning),
         confidence,
+        identifiedAs: cat.vlm_identified_as,
+        reasoning: cat.vlm_reasoning,
       };
     });
 

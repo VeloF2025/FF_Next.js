@@ -151,6 +151,7 @@ export interface FewShotSelectionResult {
  * Source: categorizationVlmService.ts prompt comments
  */
 export const DR_PHOTO_CONFUSION_PAIRS: Array<[number, number]> = [
+  [2, 3], // Cable from Pole vs Entry Outside (aerial vs wall entry)
   [3, 4], // Entry Outside vs Entry Inside
   [6, 8], // ONT Back vs Final Installation
   [1, 8], // House Photo vs Final Installation

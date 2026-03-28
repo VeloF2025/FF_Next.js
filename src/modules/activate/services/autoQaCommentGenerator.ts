@@ -33,6 +33,8 @@ export interface AutoQaPhotoResult {
   decision: 'PASS' | 'FAIL';
   comment: string;
   confidence: number;
+  identifiedAs?: string;
+  reasoning?: string;
 }
 
 export interface AutoQaValidations {

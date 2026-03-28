@@ -96,10 +96,11 @@ export interface BatchCategorizationResult {
 export const PHOTO_TYPE_TO_STEP: Record<string, number> = {
   // Step 1: House Photo
   'ph_prop': 1,
+  'ph_outs': 1,   // "outside" = property exterior (house photo)
 
   // Step 2: Cable from Pole
   'ph_pole': 2,
-  'ph_outs': 2,
+  'ph_cbl_r': 2,  // "cable rear" = cable span from pole
 
   // Step 3: Cable Entry Outside
   'ph_entry_out': 3,
@@ -115,7 +116,6 @@ export const PHOTO_TYPE_TO_STEP: Record<string, number> = {
   // Step 6: ONT Back After Install
   'ph_ont': 6,
   'ph_ont_back': 6,
-  'ph_cbl_r': 6,
   'ph_conn1': 6,  // ONT front panel / connections
 
   // Step 7: Power Meter Reading
@@ -153,13 +153,13 @@ export const STEP_LABELS: Record<number, string> = {
   0: 'Discard - Rubbish',
   1: 'House Photo',
   2: 'Cable from Pole',
-  3: 'Entry Outside',
-  4: 'Entry Inside',
-  5: 'Wall',
-  6: 'ONT Back',
-  7: 'Power Meter',
+  3: 'Cable Entry Outside',
+  4: 'Cable Entry Inside',
+  5: 'Wall for Installation',
+  6: 'ONT Back After Install',
+  7: 'Power Meter Reading',
   8: 'Final Installation',
-  9: 'Green Lights',
+  9: 'Green Lights on ONT',
   10: 'Signature',
   11: 'Dome Joint Open',
   12: 'Dome Joint Closed',
@@ -320,11 +320,11 @@ export interface PhotoInput {
  * @example
  * // OneMap type available (highest confidence)
  * categorizeByAttribute({ filename: 'DR1730550_ph_prop_001.jpg', original_type: 'ph_prop' })
- * // Returns: { step: 1, confidence: 1.0, source: 'attribute', needsVlmCategorization: false }
+ * // Returns: { step: 1, confidence: 0.8, source: 'attribute', needsVlmCategorization: true }
  *
  * // Fallback to filename extraction
  * categorizeByAttribute({ filename: 'DR1730550_ph_powm_001.jpg' })
- * // Returns: { step: 7, confidence: 0.9, source: 'filename', needsVlmCategorization: false }
+ * // Returns: { step: 7, confidence: 0.7, source: 'filename', needsVlmCategorization: true }
  *
  * // Unknown type
  * categorizeByAttribute({ filename: 'unknown_photo.jpg' })
@@ -342,20 +342,22 @@ export function categorizeByAttribute(photo: PhotoInput): CategorizationResult {
     needsVlmCategorization: true,
   };
 
-  // Strategy 1: Use original_type from OneMap (highest confidence)
+  // Strategy 1: Use original_type from OneMap as initial hint
+  // VLM still verifies — technicians often upload to wrong step
   if (photo.original_type) {
     const step = PHOTO_TYPE_TO_STEP[photo.original_type];
     if (step !== undefined) {
       result.step = step;
       result.stepLabel = STEP_LABELS[step] ?? null;
-      result.confidence = 1.0;
+      result.confidence = 0.8;
       result.source = 'attribute';
-      result.needsVlmCategorization = false;
+      result.needsVlmCategorization = true;
       return result;
     }
   }
 
-  // Strategy 2: Extract type from filename pattern (high confidence)
+  // Strategy 2: Extract type from filename pattern as hint
+  // VLM still verifies for step correctness and quality
   const extractedType = extractTypeFromFilename(photo.filename);
   result.extractedType = extractedType;
 
@@ -364,9 +366,9 @@ export function categorizeByAttribute(photo: PhotoInput): CategorizationResult {
     if (step !== undefined) {
       result.step = step;
       result.stepLabel = STEP_LABELS[step] ?? null;
-      result.confidence = 0.9;
+      result.confidence = 0.7;
       result.source = 'filename';
-      result.needsVlmCategorization = false;
+      result.needsVlmCategorization = true;
       return result;
     }
   }
