@@ -211,32 +211,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       });
     }
 
-    // --- Within-DR dedup: for steps 1-10, keep first photo, discard extras to step 0 ---
-    let autoDiscardedCount = 0;
-    const seenSteps = new Set<number>();
-
-    for (let i = 0; i < photosToStore.length; i++) {
-      const photo = photosToStore[i]!;
-      const step = photo.step;
-
-      if (step >= 1 && step <= 10) {
-        if (seenSteps.has(step)) {
-          photosToStore[i] = { ...photo, step: 0 };
-          const catResult = updatedResults.find((r) => r.photo_filename === photo.filename);
-          if (catResult) {
-            catResult.human_override_step = 0;
-            catResult.human_override_reason = `Auto-discarded: duplicate of Step ${step} (${STEP_LABELS[step] || 'Unknown'})`;
-          }
-          autoDiscardedCount++;
-        } else {
-          seenSteps.add(step);
-        }
-      }
-    }
-
-    if (autoDiscardedCount > 0) {
-      log.info('ApproveCategorization', `Auto-discarded ${autoDiscardedCount} within-DR duplicate(s) for ${dropNumber}`);
-    }
+    // Within-DR dedup now runs in autoQaProcessor (before feedback phase)
+    // No need to re-run here — duplicates are already discarded
 
     // Update database
     await pool.query(
@@ -255,7 +231,6 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     log.info('ApproveCategorization', `Approved categorization for ${dropNumber}`, {
       approvedCount,
       overriddenCount,
-      autoDiscardedCount,
       crossDRDuplicateCount,
       totalPhotos: photosToStore.length,
     });
