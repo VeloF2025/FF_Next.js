@@ -5,7 +5,7 @@
  * opens it in a lightbox overlay.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, ZoomIn, Camera } from 'lucide-react';
 
 export interface GalleryPhoto {
@@ -33,10 +33,32 @@ export function PhotoGallery({
 }: PhotoGalleryProps) {
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
+  // Keyboard navigation for lightbox
+  useEffect(() => {
+    if (lightboxIdx === null) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        setLightboxIdx((idx) =>
+          idx !== null ? (idx - 1 + photos.length) % photos.length : null
+        );
+      } else if (e.key === 'ArrowRight') {
+        setLightboxIdx((idx) =>
+          idx !== null ? (idx + 1) % photos.length : null
+        );
+      } else if (e.key === 'Escape') {
+        setLightboxIdx(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxIdx, photos.length]);
+
   if (!photos || photos.length === 0) {
     return (
       <div className="flex flex-col items-center py-6 text-[var(--ff-text-tertiary)]">
-        <Camera className="w-8 h-8 mb-2 opacity-40" />
+        <Camera aria-hidden="true" className="w-8 h-8 mb-2 opacity-40" />
         <p className="text-sm">{emptyMessage}</p>
       </div>
     );
@@ -51,6 +73,7 @@ export function PhotoGallery({
           <button
             key={idx}
             type="button"
+            aria-label={photo.caption ? `View photo: ${photo.caption}` : `View photo ${idx + 1}`}
             onClick={() => setLightboxIdx(idx)}
             className="group relative rounded-lg overflow-hidden border border-[var(--ff-border-light)] hover:border-[var(--ff-primary-500)] transition-colors"
           >
@@ -61,7 +84,7 @@ export function PhotoGallery({
               className="w-full h-28 object-cover"
             />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-              <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+              <ZoomIn aria-hidden="true" className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
             {photo.caption && (
               <div className="px-2 py-1 bg-[var(--ff-bg-tertiary)] text-xs text-[var(--ff-text-secondary)] truncate">
@@ -75,6 +98,9 @@ export function PhotoGallery({
       {/* Lightbox */}
       {current && lightboxIdx !== null && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Photo gallery"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
           onClick={() => setLightboxIdx(null)}
         >
@@ -84,23 +110,26 @@ export function PhotoGallery({
           >
             <button
               onClick={() => setLightboxIdx(null)}
-              className="absolute -top-10 right-0 p-2 text-white/80 hover:text-white"
+              aria-label="Close photo gallery"
+              className="absolute -top-10 right-0 p-3 text-white/80 hover:text-white rounded-lg"
             >
-              <X className="w-6 h-6" />
+              <X aria-hidden="true" className="w-6 h-6" />
             </button>
 
             {/* Navigation */}
             {photos.length > 1 && (
               <div className="absolute top-1/2 -translate-y-1/2 -left-12 -right-12 flex justify-between pointer-events-none">
                 <button
+                  aria-label="Previous photo"
                   onClick={() => setLightboxIdx((lightboxIdx - 1 + photos.length) % photos.length)}
-                  className="pointer-events-auto p-2 text-white/70 hover:text-white text-2xl"
+                  className="pointer-events-auto p-3 text-white/70 hover:text-white text-2xl min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   &lsaquo;
                 </button>
                 <button
+                  aria-label="Next photo"
                   onClick={() => setLightboxIdx((lightboxIdx + 1) % photos.length)}
-                  className="pointer-events-auto p-2 text-white/70 hover:text-white text-2xl"
+                  className="pointer-events-auto p-3 text-white/70 hover:text-white text-2xl min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   &rsaquo;
                 </button>

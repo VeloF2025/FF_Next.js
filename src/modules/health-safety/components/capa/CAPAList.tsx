@@ -45,16 +45,18 @@ export function CAPAList({ projectId, contractorId, onSelectCAPA }: CAPAListProp
     <div className="space-y-4">
       {/* Stats Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Open" value={stats.open || 0} icon={<AlertTriangle className="w-4 h-4" />} color="blue" />
-        <StatCard label="In Progress" value={stats.in_progress || 0} icon={<Clock className="w-4 h-4" />} color="amber" />
-        <StatCard label="Overdue" value={stats.overdue || 0} icon={<AlertTriangle className="w-4 h-4" />} color="red" />
-        <StatCard label="Closed" value={stats.closed || 0} icon={<CheckCircle className="w-4 h-4" />} color="green" />
+        <StatCard label="Open" value={stats.open || 0} icon={<AlertTriangle aria-hidden="true" className="w-4 h-4" />} color="blue" />
+        <StatCard label="In Progress" value={stats.in_progress || 0} icon={<Clock aria-hidden="true" className="w-4 h-4" />} color="amber" />
+        <StatCard label="Overdue" value={stats.overdue || 0} icon={<AlertTriangle aria-hidden="true" className="w-4 h-4" />} color="red" />
+        <StatCard label="Closed" value={stats.closed || 0} icon={<CheckCircle aria-hidden="true" className="w-4 h-4" />} color="green" />
       </div>
 
       {/* Filters */}
       <div className="flex items-center gap-3">
-        <Filter className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
+        <Filter aria-hidden="true" className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
+        <label htmlFor="status-filter" className="sr-only">Filter by status</label>
         <select
+          id="status-filter"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as CAPAStatus | '')}
           className="px-3 py-1.5 text-sm bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
@@ -81,6 +83,7 @@ export function CAPAList({ projectId, contractorId, onSelectCAPA }: CAPAListProp
             <button
               key={capa.id}
               type="button"
+              aria-label={`View CAPA: ${capa.title}`}
               onClick={() => onSelectCAPA?.(capa.id)}
               className="w-full text-left p-4 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] hover:border-[var(--ff-primary-500)] transition-colors"
             >
