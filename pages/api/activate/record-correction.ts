@@ -21,6 +21,7 @@ interface RecordCorrectionBody {
   vlmPredictedCategory: string;
   vlmConfidence: number;
   vlmReasoning?: string;
+  photoDescription?: string;
   correctStep: number;
   correctCategory: string;
   correctionReason?: string;
@@ -50,6 +51,7 @@ async function handler(
     const correction = await recordCorrection({
       workflowType: 'dr_photo',
       photoFilename: body.photoFilename,
+      photoDescription: body.photoDescription,
       vlmPredictedStep: body.vlmPredictedStep,
       vlmPredictedCategory: body.vlmPredictedCategory,
       vlmConfidence: body.vlmConfidence,

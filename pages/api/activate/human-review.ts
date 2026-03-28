@@ -24,6 +24,7 @@ import {
   logStepRejection,
 } from '@/modules/activate/services/activityLogService';
 import { STEP_LABELS } from '@/modules/activate/utils/stepMapper';
+import { recordCorrection } from '@/modules/qa-learning';
 
 // ============================================================================
 // TYPES
@@ -34,6 +35,10 @@ interface StepReviewAction {
   action: 'approve' | 'reject';
   reason?: string;
   overrideVlm?: boolean;
+  vlmOriginalStep?: number;
+  vlmConfidence?: number;
+  photoFilename?: string;
+  photoDescription?: string;
 }
 
 interface StartReviewRequest {
@@ -131,7 +136,7 @@ async function handleStepReview(
   stepReview: StepReviewAction,
   res: NextApiResponse
 ): Promise<void> {
-  const { step, action, reason, overrideVlm } = stepReview;
+  const { step, action, reason, overrideVlm, vlmOriginalStep, vlmConfidence, photoFilename, photoDescription } = stepReview;
   const stepLabel = STEP_LABELS[step] || `Step ${step}`;
 
   log.info('HumanReview', `${action} step ${step} for ${dropNumber}`, { reason, overrideVlm });
@@ -185,6 +190,24 @@ async function handleStepReview(
     await logStepApproval(dropNumber, step, stepLabel, userId);
   } else {
     await logStepRejection(dropNumber, step, stepLabel, reason || 'No reason provided', userId);
+  }
+
+  // Feed HITL learning when VLM step is overridden
+  if (overrideVlm && vlmOriginalStep !== undefined && vlmOriginalStep !== step) {
+    recordCorrection({
+      workflowType: 'dr_photo',
+      photoFilename: photoFilename || `${dropNumber}_step${step}`,
+      photoDescription: photoDescription,
+      vlmPredictedStep: vlmOriginalStep,
+      vlmPredictedCategory: STEP_LABELS[vlmOriginalStep] || `Step ${vlmOriginalStep}`,
+      vlmConfidence: vlmConfidence ?? 0,
+      correctStep: step,
+      correctCategory: stepLabel,
+      correctionReason: reason || `Human review override: Step ${vlmOriginalStep} → Step ${step}`,
+      correctedBy: userId,
+    }).catch((err) => {
+      log.warn('HumanReview', 'Failed to record HITL correction (non-critical)', err);
+    });
   }
 
   return apiResponse.success(res, {

@@ -204,7 +204,7 @@ const STEP_QA_CRITERIA: Record<number, { checks: Array<{ id: string; description
     // Power Meter Reading - FiberTime spec additions
     checks: [
       { id: '7.1', description: 'Power meter display clearly readable', severity: 'critical' },
-      { id: '7.2', description: 'dBm reading visible (should be -8 to -28 dBm)', severity: 'critical' },
+      { id: '7.2', description: 'dBm reading visible (valid range: -18 to -24 dBm)', severity: 'critical' },
       { id: '7.3', description: 'Reading within acceptable range', severity: 'critical' },
     ],
   },
@@ -260,7 +260,9 @@ function buildQaPrompt(step: number, drNumber: string): string {
 
   return `You are a fiber optic installation QA inspector reviewing a photo for ${drNumber}.
 
-This is a "${stepLabel}" photo (Step ${step}).
+This photo is expected to be a "${stepLabel}" photo (Step ${step}).
+
+FIRST: Verify this photo actually matches Step ${step} (${stepLabel}). If the photo clearly shows something different, note the mismatch in your observations and evaluate based on what the photo ACTUALLY shows.
 
 QUALITY CHECKLIST - Evaluate each item:
 ${checksText}
@@ -269,6 +271,8 @@ For this photo, respond in this exact JSON format:
 {
   "passed": <true/false - overall pass if all critical checks pass>,
   "score": <0-100 quality score>,
+  "stepMismatch": <true/false - true if photo does not match the expected step>,
+  "actualStep": <number or null - if stepMismatch is true, what step this photo actually belongs to>,
   "checks": [
     {
       "checkId": "<check ID from list>",
@@ -281,7 +285,8 @@ For this photo, respond in this exact JSON format:
 }
 
 Be strict but fair. Critical issues must fail the photo. Minor issues should be noted but may still pass.
-Focus on what is VISIBLE in the photo - don't fail for items that simply aren't shown.`;
+Focus on what is VISIBLE in the photo - don't fail for items that simply aren't shown.
+If the photo is misclassified (wrong step), it must FAIL regardless of quality.`;
 }
 
 // ============================================================================
@@ -325,6 +330,8 @@ async function callVlmForQa(
   checks: Array<{ checkId: string; passed: boolean; details: string }>;
   observations: string;
   feedback: string;
+  stepMismatch?: boolean;
+  actualStep?: number | null;
 }> {
   const prompt = buildQaPrompt(step, drNumber);
 
@@ -379,12 +386,18 @@ async function callVlmForQa(
 
     const parsed = JSON.parse(jsonMatch[1] || content);
 
+    const stepMismatch = Boolean(parsed.stepMismatch);
+
     return {
-      passed: Boolean(parsed.passed),
-      score: Number(parsed.score) || 0,
+      passed: stepMismatch ? false : Boolean(parsed.passed),
+      score: stepMismatch ? 0 : (Number(parsed.score) || 0),
       checks: parsed.checks || [],
       observations: parsed.observations || '',
-      feedback: parsed.feedback || '',
+      feedback: stepMismatch
+        ? `Step mismatch: photo appears to be Step ${parsed.actualStep}, not the expected step. ${parsed.feedback || ''}`
+        : (parsed.feedback || ''),
+      stepMismatch,
+      actualStep: parsed.actualStep ?? null,
     };
   } catch (error: unknown) {
     clearTimeout(timeoutId);
@@ -431,7 +444,7 @@ export async function validatePhoto(
       return {
         checkId: criteriaCheck.id,
         description: criteriaCheck.description,
-        passed: vlmCheck?.passed ?? true, // Default to passed if not evaluated
+        passed: vlmCheck?.passed ?? (criteriaCheck.severity === 'critical' ? false : true), // Critical checks default to failed if not evaluated
         severity: criteriaCheck.severity,
         details: vlmCheck?.details || 'Not evaluated',
       };
