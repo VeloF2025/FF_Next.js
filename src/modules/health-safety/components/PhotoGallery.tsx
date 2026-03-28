@@ -5,8 +5,8 @@
  * opens it in a lightbox overlay.
  */
 
-import React, { useState, useEffect } from 'react';
-import { X, ZoomIn, Camera } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { X, ZoomIn, Camera, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export interface GalleryPhoto {
   url: string;
@@ -33,27 +33,24 @@ export function PhotoGallery({
 }: PhotoGalleryProps) {
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
-  // Keyboard navigation for lightbox
+  const closeLightbox = useCallback(() => setLightboxIdx(null), []);
+  const prevPhoto = useCallback(() => {
+    setLightboxIdx(prev => prev !== null ? (prev - 1 + photos.length) % photos.length : null);
+  }, [photos.length]);
+  const nextPhoto = useCallback(() => {
+    setLightboxIdx(prev => prev !== null ? (prev + 1) % photos.length : null);
+  }, [photos.length]);
+
   useEffect(() => {
     if (lightboxIdx === null) return;
-
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') {
-        setLightboxIdx((idx) =>
-          idx !== null ? (idx - 1 + photos.length) % photos.length : null
-        );
-      } else if (e.key === 'ArrowRight') {
-        setLightboxIdx((idx) =>
-          idx !== null ? (idx + 1) % photos.length : null
-        );
-      } else if (e.key === 'Escape') {
-        setLightboxIdx(null);
-      }
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowLeft') prevPhoto();
+      if (e.key === 'ArrowRight') nextPhoto();
     };
-
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [lightboxIdx, photos.length]);
+  }, [lightboxIdx, closeLightbox, prevPhoto, nextPhoto]);
 
   if (!photos || photos.length === 0) {
     return (
@@ -100,38 +97,38 @@ export function PhotoGallery({
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Photo gallery"
+          aria-label={`Photo lightbox: ${current.caption || `Photo ${lightboxIdx + 1} of ${photos.length}`}`}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
-          onClick={() => setLightboxIdx(null)}
+          onClick={closeLightbox}
         >
           <div
             className="relative max-w-4xl max-h-[90vh] mx-4"
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              onClick={() => setLightboxIdx(null)}
-              aria-label="Close photo gallery"
-              className="absolute -top-10 right-0 p-3 text-white/80 hover:text-white rounded-lg"
+              onClick={closeLightbox}
+              aria-label="Close lightbox (Escape)"
+              className="absolute -top-10 right-0 p-3 text-white/80 hover:text-white focus:outline-none focus:ring-2 focus:ring-white rounded-lg min-w-[44px] min-h-[44px]"
             >
-              <X aria-hidden="true" className="w-6 h-6" />
+              <X className="w-6 h-6" aria-hidden="true" />
             </button>
 
             {/* Navigation */}
             {photos.length > 1 && (
               <div className="absolute top-1/2 -translate-y-1/2 -left-12 -right-12 flex justify-between pointer-events-none">
                 <button
-                  aria-label="Previous photo"
-                  onClick={() => setLightboxIdx((lightboxIdx - 1 + photos.length) % photos.length)}
-                  className="pointer-events-auto p-3 text-white/70 hover:text-white text-2xl min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  onClick={prevPhoto}
+                  aria-label={`Previous photo (${(lightboxIdx - 1 + photos.length) % photos.length + 1} of ${photos.length})`}
+                  className="pointer-events-auto p-3 text-white/70 hover:text-white focus:outline-none focus:ring-2 focus:ring-white rounded min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
-                  &lsaquo;
+                  <ChevronLeft className="w-6 h-6" aria-hidden="true" />
                 </button>
                 <button
-                  aria-label="Next photo"
-                  onClick={() => setLightboxIdx((lightboxIdx + 1) % photos.length)}
-                  className="pointer-events-auto p-3 text-white/70 hover:text-white text-2xl min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  onClick={nextPhoto}
+                  aria-label={`Next photo (${(lightboxIdx + 1) % photos.length + 1} of ${photos.length})`}
+                  className="pointer-events-auto p-3 text-white/70 hover:text-white focus:outline-none focus:ring-2 focus:ring-white rounded min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
-                  &rsaquo;
+                  <ChevronRight className="w-6 h-6" aria-hidden="true" />
                 </button>
               </div>
             )}
@@ -139,13 +136,13 @@ export function PhotoGallery({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={current.url}
-              alt={current.caption || 'Photo'}
+              alt={current.caption || `Photo ${lightboxIdx + 1} of ${photos.length}`}
               className="max-w-full max-h-[80vh] object-contain rounded-lg"
             />
             {current.caption && (
               <p className="text-center text-sm text-white/80 mt-3">{current.caption}</p>
             )}
-            <p className="text-center text-xs text-white/50 mt-1">
+            <p className="text-center text-xs text-white/50 mt-1" aria-live="polite">
               {lightboxIdx + 1} / {photos.length}
             </p>
           </div>

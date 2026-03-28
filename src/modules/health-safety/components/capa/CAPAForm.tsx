@@ -166,9 +166,9 @@ export function CAPAForm({
           <button
             onClick={onCancel}
             aria-label="Close dialog"
-            className="p-3 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] rounded-lg transition-colors"
+            className="p-3 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] rounded-lg transition-colors min-w-[44px] min-h-[44px]"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 

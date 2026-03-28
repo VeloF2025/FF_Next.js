@@ -134,11 +134,16 @@ export function IncidentPhotoUpload({
               >
                 <X aria-hidden="true" className="w-3 h-3" />
               </button>
+              <label htmlFor={`photo-caption-${idx}`} className="sr-only">
+                Caption for photo {idx + 1}
+              </label>
               <input
+                id={`photo-caption-${idx}`}
                 type="text"
                 value={photo.caption || ''}
                 onChange={(e) => updateCaption(idx, e.target.value)}
                 placeholder="Caption..."
+                aria-label={`Caption for photo ${idx + 1}`}
                 className="w-full px-2 py-1 text-xs bg-[var(--ff-bg-tertiary)] border-t border-[var(--ff-border-light)] text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:outline-none"
               />
             </div>
