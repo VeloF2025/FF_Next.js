@@ -298,6 +298,14 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
       };
     }
 
+    // Health & Safety
+    if (path.includes('health-safety')) {
+      return {
+        title: 'Health & Safety',
+        breadcrumbs: ['Home', 'Projects', 'Health & Safety'],
+      };
+    }
+
     // System Health
     if (path.includes('system-health') || path.includes('health')) {
       return {

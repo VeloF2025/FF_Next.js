@@ -88,6 +88,16 @@ export default function ProcurementPage({
     setIsMounted(true);
   }, []);
 
+  // Sync activeTab when URL query changes (e.g. nav links to /procurement?tab=boq-view)
+  useEffect(() => {
+    if (!isMounted) return;
+    const tabFromQuery = router.query.tab as ProcurementTabId | undefined;
+    if (tabFromQuery && tabFromQuery !== activeTab) {
+      setActiveTab(tabFromQuery);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.query.tab, isMounted]);
+
   /**
    * Load aggregate metrics for "All Projects" view
    */
