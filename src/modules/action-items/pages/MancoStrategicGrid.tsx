@@ -302,19 +302,36 @@ export function MancoStrategicGrid() {
                         >
                           <td className="px-4 py-3">
                             <span
-                              className="px-2 py-1 rounded text-xs font-medium"
+                              className="px-2 py-1 rounded text-xs font-medium border"
                               style={{
                                 // WCAG AA contrast: color-mix pattern from Flow's CAPAStatusBadge (PR #490)
                                 background: overdue
-                                  ? 'color-mix(in srgb, var(--ff-danger) 85%, black)'
+                                  ? 'color-mix(in srgb, var(--ff-danger) 12%, transparent)'
                                   : item.status === 'pending'
-                                  ? 'color-mix(in srgb, var(--ff-warning) 85%, black)'
+                                  ? 'color-mix(in srgb, var(--ff-warning) 12%, transparent)'
                                   : item.status === 'in_progress'
-                                  ? 'color-mix(in srgb, var(--ff-info) 85%, black)'
+                                  ? 'color-mix(in srgb, var(--ff-info) 12%, transparent)'
                                   : item.status === 'completed'
-                                  ? 'color-mix(in srgb, var(--ff-success) 85%, black)'
+                                  ? 'color-mix(in srgb, var(--ff-success) 12%, transparent)'
+                                  : 'color-mix(in srgb, var(--ff-text-secondary) 12%, transparent)',
+                                color: overdue
+                                  ? 'var(--ff-danger)'
+                                  : item.status === 'pending'
+                                  ? 'var(--ff-warning)'
+                                  : item.status === 'in_progress'
+                                  ? 'var(--ff-info)'
+                                  : item.status === 'completed'
+                                  ? 'var(--ff-success)'
                                   : 'var(--ff-text-secondary)',
-                                color: 'white',
+                                borderColor: overdue
+                                  ? 'color-mix(in srgb, var(--ff-danger) 30%, transparent)'
+                                  : item.status === 'pending'
+                                  ? 'color-mix(in srgb, var(--ff-warning) 30%, transparent)'
+                                  : item.status === 'in_progress'
+                                  ? 'color-mix(in srgb, var(--ff-info) 30%, transparent)'
+                                  : item.status === 'completed'
+                                  ? 'color-mix(in srgb, var(--ff-success) 30%, transparent)'
+                                  : 'color-mix(in srgb, var(--ff-text-secondary) 30%, transparent)',
                               }}
                             >
                               {overdue ? 'OVERDUE' : item.status.replace('_', ' ').toUpperCase()}
