@@ -137,11 +137,16 @@ export function MancoDetailPane({
             <h2 className="text-lg font-bold text-[var(--ff-text-primary)] pr-4">
               {item.action_item}
             </h2>
-            <div className="mt-2 inline-block px-3 py-1 rounded text-xs font-medium text-white" style={{
-              backgroundColor: item.status === 'pending' ? 'var(--ff-warning)'
-                : item.status === 'in_progress' ? 'var(--ff-info)'
-                : item.status === 'completed' ? 'var(--ff-success)'
+            <div className="mt-2 inline-block px-3 py-1 rounded text-xs font-medium" style={{
+              // WCAG AA contrast: color-mix pattern from Flow's CAPAStatusBadge (PR #490)
+              background: item.status === 'pending'
+                ? 'color-mix(in srgb, var(--ff-warning) 85%, black)'
+                : item.status === 'in_progress'
+                ? 'color-mix(in srgb, var(--ff-info) 85%, black)'
+                : item.status === 'completed'
+                ? 'color-mix(in srgb, var(--ff-success) 85%, black)'
                 : 'var(--ff-text-secondary)',
+              color: 'white',
             }}>
               {item.status.replace('_', ' ').toUpperCase()}
             </div>
