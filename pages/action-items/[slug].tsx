@@ -6,6 +6,7 @@ import { ActionItemsByMeeting } from '@/modules/action-items/pages/ActionItemsBy
 import { ActionItemsByAssignee } from '@/modules/action-items/pages/ActionItemsByAssignee';
 import { ActionItemsSearch } from '@/modules/action-items/pages/ActionItemsSearch';
 import { MyActionItems } from '@/modules/action-items/pages/MyActionItems';
+import { MancoStrategicGrid } from '@/modules/action-items/pages/MancoStrategicGrid';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 
@@ -17,6 +18,7 @@ const components = {
   'by-meeting': ActionItemsByMeeting,
   'by-assignee': ActionItemsByAssignee,
   search: ActionItemsSearch,
+  manco: MancoStrategicGrid,
 };
 
 export default function ActionItemsSubPage() {
