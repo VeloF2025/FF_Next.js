@@ -13,7 +13,6 @@ import {
   getUniqueDepartments,
   getUniqueResponsiblePersons,
 } from '../components/manco-grid-helpers';
-import { AppLayout } from '@/components/layout/AppLayout';
 
 type TabType = 'all' | 'pending' | 'in_progress' | 'completed' | 'overdue';
 
@@ -106,16 +105,14 @@ export function MancoStrategicGrid() {
 
   if (loading) {
     return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-primary)]" />
-        </div>
-      </AppLayout>
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-primary)]" />
+      </div>
     );
   }
 
   return (
-    <AppLayout>
+    <>
       <div className="p-6">
         {/* Header */}
         <div className="mb-8">
@@ -313,6 +310,6 @@ export function MancoStrategicGrid() {
           handlePaneClose();
         }}
       />
-    </AppLayout>
+    </>
   );
 }

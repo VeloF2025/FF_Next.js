@@ -36,8 +36,8 @@ export function MancoDetailPane({
       try {
         const res = await fetch(`/api/manco-action-items/comments?item_id=${item.id}`);
         if (res.ok) {
-          const data = await res.json() as MancoActionItemComment[];
-          setComments(data);
+          const json = await res.json();
+          setComments(Array.isArray(json) ? json : (json.data ?? []));
         } else {
           log.error('Failed to load comments', { itemId: item.id, status: res.status });
         }
@@ -90,8 +90,8 @@ export function MancoDetailPane({
         // Reload comments to show the newly posted one
         const commentsRes = await fetch(`/api/manco-action-items/comments?item_id=${item.id}`);
         if (commentsRes.ok) {
-          const data = await commentsRes.json() as MancoActionItemComment[];
-          setComments(data);
+          const json2 = await commentsRes.json();
+          setComments(Array.isArray(json2) ? json2 : (json2.data ?? []));
         }
         onUpdated();
       }
