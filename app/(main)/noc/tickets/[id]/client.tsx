@@ -22,7 +22,8 @@ import { useParams } from 'next/navigation';
 
 export default function TicketDetailPageClient() {
   const params = useParams();
-  const ticketId = params.id as string;
+  // Handle null params (Next.js can return null in some render scenarios)
+  const ticketId = params?.id as string;
 
   return (
     <div className="p-6">
