@@ -117,7 +117,7 @@ function extractMunicipalityFromDisplayName(displayName: string): string | null 
 
   for (const pattern of patterns) {
     const match = displayName.match(pattern);
-    if (match) {
+    if (match && match[1]) {
       return match[1].trim();
     }
   }
@@ -155,7 +155,7 @@ export function parseGPSCoordinates(input: string): { lat: number; lng: number }
 
   // Format 1: "-34.031085438557376, 18.463559275830423"
   const decimalPair = cleanInput.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
-  if (decimalPair) {
+  if (decimalPair && decimalPair[1] && decimalPair[2]) {
     const lat = parseFloat(decimalPair[1]);
     const lng = parseFloat(decimalPair[2]);
     if (!isNaN(lat) && !isNaN(lng)) {
@@ -186,7 +186,7 @@ export function parseGPSCoordinates(input: string): { lat: number; lng: number }
 
   // Format 3: Single coordinate pair without separators "34.031085438557376 18.463559275830423"
   const spaceSeparated = cleanInput.match(/^(-?\d+\.?\d*)\s+(-?\d+\.?\d*)$/);
-  if (spaceSeparated) {
+  if (spaceSeparated && spaceSeparated[1] && spaceSeparated[2]) {
     const lat = parseFloat(spaceSeparated[1]);
     const lng = parseFloat(spaceSeparated[2]);
     if (!isNaN(lat) && !isNaN(lng)) {
@@ -196,7 +196,7 @@ export function parseGPSCoordinates(input: string): { lat: number; lng: number }
 
   // Format 4: Try to extract two decimal numbers — only accept if they look like valid coordinates
   const allDecimals = cleanInput.match(/-?\d+\.\d+/g);
-  if (allDecimals && allDecimals.length >= 2) {
+  if (allDecimals && allDecimals.length >= 2 && allDecimals[0] && allDecimals[1]) {
     const lat = parseFloat(allDecimals[0]);
     const lng = parseFloat(allDecimals[1]);
     if (!isNaN(lat) && !isNaN(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
