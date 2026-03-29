@@ -2,7 +2,7 @@
  * Risk Assessment Form - Create/edit risk register entry
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { log } from '@/lib/logger';
 import {
@@ -36,6 +36,7 @@ export function RiskForm({ projectId, onSuccess, onCancel }: RiskFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [projects, setProjects] = useState<{ id: string; project_name: string }[]>([]);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   const [form, setForm] = useState({
     project_id: projectId || '',
@@ -59,6 +60,53 @@ export function RiskForm({ projectId, onSuccess, onCancel }: RiskFormProps) {
       .then((d) => setProjects(d.data || []))
       .catch((err) => log.error('Failed to load projects', err as Error));
   }, []);
+
+  // Focus trap + Escape close
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const focusableSelectors =
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+    // Focus first interactive element on mount
+    const focusable = Array.from(
+      dialog.querySelectorAll<HTMLElement>(focusableSelectors)
+    ).filter((el) => !el.hasAttribute('disabled'));
+    focusable[0]?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCancel();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+
+      const els = Array.from(
+        dialog.querySelectorAll<HTMLElement>(focusableSelectors)
+      ).filter((el) => !el.hasAttribute('disabled'));
+
+      if (els.length === 0) return;
+
+      const first = els[0]!;
+      const last = els[els.length - 1]!;
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onCancel]);
 
   const inherentLevel = getRiskLevel(form.likelihood, form.severity);
   const residualLevel = form.residual_likelihood && form.residual_severity
@@ -98,12 +146,26 @@ export function RiskForm({ projectId, onSuccess, onCancel }: RiskFormProps) {
   const set = (field: string, value: string | number) => setForm((p) => ({ ...p, [field]: value }));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-[var(--ff-bg-primary)] rounded-xl border border-[var(--ff-border-light)] w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      onClick={onCancel}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="risk-dialog-title"
+        className="bg-[var(--ff-bg-primary)] rounded-xl border border-[var(--ff-border-light)] w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between p-4 border-b border-[var(--ff-border-light)]">
-          <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">New Risk Assessment</h2>
-          <button onClick={onCancel} className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]">
-            <X className="w-5 h-5" />
+          <h2 id="risk-dialog-title" className="text-lg font-semibold text-[var(--ff-text-primary)]">New Risk Assessment</h2>
+          <button
+            onClick={onCancel}
+            aria-label="Close dialog"
+            className="p-3 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] rounded-lg transition-colors min-w-[44px] min-h-[44px]"
+          >
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
