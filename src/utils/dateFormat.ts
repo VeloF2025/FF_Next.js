@@ -115,7 +115,7 @@ export function formatDisplayTime(date: DateInput, fallback = 'N/A'): string {
 export function formatDateISO(date: DateInput): string {
   const d = toDate(date);
   if (!d) return '';
-  return d.toISOString().split('T')[0];
+  return d.toISOString().split('T')[0] ?? '';
 }
 
 /**

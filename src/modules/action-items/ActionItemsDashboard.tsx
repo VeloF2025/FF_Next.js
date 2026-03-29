@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CheckCircle, Clock, AlertCircle, Calendar, Users, Filter, Inbox } from 'lucide-react';
+import { CheckCircle, Clock, AlertCircle, Calendar, Users, Filter, Inbox, Target } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { ActionItemStats } from '@/types/action-items.types';
 import { actionItemsService } from '@/services/action-items/actionItemsService';
@@ -79,6 +79,13 @@ export function ActionItemsDashboard() {
       icon: Filter,
       color: 'bg-indigo-500',
       onClick: () => router.push('/action-items/search'),
+    },
+    {
+      title: 'Manco Strategic',
+      description: 'Executive strategic action items from Manco meetings',
+      icon: Target,
+      color: 'bg-amber-600',
+      onClick: () => router.push('/action-items/manco'),
     },
   ];
 

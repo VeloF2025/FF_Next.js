@@ -340,7 +340,6 @@ export interface StockItemMatch {
   confidence: number;
 }
 
-// Type exports that match Drizzle inferred types
-export type { BOQ as DrizzleBOQ, NewBOQ as NewDrizzleBOQ } from '../../lib/neon/schema';
-export type { BOQItem as DrizzleBOQItem, NewBOQItem as NewDrizzleBOQItem } from '../../lib/neon/schema';
-export type { BOQException as DrizzleBOQException, NewBOQException as NewDrizzleBOQException } from '../../lib/neon/schema';
+// Note: BOQ, BOQItem, and BOQException are defined as interfaces above.
+// The schema.ts file is a placeholder stub and does not export these types.
+// If Drizzle schema is implemented in the future, update imports accordingly.
