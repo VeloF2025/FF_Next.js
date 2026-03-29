@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, MessageCircle, Send, Loader2 } from 'lucide-react';
-import { MancoActionItem, MancoActionItemComment } from '@/types/manco-action-items.types';
+import { X, MessageCircle, Send, Loader2, Calendar } from 'lucide-react';
+import { MancoActionItem, MancoActionItemComment, MancoMeetingContext } from '@/types/manco-action-items.types';
 import { log } from '@/lib/logger';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDate } from './manco-grid-helpers';
@@ -26,29 +26,44 @@ export function MancoDetailPane({
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [commentsLoading, setCommentsLoading] = useState(false);
+  const [meetingContext, setMeetingContext] = useState<MancoMeetingContext | null>(null);
+  const [contextLoading, setContextLoading] = useState(false);
 
-  // Fetch existing comments whenever the selected item changes
+  // Fetch existing comments and meeting context whenever the selected item changes
   useEffect(() => {
     if (!item?.id) return;
 
-    const fetchComments = async () => {
+    const fetchData = async () => {
       setCommentsLoading(true);
+      setContextLoading(true);
+
       try {
-        const res = await fetch(`/api/manco-action-items/comments?item_id=${item.id}`);
-        if (res.ok) {
-          const json = await res.json();
+        // Fetch comments
+        const commentsRes = await fetch(`/api/manco-action-items/comments?item_id=${item.id}`);
+        if (commentsRes.ok) {
+          const json = await commentsRes.json();
           setComments(Array.isArray(json) ? json : (json.data ?? []));
         } else {
-          log.error('Failed to load comments', { itemId: item.id, status: res.status });
+          log.error('Failed to load comments', { itemId: item.id, status: commentsRes.status });
+        }
+
+        // Fetch meeting context
+        const contextRes = await fetch(`/api/manco-action-items/meeting-context?item_id=${item.id}`);
+        if (contextRes.ok) {
+          const contextJson = await contextRes.json();
+          setMeetingContext(contextJson.data ?? contextJson);
+        } else {
+          log.error('Failed to load meeting context', { itemId: item.id, status: contextRes.status });
         }
       } catch (error) {
-        log.error('Error fetching comments', { error, itemId: item.id });
+        log.error('Error fetching data', { error, itemId: item.id });
       } finally {
         setCommentsLoading(false);
+        setContextLoading(false);
       }
     };
 
-    void fetchComments();
+    void fetchData();
   }, [item?.id]);
 
   if (!item || !isOpen) return null;
@@ -201,6 +216,73 @@ export function MancoDetailPane({
               </p>
             </div>
           )}
+
+          {/* Meeting Context */}
+          <div className="border-t border-[var(--ff-border-light)] pt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Calendar className="w-4 h-4 text-[var(--ff-text-secondary)]" />
+              <p className="text-sm font-semibold text-[var(--ff-text-primary)]">Meeting Context</p>
+            </div>
+
+            {contextLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-4 h-4 animate-spin text-[var(--ff-text-secondary)]" />
+              </div>
+            ) : meetingContext && meetingContext.meeting ? (
+              <div className="space-y-3 p-3 bg-[var(--ff-bg-secondary)] rounded text-xs">
+                <div>
+                  <p className="font-semibold text-[var(--ff-text-primary)]">{meetingContext.meeting.title}</p>
+                  <p className="text-[var(--ff-text-secondary)] text-xs mt-1">
+                    {formatDate(meetingContext.meeting.meeting_date)}
+                  </p>
+                </div>
+
+                {meetingContext.summary && meetingContext.summary.overview && (
+                  <div>
+                    <p className="font-medium text-[var(--ff-text-primary)] mb-1">Overview:</p>
+                    <p className="text-[var(--ff-text-secondary)] text-xs leading-relaxed">
+                      {meetingContext.summary.overview}
+                    </p>
+                  </div>
+                )}
+
+                {meetingContext.summary && meetingContext.summary.decisions && meetingContext.summary.decisions.length > 0 && (
+                  <div>
+                    <p className="font-medium text-[var(--ff-text-primary)] mb-1">Key Decisions:</p>
+                    <ul className="space-y-1">
+                      {meetingContext.summary.decisions.slice(0, 2).map((decision, idx) => (
+                        <li key={idx} className="text-[var(--ff-text-secondary)] text-xs">
+                          • {decision}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {meetingContext.excerpts && meetingContext.excerpts.length > 0 && (
+                  <div>
+                    <p className="font-medium text-[var(--ff-text-primary)] mb-2">Relevant Discussion:</p>
+                    <div className="space-y-2">
+                      {meetingContext.excerpts.slice(0, 3).map((excerpt, idx) => (
+                        <div key={idx} className="border-l-2 border-[var(--ff-primary)] pl-2 py-1">
+                          <p className="text-[var(--ff-text-secondary)] text-xs">
+                            <span className="font-semibold">{excerpt.timestamp}</span> {excerpt.speaker && `• ${excerpt.speaker}`}
+                          </p>
+                          <p className="text-[var(--ff-text-primary)] text-xs mt-1">
+                            "{excerpt.text.substring(0, 100)}{excerpt.text.length > 100 ? '...' : ''}"
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-3 bg-[var(--ff-bg-secondary)] rounded text-xs text-[var(--ff-text-secondary)]">
+                No meeting linked
+              </div>
+            )}
+          </div>
 
           {/* Status Update */}
           <div className="border-t border-[var(--ff-border-light)] pt-6">

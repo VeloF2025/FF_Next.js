@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Search, Filter, ChevronDown, Loader2 } from 'lucide-react';
+import { Search, Filter, ChevronDown, Loader2, List, Columns } from 'lucide-react';
 import { MancoActionItem, MancoActionItemStats } from '@/types/manco-action-items.types';
 import { log } from '@/lib/logger';
 import { MancoDetailPane } from '../components/MancoDetailPane';
+import { MancoKanbanView } from '../components/MancoKanbanView';
 import {
   isOverdue,
   daysUntilEta,
@@ -15,6 +16,7 @@ import {
 } from '../components/manco-grid-helpers';
 
 type TabType = 'all' | 'pending' | 'in_progress' | 'completed' | 'overdue';
+type ViewMode = 'list' | 'kanban';
 
 export function MancoStrategicGrid() {
   const [items, setItems] = useState<MancoActionItem[]>([]);
@@ -28,6 +30,12 @@ export function MancoStrategicGrid() {
   const [paneOpen, setPaneOpen] = useState(false);
   const [departments, setDepartments] = useState<string[]>([]);
   const [responsiblePersons, setResponsiblePersons] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('manco-view-mode') as ViewMode) || 'list';
+    }
+    return 'list';
+  });
 
   useEffect(() => {
     fetchData();
@@ -103,6 +111,11 @@ export function MancoStrategicGrid() {
     setTimeout(() => setSelectedItem(null), 300);
   };
 
+  const handleViewChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    localStorage.setItem('manco-view-mode', mode);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -152,21 +165,49 @@ export function MancoStrategicGrid() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-[var(--ff-border-light)]">
-          {(['all', 'pending', 'in_progress', 'completed', 'overdue'] as TabType[]).map((tab) => (
+        {/* Tabs & View Toggle */}
+        <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-center md:justify-between">
+          <div className="flex gap-2 border-b border-[var(--ff-border-light)]">
+            {(['all', 'pending', 'in_progress', 'completed', 'overdue'] as TabType[]).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setSelectedTab(tab)}
+                className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors ${
+                  selectedTab === tab
+                    ? 'border-[var(--ff-primary)] text-[var(--ff-primary)]'
+                    : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
+                }`}
+              >
+                {tab.replace('_', ' ').toUpperCase()}
+              </button>
+            ))}
+          </div>
+
+          {/* View Toggle */}
+          <div className="flex items-center gap-1 bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-1">
             <button
-              key={tab}
-              onClick={() => setSelectedTab(tab)}
-              className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors ${
-                selectedTab === tab
-                  ? 'border-[var(--ff-primary)] text-[var(--ff-primary)]'
-                  : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
+              onClick={() => handleViewChange('list')}
+              className={`p-2 rounded transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-[var(--ff-primary)] text-white'
+                  : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
               }`}
+              aria-label="List view"
             >
-              {tab.replace('_', ' ').toUpperCase()}
+              <List className="w-4 h-4" />
             </button>
-          ))}
+            <button
+              onClick={() => handleViewChange('kanban')}
+              className={`p-2 rounded transition-colors ${
+                viewMode === 'kanban'
+                  ? 'bg-[var(--ff-primary)] text-white'
+                  : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
+              }`}
+              aria-label="Kanban view"
+            >
+              <Columns className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -215,89 +256,98 @@ export function MancoStrategicGrid() {
           </div>
         </div>
 
-        {/* Table */}
-        {displayItems.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-[var(--ff-text-secondary)]">No action items found</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
-                  <th className="px-4 py-3 text-left font-semibold text-[var(--ff-text-secondary)]">Status</th>
-                  <th className="px-4 py-3 text-left font-semibold text-[var(--ff-text-secondary)]">Action Item</th>
-                  <th className="px-4 py-3 text-left font-semibold text-[var(--ff-text-secondary)]">Department</th>
-                  <th className="px-4 py-3 text-left font-semibold text-[var(--ff-text-secondary)]">Responsible</th>
-                  <th className="px-4 py-3 text-left font-semibold text-[var(--ff-text-secondary)]">Logged</th>
-                  <th className="px-4 py-3 text-left font-semibold text-[var(--ff-text-secondary)]">ETA</th>
-                  <th className="px-4 py-3 text-center font-semibold text-[var(--ff-text-secondary)]">FF Dev</th>
-                  <th className="px-4 py-3 text-left font-semibold text-[var(--ff-text-secondary)]">FF Module</th>
-                  <th className="px-4 py-3 text-left font-semibold text-[var(--ff-text-secondary)]">Comment</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayItems.map((item) => {
-                  const overdue = isOverdue(item);
-                  const daysLeft = daysUntilEta(item);
-                  return (
-                    <tr
-                      key={item.id}
-                      onClick={() => handleRowClick(item)}
-                      className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-secondary)] cursor-pointer transition-colors"
-                    >
-                      <td className="px-4 py-3">
-                        <span
-                          className="px-2 py-1 rounded text-xs font-medium text-white"
-                          style={{
-                            backgroundColor: overdue
-                              ? 'var(--ff-danger)'
-                              : item.status === 'pending'
-                              ? 'var(--ff-warning)'
-                              : item.status === 'in_progress'
-                              ? 'var(--ff-info)'
-                              : item.status === 'completed'
-                              ? 'var(--ff-success)'
-                              : 'var(--ff-text-secondary)',
-                          }}
-                        >
-                          {overdue ? 'OVERDUE' : item.status.replace('_', ' ').toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-medium text-[var(--ff-text-primary)]">
-                        {item.action_item}
-                      </td>
-                      <td className="px-4 py-3 text-[var(--ff-text-secondary)]">{item.department || '—'}</td>
-                      <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
-                        {item.responsible_person || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
-                        {formatDate(item.logged_date)}
-                      </td>
-                      <td className="px-4 py-3" style={{
-                        color: overdue
-                          ? 'var(--ff-danger)'
-                          : daysLeft !== null && daysLeft <= 7
-                          ? 'var(--ff-warning)'
-                          : 'var(--ff-text-secondary)',
-                      }}>
-                        {formatDate(item.completion_eta)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {item.fibreflow_dev ? '✓' : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
-                        {item.fibreflow_module || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-[var(--ff-text-secondary)]" title={item.comment}>
-                        {truncateText(item.comment, 40)}
-                      </td>
+        {/* Render based on viewMode */}
+        {viewMode === 'list' ? (
+          <>
+            {displayItems.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-[var(--ff-text-secondary)]">No action items found</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
+                      <th className="px-4 py-3 text-left font-semibold text-[var(--ff-text-secondary)]">Status</th>
+                      <th className="px-4 py-3 text-left font-semibold text-[var(--ff-text-secondary)]">Action Item</th>
+                      <th className="px-4 py-3 text-left font-semibold text-[var(--ff-text-secondary)]">Department</th>
+                      <th className="px-4 py-3 text-left font-semibold text-[var(--ff-text-secondary)]">Responsible</th>
+                      <th className="px-4 py-3 text-left font-semibold text-[var(--ff-text-secondary)]">Logged</th>
+                      <th className="px-4 py-3 text-left font-semibold text-[var(--ff-text-secondary)]">ETA</th>
+                      <th className="px-4 py-3 text-center font-semibold text-[var(--ff-text-secondary)]">FF Dev</th>
+                      <th className="px-4 py-3 text-left font-semibold text-[var(--ff-text-secondary)]">FF Module</th>
+                      <th className="px-4 py-3 text-left font-semibold text-[var(--ff-text-secondary)]">Comment</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {displayItems.map((item) => {
+                      const overdue = isOverdue(item);
+                      const daysLeft = daysUntilEta(item);
+                      return (
+                        <tr
+                          key={item.id}
+                          onClick={() => handleRowClick(item)}
+                          className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-secondary)] cursor-pointer transition-colors"
+                        >
+                          <td className="px-4 py-3">
+                            <span
+                              className="px-2 py-1 rounded text-xs font-medium text-white"
+                              style={{
+                                backgroundColor: overdue
+                                  ? 'var(--ff-danger)'
+                                  : item.status === 'pending'
+                                  ? 'var(--ff-warning)'
+                                  : item.status === 'in_progress'
+                                  ? 'var(--ff-info)'
+                                  : item.status === 'completed'
+                                  ? 'var(--ff-success)'
+                                  : 'var(--ff-text-secondary)',
+                              }}
+                            >
+                              {overdue ? 'OVERDUE' : item.status.replace('_', ' ').toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-medium text-[var(--ff-text-primary)]">
+                            {item.action_item}
+                          </td>
+                          <td className="px-4 py-3 text-[var(--ff-text-secondary)]">{item.department || '—'}</td>
+                          <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
+                            {item.responsible_person || '—'}
+                          </td>
+                          <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
+                            {formatDate(item.logged_date)}
+                          </td>
+                          <td
+                            className="px-4 py-3"
+                            style={{
+                              color: overdue
+                                ? 'var(--ff-danger)'
+                                : daysLeft !== null && daysLeft <= 7
+                                ? 'var(--ff-warning)'
+                                : 'var(--ff-text-secondary)',
+                            }}
+                          >
+                            {formatDate(item.completion_eta)}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {item.fibreflow_dev ? '✓' : '—'}
+                          </td>
+                          <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
+                            {item.fibreflow_module || '—'}
+                          </td>
+                          <td className="px-4 py-3 text-[var(--ff-text-secondary)]" title={item.comment}>
+                            {truncateText(item.comment, 40)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        ) : (
+          <MancoKanbanView items={displayItems} onItemClick={handleRowClick} />
         )}
       </div>
 
