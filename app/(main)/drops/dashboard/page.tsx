@@ -19,57 +19,12 @@ import { useState, useMemo } from 'react';
 export const dynamic = 'force-dynamic';
 import { useRouter } from 'next/navigation';
 import { useProjects } from '@/hooks/useProjects';
-import { useWaMonitorSummary } from '@/modules/wa-monitor/hooks/useWaMonitorStats';
-
-// Type definitions for WA Monitor dashboard stats
-interface ProjectStats {
-  project: string;
-  total: number;
-  complete: number;
-  completionRate: number;
-  overallTotal?: number;
-  overallComplete?: number;
-}
-
-interface CommonFailure {
-  step: string;
-  count: number;
-  percentage: number;
-}
-
-interface AgentPerformance {
-  agent: string;
-  drops: number;
-  completionRate: number;
-}
-
-interface WaMonitorStats {
-  total: number;
-  complete: number;
-  incomplete: number;
-  completionRate: number;
-  byProject?: ProjectStats[];
-  commonFailures?: CommonFailure[];
-  agentPerformance?: AgentPerformance[];
-  resubmissions?: {
-    total: number;
-    rate: number;
-    firstTimePassRate: number;
-  };
-  feedbackStats?: {
-    sent: number;
-    pending: number;
-    sendRate: number;
-  };
-  trends?: {
-    weekly: {
-      total: number;
-    };
-    monthly: {
-      total: number;
-    };
-  };
-}
+import {
+  useWaMonitorSummary,
+  type WaMonitorProjectStats,
+  type WaMonitorCommonFailure,
+  type WaMonitorAgentPerformance,
+} from '@/modules/wa-monitor/hooks/useWaMonitorStats';
 import {
   CheckCircle,
   FolderKanban,
@@ -85,8 +40,6 @@ import {
   BarChart3,
 } from 'lucide-react';
 import {
-  LineChart,
-  Line,
   BarChart,
   Bar,
   PieChart,
@@ -98,8 +51,9 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  type PieLabelRenderProps,
 } from 'recharts';
-import { format, subDays, startOfWeek, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfWeek, startOfMonth } from 'date-fns';
 
 // Chart colors
 const COLORS = {
@@ -114,7 +68,7 @@ type DateRangePreset = 'today' | 'week' | 'month' | 'custom';
 
 export default function DropDashboard() {
   const router = useRouter();
-  const { data: projects = [], isLoading: projectsLoading } = useProjects();
+  const { data: projects = [] } = useProjects();
 
   // Date range state
   const [datePreset, setDatePreset] = useState<DateRangePreset>('today');
@@ -123,11 +77,7 @@ export default function DropDashboard() {
   const [selectedProject, setSelectedProject] = useState<string>('all');
 
   // Fetch data with date range
-  const { data: waStats, isLoading: waLoading, error: waError } = useWaMonitorSummary(startDate, endDate) as {
-    data: WaMonitorStats | undefined;
-    isLoading: boolean;
-    error: Error | null;
-  };
+  const { data: waStats, isLoading: waLoading, error: waError } = useWaMonitorSummary(startDate, endDate);
 
   // Handle date preset changes
   const handlePresetChange = (preset: DateRangePreset) => {
@@ -153,17 +103,13 @@ export default function DropDashboard() {
     }
   };
 
-  // Calculate project stats
-  const activeProjects = projects.filter(p => p.status === 'active').length;
-  const totalProjects = projects.length;
-
   // Helper to find project ID by name for navigation
   const findProjectIdByName = (projectName: string): string | null => {
     const project = projects.find(p =>
       p.name?.toLowerCase() === projectName.toLowerCase() ||
-      (p as any).project_name?.toLowerCase() === projectName.toLowerCase()
+      p.project_name?.toLowerCase() === projectName.toLowerCase()
     );
-    return project?.id || (project as any)?.projectId || null;
+    return project?.id ?? null;
   };
 
   // Filter stats by selected project
@@ -186,7 +132,7 @@ export default function DropDashboard() {
   // Prepare chart data
   const projectComparisonData = useMemo(() => {
     if (!waStats?.byProject) return [];
-    return waStats.byProject.map((p: ProjectStats) => ({
+    return waStats.byProject.map((p: WaMonitorProjectStats) => ({
       name: p.project,
       Complete: p.complete,
       Incomplete: p.total - p.complete,
@@ -207,7 +153,7 @@ export default function DropDashboard() {
     if (!waStats?.byProject) return;
 
     const headers = ['Project', 'Total Drops', 'Complete', 'Incomplete', 'Completion Rate (%)', 'Overall Total', 'Overall Complete'];
-    const rows = waStats.byProject.map((p: ProjectStats) => [
+    const rows = waStats.byProject.map((p: WaMonitorProjectStats) => [
       p.project,
       p.total,
       p.complete,
@@ -456,7 +402,9 @@ export default function DropDashboard() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={(props: any) => `${props.name} ${(props.percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }: PieLabelRenderProps) =>
+                    `${name ?? ''} ${((percent ?? 0) * 100).toFixed(0)}%`
+                  }
                   outerRadius={100}
                   fill="#8884d8"
                   dataKey="value"
@@ -481,7 +429,7 @@ export default function DropDashboard() {
               <h2 className="ml-3 text-lg font-semibold text-gray-900">Top 5 Common Failure Points</h2>
             </div>
             <div className="space-y-4">
-              {waStats.commonFailures.map((failure: CommonFailure, idx: number) => (
+              {waStats.commonFailures.map((failure: WaMonitorCommonFailure, idx: number) => (
                 <div key={idx} className="flex items-center">
                   <div className="flex-1">
                     <div className="flex justify-between items-center mb-1">
@@ -521,7 +469,7 @@ export default function DropDashboard() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {waStats.agentPerformance.map((agent: AgentPerformance, idx: number) => (
+                  {waStats.agentPerformance.map((agent: WaMonitorAgentPerformance, idx: number) => (
                     <tr key={idx} className="hover:bg-gray-50">
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">#{idx + 1}</td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{agent.agent}</td>
@@ -565,7 +513,7 @@ export default function DropDashboard() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {waStats.byProject.map((project: ProjectStats) => {
+                  {waStats.byProject.map((project: WaMonitorProjectStats) => {
                     const projectId = findProjectIdByName(project.project);
                     return (
                     <tr
