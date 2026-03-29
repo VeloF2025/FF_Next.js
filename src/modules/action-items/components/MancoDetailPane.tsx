@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, MessageCircle, Send, Loader2 } from 'lucide-react';
 import { MancoActionItem, MancoActionItemComment } from '@/types/manco-action-items.types';
 import { log } from '@/lib/logger';
+import { useAuth } from '@/contexts/AuthContext';
 import { formatDate } from './manco-grid-helpers';
 
 interface MancoDetailPaneProps {
@@ -19,11 +20,36 @@ export function MancoDetailPane({
   onClose,
   onUpdated,
 }: MancoDetailPaneProps) {
+  const { currentUser } = useAuth();
   const [status, setStatus] = useState<string>(item?.status || 'pending');
   const [comments, setComments] = useState<MancoActionItemComment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [commentsLoading, setCommentsLoading] = useState(false);
+
+  // Fetch existing comments whenever the selected item changes
+  useEffect(() => {
+    if (!item?.id) return;
+
+    const fetchComments = async () => {
+      setCommentsLoading(true);
+      try {
+        const res = await fetch(`/api/manco-action-items/comments?item_id=${item.id}`);
+        if (res.ok) {
+          const data = await res.json() as MancoActionItemComment[];
+          setComments(data);
+        } else {
+          log.error('Failed to load comments', { itemId: item.id, status: res.status });
+        }
+      } catch (error) {
+        log.error('Error fetching comments', { error, itemId: item.id });
+      } finally {
+        setCommentsLoading(false);
+      }
+    };
+
+    void fetchComments();
+  }, [item?.id]);
 
   if (!item || !isOpen) return null;
 
@@ -55,13 +81,18 @@ export function MancoDetailPane({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           manco_action_item_id: item.id,
-          author_name: 'System User',
+          author_name: currentUser?.displayName || 'Unknown User',
           content: newComment,
         }),
       });
       if (res.ok) {
         setNewComment('');
-        setComments([]);
+        // Reload comments to show the newly posted one
+        const commentsRes = await fetch(`/api/manco-action-items/comments?item_id=${item.id}`);
+        if (commentsRes.ok) {
+          const data = await commentsRes.json() as MancoActionItemComment[];
+          setComments(data);
+        }
         onUpdated();
       }
     } catch (error) {
