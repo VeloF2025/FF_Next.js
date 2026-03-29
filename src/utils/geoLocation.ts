@@ -117,7 +117,7 @@ function extractMunicipalityFromDisplayName(displayName: string): string | null 
 
   for (const pattern of patterns) {
     const match = displayName.match(pattern);
-    if (match) {
+    if (match && match[1]) {
       return match[1].trim();
     }
   }
@@ -155,7 +155,7 @@ export function parseGPSCoordinates(input: string): { lat: number; lng: number }
 
   // Format 1: "-34.031085438557376, 18.463559275830423"
   const decimalPair = cleanInput.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
-  if (decimalPair) {
+  if (decimalPair && decimalPair[1] && decimalPair[2]) {
     const lat = parseFloat(decimalPair[1]);
     const lng = parseFloat(decimalPair[2]);
     if (!isNaN(lat) && !isNaN(lng)) {
@@ -173,7 +173,8 @@ export function parseGPSCoordinates(input: string): { lat: number; lng: number }
     const coord2 = dmsMatch[3];
     const dir2 = dmsMatch[4];
 
-    if (coord1 && dir1 && coord2 && dir2) {
+    // Type guard: ensure all captures are defined before proceeding
+    if (coord1 !== undefined && dir1 !== undefined && coord2 !== undefined && dir2 !== undefined) {
       const lat = parseCoordinate(coord1.trim(), dir1);
       const lng = parseCoordinate(coord2.trim(), dir2);
 
@@ -185,7 +186,7 @@ export function parseGPSCoordinates(input: string): { lat: number; lng: number }
 
   // Format 3: Single coordinate pair without separators "34.031085438557376 18.463559275830423"
   const spaceSeparated = cleanInput.match(/^(-?\d+\.?\d*)\s+(-?\d+\.?\d*)$/);
-  if (spaceSeparated) {
+  if (spaceSeparated && spaceSeparated[1] && spaceSeparated[2]) {
     const lat = parseFloat(spaceSeparated[1]);
     const lng = parseFloat(spaceSeparated[2]);
     if (!isNaN(lat) && !isNaN(lng)) {
@@ -195,7 +196,7 @@ export function parseGPSCoordinates(input: string): { lat: number; lng: number }
 
   // Format 4: Try to extract two decimal numbers — only accept if they look like valid coordinates
   const allDecimals = cleanInput.match(/-?\d+\.\d+/g);
-  if (allDecimals && allDecimals.length >= 2) {
+  if (allDecimals && allDecimals.length >= 2 && allDecimals[0] && allDecimals[1]) {
     const lat = parseFloat(allDecimals[0]);
     const lng = parseFloat(allDecimals[1]);
     if (!isNaN(lat) && !isNaN(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
@@ -222,7 +223,7 @@ function parseCoordinate(coord: string, direction: string): number | null {
   const dmsPattern = /(\d+)[°d]\s*(\d+(?:\.\d+)?)[′'m]\s*(\d+(?:\.\d+)?)[″"s]?/i;
   const dmsMatch = absCoord.match(dmsPattern);
 
-  if (dmsMatch) {
+  if (dmsMatch && dmsMatch[1] !== undefined && dmsMatch[2] !== undefined && dmsMatch[3] !== undefined) {
     const degrees = parseInt(dmsMatch[1]);
     const minutes = parseFloat(dmsMatch[2]) || 0;
     const seconds = parseFloat(dmsMatch[3]) || 0;
@@ -235,7 +236,7 @@ function parseCoordinate(coord: string, direction: string): number | null {
   const dmPattern = /(\d+)[°d]\s*(\d+(?:\.\d+)?)[′'m]?/i;
   const dmMatch = absCoord.match(dmPattern);
 
-  if (dmMatch) {
+  if (dmMatch && dmMatch[1] !== undefined && dmMatch[2] !== undefined) {
     const degrees = parseInt(dmMatch[1]);
     const minutes = parseFloat(dmMatch[2]) || 0;
 

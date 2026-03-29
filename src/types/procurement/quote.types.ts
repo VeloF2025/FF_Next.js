@@ -1,9 +1,10 @@
 /**
  * Quote Types
  * Formal supplier quotes - can be from RFQ responses or standalone
+ * Note: These are standalone quote types. For RFQ-related quotes, see ./rfq/quote.types.ts
  */
 
-export type QuoteStatus =
+export type StandaloneQuoteStatus =
   | 'draft'
   | 'submitted'
   | 'under_review'
@@ -12,7 +13,7 @@ export type QuoteStatus =
   | 'expired'
   | 'converted';
 
-export interface Quote {
+export interface StandaloneQuote {
   id: string;
   quoteNumber: string;
 
@@ -40,7 +41,7 @@ export interface Quote {
   validUntil?: Date;
 
   // Status
-  status: QuoteStatus;
+  status: StandaloneQuoteStatus;
 
   // Financials
   currency: string;
@@ -69,7 +70,7 @@ export interface Quote {
   convertedBy?: string;
 
   // Notes
-  attachments?: QuoteAttachment[];
+  attachments?: StandaloneQuoteAttachment[];
   internalNotes?: string;
   supplierNotes?: string;
 
@@ -79,7 +80,7 @@ export interface Quote {
   updatedAt: Date;
 }
 
-export interface QuoteAttachment {
+export interface StandaloneQuoteAttachment {
   id: string;
   name: string;
   url: string;
@@ -88,7 +89,7 @@ export interface QuoteAttachment {
   uploadedAt: Date;
 }
 
-export interface QuoteItem {
+export interface StandaloneQuoteItem {
   id: string;
   quoteId: string;
 
@@ -128,7 +129,7 @@ export interface QuoteItem {
 }
 
 // List view for quotes
-export interface QuoteListItem {
+export interface StandaloneQuoteListItem {
   id: string;
   quoteNumber: string;
   supplierName: string;
@@ -136,7 +137,7 @@ export interface QuoteListItem {
   projectId?: string;
   projectName?: string;
   title?: string;
-  status: QuoteStatus;
+  status: StandaloneQuoteStatus;
   totalAmount?: number;
   currency: string;
   quoteDate: Date;
@@ -147,7 +148,7 @@ export interface QuoteListItem {
 }
 
 // Create/Update DTOs
-export interface CreateQuoteRequest {
+export interface CreateStandaloneQuoteRequest {
   supplierId: number;
   projectId?: string;
   rfqId?: string;
@@ -158,12 +159,12 @@ export interface CreateQuoteRequest {
   validUntil?: Date;
   paymentTerms?: string;
   deliveryTerms?: string;
-  items: CreateQuoteItemRequest[];
+  items: CreateStandaloneQuoteItemRequest[];
   internalNotes?: string;
   supplierNotes?: string;
 }
 
-export interface CreateQuoteItemRequest {
+export interface CreateStandaloneQuoteItemRequest {
   rfqItemId?: string;
   stockItemId?: string;
   boqItemId?: string;
@@ -183,11 +184,11 @@ export interface CreateQuoteItemRequest {
   notes?: string;
 }
 
-export interface UpdateQuoteRequest {
+export interface UpdateStandaloneQuoteRequest {
   title?: string;
   description?: string;
   referenceNumber?: string;
-  status?: QuoteStatus;
+  status?: StandaloneQuoteStatus;
   validUntil?: Date;
   paymentTerms?: string;
   deliveryTerms?: string;
@@ -199,11 +200,11 @@ export interface UpdateQuoteRequest {
 }
 
 // Filters
-export interface QuoteFilters {
+export interface StandaloneQuoteFilters {
   projectId?: string;
   supplierId?: number;
   rfqId?: string;
-  status?: QuoteStatus[];
+  status?: StandaloneQuoteStatus[];
   searchTerm?: string;
   dateRange?: {
     start: Date;
@@ -216,9 +217,9 @@ export interface QuoteFilters {
 }
 
 // Stats
-export interface QuoteStats {
+export interface StandaloneQuoteStats {
   total: number;
-  byStatus: Record<QuoteStatus, number>;
+  byStatus: Record<StandaloneQuoteStatus, number>;
   totalValue: number;
   averageValue: number;
   averageEvaluationScore: number;
@@ -227,13 +228,13 @@ export interface QuoteStats {
 }
 
 // Quote comparison (for evaluation)
-export interface QuoteComparison {
-  quotes: Quote[];
-  items: QuoteComparisonItem[];
-  summary: QuoteComparisonSummary;
+export interface StandaloneQuoteComparison {
+  quotes: StandaloneQuote[];
+  items: StandaloneQuoteComparisonItem[];
+  summary: StandaloneQuoteComparisonSummary;
 }
 
-export interface QuoteComparisonItem {
+export interface StandaloneQuoteComparisonItem {
   rfqItemId: string;
   itemCode?: string;
   description: string;
@@ -252,7 +253,7 @@ export interface QuoteComparisonItem {
   averagePrice: number;
 }
 
-export interface QuoteComparisonSummary {
+export interface StandaloneQuoteComparisonSummary {
   rfqId: string;
   rfqNumber: string;
   totalQuotes: number;
