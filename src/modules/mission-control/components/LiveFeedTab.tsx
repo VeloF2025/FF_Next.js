@@ -154,9 +154,10 @@ export function LiveFeedTab({ messages }: LiveFeedTabProps) {
                       <button
                         onClick={() => handleNudge(msg)}
                         disabled={isNudging}
-                        title="Nudge agent"
+                        aria-label={`Nudge ${msg.to_agent}`}
                         className={cn(
-                          'p-1 rounded transition-all opacity-0 group-hover:opacity-100',
+                          'p-3.5 rounded transition-all opacity-0 group-hover:opacity-100',
+                          'focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2',
                           isNudging
                             ? 'opacity-100 cursor-wait'
                             : 'hover:bg-yellow-500/20 hover:text-yellow-400'
