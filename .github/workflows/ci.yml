@@ -28,6 +28,10 @@ jobs:
         run: npx eslint src --ext ts,tsx --rule "jsx-a11y/*" --max-warnings 487
         continue-on-error: false
 
+      - name: Lint (Type Safety Gate - no-explicit-any)
+        run: npx eslint src --ext ts,tsx --rule '{"@typescript-eslint/no-explicit-any": "warn"}' --max-warnings 2573
+        continue-on-error: false
+
       - name: Run TypeScript type check
         run: npm run type-check
         continue-on-error: true
