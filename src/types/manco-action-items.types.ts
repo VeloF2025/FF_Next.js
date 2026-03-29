@@ -45,3 +45,21 @@ export interface MancoActionItemStats {
   completed: number;
   overdue: number;
 }
+
+export interface MancoMeetingContext {
+  meeting: {
+    id: number;
+    title: string;
+    meeting_date: string;
+  } | null;
+  excerpts: Array<{
+    timestamp: string;
+    speaker: string;
+    text: string;
+  }>;
+  summary: {
+    overview: string;
+    decisions: string[];
+    action_items: string[];
+  } | null;
+}
