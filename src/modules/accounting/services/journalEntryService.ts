@@ -176,19 +176,32 @@ export async function createJournalEntry(
 
     const entryId = String(entryRows[0].id);
 
-    for (const line of input.lines) {
+    if (input.lines.length > 0) {
+      // Bulk INSERT all GL lines in a single round-trip using UNNEST
+      const entryIds = input.lines.map(() => entryId);
+      const glAccountIds = input.lines.map(l => l.glAccountId);
+      const debits = input.lines.map(l => l.debit);
+      const credits = input.lines.map(l => l.credit);
+      const lineDescs = input.lines.map(l => l.description || null);
+      const projectIds = input.lines.map(l => l.projectId || null);
+      const costCenterIds = input.lines.map(l => l.costCenterId || null);
+      const buIds = input.lines.map(l => l.buId || null);
+      const vatTypes = input.lines.map(l => l.vatType || null);
       await sql`
         INSERT INTO gl_journal_lines (
           journal_entry_id, gl_account_id, debit, credit,
           description, project_id, cost_center_id, bu_id, vat_type
-        ) VALUES (
-          ${entryId}::UUID, ${line.glAccountId}::UUID,
-          ${line.debit}, ${line.credit},
-          ${line.description || null},
-          ${line.projectId || null},
-          ${line.costCenterId || null},
-          ${line.buId || null},
-          ${line.vatType || null}
+        )
+        SELECT * FROM UNNEST(
+          ${entryIds}::uuid[],
+          ${glAccountIds}::uuid[],
+          ${debits}::numeric[],
+          ${credits}::numeric[],
+          ${lineDescs}::text[],
+          ${projectIds}::uuid[],
+          ${costCenterIds}::uuid[],
+          ${buIds}::uuid[],
+          ${vatTypes}::text[]
         )
       `;
     }

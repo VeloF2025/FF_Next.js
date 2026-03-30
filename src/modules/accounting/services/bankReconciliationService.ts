@@ -60,17 +60,30 @@ export async function importBankStatement(
 
     const batchId = crypto.randomUUID();
 
-    for (const tx of parseResult.transactions) {
-      await sql`
-        INSERT INTO bank_transactions (
-          bank_account_id, transaction_date, value_date, amount,
-          description, reference, import_batch_id
-        ) VALUES (
-          ${bankAccountId}::UUID, ${tx.transactionDate}, ${tx.valueDate || null},
-          ${tx.amount}, ${tx.description}, ${tx.reference || null}, ${batchId}::UUID
-        )
-      `;
-    }
+    // Bulk INSERT all transactions in a single round-trip using UNNEST
+    const txs = parseResult.transactions;
+    const bankAccountIds = txs.map(() => bankAccountId);
+    const txDates = txs.map(t => t.transactionDate);
+    const valueDates = txs.map(t => t.valueDate || null);
+    const amounts = txs.map(t => t.amount);
+    const descriptions = txs.map(t => t.description);
+    const references = txs.map(t => t.reference || null);
+    const batchIds = txs.map(() => batchId);
+    await sql`
+      INSERT INTO bank_transactions (
+        bank_account_id, transaction_date, value_date, amount,
+        description, reference, import_batch_id
+      )
+      SELECT * FROM UNNEST(
+        ${bankAccountIds}::uuid[],
+        ${txDates}::date[],
+        ${valueDates}::date[],
+        ${amounts}::numeric[],
+        ${descriptions}::text[],
+        ${references}::text[],
+        ${batchIds}::uuid[]
+      )
+    `;
 
     log.info('Imported bank statement', {
       batchId, format, count: parseResult.transactions.length,
@@ -105,17 +118,30 @@ export async function importParsedTransactions(
 
     const batchId = crypto.randomUUID();
 
-    for (const tx of parseResult.transactions) {
-      await sql`
-        INSERT INTO bank_transactions (
-          bank_account_id, transaction_date, value_date, amount,
-          description, reference, import_batch_id
-        ) VALUES (
-          ${bankAccountId}::UUID, ${tx.transactionDate}, ${tx.valueDate || null},
-          ${tx.amount}, ${tx.description}, ${tx.reference || null}, ${batchId}::UUID
-        )
-      `;
-    }
+    // Bulk INSERT all transactions in a single round-trip using UNNEST
+    const ptxs = parseResult.transactions;
+    const pBankAccountIds = ptxs.map(() => bankAccountId);
+    const pTxDates = ptxs.map(t => t.transactionDate);
+    const pValueDates = ptxs.map(t => t.valueDate || null);
+    const pAmounts = ptxs.map(t => t.amount);
+    const pDescriptions = ptxs.map(t => t.description);
+    const pReferences = ptxs.map(t => t.reference || null);
+    const pBatchIds = ptxs.map(() => batchId);
+    await sql`
+      INSERT INTO bank_transactions (
+        bank_account_id, transaction_date, value_date, amount,
+        description, reference, import_batch_id
+      )
+      SELECT * FROM UNNEST(
+        ${pBankAccountIds}::uuid[],
+        ${pTxDates}::date[],
+        ${pValueDates}::date[],
+        ${pAmounts}::numeric[],
+        ${pDescriptions}::text[],
+        ${pReferences}::text[],
+        ${pBatchIds}::uuid[]
+      )
+    `;
 
     log.info('Imported parsed bank statement', {
       batchId,

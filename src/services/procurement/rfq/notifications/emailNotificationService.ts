@@ -210,16 +210,21 @@ export class EmailNotificationService {
   }
 
   /**
-   * Process pending notifications
+   * Process pending notifications.
+   * Email sends are per-notification (external call, individual success/failure),
+   * but status UPDATEs are batched at the end — two queries instead of N.
    */
   static async processPendingNotifications(): Promise<void> {
     try {
       const pending = await sql`
-        SELECT * FROM rfq_notifications 
-        WHERE status = 'pending' 
+        SELECT * FROM rfq_notifications
+        WHERE status = 'pending'
         AND retry_count < 3
         ORDER BY created_at
         LIMIT 10`;
+
+      const sentIds: string[] = [];
+      const failedIds: string[] = [];
 
       for (const notification of pending) {
         const success = await this.sendEmail({
@@ -228,22 +233,36 @@ export class EmailNotificationService {
           recipientId: notification.recipient_id,
           subject: notification.subject,
           message: notification.message,
-          metadata: notification.metadata
+          metadata: notification.metadata,
         });
 
         if (success) {
-          await sql`
-            UPDATE rfq_notifications 
-            SET status = 'sent', sent_at = ${new Date().toISOString()}
-            WHERE id = ${notification.id}`;
+          sentIds.push(String(notification.id));
         } else {
-          await sql`
-            UPDATE rfq_notifications 
-            SET retry_count = retry_count + 1,
-                status = CASE WHEN retry_count >= 2 THEN 'failed' ELSE 'pending' END,
-                failed_at = CASE WHEN retry_count >= 2 THEN ${new Date().toISOString()} ELSE NULL END
-            WHERE id = ${notification.id}`;
+          failedIds.push(String(notification.id));
         }
+      }
+
+      const now = new Date().toISOString();
+
+      // Batch UPDATE sent notifications — one query instead of N
+      if (sentIds.length > 0) {
+        await sql`
+          UPDATE rfq_notifications
+          SET status = 'sent', sent_at = ${now}
+          WHERE id = ANY(${sentIds}::uuid[])
+        `;
+      }
+
+      // Batch UPDATE failed notifications — one query instead of N
+      if (failedIds.length > 0) {
+        await sql`
+          UPDATE rfq_notifications
+          SET retry_count = retry_count + 1,
+              status = CASE WHEN retry_count >= 2 THEN 'failed' ELSE 'pending' END,
+              failed_at = CASE WHEN retry_count >= 2 THEN ${now} ELSE NULL END
+          WHERE id = ANY(${failedIds}::uuid[])
+        `;
       }
     } catch (error) {
       log.error('Failed to process pending notifications', { error }, 'notificationProcessor');

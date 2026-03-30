@@ -583,13 +583,21 @@ export async function addDefaultApprovals(projectId: string, createdBy?: string)
     WHERE default_required = true AND is_active = true
   `) as Record<string, unknown>[];
 
-  // Add each as a project approval
-  for (const type of types) {
+  // Bulk INSERT all default approvals in a single round-trip using UNNEST
+  if (types.length > 0) {
+    const projectIds = types.map(() => projectId);
+    const approvalTypeIds = types.map(t => t.id);
+    const isRequiredFlags = types.map(() => true);
+    const createdBys = types.map(() => createdBy || null);
     await sql`
       INSERT INTO pipeline_project_approvals (
         pipeline_project_id, approval_type_id, is_required, created_by
-      ) VALUES (
-        ${projectId}, ${type.id}, true, ${createdBy || null}
+      )
+      SELECT * FROM UNNEST(
+        ${projectIds}::uuid[],
+        ${approvalTypeIds}::uuid[],
+        ${isRequiredFlags}::boolean[],
+        ${createdBys}::uuid[]
       )
       ON CONFLICT (pipeline_project_id, approval_type_id) DO NOTHING
     `;

@@ -408,22 +408,26 @@ export async function batchRegisterFromGrn(
 
   const batchId = (batchResult[0] as Record<string, unknown>).id as string;
 
+  // Batch-check all serial numbers in a single query instead of N individual SELECTs
+  const allSerials = items.map(i => i.serialNumber);
+  const existingRows = await sql`
+    SELECT serial_number FROM assets WHERE serial_number = ANY(${allSerials}::text[])
+  `;
+  const alreadyRegistered = new Set(
+    (existingRows as Array<Record<string, unknown>>).map(r => String(r.serial_number))
+  );
+
   for (const item of items) {
+    if (alreadyRegistered.has(item.serialNumber)) {
+      skipped.push({
+        grnItemId: item.grnItemId,
+        serialNumber: item.serialNumber,
+        reason: 'Serial number already registered',
+      });
+      continue;
+    }
+
     try {
-      // Check if already registered
-      const existing = await sql`
-        SELECT id FROM assets WHERE serial_number = ${item.serialNumber}
-      `;
-
-      if (existing.length > 0) {
-        skipped.push({
-          grnItemId: item.grnItemId,
-          serialNumber: item.serialNumber,
-          reason: 'Serial number already registered',
-        });
-        continue;
-      }
-
       const asset = await registerAssetFromGrnItem(grnId, item, userId);
       registered.push(asset);
     } catch (error) {

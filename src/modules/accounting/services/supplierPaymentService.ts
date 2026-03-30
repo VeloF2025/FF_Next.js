@@ -160,10 +160,18 @@ export async function createSupplierPayment(
 
     const paymentId = String(paymentRows[0]!.id);
 
-    for (const alloc of input.allocations) {
+    if (input.allocations.length > 0) {
+      // Bulk INSERT all allocations in a single round-trip using UNNEST
+      const allocPaymentIds = input.allocations.map(() => paymentId);
+      const allocInvoiceIds = input.allocations.map(a => a.invoiceId);
+      const allocAmounts = input.allocations.map(a => a.amount);
       await sql`
         INSERT INTO payment_allocations (payment_id, invoice_id, amount_allocated)
-        VALUES (${paymentId}::UUID, ${alloc.invoiceId}::UUID, ${alloc.amount})
+        SELECT * FROM UNNEST(
+          ${allocPaymentIds}::uuid[],
+          ${allocInvoiceIds}::uuid[],
+          ${allocAmounts}::numeric[]
+        )
       `;
     }
 
@@ -223,21 +231,26 @@ export async function processSupplierPayment(
 
     await postJournalEntry(journalEntry.id, userId);
 
-    // Update invoice balances from allocations
-    for (const alloc of payment.allocations) {
+    // Batch-update invoice balances using UNNEST — two queries instead of 2N
+    if (payment.allocations.length > 0) {
+      const processInvoiceIds = payment.allocations.map(a => a.invoiceId);
+      const processAmounts = payment.allocations.map(a => a.amountAllocated);
       await sql`
-        UPDATE supplier_invoices
-        SET amount_paid = amount_paid + ${alloc.amountAllocated}
-        WHERE id = ${alloc.invoiceId}
+        UPDATE supplier_invoices si
+        SET amount_paid = si.amount_paid + upd.amount
+        FROM UNNEST(
+          ${processInvoiceIds}::uuid[],
+          ${processAmounts}::numeric[]
+        ) AS upd(invoice_id, amount)
+        WHERE si.id = upd.invoice_id
       `;
-      // Update status based on new balance
       await sql`
         UPDATE supplier_invoices SET status = CASE
           WHEN (total_amount - amount_paid) <= 0.01 THEN 'paid'
           WHEN amount_paid > 0 THEN 'partially_paid'
           ELSE status
         END
-        WHERE id = ${alloc.invoiceId}
+        WHERE id = ANY(${processInvoiceIds}::uuid[])
       `;
     }
 

@@ -101,13 +101,21 @@ export async function createCustomerPayment(
   userId: string
 ): Promise<CustomerPayment> {
   try {
-    // Validate allocations against invoice balances
+    // Validate allocations: fetch ALL invoice balances in a single query
+    const allocationInvoiceIds = input.allocations.map(a => a.invoiceId);
+    const invBalanceRows = (await sql`
+      SELECT id, total_amount, amount_paid
+      FROM customer_invoices
+      WHERE id = ANY(${allocationInvoiceIds}::uuid[])
+    `) as Row[];
+
+    const balanceMap = new Map(
+      invBalanceRows.map(r => [String(r.id), Number(r.total_amount) - Number(r.amount_paid)])
+    );
+
     for (const alloc of input.allocations) {
-      const invRows = (await sql`
-        SELECT total_amount, amount_paid FROM customer_invoices WHERE id = ${alloc.invoiceId}::UUID
-      `) as Row[];
-      if (invRows.length === 0) throw new Error(`Invoice ${alloc.invoiceId} not found`);
-      const balance = Number(invRows[0]!.total_amount) - Number(invRows[0]!.amount_paid);
+      const balance = balanceMap.get(alloc.invoiceId);
+      if (balance === undefined) throw new Error(`Invoice ${alloc.invoiceId} not found`);
       if (alloc.amount > balance + 0.01) {
         throw new Error(`Allocation R${alloc.amount.toFixed(2)} exceeds invoice balance R${balance.toFixed(2)}`);
       }
@@ -132,10 +140,18 @@ export async function createCustomerPayment(
 
     const paymentId = String(rows[0]!.id);
 
-    for (const alloc of input.allocations) {
+    if (input.allocations.length > 0) {
+      // Bulk INSERT all allocations in a single round-trip using UNNEST
+      const paymentIds = input.allocations.map(() => paymentId);
+      const invoiceIds = input.allocations.map(a => a.invoiceId);
+      const amounts = input.allocations.map(a => a.amount);
       await sql`
         INSERT INTO customer_payment_allocations (payment_id, invoice_id, amount_allocated)
-        VALUES (${paymentId}::UUID, ${alloc.invoiceId}::UUID, ${alloc.amount})
+        SELECT * FROM UNNEST(
+          ${paymentIds}::uuid[],
+          ${invoiceIds}::uuid[],
+          ${amounts}::numeric[]
+        )
       `;
     }
 
@@ -180,11 +196,18 @@ export async function confirmCustomerPayment(
     }, userId);
     await postJournalEntry(je.id, userId);
 
-    // Update invoice balances
-    for (const alloc of payment.allocations) {
+    // Batch-update invoice balances using UNNEST — two queries instead of 2N
+    if (payment.allocations.length > 0) {
+      const confirmInvoiceIds = payment.allocations.map(a => a.invoiceId);
+      const confirmAmounts = payment.allocations.map(a => a.amountAllocated);
       await sql`
-        UPDATE customer_invoices SET amount_paid = amount_paid + ${alloc.amountAllocated}
-        WHERE id = ${alloc.invoiceId}::UUID
+        UPDATE customer_invoices ci
+        SET amount_paid = ci.amount_paid + upd.amount
+        FROM UNNEST(
+          ${confirmInvoiceIds}::uuid[],
+          ${confirmAmounts}::numeric[]
+        ) AS upd(invoice_id, amount)
+        WHERE ci.id = upd.invoice_id
       `;
       await sql`
         UPDATE customer_invoices SET status = CASE
@@ -192,7 +215,7 @@ export async function confirmCustomerPayment(
           WHEN amount_paid > 0 THEN 'partially_paid'
           ELSE status
         END, paid_at = CASE WHEN (total_amount - amount_paid) <= 0.01 THEN NOW() ELSE paid_at END
-        WHERE id = ${alloc.invoiceId}::UUID
+        WHERE id = ANY(${confirmInvoiceIds}::uuid[])
       `;
     }
 
@@ -228,12 +251,18 @@ export async function cancelCustomerPayment(
       await reverseJournalEntry(payment.glJournalEntryId, userId);
     }
 
-    // Reverse invoice balance updates
-    for (const alloc of payment.allocations) {
+    // Batch-reverse invoice balance updates using UNNEST — two queries instead of 2N
+    if (payment.allocations.length > 0) {
+      const cancelInvoiceIds = payment.allocations.map(a => a.invoiceId);
+      const cancelAmounts = payment.allocations.map(a => a.amountAllocated);
       await sql`
-        UPDATE customer_invoices
-        SET amount_paid = GREATEST(0, amount_paid - ${alloc.amountAllocated})
-        WHERE id = ${alloc.invoiceId}::UUID
+        UPDATE customer_invoices ci
+        SET amount_paid = GREATEST(0, ci.amount_paid - upd.amount)
+        FROM UNNEST(
+          ${cancelInvoiceIds}::uuid[],
+          ${cancelAmounts}::numeric[]
+        ) AS upd(invoice_id, amount)
+        WHERE ci.id = upd.invoice_id
       `;
       await sql`
         UPDATE customer_invoices SET status = CASE
@@ -241,7 +270,7 @@ export async function cancelCustomerPayment(
           WHEN amount_paid < total_amount THEN 'partially_paid'
           ELSE status
         END, paid_at = CASE WHEN amount_paid <= 0.01 THEN NULL ELSE paid_at END
-        WHERE id = ${alloc.invoiceId}::UUID
+        WHERE id = ANY(${cancelInvoiceIds}::uuid[])
       `;
     }
 

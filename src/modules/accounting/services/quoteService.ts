@@ -158,12 +158,28 @@ export async function createQuote(input: QuoteInput, userId?: string): Promise<Q
   `) as Row[];
 
   const quote = mapQuote(rows[0]);
-  for (let i = 0; i < input.lines.length; i++) {
-    const l = input.lines[i];
-    const lineTotal = Math.round(l.quantity * l.unitPrice * 100) / 100;
+  if (input.lines.length > 0) {
+    // Bulk INSERT all lines in a single round-trip using UNNEST
+    const quoteIds = input.lines.map(() => quote.id);
+    const lineNumbers = input.lines.map((_, i) => i + 1);
+    const descriptions = input.lines.map(l => l.description);
+    const quantities = input.lines.map(l => l.quantity);
+    const unitPrices = input.lines.map(l => l.unitPrice);
+    const taxRates = input.lines.map(l => l.taxRate ?? 15);
+    const lineTotals = input.lines.map(l => Math.round(l.quantity * l.unitPrice * 100) / 100);
+    const accountIds = input.lines.map(l => l.accountId || null);
     await sql`
       INSERT INTO customer_quote_lines (quote_id, line_number, description, quantity, unit_price, tax_rate, line_total, account_id)
-      VALUES (${quote.id}::UUID, ${i + 1}, ${l.description}, ${l.quantity}, ${l.unitPrice}, ${l.taxRate ?? 15}, ${lineTotal}, ${l.accountId || null})
+      SELECT * FROM UNNEST(
+        ${quoteIds}::uuid[],
+        ${lineNumbers}::integer[],
+        ${descriptions}::text[],
+        ${quantities}::numeric[],
+        ${unitPrices}::numeric[],
+        ${taxRates}::numeric[],
+        ${lineTotals}::numeric[],
+        ${accountIds}::uuid[]
+      )
     `;
   }
   log.info('Quote created', { quoteNumber, total });
@@ -183,12 +199,28 @@ export async function updateQuote(id: string, input: QuoteInput): Promise<Quote 
     WHERE id = ${id}::UUID AND status = 'draft'
   `;
   await sql`DELETE FROM customer_quote_lines WHERE quote_id = ${id}::UUID`;
-  for (let i = 0; i < input.lines.length; i++) {
-    const l = input.lines[i];
-    const lineTotal = Math.round(l.quantity * l.unitPrice * 100) / 100;
+  if (input.lines.length > 0) {
+    // Bulk INSERT all lines in a single round-trip using UNNEST
+    const quoteIds = input.lines.map(() => id);
+    const lineNumbers = input.lines.map((_, i) => i + 1);
+    const descriptions = input.lines.map(l => l.description);
+    const quantities = input.lines.map(l => l.quantity);
+    const unitPrices = input.lines.map(l => l.unitPrice);
+    const taxRates = input.lines.map(l => l.taxRate ?? 15);
+    const lineTotals = input.lines.map(l => Math.round(l.quantity * l.unitPrice * 100) / 100);
+    const accountIds = input.lines.map(l => l.accountId || null);
     await sql`
       INSERT INTO customer_quote_lines (quote_id, line_number, description, quantity, unit_price, tax_rate, line_total, account_id)
-      VALUES (${id}::UUID, ${i + 1}, ${l.description}, ${l.quantity}, ${l.unitPrice}, ${l.taxRate ?? 15}, ${lineTotal}, ${l.accountId || null})
+      SELECT * FROM UNNEST(
+        ${quoteIds}::uuid[],
+        ${lineNumbers}::integer[],
+        ${descriptions}::text[],
+        ${quantities}::numeric[],
+        ${unitPrices}::numeric[],
+        ${taxRates}::numeric[],
+        ${lineTotals}::numeric[],
+        ${accountIds}::uuid[]
+      )
     `;
   }
   log.info('Quote updated', { id });
@@ -219,11 +251,27 @@ export async function convertToInvoice(id: string, userId?: string): Promise<{ q
   `) as Row[];
   const invoiceId = invRows[0].id;
 
-  // Copy lines
-  for (const line of quote.lines || []) {
+  // Copy lines — bulk INSERT in a single round-trip
+  const quoteLines = quote.lines || [];
+  if (quoteLines.length > 0) {
+    const invoiceIds = quoteLines.map(() => invoiceId);
+    const descriptions = quoteLines.map(l => l.description);
+    const quantities = quoteLines.map(l => l.quantity);
+    const unitPrices = quoteLines.map(l => l.unitPrice);
+    const taxRates = quoteLines.map(l => l.taxRate);
+    const lineTotals = quoteLines.map(l => l.lineTotal);
+    const accountIds = quoteLines.map(l => l.accountId || null);
     await sql`
       INSERT INTO customer_invoice_items (invoice_id, description, quantity, unit_price, tax_rate, line_total, account_id)
-      VALUES (${invoiceId}::UUID, ${line.description}, ${line.quantity}, ${line.unitPrice}, ${line.taxRate}, ${line.lineTotal}, ${line.accountId})
+      SELECT * FROM UNNEST(
+        ${invoiceIds}::uuid[],
+        ${descriptions}::text[],
+        ${quantities}::numeric[],
+        ${unitPrices}::numeric[],
+        ${taxRates}::numeric[],
+        ${lineTotals}::numeric[],
+        ${accountIds}::uuid[]
+      )
     `;
   }
 

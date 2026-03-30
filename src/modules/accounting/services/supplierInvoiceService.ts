@@ -164,19 +164,41 @@ export async function createSupplierInvoice(
 
     const invoiceId = String(rows[0]!.id);
 
-    for (const item of computedItems) {
+    if (computedItems.length > 0) {
+      // Bulk INSERT all items in a single round-trip using UNNEST
+      const invoiceIds = computedItems.map(() => invoiceId);
+      const poItemIds = computedItems.map(i => i.poItemId || null);
+      const descriptions = computedItems.map(i => i.description);
+      const quantities = computedItems.map(i => i.quantity);
+      const unitPrices = computedItems.map(i => i.unitPrice);
+      const itemTaxRates = computedItems.map(i => i.taxRate);
+      const taxAmounts = computedItems.map(i => i.taxAmount);
+      const lineTotals = computedItems.map(i => i.lineTotal);
+      const glAccountIds = computedItems.map(i => i.glAccountId || null);
+      const projectIds = computedItems.map(i => i.projectId || null);
+      const costCenterIds = computedItems.map(i => i.costCenterId || null);
+      const vatClassifications = computedItems.map(i =>
+        i.vatClassification || (i.taxRate > 0 ? 'standard' : 'zero_rated')
+      );
       await sql`
         INSERT INTO supplier_invoice_items (
           supplier_invoice_id, po_item_id, description, quantity,
           unit_price, tax_rate, tax_amount, line_total,
           gl_account_id, project_id, cost_center_id, vat_classification
-        ) VALUES (
-          ${invoiceId}::UUID, ${item.poItemId || null}, ${item.description},
-          ${item.quantity}, ${item.unitPrice}, ${item.taxRate},
-          ${item.taxAmount}, ${item.lineTotal},
-          ${item.glAccountId || null}, ${item.projectId || null},
-          ${item.costCenterId || null},
-          ${item.vatClassification || (item.taxRate > 0 ? 'standard' : 'zero_rated')}
+        )
+        SELECT * FROM UNNEST(
+          ${invoiceIds}::uuid[],
+          ${poItemIds}::uuid[],
+          ${descriptions}::text[],
+          ${quantities}::numeric[],
+          ${unitPrices}::numeric[],
+          ${itemTaxRates}::numeric[],
+          ${taxAmounts}::numeric[],
+          ${lineTotals}::numeric[],
+          ${glAccountIds}::uuid[],
+          ${projectIds}::uuid[],
+          ${costCenterIds}::uuid[],
+          ${vatClassifications}::text[]
         )
       `;
     }
