@@ -142,11 +142,11 @@ function SubMenuItems({ items, asPath, onClose, accent }: SubMenuItemsProps) {
               href={item.href}
               onClick={(e) => {
                 // Same-pathname navigation with query params needs router.push
-                // to ensure the page re-renders (Link alone may skip it)
+                // with shallow:true so router.query updates client-side
                 const url = new URL(item.href, window.location.origin);
                 if (url.pathname === router.pathname && url.search) {
                   e.preventDefault();
-                  void router.push(item.href);
+                  void router.push(item.href, undefined, { shallow: true });
                 }
                 onClose();
               }}
