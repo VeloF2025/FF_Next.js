@@ -74,13 +74,13 @@ export function BOQStockTable({ rows, loading }: BOQStockTableProps) {
               <th className="text-left px-3 py-2.5 font-medium text-muted-foreground">Description</th>
               <th className="text-left px-3 py-2.5 font-medium text-muted-foreground w-28">Category</th>
               <th className="text-right px-3 py-2.5 font-medium text-muted-foreground w-16">UOM</th>
-              <th className="text-right px-3 py-2.5 font-medium text-muted-foreground w-28">BOQ Rate</th>
+              <th className="text-right px-3 py-2.5 font-medium text-muted-foreground w-28 border-r border-border">BOQ Rate</th>
               <th className="text-right px-3 py-2.5 font-medium text-muted-foreground w-24">Planned QTY</th>
-              <th className="text-right px-3 py-2.5 font-medium text-muted-foreground w-32">Planned Value</th>
+              <th className="text-right px-3 py-2.5 font-medium text-muted-foreground w-32 border-r border-border">Planned Value</th>
               <th className="text-right px-3 py-2.5 font-medium text-muted-foreground w-24">Ordered QTY</th>
-              <th className="text-right px-3 py-2.5 font-medium text-muted-foreground w-32">Ordered Value</th>
+              <th className="text-right px-3 py-2.5 font-medium text-muted-foreground w-32 border-r border-border">Ordered Value</th>
               <th className="text-right px-3 py-2.5 font-medium text-muted-foreground w-24">Delivered QTY</th>
-              <th className="text-right px-3 py-2.5 font-medium text-muted-foreground w-32">Delivered Value</th>
+              <th className="text-right px-3 py-2.5 font-medium text-muted-foreground w-32 border-r border-border">Delivered Value</th>
               <th className="text-right px-3 py-2.5 font-medium text-muted-foreground w-24">SOH QTY</th>
               <th className="text-right px-3 py-2.5 font-medium text-muted-foreground w-32">SOH Value</th>
             </tr>
@@ -104,13 +104,13 @@ export function BOQStockTable({ rows, loading }: BOQStockTableProps) {
                 </td>
                 <td className="px-3 py-2 text-muted-foreground">{row.category}</td>
                 <td className="px-3 py-2 text-right text-muted-foreground">{row.uom}</td>
-                <td className="px-3 py-2 text-right text-foreground">{fmtCurrency(row.boqRate)}</td>
+                <td className="px-3 py-2 text-right text-foreground border-r border-border">{fmtCurrency(row.boqRate)}</td>
                 <td className="px-3 py-2 text-right text-foreground">{fmt(row.plannedQty)}</td>
-                <td className="px-3 py-2 text-right text-foreground">{fmtCurrency(row.boqRate * row.plannedQty)}</td>
+                <td className="px-3 py-2 text-right text-foreground border-r border-border">{fmtCurrency(row.boqRate * row.plannedQty)}</td>
                 <td className="px-3 py-2 text-right text-foreground">{fmt(row.orderedQty)}</td>
-                <td className="px-3 py-2 text-right text-foreground">{fmtCurrency(row.boqRate * row.orderedQty)}</td>
+                <td className="px-3 py-2 text-right text-foreground border-r border-border">{fmtCurrency(row.boqRate * row.orderedQty)}</td>
                 <td className="px-3 py-2 text-right text-foreground">{fmt(row.deliveredQty)}</td>
-                <td className="px-3 py-2 text-right text-foreground">{fmtCurrency(row.boqRate * row.deliveredQty)}</td>
+                <td className="px-3 py-2 text-right text-foreground border-r border-border">{fmtCurrency(row.boqRate * row.deliveredQty)}</td>
                 <td className={`px-3 py-2 text-right ${sohColor(row.soh, row.plannedQty)}`}>
                   {fmt(row.soh)}
                 </td>
@@ -120,15 +120,15 @@ export function BOQStockTable({ rows, loading }: BOQStockTableProps) {
           </tbody>
           <tfoot>
             <tr className="border-t border-border bg-muted/50">
-              <td colSpan={6} className="px-3 py-2.5 text-xs font-semibold text-foreground">
+              <td colSpan={6} className="px-3 py-2.5 text-xs font-semibold text-foreground border-r border-border">
                 TOTALS ({rows.length} items)
               </td>
               <td className="px-3 py-2.5 text-right font-semibold text-foreground">{fmt(totals.plannedQty)}</td>
-              <td className="px-3 py-2.5 text-right font-semibold text-foreground">{fmtCurrency(totals.plannedValue)}</td>
+              <td className="px-3 py-2.5 text-right font-semibold text-foreground border-r border-border">{fmtCurrency(totals.plannedValue)}</td>
               <td className="px-3 py-2.5 text-right font-semibold text-foreground">{fmt(totals.orderedQty)}</td>
-              <td className="px-3 py-2.5 text-right font-semibold text-foreground">{fmtCurrency(totals.orderedValue)}</td>
+              <td className="px-3 py-2.5 text-right font-semibold text-foreground border-r border-border">{fmtCurrency(totals.orderedValue)}</td>
               <td className="px-3 py-2.5 text-right font-semibold text-foreground">{fmt(totals.deliveredQty)}</td>
-              <td className="px-3 py-2.5 text-right font-semibold text-foreground">{fmtCurrency(totals.deliveredValue)}</td>
+              <td className="px-3 py-2.5 text-right font-semibold text-foreground border-r border-border">{fmtCurrency(totals.deliveredValue)}</td>
               <td className="px-3 py-2.5 text-right font-semibold text-foreground">{fmt(totals.sohQty)}</td>
               <td className="px-3 py-2.5 text-right font-semibold text-foreground">{fmtCurrency(totals.sohValue)}</td>
             </tr>
