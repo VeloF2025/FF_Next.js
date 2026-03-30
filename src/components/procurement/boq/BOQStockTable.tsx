@@ -68,7 +68,7 @@ export function BOQStockTable({ rows, loading }: BOQStockTableProps) {
       <div className="overflow-x-auto">
         <table className="w-full text-xs border-collapse">
           <thead>
-            <tr className="bg-muted/50 border-b border-border">
+            <tr className="sticky top-0 z-10 bg-muted/50 border-b border-border">
               <th className="text-left px-3 py-2.5 font-medium text-muted-foreground w-8">#</th>
               <th className="text-left px-3 py-2.5 font-medium text-muted-foreground w-36">Code</th>
               <th className="text-left px-3 py-2.5 font-medium text-muted-foreground">Description</th>
