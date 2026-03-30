@@ -283,11 +283,21 @@ export function MancoStrategicGrid() {
                     {displayItems.map((item) => {
                       const overdue = isOverdue(item);
                       const daysLeft = daysUntilEta(item);
+                      const handleKeyDown = (e: React.KeyboardEvent<HTMLTableRowElement>) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleRowClick(item);
+                        }
+                      };
                       return (
                         <tr
                           key={item.id}
                           onClick={() => handleRowClick(item)}
-                          className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-secondary)] cursor-pointer transition-colors"
+                          onKeyDown={handleKeyDown}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`View details for action item: ${item.action_item}`}
+                          className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-secondary)] cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ff-info)] focus:ring-inset"
                         >
                           <td className="px-4 py-3">
                             <span
