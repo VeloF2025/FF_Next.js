@@ -100,6 +100,7 @@ The module tracks character confusion patterns across all corrections:
 ### Testing & Validation
 
 Research scripts validate VLM accuracy:
+- **vlm-accuracy-audit.ts:** Queries HITL corrections, updates hardcoded confusion stats in VLM prompts, generates accuracy report (added 2026-03-30, #513)
 - **retest-vlm-serials.ts:** Re-extracts serials from recent mismatched DRs with improved prompts
 - **analyze-confusion-patterns.ts:** Builds confusion matrices by position and character
 - **test-confirmation-pass.ts:** Tests two-pass extraction (initial + confirmation for ambiguous characters)
@@ -166,4 +167,4 @@ Main extraction results:
 
 ---
 
-**Last updated:** March 13, 2026 (Commit 5f6b2bc)
+**Last updated:** March 30, 2026 (Commit a138562 — added vlm-accuracy-audit.ts)
