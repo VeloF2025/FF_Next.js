@@ -151,8 +151,8 @@ async function handlePut(projectId: string, req: NextApiRequest, res: NextApiRes
 
   // Log activity
   await sql`
-    INSERT INTO hs_activity_log (entity_type, entity_id, action, details)
-    VALUES ('project_config', ${config.id}, 'updated', ${JSON.stringify({
+    INSERT INTO hs_activity_log (activity_type, entity_type, entity_id, description, metadata)
+    VALUES ('config_updated', 'project_config', ${config.id}::text, ${'H&S configuration updated'}, ${JSON.stringify({
       project_id: projectId,
       project_name: project.project_name,
       audit_frequency,
