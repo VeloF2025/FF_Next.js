@@ -909,12 +909,32 @@ export async function syncFiberTimeInboundTickets(
         total: totalTickets,
       });
 
-      // Process each case on this page (skip Closed/Solved since API doesn't support not_equals filter)
+      // Process each case on this page
       for (const ftCase of response.results) {
-      // Skip closed/solved tickets - we couldn't filter them via API
+      // For Solved/Unsolved tickets: only process if FF has an open counterpart
+      // (reconcile status, but don't create new tickets for already-closed cases)
       if (ftCase.status === 'Solved' || ftCase.status === 'Unsolved - No Response') {
-        stats.skipped++;
-        continue;
+        const existingId = await checkDuplicate(String(ftCase.id));
+        if (!existingId) {
+          stats.skipped++;
+          continue;
+        }
+        // Existing FF ticket found — check if it still needs closing
+        const existing = await queryOne<{ status: string }>(
+          'SELECT status FROM maintenance_tickets WHERE id = $1',
+          [existingId]
+        );
+        if (existing && ['resolved', 'closed', 'cancelled'].includes(existing.status)) {
+          stats.skipped++;
+          continue;
+        }
+        // FF ticket is still open but QC is closed — fall through to sync
+        logger.info('Reconciling closed QC ticket with open FF ticket', {
+          qcontactId: ftCase.id,
+          ffTicketId: existingId,
+          ffStatus: existing?.status,
+          qcStatus: ftCase.status,
+        });
       }
       stats.total_processed++;
 

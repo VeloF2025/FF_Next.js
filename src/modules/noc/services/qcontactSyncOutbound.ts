@@ -737,6 +737,26 @@ export async function syncOutboundUpdate(
       };
     }
 
+    // Skip tickets in terminal status — QContact returns 422
+    // "can't be changed, you can't re-open a Closed case"
+    const TERMINAL_STATUSES = ['resolved', 'closed', 'cancelled'];
+    if (ticket.status && TERMINAL_STATUSES.includes(ticket.status)) {
+      logger.info('Ticket in terminal status, skipping outbound sync', {
+        ticketId,
+        status: ticket.status,
+        externalId: ticket.external_id,
+      });
+
+      return {
+        success: true,
+        sync_log_id: '',
+        ticket_id: ticketId,
+        qcontact_ticket_id: ticket.external_id,
+        error_message: `Skipped - ticket already ${ticket.status}`,
+        synced_at: new Date(),
+      };
+    }
+
     // Build QContact update payload
     const qcontactPayload: Record<string, any> = {};
 
