@@ -158,6 +158,9 @@ async function handler(
         fibreflow_dev_status,
         comment,
         status,
+        reference_link,
+        document_url,
+        document_name,
       } = req.body;
 
       if (!action_item || !status) {
@@ -171,11 +174,11 @@ async function handler(
         INSERT INTO manco_action_items (
           action_item, department, logged_date, completion_eta, responsible_person,
           fibreflow_dev, fibreflow_module, fibreflow_responsible, fibreflow_dev_status,
-          comment, status
+          comment, status, reference_link, document_url, document_name
         ) VALUES (
           ${action_item}, ${department}, ${logged_date}, ${completion_eta}, ${responsible_person},
           ${ffDev}, ${fibreflow_module}, ${fibreflow_responsible}, ${fibreflow_dev_status},
-          ${comment}, ${statusStr}
+          ${comment}, ${statusStr}, ${reference_link ?? null}, ${document_url ?? null}, ${document_name ?? null}
         )
         RETURNING *
       `;

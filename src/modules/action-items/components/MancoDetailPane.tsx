@@ -1,11 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, MessageCircle, Send, Loader2, Calendar } from 'lucide-react';
+import { X, MessageCircle, Send, Loader2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { MancoActionItem, MancoActionItemComment, MancoMeetingContext } from '@/types/manco-action-items.types';
 import { log } from '@/lib/logger';
 import { useAuth } from '@/contexts/AuthContext';
-import { formatDate, isOverdue } from './manco-grid-helpers';
+import { isOverdue } from './manco-grid-helpers';
+import { MancoReferenceLink } from './MancoReferenceLink';
+import { MancoDocumentUpload } from './MancoDocumentUpload';
+import { MancoMeetingContext as MancoMeetingContextSection } from './MancoMeetingContext';
+import { MancoItemDetails } from './MancoItemDetails';
 
 interface MancoDetailPaneProps {
   item: MancoActionItem | null;
@@ -14,6 +19,11 @@ interface MancoDetailPaneProps {
   onUpdated: () => void;
 }
 
+/**
+ * Slide-in detail pane for a manco action item.
+ * Shows metadata, meeting context, status editor, reference link, document
+ * upload, and a comment thread.
+ */
 export function MancoDetailPane({
   item,
   isOpen,
@@ -21,15 +31,16 @@ export function MancoDetailPane({
   onUpdated,
 }: MancoDetailPaneProps) {
   const { currentUser } = useAuth();
-  const [status, setStatus] = useState<string>(item?.status || 'pending');
+  const [status, setStatus] = useState<string>(item?.status ?? 'pending');
   const [comments, setComments] = useState<MancoActionItemComment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [meetingContext, setMeetingContext] = useState<MancoMeetingContext | null>(null);
   const [contextLoading, setContextLoading] = useState(false);
+  const [docUploading, setDocUploading] = useState(false);
 
-  // Fetch existing comments and meeting context whenever the selected item changes
+  // Fetch comments and meeting context whenever the selected item changes.
   useEffect(() => {
     if (!item?.id) return;
 
@@ -38,25 +49,27 @@ export function MancoDetailPane({
       setContextLoading(true);
 
       try {
-        // Fetch comments
-        const commentsRes = await fetch(`/api/manco-action-items/comments?item_id=${item.id}`);
+        const [commentsRes, contextRes] = await Promise.all([
+          fetch(`/api/manco-action-items/comments?item_id=${item.id}`),
+          fetch(`/api/manco-action-items/meeting-context?item_id=${item.id}`),
+        ]);
+
         if (commentsRes.ok) {
-          const json = await commentsRes.json();
-          setComments(Array.isArray(json) ? json : (json.data ?? []));
+          const json = await commentsRes.json() as unknown;
+          const arr = Array.isArray(json) ? json : ((json as { data?: MancoActionItemComment[] }).data ?? []);
+          setComments(arr as MancoActionItemComment[]);
         } else {
           log.error('Failed to load comments', { itemId: item.id, status: commentsRes.status });
         }
 
-        // Fetch meeting context
-        const contextRes = await fetch(`/api/manco-action-items/meeting-context?item_id=${item.id}`);
         if (contextRes.ok) {
-          const contextJson = await contextRes.json();
-          setMeetingContext(contextJson.data ?? contextJson);
+          const contextJson = await contextRes.json() as { data?: MancoMeetingContext } | MancoMeetingContext;
+          setMeetingContext((contextJson as { data?: MancoMeetingContext }).data ?? (contextJson as MancoMeetingContext));
         } else {
           log.error('Failed to load meeting context', { itemId: item.id, status: contextRes.status });
         }
       } catch (error) {
-        log.error('Error fetching data', { error, itemId: item.id });
+        log.error('Error fetching pane data', { error, itemId: item.id });
       } finally {
         setCommentsLoading(false);
         setContextLoading(false);
@@ -66,7 +79,14 @@ export function MancoDetailPane({
     void fetchData();
   }, [item?.id]);
 
+  // Sync status selector when item changes.
+  useEffect(() => {
+    if (item?.status) setStatus(item.status);
+  }, [item?.id, item?.status]);
+
   if (!item || !isOpen) return null;
+
+  // ------------------------------------------------------------------ handlers
 
   const handleStatusUpdate = async () => {
     setLoading(true);
@@ -76,11 +96,19 @@ export function MancoDetailPane({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
-      if (res.ok) {
-        onUpdated();
-        log.info('Status updated', { itemId: item.id, status });
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({})) as { message?: string };
+        toast.error(json.message ?? 'Failed to update status');
+        log.error('Failed to update status', { itemId: item.id, status: res.status });
+        return;
       }
+
+      toast.success('Status updated');
+      log.info('Status updated', { itemId: item.id, status });
+      onUpdated();
     } catch (error) {
+      toast.error('Error updating status');
       log.error('Error updating status', { error });
     } finally {
       setLoading(false);
@@ -96,26 +124,55 @@ export function MancoDetailPane({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           manco_action_item_id: item.id,
-          author_name: currentUser?.displayName || 'Unknown User',
+          author_name: currentUser?.displayName ?? 'Unknown User',
           content: newComment,
         }),
       });
-      if (res.ok) {
-        setNewComment('');
-        // Reload comments to show the newly posted one
-        const commentsRes = await fetch(`/api/manco-action-items/comments?item_id=${item.id}`);
-        if (commentsRes.ok) {
-          const json2 = await commentsRes.json();
-          setComments(Array.isArray(json2) ? json2 : (json2.data ?? []));
-        }
-        onUpdated();
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({})) as { message?: string };
+        toast.error(json.message ?? 'Failed to add comment');
+        log.error('Failed to add comment', { itemId: item.id, status: res.status });
+        return;
       }
+
+      setNewComment('');
+
+      // Reload comments to include the newly posted one.
+      const commentsRes = await fetch(`/api/manco-action-items/comments?item_id=${item.id}`);
+      if (commentsRes.ok) {
+        const json2 = await commentsRes.json() as unknown;
+        const arr = Array.isArray(json2) ? json2 : ((json2 as { data?: MancoActionItemComment[] }).data ?? []);
+        setComments(arr as MancoActionItemComment[]);
+      }
+      onUpdated();
     } catch (error) {
+      toast.error('Error adding comment');
       log.error('Error adding comment', { error });
     } finally {
       setCommentsLoading(false);
     }
   };
+
+  // --------------------------------------------------------------- status badge
+
+  const statusColor = isOverdue(item) ? 'var(--ff-danger)'
+    : item.status === 'pending'     ? 'var(--ff-warning)'
+    : item.status === 'in_progress' ? 'var(--ff-info)'
+    : item.status === 'completed'   ? 'var(--ff-success)'
+    : 'var(--ff-text-secondary)';
+
+  const statusBadgeStyle = {
+    background:   `color-mix(in srgb, ${statusColor} 12%, transparent)`,
+    color:         statusColor,
+    borderColor:  `color-mix(in srgb, ${statusColor} 30%, transparent)`,
+  };
+
+  const statusLabel = isOverdue(item)
+    ? 'OVERDUE'
+    : item.status.replace('_', ' ').toUpperCase();
+
+  // ---------------------------------------------------------------------- JSX
 
   return (
     <>
@@ -139,37 +196,9 @@ export function MancoDetailPane({
             </h2>
             <div
               className="mt-2 inline-block px-3 py-1 rounded border text-xs font-medium"
-              style={{
-                background: isOverdue(item)
-                  ? 'color-mix(in srgb, var(--ff-danger) 12%, transparent)'
-                  : item.status === 'pending'
-                  ? 'color-mix(in srgb, var(--ff-warning) 12%, transparent)'
-                  : item.status === 'in_progress'
-                  ? 'color-mix(in srgb, var(--ff-info) 12%, transparent)'
-                  : item.status === 'completed'
-                  ? 'color-mix(in srgb, var(--ff-success) 12%, transparent)'
-                  : 'color-mix(in srgb, var(--ff-text-secondary) 12%, transparent)',
-                color: isOverdue(item)
-                  ? 'var(--ff-danger)'
-                  : item.status === 'pending'
-                  ? 'var(--ff-warning)'
-                  : item.status === 'in_progress'
-                  ? 'var(--ff-info)'
-                  : item.status === 'completed'
-                  ? 'var(--ff-success)'
-                  : 'var(--ff-text-secondary)',
-                borderColor: isOverdue(item)
-                  ? 'color-mix(in srgb, var(--ff-danger) 30%, transparent)'
-                  : item.status === 'pending'
-                  ? 'color-mix(in srgb, var(--ff-warning) 30%, transparent)'
-                  : item.status === 'in_progress'
-                  ? 'color-mix(in srgb, var(--ff-info) 30%, transparent)'
-                  : item.status === 'completed'
-                  ? 'color-mix(in srgb, var(--ff-success) 30%, transparent)'
-                  : 'color-mix(in srgb, var(--ff-text-secondary) 30%, transparent)',
-              }}
+              style={statusBadgeStyle}
             >
-              {isOverdue(item) ? 'OVERDUE' : item.status.replace('_', ' ').toUpperCase()}
+              {statusLabel}
             </div>
           </div>
           <button
@@ -180,58 +209,20 @@ export function MancoDetailPane({
           </button>
         </div>
 
-        {/* Details Grid */}
         <div className="p-6 space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            {item.department && (
-              <div>
-                <p className="text-xs font-semibold text-[var(--ff-text-secondary)] uppercase">Department</p>
-                <p className="text-sm text-[var(--ff-text-primary)] mt-1">{item.department}</p>
-              </div>
-            )}
-            {item.responsible_person && (
-              <div>
-                <p className="text-xs font-semibold text-[var(--ff-text-secondary)] uppercase">Responsible</p>
-                <p className="text-sm text-[var(--ff-text-primary)] mt-1">{item.responsible_person}</p>
-              </div>
-            )}
-            {item.logged_date && (
-              <div>
-                <p className="text-xs font-semibold text-[var(--ff-text-secondary)] uppercase">Logged</p>
-                <p className="text-sm text-[var(--ff-text-primary)] mt-1">{formatDate(item.logged_date)}</p>
-              </div>
-            )}
-            {item.completion_eta && (
-              <div>
-                <p className="text-xs font-semibold text-[var(--ff-text-secondary)] uppercase">ETA</p>
-                <p className="text-sm text-[var(--ff-text-primary)] mt-1">{formatDate(item.completion_eta)}</p>
-              </div>
-            )}
-            {item.completion_date && (
-              <div>
-                <p className="text-xs font-semibold text-[var(--ff-text-secondary)] uppercase">Completed</p>
-                <p className="text-sm text-[var(--ff-text-primary)] mt-1">{formatDate(item.completion_date)}</p>
-              </div>
-            )}
-            {item.fibreflow_module && (
-              <div>
-                <p className="text-xs font-semibold text-[var(--ff-text-secondary)] uppercase">FF Module</p>
-                <p className="text-sm text-[var(--ff-text-primary)] mt-1">{item.fibreflow_module}</p>
-              </div>
-            )}
-            {item.fibreflow_responsible && (
-              <div>
-                <p className="text-xs font-semibold text-[var(--ff-text-secondary)] uppercase">FF Owner</p>
-                <p className="text-sm text-[var(--ff-text-primary)] mt-1">{item.fibreflow_responsible}</p>
-              </div>
-            )}
-            {item.fibreflow_dev_status && (
-              <div>
-                <p className="text-xs font-semibold text-[var(--ff-text-secondary)] uppercase">FF Status</p>
-                <p className="text-sm text-[var(--ff-text-primary)] mt-1">{item.fibreflow_dev_status}</p>
-              </div>
-            )}
-          </div>
+          {/* Details grid */}
+          <MancoItemDetails item={item} />
+
+          {/* Reference link (read + edit) */}
+          <MancoReferenceLink item={item} onUpdated={onUpdated} />
+
+          {/* Document (read + upload) */}
+          <MancoDocumentUpload
+            item={item}
+            uploading={docUploading}
+            onUploadingChange={setDocUploading}
+            onUpdated={onUpdated}
+          />
 
           {/* Notes */}
           {item.comment && (
@@ -243,81 +234,20 @@ export function MancoDetailPane({
             </div>
           )}
 
-          {/* Meeting Context */}
+          {/* Meeting context */}
+          <MancoMeetingContextSection context={meetingContext} loading={contextLoading} />
+
+          {/* Status update */}
           <div className="border-t border-[var(--ff-border-light)] pt-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Calendar className="w-4 h-4 text-[var(--ff-text-secondary)]" />
-              <p className="text-sm font-semibold text-[var(--ff-text-primary)]">Meeting Context</p>
-            </div>
-
-            {contextLoading ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-4 h-4 animate-spin text-[var(--ff-text-secondary)]" />
-              </div>
-            ) : meetingContext && meetingContext.meeting ? (
-              <div className="space-y-3 p-3 bg-[var(--ff-bg-secondary)] rounded text-xs">
-                <div>
-                  <p className="font-semibold text-[var(--ff-text-primary)]">{meetingContext.meeting.title}</p>
-                  <p className="text-[var(--ff-text-secondary)] text-xs mt-1">
-                    {formatDate(meetingContext.meeting.meeting_date)}
-                  </p>
-                </div>
-
-                {meetingContext.summary && meetingContext.summary.overview && (
-                  <div>
-                    <p className="font-medium text-[var(--ff-text-primary)] mb-1">Overview:</p>
-                    <p className="text-[var(--ff-text-secondary)] text-xs leading-relaxed">
-                      {meetingContext.summary.overview}
-                    </p>
-                  </div>
-                )}
-
-                {meetingContext.summary && meetingContext.summary.decisions && meetingContext.summary.decisions.length > 0 && (
-                  <div>
-                    <p className="font-medium text-[var(--ff-text-primary)] mb-1">Key Decisions:</p>
-                    <ul className="space-y-1">
-                      {meetingContext.summary.decisions.slice(0, 2).map((decision, idx) => (
-                        <li key={idx} className="text-[var(--ff-text-secondary)] text-xs">
-                          • {decision}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {meetingContext.excerpts && meetingContext.excerpts.length > 0 && (
-                  <div>
-                    <p className="font-medium text-[var(--ff-text-primary)] mb-2">Relevant Discussion:</p>
-                    <div className="space-y-2">
-                      {meetingContext.excerpts.slice(0, 3).map((excerpt, idx) => (
-                        <div key={idx} className="border-l-2 border-[var(--ff-primary)] pl-2 py-1">
-                          <p className="text-[var(--ff-text-secondary)] text-xs">
-                            <span className="font-semibold">{excerpt.timestamp}</span> {excerpt.speaker && `• ${excerpt.speaker}`}
-                          </p>
-                          <p className="text-[var(--ff-text-primary)] text-xs mt-1">
-                            "{excerpt.text.substring(0, 100)}{excerpt.text.length > 100 ? '...' : ''}"
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="p-3 bg-[var(--ff-bg-secondary)] rounded text-xs text-[var(--ff-text-secondary)]">
-                No meeting linked
-              </div>
-            )}
-          </div>
-
-          {/* Status Update */}
-          <div className="border-t border-[var(--ff-border-light)] pt-6">
-            <label className="text-xs font-semibold text-[var(--ff-text-secondary)] uppercase">Update Status</label>
+            <label className="text-xs font-semibold text-[var(--ff-text-secondary)] uppercase">
+              Update Status
+            </label>
             <div className="flex gap-2 mt-2">
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
                 className="flex-1 px-3 py-2 text-sm border border-[var(--ff-border-light)] rounded bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)]"
+                aria-label="Select new status"
               >
                 <option value="pending">Pending</option>
                 <option value="in_progress">In Progress</option>
@@ -328,6 +258,7 @@ export function MancoDetailPane({
                 onClick={handleStatusUpdate}
                 disabled={loading || status === item.status}
                 className="px-4 py-2 bg-[var(--ff-primary)] text-white rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
+                aria-label="Save status update"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update'}
               </button>
@@ -369,6 +300,7 @@ export function MancoDetailPane({
                 onClick={handleAddComment}
                 disabled={commentsLoading || !newComment.trim()}
                 className="px-3 py-2 bg-[var(--ff-primary)] text-white rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 self-end"
+                aria-label="Post comment"
               >
                 {commentsLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

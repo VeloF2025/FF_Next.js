@@ -15,6 +15,9 @@ export interface MancoActionItem {
   fibreflow_priority?: string;
   fibreflow_dev_status?: string;
   comment?: string;
+  reference_link?: string;
+  document_url?: string;
+  document_name?: string;
   status: MancoActionItemStatus;
   is_ongoing: boolean;
   source_meeting_id?: number;
