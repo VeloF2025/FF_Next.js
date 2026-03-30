@@ -306,7 +306,6 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
           projectId={id!}
           projectName={project.name}
           onStartAudit={() => router.push(`/health-safety/project/${id}/audits/new`)}
-          onConfigureHS={() => router.push(`/health-safety/project/${id}/configure`)}
         />
       )}
 
