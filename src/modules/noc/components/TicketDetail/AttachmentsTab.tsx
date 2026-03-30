@@ -154,20 +154,17 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
 
   return (
     <div className="space-y-4">
-      {/* Upload Zone */}
+      {/* Upload Zone — drop and paste target (clicking Browse opens file picker) */}
       <div
         ref={dropZoneRef}
-        role="button"
         tabIndex={0}
-        aria-label="Upload files — drop here or click to browse"
+        aria-label="Upload files — drop here, paste, or click Browse"
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        onKeyDown={(e) => { if(e.key==='Enter' || e.key===' ') fileInputRef.current?.click(); }}
-        className={`bg-[var(--ff-bg-secondary)] border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer focus:ring-2 focus:ring-blue-500 focus:outline-none ${
-          dragOver ? 'border-blue-500 bg-blue-500/10' : 'border-[var(--ff-border-light)] hover:border-blue-500/50'
+        className={`bg-[var(--ff-bg-secondary)] border-2 border-dashed rounded-lg p-6 text-center transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none ${
+          dragOver ? 'border-blue-500 bg-blue-500/10' : 'border-[var(--ff-border-light)]'
         }`}
-        onClick={() => fileInputRef.current?.click()}
       >
         <input
           ref={fileInputRef}
@@ -186,9 +183,16 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
           <>
             <Upload className="w-8 h-8 text-[var(--ff-text-secondary)] mx-auto mb-2" />
             <p className="text-sm text-[var(--ff-text-primary)] font-medium">
-              Drop files here, click to browse, or paste from clipboard
+              Drop files here or paste from clipboard (Ctrl+V)
             </p>
-            <p className="text-xs text-[var(--ff-text-secondary)] mt-1">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="mt-2 px-4 py-1.5 text-sm font-medium text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-md transition-colors"
+            >
+              Browse Files
+            </button>
+            <p className="text-xs text-[var(--ff-text-secondary)] mt-2">
               Photos, videos, PDFs, Excel — max 10MB each
             </p>
           </>
