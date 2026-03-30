@@ -125,6 +125,7 @@ interface SubMenuItemsProps {
 
 /** Renders a list of NavItems — links for DropdownItem, hoverable sub-sections for FlyoutSection */
 function SubMenuItems({ items, asPath, onClose, accent }: SubMenuItemsProps) {
+  const router = useRouter();
   const [hovered, setHovered] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clear = () => { if (timerRef.current) clearTimeout(timerRef.current); };
@@ -139,7 +140,16 @@ function SubMenuItems({ items, asPath, onClose, accent }: SubMenuItemsProps) {
             <Link
               key={item.href}
               href={item.href}
-              onClick={onClose}
+              onClick={(e) => {
+                // Same-pathname navigation with query params needs router.push
+                // to ensure the page re-renders (Link alone may skip it)
+                const url = new URL(item.href, window.location.origin);
+                if (url.pathname === router.pathname && url.search) {
+                  e.preventDefault();
+                  void router.push(item.href);
+                }
+                onClose();
+              }}
               className={makeLinkCls(isLinkActive(item.href, asPath), accent)}
             >
               {item.label}
@@ -280,8 +290,8 @@ export function ModuleNav({ tabs, getActiveTabId, accentColor }: ModuleNavProps)
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  /** Close open menu on route change */
-  useEffect(() => { setOpenTab(null); }, [router.pathname]);
+  /** Close open menu on route change (asPath includes query params) */
+  useEffect(() => { setOpenTab(null); }, [router.asPath]);
 
   const hasFlyout = (t: Tab) => t.items?.some(isFlyout) ?? false;
 
