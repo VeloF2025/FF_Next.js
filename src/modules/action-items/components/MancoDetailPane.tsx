@@ -5,7 +5,7 @@ import { X, MessageCircle, Send, Loader2, Calendar } from 'lucide-react';
 import { MancoActionItem, MancoActionItemComment, MancoMeetingContext } from '@/types/manco-action-items.types';
 import { log } from '@/lib/logger';
 import { useAuth } from '@/contexts/AuthContext';
-import { formatDate } from './manco-grid-helpers';
+import { formatDate, isOverdue } from './manco-grid-helpers';
 
 interface MancoDetailPaneProps {
   item: MancoActionItem | null;
@@ -137,13 +137,39 @@ export function MancoDetailPane({
             <h2 className="text-lg font-bold text-[var(--ff-text-primary)] pr-4">
               {item.action_item}
             </h2>
-            <div className="mt-2 inline-block px-3 py-1 rounded text-xs font-medium text-white" style={{
-              backgroundColor: item.status === 'pending' ? 'var(--ff-warning)'
-                : item.status === 'in_progress' ? 'var(--ff-info)'
-                : item.status === 'completed' ? 'var(--ff-success)'
-                : 'var(--ff-text-secondary)',
-            }}>
-              {item.status.replace('_', ' ').toUpperCase()}
+            <div
+              className="mt-2 inline-block px-3 py-1 rounded border text-xs font-medium"
+              style={{
+                background: isOverdue(item)
+                  ? 'color-mix(in srgb, var(--ff-danger) 12%, transparent)'
+                  : item.status === 'pending'
+                  ? 'color-mix(in srgb, var(--ff-warning) 12%, transparent)'
+                  : item.status === 'in_progress'
+                  ? 'color-mix(in srgb, var(--ff-info) 12%, transparent)'
+                  : item.status === 'completed'
+                  ? 'color-mix(in srgb, var(--ff-success) 12%, transparent)'
+                  : 'color-mix(in srgb, var(--ff-text-secondary) 12%, transparent)',
+                color: isOverdue(item)
+                  ? 'var(--ff-danger)'
+                  : item.status === 'pending'
+                  ? 'var(--ff-warning)'
+                  : item.status === 'in_progress'
+                  ? 'var(--ff-info)'
+                  : item.status === 'completed'
+                  ? 'var(--ff-success)'
+                  : 'var(--ff-text-secondary)',
+                borderColor: isOverdue(item)
+                  ? 'color-mix(in srgb, var(--ff-danger) 30%, transparent)'
+                  : item.status === 'pending'
+                  ? 'color-mix(in srgb, var(--ff-warning) 30%, transparent)'
+                  : item.status === 'in_progress'
+                  ? 'color-mix(in srgb, var(--ff-info) 30%, transparent)'
+                  : item.status === 'completed'
+                  ? 'color-mix(in srgb, var(--ff-success) 30%, transparent)'
+                  : 'color-mix(in srgb, var(--ff-text-secondary) 30%, transparent)',
+              }}
+            >
+              {isOverdue(item) ? 'OVERDUE' : item.status.replace('_', ' ').toUpperCase()}
             </div>
           </div>
           <button
