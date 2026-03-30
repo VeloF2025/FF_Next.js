@@ -9,7 +9,7 @@ import {
   ResponsiveContainer,
   ComposedChart,
   Area,
-} from 'recharts';
+} from '@/components/ui/DynamicChart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/Card';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/Select';

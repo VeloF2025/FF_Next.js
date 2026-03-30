@@ -9,7 +9,7 @@ import { useState } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, LabelList,
-} from 'recharts';
+} from '@/components/ui/DynamicChart';
 import { ReportTabLayout } from '../ReportTabLayout';
 import { useBuildMilestonesData } from './useBuildMilestonesData';
 import type {

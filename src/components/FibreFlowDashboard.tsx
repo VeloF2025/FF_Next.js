@@ -16,7 +16,7 @@ import React, { useState, useEffect } from 'react';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
-} from 'recharts';
+} from '@/components/ui/DynamicChart';
 
 // API configuration
 const API_BASE = 'http://100.96.203.105:8001/api/dashboard';

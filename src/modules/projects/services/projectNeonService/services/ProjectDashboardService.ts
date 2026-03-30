@@ -199,23 +199,26 @@ export async function getActivityTimeline(
 export async function getProcurementSummary(projectId: string): Promise<ProcurementSummary> {
   const sql = getSql();
 
-  const boqs = await sql`SELECT COUNT(*) as count FROM boqs WHERE project_id = ${projectId}`;
-  const rfqs = await sql`SELECT COUNT(*) as count FROM rfqs WHERE project_id::text = ${projectId}`;
-  const pos = await sql`
-    SELECT
-      COUNT(*) as count,
-      COALESCE(SUM(total_amount), 0) as total_value,
-      COUNT(*) FILTER (WHERE status = 'pending_approval') as pending
-    FROM purchase_orders WHERE project_id = ${projectId}
-  `;
-  const grns = await sql`
-    SELECT COUNT(*) as count, COALESCE(SUM(total_received_value), 0) as total_value
-    FROM goods_receipt_notes WHERE project_id = ${projectId}
-  `;
-  const openRfqs = await sql`
-    SELECT COUNT(*) as count FROM rfqs
-    WHERE project_id::text = ${projectId} AND status = 'open'
-  `;
+  // 🟢 WORKING: All 5 queries are independent — run in parallel for ~5x speedup
+  const [boqs, rfqs, pos, grns, openRfqs] = await Promise.all([
+    sql`SELECT COUNT(*) as count FROM boqs WHERE project_id = ${projectId}`,
+    sql`SELECT COUNT(*) as count FROM rfqs WHERE project_id::text = ${projectId}`,
+    sql`
+      SELECT
+        COUNT(*) as count,
+        COALESCE(SUM(total_amount), 0) as total_value,
+        COUNT(*) FILTER (WHERE status = 'pending_approval') as pending
+      FROM purchase_orders WHERE project_id = ${projectId}
+    `,
+    sql`
+      SELECT COUNT(*) as count, COALESCE(SUM(total_received_value), 0) as total_value
+      FROM goods_receipt_notes WHERE project_id = ${projectId}
+    `,
+    sql`
+      SELECT COUNT(*) as count FROM rfqs
+      WHERE project_id::text = ${projectId} AND status = 'open'
+    `,
+  ]);
 
   return {
     boqs: Number(boqs[0]?.count) || 0,
@@ -237,21 +240,23 @@ export async function getProcurementSummary(projectId: string): Promise<Procurem
 export async function getMaintenanceSummary(projectId: string): Promise<MaintenanceSummary> {
   const sql = getSql();
 
-  const counts = await sql`
-    SELECT
-      COUNT(*) FILTER (WHERE status = 'open') as open,
-      COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
-      COUNT(*) FILTER (WHERE status = 'resolved') as resolved,
-      COUNT(*) FILTER (WHERE status = 'closed') as closed
-    FROM maintenance_tickets
-    WHERE project_id::text = ${projectId}
-  `;
-
-  const resolution = await sql`
-    SELECT AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600) as avg_hours
-    FROM maintenance_tickets
-    WHERE project_id::text = ${projectId} AND resolved_at IS NOT NULL
-  `;
+  // 🟢 WORKING: Both queries are independent — run in parallel for ~2x speedup
+  const [counts, resolution] = await Promise.all([
+    sql`
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'open') as open,
+        COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
+        COUNT(*) FILTER (WHERE status = 'resolved') as resolved,
+        COUNT(*) FILTER (WHERE status = 'closed') as closed
+      FROM maintenance_tickets
+      WHERE project_id::text = ${projectId}
+    `,
+    sql`
+      SELECT AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600) as avg_hours
+      FROM maintenance_tickets
+      WHERE project_id::text = ${projectId} AND resolved_at IS NOT NULL
+    `,
+  ]);
 
   return {
     open: Number(counts[0]?.open) || 0,

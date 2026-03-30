@@ -342,18 +342,24 @@ export class EmailNotificationService {
    * Send award notification
    */
   static async sendAwardNotification(
-    rfqId: string, 
+    rfqId: string,
     winningSupplierId: string,
     allSupplierIds: string[]
   ): Promise<void> {
     try {
-      const rfq = await sql`SELECT * FROM rfqs WHERE id = ${rfqId}`;
+      // 🟢 WORKING: Fetch rfq, winner, and losers in parallel — all 3 queries are independent
+      const otherSupplierIds = allSupplierIds.filter(id => id !== winningSupplierId);
+      const [rfq, winner, otherSuppliers] = await Promise.all([
+        sql`SELECT * FROM rfqs WHERE id = ${rfqId}`,
+        sql`SELECT * FROM suppliers WHERE id = ${winningSupplierId}`,
+        otherSupplierIds.length > 0
+          ? sql`SELECT * FROM suppliers WHERE id = ANY(${otherSupplierIds})`
+          : Promise.resolve([]),
+      ]);
+
       if (rfq.length === 0) return;
 
       // Notify winning supplier
-      const winner = await sql`
-        SELECT * FROM suppliers WHERE id = ${winningSupplierId}`;
-      
       if (winner.length > 0) {
         await this.sendEmail({
           type: 'rfq_award',
@@ -361,20 +367,16 @@ export class EmailNotificationService {
           subject: `Congratulations! RFQ ${rfq[0].rfq_number} Awarded`,
           message: `
             Dear ${winner[0].company_name},
-            
-            We are pleased to inform you that your quote for RFQ ${rfq[0].rfq_number} 
+
+            We are pleased to inform you that your quote for RFQ ${rfq[0].rfq_number}
             has been accepted.
-            
+
             Our procurement team will contact you shortly with further details.
           `
         });
       }
 
       // Notify other suppliers
-      const others = allSupplierIds.filter(id => id !== winningSupplierId);
-      const otherSuppliers = await sql`
-        SELECT * FROM suppliers WHERE id = ANY(${others})`;
-      
       for (const supplier of otherSuppliers) {
         await this.sendEmail({
           type: 'rfq_evaluation',
@@ -382,9 +384,9 @@ export class EmailNotificationService {
           subject: `RFQ ${rfq[0].rfq_number} - Evaluation Complete`,
           message: `
             Dear ${supplier.company_name},
-            
+
             Thank you for your participation in RFQ ${rfq[0].rfq_number}.
-            
+
             After careful evaluation, we have selected another supplier for this requirement.
             We appreciate your time and effort, and look forward to future opportunities.
           `

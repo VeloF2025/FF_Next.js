@@ -11,7 +11,7 @@ import { useState, useCallback } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, LabelList,
-} from 'recharts';
+} from '@/components/ui/DynamicChart';
 import { ChevronDown, ChevronRight, Loader2, AlertCircle, ChevronLeft } from 'lucide-react';
 import { ReportTabLayout } from '../ReportTabLayout';
 import { useActivationsData } from './useActivationsData';

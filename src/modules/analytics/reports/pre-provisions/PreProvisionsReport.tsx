@@ -10,7 +10,7 @@ import { useState } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, LabelList,
-} from 'recharts';
+} from '@/components/ui/DynamicChart';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { ReportTabLayout } from '../ReportTabLayout';
 import { usePreProvisionsData } from './usePreProvisionsData';

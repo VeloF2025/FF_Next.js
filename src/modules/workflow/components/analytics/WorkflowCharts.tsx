@@ -12,8 +12,8 @@ import {
   Pie,
   Cell,
   AreaChart,
-  Area
-} from 'recharts';
+  Area,
+} from '@/components/ui/DynamicChart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/Card';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Progress } from '@/shared/components/ui/Progress';

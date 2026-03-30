@@ -51,6 +51,16 @@ const LazyCartesianGrid = createLazyChartComponent('CartesianGrid');
 const LazyTooltip = createLazyChartComponent('Tooltip');
 const LazyResponsiveContainer = createLazyChartComponent('ResponsiveContainer');
 const LazyLegend = createLazyChartComponent('Legend');
+// 🟢 WORKING: Extended components for radar, composed, area charts, and label annotations
+const LazyLabelList = createLazyChartComponent('LabelList');
+const LazyRadarChart = createLazyChartComponent('RadarChart');
+const LazyRadar = createLazyChartComponent('Radar');
+const LazyPolarGrid = createLazyChartComponent('PolarGrid');
+const LazyPolarAngleAxis = createLazyChartComponent('PolarAngleAxis');
+const LazyPolarRadiusAxis = createLazyChartComponent('PolarRadiusAxis');
+const LazyComposedChart = createLazyChartComponent('ComposedChart');
+const LazyAreaChart = createLazyChartComponent('AreaChart');
+const LazyArea = createLazyChartComponent('Area');
 
 // Loading spinner component
 const ChartLoader = () => (
@@ -153,7 +163,67 @@ export const DynamicLegend: React.FC<any> = (props) => (
   </Suspense>
 );
 
-// Re-export for easier imports
+export const DynamicLabelList: React.FC<any> = (props) => (
+  <Suspense fallback={null}>
+    <LazyLabelList {...props} />
+  </Suspense>
+);
+
+export const DynamicRadarChart: React.FC<any> = (props) => (
+  <ChartErrorBoundary>
+    <Suspense fallback={<ChartLoader />}>
+      <LazyRadarChart {...props} />
+    </Suspense>
+  </ChartErrorBoundary>
+);
+
+export const DynamicRadar: React.FC<any> = (props) => (
+  <Suspense fallback={null}>
+    <LazyRadar {...props} />
+  </Suspense>
+);
+
+export const DynamicPolarGrid: React.FC<any> = (props) => (
+  <Suspense fallback={null}>
+    <LazyPolarGrid {...props} />
+  </Suspense>
+);
+
+export const DynamicPolarAngleAxis: React.FC<any> = (props) => (
+  <Suspense fallback={null}>
+    <LazyPolarAngleAxis {...props} />
+  </Suspense>
+);
+
+export const DynamicPolarRadiusAxis: React.FC<any> = (props) => (
+  <Suspense fallback={null}>
+    <LazyPolarRadiusAxis {...props} />
+  </Suspense>
+);
+
+export const DynamicComposedChart: React.FC<any> = (props) => (
+  <ChartErrorBoundary>
+    <Suspense fallback={<ChartLoader />}>
+      <LazyComposedChart {...props} />
+    </Suspense>
+  </ChartErrorBoundary>
+);
+
+export const DynamicAreaChart: React.FC<any> = (props) => (
+  <ChartErrorBoundary>
+    <Suspense fallback={<ChartLoader />}>
+      <LazyAreaChart {...props} />
+    </Suspense>
+  </ChartErrorBoundary>
+);
+
+export const DynamicArea: React.FC<any> = (props) => (
+  <Suspense fallback={null}>
+    <LazyArea {...props} />
+  </Suspense>
+);
+
+// Re-export for easier imports — drop-in replacement for 'recharts' direct imports
 export {
   DynamicBarChart as BarChart,
   DynamicBar as Bar,
@@ -167,5 +237,14 @@ export {
   DynamicCartesianGrid as CartesianGrid,
   DynamicTooltip as Tooltip,
   DynamicResponsiveContainer as ResponsiveContainer,
-  DynamicLegend as Legend
+  DynamicLegend as Legend,
+  DynamicRadarChart as RadarChart,
+  DynamicRadar as Radar,
+  DynamicPolarGrid as PolarGrid,
+  DynamicPolarAngleAxis as PolarAngleAxis,
+  DynamicPolarRadiusAxis as PolarRadiusAxis,
+  DynamicComposedChart as ComposedChart,
+  DynamicAreaChart as AreaChart,
+  DynamicArea as Area,
+  DynamicLabelList as LabelList,
 };

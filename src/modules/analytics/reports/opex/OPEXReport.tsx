@@ -12,7 +12,7 @@ import { useState, useCallback } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell, LabelList,
-} from 'recharts';
+} from '@/components/ui/DynamicChart';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { ReportTabLayout } from '../ReportTabLayout';
 import { useOPEXData } from './useOPEXData';

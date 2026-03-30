@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-} from 'recharts';
+} from '@/components/ui/DynamicChart';
 import { StandardSummaryCards, type SummaryCardData } from '@/components/ui/StandardSummaryCards';
 import { log } from '@/lib/logger';
 

@@ -10,7 +10,7 @@ import { useState } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, Legend, LabelList,
-} from 'recharts';
+} from '@/components/ui/DynamicChart';
 import { useProjectRevenueData } from './useProjectRevenueData';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { ReportTabLayout } from '../ReportTabLayout';
