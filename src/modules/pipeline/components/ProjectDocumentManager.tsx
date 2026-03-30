@@ -171,7 +171,11 @@ export function ProjectDocumentManager({
   const [uploadingFile, setUploadingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function handleFileSelect(file: File) {
+  // 🟢 WORKING: Single-file upload — form schema supports one document per submission
+  async function handleFileSelect(files: FileList) {
+    const file = files[0];
+    if (!file) return;
+
     setUploadingFile(true);
     try {
       const formData = new FormData();
@@ -185,7 +189,7 @@ export function ProjectDocumentManager({
       });
       if (!response.ok) {
         const errData = await response.json().catch(() => null);
-        throw new Error(errData?.error || 'Upload failed');
+        throw new Error(errData?.error || `Upload failed for ${file.name}`);
       }
       const data = await response.json();
       setUploadData((prev) => ({
@@ -508,7 +512,7 @@ export function ProjectDocumentManager({
 
       {/* Upload Form Modal */}
       {showUploadForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
           <div className="bg-[var(--ff-bg-primary)] rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-[var(--ff-border-light)] flex items-center justify-between">
               <h3 className="text-lg font-semibold">Add Document</h3>
@@ -578,8 +582,9 @@ export function ProjectDocumentManager({
                   accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
                   className="hidden"
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleFileSelect(file);
+                    if (e.target.files && e.target.files.length > 0) {
+                      handleFileSelect(e.target.files);
+                    }
                     e.target.value = '';
                   }}
                 />

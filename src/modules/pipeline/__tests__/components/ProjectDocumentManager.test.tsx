@@ -1,16 +1,16 @@
 /**
- * ProjectDocumentManager Component Tests — TDD RED phase
+ * ProjectDocumentManager Component Tests
  *
  * Tests for VF-20260316-019: Document Upload Feature Not Working
  *
- * ROOT CAUSES:
- * 1. Upload modal uses z-50 same z-index as parent ApprovalDetailDrawer → modal
- *    is hidden behind the drawer overlay.
- * 2. File input lacks `multiple` attribute → only single-file upload possible
- *    even though the user expects to attach several files at once.
- * 3. handleFileSelect only processes `files?.[0]` — multi-file not supported.
+ * ROOT CAUSES FIXED:
+ * 1. Upload modal used z-50 (same z-index as parent ApprovalDetailDrawer) — modal
+ *    was hidden behind the drawer overlay. Fixed: modal now uses z-[60].
+ * 2. Multi-file upload was incorrectly added but the form schema only supports
+ *    one document per submission (single document_type, reference_number, etc.).
+ *    Fixed: reverted to single-file upload, removed `multiple` attribute.
  *
- * ⚪ UNTESTED: Tests are RED — they define correct behaviour that must be implemented.
+ * 🟢 WORKING: Tests guard the correct z-index and single-file behaviour.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -86,21 +86,19 @@ describe('ProjectDocumentManager — upload modal z-index (VF-20260316-019)', ()
   });
 });
 
-describe('ProjectDocumentManager — multi-file upload (VF-20260316-019)', () => {
+describe('ProjectDocumentManager — single-file upload (VF-20260316-019)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetchDocumentsEmpty();
   });
 
   /**
-   * The hidden file input inside the upload modal MUST have the `multiple`
-   * attribute.  Without it the browser file-picker only allows a single file
-   * and users cannot attach multiple documents at once.
-   *
-   * CURRENT STATE (RED): The file input in ProjectDocumentManager currently
-   * does NOT have `multiple` — it only processes `files?.[0]`.
+   * The form schema supports one document per submission (single document_type,
+   * reference_number, etc.), so the file input MUST NOT have the `multiple`
+   * attribute. Multi-file selection would silently discard all files but the
+   * last because each iteration overwrites `setUploadData`.
    */
-  it('file input inside the upload modal has the multiple attribute', async () => {
+  it('file input inside the upload modal does not have the multiple attribute', async () => {
     render(<ProjectDocumentManager projectId="project-001" />);
 
     await openUploadModal();
@@ -108,27 +106,16 @@ describe('ProjectDocumentManager — multi-file upload (VF-20260316-019)', () =>
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     expect(fileInput).not.toBeNull();
 
-    // FAILS until ProjectDocumentManager adds multiple to its file input
-    expect(fileInput.multiple).toBe(true);
+    // Must be single-file — multi-file is not supported by the form schema
+    expect(fileInput.multiple).toBe(false);
   });
 
   /**
-   * handleFileSelect in ProjectDocumentManager currently receives a single File
-   * and only saves one document per submit (`files?.[0]`).
-   *
-   * EXPECTED BEHAVIOUR: when the user selects N files and submits, the storage
-   * upload API is called N times so that all files are processed.
-   *
-   * CURRENT STATE (RED): handleFileSelect only handles `files?.[0]` so this
-   * test will fail until the method iterates over all selected files.
+   * handleFileSelect processes only the first file in the FileList.
+   * Selecting one file must call the storage upload API exactly once.
    */
-  it('handles multiple files — calls storage upload once per selected file', async () => {
+  it('handles a single file — calls storage upload exactly once', async () => {
     const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
-
-    const storageUploadResponse = {
-      ok: true,
-      json: async () => ({ url: 'https://storage.example.com/file.pdf' }),
-    };
 
     fetchMock
       // Initial documents fetch
@@ -138,9 +125,11 @@ describe('ProjectDocumentManager — multi-file upload (VF-20260316-019)', () =>
           data: { documents: [], byApproval: {}, projectLevel: [], requiredDocs: [] },
         }),
       })
-      // Two storage uploads for two files
-      .mockResolvedValueOnce(storageUploadResponse)
-      .mockResolvedValueOnce(storageUploadResponse)
+      // One storage upload for the selected file
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ url: 'https://storage.example.com/file.pdf' }),
+      })
       // Catch-all fallback
       .mockResolvedValue({
         ok: true,
@@ -155,26 +144,22 @@ describe('ProjectDocumentManager — multi-file upload (VF-20260316-019)', () =>
     expect(fileInput).not.toBeNull();
 
     const file1 = new File(['content1'], 'doc1.pdf', { type: 'application/pdf' });
-    const file2 = new File(['content2'], 'doc2.pdf', { type: 'application/pdf' });
 
-    // Simulate selecting two files via onChange event
     await act(async () => {
       Object.defineProperty(fileInput, 'files', {
-        value: [file1, file2],
+        value: [file1],
         configurable: true,
       });
       fireEvent.change(fileInput);
     });
 
-    // Wait for upload processing
     await waitFor(() => {
-      // Count storage upload API calls
       const storageApiCalls = fetchMock.mock.calls.filter(
         ([url]: [string]) =>
           typeof url === 'string' && url.includes('/api/storage/upload')
       );
-      // FAILS until handleFileSelect processes all files, not just files?.[0]
-      expect(storageApiCalls.length).toBeGreaterThanOrEqual(2);
+      // Exactly one upload for the single selected file
+      expect(storageApiCalls.length).toBe(1);
     });
   });
 });

@@ -106,6 +106,13 @@ export function DocumentManager({
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadFormRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (showUploadForm && uploadFormRef.current) {
+      uploadFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [showUploadForm]);
 
   function fileNameWithoutExt(name: string): string {
     return name.replace(/\.[^.]+$/, '');
@@ -382,7 +389,7 @@ export function DocumentManager({
 
       {/* Upload Form */}
       {showUploadForm && (
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-4">
+        <div ref={uploadFormRef} className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-4">
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-medium text-[var(--ff-text-primary)]">
               Add Document
