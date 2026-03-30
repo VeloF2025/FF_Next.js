@@ -1,22 +1,24 @@
 # DevOps Module
 
+## Overview
+The DevOps module provides administrative tooling for schema management and field mapping configuration. This is a navigation section housing developer utilities.
+
+## Routes
+- `/devops/schema` — Database schema viewer and management
+- `/devops/field-mapping` — Field mapping configuration
+
 ## Purpose
-The DevOps module enhances development and operational processes within FibreFlow. It provides tools for collaboration between development and operations teams, CI/CD workflows, infrastructure management, and monitoring.
+Administrative interface for developers and system administrators to manage FibreFlow's underlying data structures.
 
-## Key Features
-- **CI/CD Pipelines**: Automated deployment of code changes to production environments upon successful testing
-- **Infrastructure as Code (IaC)**: Automated setup and management of infrastructure through code
-- **Monitoring and Logging**: Application performance monitoring, error logging, and system health tracking
-- **Collaboration Tools**: Integrated communication and dashboards for cross-team workflows
+## Access Control
+- RBAC key: `devops.schema`
+- Restricted to admin and developer roles
 
-## Key Files & Structure
-- `app/api/devops` — API routes for DevOps operations
-- `app/(main)/devops` — UI pages for DevOps dashboard and tools
-
-## Status
-- **Version**: v1
-- **Maintained**: Active
-- **Module Location**: `/src/modules/` (routes at `app/api/devops` and `app/(main)/devops`)
+## Related Modules
+- System (for core admin functions)
+- Database schema management utilities
 
 ---
-Last updated: 2026-03-30
+
+**Last updated:** 2026-03-30  
+**Status:** DevOps utility section (not a feature module)

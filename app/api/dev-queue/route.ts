@@ -44,8 +44,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true, data: board });
   } catch (error) {
     console.error('DevQueue GET error:', error);
+    const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error?.message },
+      { error: 'Internal server error', details: message },
       { status: 500 }
     );
   }
@@ -99,8 +100,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, data: newItem }, { status: 201 });
   } catch (error) {
     console.error('DevQueue POST error:', error);
+    const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error?.message },
+      { error: 'Internal server error', details: message },
       { status: 500 }
     );
   }
