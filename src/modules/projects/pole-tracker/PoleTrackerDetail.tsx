@@ -25,6 +25,29 @@ export function PoleTrackerDetail() {
   const { id } = router.query;
   const { pole, tabs, activeTab, handleTabChange } = usePoleDetail(id);
 
+  // Handle loading state while pole data is being fetched
+  if (!pole) {
+    return (
+      <div className="ff-page-container">
+        <DashboardHeader 
+          title="Pole Details"
+          subtitle="Loading..."
+          actions={[
+            {
+              label: 'Back to List',
+              icon: ArrowLeft as React.ComponentType<{ className?: string; }>,
+              onClick: () => router.push('/pole-tracker'),
+              variant: 'secondary'
+            }
+          ]}
+        />
+        <div className="p-6 text-center text-gray-500">
+          Loading pole data...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="ff-page-container">
       <DashboardHeader 

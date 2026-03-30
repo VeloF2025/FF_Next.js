@@ -320,6 +320,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     let upsTransferResult = null;
     if (upsTransfer?.needed && upsTransfer.serial) {
       try {
+        // Narrow type after guard check
+        const upsSerial = upsTransfer.serial;
         let drBSetSuccess = false;
         let drAClearSuccess = false;
 
@@ -327,7 +329,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         const drBSearchResult = await oneMapApi.searchDR(drBNumber);
         if (drBSearchResult.success && drBSearchResult.records.length > 0) {
           const drBHasThisUps = drBSearchResult.records.some(
-            r => r.br_ser?.toUpperCase() === upsTransfer.serial.toUpperCase()
+            r => r.br_ser?.toUpperCase() === upsSerial.toUpperCase()
           );
           if (drBHasThisUps) {
             drBSetSuccess = true; // Already there
@@ -339,7 +341,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             const upsResult = await oneMapApi.updateOntAndUpsSerial(
               drBRecord.prop_id,
               currentOnt,
-              upsTransfer.serial
+              upsSerial
             );
             drBSetSuccess = upsResult.success;
           }
@@ -350,7 +352,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           const drASearchForUps = await oneMapApi.searchDR(drANumber);
           if (drASearchForUps.success) {
             const drAUpsRecord = drASearchForUps.records.find(
-              r => r.br_ser?.toUpperCase() === upsTransfer.serial.toUpperCase()
+              r => r.br_ser?.toUpperCase() === upsSerial.toUpperCase()
             );
             if (drAUpsRecord) {
               const clearResult = await oneMapApi.updateOntAndUpsSerial(
