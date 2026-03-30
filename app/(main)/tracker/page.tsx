@@ -24,7 +24,8 @@ const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: st
 export default function TrackerPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tabParam = searchParams.get('tab') as Tab | null;
+  // Handle null searchParams (Next.js can return null in some render scenarios)
+  const tabParam = searchParams?.get('tab') as Tab | null;
   const activeTab: Tab = tabParam && ['pon', 'master', 'settings'].includes(tabParam) ? tabParam : 'pon';
 
   const [projects, setProjects] = useState<Project[]>([]);

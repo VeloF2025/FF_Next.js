@@ -35,6 +35,9 @@ export default function CreateTicketPageClient() {
   const initialValues = useMemo((): Partial<TicketFormData> | undefined => {
     const values: Partial<TicketFormData> = {};
 
+    // Handle null searchParams (Next.js can return null in some render scenarios)
+    if (!searchParams) return undefined;
+
     const dr_number = searchParams.get('dr_number');
     const source = searchParams.get('source');
     const ticket_type = searchParams.get('ticket_type');
