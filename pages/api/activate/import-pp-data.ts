@@ -95,9 +95,30 @@ async function handler(
       whereClause += ` AND pp.resolution_status = $${paramIndex++}`;
       params.push(status);
     }
-    if (priority) {
+    // When aging is active it implies priority = 'high', so override any separate
+    // priority param to avoid a conflicting AND mt.priority = X double-clause.
+    const effectivePriority = aging ? 'high' : priority;
+    if (effectivePriority) {
       whereClause += ` AND mt.priority = $${paramIndex++}`;
-      params.push(priority);
+      params.push(effectivePriority);
+    }
+
+    if (aging) {
+      // Each aging bucket is expressed as a half-open date interval so Postgres
+      // can use an index on mt.created_at.  All boundaries are parameterized.
+      if (aging === 'recent') {
+        // 0-6 days old: created_at >= NOW() - 6 days
+        whereClause += ` AND mt.created_at >= NOW() - $${paramIndex++}::interval`;
+        params.push('6 days');
+      } else if (aging === '7days') {
+        // 7-13 days old: created_at in [NOW()-13d, NOW()-6d)
+        whereClause += ` AND mt.created_at >= NOW() - $${paramIndex++}::interval AND mt.created_at < NOW() - $${paramIndex++}::interval`;
+        params.push('13 days', '6 days');
+      } else if (aging === '14days') {
+        // 14+ days old: created_at < NOW() - 13 days
+        whereClause += ` AND mt.created_at < NOW() - $${paramIndex++}::interval`;
+        params.push('13 days');
+      }
     }
     if (aging) {
       // Aging filter: force high priority and filter by ticket age bucket
