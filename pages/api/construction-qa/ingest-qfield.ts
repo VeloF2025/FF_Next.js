@@ -4,7 +4,9 @@
  * Triggers ingestion of QField photos into the Construction QA system.
  * Reads from qfield_photo_validations and creates review + photo records.
  *
- * Auth: session cookie OR x-cron-secret header (for cron jobs)
+ * Auth: x-cron-secret header required (server-to-server cron endpoint only).
+ * Cookie fallback has been removed — presence of any browser cookie would
+ * have bypassed the CRON_SECRET check entirely.
  *
  * Body: { projectId?, discipline?, sinceDate?, dryRun? }
  *   - projectId: FibreFlow project UUID (optional — omit to ingest ALL mapped projects)
@@ -25,9 +27,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.methodNotAllowed(res, req.method || 'unknown', ['POST']);
   }
 
-  // Auth: cron secret or session cookie
+  // Auth: CRON_SECRET only — this is a server-to-server endpoint.
+  // The cookie fallback was removed because any authenticated browser session
+  // would bypass the secret check, exposing mass-ingest to web users.
   const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
-  if (cronSecret !== CRON_SECRET && !req.headers.cookie) {
+  if (cronSecret !== CRON_SECRET) {
     return apiResponse.unauthorized(res, 'Invalid cron secret');
   }
 

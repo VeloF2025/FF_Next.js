@@ -31,17 +31,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const { status, technicianId, priority, dateFrom, dateTo } = req.query;
 
-    // Build WHERE clause
-    const conditions: string[] = [];
-    if (status)       conditions.push(`t.status = '${(status as string).replace(/'/g, "''")}'`);
-    if (technicianId) conditions.push(`t.assigned_to = '${(technicianId as string).replace(/'/g, "''")}'`);
-    if (priority)     conditions.push(`t.priority = '${(priority as string).replace(/'/g, "''")}'`);
-    if (dateFrom)     conditions.push(`t.due_date >= '${(dateFrom as string).replace(/'/g, "''")}'`);
-    if (dateTo)       conditions.push(`t.due_date <= '${(dateTo as string).replace(/'/g, "''")}'`);
+    // Normalise optional filter values — string or null, never raw array
+    const s  = typeof status       === 'string' ? status       : null;
+    const tc = typeof technicianId === 'string' ? technicianId : null;
+    const pr = typeof priority     === 'string' ? priority     : null;
+    const df = typeof dateFrom     === 'string' ? dateFrom     : null;
+    const dt = typeof dateTo       === 'string' ? dateTo       : null;
 
-    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-    const rows = await sql.unsafe(`
+    // 🟢 WORKING: explicit query branches using Neon tagged template literals.
+    // Every user-supplied value is a driver-level parameter — no string
+    // concatenation, no manual quoting, no sql.unsafe() with user data.
+    // The static SQL fragments (BASE SELECT + ORDER BY) are safe to pass to
+    // sql.unsafe() because they contain no user input.
+    const BASE = `
       SELECT
         t.id,
         t.title,
@@ -58,7 +60,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       FROM tasks t
       LEFT JOIN users    u ON u.id = t.assigned_to
       LEFT JOIN projects p ON p.id = t.project_id
-      ${where}
+    `;
+    const TAIL = `
       ORDER BY
         CASE t.priority
           WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4
@@ -66,14 +69,83 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         END,
         t.due_date ASC NULLS LAST
       LIMIT 5000
-    `);
+    `;
+
+    let rows: Record<string, unknown>[];
+
+    // All 32 filter combinations (5 booleans → 2^5 = 32 branches)
+    if (s && tc && pr && df && dt) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.status=${s} AND t.assigned_to::text=${tc} AND t.priority=${pr} AND t.due_date>=${df}::date AND t.due_date<=${dt}::date ${sql.unsafe(TAIL)}`;
+    } else if (s && tc && pr && df) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.status=${s} AND t.assigned_to::text=${tc} AND t.priority=${pr} AND t.due_date>=${df}::date ${sql.unsafe(TAIL)}`;
+    } else if (s && tc && pr && dt) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.status=${s} AND t.assigned_to::text=${tc} AND t.priority=${pr} AND t.due_date<=${dt}::date ${sql.unsafe(TAIL)}`;
+    } else if (s && tc && df && dt) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.status=${s} AND t.assigned_to::text=${tc} AND t.due_date>=${df}::date AND t.due_date<=${dt}::date ${sql.unsafe(TAIL)}`;
+    } else if (s && pr && df && dt) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.status=${s} AND t.priority=${pr} AND t.due_date>=${df}::date AND t.due_date<=${dt}::date ${sql.unsafe(TAIL)}`;
+    } else if (tc && pr && df && dt) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.assigned_to::text=${tc} AND t.priority=${pr} AND t.due_date>=${df}::date AND t.due_date<=${dt}::date ${sql.unsafe(TAIL)}`;
+    } else if (s && tc && pr) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.status=${s} AND t.assigned_to::text=${tc} AND t.priority=${pr} ${sql.unsafe(TAIL)}`;
+    } else if (s && tc && df) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.status=${s} AND t.assigned_to::text=${tc} AND t.due_date>=${df}::date ${sql.unsafe(TAIL)}`;
+    } else if (s && tc && dt) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.status=${s} AND t.assigned_to::text=${tc} AND t.due_date<=${dt}::date ${sql.unsafe(TAIL)}`;
+    } else if (s && pr && df) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.status=${s} AND t.priority=${pr} AND t.due_date>=${df}::date ${sql.unsafe(TAIL)}`;
+    } else if (s && pr && dt) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.status=${s} AND t.priority=${pr} AND t.due_date<=${dt}::date ${sql.unsafe(TAIL)}`;
+    } else if (s && df && dt) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.status=${s} AND t.due_date>=${df}::date AND t.due_date<=${dt}::date ${sql.unsafe(TAIL)}`;
+    } else if (tc && pr && df) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.assigned_to::text=${tc} AND t.priority=${pr} AND t.due_date>=${df}::date ${sql.unsafe(TAIL)}`;
+    } else if (tc && pr && dt) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.assigned_to::text=${tc} AND t.priority=${pr} AND t.due_date<=${dt}::date ${sql.unsafe(TAIL)}`;
+    } else if (tc && df && dt) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.assigned_to::text=${tc} AND t.due_date>=${df}::date AND t.due_date<=${dt}::date ${sql.unsafe(TAIL)}`;
+    } else if (pr && df && dt) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.priority=${pr} AND t.due_date>=${df}::date AND t.due_date<=${dt}::date ${sql.unsafe(TAIL)}`;
+    } else if (s && tc) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.status=${s} AND t.assigned_to::text=${tc} ${sql.unsafe(TAIL)}`;
+    } else if (s && pr) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.status=${s} AND t.priority=${pr} ${sql.unsafe(TAIL)}`;
+    } else if (s && df) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.status=${s} AND t.due_date>=${df}::date ${sql.unsafe(TAIL)}`;
+    } else if (s && dt) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.status=${s} AND t.due_date<=${dt}::date ${sql.unsafe(TAIL)}`;
+    } else if (tc && pr) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.assigned_to::text=${tc} AND t.priority=${pr} ${sql.unsafe(TAIL)}`;
+    } else if (tc && df) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.assigned_to::text=${tc} AND t.due_date>=${df}::date ${sql.unsafe(TAIL)}`;
+    } else if (tc && dt) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.assigned_to::text=${tc} AND t.due_date<=${dt}::date ${sql.unsafe(TAIL)}`;
+    } else if (pr && df) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.priority=${pr} AND t.due_date>=${df}::date ${sql.unsafe(TAIL)}`;
+    } else if (pr && dt) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.priority=${pr} AND t.due_date<=${dt}::date ${sql.unsafe(TAIL)}`;
+    } else if (df && dt) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.due_date>=${df}::date AND t.due_date<=${dt}::date ${sql.unsafe(TAIL)}`;
+    } else if (s) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.status=${s} ${sql.unsafe(TAIL)}`;
+    } else if (tc) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.assigned_to::text=${tc} ${sql.unsafe(TAIL)}`;
+    } else if (pr) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.priority=${pr} ${sql.unsafe(TAIL)}`;
+    } else if (df) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.due_date>=${df}::date ${sql.unsafe(TAIL)}`;
+    } else if (dt) {
+      rows = await sql`${sql.unsafe(BASE)} WHERE t.due_date<=${dt}::date ${sql.unsafe(TAIL)}`;
+    } else {
+      rows = await sql`${sql.unsafe(BASE)} ${sql.unsafe(TAIL)}`;
+    }
 
     // Escape a CSV cell value
     const cell = (v: unknown): string => {
       if (v === null || v === undefined) return '';
-      const s = String(v);
-      return s.includes(',') || s.includes('"') || s.includes('\n')
-        ? `"${s.replace(/"/g, '""')}"` : s;
+      const str = String(v);
+      return str.includes(',') || str.includes('"') || str.includes('\n')
+        ? `"${str.replace(/"/g, '""')}"` : str;
     };
 
     const headers = ['Task ID', 'Title', 'Category', 'Status', 'Priority', 'Technician', 'Project', 'Location', 'Due Date', 'Completed At', 'Notes', 'Created At'];
@@ -90,7 +162,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     res.setHeader('Content-Disposition', `attachment; filename="field-tasks-${dateStr}.csv"`);
     res.status(200).send(csvRows.join('\n'));
 
-    log.info('Field task export', { rowCount: rows.length, filters: { status, technicianId, priority, dateFrom, dateTo } });
+    log.info('Field task export', { rowCount: rows.length, filters: { status: s, technicianId: tc, priority: pr, dateFrom: df, dateTo: dt } });
   } catch (error) {
     log.error('Field export error', { error });
     return apiResponse.internalError(res, error);

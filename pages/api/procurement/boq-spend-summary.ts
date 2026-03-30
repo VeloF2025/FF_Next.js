@@ -6,6 +6,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
+import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { cachedQuery } from '@/lib/queryCache';
@@ -15,7 +16,7 @@ const sql = neon(process.env.DATABASE_URL!);
 /** Cache TTL: 5 minutes — BOQ spend aggregates join multiple large tables */
 const CACHE_TTL_MS = 300_000;
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, ['GET']);
   }
@@ -170,3 +171,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.serverError(res, err instanceof Error ? err.message : 'Unknown error');
   }
 }
+
+export default withAuth(handler);

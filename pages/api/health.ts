@@ -1,182 +1,49 @@
+/**
+ * Health Check API
+ * GET /api/health
+ *
+ * Returns only { status, timestamp } — infrastructure details (Node version,
+ * memory stats, PG version) have been removed to avoid leaking server
+ * fingerprinting data to unauthenticated callers.
+ */
+
 import { sql } from '@/lib/neon';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
 
-interface HealthCheck {
-  status: 'healthy' | 'unhealthy' | 'degraded';
+interface HealthResponse {
+  status: 'healthy' | 'unhealthy';
   timestamp: string;
-  uptime: number;
-  version: {
-    gitCommit: string;
-    gitCommitShort: string;
-    builtAt: string;
-    environment: string;
-  };
-  checks: {
-    database: 'connected' | 'error' | 'pending';
-    memory: 'ok' | 'high' | 'critical' | 'pending';
-    environment: 'ok' | 'error';
-  };
-  details: {
-    memory?: {
-      heapUsed: string;
-      heapTotal: string;
-      rss: string;
-      external: string;
-    };
-    database?: {
-      latency?: number;
-      error?: string;
-    };
-    environment?: {
-      nodeVersion: string;
-      nextVersion?: string;
-      environment: string;
-    };
-  };
 }
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<HealthCheck>
+  res: NextApiResponse<HealthResponse>
 ) {
-  // Only allow GET requests
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
     return res.status(405).json({
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
-      uptime: 0,
-      version: {
-        gitCommit: process.env.GIT_SHA || 'unknown',
-        gitCommitShort: process.env.GIT_SHA_SHORT || 'unknown',
-        builtAt: process.env.BUILD_TIMESTAMP || 'unknown',
-        environment: process.env.NODE_ENV || 'unknown',
-      },
-      checks: {
-        database: 'error',
-        memory: 'ok',
-        environment: 'error',
-      },
-      details: {},
-    } as HealthCheck);
+    });
   }
 
-  const health: HealthCheck = {
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    version: {
-      gitCommit: process.env.GIT_SHA || 'unknown',
-      gitCommitShort: process.env.GIT_SHA_SHORT || 'unknown',
-      builtAt: process.env.BUILD_TIMESTAMP || 'unknown',
-      environment: process.env.NODE_ENV || 'unknown',
-    },
-    checks: {
-      database: 'pending',
-      memory: 'pending',
-      environment: 'pending',
-    },
-    details: {},
-  };
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
 
   try {
-    // Database check with latency measurement
-    const dbStart = Date.now();
-    try {
-      const result = await sql`SELECT 1 as check, current_timestamp as time`;
-      const dbLatency = Date.now() - dbStart;
-      
-      if (result && result[0]?.check === 1) {
-        health.checks.database = 'connected';
-        health.details.database = { latency: dbLatency };
-      } else {
-        health.checks.database = 'error';
-        health.details.database = { error: 'Invalid response from database' };
-      }
-    } catch (dbError) {
-      log.error('health-check: database error', { error: dbError instanceof Error ? dbError.message : String(dbError) });
-      health.checks.database = 'error';
-      health.details.database = {
-        error: dbError instanceof Error ? dbError.message : 'Unknown database error',
-      };
+    // Lightweight connectivity check — no version() call that would expose PG version
+    const result = await sql`SELECT 1 AS check`;
+
+    if (result?.[0]?.check !== 1) {
+      log.error('health-check: unexpected database response');
+      return res.status(503).json({ status: 'unhealthy', timestamp: new Date().toISOString() });
     }
 
-    // Memory check
-    const usage = process.memoryUsage();
-    const heapUsedMB = usage.heapUsed / (1024 * 1024);
-    const heapTotalMB = usage.heapTotal / (1024 * 1024);
-    
-    health.details.memory = {
-      heapUsed: `${heapUsedMB.toFixed(2)} MB`,
-      heapTotal: `${heapTotalMB.toFixed(2)} MB`,
-      rss: `${(usage.rss / (1024 * 1024)).toFixed(2)} MB`,
-      external: `${(usage.external / (1024 * 1024)).toFixed(2)} MB`,
-    };
-
-    // Memory thresholds
-    if (heapUsedMB < 500) {
-      health.checks.memory = 'ok';
-    } else if (heapUsedMB < 800) {
-      health.checks.memory = 'high';
-      health.status = 'degraded';
-    } else {
-      health.checks.memory = 'critical';
-      health.status = 'unhealthy';
-    }
-
-    // Environment check
-    try {
-      health.checks.environment = 'ok';
-      health.details.environment = {
-        nodeVersion: process.version,
-        nextVersion: process.env.NEXT_RUNTIME ? 'edge' : 'node',
-        environment: process.env.NODE_ENV || 'development',
-      };
-    } catch {
-      health.checks.environment = 'error';
-    }
-
-    // Determine overall health status
-    const checksArray = Object.values(health.checks);
-    if (checksArray.includes('error')) {
-      health.status = 'unhealthy';
-    } else if (checksArray.includes('critical')) {
-      health.status = 'unhealthy';
-    } else if (checksArray.includes('high')) {
-      health.status = 'degraded';
-    }
-
-    // Set appropriate HTTP status code
-    const statusCode = health.status === 'healthy' ? 200 :
-                       health.status === 'degraded' ? 200 : 503;
-
-    // Set cache headers (don't cache health checks)
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-
-    return res.status(statusCode).json({
-      status: health.status,
-      timestamp: health.timestamp,
-      version: health.version,
-      checks: health.checks,
-    } as HealthCheck);
+    return res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
   } catch (error) {
-    log.error('health-check: critical failure', { error: error instanceof Error ? error.message : String(error) });
-    // Critical failure
-    health.status = 'unhealthy';
-    health.checks = {
-      database: 'error',
-      memory: 'error',
-      environment: 'error',
-    };
-    
-    return res.status(503).json({
-      status: health.status,
-      timestamp: health.timestamp,
-      version: health.version,
-      checks: health.checks,
-    } as HealthCheck);
+    log.error('health-check: database error', { error: error instanceof Error ? error.message : String(error) });
+    return res.status(503).json({ status: 'unhealthy', timestamp: new Date().toISOString() });
   }
 }

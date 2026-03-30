@@ -67,15 +67,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     return apiResponse.error(res, ErrorCode.METHOD_NOT_ALLOWED, 'Method not allowed');
   }
 
-  // Verify cron secret
+  // Verify cron secret unconditionally — dev shares the production database
+  // so bypassing auth in non-production environments is not safe.
   const authHeader = req.headers.authorization;
   const cronSecret = process.env.CRON_SECRET;
 
-  if (process.env.NODE_ENV === 'production' && cronSecret) {
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      log.error('RecheckOneMap', 'Unauthorized request');
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+  if (!cronSecret) {
+    log.error('RecheckOneMap', 'CRON_SECRET not configured');
+    return res.status(500).json({ error: 'CRON_SECRET not configured' });
+  }
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    log.error('RecheckOneMap', 'Unauthorized request');
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   const limit = Number(req.query.limit) || 50;

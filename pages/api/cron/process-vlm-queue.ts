@@ -285,15 +285,18 @@ export default async function handler(
     return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
   }
 
-  // Verify cron secret in production
+  // Verify cron secret unconditionally — dev shares the production database
+  // so bypassing auth in non-production environments is not safe.
   const authHeader = req.headers.authorization;
   const cronSecret = process.env.CRON_SECRET;
 
-  if (process.env.NODE_ENV === 'production' && cronSecret) {
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      log.error('ProcessVlmQueue', 'Unauthorized request');
-      return apiResponse.unauthorized(res);
-    }
+  if (!cronSecret) {
+    log.error('ProcessVlmQueue', 'CRON_SECRET not configured');
+    return apiResponse.serverError(res, new Error('CRON_SECRET not configured'));
+  }
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    log.error('ProcessVlmQueue', 'Unauthorized request');
+    return apiResponse.unauthorized(res);
   }
 
   const limit = Number(req.query.limit) || Number(req.body?.limit) || 20;

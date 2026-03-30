@@ -1,11 +1,10 @@
 import React from 'react';
 import { MapPin } from 'lucide-react';
-import { QFieldMappingTable } from './QFieldMappingTable';
-import { qfieldMappings, tableOverlaps } from './qfieldMappingData';
+import { QFieldMappingPageClient } from './QFieldMappingPageClient';
 
 export const metadata = {
   title: 'QField Mapping | DevOps',
-  description: 'QField layer to FibreFlow database field mappings, gap analysis, and table overlap audit',
+  description: 'QField layer to FibreFlow database field mappings, gap analysis, stock implications, and table overlap audit',
 };
 
 export default function QFieldMappingPage(): React.ReactNode {
@@ -18,11 +17,11 @@ export default function QFieldMappingPage(): React.ReactNode {
             <h1 className="text-3xl font-bold">QField Mapping</h1>
           </div>
           <p className="text-gray-400">
-            QField GPKG/API layer attributes mapped to FibreFlow database tables. Highlights gaps (not imported) and duplicate tables.
+            QField GPKG/API layer attributes mapped to FibreFlow database tables. Highlights gaps, stock implications, and duplicate tables.
           </p>
         </div>
 
-        <QFieldMappingTable data={qfieldMappings} overlaps={tableOverlaps} />
+        <QFieldMappingPageClient />
       </div>
     </div>
   );

@@ -137,6 +137,15 @@ export default async function handler(
     return apiResponse.methodNotAllowed(res, req.method || 'unknown', ['POST']);
   }
 
+  // Guard: if the env var is not set the endpoint must not accept any traffic.
+  // Without this check, QFIELD_API_KEY === undefined and any request that
+  // omits the X-Api-Key header would also produce undefined, making
+  // `undefined !== undefined` evaluate to false and bypassing auth entirely.
+  if (!QFIELD_API_KEY) {
+    log.error({ module: 'qfield-validate-photo' }, 'QFIELD_PLUGIN_API_KEY not configured — rejecting all requests');
+    return apiResponse.serverError(res, new Error('QFIELD_PLUGIN_API_KEY not configured'));
+  }
+
   // Authenticate via API key (for plugin use)
   const apiKey = req.headers['x-api-key'];
   if (apiKey !== QFIELD_API_KEY) {

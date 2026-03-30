@@ -1,3 +1,11 @@
+/**
+ * Database Health Check API Route
+ * GET /api/database/health
+ *
+ * Returns database connectivity status without exposing the PostgreSQL
+ * version string or environment details to unauthenticated callers.
+ */
+
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
@@ -5,37 +13,29 @@ import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-/**
- * Database Health Check API Route
- * Checks the database connection status directly using Neon
- */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Only allow GET requests
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   try {
-    // Direct database health check using Neon
-    const result = await sql`SELECT NOW() as time, version() as version`;
-    
-    return res.status(200).json({ 
+    // Use SELECT 1 — version() would expose PostgreSQL version to unauthenticated callers
+    await sql`SELECT 1`;
+
+    return res.status(200).json({
       status: 'healthy',
       database: 'connected',
-      timestamp: result[0].time,
-      version: result[0].version,
-      environment: process.env.NODE_ENV || 'development'
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    log.error('Health check error', { error });
-    return res.status(503).json({ 
+    log.error('Database health check error', { error });
+    return res.status(503).json({
       status: 'unhealthy',
       database: 'disconnected',
-      error: error instanceof Error ? error.message : 'Database connection failed',
-      environment: process.env.NODE_ENV || 'development'
+      timestamp: new Date().toISOString(),
     });
   }
 }

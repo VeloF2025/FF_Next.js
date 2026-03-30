@@ -23,16 +23,18 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Verify this is called by Vercel Cron
+  // Verify cron secret unconditionally — dev shares the production database
+  // so bypassing auth in non-production environments is not safe.
   const authHeader = req.headers.authorization;
   const cronSecret = process.env.CRON_SECRET;
 
-  // In production, verify the cron secret
-  if (process.env.NODE_ENV === 'production' && cronSecret) {
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      log.error('cronTask', { action: 'sync-onemap-serials', error: 'Unauthorized request' });
-      return apiResponse.unauthorized(res);
-    }
+  if (!cronSecret) {
+    log.error('cronTask', { action: 'sync-onemap-serials', error: 'CRON_SECRET not configured' });
+    return apiResponse.serverError(res, new Error('CRON_SECRET not configured'));
+  }
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    log.error('cronTask', { action: 'sync-onemap-serials', error: 'Unauthorized request' });
+    return apiResponse.unauthorized(res);
   }
 
   log.debug('cronTask', { action: 'sync-onemap-serials', step: 'start' });
