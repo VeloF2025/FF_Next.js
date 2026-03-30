@@ -44,4 +44,4 @@
 - [ ] Deployment process documented
 
 ---
-**Developer Standards:** Read `knowledge/fibreflow-developer-handover.md` before submitting. Violations block PRs.
+> Full coding standards: [CLAUDE.md](../../CLAUDE.md) — read before submitting. Violations block PRs.
