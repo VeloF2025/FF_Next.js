@@ -68,9 +68,11 @@ This photo shows a printed sticker with TWO serial numbers:
    ❌ Do NOT extract model/part numbers (start with "STN")
 
 2. UPS SERIAL NUMBER:
-   - Starts with "GU18W" followed by 8-10 alphanumeric characters
+   - Full model+serial string printed under the barcode on the Gizzu UPS sticker
+   - Format: "GU18W12V" (model prefix) + 10 numeric digits = 18-19 characters total
+   - Example shape: GU18W12V##########
+   - IMPORTANT: Read the ENTIRE string under the barcode — do NOT drop "12V" from the middle
    - Usually labeled "UPS Serial" or "Gizzu Serial"
-   - 13-15 characters total
 
 ⚠️ VALIDATION (check before answering):
 - ONT serial must be exactly 12 chars starting with ALCLB4
@@ -86,7 +88,7 @@ Respond in this exact JSON format:
   },
   "upsSerial": {
     "found": true/false,
-    "serial": "<serial starting with GU18W, or null>",
+    "serial": "<full serial starting with GU18W12V, or null>",
     "confidence": <0.0 to 1.0>
   }
 }
@@ -100,7 +102,7 @@ CRITICAL: Only extract serials you can ACTUALLY READ. null is better than wrong.
 /**
  * Validate UPS/Gizzu serial format.
  * - Must start with GU18W
- * - Must be 12–16 characters
+ * - Must be 12–22 characters (GU18W12V + 10 digits = 18-19 typical)
  * - Must not be a prompt example (hallucination guard)
  */
 function isValidUpsSerial(serial: string | null): boolean {
@@ -114,7 +116,7 @@ function isValidUpsSerial(serial: string | null): boolean {
     return false;
   }
 
-  if (s.length < 12 || s.length > 16) {
+  if (s.length < 12 || s.length > 22) {
     vlmLogger.debug(
       `Rejected UPS serial with wrong length (${s.length}): ${serial}`
     );
