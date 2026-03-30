@@ -387,10 +387,10 @@ CIVIL CHECKLIST STEPS (in order of the installation process):
   - Optical/fibre equipment (splice trays, domes, fibre cables, ONTs, patch panels)
   - Something completely unrelated to pole installation (vehicles, people posing, documents)
   If the photo shows ANYTHING related to a pole, ground, hole, or construction → it is NOT Unrelated.
-  Based on 1208 human corrections, 38% of all VLM errors are valid civil photos wrongly classified as Unrelated.
+  Based on 1212 human corrections, 38% of all VLM errors are valid civil photos wrongly classified as Unrelated.
 
-⚠️ TOP CONFUSION PAIRS (from 1208 human corrections — avoid these mistakes):
-  1. During (2) vs Compaction (5): 207 errors. KEY: Is the hole OPEN and EMPTY → Step 2. Is the hole FILLED with pole standing → Step 5.
+⚠️ TOP CONFUSION PAIRS (from 1212 human corrections — avoid these mistakes):
+  1. During (2) vs Compaction (5): 208 errors. KEY: Is the hole OPEN and EMPTY → Step 2. Is the hole FILLED with pole standing → Step 5.
   2. Unrelated (0) vs End Plates (4): 200 errors. Close-up of metal hardware on a pole = Step 4, NOT unrelated.
   3. Unrelated (0) vs Before Photo (1): 152 errors. Ground-level photo without a hole = Step 1, NOT unrelated.
   4. Compaction (5) vs End Plates (4): 66 errors. Metal fittings/straps = Step 4. Packed earth surface = Step 5.
@@ -402,7 +402,7 @@ CIVIL CHECKLIST STEPS (in order of the installation process):
   Step 2 (During): Ground is BROKEN. A DUG HOLE, piled dirt, or active digging. NO pole yet.
   → Intact ground = Step 1. Broken ground with hole = Step 2.
 
-⚠️ DURING vs COMPACTION (most confused pair — 207 errors):
+⚠️ DURING vs COMPACTION (most confused pair — 208 errors):
   Step 2 (During): Hole is OPEN and EMPTY. No pole installed. Workers may be digging.
   Step 5 (Compaction): Pole is STANDING. Hole is FILLED and PACKED around the pole base.
   → No pole + open hole = Step 2. Pole standing + filled ground = Step 5.

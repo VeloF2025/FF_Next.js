@@ -87,7 +87,16 @@ KEY DIFFERENTIATORS for commonly confused categories:
 - Step 3 vs Step 4: Step 3 = OUTSIDE (exterior wall, daylight). Step 4 = INSIDE (interior wall, indoor lighting). Sky or exterior materials = Step 3. Enclosed indoor = Step 4.
 - Step 4 vs Step 5: Step 4 = cable ROUTING/traveling along walls. Step 5 = TARGET wall (bracket, outlet). Cable as main subject = Step 4. Wall surface as main subject = Step 5.
 - Step 6 vs Step 8: ONT BACK only (cables) vs FULL SETUP wide shot (ONT + UPS + cables)
-- Step 8 vs Step 9: FRAMING is key. Step 8 = WIDE shot (ONT + UPS + wall + surroundings). Step 9 = CLOSE-UP of front panel lights only. UPS and wall visible = Step 8 even if lights visible.`;
+- Step 8 vs Step 9: FRAMING is key. Step 8 = WIDE shot (ONT + UPS + wall + surroundings). Step 9 = CLOSE-UP of front panel lights only. UPS and wall visible = Step 8 even if lights visible.
+
+⚠️ CRITICAL — DO NOT DISCARD (Step 0) unless the photo is truly rubbish:
+Based on 2336 human corrections, the #1 VLM error is wrongly discarding valid installation photos.
+- A blurry or dark photo of installation equipment is NOT rubbish — classify it to the best matching step with low confidence.
+- An outdoor photo showing poles, cables, or buildings = Step 1 or 2, NOT discard.
+- A photo of an ONT, router, or networking equipment = Step 6, 8, or 9, NOT discard.
+- A photo of a meter, display, or screen = Step 7, NOT discard.
+- A photo of a signature or form = Step 10, NOT discard.
+- ONLY discard: completely blank photos, accidental selfies, unrelated objects (food, pets, vehicles).`;
 
   // Inject few-shot examples from human corrections (HITL learning)
   if (fewShotExamples && fewShotExamples.length > 0) {

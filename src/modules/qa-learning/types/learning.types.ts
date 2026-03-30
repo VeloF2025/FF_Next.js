@@ -148,9 +148,16 @@ export interface FewShotSelectionResult {
  * Known confusion pairs for DR Photo workflow
  * Steps that VLM commonly confuses with each other
  *
- * Source: categorizationVlmService.ts prompt comments
+ * Source: vlm-accuracy-audit.ts (auto-generated from 2336 corrections)
+ * Last updated: 2026-03-30
  */
 export const DR_PHOTO_CONFUSION_PAIRS: Array<[number, number]> = [
+  [0, 2], // Discard vs Cable from Pole (297 corrections — #1 error)
+  [0, 1], // Discard vs House Photo (190 corrections)
+  [0, 9], // Discard vs Green Lights (169 corrections)
+  [0, 10], // Discard vs Signature (140 corrections)
+  [0, 7], // Discard vs Power Meter (131 corrections)
+  [0, 6], // Discard vs ONT Back (126 corrections)
   [2, 3], // Cable from Pole vs Entry Outside (aerial vs wall entry)
   [3, 4], // Entry Outside vs Entry Inside
   [6, 8], // ONT Back vs Final Installation
