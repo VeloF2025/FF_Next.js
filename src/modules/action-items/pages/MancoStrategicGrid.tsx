@@ -296,7 +296,6 @@ export function MancoStrategicGrid() {
                             }
                           }}
                           tabIndex={0}
-                          role="button"
                           aria-label={`View details for ${item.action_item}`}
                           className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-secondary)] cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)] focus:ring-inset"
                         >
@@ -304,7 +303,6 @@ export function MancoStrategicGrid() {
                             <span
                               className="px-2 py-1 rounded text-xs font-medium border"
                               style={{
-                                // WCAG AA contrast: color-mix pattern from Flow's CAPAStatusBadge (PR #490)
                                 background: overdue
                                   ? 'color-mix(in srgb, var(--ff-danger) 12%, transparent)'
                                   : item.status === 'pending'
