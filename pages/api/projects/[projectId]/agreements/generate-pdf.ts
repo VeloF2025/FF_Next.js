@@ -240,13 +240,16 @@ async function handler(
       contractorId: body.contractorId,
     });
 
+    // Convert Uint8Array to Buffer so Next.js sends binary, not JSON
+    const buffer = Buffer.from(pdfBuffer);
+
     // Set response headers for PDF download
     const filename = `${body.agreementType.toUpperCase()}_${referenceNumber.replace(/\//g, '-')}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Length', pdfBuffer.length);
+    res.setHeader('Content-Length', buffer.length);
 
-    return res.send(pdfBuffer);
+    return res.send(buffer);
   } catch (error) {
     log.error('AgreementPDFGeneration', {
       projectId,
