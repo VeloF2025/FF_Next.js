@@ -20,6 +20,7 @@ interface PPRecord {
   maintenance_ticket_id: string | null;
   ticket_uid: string | null;
   ticket_priority: string | null;
+  ticket_created_at: string | null;
   oes_team: string | null;
   activation_date: string | null;
   wa_phone: string | null;
@@ -63,6 +64,22 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }>
   located_local: { bg: 'bg-cyan-100 dark:bg-cyan-900/30', text: 'text-cyan-800 dark:text-cyan-300', label: 'Found (Local)' },
   activated: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-800 dark:text-green-300', label: 'Activated' },
 };
+
+/** Calculate days since a given date */
+function daysAgo(dateStr: string | null): number | null {
+  if (!dateStr) return null;
+  const created = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - created.getTime();
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+}
+
+/** Get age badge color based on days */
+function ageBadgeStyle(days: number): string {
+  if (days >= 14) return 'bg-red-900/40 text-red-300 border-red-700';
+  if (days >= 7) return 'bg-orange-900/40 text-orange-300 border-orange-700';
+  return 'bg-gray-800/40 text-gray-300 border-gray-600';
+}
 
 /** Check if a record is eligible for ticket selection (any unticketed, non-activated record) */
 function isSelectable(r: PPRecord): boolean {
@@ -139,13 +156,24 @@ const PPDataRow = React.memo(function PPDataRow({
       </td>
       <td className="px-3 py-2">
         {record.ticket_priority ? (
-          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-            record.ticket_priority === 'high'
-              ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-              : 'bg-gray-100 dark:bg-gray-800/30 text-gray-700 dark:text-gray-300'
-          }`}>
-            {record.ticket_priority === 'high' ? 'High' : 'Normal'}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+              record.ticket_priority === 'high'
+                ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                : 'bg-gray-100 dark:bg-gray-800/30 text-gray-700 dark:text-gray-300'
+            }`}>
+              {record.ticket_priority === 'high' ? 'High' : 'Normal'}
+            </span>
+            {(() => {
+              const days = daysAgo(record.ticket_created_at);
+              if (days === null) return null;
+              return (
+                <span className={`px-1.5 py-0.5 rounded border text-[10px] font-mono font-medium ${ageBadgeStyle(days)}`}>
+                  {days}d
+                </span>
+              );
+            })()}
+          </div>
         ) : (
           <span className="text-[var(--ff-text-tertiary)]">-</span>
         )}
@@ -166,6 +194,7 @@ export function PPDataTab() {
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
+  const [filterAging, setFilterAging] = useState('');
   const [searchText, setSearchText] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [lookupStatus, setLookupStatus] = useState<LookupStatus | null>(null);
@@ -186,7 +215,7 @@ export function PPDataTab() {
   }, [searchText]);
 
   // Clear selection when filters or page change
-  useEffect(() => { setSelectedIds([]); }, [page, filterProject, filterStatus, filterPriority, filterDateFrom, filterDateTo, debouncedSearch]);
+  useEffect(() => { setSelectedIds([]); }, [page, filterProject, filterStatus, filterPriority, filterAging, filterDateFrom, filterDateTo, debouncedSearch]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -208,6 +237,7 @@ export function PPDataTab() {
       if (filterProject) params.set('project', filterProject);
       if (filterStatus) params.set('status', filterStatus);
       if (filterPriority) params.set('priority', filterPriority);
+      if (filterAging) params.set('aging', filterAging);
       if (filterDateFrom) params.set('dateFrom', filterDateFrom);
       if (filterDateTo) params.set('dateTo', filterDateTo);
       if (debouncedSearch) params.set('search', debouncedSearch);
@@ -221,7 +251,7 @@ export function PPDataTab() {
     } catch {
       // Non-fatal
     }
-  }, [page, filterProject, filterStatus, filterPriority, filterDateFrom, filterDateTo, debouncedSearch]);
+  }, [page, filterProject, filterStatus, filterPriority, filterAging, filterDateFrom, filterDateTo, debouncedSearch]);
 
   const fetchLookupStatus = useCallback(async () => {
     try {
@@ -597,6 +627,20 @@ export function PPDataTab() {
               <option value="">All Priorities</option>
               <option value="normal">Normal</option>
               <option value="high">High</option>
+            </select>
+            <select
+              value={filterAging}
+              onChange={(e) => { setFilterAging(e.target.value); setPage(1); }}
+              className={`px-3 py-1.5 rounded border text-sm ${
+                filterAging
+                  ? 'bg-red-900/20 border-red-700 text-red-300'
+                  : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-primary)]'
+              }`}
+            >
+              <option value="">Ticket Age</option>
+              <option value="recent">Recent (0–6 days)</option>
+              <option value="7days">7 Days (7–13 days)</option>
+              <option value="14days">14 Days (14+ days)</option>
             </select>
             <div className="flex items-center gap-1.5">
               <label className="text-xs text-[var(--ff-text-tertiary)]">From</label>

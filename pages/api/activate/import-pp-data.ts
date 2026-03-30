@@ -79,6 +79,7 @@ async function handler(
     const dateTo = req.query.dateTo as string;
     const search = (req.query.search as string || '').trim();
     const priority = req.query.priority as string;
+    const aging = req.query.aging as string;
 
     let whereClause = '';
     const params: (string | number)[] = [];
@@ -97,6 +98,17 @@ async function handler(
     if (priority) {
       whereClause += ` AND mt.priority = $${paramIndex++}`;
       params.push(priority);
+    }
+    if (aging) {
+      // Aging filter: force high priority and filter by ticket age bucket
+      whereClause += ` AND mt.priority = 'high'`;
+      if (aging === 'recent') {
+        whereClause += ` AND mt.created_at >= NOW() - INTERVAL '6 days'`;
+      } else if (aging === '7days') {
+        whereClause += ` AND mt.created_at >= NOW() - INTERVAL '13 days' AND mt.created_at < NOW() - INTERVAL '6 days'`;
+      } else if (aging === '14days') {
+        whereClause += ` AND mt.created_at < NOW() - INTERVAL '13 days'`;
+      }
     }
     if (dateFrom) {
       whereClause += ` AND pp.date_registered >= $${paramIndex++}::date`;
@@ -120,7 +132,7 @@ async function handler(
     );
 
     const dataResult = await pool.query(
-      `SELECT pp.*, mt.ticket_uid, mt.priority AS ticket_priority,
+      `SELECT pp.*, mt.ticket_uid, mt.priority AS ticket_priority, mt.created_at AS ticket_created_at,
               COALESCE(oa.team, d.installed_by_name) AS oes_team,
               oa.activation_date,
               dur.sender_phone AS wa_phone,
