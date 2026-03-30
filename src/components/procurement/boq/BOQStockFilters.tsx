@@ -119,6 +119,8 @@ interface BOQStockFiltersProps {
   totalCount: number;
   search: string;
   onSearchChange: (v: string) => void;
+  hideZeros: boolean;
+  onHideZerosChange: (v: boolean) => void;
 }
 
 export function BOQStockFilters({
@@ -131,6 +133,8 @@ export function BOQStockFilters({
   totalCount,
   search,
   onSearchChange,
+  hideZeros,
+  onHideZerosChange,
 }: BOQStockFiltersProps) {
   const projectOptions = projects.map((p) => ({ value: p.id, label: p.name }));
   const categoryOptions = categories.map((c) => ({ value: c, label: c }));
@@ -166,6 +170,20 @@ export function BOQStockFilters({
           onChange={onCategoriesChange}
           placeholder="Search categories..."
         />
+
+        {/* Filter Zeros toggle */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onHideZerosChange(!hideZeros)}
+          className={`h-8 gap-1.5 text-xs font-normal border-zinc-700 ${
+            hideZeros
+              ? 'bg-blue-600 border-blue-500 text-white hover:bg-blue-500'
+              : 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700 hover:text-white'
+          }`}
+        >
+          Filter Zeros
+        </Button>
       </div>
 
       {/* Item count */}

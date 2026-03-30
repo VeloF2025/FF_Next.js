@@ -31,6 +31,7 @@ export function BOQStockView({ selectedProject }: BOQStockViewProps) {
   );
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [search, setSearch] = useState('');
+  const [hideZeros, setHideZeros] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -74,14 +75,15 @@ export function BOQStockView({ selectedProject }: BOQStockViewProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProject?.id]);
 
-  // Client-side search filter
-  const filtered = search.trim()
-    ? data.filter(
-        (r) =>
-          r.name.toLowerCase().includes(search.toLowerCase()) ||
-          (r.itemCode ?? '').toLowerCase().includes(search.toLowerCase())
-      )
-    : data;
+  // Client-side filters
+  const filtered = data.filter((r) => {
+    if (hideZeros && r.plannedQty === 0) return false;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      return r.name.toLowerCase().includes(q) || (r.itemCode ?? '').toLowerCase().includes(q);
+    }
+    return true;
+  });
 
   function handleExcel() {
     if (filtered.length === 0) return;
@@ -139,6 +141,8 @@ export function BOQStockView({ selectedProject }: BOQStockViewProps) {
         totalCount={filtered.length}
         search={search}
         onSearchChange={setSearch}
+        hideZeros={hideZeros}
+        onHideZerosChange={setHideZeros}
       />
 
       {/* Error */}
