@@ -88,7 +88,7 @@ export default withAuth(async (req: NextApiRequest, res: NextApiResponse) => {
           WHERE poi.boq_item_id IS NOT NULL AND grn.status = 'completed'
           GROUP BY poi.boq_item_id
         ) grn_agg ON grn_agg.boq_item_id = bi.id
-        WHERE b.project_id = ANY(${projectIds}::uuid[])
+        WHERE b.project_id = ANY(${projectIds}::text[])
           AND COALESCE(si.category, bi.category, 'Uncategorized') = ANY(${categories})
           AND (bi.item_code IS NULL OR bi.item_code != 'TOTAL')
         GROUP BY
@@ -129,7 +129,7 @@ export default withAuth(async (req: NextApiRequest, res: NextApiResponse) => {
           WHERE poi.boq_item_id IS NOT NULL AND grn.status = 'completed'
           GROUP BY poi.boq_item_id
         ) grn_agg ON grn_agg.boq_item_id = bi.id
-        WHERE b.project_id = ANY(${projectIds}::uuid[])
+        WHERE b.project_id = ANY(${projectIds}::text[])
           AND (bi.item_code IS NULL OR bi.item_code != 'TOTAL')
         GROUP BY
           COALESCE(si.item_code, bi.item_code),
