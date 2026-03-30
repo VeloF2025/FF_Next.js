@@ -17,6 +17,7 @@
 import React, { useState } from 'react';
 import { Search, Filter, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useProjects } from '@/hooks/useProjects';
 import type { TicketFilters as TicketFiltersType } from '../../types/ticket';
 
 interface TicketFiltersProps {
@@ -33,6 +34,10 @@ interface TicketFiltersProps {
  */
 export function TicketFilters({ filters, onFiltersChange, compact = false }: TicketFiltersProps) {
   const [showFilters, setShowFilters] = useState(false);
+  const { data: projects = [] } = useProjects();
+  const activeProjects = (projects as { id: string; name: string; code?: string; status?: string }[])
+    .filter((p) => p.status === 'active' || p.status === 'in_progress')
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   // 🟢 WORKING: Handle filter change
   const handleFilterChange = (key: keyof TicketFiltersType, value: any) => {
@@ -219,6 +224,25 @@ export function TicketFilters({ filters, onFiltersChange, compact = false }: Tic
               onChange={(e) => handleFilterChange('dr_number', e.target.value)}
               className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             />
+          </div>
+
+          {/* Project Filter */}
+          <div>
+            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-2">
+              Project
+            </label>
+            <select
+              value={filters.project_id || ''}
+              onChange={(e) => handleFilterChange('project_id', e.target.value)}
+              className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            >
+              <option value="">All Projects</option>
+              {activeProjects.map((project: { id: string; name: string; code?: string }) => (
+                <option key={project.id} value={project.id}>
+                  {project.code ? `${project.code} — ${project.name}` : project.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       )}
