@@ -1,54 +1,5 @@
 {
   "sessions": {
-    "1a3d91ef-1d5e-4f6a-a481-d6c895295e34": {
-      "session_id": "1a3d91ef-1d5e-4f6a-a481-d6c895295e34",
-      "started_at": "2026-03-22T10:33:07.730Z",
-      "total_input_tokens": 9837,
-      "total_output_tokens": 0,
-      "total_cost_usd": 0.029511,
-      "tool_calls": 102,
-      "tools_used": {
-        "Bash": 57,
-        "TaskCreate": 2,
-        "Grep": 4,
-        "TaskUpdate": 5,
-        "Write": 1,
-        "Read": 12,
-        "Edit": 18,
-        "Agent": 3
-      }
-    },
-    "812e6eb4-cf2b-4a5a-b549-40579f2b07a8": {
-      "session_id": "812e6eb4-cf2b-4a5a-b549-40579f2b07a8",
-      "started_at": "2026-03-22T11:40:06.448Z",
-      "total_input_tokens": 5471,
-      "total_output_tokens": 0,
-      "total_cost_usd": 0.016413,
-      "tool_calls": 89,
-      "tools_used": {
-        "Bash": 38,
-        "Agent": 4,
-        "Read": 24,
-        "ToolSearch": 2,
-        "Glob": 3,
-        "Grep": 5,
-        "Edit": 13
-      }
-    },
-    "781feca0-9a4f-470d-8825-6175f413a7c4": {
-      "session_id": "781feca0-9a4f-470d-8825-6175f413a7c4",
-      "started_at": "2026-03-22T19:58:24.699Z",
-      "total_input_tokens": 13698,
-      "total_output_tokens": 0,
-      "total_cost_usd": 0.041094000000000006,
-      "tool_calls": 51,
-      "tools_used": {
-        "Bash": 8,
-        "Read": 26,
-        "Agent": 1,
-        "Write": 16
-      }
-    },
     "a213ec0d-da00-41ac-9aab-f89e3d6f92d7": {
       "session_id": "a213ec0d-da00-41ac-9aab-f89e3d6f92d7",
       "started_at": "2026-03-26T00:03:12.353Z",
@@ -126,6 +77,20 @@
         "ToolSearch": 7,
         "mcp__playwriter__execute": 24,
         "mcp__playwriter__reset": 3
+      }
+    },
+    "9bb80620-acff-4b82-ad0e-98460045c5c0": {
+      "session_id": "9bb80620-acff-4b82-ad0e-98460045c5c0",
+      "started_at": "2026-03-30T03:46:07.229Z",
+      "total_input_tokens": 4835,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.014504999999999999,
+      "tool_calls": 59,
+      "tools_used": {
+        "Bash": 25,
+        "Read": 8,
+        "Edit": 22,
+        "Grep": 4
       }
     }
   }

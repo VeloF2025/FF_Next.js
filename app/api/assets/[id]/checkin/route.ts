@@ -6,6 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { assignmentService } from '@/modules/assets/services';
+import { requireAuth } from '@/lib/auth/app-router';
+import { log } from '@/lib/logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -61,7 +63,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       message: 'Asset checked in successfully'
     }, { status: 200 });
   } catch (error) {
-    console.error('Error checking in asset:', error);
+    log.error('Error checking in asset', { error });
     return NextResponse.json(
       { error: 'Failed to check in asset' },
       { status: 500 }

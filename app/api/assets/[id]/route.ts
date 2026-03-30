@@ -9,6 +9,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { assetService } from '@/modules/assets/services';
 import { UpdateAssetSchema } from '@/modules/assets/utils/schemas';
+import { requireAuth } from '@/lib/auth/app-router';
+import { log } from '@/lib/logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -32,7 +34,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ data: result.data });
   } catch (error) {
-    console.error('Error fetching asset:', error);
+    log.error('Error fetching asset', { error });
     return NextResponse.json(
       { error: 'Failed to fetch asset' },
       { status: 500 }
@@ -78,7 +80,7 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ data: result.data });
   } catch (error) {
-    console.error('Error updating asset:', error);
+    log.error('Error updating asset', { error });
     return NextResponse.json(
       { error: 'Failed to update asset' },
       { status: 500 }
@@ -107,7 +109,7 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
-    console.error('Error deleting asset:', error);
+    log.error('Error deleting asset', { error });
     return NextResponse.json(
       { error: 'Failed to delete asset' },
       { status: 500 }

@@ -7,6 +7,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbConnection } from '@/modules/assets/utils/db';
 import { v4 as uuidv4 } from 'uuid';
+import { requireAuth } from '@/lib/auth/app-router';
+import { log } from '@/lib/logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -49,7 +51,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ data: documents });
   } catch (error) {
-    console.error('Error fetching documents:', error);
+    log.error('Error fetching documents', { error });
     return NextResponse.json(
       { error: 'Failed to fetch documents' },
       { status: 500 }
@@ -157,7 +159,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ data: document }, { status: 201 });
   } catch (error) {
-    console.error('Error creating document:', error);
+    log.error('Error creating document', { error });
     return NextResponse.json(
       { error: 'Failed to create document' },
       { status: 500 }
