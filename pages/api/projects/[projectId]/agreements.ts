@@ -50,12 +50,12 @@ async function handler(
               ca.agreement_type,
               ca.contractor_id,
               COALESCE(c.company_name, 'Unknown Contractor') as contractor_name,
-              ca.reference_number,
               ca.status,
               ca.effective_date,
               ca.expiry_date,
-              COALESCE(ca.total_value, 0)::numeric as total_value,
-              ca.signed_date,
+              ca.draft_document_url,
+              ca.signed_document_url,
+              ca.signed_at,
               ca.created_at
             FROM contractor_agreements ca
             LEFT JOIN contractors c ON ca.contractor_id = c.id
@@ -83,15 +83,13 @@ async function handler(
         const {
           agreement_type,
           contractor_id,
-          reference_number,
           effective_date,
           expiry_date,
-          total_value,
-          description,
+          created_by,
         } = req.body;
 
-        if (!agreement_type || !contractor_id || !reference_number) {
-          return apiResponse.badRequest(res, 'Missing required fields: agreement_type, contractor_id, reference_number');
+        if (!agreement_type || !contractor_id) {
+          return apiResponse.badRequest(res, 'Missing required fields: agreement_type, contractor_id');
         }
 
         const result = await sql`
@@ -99,31 +97,27 @@ async function handler(
             project_id,
             agreement_type,
             contractor_id,
-            reference_number,
             status,
             effective_date,
             expiry_date,
-            total_value,
-            description,
+            created_by,
             created_at,
             updated_at
           ) VALUES (
             ${projectId},
             ${agreement_type},
             ${contractor_id},
-            ${reference_number},
             'draft',
             ${effective_date || null},
             ${expiry_date || null},
-            ${total_value || 0},
-            ${description || null},
+            ${created_by || 'system'},
             NOW(),
             NOW()
           )
           RETURNING *
         `;
 
-        log.info('ProjectAgreements', { action: 'create', projectId, reference_number });
+        log.info('ProjectAgreements', { action: 'create', projectId, agreement_type });
 
         return apiResponse.created(res, result[0]);
       } catch (error) {

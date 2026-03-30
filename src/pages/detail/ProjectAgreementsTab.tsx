@@ -1,25 +1,34 @@
 /**
  * Project Agreements Tab (PRD-058)
- * Displays and manages contractor agreements (SOW, MBA) for a project
+ * Displays and manages contractor agreements (SOW, MBA) for a project.
+ * Supports both generating and uploading agreements, plus marking as signed.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileText, Plus, Download, Eye, Clock, CheckCircle, AlertTriangle, X, Loader2 } from 'lucide-react';
+import {
+  FileText, Plus, Download, Clock, CheckCircle, AlertTriangle,
+  X, Loader2, Upload, PenLine,
+} from 'lucide-react';
 import { log } from '@/lib/logger';
 import { formatDisplayDate } from '@/utils/dateFormat';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface Agreement {
   id: string;
   agreement_type: 'sow' | 'mba' | 'amendment';
   contractor_id: string;
   contractor_name: string;
-  reference_number: string;
   status: 'draft' | 'pending_review' | 'approved' | 'signed' | 'expired';
   effective_date: string | null;
   expiry_date: string | null;
-  total_value: number;
-  signed_date: string | null;
+  draft_document_url: string | null;
+  signed_document_url: string | null;
+  signed_at: string | null;
   created_at: string;
 }
 
@@ -34,23 +43,27 @@ interface ProjectAgreementsTabProps {
   projectId: string;
 }
 
+// ---------------------------------------------------------------------------
+// Data fetching
+// ---------------------------------------------------------------------------
+
 async function fetchProjectAgreements(projectId: string): Promise<Agreement[]> {
   const response = await fetch(`/api/projects/${projectId}/agreements`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch agreements');
-  }
+  if (!response.ok) throw new Error('Failed to fetch agreements');
   const data = await response.json();
   return data.data || [];
 }
 
 async function fetchContractors(): Promise<ContractorOption[]> {
   const response = await fetch('/api/contractors-list');
-  if (!response.ok) {
-    throw new Error('Failed to fetch contractors');
-  }
+  if (!response.ok) throw new Error('Failed to fetch contractors');
   const data = await response.json();
   return data.data || [];
 }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function getStatusBadge(status: Agreement['status']) {
   switch (status) {
@@ -71,74 +84,65 @@ function getStatusBadge(status: Agreement['status']) {
 
 function getAgreementTypeLabel(type: Agreement['agreement_type']) {
   switch (type) {
-    case 'sow': return 'Statement of Work';
-    case 'mba': return 'Master Build Agreement';
+    case 'sow': return 'SOW';
+    case 'mba': return 'MBA';
     case 'amendment': return 'Amendment';
     default: return type;
   }
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-ZA', {
-    style: 'currency',
-    currency: 'ZAR',
-    minimumFractionDigits: 0,
-  }).format(value);
 }
 
 function formatDate(dateStr: string | null): string {
   return formatDisplayDate(dateStr, '—');
 }
 
-interface GenerateModalProps {
+// ---------------------------------------------------------------------------
+// New Agreement Modal — supports Generate or Upload
+// ---------------------------------------------------------------------------
+
+type ModalMode = 'generate' | 'upload';
+
+interface NewAgreementModalProps {
   projectId: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-function GenerateAgreementModal({ projectId, onClose, onSuccess }: GenerateModalProps) {
-  const [agreementType, setAgreementType] = useState<'sow' | 'mba'>('sow');
+function NewAgreementModal({ projectId, onClose, onSuccess }: NewAgreementModalProps) {
+  const [mode, setMode] = useState<ModalMode>('generate');
+  const [agreementType, setAgreementType] = useState<'sow' | 'mba'>('mba');
   const [contractorId, setContractorId] = useState('');
-  const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().split('T')[0]);
+  const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().split('T')[0] ?? '');
   const [expiryDate, setExpiryDate] = useState('');
-  const [totalValue, setTotalValue] = useState('');
   const [paymentTerms, setPaymentTerms] = useState('Net 30 days from invoice date');
-  const [warrantyPeriod, setWarrantyPeriod] = useState('12 months');
-  const [retentionPercentage, setRetentionPercentage] = useState('5');
-  const [saveToDatabase, setSaveToDatabase] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: contractors, isLoading: loadingContractors } = useQuery({
     queryKey: ['contractors-list'],
     queryFn: fetchContractors,
   });
 
-  // Set default expiry date (1 year from effective)
+  // Default expiry = 1 year from effective
   useEffect(() => {
     if (effectiveDate && !expiryDate) {
-      const effective = new Date(effectiveDate);
-      effective.setFullYear(effective.getFullYear() + 1);
-      setExpiryDate(effective.toISOString().split('T')[0]);
+      const d = new Date(effectiveDate);
+      d.setFullYear(d.getFullYear() + 1);
+      setExpiryDate(d.toISOString().split('T')[0] ?? '');
     }
   }, [effectiveDate, expiryDate]);
 
   const handleGenerate = async () => {
-    if (!contractorId) {
-      setError('Please select a contractor');
-      return;
-    }
+    if (!contractorId) { setError('Please select a contractor'); return; }
+    if (!effectiveDate || !expiryDate) { setError('Please set dates'); return; }
 
-    if (!effectiveDate || !expiryDate) {
-      setError('Please set effective and expiry dates');
-      return;
-    }
-
-    setIsGenerating(true);
+    setIsSubmitting(true);
     setError(null);
 
     try {
-      const response = await fetch(`/api/projects/${projectId}/agreements/generate-pdf`, {
+      // 1. Generate PDF
+      const pdfRes = await fetch(`/api/projects/${projectId}/agreements/generate-pdf`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -146,48 +150,74 @@ function GenerateAgreementModal({ projectId, onClose, onSuccess }: GenerateModal
           contractorId,
           effectiveDate,
           expiryDate,
-          totalValue: totalValue ? parseFloat(totalValue) : 0,
+          totalValue: 0,
           paymentTerms,
-          warrantyPeriod: agreementType === 'sow' ? warrantyPeriod : undefined,
-          retentionPercentage: retentionPercentage ? parseFloat(retentionPercentage) : undefined,
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to generate agreement');
+      if (!pdfRes.ok) {
+        const err = await pdfRes.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to generate agreement');
       }
 
       // Download the PDF
-      const blob = await response.blob();
+      const blob = await pdfRes.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = response.headers.get('Content-Disposition')?.split('filename="')[1]?.replace('"', '') || `agreement.pdf`;
+      a.download = pdfRes.headers.get('Content-Disposition')?.split('filename="')[1]?.replace('"', '') || 'agreement.pdf';
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      // Save to database if requested
-      if (saveToDatabase) {
-        const saveResponse = await fetch(`/api/projects/${projectId}/agreements`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            agreement_type: agreementType,
-            contractor_id: contractorId,
-            reference_number: `${agreementType.toUpperCase()}/${new Date().getFullYear()}/${projectId.substring(0, 8)}`,
-            effective_date: effectiveDate,
-            expiry_date: expiryDate,
-            total_value: totalValue ? parseFloat(totalValue) : 0,
-          }),
-        });
+      // 2. Save record to DB
+      await fetch(`/api/projects/${projectId}/agreements`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agreement_type: agreementType,
+          contractor_id: contractorId,
+          effective_date: effectiveDate,
+          expiry_date: expiryDate,
+        }),
+      });
 
-        if (!saveResponse.ok) {
-          // Don't throw - PDF was already downloaded
-          log.warn('Failed to save agreement to database', undefined, 'ProjectAgreementsTab');
-        }
+      onSuccess();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!contractorId) { setError('Please select a contractor'); return; }
+    if (!effectiveDate || !expiryDate) { setError('Please set dates'); return; }
+    if (!selectedFile) { setError('Please select a PDF file'); return; }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('project_id', projectId);
+      formData.append('contractor_id', contractorId);
+      formData.append('agreement_type', agreementType);
+      formData.append('effective_date', effectiveDate);
+      formData.append('expiry_date', expiryDate);
+      formData.append('status', 'draft');
+
+      const res = await fetch('/api/agreements-upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to upload agreement');
       }
 
       onSuccess();
@@ -195,7 +225,7 @@ function GenerateAgreementModal({ projectId, onClose, onSuccess }: GenerateModal
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
-      setIsGenerating(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -204,7 +234,7 @@ function GenerateAgreementModal({ projectId, onClose, onSuccess }: GenerateModal
       <div className="ff-card max-w-lg w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
-            Generate Agreement
+            New Agreement
           </h3>
           <button
             onClick={onClose}
@@ -221,6 +251,41 @@ function GenerateAgreementModal({ projectId, onClose, onSuccess }: GenerateModal
         )}
 
         <div className="space-y-4">
+          {/* Mode: Generate or Upload */}
+          <div>
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+              How would you like to add this agreement?
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setMode('generate')}
+                className={`p-4 rounded-lg border-2 text-left transition-all ${
+                  mode === 'generate'
+                    ? 'border-blue-500 bg-blue-500/10'
+                    : 'border-[var(--ff-border-light)] hover:border-[var(--ff-primary)]'
+                }`}
+              >
+                <FileText className="w-5 h-5 mb-1 text-[var(--ff-text-primary)]" />
+                <div className="font-medium text-[var(--ff-text-primary)]">Generate</div>
+                <div className="text-xs text-[var(--ff-text-secondary)]">Create from template</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('upload')}
+                className={`p-4 rounded-lg border-2 text-left transition-all ${
+                  mode === 'upload'
+                    ? 'border-blue-500 bg-blue-500/10'
+                    : 'border-[var(--ff-border-light)] hover:border-[var(--ff-primary)]'
+                }`}
+              >
+                <Upload className="w-5 h-5 mb-1 text-[var(--ff-text-primary)]" />
+                <div className="font-medium text-[var(--ff-text-primary)]">Upload</div>
+                <div className="text-xs text-[var(--ff-text-secondary)]">Upload existing PDF</div>
+              </button>
+            </div>
+          </div>
+
           {/* Agreement Type */}
           <div>
             <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
@@ -230,7 +295,7 @@ function GenerateAgreementModal({ projectId, onClose, onSuccess }: GenerateModal
               <button
                 type="button"
                 onClick={() => setAgreementType('sow')}
-                className={`p-4 rounded-lg border-2 text-left transition-all ${
+                className={`p-3 rounded-lg border-2 text-left transition-all ${
                   agreementType === 'sow'
                     ? 'border-blue-500 bg-blue-500/10'
                     : 'border-[var(--ff-border-light)] hover:border-[var(--ff-primary)]'
@@ -242,7 +307,7 @@ function GenerateAgreementModal({ projectId, onClose, onSuccess }: GenerateModal
               <button
                 type="button"
                 onClick={() => setAgreementType('mba')}
-                className={`p-4 rounded-lg border-2 text-left transition-all ${
+                className={`p-3 rounded-lg border-2 text-left transition-all ${
                   agreementType === 'mba'
                     ? 'border-blue-500 bg-blue-500/10'
                     : 'border-[var(--ff-border-light)] hover:border-[var(--ff-primary)]'
@@ -267,9 +332,7 @@ function GenerateAgreementModal({ projectId, onClose, onSuccess }: GenerateModal
             >
               <option value="">Select a contractor...</option>
               {contractors?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.company_name}
-                </option>
+                <option key={c.id} value={c.id}>{c.company_name}</option>
               ))}
             </select>
           </div>
@@ -300,74 +363,58 @@ function GenerateAgreementModal({ projectId, onClose, onSuccess }: GenerateModal
             </div>
           </div>
 
-          {/* Contract Value */}
-          <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
-              Contract Value (ZAR)
-            </label>
-            <input
-              type="number"
-              value={totalValue}
-              onChange={(e) => setTotalValue(e.target.value)}
-              placeholder="0.00"
-              className="ff-input w-full"
-            />
-          </div>
-
-          {/* Payment Terms */}
-          <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
-              Payment Terms
-            </label>
-            <input
-              type="text"
-              value={paymentTerms}
-              onChange={(e) => setPaymentTerms(e.target.value)}
-              className="ff-input w-full"
-            />
-          </div>
-
-          {/* SOW-specific fields */}
-          {agreementType === 'sow' && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
-                  Warranty Period
-                </label>
-                <input
-                  type="text"
-                  value={warrantyPeriod}
-                  onChange={(e) => setWarrantyPeriod(e.target.value)}
-                  className="ff-input w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
-                  Retention %
-                </label>
-                <input
-                  type="number"
-                  value={retentionPercentage}
-                  onChange={(e) => setRetentionPercentage(e.target.value)}
-                  className="ff-input w-full"
-                />
-              </div>
+          {/* Generate-only: Payment Terms */}
+          {mode === 'generate' && (
+            <div>
+              <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                Payment Terms
+              </label>
+              <input
+                type="text"
+                value={paymentTerms}
+                onChange={(e) => setPaymentTerms(e.target.value)}
+                className="ff-input w-full"
+              />
             </div>
           )}
 
-          {/* Save to Database */}
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="saveToDb"
-              checked={saveToDatabase}
-              onChange={(e) => setSaveToDatabase(e.target.checked)}
-              className="w-4 h-4 rounded border-[var(--ff-border-light)] text-blue-500 focus:ring-blue-500"
-            />
-            <label htmlFor="saveToDb" className="text-sm text-[var(--ff-text-secondary)]">
-              Save agreement record to database
-            </label>
-          </div>
+          {/* Upload-only: File picker */}
+          {mode === 'upload' && (
+            <div>
+              <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                Agreement PDF *
+              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full p-4 border-2 border-dashed border-[var(--ff-border-light)] rounded-lg hover:border-[var(--ff-primary)] transition-colors text-center"
+              >
+                {selectedFile ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <FileText className="w-5 h-5 text-green-500" />
+                    <span className="text-sm text-[var(--ff-text-primary)]">{selectedFile.name}</span>
+                    <span className="text-xs text-[var(--ff-text-secondary)]">
+                      ({(selectedFile.size / 1024 / 1024).toFixed(1)} MB)
+                    </span>
+                  </div>
+                ) : (
+                  <div>
+                    <Upload className="w-6 h-6 mx-auto text-[var(--ff-text-secondary)] mb-1" />
+                    <span className="text-sm text-[var(--ff-text-secondary)]">
+                      Click to select PDF file
+                    </span>
+                  </div>
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Actions */}
@@ -375,24 +422,29 @@ function GenerateAgreementModal({ projectId, onClose, onSuccess }: GenerateModal
           <button
             onClick={onClose}
             className="ff-button ff-button--secondary"
-            disabled={isGenerating}
+            disabled={isSubmitting}
           >
             Cancel
           </button>
           <button
-            onClick={handleGenerate}
-            disabled={isGenerating || !contractorId}
+            onClick={mode === 'generate' ? handleGenerate : handleUpload}
+            disabled={isSubmitting || !contractorId}
             className="ff-button ff-button--primary inline-flex items-center gap-2"
           >
-            {isGenerating ? (
+            {isSubmitting ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Generating...
+                {mode === 'generate' ? 'Generating...' : 'Uploading...'}
               </>
-            ) : (
+            ) : mode === 'generate' ? (
               <>
                 <Download className="w-4 h-4" />
                 Generate PDF
+              </>
+            ) : (
+              <>
+                <Upload className="w-4 h-4" />
+                Upload Agreement
               </>
             )}
           </button>
@@ -402,8 +454,14 @@ function GenerateAgreementModal({ projectId, onClose, onSuccess }: GenerateModal
   );
 }
 
+// ---------------------------------------------------------------------------
+// Main Tab Component
+// ---------------------------------------------------------------------------
+
 export function ProjectAgreementsTab({ projectId }: ProjectAgreementsTabProps) {
   const [showNewModal, setShowNewModal] = useState(false);
+  const [signingId, setSigningId] = useState<string | null>(null);
+  const [isMarking, setIsMarking] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: agreements, isLoading, error } = useQuery({
@@ -413,6 +471,28 @@ export function ProjectAgreementsTab({ projectId }: ProjectAgreementsTabProps) {
 
   const handleSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['project-agreements', projectId] });
+  };
+
+  const handleMarkSigned = async () => {
+    if (!signingId) return;
+    setIsMarking(true);
+    try {
+      const res = await fetch(`/api/agreements-update?id=${signingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'signed' }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        log.error('MarkSigned', { error: err.error || 'Failed' });
+      }
+      handleSuccess();
+    } catch (err) {
+      log.error('MarkSigned', { error: err instanceof Error ? err.message : 'Unknown' });
+    } finally {
+      setIsMarking(false);
+      setSigningId(null);
+    }
   };
 
   if (isLoading) {
@@ -444,7 +524,7 @@ export function ProjectAgreementsTab({ projectId }: ProjectAgreementsTabProps) {
     );
   }
 
-  const activeAgreements = agreements?.filter(a => a.status === 'signed') || [];
+  const signedAgreements = agreements?.filter(a => a.status === 'signed') || [];
   const pendingAgreements = agreements?.filter(a => ['draft', 'pending_review', 'approved'].includes(a.status)) || [];
   const expiredAgreements = agreements?.filter(a => a.status === 'expired') || [];
 
@@ -477,8 +557,8 @@ export function ProjectAgreementsTab({ projectId }: ProjectAgreementsTabProps) {
               <CheckCircle className="w-5 h-5 text-green-500" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{activeAgreements.length}</p>
-              <p className="text-xs text-[var(--ff-text-secondary)]">Active Agreements</p>
+              <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{signedAgreements.length}</p>
+              <p className="text-xs text-[var(--ff-text-secondary)]">Signed</p>
             </div>
           </div>
         </div>
@@ -515,14 +595,14 @@ export function ProjectAgreementsTab({ projectId }: ProjectAgreementsTabProps) {
               No Agreements Yet
             </h3>
             <p className="text-sm text-[var(--ff-text-secondary)] mb-4">
-              Create your first contractor agreement for this project.
+              Generate or upload your first contractor agreement.
             </p>
             <button
               onClick={() => setShowNewModal(true)}
               className="ff-button ff-button--primary inline-flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
-              Create Agreement
+              Add Agreement
             </button>
           </div>
         ) : (
@@ -530,11 +610,10 @@ export function ProjectAgreementsTab({ projectId }: ProjectAgreementsTabProps) {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[var(--ff-border-light)]">
-                  <th className="ff-table-th text-left py-3 px-4">Reference</th>
                   <th className="ff-table-th text-left py-3 px-4">Type</th>
                   <th className="ff-table-th text-left py-3 px-4">Contractor</th>
                   <th className="ff-table-th text-left py-3 px-4">Status</th>
-                  <th className="ff-table-th text-left py-3 px-4 hidden md:table-cell">Value</th>
+                  <th className="ff-table-th text-left py-3 px-4 hidden md:table-cell">Effective</th>
                   <th className="ff-table-th text-left py-3 px-4 hidden lg:table-cell">Expiry</th>
                   <th className="ff-table-th text-right py-3 px-4">Actions</th>
                 </tr>
@@ -542,8 +621,7 @@ export function ProjectAgreementsTab({ projectId }: ProjectAgreementsTabProps) {
               <tbody>
                 {agreements.map((agreement) => {
                   const statusBadge = getStatusBadge(agreement.status);
-                  const isExpiringSoon = agreement.expiry_date &&
-                    new Date(agreement.expiry_date) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+                  const canSign = ['draft', 'pending_review', 'approved'].includes(agreement.status);
 
                   return (
                     <tr
@@ -552,11 +630,6 @@ export function ProjectAgreementsTab({ projectId }: ProjectAgreementsTabProps) {
                     >
                       <td className="py-3 px-4">
                         <span className="font-medium text-[var(--ff-text-primary)]">
-                          {agreement.reference_number}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="text-sm text-[var(--ff-text-secondary)]">
                           {getAgreementTypeLabel(agreement.agreement_type)}
                         </span>
                       </td>
@@ -571,30 +644,38 @@ export function ProjectAgreementsTab({ projectId }: ProjectAgreementsTabProps) {
                         </span>
                       </td>
                       <td className="py-3 px-4 hidden md:table-cell">
-                        <span className="text-sm text-[var(--ff-text-primary)]">
-                          {formatCurrency(agreement.total_value)}
+                        <span className="text-sm text-[var(--ff-text-secondary)]">
+                          {formatDate(agreement.effective_date)}
                         </span>
                       </td>
                       <td className="py-3 px-4 hidden lg:table-cell">
-                        <span className={`text-sm ${isExpiringSoon ? 'text-red-500 font-medium' : 'text-[var(--ff-text-secondary)]'}`}>
+                        <span className="text-sm text-[var(--ff-text-secondary)]">
                           {formatDate(agreement.expiry_date)}
-                          {isExpiringSoon && ' ⚠️'}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                            className="p-1.5 rounded hover:bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-primary)]"
-                            title="View"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            className="p-1.5 rounded hover:bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-primary)]"
-                            title="Download"
-                          >
-                            <Download className="w-4 h-4" />
-                          </button>
+                          {canSign && (
+                            <button
+                              onClick={() => setSigningId(agreement.id)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium bg-green-500/10 text-green-600 hover:bg-green-500/20 transition-colors"
+                              title="Mark as Signed"
+                            >
+                              <PenLine className="w-3.5 h-3.5" />
+                              Sign
+                            </button>
+                          )}
+                          {agreement.draft_document_url && (
+                            <a
+                              href={agreement.draft_document_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 rounded hover:bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-primary)]"
+                              title="View Document"
+                            >
+                              <Download className="w-4 h-4" />
+                            </a>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -606,14 +687,25 @@ export function ProjectAgreementsTab({ projectId }: ProjectAgreementsTabProps) {
         )}
       </div>
 
-      {/* Generate Agreement Modal */}
+      {/* New Agreement Modal */}
       {showNewModal && (
-        <GenerateAgreementModal
+        <NewAgreementModal
           projectId={projectId}
           onClose={() => setShowNewModal(false)}
           onSuccess={handleSuccess}
         />
       )}
+
+      {/* Confirm Sign Dialog */}
+      <ConfirmDialog
+        open={!!signingId}
+        onConfirm={handleMarkSigned}
+        onCancel={() => setSigningId(null)}
+        title="Mark Agreement as Signed"
+        message="This will mark the agreement as signed and satisfy the Contractor Signed activation requirement. This action cannot be undone."
+        confirmLabel={isMarking ? 'Marking...' : 'Confirm Signed'}
+        variant="info"
+      />
     </div>
   );
 }
