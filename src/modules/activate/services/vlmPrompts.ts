@@ -74,8 +74,8 @@ Look for THREE items:
 
 2. ONT SERIAL NUMBER - on a small white sticker attached to the front:
    FORMAT: ALCLB4 + 6 hex characters = exactly 12 characters total
-   - The 7th char is "8" (64%), "7" (26%), or "6" (10%) — read it carefully, do NOT assume "8"
-   - Top patterns: ALCLB48D (20%), ALCLB477 (15%), ALCLB48C (12%), ALCLB48A (9%), ALCLB48F (6%)
+   - The 7th char is "8" (68.3%), "7" (23.1%), or "6" (8.6%) — read it carefully, do NOT assume "8"
+   - Top patterns: ALCLB48D (20%), ALCLB477 (15%), ALCLB48C (12%), ALCLB48A (9%), ALCLB480 (7%), ALCLB48F (6%)
    - Only hex chars after ALCLB4: digits 0-9 and letters A-F
    - NEVER letters like M, N, P, R, S, Y, Z — those mean you misread
 
@@ -90,6 +90,17 @@ Look for THREE items:
    - Starts with ALCLB4? If "ALCL" + random chars, you read the wrong label
    - Only hex after ALCLB4? M/N/P/R/Y = misread
    - Looks like a phone number or DR number? WRONG field
+
+   ⚠️ MULTIPLE SERIAL LABELS WARNING:
+   The front of the ONT may have MULTIPLE stickers with serial numbers.
+   - READ ONLY the small white sticker ATTACHED to the ONT front panel (usually hand-applied)
+   - IGNORE any serial printed on the original packaging/box visible behind the ONT
+   - IGNORE any serial on the product's factory label (usually on the back or bottom)
+   - If you see multiple ALCLB4 serials, prefer the one on the SMALLEST, most recently applied sticker
+   - The front sticker serial should DIFFER from any serial visible on the back label
+
+   DO NOT return the same serial for every photo — each ONT has a UNIQUE serial.
+   If you cannot distinguish the front sticker serial from other labels, return found: false.
 
 3. DR NUMBER - handwritten/printed label: "DR" + 6-7 digits (e.g., DR1736721)
 

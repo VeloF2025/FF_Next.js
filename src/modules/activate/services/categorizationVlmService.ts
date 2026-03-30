@@ -67,9 +67,10 @@ function buildCategorizationPrompt(
 ): string {
   let prompt = `You are an expert fiber optic installation photo categorizer for ${drNumber}.
 
-Your task is to analyze ${photoCount} photos and categorize each one into one of these 10 installation steps:
+Your task is to analyze ${photoCount} photos and categorize each one into one of these 11 installation steps:
 
 STEP CATEGORIES:
+0. Unclassifiable/Discard - ONLY for: completely blank photos, accidental selfies, unrelated objects (food, pets, vehicles). NOT for blurry/dark installation photos.
 1. House Photo - Property exterior showing the BUILDING for location verification. Must show the structure itself, not just sky/poles.
 2. Cable from Pole - Fiber cable visibly spanning open air between a utility pole and the building fascia. Must show cable crossing sky. Pole J-hook, service drop wire, messenger wire are indicators. A pole alone without visible cable span = low confidence.
 3. Cable Entry Outside - EXTERIOR close-up of where cable ENTERS the building through wall/roof. Cable penetrating exterior wall, conduit, grommet. Drip loop before entry point is a strong indicator. Cable transitioning from OUTSIDE to INSIDE.
@@ -112,13 +113,14 @@ For EACH photo (numbered 1-${photoCount}), respond in this JSON format:
       "photo_index": 1,
       "identified_as": "Brief description of what this photo actually shows",
       "predicted_category": "Category name from list above",
-      "predicted_step": <number 1-10>,
+      "predicted_step": <number 0-10>,
       "confidence": <0.0-1.0>,
       "reasoning": "Visual elements that led to this classification"
     }
   ]
 }
 
+Step 0 = unclassifiable (completely blank, selfies, unrelated objects ONLY).
 CRITICAL: Do NOT trust any pre-existing labels or filenames. Categorize based ONLY on visual content.
 If a photo doesn't clearly match any category, set confidence below 0.5 and explain why.`;
 

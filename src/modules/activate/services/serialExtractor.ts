@@ -52,6 +52,13 @@ const PROMPT_EXAMPLE_SERIALS = new Set([
   'ALCL8408021',
   'ALCL84080311',
   'GU18W220901234',
+  // Ghost/sticky serials: appear repeatedly in Step 6/9 mismatches
+  'ALCLB48D2939', // ghost serial — 37% of Step 6 errors
+  'ALCLB48DF36C', // sticky serial — Step 9
+  'ALCLB48DE198', // sticky serial — Step 9
+  'ALCLB48E0939', // variant of ghost serial
+  'ALCLB48E2939', // variant of ghost serial
+  'ALCLB48D0A4F', // sticky serial — Step 9
 ]);
 
 /**
@@ -116,6 +123,7 @@ export function normalizeSerial(serial: string | null): string | null {
   let s = serial.trim().toUpperCase();
 
   s = s.replace(/[\s\-,]/g, '');
+  s = s.replace(/\./g, '');
 
   if (s.startsWith('ALCLB4') && s.length >= 7) {
     const prefix = s.substring(0, 6);
@@ -124,6 +132,10 @@ export function normalizeSerial(serial: string | null): string | null {
     suffix = suffix.replace(/[O]/g, '0');
     suffix = suffix.replace(/[S]/g, '5');
     suffix = suffix.replace(/[Z]/g, '2');
+    // Additional OCR corrections based on character confusion analysis
+    suffix = suffix.replace(/[L]/g, '1'); // L looks like 1 in small sticker text
+    suffix = suffix.replace(/[T]/g, '7'); // T misread as hex 7
+    suffix = suffix.replace(/[J]/g, '1'); // J looks like 1
     suffix = suffix.replace(/[^0-9A-F]/g, '');
     s = prefix + suffix;
   }
