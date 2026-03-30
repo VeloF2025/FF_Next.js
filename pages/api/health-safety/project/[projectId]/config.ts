@@ -159,6 +159,16 @@ async function handlePut(projectId: string, req: NextApiRequest, res: NextApiRes
     })}::jsonb)
   `;
 
+  // Auto-complete the hs_verified project requirement when H&S is configured
+  await sql`
+    UPDATE project_requirements
+    SET is_completed = true, completed_at = NOW(), completed_by = 'system'
+    WHERE project_id = ${projectId}
+    AND requirement_type = 'hs_verified'
+    AND stage = 'planning'
+    AND is_completed = false
+  `;
+
   return apiResponse.success(res, {
     ...config,
     project_name: project.project_name,

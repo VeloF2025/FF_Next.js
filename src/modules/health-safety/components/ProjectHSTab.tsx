@@ -235,27 +235,210 @@ export function ProjectHSTab({
 function NotConfiguredState({
   projectId,
   onConfigure,
+  onConfigured,
 }: {
   projectId: string;
   onConfigure?: () => void;
+  onConfigured?: () => void;
 }) {
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [auditFrequency, setAuditFrequency] = useState('weekly');
+  const [minScore, setMinScore] = useState('80');
+  const [dailyBriefing, setDailyBriefing] = useState(true);
+  const [heightWork, setHeightWork] = useState(false);
+  const [hotWork, setHotWork] = useState(false);
+  const [confinedSpace, setConfinedSpace] = useState(false);
+  const [excavation, setExcavation] = useState(false);
+  const [notes, setNotes] = useState('');
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/health-safety/project/${projectId}/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audit_frequency: auditFrequency,
+          min_score_threshold: parseInt(minScore) || 80,
+          requires_daily_briefing: dailyBriefing,
+          height_work_permitted: heightWork,
+          hot_work_permitted: hotWork,
+          confined_space_work: confinedSpace,
+          excavation_work: excavation,
+          notes: notes || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to save H&S configuration');
+      }
+
+      if (onConfigured) onConfigured();
+      // Reload the tab to show configured state
+      window.location.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!showForm) {
+    return (
+      <div className="bg-card rounded-lg border border-border p-8 text-center">
+        <Shield className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+        <h3 className="text-lg font-semibold text-foreground mb-2">
+          H&S Not Configured
+        </h3>
+        <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+          Configure Health & Safety settings for this project to enable audits, incident tracking, and
+          compliance monitoring.
+        </p>
+        <button
+          onClick={onConfigure || (() => setShowForm(true))}
+          className="inline-flex items-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors"
+        >
+          <Settings className="w-5 h-5" />
+          Configure H&S
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-card rounded-lg border border-border p-8 text-center">
-      <Shield className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-      <h3 className="text-lg font-semibold text-foreground mb-2">
-        H&S Not Configured
+    <div className="bg-card rounded-lg border border-border p-6">
+      <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+        <Shield className="w-5 h-5 text-orange-500" />
+        Configure Health & Safety
       </h3>
-      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-        Configure Health & Safety settings for this project to enable audits, incident tracking, and
-        compliance monitoring.
-      </p>
-      <button
-        onClick={onConfigure || (() => window.location.href = `/health-safety/project/${projectId}/configure`)}
-        className="inline-flex items-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors"
-      >
-        <Settings className="w-5 h-5" />
-        Configure H&S
-      </button>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-500 text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="space-y-4">
+        {/* Audit Frequency */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            Audit Frequency
+          </label>
+          <select
+            value={auditFrequency}
+            onChange={(e) => setAuditFrequency(e.target.value)}
+            className="ff-input w-full"
+          >
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="fortnightly">Fortnightly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </div>
+
+        {/* Min Score */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            Minimum Score Threshold (%)
+          </label>
+          <input
+            type="number"
+            value={minScore}
+            onChange={(e) => setMinScore(e.target.value)}
+            min="0"
+            max="100"
+            className="ff-input w-full"
+          />
+        </div>
+
+        {/* Daily Briefing */}
+        <div className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="dailyBriefing"
+            checked={dailyBriefing}
+            onChange={(e) => setDailyBriefing(e.target.checked)}
+            className="w-4 h-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+          />
+          <label htmlFor="dailyBriefing" className="text-sm text-foreground">
+            Require daily safety briefing
+          </label>
+        </div>
+
+        {/* Work Permits */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">
+            Work Permits Required
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { id: 'heightWork', label: 'Height Work', checked: heightWork, set: setHeightWork },
+              { id: 'hotWork', label: 'Hot Work', checked: hotWork, set: setHotWork },
+              { id: 'confinedSpace', label: 'Confined Space', checked: confinedSpace, set: setConfinedSpace },
+              { id: 'excavation', label: 'Excavation', checked: excavation, set: setExcavation },
+            ].map((permit) => (
+              <div key={permit.id} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id={permit.id}
+                  checked={permit.checked}
+                  onChange={(e) => permit.set(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                />
+                <label htmlFor={permit.id} className="text-sm text-foreground">
+                  {permit.label}
+                </label>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Notes */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            Notes (optional)
+          </label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            className="ff-input w-full"
+            placeholder="Additional H&S notes..."
+          />
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
+        <button
+          onClick={() => setShowForm(false)}
+          className="ff-button ff-button--secondary"
+          disabled={saving}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors disabled:opacity-50"
+        >
+          {saving ? (
+            <>
+              <Clock className="w-4 h-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <CheckCircle className="w-4 h-4" />
+              Save & Enable H&S
+            </>
+          )}
+        </button>
+      </div>
     </div>
   );
 }
