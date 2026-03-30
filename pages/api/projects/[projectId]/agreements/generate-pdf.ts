@@ -134,12 +134,12 @@ async function handler(
         const rows = await sql`
           SELECT
             id,
-            name,
+            company_name AS name,
             company_name,
-            address,
+            physical_address AS address,
             contact_person,
             registration_number
-          FROM suppliers
+          FROM contractors
           WHERE id = ${body.contractorId}
         `;
         return (rows[0] as Contractor) || null;

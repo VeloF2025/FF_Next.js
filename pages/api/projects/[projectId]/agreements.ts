@@ -49,7 +49,7 @@ async function handler(
               ca.id,
               ca.agreement_type,
               ca.contractor_id,
-              COALESCE(s.company_name, s.name, 'Unknown Contractor') as contractor_name,
+              COALESCE(c.company_name, 'Unknown Contractor') as contractor_name,
               ca.reference_number,
               ca.status,
               ca.effective_date,
@@ -58,7 +58,7 @@ async function handler(
               ca.signed_date,
               ca.created_at
             FROM contractor_agreements ca
-            LEFT JOIN suppliers s ON ca.contractor_id = s.id
+            LEFT JOIN contractors c ON ca.contractor_id = c.id
             WHERE ca.project_id = ${projectId}
             ORDER BY ca.created_at DESC
           `

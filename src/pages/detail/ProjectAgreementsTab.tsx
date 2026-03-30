@@ -23,10 +23,11 @@ interface Agreement {
   created_at: string;
 }
 
-interface Supplier {
+interface ContractorOption {
   id: string;
-  name: string;
-  company_name: string | null;
+  company_name: string;
+  contact_person: string | null;
+  status: string;
 }
 
 interface ProjectAgreementsTabProps {
@@ -42,13 +43,13 @@ async function fetchProjectAgreements(projectId: string): Promise<Agreement[]> {
   return data.data || [];
 }
 
-async function fetchSuppliers(): Promise<Supplier[]> {
-  const response = await fetch('/api/suppliers');
+async function fetchContractors(): Promise<ContractorOption[]> {
+  const response = await fetch('/api/contractors-list');
   if (!response.ok) {
-    throw new Error('Failed to fetch suppliers');
+    throw new Error('Failed to fetch contractors');
   }
   const data = await response.json();
-  return data.data || data || [];
+  return data.data || [];
 }
 
 function getStatusBadge(status: Agreement['status']) {
@@ -108,9 +109,9 @@ function GenerateAgreementModal({ projectId, onClose, onSuccess }: GenerateModal
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: suppliers, isLoading: loadingSuppliers } = useQuery({
-    queryKey: ['suppliers'],
-    queryFn: fetchSuppliers,
+  const { data: contractors, isLoading: loadingContractors } = useQuery({
+    queryKey: ['contractors-list'],
+    queryFn: fetchContractors,
   });
 
   // Set default expiry date (1 year from effective)
@@ -262,12 +263,12 @@ function GenerateAgreementModal({ projectId, onClose, onSuccess }: GenerateModal
               value={contractorId}
               onChange={(e) => setContractorId(e.target.value)}
               className="ff-input w-full"
-              disabled={loadingSuppliers}
+              disabled={loadingContractors}
             >
               <option value="">Select a contractor...</option>
-              {suppliers?.map((supplier) => (
-                <option key={supplier.id} value={supplier.id}>
-                  {supplier.company_name || supplier.name}
+              {contractors?.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.company_name}
                 </option>
               ))}
             </select>
