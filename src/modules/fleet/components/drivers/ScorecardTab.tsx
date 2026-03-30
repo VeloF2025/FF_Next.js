@@ -147,7 +147,7 @@ function DriverPicker({ drivers, onSelect }: { drivers: FleetDriver[]; onSelect:
             className="flex items-center gap-3 p-3 bg-[var(--ff-bg-tertiary)] rounded-lg hover:bg-[var(--ff-primary)]/10 transition-colors text-left"
           >
             {driver.photoUrl ? (
-              <img src={driver.photoUrl} alt={driver.name} className="w-10 h-10 rounded-full object-cover" />
+              <img src={driver.photoUrl} alt={driver.name} className="w-10 h-10 rounded-full object-cover" loading="lazy" />
             ) : (
               <div className="w-10 h-10 rounded-full bg-[var(--ff-primary)] flex items-center justify-center">
                 <User className="w-5 h-5 text-white" />

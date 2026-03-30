@@ -139,7 +139,7 @@ export function ScreenshotUploader({ onFieldsExtracted, disabled }: ScreenshotUp
               ) : p.type === 'video' ? (
                 <div className="w-full h-full rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] flex flex-col items-center justify-center gap-1 overflow-hidden">
                   {p.dataUrl ? (
-                    <img src={p.dataUrl} alt={p.name} className="w-full h-full object-cover" />
+                    <img src={p.dataUrl} alt={p.name} className="w-full h-full object-cover" loading="lazy" />
                   ) : (
                     <>
                       <FileVideo className="w-6 h-6 text-blue-400" />
