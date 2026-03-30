@@ -91,6 +91,10 @@ async function handler(
     }
     if (status === 'unticketed') {
       whereClause += ` AND pp.maintenance_ticket_id IS NULL AND pp.resolution_status != 'activated'`;
+    } else if (status === 'located') {
+      whereClause += ` AND pp.resolution_status LIKE 'located_%'`;
+    } else if (status === 'ticketed') {
+      whereClause += ` AND pp.maintenance_ticket_id IS NOT NULL`;
     } else if (status) {
       whereClause += ` AND pp.resolution_status = $${paramIndex++}`;
       params.push(status);
@@ -123,6 +127,16 @@ async function handler(
     if (aging) {
       // Aging filter: force high priority and filter by ticket age bucket
       whereClause += ` AND mt.priority = 'high'`;
+      if (aging === 'recent') {
+        whereClause += ` AND mt.created_at >= NOW() - INTERVAL '6 days'`;
+      } else if (aging === '7days') {
+        whereClause += ` AND mt.created_at >= NOW() - INTERVAL '13 days' AND mt.created_at < NOW() - INTERVAL '6 days'`;
+      } else if (aging === '14days') {
+        whereClause += ` AND mt.created_at < NOW() - INTERVAL '13 days'`;
+      }
+    }
+    if (aging) {
+      // Aging filter: filter by ticket age bucket only, priority is handled separately
       if (aging === 'recent') {
         whereClause += ` AND mt.created_at >= NOW() - INTERVAL '6 days'`;
       } else if (aging === '7days') {
@@ -204,6 +218,10 @@ async function handler(
     }
     if (status === 'unticketed') {
       whereClause += ` AND pp.maintenance_ticket_id IS NULL AND pp.resolution_status != 'activated'`;
+    } else if (status === 'located') {
+      whereClause += ` AND pp.resolution_status LIKE 'located_%'`;
+    } else if (status === 'ticketed') {
+      whereClause += ` AND pp.maintenance_ticket_id IS NOT NULL`;
     } else if (status) {
       whereClause += ` AND pp.resolution_status = $${paramIndex++}`;
       params.push(status);

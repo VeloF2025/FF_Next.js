@@ -1,0 +1,196 @@
+'use client';
+
+import React, { useState, useCallback, useEffect } from 'react';
+import { X, Loader2, Search, XCircle, Wrench } from 'lucide-react';
+import { log } from '@/lib/logger';
+import { CreatePPTicketsModal } from './CreatePPTicketsModal';
+import { type PPRecord, type PPCardCategory, isSelectable } from './ppDataShared';
+import { PPDataRow, PPDataTableHead } from './PPDataRow';
+import toast from 'react-hot-toast';
+
+const CATEGORY_CONFIG: Record<PPCardCategory, { title: string; statusFilter: string; color: string }> = {
+  total:     { title: 'Total Imported',  statusFilter: '',          color: 'text-[var(--ff-text-primary)]' },
+  activated: { title: 'Activated',       statusFilter: 'activated', color: 'text-green-500' },
+  located:   { title: 'Located',         statusFilter: 'located',   color: 'text-blue-500' },
+  not_found: { title: 'Not Found',       statusFilter: 'not_found', color: 'text-amber-500' },
+  ticketed:  { title: 'Ticketed',        statusFilter: 'ticketed',  color: 'text-orange-500' },
+};
+
+interface PPDataCardModalProps {
+  category: PPCardCategory;
+  count: number;
+  onClose: () => void;
+}
+
+export { type PPCardCategory } from './ppDataShared';
+
+export function PPDataCardModal({ category, count, onClose }: PPDataCardModalProps) {
+  const config = CATEGORY_CONFIG[category];
+  const [records, setRecords] = useState<PPRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(count);
+  const [searchText, setSearchText] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [showTicketModal, setShowTicketModal] = useState(false);
+  const [creatingTickets, setCreatingTickets] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => { setDebouncedSearch(searchText); setPage(1); }, 300);
+    return () => clearTimeout(timer);
+  }, [searchText]);
+
+  useEffect(() => { setSelectedIds([]); }, [page, debouncedSearch]);
+
+  const fetchRecords = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ action: 'list', page: String(page), limit: '50' });
+      if (config.statusFilter) params.set('status', config.statusFilter);
+      if (debouncedSearch) params.set('search', debouncedSearch);
+
+      const res = await fetch(`/api/activate/import-pp-data?${params}`);
+      const data = await res.json();
+      if (data.success) {
+        setRecords(data.data);
+        setTotalPages(data.pagination.totalPages);
+        setTotal(data.pagination.total);
+      }
+    } catch (err) {
+      log.error('Failed to fetch records', { err }, 'PPDataCardModal');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, config.statusFilter, debouncedSearch]);
+
+  useEffect(() => { fetchRecords(); }, [fetchRecords]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  const toggleSelect = useCallback((id: number) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  }, []);
+
+  const selectableOnPage = records.filter(isSelectable);
+  const allSelectableChecked = selectableOnPage.length > 0 && selectableOnPage.every(r => selectedIds.includes(r.id));
+
+  const toggleSelectAll = () => {
+    if (allSelectableChecked) {
+      setSelectedIds(prev => prev.filter(id => !selectableOnPage.some(r => r.id === id)));
+    } else {
+      setSelectedIds(prev => {
+        const newIds = new Set(prev);
+        selectableOnPage.forEach(r => newIds.add(r.id));
+        return Array.from(newIds);
+      });
+    }
+  };
+
+  const handleCreateTickets = async (params: { ticket_type: string; priority: string; notes: string; assigned_team_id?: string }) => {
+    setCreatingTickets(true);
+    try {
+      const res = await fetch('/api/activate/pp-data-tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pp_data_ids: selectedIds, ...params }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error?.message || result.error || 'Failed to create tickets');
+      const { created, skipped } = result.data;
+      toast.success(`Created ${created} ticket${created !== 1 ? 's' : ''}${skipped > 0 ? ` (${skipped} skipped)` : ''}`);
+      setShowTicketModal(false);
+      setSelectedIds([]);
+      fetchRecords();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create tickets');
+    } finally {
+      setCreatingTickets(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[var(--ff-bg-primary)] flex flex-col" role="dialog" aria-modal="true" aria-label={config.title}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
+        <div className="flex items-center gap-3">
+          <h2 className={`text-xl font-bold ${config.color}`}>{config.title}</h2>
+          <span className="text-sm text-[var(--ff-text-tertiary)]">{total} record{total !== 1 ? 's' : ''}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--ff-text-tertiary)]" />
+            <input
+              type="text" value={searchText} onChange={(e) => setSearchText(e.target.value)}
+              placeholder="Search serial, DR, ticket..."
+              className="pl-8 pr-3 py-1.5 rounded bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)]
+                         text-[var(--ff-text-primary)] text-sm w-56 placeholder:text-[var(--ff-text-tertiary)]"
+            />
+            {searchText && (
+              <button onClick={() => setSearchText('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]">
+                <XCircle className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-[var(--ff-bg-primary)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Bulk Actions Bar */}
+      {selectedIds.length > 0 && (
+        <div className="bg-blue-900/30 border-b border-blue-700 px-6 py-3 flex items-center justify-between">
+          <span className="text-sm text-blue-300"><strong>{selectedIds.length}</strong> record{selectedIds.length !== 1 ? 's' : ''} selected</span>
+          <div className="flex gap-3">
+            <button onClick={() => setSelectedIds([])} className="px-3 py-1.5 text-sm rounded border border-blue-700 text-blue-300 hover:text-blue-100">Clear</button>
+            <button onClick={() => setShowTicketModal(true)} className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1.5">
+              <Wrench className="w-3.5 h-3.5" /> Create NOC Tickets
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="flex-1 overflow-auto">
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-text-tertiary)]" />
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <PPDataTableHead showSelectAll={selectableOnPage.length > 0} allChecked={allSelectableChecked} onToggleAll={toggleSelectAll} />
+            <tbody className="divide-y divide-[var(--ff-border-light)]">
+              {records.map((record) => (
+                <PPDataRow key={record.id} record={record} isSelected={selectedIds.includes(record.id)} onToggleSelect={toggleSelect} />
+              ))}
+              {records.length === 0 && (
+                <tr><td colSpan={12} className="px-3 py-8 text-center text-[var(--ff-text-tertiary)]">No records found</td></tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center px-6 py-3 border-t border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+            className="px-3 py-1 text-sm rounded border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] disabled:opacity-50">Previous</button>
+          <span className="text-sm text-[var(--ff-text-secondary)]">Page {page} of {totalPages}</span>
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+            className="px-3 py-1 text-sm rounded border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] disabled:opacity-50">Next</button>
+        </div>
+      )}
+
+      {showTicketModal && (
+        <CreatePPTicketsModal selectedCount={selectedIds.length} onConfirm={handleCreateTickets} onClose={() => setShowTicketModal(false)} loading={creatingTickets} />
+      )}
+    </div>
+  );
+}
