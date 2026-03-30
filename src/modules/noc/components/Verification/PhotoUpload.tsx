@@ -15,7 +15,7 @@
 'use client';
 
 import React, { useCallback, useState, useRef } from 'react';
-import { Upload, X, Image as ImageIcon, CheckCircle, AlertCircle, Maximize2 } from 'lucide-react';
+import { Upload, Camera, X, Image as ImageIcon, CheckCircle, AlertCircle, Maximize2 } from 'lucide-react';
 import { VelocityButton } from '@/components/ui/VelocityButton';
 import { cn } from '@/lib/utils';
 
@@ -60,6 +60,7 @@ export function PhotoUpload({
   const [error, setError] = useState<string | null>(null);
   const [showLightbox, setShowLightbox] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // 🟢 WORKING: Validate file before upload
   const validateFile = useCallback(
@@ -184,6 +185,13 @@ export function PhotoUpload({
     }
   }, [disabled, isUploading]);
 
+  const handleCameraClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!disabled && !isUploading) {
+      cameraInputRef.current?.click();
+    }
+  }, [disabled, isUploading]);
+
   // 🟢 WORKING: Handle clipboard paste (Ctrl+V / Cmd+V)
   const handlePaste = useCallback(
     (event: React.ClipboardEvent) => {
@@ -283,7 +291,7 @@ export function PhotoUpload({
   // 🟢 WORKING: Render upload area
   return (
     <div className="w-full">
-      {/* Hidden file input */}
+      {/* Hidden file input - gallery/file picker */}
       <input
         ref={fileInputRef}
         type="file"
@@ -292,6 +300,17 @@ export function PhotoUpload({
         disabled={disabled || isUploading}
         className="hidden"
         aria-label="Upload photo"
+      />
+      {/* Hidden camera input - opens rear camera on mobile */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileInputChange}
+        disabled={disabled || isUploading}
+        className="hidden"
+        aria-label="Take photo"
       />
 
       {/* Upload area */}
@@ -332,17 +351,28 @@ export function PhotoUpload({
                 <span className="text-xs text-[var(--ff-text-primary)]">Upload Photo</span>
               </>
             ) : (
-              <div className="flex flex-col items-center space-y-1">
-                <VelocityButton
-                  variant="glass"
-                  size="sm"
-                  disabled={disabled}
-                  className="pointer-events-none"
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Upload Photo
-                </VelocityButton>
-                <span className="text-xs text-[var(--ff-text-secondary)]">Drop, paste, or click to upload</span>
+              <div className="flex flex-col items-center space-y-2">
+                <div className="flex items-center gap-2">
+                  <VelocityButton
+                    variant="glass"
+                    size="sm"
+                    disabled={disabled}
+                    className="pointer-events-none"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Photo
+                  </VelocityButton>
+                  <VelocityButton
+                    variant="glass"
+                    size="sm"
+                    disabled={disabled}
+                    onClick={handleCameraClick}
+                  >
+                    <Camera className="w-4 h-4 mr-2" />
+                    Take Photo
+                  </VelocityButton>
+                </div>
+                <span className="text-xs text-[var(--ff-text-secondary)]">Drop, paste, click to upload, or take a photo</span>
               </div>
             )}
           </div>
