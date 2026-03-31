@@ -5,23 +5,28 @@ import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import { type PPCardCategory, type PPStats, type LookupStatus } from './ppDataShared';
 
-export function SummaryCards({ stats, onCardClick }: { stats: PPStats; onCardClick: (cat: PPCardCategory, count: number) => void }) {
-  const cards: { cat: PPCardCategory; value: number; label: string; color: string; hover: string }[] = [
-    { cat: 'total', value: stats.total, label: 'Total Imported', color: 'text-[var(--ff-text-primary)]', hover: 'hover:border-[var(--ff-text-tertiary)] hover:bg-[var(--ff-bg-secondary)]' },
-    { cat: 'activated', value: stats.activated, label: 'Activated', color: 'text-green-500', hover: 'hover:border-green-700 hover:bg-green-900/10' },
-    { cat: 'located', value: stats.located, label: 'Located', color: 'text-blue-500', hover: 'hover:border-blue-700 hover:bg-blue-900/10' },
-    { cat: 'not_found', value: stats.notFound, label: 'Not Found', color: 'text-amber-500', hover: 'hover:border-amber-700 hover:bg-amber-900/10' },
-    { cat: 'ticketed', value: stats.ticketed, label: 'Ticketed', color: 'text-orange-500', hover: 'hover:border-orange-700 hover:bg-orange-900/10' },
+export function SummaryCards({ stats, activeCard, onCardClick }: { stats: PPStats; activeCard: PPCardCategory | null; onCardClick: (cat: PPCardCategory) => void }) {
+  const cards: { cat: PPCardCategory; value: number; label: string; color: string; hover: string; activeBorder: string }[] = [
+    { cat: 'total', value: stats.total, label: 'Total Imported', color: 'text-[var(--ff-text-primary)]', hover: 'hover:border-[var(--ff-text-tertiary)] hover:bg-[var(--ff-bg-secondary)]', activeBorder: 'border-[var(--ff-text-tertiary)] bg-[var(--ff-bg-secondary)]' },
+    { cat: 'activated', value: stats.activated, label: 'Activated', color: 'text-green-500', hover: 'hover:border-green-700 hover:bg-green-900/10', activeBorder: 'border-green-500 bg-green-900/20' },
+    { cat: 'located', value: stats.located, label: 'Located', color: 'text-blue-500', hover: 'hover:border-blue-700 hover:bg-blue-900/10', activeBorder: 'border-blue-500 bg-blue-900/20' },
+    { cat: 'not_found', value: stats.notFound, label: 'Not Found', color: 'text-amber-500', hover: 'hover:border-amber-700 hover:bg-amber-900/10', activeBorder: 'border-amber-500 bg-amber-900/20' },
+    { cat: 'ticketed', value: stats.ticketed, label: 'Ticketed', color: 'text-orange-500', hover: 'hover:border-orange-700 hover:bg-orange-900/10', activeBorder: 'border-orange-500 bg-orange-900/20' },
   ];
   return (
     <div className="grid grid-cols-2 sm:grid-cols-6 gap-4">
-      {cards.map(c => (
-        <button key={c.cat} onClick={() => onCardClick(c.cat, c.value)}
-          className={`bg-[var(--ff-bg-primary)] rounded-lg p-4 border border-[var(--ff-border-light)] text-left ${c.hover} transition-colors cursor-pointer`}>
-          <p className={`text-2xl font-bold ${c.color}`}>{c.value}</p>
-          <p className="text-sm text-[var(--ff-text-secondary)]">{c.label}</p>
-        </button>
-      ))}
+      {cards.map(c => {
+        const isActive = activeCard === c.cat;
+        return (
+          <button key={c.cat} onClick={() => onCardClick(c.cat)}
+            className={`rounded-lg p-4 border-2 text-left transition-colors cursor-pointer ${
+              isActive ? c.activeBorder : `bg-[var(--ff-bg-primary)] border-[var(--ff-border-light)] ${c.hover}`
+            }`}>
+            <p className={`text-2xl font-bold ${c.color}`}>{c.value}</p>
+            <p className="text-sm text-[var(--ff-text-secondary)]">{c.label}</p>
+          </button>
+        );
+      })}
       <div className="bg-[var(--ff-bg-primary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
         <p className="text-sm text-[var(--ff-text-secondary)]">Last Import</p>
         <p className="text-sm font-medium text-[var(--ff-text-primary)] truncate">

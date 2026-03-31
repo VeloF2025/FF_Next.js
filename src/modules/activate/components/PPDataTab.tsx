@@ -6,10 +6,9 @@ import { log } from '@/lib/logger';
 import toast from 'react-hot-toast';
 import { SummaryCards, LookupProgressBanner, LookupCompleteBanner } from './PPSummaryCards';
 import { CreatePPTicketsModal } from './CreatePPTicketsModal';
-import { PPDataCardModal, type PPCardCategory } from './PPDataCardModal';
 import { PPDataFilters } from './PPDataFilters';
 import { PPDataRow, PPDataTableHead } from './PPDataRow';
-import { type PPRecord, type PPStats, type LookupStatus, isSelectable } from './ppDataShared';
+import { type PPRecord, type PPCardCategory, type PPStats, type LookupStatus, isSelectable } from './ppDataShared';
 
 export function PPDataTab() {
   const [isResolving, setIsResolving] = useState(false);
@@ -31,7 +30,7 @@ export function PPDataTab() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [creatingTickets, setCreatingTickets] = useState(false);
-  const [cardModal, setCardModal] = useState<{ category: PPCardCategory; count: number } | null>(null);
+  const [activeCard, setActiveCard] = useState<PPCardCategory | null>(null);
   const [selectingAllUnticketed, setSelectingAllUnticketed] = useState(false);
 
   useEffect(() => {
@@ -182,7 +181,14 @@ export function PPDataTab() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   }, []);
 
-  const handleFilterChange = (setter: (v: string) => void) => (val: string) => { setter(val); setPage(1); };
+  const handleFilterChange = (setter: (v: string) => void) => (val: string) => {
+    setter(val);
+    setPage(1);
+    if (setter === setFilterStatus) {
+      const reverseMap: Record<string, PPCardCategory> = { activated: 'activated', located: 'located', not_found: 'not_found', ticketed: 'ticketed' };
+      setActiveCard(val === '' ? null : reverseMap[val] || null);
+    }
+  };
   const handleExport = () => {
     const params = new URLSearchParams({ action: 'export' });
     if (filterProject) params.set('project', filterProject);
@@ -203,7 +209,19 @@ export function PPDataTab() {
         </p>
       </div>
 
-      {stats && <SummaryCards stats={stats} onCardClick={(cat, count) => setCardModal({ category: cat, count })} />}
+      {stats && <SummaryCards stats={stats} activeCard={activeCard} onCardClick={(cat) => {
+        if (activeCard === cat) {
+          setActiveCard(null);
+          setFilterStatus('');
+        } else {
+          setActiveCard(cat);
+          const statusMap: Record<PPCardCategory, string> = {
+            total: '', activated: 'activated', located: 'located', not_found: 'not_found', ticketed: 'ticketed',
+          };
+          setFilterStatus(statusMap[cat]);
+        }
+        setPage(1);
+      }} />}
 
       {stats?.total === 0 && (
         <div className="text-center py-12 text-[var(--ff-text-tertiary)]">
@@ -294,7 +312,6 @@ export function PPDataTab() {
       )}
 
       {showTicketModal && <CreatePPTicketsModal selectedCount={selectedIds.length} onConfirm={handleCreateTickets} onClose={() => setShowTicketModal(false)} loading={creatingTickets} />}
-      {cardModal && <PPDataCardModal category={cardModal.category} count={cardModal.count} onClose={() => setCardModal(null)} />}
     </div>
   );
 }
