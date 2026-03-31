@@ -21,20 +21,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    // Fetch NOC stats
-    const nocStats = await getNocStats();
-
-    // Fetch activate stats
-    const activateStats = await getActivateStats();
-
-    // Fetch OLT stats
-    const oltStats = await getOltStats();
-
-    // Fetch QField stats
-    const qfieldStats = await getQFieldStats();
-
-    // Fetch Billing stats
-    const billingStats = await getBillingStats();
+    // Fetch all stat groups in parallel
+    const [nocStats, activateStats, oltStats, qfieldStats, billingStats] = await Promise.all([
+      getNocStats(),
+      getActivateStats(),
+      getOltStats(),
+      getQFieldStats(),
+      getBillingStats(),
+    ]);
 
     const stats: DataSyncStats = {
       noc: nocStats,
@@ -53,48 +47,37 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
 async function getNocStats() {
   try {
-    // Get last QContact sync time
-    const lastSyncResult = await sql`
-      SELECT MAX(synced_at) as last_sync
-      FROM qcontact_sync_log
-      WHERE status = 'SUCCESS'
-    `;
-    const lastQContactSync = lastSyncResult[0]?.last_sync || null;
+    // Run all NOC queries in parallel; qcontact_sync_log may not exist
+    const [pendingResult, importsResult, qcontactResult] = await Promise.all([
+      sql`
+        SELECT COUNT(*) as count
+        FROM maintenance_tickets
+        WHERE status NOT IN ('closed', 'resolved')
+        AND (qcontact_synced_at IS NULL OR qcontact_synced_at < updated_at)
+      `,
+      sql`
+        SELECT COUNT(*) as count
+        FROM weekly_maintenance_reports
+        WHERE created_at >= date_trunc('month', CURRENT_DATE)
+      `,
+      sql`
+        SELECT
+          MAX(synced_at) FILTER (WHERE status = 'SUCCESS') as last_sync,
+          COUNT(*) FILTER (WHERE status = 'SUCCESS' AND synced_at >= NOW() - INTERVAL '24 hours') as success_24h,
+          COUNT(*) FILTER (WHERE synced_at >= NOW() - INTERVAL '24 hours') as total_24h
+        FROM qcontact_sync_log
+      `.catch(() => [{ last_sync: null, success_24h: '0', total_24h: '0' }]),
+    ]);
 
-    // Get pending tickets count (tickets needing sync)
-    const pendingResult = await sql`
-      SELECT COUNT(*) as count
-      FROM maintenance_tickets
-      WHERE status NOT IN ('closed', 'resolved')
-      AND (qcontact_synced_at IS NULL OR qcontact_synced_at < updated_at)
-    `;
-    const pendingTickets = parseInt(pendingResult[0]?.count || '0', 10);
-
-    // Get weekly imports this month
-    const importsResult = await sql`
-      SELECT COUNT(*) as count
-      FROM weekly_maintenance_reports
-      WHERE created_at >= date_trunc('month', CURRENT_DATE)
-    `;
-    const weeklyImportsThisMonth = parseInt(importsResult[0]?.count || '0', 10);
-
-    // Check sync health (>80% success rate in last 24h)
-    const healthResult = await sql`
-      SELECT
-        COUNT(*) FILTER (WHERE status = 'SUCCESS') as success_count,
-        COUNT(*) as total_count
-      FROM qcontact_sync_log
-      WHERE synced_at >= NOW() - INTERVAL '24 hours'
-    `;
-    const successCount = parseInt(healthResult[0]?.success_count || '0', 10);
-    const totalCount = parseInt(healthResult[0]?.total_count || '1', 10);
-    const syncHealthy = totalCount === 0 || (successCount / totalCount) >= 0.8;
+    const qc = qcontactResult[0] || {};
+    const total24h = parseInt(qc.total_24h || '0', 10);
+    const success24h = parseInt(qc.success_24h || '0', 10);
 
     return {
-      lastQContactSync,
-      pendingTickets,
-      weeklyImportsThisMonth,
-      syncHealthy,
+      lastQContactSync: qc.last_sync || null,
+      pendingTickets: parseInt(pendingResult[0]?.count || '0', 10),
+      weeklyImportsThisMonth: parseInt(importsResult[0]?.count || '0', 10),
+      syncHealthy: total24h === 0 || (success24h / total24h) >= 0.8,
     };
   } catch (error) {
     log.warn('Error fetching NOC stats, returning defaults', { error });
@@ -218,23 +201,25 @@ async function getQFieldStats() {
  */
 async function getBillingStats() {
   try {
-    const result = await sql`
-      SELECT
-        COUNT(*)::int                                                     AS total_weeks,
-        MAX(week_ending)::text                                            AS last_week,
-        COUNT(*) FILTER (WHERE reconciliation_status = 'pending')::int   AS pending_count
-      FROM ft_weekly_billing
-    `;
-    const paidResult = await sql`
-      SELECT COUNT(*)::int AS paid_count
-      FROM oes_activations
-      WHERE payment_status = 'paid'
-    `;
-    const deductedResult = await sql`
-      SELECT COUNT(*)::int AS deducted_count
-      FROM oes_activations
-      WHERE payment_status = 'deducted'
-    `;
+    const [result, paidResult, deductedResult] = await Promise.all([
+      sql`
+        SELECT
+          COUNT(*)::int                                                     AS total_weeks,
+          MAX(week_ending)::text                                            AS last_week,
+          COUNT(*) FILTER (WHERE reconciliation_status = 'pending')::int   AS pending_count
+        FROM ft_weekly_billing
+      `,
+      sql`
+        SELECT COUNT(*)::int AS paid_count
+        FROM oes_activations
+        WHERE payment_status = 'paid'
+      `,
+      sql`
+        SELECT COUNT(*)::int AS deducted_count
+        FROM oes_activations
+        WHERE payment_status = 'deducted'
+      `,
+    ]);
     return {
       totalWeeks: result[0]?.total_weeks ?? 0,
       lastUploadedWeek: result[0]?.last_week ?? null,
