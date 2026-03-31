@@ -30,7 +30,7 @@ import type {
 import { useProcurementPortalOptional } from '../context/ProcurementPortalProvider';
 
 // Define category structure
-type CategoryId = 'dashboard' | 'sourcing' | 'purchasing' | 'inventory' | 'field-stock' | 'approvals' | 'reports';
+type CategoryId = 'dashboard' | 'sourcing' | 'purchasing' | 'inventory' | 'field-stock' | 'approvals' | 'stock-view' | 'reports';
 
 interface SubTab {
   id: ProcurementTabId;
@@ -54,7 +54,9 @@ const tabToCategoryMap: Record<ProcurementTabId, CategoryId> = {
   'open-orders': 'purchasing',
   'suppliers': 'sourcing',
   'boq': 'sourcing',
-  'boq-view': 'sourcing',
+  'stock-view': 'stock-view',
+  'stock-view-boq': 'stock-view',
+  'stock-view-soh': 'stock-view',
   'rfq': 'sourcing',
   'requisitions': 'purchasing',
   'quotes': 'purchasing',
@@ -117,7 +119,7 @@ export function ProcurementTabs({
       subTabs: [
         { id: 'suppliers', label: 'Suppliers', icon: Truck, permission: 'canViewSuppliers', path: '/procurement/sourcing?tab=suppliers' },
         { id: 'boq', label: 'BOQ', icon: FileText, permission: 'canViewBOQ', path: '/procurement/sourcing?tab=boq' },
-        { id: 'boq-view', label: 'BOQ View', icon: TableProperties, permission: 'canViewBOQ', path: '/procurement?tab=boq-view' },
+
         { id: 'rfq', label: 'RFQ', icon: Send, permission: 'canViewRFQ', path: '/procurement/sourcing?tab=rfq' },
       ]
     },
@@ -156,6 +158,15 @@ export function ProcurementTabs({
       icon: CheckCircle,
       subTabs: [
         { id: 'approvals', label: 'Approvals', icon: CheckCircle, path: '/procurement/approvals' }
+      ]
+    },
+    {
+      id: 'stock-view',
+      label: 'Stock View',
+      icon: TableProperties,
+      subTabs: [
+        { id: 'stock-view-boq', label: 'BOQ View', icon: TableProperties, permission: 'canViewBOQ', path: '/procurement?tab=stock-view&sub=boq' },
+        { id: 'stock-view-soh', label: 'SOH', icon: Package, permission: 'canViewBOQ', path: '/procurement?tab=stock-view&sub=soh' },
       ]
     },
     {

@@ -28,7 +28,7 @@ export const TABS: Tab[] = [
         section: 'Bill of Quantities',
         items: [
           { label: 'BOQ List', href: '/procurement/boq' },
-          { label: 'BOQ Stock View', href: '/procurement?tab=boq-view' },
+          { label: 'BOQ Stock View', href: '/procurement?tab=stock-view&sub=boq' },
         ],
       },
       {
@@ -93,7 +93,7 @@ export const TABS: Tab[] = [
     ],
   },
   { id: 'approvals', label: 'Approvals', href: '/procurement/approvals' },
-  { id: 'boq-view', label: 'BOQ View', href: '/procurement?tab=boq-view' },
+  { id: 'stock-view', label: 'Stock View', href: '/procurement?tab=stock-view&sub=boq' },
   {
     id: 'reports', label: 'Reports',
     items: [
@@ -116,8 +116,8 @@ export function getActiveTabId(
   pathname: string,
   query: Record<string, string | string[] | undefined>,
 ): string {
-  // BOQ View lives at /procurement?tab=boq-view
-  if (pathname === '/procurement' && query.tab === 'boq-view') return 'boq-view';
+  // Stock View lives at /procurement?tab=stock-view
+  if (pathname === '/procurement' && query.tab === 'stock-view') return 'stock-view';
 
   // Dashboard — exact match on /procurement with no special query
   if (pathname === '/procurement') return 'dashboard';

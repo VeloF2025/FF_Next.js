@@ -61,7 +61,9 @@ export default function ProcurementPage({
     'open-orders': {},
     requisitions: {},
     boq: {},
-    'boq-view': {},
+    'stock-view': {},
+    'stock-view-boq': {},
+    'stock-view-soh': {},
     rfq: {},
     quotes: {},
     'purchase-orders': {},
@@ -88,15 +90,19 @@ export default function ProcurementPage({
     setIsMounted(true);
   }, []);
 
-  // Sync activeTab when URL query changes (e.g. nav links to /procurement?tab=boq-view)
+  // Sync activeTab when URL query changes
   useEffect(() => {
     if (!isMounted) return;
-    const tabFromQuery = router.query.tab as ProcurementTabId | undefined;
-    if (tabFromQuery && tabFromQuery !== activeTab) {
-      setActiveTab(tabFromQuery);
+    const tabFromQuery = router.query.tab as string | undefined;
+    const subFromQuery = router.query.sub as string | undefined;
+    if (tabFromQuery === 'stock-view') {
+      const subTab: ProcurementTabId = subFromQuery === 'soh' ? 'stock-view-soh' : 'stock-view-boq';
+      if (subTab !== activeTab) setActiveTab(subTab);
+    } else if (tabFromQuery && tabFromQuery !== activeTab) {
+      setActiveTab(tabFromQuery as ProcurementTabId);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.query.tab, isMounted]);
+  }, [router.query.tab, router.query.sub, isMounted]);
 
   /**
    * Load aggregate metrics for "All Projects" view
@@ -301,7 +307,9 @@ export default function ProcurementPage({
               {activeTab === 'overview' && <DashboardTabContent project={selectedProject} aggregateMetrics={aggregateMetrics} isLoading={isLoading} />}
               {activeTab === 'requisitions' && <RequisitionsTabContent />}
               {activeTab === 'boq' && <BOQStockView selectedProject={selectedProject} />}
-              {activeTab === 'boq-view' && <BOQStockView selectedProject={selectedProject} />}
+              {activeTab === 'stock-view-boq' && <BOQStockView selectedProject={selectedProject} />}
+              {activeTab === 'stock-view-soh' && <SOHPlaceholder />}
+              {activeTab === 'stock-view' && <BOQStockView selectedProject={selectedProject} />}
               {activeTab === 'rfq' && <PlaceholderTab title="Request for Quotations" icon={Send} description="Create and manage RFQs" />}
               {activeTab === 'quotes' && <PlaceholderTab title="Quote Evaluation" icon={Quote} description="Evaluate and compare supplier quotes" />}
               {activeTab === 'purchase-orders' && <PurchaseOrdersTabContent />}
@@ -490,6 +498,28 @@ function GoodsReceiptTabContent() {
       <p className="text-[var(--ff-text-secondary)]">
         Receive and inspect deliveries. Click &quot;View All&quot; to access the full Goods Receipt Notes page.
       </p>
+    </div>
+  );
+}
+
+function SOHPlaceholder() {
+  return (
+    <div className="flex flex-col h-full">
+      {/* Filter bar shell — same layout as BOQ View */}
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-48 rounded border border-border bg-muted/30 animate-none" />
+          <div className="h-8 w-32 rounded border border-border bg-muted/30 animate-none" />
+          <div className="h-8 w-32 rounded border border-border bg-muted/30 animate-none" />
+        </div>
+        <span className="text-xs text-muted-foreground">0 items</span>
+      </div>
+      {/* Empty state */}
+      <div className="flex flex-col items-center justify-center flex-1 py-24 text-muted-foreground gap-3">
+        <Package className="h-10 w-10 opacity-30" />
+        <p className="text-sm font-medium">SOH — Coming Soon</p>
+        <p className="text-xs opacity-60">Stock on Hand view is being scoped. Check back soon.</p>
+      </div>
     </div>
   );
 }
