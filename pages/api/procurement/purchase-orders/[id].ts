@@ -85,21 +85,23 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
 
     const po = poResult[0]!;
 
-    // Fetch line items
+    // Fetch line items — LEFT JOIN boq_items to surface the project BOQ unit rate
     const itemsResult = await sql`
       SELECT
-        id,
-        item_code,
-        item_description,
-        quantity_ordered,
-        quantity_received,
-        uom,
-        unit_price,
-        total_price,
-        notes
-      FROM purchase_order_items
-      WHERE purchase_order_id = ${id}
-      ORDER BY created_at
+        poi.id,
+        poi.item_code,
+        poi.item_description,
+        poi.quantity_ordered,
+        poi.quantity_received,
+        poi.uom,
+        poi.unit_price,
+        poi.total_price,
+        poi.notes,
+        bi.unit_price AS boq_unit_rate
+      FROM purchase_order_items poi
+      LEFT JOIN boq_items bi ON bi.id = poi.boq_item_id
+      WHERE poi.purchase_order_id = ${id}
+      ORDER BY poi.created_at
     `;
 
     // Map items with calculated pending quantity
@@ -118,6 +120,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         unitPrice: parseFloat(item.unit_price) || 0,
         lineTotal: parseFloat(item.total_price) || 0,
         notes: item.notes,
+        boqUnitRate: item.boq_unit_rate != null ? parseFloat(item.boq_unit_rate) : null,
       };
     });
 
