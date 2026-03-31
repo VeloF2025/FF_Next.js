@@ -97,7 +97,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         poi.unit_price,
         poi.total_price,
         poi.notes,
-        bi.unit_price AS boq_unit_rate
+        bi.unit_price AS boq_unit_rate,
+        bi.quantity AS boq_quantity
       FROM purchase_order_items poi
       LEFT JOIN boq_items bi ON bi.id = poi.boq_item_id
       WHERE poi.purchase_order_id = ${id}
@@ -121,6 +122,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         lineTotal: parseFloat(item.total_price) || 0,
         notes: item.notes,
         boqUnitRate: item.boq_unit_rate != null ? parseFloat(item.boq_unit_rate) : null,
+        boqQuantity: item.boq_quantity != null ? parseFloat(item.boq_quantity) : null,
       };
     });
 
