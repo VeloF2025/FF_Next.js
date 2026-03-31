@@ -26,6 +26,7 @@ import {
   PackageCheck,
   Workflow,
   TableProperties,
+  GitBranch,
 } from 'lucide-react';
 import type {
   ProcurementTabId,
@@ -37,6 +38,7 @@ import { ProcurementOverview } from '@/modules/procurement/components/Procuremen
 import { BOQSpendSummary } from '@/modules/procurement/reports/BOQSpendSummary';
 import { BOQStockView } from '@/components/procurement/boq/BOQStockView';
 import { SOHAuditView } from '@/components/procurement/soh/SOHAuditView';
+const SOHSpiderView = dynamic(() => import('@/components/procurement/soh/SOHSpiderView').then(m => m.SOHSpiderView), { ssr: false });
 
 interface ProcurementPageProps {
   initialProject?: Project;
@@ -66,6 +68,7 @@ export default function ProcurementPage({
     'stock-view': {},
     'stock-view-boq': {},
     'stock-view-soh': {},
+    'stock-view-spider': {},
     rfq: {},
     quotes: {},
     'purchase-orders': {},
@@ -98,7 +101,7 @@ export default function ProcurementPage({
     const tabFromQuery = router.query.tab as string | undefined;
     const subFromQuery = router.query.sub as string | undefined;
     if (tabFromQuery === 'stock-view') {
-      const subTab: ProcurementTabId = subFromQuery === 'soh' ? 'stock-view-soh' : 'stock-view-boq';
+      const subTab: ProcurementTabId = subFromQuery === 'soh' ? 'stock-view-soh' : subFromQuery === 'spider' ? 'stock-view-spider' : 'stock-view-boq';
       if (subTab !== activeTab) setActiveTab(subTab);
     } else if (tabFromQuery && tabFromQuery !== activeTab) {
       setActiveTab(tabFromQuery as ProcurementTabId);
@@ -309,7 +312,7 @@ export default function ProcurementPage({
               {activeTab === 'overview' && <DashboardTabContent project={selectedProject} aggregateMetrics={aggregateMetrics} isLoading={isLoading} />}
               {activeTab === 'requisitions' && <RequisitionsTabContent />}
               {activeTab === 'boq' && <BOQStockView selectedProject={selectedProject} />}
-              {(activeTab === 'stock-view-boq' || activeTab === 'stock-view-soh' || activeTab === 'stock-view') && (
+              {(activeTab === 'stock-view-boq' || activeTab === 'stock-view-soh' || activeTab === 'stock-view-spider' || activeTab === 'stock-view') && (
                 <div>
                   {/* Stock View sub-tabs */}
                   <nav className="flex space-x-1 mb-4 bg-[var(--ff-bg-secondary)]/50 px-2 py-1 rounded-lg border border-[var(--ff-border-light)]">
@@ -335,9 +338,21 @@ export default function ProcurementPage({
                       <Package className="h-4 w-4 flex-shrink-0" />
                       <span>SOH</span>
                     </button>
+                    <button
+                      onClick={() => { void router.push('/procurement?tab=stock-view&sub=spider'); }}
+                      className={`relative py-2 px-4 rounded-md font-medium text-sm whitespace-nowrap flex items-center gap-2 transition-all duration-200 ${
+                        activeTab === 'stock-view-spider'
+                          ? 'bg-[var(--ff-primary-500)]/20 text-[var(--ff-primary-400)] ring-1 ring-[var(--ff-primary-500)]/30'
+                          : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)]'
+                      }`}
+                    >
+                      <GitBranch className="h-4 w-4 flex-shrink-0" />
+                      <span>Spiderweb</span>
+                    </button>
                   </nav>
                   {(activeTab === 'stock-view-boq' || activeTab === 'stock-view') && <BOQStockView selectedProject={selectedProject} />}
                   {activeTab === 'stock-view-soh' && <SOHAuditView selectedProject={selectedProject} />}
+                  {activeTab === 'stock-view-spider' && <SOHSpiderView />}
                 </div>
               )}
               {activeTab === 'rfq' && <PlaceholderTab title="Request for Quotations" icon={Send} description="Create and manage RFQs" />}

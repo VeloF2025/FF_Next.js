@@ -11,6 +11,7 @@ export type ProcurementTabId =
   | 'stock-view'
   | 'stock-view-boq'
   | 'stock-view-soh'
+  | 'stock-view-spider'
   | 'rfq'
   | 'quotes'
   | 'purchase-orders'

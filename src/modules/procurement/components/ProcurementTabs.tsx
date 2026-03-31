@@ -57,6 +57,7 @@ const tabToCategoryMap: Record<ProcurementTabId, CategoryId> = {
   'stock-view': 'stock-view',
   'stock-view-boq': 'stock-view',
   'stock-view-soh': 'stock-view',
+  'stock-view-spider': 'stock-view',
   'rfq': 'sourcing',
   'requisitions': 'purchasing',
   'quotes': 'purchasing',
@@ -167,6 +168,7 @@ export function ProcurementTabs({
       subTabs: [
         { id: 'stock-view-boq', label: 'BOQ View', icon: TableProperties, permission: 'canViewBOQ', path: '/procurement?tab=stock-view&sub=boq' },
         { id: 'stock-view-soh', label: 'SOH', icon: Package, permission: 'canViewBOQ', path: '/procurement?tab=stock-view&sub=soh' },
+        { id: 'stock-view-spider', label: 'Spiderweb', icon: GitBranch, permission: 'canViewBOQ', path: '/procurement?tab=stock-view&sub=spider' },
       ]
     },
     {

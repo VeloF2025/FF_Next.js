@@ -92,6 +92,33 @@
         "Edit": 22,
         "Grep": 4
       }
+    },
+    "8f05a138-508c-473a-a51e-dec549a5325d": {
+      "session_id": "8f05a138-508c-473a-a51e-dec549a5325d",
+      "started_at": "2026-03-31T12:17:42.237Z",
+      "total_input_tokens": 1453,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.004359,
+      "tool_calls": 36,
+      "tools_used": {
+        "Bash": 8,
+        "Glob": 3,
+        "Read": 17,
+        "Grep": 7,
+        "Agent": 1
+      }
+    },
+    "0094b994-7bfa-482a-a06d-251f65ce2327": {
+      "session_id": "0094b994-7bfa-482a-a06d-251f65ce2327",
+      "started_at": "2026-03-31T12:19:05.031Z",
+      "total_input_tokens": 638,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.001914,
+      "tool_calls": 3,
+      "tools_used": {
+        "Read": 1,
+        "Bash": 2
+      }
     }
   }
 }
