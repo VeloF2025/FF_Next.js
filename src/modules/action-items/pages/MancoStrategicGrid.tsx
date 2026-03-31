@@ -15,7 +15,7 @@ import {
   getUniqueResponsiblePersons,
 } from '../components/manco-grid-helpers';
 
-type TabType = 'all' | 'pending' | 'in_progress' | 'completed' | 'overdue';
+type TabType = 'ongoing' | 'all' | 'pending' | 'in_progress' | 'completed' | 'overdue';
 type ViewMode = 'list' | 'kanban';
 
 export function MancoStrategicGrid() {
@@ -66,6 +66,13 @@ export function MancoStrategicGrid() {
 
   const filterItems = (): MancoActionItem[] => {
     let filtered = [...items];
+
+    // Ongoing tab shows only ongoing items; all other tabs exclude ongoing items
+    if (selectedTab === 'ongoing') {
+      filtered = filtered.filter((i) => i.is_ongoing);
+    } else {
+      filtered = filtered.filter((i) => !i.is_ongoing);
+    }
 
     if (departmentFilter) {
       filtered = filtered.filter((i) => i.department === departmentFilter);
@@ -167,11 +174,33 @@ export function MancoStrategicGrid() {
 
         {/* Tabs & View Toggle */}
         <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-center md:justify-between">
-          <div className="flex gap-2 border-b border-[var(--ff-border-light)]">
-            {(['all', 'pending', 'in_progress', 'completed', 'overdue'] as TabType[]).map((tab) => (
+          <div className="flex items-end gap-0 border-b border-[var(--ff-border-light)]">
+            {/* Ongoing tab — lives separately */}
+            <button
+              onClick={() => setSelectedTab('ongoing')}
+              aria-label="Show ongoing items"
+              className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors ${
+                selectedTab === 'ongoing'
+                  ? 'border-[var(--ff-accent)] text-[var(--ff-accent)]'
+                  : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
+              }`}
+            >
+              ONGOING
+            </button>
+
+            {/* Visual separator */}
+            <div
+              className="self-center mx-2 h-5 w-px"
+              style={{ background: 'var(--ff-border)' }}
+              aria-hidden="true"
+            />
+
+            {/* Standard tabs */}
+            {(['all', 'pending', 'in_progress', 'completed', 'overdue'] as Exclude<TabType, 'ongoing'>[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setSelectedTab(tab)}
+                aria-label={`Show ${tab.replace('_', ' ')} items`}
                 className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors ${
                   selectedTab === tab
                     ? 'border-[var(--ff-primary)] text-[var(--ff-primary)]'
