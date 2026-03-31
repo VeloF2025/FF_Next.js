@@ -191,7 +191,7 @@ export function MancoStrategicGrid() {
             {/* Visual separator */}
             <div
               className="self-center mx-2 h-5 w-px"
-              style={{ background: 'var(--ff-border)' }}
+              style={{ background: 'var(--ff-border-light)' }}
               aria-hidden="true"
             />
 
