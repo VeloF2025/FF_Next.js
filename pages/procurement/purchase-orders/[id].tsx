@@ -44,6 +44,8 @@ interface POLineItem {
   unitPrice: number;
   lineTotal: number;
   notes: string | null;
+  boqUnitRate: number | null;
+  boqQuantity: number | null;
 }
 
 interface POHistoryEvent {
