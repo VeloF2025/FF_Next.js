@@ -20,3 +20,7 @@ ALTER TABLE hs_project_audits
   ADD COLUMN IF NOT EXISTS audit_type VARCHAR(50) DEFAULT 'routine',
   ADD COLUMN IF NOT EXISTS weather_conditions TEXT,
   ADD COLUMN IF NOT EXISTS site_personnel_count INTEGER;
+
+-- Fix auditor_id type mismatch (was integer, staff.id is uuid)
+ALTER TABLE hs_project_audits
+  ALTER COLUMN auditor_id TYPE uuid USING NULL;

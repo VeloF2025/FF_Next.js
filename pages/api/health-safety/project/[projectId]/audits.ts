@@ -41,7 +41,7 @@ async function handleGet(projectId: string, req: NextApiRequest, res: NextApiRes
   // Explicit branches to avoid conditional SQL fragments (Neon rule)
   const audits = status
     ? await sql`
-        SELECT a.*, s.full_name as auditor_name, p.project_name,
+        SELECT a.*, s.name as auditor_name, p.project_name,
           (SELECT json_build_object(
             'total', COUNT(*)::int,
             'passed', COUNT(*) FILTER (WHERE response = 'pass')::int,
@@ -56,7 +56,7 @@ async function handleGet(projectId: string, req: NextApiRequest, res: NextApiRes
         LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
       `
     : await sql`
-        SELECT a.*, s.full_name as auditor_name, p.project_name,
+        SELECT a.*, s.name as auditor_name, p.project_name,
           (SELECT json_build_object(
             'total', COUNT(*)::int,
             'passed', COUNT(*) FILTER (WHERE response = 'pass')::int,
