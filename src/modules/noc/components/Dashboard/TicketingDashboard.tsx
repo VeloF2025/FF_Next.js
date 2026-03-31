@@ -67,35 +67,39 @@ export function TicketingDashboard({
       setIsError(false);
       setError(null);
 
-      // Fetch summary data
-      const summaryResponse = await fetch('/api/noc/dashboard/summary');
-      if (!summaryResponse.ok) {
-        const errorData = await summaryResponse.json();
-        throw new Error(errorData.error?.message || 'Failed to fetch dashboard data');
-      }
-      const summaryResult = await summaryResponse.json();
-      if (!summaryResult.success) {
+      // Helper to safely parse JSON responses (handles HTML error pages)
+      const safeJsonParse = async (response: Response, label: string) => {
+        const text = await response.text();
+        try {
+          return JSON.parse(text);
+        } catch {
+          throw new Error(`${label}: server returned non-JSON response (status ${response.status})`);
+        }
+      };
+
+      // Fetch all data in parallel
+      const [summaryResponse, workloadResponse, recentResponse] = await Promise.all([
+        fetch('/api/noc/dashboard/summary'),
+        fetch('/api/noc/dashboard/workload?active_only=true'),
+        fetch('/api/noc/tickets?pageSize=10'),
+      ]);
+
+      // Parse summary
+      const summaryResult = await safeJsonParse(summaryResponse, 'Dashboard summary');
+      if (!summaryResponse.ok || !summaryResult.success) {
         throw new Error(summaryResult.error?.message || 'Failed to fetch dashboard data');
       }
       setSummaryData(summaryResult.data);
 
-      // Fetch workload data
-      const workloadResponse = await fetch('/api/noc/dashboard/workload?active_only=true');
-      if (!workloadResponse.ok) {
-        throw new Error('Failed to fetch workload data');
-      }
-      const workloadResult = await workloadResponse.json();
-      if (workloadResult.success) {
+      // Parse workload
+      const workloadResult = await safeJsonParse(workloadResponse, 'Workload data');
+      if (workloadResponse.ok && workloadResult.success) {
         setWorkloadData(workloadResult.data);
       }
 
-      // Fetch recent tickets (using tickets API with filters)
-      const recentResponse = await fetch('/api/noc/tickets?pageSize=10');
-      if (!recentResponse.ok) {
-        throw new Error('Failed to fetch recent tickets');
-      }
-      const recentResult = await recentResponse.json();
-      if (recentResult.success) {
+      // Parse recent tickets
+      const recentResult = await safeJsonParse(recentResponse, 'Recent tickets');
+      if (recentResponse.ok && recentResult.success) {
         setRecentTickets(recentResult.data || []);
       }
 
