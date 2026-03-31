@@ -20,6 +20,8 @@ interface POLineItem {
   lineTotal: number;
   notes: string | null;
   boqUnitRate: number | null;
+  boqQuantity: number | null;
+  boqMatchSource: 'id' | 'code' | 'description' | null;
 }
 
 function fmtZAR(n: number) {
@@ -160,6 +162,7 @@ export function POItemsTable({ poId, items, canEdit = false, onItemsUpdated }: P
             <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Received</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">UOM</th>
             <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">BOQ Rate</th>
+            <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">BOQ Qty</th>
             <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Unit Price</th>
             <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Line Total</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Status</th>
@@ -196,7 +199,7 @@ export function POItemsTable({ poId, items, canEdit = false, onItemsUpdated }: P
                   {item.boqUnitRate != null ? (
                     <span
                       className="text-sm font-medium"
-                      title="BOQ unit rate for this project"
+                      title={`BOQ rate (matched by ${item.boqMatchSource ?? 'id'})`}
                       style={{
                         color: item.unitPrice > item.boqUnitRate
                           ? 'var(--ff-warning)'
@@ -204,6 +207,19 @@ export function POItemsTable({ poId, items, canEdit = false, onItemsUpdated }: P
                       }}
                     >
                       {fmtZAR(item.boqUnitRate)}
+                    </span>
+                  ) : (
+                    <span className="text-sm" style={{ color: 'var(--ff-text-tertiary)' }}>—</span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  {item.boqQuantity != null ? (
+                    <span
+                      className="text-sm"
+                      title={`BOQ quantity (matched by ${item.boqMatchSource ?? 'id'})`}
+                      style={{ color: 'var(--ff-text-secondary)' }}
+                    >
+                      {item.boqQuantity.toLocaleString('en-ZA')}
                     </span>
                   ) : (
                     <span className="text-sm" style={{ color: 'var(--ff-text-tertiary)' }}>—</span>

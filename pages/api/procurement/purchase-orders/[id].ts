@@ -97,9 +97,40 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         poi.unit_price,
         poi.total_price,
         poi.notes,
-        bi.unit_price AS boq_unit_rate
+        COALESCE(bi_direct.unit_price, bi_code.unit_price, bi_desc.unit_price) AS boq_unit_rate,
+        COALESCE(bi_direct.quantity,   bi_code.quantity,   bi_desc.quantity)   AS boq_quantity,
+        CASE
+          WHEN bi_direct.id IS NOT NULL THEN 'id'::text
+          WHEN bi_code.id   IS NOT NULL THEN 'code'::text
+          WHEN bi_desc.id   IS NOT NULL THEN 'description'::text
+          ELSE NULL
+        END AS boq_match_source
       FROM purchase_order_items poi
-      LEFT JOIN boq_items bi ON bi.id = poi.boq_item_id
+      JOIN purchase_orders po_ref ON po_ref.id = poi.purchase_order_id
+      -- Tier 1: direct FK
+      LEFT JOIN boq_items bi_direct ON bi_direct.id = poi.boq_item_id
+      -- Tier 2: item_code match within project BOQ (only when no direct FK)
+      LEFT JOIN LATERAL (
+        SELECT bi2.id, bi2.unit_price, bi2.quantity
+        FROM boq_items bi2
+        JOIN boqs b2 ON b2.id = bi2.boq_id
+        WHERE b2.project_id::text = po_ref.project_id::text
+          AND bi2.item_code = poi.item_code
+          AND poi.boq_item_id IS NULL
+          AND poi.item_code IS NOT NULL
+        LIMIT 1
+      ) bi_code ON true
+      -- Tier 3: case-insensitive description match (only when no FK and no code match)
+      LEFT JOIN LATERAL (
+        SELECT bi3.id, bi3.unit_price, bi3.quantity
+        FROM boq_items bi3
+        JOIN boqs b3 ON b3.id = bi3.boq_id
+        WHERE b3.project_id::text = po_ref.project_id::text
+          AND LOWER(bi3.description) = LOWER(poi.item_description)
+          AND poi.boq_item_id IS NULL
+          AND bi_code.id IS NULL
+        LIMIT 1
+      ) bi_desc ON true
       WHERE poi.purchase_order_id = ${id}
       ORDER BY poi.created_at
     `;
@@ -121,6 +152,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         lineTotal: parseFloat(item.total_price) || 0,
         notes: item.notes,
         boqUnitRate: item.boq_unit_rate != null ? parseFloat(item.boq_unit_rate) : null,
+        boqQuantity: item.boq_quantity != null ? parseFloat(item.boq_quantity) : null,
+        boqMatchSource: (item.boq_match_source as 'id' | 'code' | 'description' | null) ?? null,
       };
     });
 
