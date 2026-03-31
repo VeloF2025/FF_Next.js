@@ -25,6 +25,7 @@ import {
   FileInput,
   PackageCheck,
   Workflow,
+  TableProperties,
 } from 'lucide-react';
 import type {
   ProcurementTabId,
@@ -307,9 +308,37 @@ export default function ProcurementPage({
               {activeTab === 'overview' && <DashboardTabContent project={selectedProject} aggregateMetrics={aggregateMetrics} isLoading={isLoading} />}
               {activeTab === 'requisitions' && <RequisitionsTabContent />}
               {activeTab === 'boq' && <BOQStockView selectedProject={selectedProject} />}
-              {activeTab === 'stock-view-boq' && <BOQStockView selectedProject={selectedProject} />}
-              {activeTab === 'stock-view-soh' && <SOHPlaceholder />}
-              {activeTab === 'stock-view' && <BOQStockView selectedProject={selectedProject} />}
+              {(activeTab === 'stock-view-boq' || activeTab === 'stock-view-soh' || activeTab === 'stock-view') && (
+                <div>
+                  {/* Stock View sub-tabs */}
+                  <nav className="flex space-x-1 mb-4 bg-[var(--ff-bg-secondary)]/50 px-2 py-1 rounded-lg border border-[var(--ff-border-light)]">
+                    <button
+                      onClick={() => { void router.push('/procurement?tab=stock-view&sub=boq'); }}
+                      className={`relative py-2 px-4 rounded-md font-medium text-sm whitespace-nowrap flex items-center gap-2 transition-all duration-200 ${
+                        activeTab === 'stock-view-boq' || activeTab === 'stock-view'
+                          ? 'bg-[var(--ff-primary-500)]/20 text-[var(--ff-primary-400)] ring-1 ring-[var(--ff-primary-500)]/30'
+                          : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)]'
+                      }`}
+                    >
+                      <TableProperties className="h-4 w-4 flex-shrink-0" />
+                      <span>BOQ View</span>
+                    </button>
+                    <button
+                      onClick={() => { void router.push('/procurement?tab=stock-view&sub=soh'); }}
+                      className={`relative py-2 px-4 rounded-md font-medium text-sm whitespace-nowrap flex items-center gap-2 transition-all duration-200 ${
+                        activeTab === 'stock-view-soh'
+                          ? 'bg-[var(--ff-primary-500)]/20 text-[var(--ff-primary-400)] ring-1 ring-[var(--ff-primary-500)]/30'
+                          : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)]'
+                      }`}
+                    >
+                      <Package className="h-4 w-4 flex-shrink-0" />
+                      <span>SOH</span>
+                    </button>
+                  </nav>
+                  {(activeTab === 'stock-view-boq' || activeTab === 'stock-view') && <BOQStockView selectedProject={selectedProject} />}
+                  {activeTab === 'stock-view-soh' && <SOHPlaceholder />}
+                </div>
+              )}
               {activeTab === 'rfq' && <PlaceholderTab title="Request for Quotations" icon={Send} description="Create and manage RFQs" />}
               {activeTab === 'quotes' && <PlaceholderTab title="Quote Evaluation" icon={Quote} description="Evaluate and compare supplier quotes" />}
               {activeTab === 'purchase-orders' && <PurchaseOrdersTabContent />}
