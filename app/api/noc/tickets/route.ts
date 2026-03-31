@@ -24,6 +24,10 @@ import {
   logTicketActivity,
 } from '@/modules/noc/services/ticketService';
 import {
+  triggerOnTicketAssignment,
+  triggerOnTeamAssignment,
+} from '@/modules/noc/services/notificationTriggers';
+import {
   TicketSource,
   TicketType,
   TicketPriority,
@@ -261,6 +265,19 @@ export async function POST(req: NextRequest) {
     }).catch(err => {
       logger.error('Activity logging error on create', { ticketId: ticket.id, error: err.message });
     });
+
+    // Fire notifications for initial assignment (non-blocking)
+    if (ticket.assigned_to) {
+      triggerOnTicketAssignment(ticket, ticket.status).catch(err => {
+        logger.error('Assignment notification error on create', { ticketId: ticket.id, error: err.message });
+      });
+    }
+
+    if (ticket.assigned_team_id) {
+      triggerOnTeamAssignment(ticket).catch(err => {
+        logger.error('Team assignment notification error on create', { ticketId: ticket.id, error: err.message });
+      });
+    }
 
     return NextResponse.json(
       {
