@@ -41,7 +41,7 @@ async function handleGet(auditId: string, res: NextApiResponse) {
   const [audit] = await sql`
     SELECT
       a.*,
-      s.full_name as auditor_name,
+      s.name as auditor_name,
       p.project_name
     FROM hs_project_audits a
     LEFT JOIN staff s ON s.id = a.auditor_id
