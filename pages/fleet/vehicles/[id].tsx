@@ -1562,6 +1562,7 @@ function OdometerTab({
   vehicleStats,
   loading,
   onRefresh,
+  currentUserId,
 }: {
   vehicleId: string;
   odometerHistory: OdometerReading[];
@@ -1571,10 +1572,46 @@ function OdometerTab({
   vehicleStats: VehicleStatistics | null;
   loading: boolean;
   onRefresh: () => void;
+  currentUserId?: string;
 }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [manualReading, setManualReading] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [resolveNotes, setResolveNotes] = useState('');
+  const [resolveSubmitting, setResolveSubmitting] = useState(false);
+
+  const handleResolveAnomaly = async (anomalyId: string) => {
+    if (!currentUserId) {
+      toast.error('Unable to resolve — user not identified');
+      return;
+    }
+    setResolveSubmitting(true);
+    try {
+      const res = await fetch(`/api/fleet/vehicles/${vehicleId}/odometer-anomalies`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          anomalyId,
+          resolvedBy: currentUserId,
+          resolutionNotes: resolveNotes.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Anomaly resolved');
+        setResolvingId(null);
+        setResolveNotes('');
+        onRefresh();
+      } else {
+        toast.error(data.error?.message || 'Failed to resolve anomaly');
+      }
+    } catch {
+      toast.error('Failed to resolve anomaly');
+    } finally {
+      setResolveSubmitting(false);
+    }
+  };
 
   const latestReading = odometerHistory[0];
 
@@ -1740,17 +1777,53 @@ function OdometerTab({
             <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="font-medium text-red-800">Unresolved Anomalies Detected</p>
-              <div className="mt-2 space-y-2">
-                {odometerAnomalies.slice(0, 3).map((anomaly) => (
+              <div className="mt-2 space-y-3">
+                {odometerAnomalies.slice(0, 5).map((anomaly) => (
                   <div key={anomaly.id} className="text-sm text-red-700">
-                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium mr-2 ${
-                      anomaly.severity === 'critical' ? 'bg-red-200' : 'bg-yellow-200 text-yellow-800'
-                    }`}>
-                      {anomaly.anomalyType.replace('_', ' ')}
-                    </span>
-                    {anomaly.odometerReading.toLocaleString()} km
-                    {anomaly.previousReading && ` (was ${anomaly.previousReading.toLocaleString()} km)`}
-                    <span className="text-red-500 ml-2">{formatDate(anomaly.detectedAt)}</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium mr-2 ${
+                          anomaly.severity === 'critical' ? 'bg-red-200' : 'bg-yellow-200 text-yellow-800'
+                        }`}>
+                          {anomaly.anomalyType.replace('_', ' ')}
+                        </span>
+                        {anomaly.odometerReading.toLocaleString()} km
+                        {anomaly.previousReading && ` (was ${anomaly.previousReading.toLocaleString()} km)`}
+                        <span className="text-red-500 ml-2">{formatDate(anomaly.detectedAt)}</span>
+                      </div>
+                      {resolvingId !== anomaly.id && (
+                        <button
+                          onClick={() => { setResolvingId(anomaly.id); setResolveNotes(''); }}
+                          className="px-3 py-1 text-xs font-medium bg-white border border-red-300 text-red-700 rounded hover:bg-red-100 transition-colors flex-shrink-0"
+                        >
+                          Resolve
+                        </button>
+                      )}
+                    </div>
+                    {resolvingId === anomaly.id && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={resolveNotes}
+                          onChange={(e) => setResolveNotes(e.target.value)}
+                          placeholder="Resolution notes (e.g. VLM misread, correct reading is 77,938 km)"
+                          className="flex-1 px-3 py-1.5 text-sm border border-red-300 rounded bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-red-400"
+                        />
+                        <button
+                          onClick={() => handleResolveAnomaly(anomaly.id)}
+                          disabled={resolveSubmitting}
+                          className="px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition-colors"
+                        >
+                          {resolveSubmitting ? 'Saving...' : 'Confirm'}
+                        </button>
+                        <button
+                          onClick={() => setResolvingId(null)}
+                          className="px-3 py-1.5 text-xs font-medium bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -3733,6 +3806,7 @@ export default function VehicleDetailPage() {
                 vehicleStats={vehicleStats}
                 loading={loadingOdometer}
                 onRefresh={fetchOdometerData}
+                currentUserId={currentUser?.id}
               />
             )}
             {activeTab === 'fuel' && (
