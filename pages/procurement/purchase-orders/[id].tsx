@@ -46,6 +46,7 @@ interface POLineItem {
   notes: string | null;
   boqUnitRate: number | null;
   boqQuantity: number | null;
+  boqMatchSource: 'id' | 'code' | 'description' | null;
 }
 
 interface POHistoryEvent {

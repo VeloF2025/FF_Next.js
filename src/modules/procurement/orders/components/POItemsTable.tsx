@@ -21,6 +21,7 @@ interface POLineItem {
   notes: string | null;
   boqUnitRate: number | null;
   boqQuantity: number | null;
+  boqMatchSource: 'id' | 'code' | 'description' | null;
 }
 
 function fmtZAR(n: number) {
@@ -198,7 +199,7 @@ export function POItemsTable({ poId, items, canEdit = false, onItemsUpdated }: P
                   {item.boqUnitRate != null ? (
                     <span
                       className="text-sm font-medium"
-                      title="BOQ unit rate for this project"
+                      title={`BOQ rate (matched by ${item.boqMatchSource ?? 'id'})`}
                       style={{
                         color: item.unitPrice > item.boqUnitRate
                           ? 'var(--ff-warning)'
@@ -213,7 +214,11 @@ export function POItemsTable({ poId, items, canEdit = false, onItemsUpdated }: P
                 </td>
                 <td className="px-4 py-3 text-right">
                   {item.boqQuantity != null ? (
-                    <span className="text-sm" style={{ color: 'var(--ff-text-secondary)' }} title="BOQ quantity for this project">
+                    <span
+                      className="text-sm"
+                      title={`BOQ quantity (matched by ${item.boqMatchSource ?? 'id'})`}
+                      style={{ color: 'var(--ff-text-secondary)' }}
+                    >
                       {item.boqQuantity.toLocaleString('en-ZA')}
                     </span>
                   ) : (
