@@ -39,6 +39,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, 'Photo key parameter required');
   }
 
+  // Validate path to prevent shell injection via docker exec
+  if (/[;`$|&\\(){}\[\]!#]/.test(key)) {
+    return apiResponse.badRequest(res, 'Invalid characters in photo key');
+  }
+
   try {
     if (source === 'qfield') {
       return await proxyMinioPhoto(key, res);

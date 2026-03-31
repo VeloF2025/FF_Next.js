@@ -231,7 +231,13 @@ async function clearStuckJobs(jobIds?: string[]): Promise<{ success: boolean; cl
   try {
     let whereClause = "status IN ('pending', 'queued')";
     if (jobIds && jobIds.length > 0) {
-      const ids = jobIds.map(id => `'${id}'`).join(', ');
+      // Validate each ID is a valid UUID to prevent SQL/command injection
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const sanitized = jobIds.filter(id => uuidRegex.test(id));
+      if (sanitized.length === 0) {
+        return { success: false, cleared: 0 };
+      }
+      const ids = sanitized.map(id => `'${id}'`).join(', ');
       whereClause = `id IN (${ids})`;
     }
 

@@ -13,7 +13,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { withOptionalAuth } from '@/lib/auth/middleware';
+import { withAuth } from '@/lib/auth/middleware';
 import { createLogger } from '@/lib/logger';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import rateLimiter, { RateLimits } from '@/lib/rateLimiter';
@@ -439,4 +439,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withOptionalAuth(handler);
+export default withAuth(handler);

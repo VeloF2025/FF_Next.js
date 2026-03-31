@@ -186,10 +186,16 @@ async function handler(
 async function fetchPhotoAsBase64(photoKey: string): Promise<string> {
   const objectPath = photoKey.startsWith('/') ? photoKey.slice(1) : photoKey;
 
+  // Validate path to prevent shell injection
+  if (/[;`$|&\\(){}\[\]!#]/.test(objectPath)) {
+    throw new Error('Invalid characters in photo key');
+  }
+
   try {
     // Use mc cat inside the MinIO Docker container to fetch the photo
     // The 'local' alias is pre-configured in the container
-    const command = `docker exec qfieldcloud-minio-1 mc cat 'local/${MINIO_BUCKET}/${objectPath}' 2>/dev/null | base64 -w 0`;
+    const escapedPath = `local/${MINIO_BUCKET}/${objectPath}`.replace(/'/g, "'\\''");
+    const command = `docker exec qfieldcloud-minio-1 mc cat '${escapedPath}' 2>/dev/null | base64 -w 0`;
 
     log.info({ module: 'qfield-qa-validate', photoKey: photoKey.substring(0, 80) }, 'Fetching photo via Docker mc');
 

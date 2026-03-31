@@ -248,17 +248,18 @@ async function resolveFeatureFid(
       { maxBuffer: 50 * 1024 * 1024 },
     );
 
-    // Use Python sqlite3 to query
+    // Use Python sqlite3 to query — pass featureId via env to prevent injection
     const { stdout: fidOut } = await execAsync(
       `python3 -c "
-import sqlite3, sys
+import sqlite3, os
 db = sqlite3.connect('${tmpPath}')
-cur = db.execute('SELECT fid FROM ${tableName} WHERE \\\"${labelCol}\\\" = ?', ('${featureId.replace(/'/g, "''")}',))
+fid_val = os.environ['QF_FEATURE_ID']
+cur = db.execute('SELECT fid FROM ${tableName} WHERE \\\"${labelCol}\\\" = ?', (fid_val,))
 row = cur.fetchone()
 print(row[0] if row else '')
 db.close()
 "`,
-      { encoding: 'utf-8' },
+      { encoding: 'utf-8', env: { ...process.env, QF_FEATURE_ID: featureId } },
     );
 
     const fid = fidOut.trim();

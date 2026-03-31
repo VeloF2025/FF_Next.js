@@ -33,6 +33,11 @@ async function handler(
     return apiResponse.badRequest(res, 'Photo key parameter required');
   }
 
+  // Validate path to prevent shell injection via docker exec
+  if (/[;`$|&\\(){}\[\]!#]/.test(key)) {
+    return apiResponse.badRequest(res, 'Invalid characters in photo key');
+  }
+
   try {
     // Key format: projects/{project_id}/files/DCIM/{filename}/{version}
     const objectPath = key.startsWith('/') ? key.slice(1) : key;

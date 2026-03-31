@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next'
 import { execSync } from 'child_process'
 import { log } from '@/lib/logger'
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth, withRole } from '@/lib/auth/middleware';
 
 interface ServiceHealth {
   name: string
@@ -104,7 +105,7 @@ async function getGitHubStatus() {
   }
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse<DeployHealthResponse | { error: string }>) {
+async function handler(req: NextApiRequest, res: NextApiResponse<DeployHealthResponse | { error: string }>) {
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method!, ['GET'])
   }
@@ -129,3 +130,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     return apiResponse.internalError(res, new Error('Internal server error'))
   }
 }
+
+export default withAuth(withRole('super_admin')(handler));
