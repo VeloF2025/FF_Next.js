@@ -36,6 +36,7 @@ import type {
 import { ProcurementOverview } from '@/modules/procurement/components/ProcurementOverview';
 import { BOQSpendSummary } from '@/modules/procurement/reports/BOQSpendSummary';
 import { BOQStockView } from '@/components/procurement/boq/BOQStockView';
+import { SOHAuditView } from '@/components/procurement/soh/SOHAuditView';
 
 interface ProcurementPageProps {
   initialProject?: Project;
@@ -336,7 +337,7 @@ export default function ProcurementPage({
                     </button>
                   </nav>
                   {(activeTab === 'stock-view-boq' || activeTab === 'stock-view') && <BOQStockView selectedProject={selectedProject} />}
-                  {activeTab === 'stock-view-soh' && <SOHPlaceholder />}
+                  {activeTab === 'stock-view-soh' && <SOHAuditView selectedProject={selectedProject} />}
                 </div>
               )}
               {activeTab === 'rfq' && <PlaceholderTab title="Request for Quotations" icon={Send} description="Create and manage RFQs" />}
