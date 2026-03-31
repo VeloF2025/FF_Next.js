@@ -53,48 +53,61 @@ const ProgressCell = ({ pct }: { pct: number }) => (
 
 // ─── Report 1: Scope vs Actual ───────────────────────────────────────────────
 
-const ScopeTable = ({ rows, totals }: { rows: BuildMilestoneRow[]; totals: BuildMilestonesData['totals'] }) => (
-  <div className="overflow-x-auto">
-    <table className="w-full text-sm" role="table" aria-label="Build milestones scope vs actual">
-      <thead>
-        <tr className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] text-[var(--ff-text-primary)]">
-          <th scope="col" className="px-3 py-2 text-left font-semibold">Project</th>
-          <th scope="col" className="px-3 py-2 text-right font-semibold">PON Scope</th>
-          <th scope="col" className="px-3 py-2 text-right font-semibold">RFO Done</th>
-          <th scope="col" className="px-3 py-2 text-center font-semibold" style={{ minWidth: 150 }}>RFO %</th>
-          <th scope="col" className="px-3 py-2 text-right font-semibold">ATP Done</th>
-          <th scope="col" className="px-3 py-2 text-center font-semibold" style={{ minWidth: 150 }}>ATP %</th>
-          <th scope="col" className="px-3 py-2 text-right font-semibold text-[var(--ff-warning)]" title="RFO Done minus ATP Done — PONs awaiting ATP">Lag (RFO−ATP)</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, idx) => {
-          const lag = row.rfoDone - row.atpDone;
-          return (
-            <tr key={row.projectId} className={idx % 2 === 0 ? 'bg-[var(--ff-bg-primary)]' : 'bg-[var(--ff-bg-secondary)]'}>
-              <td className="px-3 py-2 text-[var(--ff-text-primary)] font-medium">{row.projectName}</td>
-              <td className="px-3 py-2 text-right text-[var(--ff-text-secondary)]">{row.ponScope.toLocaleString()}</td>
-              <td className="px-3 py-2 text-right text-[var(--ff-text-secondary)]">{row.rfoDone.toLocaleString()}</td>
-              <td className="px-3 py-2"><ProgressCell pct={row.rfoPct} /></td>
-              <td className="px-3 py-2 text-right text-[var(--ff-text-secondary)]">{row.atpDone.toLocaleString()}</td>
-              <td className="px-3 py-2"><ProgressCell pct={row.atpPct} /></td>
-              <td className="px-3 py-2 text-right font-semibold" style={{ color: lag > 0 ? PCT_MED : PCT_NONE }}>{lag}</td>
+const ScopeTable = ({ rows, totals, syncedAt }: { rows: BuildMilestoneRow[]; totals: BuildMilestonesData['totals']; syncedAt?: string }) => {
+  const syncTime = syncedAt ? new Date(syncedAt).toLocaleString('en-ZA', { 
+    dateStyle: 'short', 
+    timeStyle: 'short', 
+    timeZone: 'Africa/Johannesburg' 
+  }) : 'Unknown';
+
+  return (
+    <div>
+      <div className="mb-3 text-xs text-[var(--ff-text-tertiary)]">
+        Last synced: <span className="font-medium text-[var(--ff-text-secondary)]">{syncTime} SAST</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm" role="table" aria-label="Build milestones scope vs actual">
+          <thead>
+            <tr className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] text-[var(--ff-text-primary)]">
+              <th scope="col" className="px-4 py-3 text-left font-semibold border-r border-[#e5e7eb]">Project</th>
+              <th scope="col" className="px-4 py-3 text-right font-semibold border-r border-[#e5e7eb]">PON Scope</th>
+              <th scope="col" className="px-4 py-3 text-right font-semibold border-r border-[#e5e7eb]">RFO Done</th>
+              <th scope="col" className="px-4 py-3 text-center font-semibold border-r border-[#e5e7eb]" style={{ minWidth: 150 }}>RFO %</th>
+              <th scope="col" className="px-4 py-3 text-right font-semibold border-r border-[#e5e7eb]">ATP Done</th>
+              <th scope="col" className="px-4 py-3 text-center font-semibold border-r border-[#e5e7eb]" style={{ minWidth: 150 }}>ATP %</th>
+              <th scope="col" className="px-4 py-3 text-right font-semibold text-[var(--ff-warning)]" title="RFO Done minus ATP Done — PONs awaiting ATP">Lag (RFO−ATP)</th>
             </tr>
-          );
-        })}
-        <tr className="bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] font-semibold border-t-2 border-[var(--ff-border-light)]">
-          <td className="px-3 py-2">Total</td>
-          <td className="px-3 py-2 text-right">{totals.ponScope.toLocaleString()}</td>
-          <td className="px-3 py-2 text-right">{totals.rfoDone.toLocaleString()}</td>
-          <td className="px-3 py-2"><ProgressCell pct={totals.rfoPct} /></td>
-          <td className="px-3 py-2 text-right">{totals.atpDone.toLocaleString()}</td>
-          <td className="px-3 py-2"><ProgressCell pct={totals.atpPct} /></td>
-          <td className="px-3 py-2 text-right font-semibold text-[var(--ff-warning)]">{totals.rfoDone - totals.atpDone}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-);
+          </thead>
+          <tbody>
+            {rows.map((row, idx) => {
+              const lag = row.rfoDone - row.atpDone;
+              return (
+                <tr key={row.projectId} className={idx % 2 === 0 ? 'bg-[var(--ff-bg-primary)]' : 'bg-[var(--ff-bg-secondary)]'}>
+                  <td className="px-4 py-3 text-[var(--ff-text-primary)] font-medium border-r border-[#e5e7eb]">{row.projectName}</td>
+                  <td className="px-4 py-3 text-right text-[var(--ff-text-secondary)] border-r border-[#e5e7eb]">{row.ponScope.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right text-[var(--ff-text-secondary)] border-r border-[#e5e7eb]">{row.rfoDone.toLocaleString()}</td>
+                  <td className="px-4 py-3 border-r border-[#e5e7eb]"><ProgressCell pct={row.rfoPct} /></td>
+                  <td className="px-4 py-3 text-right text-[var(--ff-text-secondary)] border-r border-[#e5e7eb]">{row.atpDone.toLocaleString()}</td>
+                  <td className="px-4 py-3 border-r border-[#e5e7eb]"><ProgressCell pct={row.atpPct} /></td>
+                  <td className="px-4 py-3 text-right font-semibold" style={{ color: lag > 0 ? PCT_MED : PCT_NONE }}>{lag}</td>
+                </tr>
+              );
+            })}
+            <tr className="bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] font-semibold border-t-2 border-[var(--ff-border-light)]">
+              <td className="px-4 py-3 border-r border-[#e5e7eb]">Total</td>
+              <td className="px-4 py-3 text-right border-r border-[#e5e7eb]">{totals.ponScope.toLocaleString()}</td>
+              <td className="px-4 py-3 text-right border-r border-[#e5e7eb]">{totals.rfoDone.toLocaleString()}</td>
+              <td className="px-4 py-3 border-r border-[#e5e7eb]"><ProgressCell pct={totals.rfoPct} /></td>
+              <td className="px-4 py-3 text-right border-r border-[#e5e7eb]">{totals.atpDone.toLocaleString()}</td>
+              <td className="px-4 py-3 border-r border-[#e5e7eb]"><ProgressCell pct={totals.atpPct} /></td>
+              <td className="px-4 py-3 text-right font-semibold text-[var(--ff-warning)]">{totals.rfoDone - totals.atpDone}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
 
 // Recharts chart tokens (hex required for SVG — annotated with semantic equivalents)
 const CHART_GRID   = '#374151'; // --ff-border-light
@@ -284,7 +297,7 @@ export default function BuildMilestonesReport() {
         <div>
           {subTabs}
           {subReport === 'scope'
-            ? <ScopeTable rows={data.rows} totals={data.totals} />
+            ? <ScopeTable rows={data.rows} totals={data.totals} syncedAt={data.syncedAt} />
             : <TimelineTable timeline={data.timeline} projectNames={data.projectNames} />}
         </div>
       }

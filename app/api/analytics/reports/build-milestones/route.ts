@@ -51,6 +51,7 @@ export interface BuildMilestonesData {
   totals: { ponScope: number; rfoDone: number; rfoPct: number; atpDone: number; atpPct: number };
   timeline: BuildMilestoneMonth[];
   projectNames: string[]; // ordered list for column headers
+  syncedAt: string; // ISO timestamp of when data was fetched
 }
 
 async function auth(req: NextRequest): Promise<string | null> {
@@ -153,7 +154,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
       const timeline: BuildMilestoneMonth[] = Array.from(monthMap.values()).sort((a, b) => a.monthKey.localeCompare(b.monthKey));
 
-      return NextResponse.json({ success: true, data: { rows, totals, timeline, projectNames } satisfies BuildMilestonesData });
+      return NextResponse.json({ success: true, data: { rows, totals, timeline, projectNames, syncedAt: new Date().toISOString() } satisfies BuildMilestonesData });
     } finally {
       client.release();
     }
