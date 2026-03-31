@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, MessageCircle, Send, Loader2 } from 'lucide-react';
+import { X, MessageCircle, Send, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { MancoActionItem, MancoActionItemComment, MancoMeetingContext } from '@/types/manco-action-items.types';
 import { log } from '@/lib/logger';
@@ -110,6 +110,34 @@ export function MancoDetailPane({
     } catch (error) {
       toast.error('Error updating status');
       log.error('Error updating status', { error });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleOngoing = async () => {
+    setLoading(true);
+    try {
+      const next = !item.is_ongoing;
+      const res = await fetch(`/api/manco-action-items/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_ongoing: next }),
+      });
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({})) as { message?: string };
+        toast.error(json.message ?? 'Failed to update ongoing status');
+        log.error('Failed to toggle ongoing', { itemId: item.id, status: res.status });
+        return;
+      }
+
+      toast.success(next ? 'Moved to Ongoing' : 'Removed from Ongoing');
+      log.info('Toggled ongoing', { itemId: item.id, is_ongoing: next });
+      onUpdated();
+    } catch (error) {
+      toast.error('Error updating ongoing status');
+      log.error('Error toggling ongoing', { error });
     } finally {
       setLoading(false);
     }
@@ -262,6 +290,42 @@ export function MancoDetailPane({
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update'}
               </button>
+            </div>
+          </div>
+
+          {/* Ongoing toggle */}
+          <div className="border-t border-[var(--ff-border-light)] pt-6">
+            <label className="text-xs font-semibold text-[var(--ff-text-secondary)] uppercase">
+              Ongoing
+            </label>
+            <div className="mt-2">
+              <button
+                onClick={handleToggleOngoing}
+                disabled={loading}
+                aria-label={item.is_ongoing ? 'Remove from Ongoing' : 'Move to Ongoing'}
+                className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={
+                  item.is_ongoing
+                    ? {
+                        background: 'color-mix(in srgb, var(--ff-accent) 12%, transparent)',
+                        color: 'var(--ff-accent)',
+                        borderColor: 'color-mix(in srgb, var(--ff-accent) 30%, transparent)',
+                      }
+                    : {
+                        background: 'var(--ff-bg-secondary)',
+                        color: 'var(--ff-text-secondary)',
+                        borderColor: 'var(--ff-border-light)',
+                      }
+                }
+              >
+                <RefreshCw className="w-4 h-4" />
+                {item.is_ongoing ? 'Remove from Ongoing' : 'Move to Ongoing'}
+              </button>
+              {item.is_ongoing && (
+                <p className="text-xs mt-2" style={{ color: 'var(--ff-text-secondary)' }}>
+                  This item appears in the Ongoing tab and is excluded from All/Pending/In Progress/Completed/Overdue.
+                </p>
+              )}
             </div>
           </div>
 
