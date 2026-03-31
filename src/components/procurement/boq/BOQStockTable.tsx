@@ -66,7 +66,7 @@ export function BOQStockTable({ rows, loading }: BOQStockTableProps) {
       <div className="overflow-auto max-h-[calc(100vh-280px)]">
         <table className="w-full text-xs border-collapse">
 
-          <thead className="sticky top-0 z-10">
+          <thead className="sticky top-0 z-20" style={{ boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
             {/* Group header row */}
             <tr>
               {/* Item columns — no group label */}
@@ -101,20 +101,20 @@ export function BOQStockTable({ rows, loading }: BOQStockTableProps) {
 
             {/* Column labels */}
             <tr style={{ background: '#0f172a', borderBottom: '2px solid #1e3a8a' }}>
-              <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-slate-400 w-8">#</th>
-              <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-slate-400 w-36 whitespace-nowrap">Code</th>
-              <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-slate-400 min-w-[200px]">Description</th>
-              <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-slate-400 w-28 whitespace-nowrap">Category</th>
-              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-slate-400 w-12">UOM</th>
-              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-slate-400 w-28 whitespace-nowrap" style={{ borderRight: '1px solid #334155' }}>BOQ Rate</th>
-              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-blue-400 w-24">QTY</th>
-              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-blue-400 w-32 whitespace-nowrap" style={{ borderRight: '1px solid #334155' }}>Value</th>
-              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-emerald-400 w-24">QTY</th>
-              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-emerald-400 w-32 whitespace-nowrap" style={{ borderRight: '1px solid #334155' }}>Value</th>
-              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-amber-400 w-24">QTY</th>
-              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-amber-400 w-32 whitespace-nowrap" style={{ borderRight: '1px solid #334155' }}>Value</th>
-              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-purple-400 w-24">QTY</th>
-              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-purple-400 w-32 whitespace-nowrap">Value</th>
+              <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-slate-400 w-8" style={{ background: '#0f172a' }}>#</th>
+              <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-slate-400 w-36 whitespace-nowrap" style={{ background: '#0f172a' }}>Code</th>
+              <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-slate-400 min-w-[200px]" style={{ background: '#0f172a' }}>Description</th>
+              <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-slate-400 w-28 whitespace-nowrap" style={{ background: '#0f172a' }}>Category</th>
+              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-slate-400 w-12" style={{ background: '#0f172a' }}>UOM</th>
+              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-slate-400 w-28 whitespace-nowrap" style={{ background: '#0f172a', borderRight: '1px solid #334155' }}>BOQ Rate</th>
+              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-blue-400 w-24" style={{ background: '#0f172a' }}>QTY</th>
+              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-blue-400 w-32 whitespace-nowrap" style={{ background: '#0f172a', borderRight: '1px solid #334155' }}>Value</th>
+              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-emerald-400 w-24" style={{ background: '#0f172a' }}>QTY</th>
+              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-emerald-400 w-32 whitespace-nowrap" style={{ background: '#0f172a', borderRight: '1px solid #334155' }}>Value</th>
+              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-amber-400 w-24" style={{ background: '#0f172a' }}>QTY</th>
+              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-amber-400 w-32 whitespace-nowrap" style={{ background: '#0f172a', borderRight: '1px solid #334155' }}>Value</th>
+              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-purple-400 w-24" style={{ background: '#0f172a' }}>QTY</th>
+              <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-purple-400 w-32 whitespace-nowrap" style={{ background: '#0f172a' }}>Value</th>
             </tr>
           </thead>
 
