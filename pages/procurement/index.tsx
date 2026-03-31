@@ -317,7 +317,7 @@ export default function ProcurementPage({
                   {/* Stock View sub-tabs */}
                   <nav className="flex space-x-1 mb-4 bg-[var(--ff-bg-secondary)]/50 px-2 py-1 rounded-lg border border-[var(--ff-border-light)]">
                     <button
-                      onClick={() => { void router.push('/procurement?tab=stock-view&sub=boq'); }}
+                      onClick={() => { void router.replace('/procurement?tab=stock-view&sub=boq', undefined, { shallow: true }); }}
                       className={`relative py-2 px-4 rounded-md font-medium text-sm whitespace-nowrap flex items-center gap-2 transition-all duration-200 ${
                         activeTab === 'stock-view-boq' || activeTab === 'stock-view'
                           ? 'bg-[var(--ff-primary-500)]/20 text-[var(--ff-primary-400)] ring-1 ring-[var(--ff-primary-500)]/30'
@@ -328,7 +328,7 @@ export default function ProcurementPage({
                       <span>BOQ View</span>
                     </button>
                     <button
-                      onClick={() => { void router.push('/procurement?tab=stock-view&sub=soh'); }}
+                      onClick={() => { void router.replace('/procurement?tab=stock-view&sub=soh', undefined, { shallow: true }); }}
                       className={`relative py-2 px-4 rounded-md font-medium text-sm whitespace-nowrap flex items-center gap-2 transition-all duration-200 ${
                         activeTab === 'stock-view-soh'
                           ? 'bg-[var(--ff-primary-500)]/20 text-[var(--ff-primary-400)] ring-1 ring-[var(--ff-primary-500)]/30'
@@ -339,7 +339,7 @@ export default function ProcurementPage({
                       <span>SOH</span>
                     </button>
                     <button
-                      onClick={() => { void router.push('/procurement?tab=stock-view&sub=spider'); }}
+                      onClick={() => { void router.replace('/procurement?tab=stock-view&sub=spider', undefined, { shallow: true }); }}
                       className={`relative py-2 px-4 rounded-md font-medium text-sm whitespace-nowrap flex items-center gap-2 transition-all duration-200 ${
                         activeTab === 'stock-view-spider'
                           ? 'bg-[var(--ff-primary-500)]/20 text-[var(--ff-primary-400)] ring-1 ring-[var(--ff-primary-500)]/30'
