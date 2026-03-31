@@ -27,6 +27,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { Search, Users, User, Filter, X, Calendar } from 'lucide-react';
 import { TicketSummaryTiles } from '@/modules/noc/components/TicketList/TicketSummaryTiles';
+import { useProjects } from '@/hooks/useProjects';
 import type { TicketFilters } from '@/modules/noc/types/ticket';
 
 type ViewMode = 'table' | 'kanban' | 'grid';
@@ -59,8 +60,13 @@ export default function TicketsListPageClient() {
   const [filterType, setFilterType] = useState('');
   const [filterSource, setFilterSource] = useState('');
   const [filterDatePreset, setFilterDatePreset] = useState('');
+  const [filterProject, setFilterProject] = useState('');
   const { teamIds } = useMyTeams();
   const { currentUser } = useAuth();
+  const { data: projects = [] } = useProjects();
+  const activeProjects = (projects as { id: string; name: string; code?: string; status?: string }[])
+    .filter((p) => p.status === 'active' || p.status === 'in_progress')
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   // Read status filter from URL params (Active/Completed sub-tabs)
   const statusFilter = searchParams?.get('status') || undefined;
@@ -121,15 +127,16 @@ export default function TicketsListPageClient() {
       status: statusFilter as any,
       ticket_type: (filterType || undefined) as any,
       source: (filterSource || undefined) as any,
+      project_id: filterProject || undefined,
       assigned_to: ticketScope === 'my_tickets' && currentUser?.id ? currentUser.id : undefined,
       assigned_team_id: ticketScope === 'my_team' ? (teamIds.length > 0 ? teamIds[0] : '00000000-0000-0000-0000-000000000000') : undefined,
     };
     if (dateRange.created_after) f.created_after = dateRange.created_after;
     if (dateRange.created_before) f.created_before = dateRange.created_before;
     return f;
-  }, [searchTerm, statusFilter, filterType, filterSource, ticketScope, teamIds, currentUser?.id, dateRange]);
+  }, [searchTerm, statusFilter, filterType, filterSource, filterProject, ticketScope, teamIds, currentUser?.id, dateRange]);
 
-  const hasActiveFilters = filterType || filterSource || filterDatePreset;
+  const hasActiveFilters = filterType || filterSource || filterDatePreset || filterProject;
 
   return (
     <ModulePage config={nocConfig} hideHeader>
@@ -264,9 +271,25 @@ export default function TicketsListPageClient() {
                 <option value="7d">Last 7 Days</option>
                 <option value="30d">Last 30 Days</option>
               </select>
+              <select
+                value={filterProject}
+                onChange={(e) => setFilterProject(e.target.value)}
+                className={`px-2.5 py-1.5 rounded-lg text-sm border transition-colors max-w-[180px]
+                  ${filterProject
+                    ? 'bg-orange-500/10 border-orange-500/30 text-orange-300'
+                    : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
+                  }`}
+              >
+                <option value="">All Projects</option>
+                {activeProjects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.code ? `${p.code} — ${p.name}` : p.name}
+                  </option>
+                ))}
+              </select>
               {hasActiveFilters && (
                 <button
-                  onClick={() => { setFilterType(''); setFilterSource(''); setFilterDatePreset(''); }}
+                  onClick={() => { setFilterType(''); setFilterSource(''); setFilterDatePreset(''); setFilterProject(''); }}
                   className="p-1.5 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] rounded"
                   title="Clear filters"
                 >
