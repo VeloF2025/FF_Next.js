@@ -9,9 +9,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
-
 import { withAuth } from '@/lib/auth';
-const sql = neon(process.env.DATABASE_URL!);
+
+const getSql = () => neon(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { auditId } = req.query;
@@ -30,13 +30,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
     }
   } catch (error) {
-    log.error('[H&S Audit Detail API] Error', { error });
+    log.error('HSAuditDetail', { error, auditId });
     return apiResponse.internalError(res, error);
   }
 }
 
 async function handleGet(auditId: string, res: NextApiResponse) {
-  // Get audit with responses and checklist items
+  const sql = getSql();
+
   const [audit] = await sql`
     SELECT
       a.*,
@@ -55,7 +56,13 @@ async function handleGet(auditId: string, res: NextApiResponse) {
   // Get responses with checklist item details
   const responses = await sql`
     SELECT
-      r.*,
+      r.id,
+      r.audit_id,
+      r.checklist_item_id,
+      r.response,
+      r.notes,
+      r.photo_url,
+      r.created_at,
       i.item_text,
       i.category,
       i.severity,
@@ -78,7 +85,6 @@ async function handleGet(auditId: string, res: NextApiResponse) {
     critical_failures: responses.filter(
       (r: any) => r.response === 'fail' && r.severity === 'critical'
     ).length,
-    corrective_actions_needed: responses.filter((r: any) => r.corrective_action_required).length,
   };
 
   // Group by category
@@ -103,9 +109,9 @@ async function handleGet(auditId: string, res: NextApiResponse) {
 }
 
 async function handlePut(auditId: string, req: NextApiRequest, res: NextApiResponse) {
-  const { status, notes, photos, responses, complete = false } = req.body;
+  const sql = getSql();
+  const { status, notes, responses, complete = false } = req.body;
 
-  // Get existing audit
   const [existing] = await sql`
     SELECT id, project_id, status, overall_score, rag_status, completed_at
     FROM hs_project_audits WHERE id = ${auditId}
@@ -123,8 +129,7 @@ async function handlePut(auditId: string, req: NextApiRequest, res: NextApiRespo
         SET
           response = COALESCE(${r.response}, response),
           notes = COALESCE(${r.notes}, notes),
-          photo_url = COALESCE(${r.photo_url}, photo_url),
-          corrective_action_required = COALESCE(${r.corrective_action_required}, corrective_action_required)
+          photo_url = COALESCE(${r.photo_url}, photo_url)
         WHERE id = ${r.id}
       `;
     }
@@ -142,7 +147,6 @@ async function handlePut(auditId: string, req: NextApiRequest, res: NextApiRespo
       WHERE r.audit_id = ${auditId}
     `;
 
-    // Calculate weighted score
     const applicable = allResponses.filter(
       (r: any) => r.response !== 'not_checked' && r.response !== 'na'
     );
@@ -153,64 +157,53 @@ async function handlePut(auditId: string, req: NextApiRequest, res: NextApiRespo
 
       for (const r of applicable) {
         const weight =
-          (r as any).severity === 'critical'
-            ? 4
-            : (r as any).severity === 'high'
-              ? 3
-              : (r as any).severity === 'medium'
-                ? 2
+          (r as any).severity === 'critical' ? 4
+            : (r as any).severity === 'high' ? 3
+              : (r as any).severity === 'medium' ? 2
                 : 1;
         weightedTotal += weight;
-        if ((r as any).response === 'pass') {
-          weightedPassed += weight;
-        }
+        if ((r as any).response === 'pass') weightedPassed += weight;
       }
 
       overallScore = Math.round((weightedPassed / weightedTotal) * 100);
 
-      // Check for critical failures
       const criticalFailures = applicable.filter(
         (r: any) => r.response === 'fail' && r.severity === 'critical'
       ).length;
 
       if (criticalFailures > 0) {
-        overallScore = Math.min(overallScore, 79); // Cap at amber
+        overallScore = Math.min(overallScore, 79);
       }
 
-      // Determine RAG
       ragStatus = overallScore < 50 ? 'red' : overallScore < 80 ? 'amber' : 'green';
     }
   }
 
-  // Determine new status
   const newStatus = complete ? 'completed' : status || existing.status;
-  const hasFailures =
-    (
-      await sql`
-    SELECT COUNT(*) as count FROM hs_audit_responses
+  const [failCount] = await sql`
+    SELECT COUNT(*)::int as count FROM hs_audit_responses
     WHERE audit_id = ${auditId} AND response = 'fail'
-  `
-    )[0].count > 0;
+  `;
+  const hasFailures = failCount.count > 0;
+  const finalStatus = newStatus === 'completed' && hasFailures ? 'requires_action' : newStatus;
 
-  const finalStatus =
-    newStatus === 'completed' && hasFailures ? 'requires_action' : newStatus;
+  const completedAt = (finalStatus === 'completed' || finalStatus === 'requires_action')
+    ? new Date().toISOString()
+    : existing.completed_at;
 
-  // Update audit
   const [audit] = await sql`
     UPDATE hs_project_audits
     SET
       status = ${finalStatus},
       overall_score = ${overallScore},
       rag_status = ${ragStatus},
-      notes = COALESCE(${notes}, notes),
-      photos = COALESCE(${photos ? JSON.stringify(photos) : null}::jsonb, photos),
-      completed_at = ${finalStatus === 'completed' || finalStatus === 'requires_action' ? new Date().toISOString() : existing.completed_at}
+      notes = COALESCE(${notes || null}, notes),
+      completed_at = ${completedAt}
     WHERE id = ${auditId}
-    RETURNING id, project_id, auditor_id, audit_date, status, overall_score,
-              rag_status, notes, photos, completed_at, created_at, updated_at
+    RETURNING *
   `;
 
-  // Update next audit due date in project config
+  // Update next audit due date on completion
   if (finalStatus === 'completed' || finalStatus === 'requires_action') {
     const [config] = await sql`
       SELECT audit_frequency, custom_frequency_days
@@ -219,13 +212,13 @@ async function handlePut(auditId: string, req: NextApiRequest, res: NextApiRespo
     `;
 
     if (config) {
-      const frequencyDays =
-        config.audit_frequency === 'custom'
-          ? config.custom_frequency_days || 7
-          : { daily: 1, weekly: 7, fortnightly: 14, monthly: 30 }[config.audit_frequency] || 7;
+      const freqMap: Record<string, number> = { daily: 1, weekly: 7, fortnightly: 14, monthly: 30 };
+      const days = config.audit_frequency === 'custom'
+        ? (config.custom_frequency_days || 7)
+        : (freqMap[config.audit_frequency] || 7);
 
       const nextDue = new Date();
-      nextDue.setDate(nextDue.getDate() + frequencyDays);
+      nextDue.setDate(nextDue.getDate() + days);
 
       await sql`
         UPDATE hs_project_config
@@ -234,16 +227,6 @@ async function handlePut(auditId: string, req: NextApiRequest, res: NextApiRespo
       `;
     }
   }
-
-  // Log activity
-  await sql`
-    INSERT INTO hs_activity_log (entity_type, entity_id, action, details)
-    VALUES ('project_audit', ${auditId}, ${complete ? 'completed' : 'updated'}, ${JSON.stringify({
-      overall_score: overallScore,
-      rag_status: ragStatus,
-      status: finalStatus,
-    })}::jsonb)
-  `;
 
   return apiResponse.success(res, audit);
 }
