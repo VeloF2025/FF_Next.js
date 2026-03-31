@@ -14,3 +14,9 @@ ALTER TABLE hs_project_config
 -- Ensure one config per project for ON CONFLICT upsert
 CREATE UNIQUE INDEX IF NOT EXISTS hs_project_config_project_id_key
   ON hs_project_config (project_id);
+
+-- Add missing columns to hs_project_audits
+ALTER TABLE hs_project_audits
+  ADD COLUMN IF NOT EXISTS audit_type VARCHAR(50) DEFAULT 'routine',
+  ADD COLUMN IF NOT EXISTS weather_conditions TEXT,
+  ADD COLUMN IF NOT EXISTS site_personnel_count INTEGER;

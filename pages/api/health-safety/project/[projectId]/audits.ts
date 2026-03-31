@@ -148,8 +148,8 @@ async function handlePost(projectId: string, req: NextApiRequest, res: NextApiRe
 
   // Log activity
   await sql`
-    INSERT INTO hs_activity_log (entity_type, entity_id, action, actor_id, details)
-    VALUES ('project_audit', ${audit.id}, 'created', ${auditor_id || null}, ${JSON.stringify({
+    INSERT INTO hs_activity_log (activity_type, entity_type, entity_id, description, metadata)
+    VALUES ('audit_created', 'project_audit', ${audit.id}::uuid, ${'New audit started'}, ${JSON.stringify({
       project_id: projectId,
       project_name: project.project_name,
       audit_type,

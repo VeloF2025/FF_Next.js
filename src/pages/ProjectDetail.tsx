@@ -305,7 +305,6 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
         <ProjectHSTab
           projectId={id!}
           projectName={project.name}
-          onStartAudit={() => router.push(`/health-safety/project/${id}/audits/new`)}
         />
       )}
 
