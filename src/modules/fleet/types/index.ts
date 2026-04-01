@@ -20,3 +20,6 @@ export * from './driver.types';
 
 // Mileage report types
 export * from './mileage.types';
+
+// Scorecard types
+export * from './scorecard.types';
