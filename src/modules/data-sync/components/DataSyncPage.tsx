@@ -30,12 +30,14 @@ import {
   Lock,
   Loader2,
   CreditCard,
+  ClipboardList,
 } from 'lucide-react';
 import type { TabGroupId } from '../types';
 import { OverviewDashboard } from './OverviewDashboard';
 import { NocGroup } from './groups/NocGroup';
 import { ActivateGroup } from './groups/ActivateGroup';
 import { OltReportGroup } from './groups/OltReportGroup';
+import { EodGroup } from './groups/EodGroup';
 import { QFieldGroup } from './groups/QFieldGroup';
 import { HistoryGroup } from './groups/HistoryGroup';
 import { BillingGroup } from './groups/BillingGroup';
@@ -47,6 +49,7 @@ const GROUP_PERMISSION_KEYS: Record<TabGroupId, string> = {
   noc: 'system.data-sync.noc',
   activate: 'system.data-sync.activate',
   olt: 'system.data-sync.olt',
+  eod: 'system.data-sync.eod',
   qfield: 'system.data-sync.qfield',
   history: 'system.data-sync.history',
   billing: 'system.data-sync.billing',
@@ -76,6 +79,12 @@ const TAB_GROUPS: {
     label: 'OLT Report',
     icon: AlertTriangle,
     description: 'Nokia OLT report import and 1Map serial fixes',
+  },
+  {
+    id: 'eod',
+    label: 'EOD',
+    icon: ClipboardList,
+    description: 'End-of-Day install sheet upload and reconciliation',
   },
   {
     id: 'qfield',
@@ -321,6 +330,13 @@ export function DataSyncPage({ groupFilter }: DataSyncPageProps) {
           <OltReportGroup
             activeTab={activeTab}
             onTabChange={(tab) => handleTabChange('olt', tab)}
+          />
+        )}
+
+        {activeGroup === 'eod' && (
+          <EodGroup
+            activeTab={activeTab}
+            onTabChange={(tab) => handleTabChange('eod', tab)}
           />
         )}
 

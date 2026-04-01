@@ -22,10 +22,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     // Fetch all stat groups in parallel
-    const [nocStats, activateStats, oltStats, qfieldStats, billingStats] = await Promise.all([
+    const [nocStats, activateStats, oltStats, eodStats, qfieldStats, billingStats] = await Promise.all([
       getNocStats(),
       getActivateStats(),
       getOltStats(),
+      getEodStats(),
       getQFieldStats(),
       getBillingStats(),
     ]);
@@ -34,6 +35,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       noc: nocStats,
       activate: activateStats,
       olt: oltStats,
+      eod: eodStats,
       qfield: qfieldStats,
       billing: billingStats,
     };
@@ -236,6 +238,35 @@ async function getBillingStats() {
       totalPaid: 0,
       totalDeducted: 0,
     };
+  }
+}
+
+async function getEodStats() {
+  try {
+    const [result] = await sql`
+      SELECT
+        COUNT(*)::int as total_sheets,
+        MAX(sheet_date)::text as last_upload_date,
+        (SELECT COUNT(*)::int FROM eod_install_sheet_entries WHERE match_status = 'pending') as pending_reconciliation
+      FROM eod_install_sheets
+    `;
+    const totalMatched = await sql`
+      SELECT COUNT(*)::int as matched FROM eod_install_sheet_entries WHERE match_status = 'matched_all'
+    `;
+    const totalEntries = await sql`
+      SELECT COUNT(*)::int as total FROM eod_install_sheet_entries
+    `;
+    const total = totalEntries[0]?.total ?? 0;
+    const matched = totalMatched[0]?.matched ?? 0;
+    return {
+      totalSheets: result?.total_sheets ?? 0,
+      lastUploadDate: result?.last_upload_date ?? null,
+      matchRate: total > 0 ? Math.round((matched / total) * 100) : 0,
+      pendingReconciliation: result?.pending_reconciliation ?? 0,
+    };
+  } catch (error) {
+    log.warn('Error fetching EOD stats', { error });
+    return { totalSheets: 0, lastUploadDate: null, matchRate: 0, pendingReconciliation: 0 };
   }
 }
 

@@ -6,7 +6,7 @@
 import type { LucideIcon } from 'lucide-react';
 
 // Tab group identifiers
-export type TabGroupId = 'noc' | 'activate' | 'olt' | 'qfield' | 'history' | 'billing';
+export type TabGroupId = 'noc' | 'activate' | 'olt' | 'eod' | 'qfield' | 'history' | 'billing';
 
 // Individual tab within a group
 export interface Tab {
@@ -52,6 +52,12 @@ export interface DataSyncStats {
     activeProjects: number;
     lastSync: string | null;
   };
+  eod: {
+    totalSheets: number;
+    lastUploadDate: string | null;
+    matchRate: number;
+    pendingReconciliation: number;
+  };
   billing: {
     totalWeeks: number;
     lastUploadedWeek: string | null;
@@ -93,6 +99,9 @@ export type QFieldTabId = 'projects';
 
 // History tab IDs
 export type HistoryTabId = 'timeline';
+
+// EOD Install Sheet tab IDs
+export type EodTabId = 'upload' | 'reconciliation' | 'history';
 
 // Billing tab IDs
 export type BillingTabId = 'upload' | 'summary' | 'dr-status';
@@ -392,3 +401,82 @@ export interface FtBillingDeduction {
 }
 
 export type PaymentStatus = 'not_yet_claimed' | 'pre_provisioned' | 'paid' | 'deducted' | 'disputed';
+
+// ─── EOD Install Sheet Types ──────────────────────────────────────────────
+
+export interface EodInstallSheet {
+  id: string;
+  sheet_date: string;
+  technician_name: string | null;
+  technician_id: string | null;
+  photo_url: string | null;
+  entry_count: number;
+  uploaded_by: string | null;
+  created_at: string;
+  updated_at: string;
+  entries?: EodInstallSheetEntry[];
+}
+
+export interface EodInstallSheetEntry {
+  id: string;
+  sheet_id: string;
+  row_number: number;
+  ont_serial: string | null;
+  gizzu_serial: string | null;
+  dr_number: string | null;
+  pon_number: string | null;
+  address: string | null;
+  match_status: EodMatchStatus;
+  matched_dr_id: string | null;
+  matched_oes_id: string | null;
+  created_at: string;
+}
+
+export type EodMatchStatus =
+  | 'pending'
+  | 'matched_all'
+  | 'partial_match'
+  | 'missing_wa'
+  | 'missing_eod'
+  | 'not_activated';
+
+export interface EodVlmExtraction {
+  date: string | null;
+  technician_name: string | null;
+  technician_id: string | null;
+  entries: EodVlmEntry[];
+  overall_confidence: number;
+}
+
+export interface EodVlmEntry {
+  row_number: number;
+  ont_serial: string | null;
+  gizzu_serial: string | null;
+  dr_number: string | null;
+  pon_number: string | null;
+  address: string | null;
+  confidence: number;
+}
+
+export interface EodReconciliationRow {
+  dr_number: string | null;
+  ont_serial: string | null;
+  eod_entry_id: string | null;
+  gizzu_serial: string | null;
+  pon_number: string | null;
+  address: string | null;
+  wa_dr_id: string | null;
+  wa_ont_serial: string | null;
+  oes_id: string | null;
+  oes_serial: string | null;
+  activation_date: string | null;
+  match_status: EodMatchStatus;
+}
+
+export interface EodReconciliationSummary {
+  total_eod: number;
+  matched_wa: number;
+  matched_oes: number;
+  matched_all: number;
+  discrepancies: number;
+}

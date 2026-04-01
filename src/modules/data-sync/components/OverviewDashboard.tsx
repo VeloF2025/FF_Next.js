@@ -20,6 +20,7 @@ import {
   Upload,
   Map,
   CreditCard,
+  ClipboardList,
 } from 'lucide-react';
 import type { TabGroupId, DataSyncStats } from '../types';
 
@@ -63,6 +64,14 @@ const CATEGORY_CARDS: {
     description: 'Nokia OLT report import, serial mismatch fixes, and 1Map integration',
     color: 'text-red-400',
     bgColor: 'bg-red-500/10',
+  },
+  {
+    id: 'eod',
+    label: 'EOD Sheets',
+    icon: ClipboardList,
+    description: 'End-of-Day install sheet upload, VLM extraction, and 3-way reconciliation',
+    color: 'text-teal-400',
+    bgColor: 'bg-teal-500/10',
   },
   {
     id: 'qfield',
@@ -208,6 +217,25 @@ export function OverviewDashboard({ onGroupSelect, accessibleGroups }: OverviewD
             label: 'Last Sync',
             value: formatRelativeTime(stats.qfield.lastSync),
             icon: Clock,
+          },
+        ] : [];
+      case 'eod':
+        return stats.eod ? [
+          {
+            label: 'Total Sheets',
+            value: stats.eod.totalSheets.toString(),
+            icon: ClipboardList,
+          },
+          {
+            label: 'Last Upload',
+            value: formatRelativeTime(stats.eod.lastUploadDate),
+            icon: Upload,
+          },
+          {
+            label: 'Pending Recon.',
+            value: stats.eod.pendingReconciliation.toString(),
+            icon: Clock,
+            highlight: stats.eod.pendingReconciliation > 0,
           },
         ] : [];
       case 'billing':
