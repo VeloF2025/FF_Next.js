@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { ScanBarcode, Loader2 } from 'lucide-react';
+import { ScanLine, Loader2 } from 'lucide-react';
 import type { EodVlmEntry } from '../../../types';
 
 interface EodEntryTableProps {
@@ -125,7 +125,7 @@ export function EodEntryTable({ entries, editable = false, onChange }: EodEntryT
                       {scanningRow === i ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
-                        <ScanBarcode className="w-4 h-4" />
+                        <ScanLine className="w-4 h-4" />
                       )}
                     </button>
                   </div>
