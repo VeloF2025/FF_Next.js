@@ -214,7 +214,9 @@ export async function updateRolePermission(
 // =====================================================
 
 /**
- * Check if user has a specific permission action
+ * Check if user has a specific permission action.
+ * Cascades: if any ancestor permission (module → page → tab) denies
+ * view access, all children are also denied.
  */
 export async function userHasPermission(
   userId: string,
@@ -227,13 +229,43 @@ export async function userHasPermission(
 
   if (userResult.length === 0) return false;
 
-  const user = userResult[0];
+  const user = userResult[0]!;
 
   // Only super_admin role bypasses RBAC entirely
   if (user.role === 'super_admin') {
     return true;
   }
 
+  // Cascade check: if any ancestor module/page is blocked, deny access.
+  const ancestors = await sql`
+    WITH RECURSIVE ancestors AS (
+      SELECT parent_key FROM access_permissions WHERE key = ${permissionKey} AND parent_key IS NOT NULL
+      UNION ALL
+      SELECT ap.parent_key FROM access_permissions ap
+      JOIN ancestors a ON ap.key = a.parent_key
+      WHERE ap.parent_key IS NOT NULL
+    )
+    SELECT parent_key AS key FROM ancestors
+  `;
+
+  for (const ancestor of ancestors) {
+    const blocked = await isPermissionBlocked(userId, user.role as string, ancestor.key as string, 'view');
+    if (blocked) return false;
+  }
+
+  return !await isPermissionBlocked(userId, user.role as string, permissionKey, action);
+}
+
+/**
+ * Check if a single permission key is blocked for a user (no cascade).
+ * Returns true if the permission is NOT granted.
+ */
+async function isPermissionBlocked(
+  userId: string,
+  userRole: string,
+  permissionKey: string,
+  action: PermissionAction
+): Promise<boolean> {
   // Check for user override first (overrides take priority over role)
   const overrideResult = await sql`
     SELECT override_type, actions FROM user_permission_overrides
@@ -243,27 +275,29 @@ export async function userHasPermission(
   `;
 
   if (overrideResult.length > 0) {
-    const override = overrideResult[0];
+    const override = overrideResult[0]!;
+    const actions = override.actions as Record<string, boolean>;
     if (override.override_type === 'grant') {
-      // Grant override replaces role — return the grant's action value
-      return override.actions[action] === true;
+      return actions[action] !== true;
     }
-    if (override.override_type === 'revoke' && override.actions[action]) {
-      return false;
+    if (override.override_type === 'revoke' && actions[action]) {
+      return true;
     }
   }
 
   // Get role-based permission
   const rolePermResult = await sql`
     SELECT actions FROM role_permissions
-    WHERE role = ${user.role} AND permission_key = ${permissionKey}
+    WHERE role = ${userRole} AND permission_key = ${permissionKey}
   `;
 
-  if (rolePermResult.length > 0 && rolePermResult[0].actions) {
-    return rolePermResult[0].actions[action] === true;
+  if (rolePermResult.length > 0) {
+    const roleActions = rolePermResult[0]!.actions as Record<string, boolean>;
+    return roleActions[action] !== true;
   }
 
-  return false;
+  // No permission entry = blocked
+  return true;
 }
 
 /**
@@ -276,15 +310,16 @@ export async function getUserEffectivePermissions(userId: string): Promise<Effec
 
   if (userResult.length === 0) return [];
 
-  const user = userResult[0];
+  const user = userResult[0]!;
+  const userRole = user.role as string;
 
   // Only super_admin role bypasses RBAC entirely
-  if (user.role === 'super_admin') {
+  if (userRole === 'super_admin') {
     const allPerms = await sql`
       SELECT key FROM access_permissions WHERE is_active = true
     `;
     return allPerms.map(p => ({
-      permissionKey: p.key,
+      permissionKey: p.key as string,
       canView: true,
       canCreate: true,
       canEdit: true,
@@ -329,20 +364,53 @@ export async function getUserEffectivePermissions(userId: string): Promise<Effec
         FALSE
       ) as can_delete
     FROM access_permissions ap
-    LEFT JOIN role_permissions rp ON rp.permission_key = ap.key AND rp.role = ${user.role}
+    LEFT JOIN role_permissions rp ON rp.permission_key = ap.key AND rp.role = ${userRole}
     LEFT JOIN user_permission_overrides upo ON upo.permission_key = ap.key
       AND upo.user_id = ${userId}
       AND (upo.expires_at IS NULL OR upo.expires_at > NOW())
     WHERE ap.is_active = true
   `;
 
-  return result.map(row => ({
-    permissionKey: row.permission_key,
-    canView: row.can_view,
-    canCreate: row.can_create,
-    canEdit: row.can_edit,
-    canDelete: row.can_delete,
-  }));
+  // Build initial permission map
+  const permMap = new Map<string, EffectivePermission>();
+  for (const row of result) {
+    permMap.set(row.permission_key, {
+      permissionKey: row.permission_key,
+      canView: row.can_view,
+      canCreate: row.can_create,
+      canEdit: row.can_edit,
+      canDelete: row.can_delete,
+    });
+  }
+
+  // Cascade: if a parent module/page has view=false, all children must also be false.
+  // Get parent_key mappings for cascade.
+  const parentRows = await sql`
+    SELECT key, parent_key FROM access_permissions WHERE is_active = true AND parent_key IS NOT NULL
+  `;
+  const parentMap = new Map<string, string>();
+  for (const row of parentRows) {
+    parentMap.set(row.key, row.parent_key);
+  }
+
+  // For each permission, walk up the parent chain — if any ancestor has view=false, block this one
+  for (const [key, perm] of permMap) {
+    if (!perm.canView) continue; // already blocked, skip
+    let parentKey = parentMap.get(key);
+    while (parentKey) {
+      const parentPerm = permMap.get(parentKey);
+      if (parentPerm && !parentPerm.canView) {
+        perm.canView = false;
+        perm.canCreate = false;
+        perm.canEdit = false;
+        perm.canDelete = false;
+        break;
+      }
+      parentKey = parentMap.get(parentKey);
+    }
+  }
+
+  return Array.from(permMap.values());
 }
 
 /**

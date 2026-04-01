@@ -34,6 +34,7 @@ interface UserAccess {
   role: string;
   effectiveActions: { view: boolean; create: boolean; edit: boolean; delete: boolean };
   hasOverride: boolean;
+  blockedByParent?: string;
 }
 
 interface ModuleDetail {
@@ -562,6 +563,10 @@ export function ModulesAccessTab() {
                             )}
                             Override
                           </button>
+                        ) : user.blockedByParent ? (
+                          <span className="text-xs text-orange-400" title={`Blocked by parent: ${user.blockedByParent}`}>
+                            Parent
+                          </span>
                         ) : (
                           <span className="text-xs text-red-400">No access</span>
                         )}

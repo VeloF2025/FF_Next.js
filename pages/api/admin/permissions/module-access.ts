@@ -24,6 +24,7 @@ interface UserAccess {
   role: string;
   effectiveActions: { view: boolean; create: boolean; edit: boolean; delete: boolean };
   hasOverride: boolean;
+  blockedByParent?: string;
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -135,6 +136,79 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           hasOverride: !!u.override_type,
         };
       });
+
+      // Cascade: check if any ancestor module/page blocks view for each user
+      // Get ancestor chain for this permission
+      const ancestorRows = await sql`
+        WITH RECURSIVE ancestors AS (
+          SELECT parent_key FROM access_permissions WHERE key = ${permissionKey} AND parent_key IS NOT NULL
+          UNION ALL
+          SELECT ap.parent_key FROM access_permissions ap
+          JOIN ancestors a ON ap.key = a.parent_key
+          WHERE ap.parent_key IS NOT NULL
+        )
+        SELECT parent_key AS key FROM ancestors
+      `;
+      const ancestorKeys = ancestorRows.map((r: Record<string, unknown>) => r.key as string);
+
+      // If there are ancestors, check each user's parent permissions
+      if (ancestorKeys.length > 0) {
+        // Get parent role_permissions and overrides for all ancestors in bulk
+        const parentRolePerms = await sql`
+          SELECT role, permission_key, actions FROM role_permissions
+          WHERE permission_key = ANY(${ancestorKeys})
+        `;
+        const parentOverrides = await sql`
+          SELECT user_id, permission_key, override_type, actions FROM user_permission_overrides
+          WHERE permission_key = ANY(${ancestorKeys})
+            AND (expires_at IS NULL OR expires_at > NOW())
+        `;
+
+        const parentRoleMap = new Map<string, Map<string, Record<string, boolean>>>();
+        for (const rp of parentRolePerms) {
+          if (!parentRoleMap.has(rp.permission_key)) parentRoleMap.set(rp.permission_key, new Map());
+          parentRoleMap.get(rp.permission_key)!.set(rp.role, rp.actions as Record<string, boolean>);
+        }
+        const parentOverrideMap = new Map<string, Record<string, unknown>>();
+        for (const po of parentOverrides) {
+          parentOverrideMap.set(`${po.user_id}:${po.permission_key}`, po as Record<string, unknown>);
+        }
+
+        for (const user of userAccess) {
+          if (!user.effectiveActions.view) continue; // already blocked
+          if (user.role === 'super_admin' && !user.hasOverride) continue; // super_admin bypasses
+
+          for (const ancestorKey of ancestorKeys) {
+            // Check if this ancestor blocks the user
+            const override = parentOverrideMap.get(`${user.userId}:${ancestorKey}`);
+            let parentViewGranted = false;
+
+            if (override) {
+              const oa = (override as Record<string, unknown>).actions as Record<string, boolean>;
+              const ot = (override as Record<string, unknown>).override_type as string;
+              if (ot === 'grant') {
+                parentViewGranted = oa.view === true;
+              } else if (ot === 'revoke' && oa.view) {
+                parentViewGranted = false;
+              } else {
+                const roleActs = parentRoleMap.get(ancestorKey)?.get(user.role);
+                parentViewGranted = roleActs?.view === true;
+              }
+            } else if (user.role === 'super_admin') {
+              parentViewGranted = true;
+            } else {
+              const roleActs = parentRoleMap.get(ancestorKey)?.get(user.role);
+              parentViewGranted = roleActs?.view === true;
+            }
+
+            if (!parentViewGranted) {
+              user.effectiveActions = { view: false, create: false, edit: false, delete: false };
+              (user as UserAccess & { blockedByParent?: string }).blockedByParent = ancestorKey;
+              break;
+            }
+          }
+        }
+      }
 
       // Filter to users who have at least view access
       const usersWithView = userAccess.filter(u => u.effectiveActions.view);
