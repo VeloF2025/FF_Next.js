@@ -15,7 +15,7 @@ export const TABS: Tab[] = [
   { id: 'health', label: 'Health', href: '/system/health' },
   { id: 'deployment', label: 'Deployment', href: '/deployment' },
   { id: 'infrastructure', label: 'Infrastructure', href: '/system/infrastructure' },
-  { id: 'data-sync', label: 'Data Sync', href: '/system/data-sync' },
+  { id: 'data-sync', label: 'Activation Ops', href: '/activate/data-sync' },
   { id: 'vlm', label: 'VLM Learning', href: '/system/vlm-learning' },
   {
     id: 'data-management',
