@@ -3,9 +3,18 @@
  * Extracts data from photographed "Home Drop and Activation - Equipment Allocation Form"
  */
 
-import { callVlmExtraction } from '@/modules/activate/services/vlmClient';
+import {
+  VLM_API_ENDPOINT,
+  VLM_MODEL,
+  VLM_TEMPERATURE,
+  VLM_TIMEOUT_MS,
+  vlmLogger,
+} from '@/modules/activate/services/vlmClient';
 import type { EodVlmExtraction } from '../types';
 import { log } from '@/lib/logger';
+
+/** Higher max_tokens than default — EOD sheets produce large structured JSON */
+const EOD_MAX_TOKENS = 4000;
 
 const EOD_EXTRACT_PROMPT = `You are extracting data from a physical "Home Drop and Activation - Equipment Allocation Form" used by Velocity Fibre field technicians.
 
@@ -51,39 +60,87 @@ Respond in this exact JSON format:
 }`;
 
 /**
- * Extract data from an EOD install sheet photo using VLM
+ * Extract data from an EOD install sheet photo using VLM.
+ * Uses higher max_tokens than the default callVlmExtraction to handle 10-row form output.
  */
 export async function extractEodSheet(
   base64Image: string
 ): Promise<{ success: boolean; data: EodVlmExtraction | null; error?: string }> {
   const startTime = Date.now();
 
-  const result = await callVlmExtraction<EodVlmExtraction>(
-    base64Image,
-    EOD_EXTRACT_PROMPT,
-    'eod-sheet-extract'
-  );
+  try {
+    const requestBody = {
+      model: VLM_MODEL,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: EOD_EXTRACT_PROMPT },
+            {
+              type: 'image_url',
+              image_url: { url: `data:image/jpeg;base64,${base64Image}` },
+            },
+          ],
+        },
+      ],
+      max_tokens: EOD_MAX_TOKENS,
+      temperature: VLM_TEMPERATURE,
+    };
 
-  const processingTimeMs = Date.now() - startTime;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_MS);
 
-  if (result.success && result.data) {
-    // Normalize DR numbers
-    result.data.entries = result.data.entries.map((entry) => ({
+    const response = await fetch(VLM_API_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`VLM API returned ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+
+    if (!content) {
+      throw new Error('No content in VLM response');
+    }
+
+    // Extract JSON from response (handle markdown code blocks)
+    const jsonMatch =
+      content.match(/```json\n([\s\S]*?)\n```/) ||
+      content.match(/```\n([\s\S]*?)\n```/) ||
+      [null, content];
+
+    const parsed: EodVlmExtraction = JSON.parse(jsonMatch[1] || content);
+
+    const processingTimeMs = Date.now() - startTime;
+
+    // Normalize entries
+    parsed.entries = parsed.entries.map((entry) => ({
       ...entry,
       dr_number: normalizeDrNumber(entry.dr_number),
       ont_serial: entry.ont_serial?.toUpperCase() || null,
     }));
 
     log.info('[EOD-VLM] Extraction complete', {
-      entries: result.data.entries.length,
-      confidence: result.data.overall_confidence,
+      entries: parsed.entries.length,
+      confidence: parsed.overall_confidence,
       processingTimeMs,
     });
-  } else {
-    log.warn('[EOD-VLM] Extraction failed', { error: result.error, processingTimeMs });
-  }
 
-  return result;
+    return { success: true, data: parsed };
+  } catch (error: unknown) {
+    const processingTimeMs = Date.now() - startTime;
+    const message = error instanceof Error ? error.message : 'Unknown VLM error';
+    log.error('[EOD-VLM] Extraction failed', { error: message, processingTimeMs });
+    return { success: false, data: null, error: message };
+  }
 }
 
 function normalizeDrNumber(dr: string | null): string | null {
