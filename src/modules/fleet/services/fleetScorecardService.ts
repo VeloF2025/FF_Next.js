@@ -1,6 +1,11 @@
 /**
  * Fleet Scorecard Service
  * Per-vehicle analytics combining distance, fuel, compliance, and driver data
+ *
+ * KM Calculation: Uses first/last CLEAN reading (excluding discrepancy-flagged entries)
+ * rather than SUM(km_since_last), which is unreliable due to:
+ * - Odoo bulk imports with no previous_reading
+ * - VLM misreads creating huge false deltas
  */
 
 import { neon } from '@/lib/db-neon';
@@ -20,8 +25,10 @@ function countWeekdays(start: Date, end: Date): number {
   return Math.max(count, 1);
 }
 
-function parseRow(row: ScorecardRow, expectedChecks: number): VehicleScorecard {
-  const totalKm = parseFloat(row.total_km) || 0;
+function parseRow(row: ScorecardRow, expectedChecks: number, daysInRange: number): VehicleScorecard {
+  const firstReading = parseInt(row.first_reading) || 0;
+  const lastReading = parseInt(row.last_reading) || 0;
+  const totalKm = Math.max(lastReading - firstReading, 0);
   const fuelCost = parseFloat(row.fuel_cost) || 0;
   const fuelLitres = parseFloat(row.fuel_litres) || 0;
   const checkInCount = parseInt(row.check_in_count) || 0;
@@ -40,7 +47,9 @@ function parseRow(row: ScorecardRow, expectedChecks: number): VehicleScorecard {
     projectCode: row.project_code,
     projectName: row.project_name,
     totalKm,
-    latestReading: parseInt(row.latest_reading) || 0,
+    firstReading,
+    lastReading,
+    avgKmPerDay: daysInRange > 0 && totalKm > 0 ? Math.round(totalKm / daysInRange) : 0,
     fuelCost,
     fuelLitres,
     costPerKm: totalKm > 0 ? Math.round((fuelCost / totalKm) * 100) / 100 : null,
@@ -50,32 +59,51 @@ function parseRow(row: ScorecardRow, expectedChecks: number): VehicleScorecard {
     weeklyChecks: parseInt(row.weekly_checks) || 0,
     lastCheckDate: row.last_check_date,
     complianceRate: Math.min(100, Math.round((checkInCount / expectedChecks) * 100)),
+    odometerReadings: parseInt(row.odo_readings) || 0,
+    fuelTransactions: parseInt(row.fuel_txns) || 0,
   };
 }
 
 /**
  * Get vehicle scorecard — all vehicles with metrics for a date range
+ * Uses robust first/last clean reading for KM instead of SUM(km_since_last)
  */
 export async function getVehicleScorecard(
   startDate: string,
   endDate: string
 ): Promise<ScorecardReport> {
-  const expectedChecks = countWeekdays(new Date(startDate), new Date(endDate));
+  const startD = new Date(startDate);
+  const endD = new Date(endDate);
+  const expectedChecks = countWeekdays(startD, endD);
+  const daysInRange = Math.max(1, Math.ceil((endD.getTime() - startD.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
+  // Robust KM: first and last CLEAN reading (excluding discrepancy-flagged)
+  // This avoids inflated values from VLM misreads and Odoo bulk imports
   const rows = await sql`
+    WITH clean_readings AS (
+      SELECT vehicle_id, reading, recorded_at,
+        ROW_NUMBER() OVER (PARTITION BY vehicle_id ORDER BY recorded_at ASC, reading ASC) as rn_first,
+        ROW_NUMBER() OVER (PARTITION BY vehicle_id ORDER BY recorded_at DESC, reading DESC) as rn_last
+      FROM fleet_odometer_history
+      WHERE recorded_at::date >= ${startDate}::date
+        AND recorded_at::date <= ${endDate}::date
+        AND (discrepancy_flag IS NULL OR discrepancy_flag = false)
+    )
     SELECT
       fv.id, fv.registration, fv.make, fv.model, fv.year,
       fv.vehicle_type, fv.ownership_type, fv.status,
       s.first_name || ' ' || s.last_name as driver_name,
       va.assignment_start::text as driver_since,
       p.project_code, p.project_name,
-      COALESCE(odo.total_km, 0) as total_km,
-      COALESCE(odo.latest_reading, 0) as latest_reading,
-      COALESCE(fuel.total_cost, 0) as fuel_cost,
-      COALESCE(fuel.total_litres, 0) as fuel_litres,
-      COALESCE(checks.total_checks, 0) as check_in_count,
-      COALESCE(checks.daily_checks, 0) as daily_checks,
-      COALESCE(checks.weekly_checks, 0) as weekly_checks,
+      COALESCE(first_r.reading, 0)::text as first_reading,
+      COALESCE(last_r.reading, 0)::text as last_reading,
+      COALESCE(odo_count.cnt, 0)::text as odo_readings,
+      COALESCE(fuel.total_cost, 0)::text as fuel_cost,
+      COALESCE(fuel.total_litres, 0)::text as fuel_litres,
+      COALESCE(fuel.txn_count, 0)::text as fuel_txns,
+      COALESCE(checks.total_checks, 0)::text as check_in_count,
+      COALESCE(checks.daily_checks, 0)::text as daily_checks,
+      COALESCE(checks.weekly_checks, 0)::text as weekly_checks,
       checks.last_check_date::text
     FROM fleet_vehicles fv
     LEFT JOIN vehicle_assignments va
@@ -84,20 +112,22 @@ export async function getVehicleScorecard(
     LEFT JOIN fleet_vehicle_project_assignments fvpa
       ON fvpa.vehicle_id = fv.id AND fvpa.is_active = true
     LEFT JOIN projects p ON p.id = fvpa.project_id
+    LEFT JOIN clean_readings first_r
+      ON first_r.vehicle_id = fv.id AND first_r.rn_first = 1
+    LEFT JOIN clean_readings last_r
+      ON last_r.vehicle_id = fv.id AND last_r.rn_last = 1
     LEFT JOIN LATERAL (
-      SELECT
-        COALESCE(SUM(km_since_last), 0) as total_km,
-        MAX(reading) as latest_reading
+      SELECT COUNT(*)::int as cnt
       FROM fleet_odometer_history
       WHERE vehicle_id = fv.id
         AND recorded_at::date >= ${startDate}::date
         AND recorded_at::date <= ${endDate}::date
-        AND km_since_last IS NOT NULL
-    ) odo ON true
+    ) odo_count ON true
     LEFT JOIN LATERAL (
       SELECT
         COALESCE(SUM(amount_rand), 0) as total_cost,
-        COALESCE(SUM(litres), 0) as total_litres
+        COALESCE(SUM(litres), 0) as total_litres,
+        COUNT(*)::int as txn_count
       FROM fleet_fuel_transactions
       WHERE vehicle_id = fv.id
         AND transaction_date >= ${startDate}::date
@@ -115,10 +145,10 @@ export async function getVehicleScorecard(
         AND check_date <= ${endDate}::date
     ) checks ON true
     WHERE fv.status != 'retired'
-    ORDER BY total_km DESC
+    ORDER BY GREATEST(COALESCE(last_r.reading, 0) - COALESCE(first_r.reading, 0), 0) DESC
   ` as ScorecardRow[];
 
-  const vehicles = rows.map(row => parseRow(row, expectedChecks));
+  const vehicles = rows.map(row => parseRow(row, expectedChecks, daysInRange));
 
   const fleetTotalKm = vehicles.reduce((s, v) => s + v.totalKm, 0);
   const fleetFuelCost = vehicles.reduce((s, v) => s + v.fuelCost, 0);
@@ -135,11 +165,13 @@ export async function getVehicleScorecard(
   return {
     startDate,
     endDate,
+    daysInRange,
     summary: {
       totalVehicles: vehicles.length,
       activeWithData,
       fleetTotalKm,
       fleetFuelCost,
+      fleetFuelLitres,
       fleetAvgCostPerKm: fleetTotalKm > 0 ? Math.round((fleetFuelCost / fleetTotalKm) * 100) / 100 : null,
       fleetAvgLitresPer100km: fleetTotalKm > 0 && fleetFuelLitres > 0
         ? Math.round((fleetFuelLitres / fleetTotalKm) * 10000) / 100 : null,
