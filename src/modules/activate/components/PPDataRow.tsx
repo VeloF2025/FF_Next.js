@@ -31,9 +31,6 @@ export const PPDataRow = React.memo(function PPDataRow({
       </td>
       <td className="px-3 py-2 font-mono text-[var(--ff-text-primary)]">{record.serial_number}</td>
       <td className="px-3 py-2 text-[var(--ff-text-secondary)]">{record.project}</td>
-      <td className="px-3 py-2 text-[var(--ff-text-secondary)]">
-        {record.date_registered ? formatDisplayDate(record.date_registered) : '-'}
-      </td>
       <td className="px-3 py-2">
         <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}>
           {statusStyle.label}
@@ -47,6 +44,9 @@ export const PPDataRow = React.memo(function PPDataRow({
       </td>
       <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs text-center">
         {record.pon_no ?? '-'}
+      </td>
+      <td className="px-3 py-2 text-[var(--ff-text-secondary)]">
+        {record.date_registered ? formatDisplayDate(record.date_registered) : '-'}
       </td>
       <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs">
         {record.oes_team || '-'}
@@ -108,7 +108,7 @@ export const PPDataRow = React.memo(function PPDataRow({
 });
 
 export const TABLE_HEADERS = [
-  'Serial', 'Project', 'Registered', 'Status', 'DR', 'Zone', 'PON',
+  'Serial', 'Project', 'Status', 'DR', 'Zone', 'PON', 'Registered',
   'Install Team', 'Activation', 'WA Technician', 'Source', 'Ticket', 'Priority',
 ] as const;
 
