@@ -110,25 +110,22 @@ async function findAllBarcodes(variants: string[]): Promise<string[]> {
 
 function buildPrompt(barcodeHints: string[]): string {
   const barcodeSection = barcodeHints.length > 0
-    ? `\nMACHINE-DECODED BARCODES:\n${barcodeHints.map((b, i) => `  ${i + 1}. ${b}`).join('\n')}\n`
+    ? `\nBarcodes decoded: ${barcodeHints.join(', ')}\n`
     : '';
 
   return `/no_think
-Read this Velocity Fibre install form table. Extract ALL rows (up to 10). Every row has DIFFERENT values.
+Read this Velocity Fibre install form. Extract each row from the table individually.
 
-Columns: Row# | ONT Serial (sticker text starting "SN: ALCL...") | Gizzu Serial (GU18W12V25...) | DR Number (DR18...) | PON (121-128) | Address (4-5 digits)
+Columns left to right: Row# | ONT Serial (printed "SN: ALCL..." text on sticker) | Gizzu Serial (GU18W12V25...) | DR Number (DR18...) | PON (121-128) | Address (4-5 digits)
 
-Date: top-right DD/MM/YYYY → YYYY-MM-DD. Technician: bottom "NAME & ID NUMBER".
+Header: Date top-right (DD/MM/YYYY→YYYY-MM-DD), Technician name+ID at bottom.
 
-Rules:
-- ONT Serial: read printed text "SN: ALCLB..." on each barcode sticker. Each is UNIQUE (e.g. ALCLB4E5A300, ALCLB48EEEE, ALCLB4E5F7D).
-- DR Number: ALWAYS "DR18" prefix (8 not 9). Each row different.
-- Gizzu: "GU18W12V25" + unique suffix per row.
-- PON: read actual value per row (128, 127, or 121 etc), don't assume same for all.
-- Address: each row different.
+IMPORTANT: Values are NOT sequential. Do NOT increment numbers across rows. Read each cell from the actual handwriting/print on the form. DR numbers, addresses, gizzu suffixes, and PON values vary independently across rows.
+
+Field hints: DR prefix is always DR18 (not DR19). ONT serials: read the small printed text below each barcode sticker.
 ${barcodeSection}
-JSON only:
-{"date":"2026-03-30","technician_name":"Doctor Onalenna","technician_id":"014825","entries":[{"row_number":1,"ont_serial":"ALCLB4E5A300","gizzu_serial":"GU18W12V25-090-30991","dr_number":"DR1865110","pon_number":"128","address":"14643","confidence":0.8}],"overall_confidence":0.8}`;
+Return JSON only:
+{"date":"YYYY-MM-DD","technician_name":"string","technician_id":"string or null","entries":[{"row_number":1,"ont_serial":"string or null","gizzu_serial":"string or null","dr_number":"string","pon_number":"string","address":"string","confidence":0.8}],"overall_confidence":0.8}`;
 }
 
 // ============================================================================
@@ -176,6 +173,17 @@ function validatePon(pon: string | null): string | null {
   const num = parseInt(pon.replace(/[^0-9]/g, ''), 10);
   if (num >= 100 && num <= 200) return num.toString();
   return pon;
+}
+
+/** Detect if numbers form a sequential pattern (incrementing by 1) */
+function isSequential(nums: number[]): boolean {
+  if (nums.length < 3) return false;
+  let seqCount = 0;
+  for (let i = 1; i < nums.length; i++) {
+    if (nums[i] === nums[i - 1] + 1) seqCount++;
+  }
+  // If >60% of transitions are +1, it's sequential
+  return seqCount / (nums.length - 1) > 0.6;
 }
 
 // ============================================================================
@@ -238,19 +246,34 @@ export async function extractEodSheet(
     // Pass 3: Post-process
     parsed.entries = postProcessEntries(parsed.entries);
 
-    // Duplicate detection — if all DR numbers identical, VLM hallucinated
-    const drSet = new Set(parsed.entries.map((e) => e.dr_number).filter(Boolean));
-    if (drSet.size === 1 && parsed.entries.length > 1) {
-      log.warn('[EOD] All DRs identical — hallucination, clearing');
-      parsed.entries = parsed.entries.map((e) => ({ ...e, dr_number: null, confidence: 0.3 }));
-      parsed.overall_confidence = 0.3;
-    }
+    // Hallucination guards
+    if (parsed.entries.length > 1) {
+      // Duplicate detection
+      const drSet = new Set(parsed.entries.map((e) => e.dr_number).filter(Boolean));
+      if (drSet.size === 1) {
+        log.warn('[EOD] All DRs identical — hallucination');
+        parsed.entries = parsed.entries.map((e) => ({ ...e, dr_number: null, confidence: 0.3 }));
+        parsed.overall_confidence = 0.3;
+      }
+      const gzSet = new Set(parsed.entries.map((e) => e.gizzu_serial).filter(Boolean));
+      if (gzSet.size === 1) {
+        log.warn('[EOD] All Gizzu identical — hallucination');
+        parsed.entries = parsed.entries.map((e) => ({ ...e, gizzu_serial: null }));
+      }
 
-    // Same for gizzu serials
-    const gzSet = new Set(parsed.entries.map((e) => e.gizzu_serial).filter(Boolean));
-    if (gzSet.size === 1 && parsed.entries.length > 1) {
-      log.warn('[EOD] All Gizzu identical — hallucination, clearing');
-      parsed.entries = parsed.entries.map((e) => ({ ...e, gizzu_serial: null }));
+      // Sequential pattern detection — if values increment by 1, it's hallucination
+      const drNums = parsed.entries.map((e) => e.dr_number ? parseInt(e.dr_number.replace(/\D/g, '')) : NaN).filter((n) => !isNaN(n));
+      if (drNums.length >= 3 && isSequential(drNums)) {
+        log.warn('[EOD] Sequential DRs detected — hallucination');
+        parsed.entries = parsed.entries.map((e) => ({ ...e, dr_number: null, confidence: 0.3 }));
+        parsed.overall_confidence = 0.3;
+      }
+
+      const addrs = parsed.entries.map((e) => e.address ? parseInt(e.address) : NaN).filter((n) => !isNaN(n));
+      if (addrs.length >= 3 && isSequential(addrs)) {
+        log.warn('[EOD] Sequential addresses detected — hallucination');
+        parsed.entries = parsed.entries.map((e) => ({ ...e, address: null }));
+      }
     }
 
     log.info('[EOD] Done', {
