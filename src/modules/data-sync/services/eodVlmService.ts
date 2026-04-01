@@ -221,10 +221,51 @@ Each is UNIQUE. Do NOT increment — if you can't read a sticker, output null fo
 JSON array only:
 [{"row":1,"serial":"ALCLB4E5A300"},{"row":2,"serial":"ALCLB48EEEE"},{"row":3,"serial":null}]`;
 
+const NAFNET_URL = process.env.NAFNET_URL || 'http://100.96.203.105:8101';
+
+/** Deblur image using NAFNet, then upscale 2x for better VLM text reading */
+async function enhanceForOntReading(base64: string): Promise<string> {
+  let enhanced = base64;
+
+  // NAFNet deblur (non-blocking — fall back to original if unavailable)
+  try {
+    const res = await fetch(`${NAFNET_URL}/deblur`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: base64 }),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.image) {
+        enhanced = data.image;
+        log.info('[EOD-ONT] NAFNet deblur applied');
+      }
+    }
+  } catch {
+    log.warn('[EOD-ONT] NAFNet unavailable, using original');
+  }
+
+  // Upscale 2x + sharpen for small text readability
+  const buf = Buffer.from(enhanced, 'base64');
+  const meta = await sharp(buf).metadata();
+  const upscaled = await sharp(buf)
+    .resize((meta.width || 1280) * 2, (meta.height || 720) * 2, { kernel: 'lanczos3' })
+    .normalise()
+    .sharpen({ sigma: 1.5 })
+    .jpeg({ quality: 95 })
+    .toBuffer();
+
+  return upscaled.toString('base64');
+}
+
 async function extractOntSerials(fullResBase64: string, rowCount: number): Promise<Map<number, string>> {
   const result = new Map<number, string>();
 
   try {
+    // Enhance image: NAFNet deblur + 2x upscale for small sticker text
+    const enhancedBase64 = await enhanceForOntReading(fullResBase64);
+
     const response = await fetch(VLM_API_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -234,7 +275,7 @@ async function extractOntSerials(fullResBase64: string, rowCount: number): Promi
           role: 'user',
           content: [
             { type: 'text', text: ONT_SERIAL_PROMPT },
-            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${fullResBase64}` } },
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${enhancedBase64}` } },
           ],
         }],
         max_tokens: 1024,
