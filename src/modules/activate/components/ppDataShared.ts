@@ -20,6 +20,8 @@ export interface PPRecord {
   wa_phone: string | null;
   wa_name: string | null;
   wa_team: string | null;
+  zone_no: number | null;
+  pon_no: number | null;
 }
 
 export type PPCardCategory = 'total' | 'activated' | 'located' | 'not_found' | 'ticketed';

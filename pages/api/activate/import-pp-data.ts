@@ -172,7 +172,9 @@ async function handler(
               oa.activation_date,
               dur.sender_phone AS wa_phone,
               COALESCE(wc.formal_name, wc.wa_display_name) AS wa_name,
-              wc.team AS wa_team
+              wc.team AS wa_team,
+              d.zone_no,
+              d.pon_no
        FROM oes_pp_data pp
        LEFT JOIN maintenance_tickets mt ON pp.maintenance_ticket_id = mt.id
        LEFT JOIN oes_activations oa ON oa.drop_number = pp.resolved_drop_number
@@ -247,7 +249,9 @@ async function handler(
               oa.activation_date,
               dur.sender_phone AS wa_phone,
               COALESCE(wc.formal_name, wc.wa_display_name) AS wa_name,
-              wc.team AS wa_team
+              wc.team AS wa_team,
+              d.zone_no,
+              d.pon_no
        FROM oes_pp_data pp
        LEFT JOIN maintenance_tickets mt ON pp.maintenance_ticket_id = mt.id
        LEFT JOIN oes_activations oa ON oa.drop_number = pp.resolved_drop_number
@@ -275,6 +279,8 @@ async function handler(
       'Date Registered': r.date_registered ? new Date(r.date_registered).toLocaleDateString() : '',
       'Status': STATUS_LABELS[r.resolution_status] || r.resolution_status,
       'Resolved DR': r.resolved_drop_number || '',
+      'Zone': r.zone_no ?? '',
+      'PON': r.pon_no ?? '',
       'Source': r.resolved_source || '',
       'Resolved At': r.resolved_at ? new Date(r.resolved_at).toLocaleString() : '',
       'Install Team': r.oes_team || '',

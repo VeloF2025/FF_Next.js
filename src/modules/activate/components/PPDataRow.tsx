@@ -42,6 +42,12 @@ export const PPDataRow = React.memo(function PPDataRow({
       <td className="px-3 py-2 font-mono text-[var(--ff-text-primary)]">
         {record.resolved_drop_number || '-'}
       </td>
+      <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs text-center">
+        {record.zone_no ?? '-'}
+      </td>
+      <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs text-center">
+        {record.pon_no ?? '-'}
+      </td>
       <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs">
         {record.oes_team || '-'}
       </td>
@@ -102,7 +108,7 @@ export const PPDataRow = React.memo(function PPDataRow({
 });
 
 export const TABLE_HEADERS = [
-  'Serial', 'Project', 'Registered', 'Status', 'DR',
+  'Serial', 'Project', 'Registered', 'Status', 'DR', 'Zone', 'PON',
   'Install Team', 'Activation', 'WA Technician', 'Source', 'Ticket', 'Priority',
 ] as const;
 
