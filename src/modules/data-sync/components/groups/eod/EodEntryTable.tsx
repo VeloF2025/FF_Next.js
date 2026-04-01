@@ -1,11 +1,12 @@
 /**
  * EOD Entry Table
- * Reusable editable/read-only table for EOD install sheet entries
+ * Editable/read-only table with per-row barcode scan for ONT serials
  */
 
 'use client';
 
-import React from 'react';
+import React, { useRef, useState } from 'react';
+import { ScanBarcode, Loader2 } from 'lucide-react';
 import type { EodVlmEntry } from '../../../types';
 
 interface EodEntryTableProps {
@@ -15,12 +16,40 @@ interface EodEntryTableProps {
 }
 
 export function EodEntryTable({ entries, editable = false, onChange }: EodEntryTableProps) {
+  const [scanningRow, setScanningRow] = useState<number | null>(null);
+  const scanInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
+
   const updateEntry = (index: number, field: keyof EodVlmEntry, value: string) => {
     if (!onChange) return;
     const updated = entries.map((e, i) =>
       i === index ? { ...e, [field]: value || null } : e
     );
     onChange(updated);
+  };
+
+  const handleScanCapture = async (index: number, file: File) => {
+    setScanningRow(index);
+    try {
+      const base64 = await fileToBase64(file);
+      const res = await fetch('/api/eod/scan-barcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64 }),
+      });
+      const json = await res.json();
+      if (json.success && json.data?.serial) {
+        updateEntry(index, 'ont_serial', json.data.serial);
+      }
+    } catch {
+      // silently fail — user can type manually
+    } finally {
+      setScanningRow(null);
+    }
+  };
+
+  const triggerScan = (index: number) => {
+    const input = scanInputRefs.current.get(index);
+    if (input) input.click();
   };
 
   const cellClass = editable
@@ -34,7 +63,9 @@ export function EodEntryTable({ entries, editable = false, onChange }: EodEntryT
           <tr className="border-b border-[var(--ff-border-light)]">
             <th className="text-left px-2 py-2 text-[var(--ff-text-secondary)] font-medium w-10">#</th>
             <th className="text-left px-2 py-2 text-[var(--ff-text-secondary)] font-medium">DR Number</th>
-            <th className="text-left px-2 py-2 text-[var(--ff-text-secondary)] font-medium">ONT Serial</th>
+            <th className="text-left px-2 py-2 text-[var(--ff-text-secondary)] font-medium">
+              ONT Serial {editable && <span className="text-xs text-[var(--ff-text-tertiary)]">(scan sticker)</span>}
+            </th>
             <th className="text-left px-2 py-2 text-[var(--ff-text-secondary)] font-medium">Gizzu Serial</th>
             <th className="text-left px-2 py-2 text-[var(--ff-text-secondary)] font-medium w-20">PON</th>
             <th className="text-left px-2 py-2 text-[var(--ff-text-secondary)] font-medium">Address</th>
@@ -66,12 +97,38 @@ export function EodEntryTable({ entries, editable = false, onChange }: EodEntryT
               </td>
               <td className="px-2 py-1.5">
                 {editable ? (
-                  <input
-                    className={cellClass}
-                    value={entry.ont_serial || ''}
-                    onChange={(e) => updateEntry(i, 'ont_serial', e.target.value)}
-                    placeholder="ALCL..."
-                  />
+                  <div className="flex gap-1 items-center">
+                    <input
+                      className={cellClass}
+                      value={entry.ont_serial || ''}
+                      onChange={(e) => updateEntry(i, 'ont_serial', e.target.value)}
+                      placeholder="ALCL..."
+                    />
+                    <input
+                      ref={(el) => { if (el) scanInputRefs.current.set(i, el); }}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleScanCapture(i, f);
+                        e.target.value = '';
+                      }}
+                    />
+                    <button
+                      onClick={() => triggerScan(i)}
+                      disabled={scanningRow !== null}
+                      className="flex-shrink-0 p-1.5 rounded bg-[var(--ff-accent)]/10 text-[var(--ff-accent)] hover:bg-[var(--ff-accent)]/20 transition-colors disabled:opacity-50"
+                      title="Scan barcode sticker"
+                    >
+                      {scanningRow === i ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <ScanBarcode className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
                 ) : (
                   <span className={`${cellClass} font-mono text-xs`}>{entry.ont_serial || '—'}</span>
                 )}
@@ -133,4 +190,16 @@ export function EodEntryTable({ entries, editable = false, onChange }: EodEntryT
       </table>
     </div>
   );
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.split(',')[1] || result);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
