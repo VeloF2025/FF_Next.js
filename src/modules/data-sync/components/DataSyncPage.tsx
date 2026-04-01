@@ -140,18 +140,19 @@ export function DataSyncPage() {
     return accessibleGroups.some((g) => g.id === activeGroup);
   }, [activeGroup, accessibleGroups]);
 
-  // Handle group change (App Router)
+  // Handle group change — use current pathname so it works from any mount point
+  const basePath = router.pathname;
   const handleGroupChange = (groupId: TabGroupId | null) => {
     if (groupId === null) {
-      router.push('/system/data-sync');
+      router.push(basePath);
     } else {
-      router.push(`/system/data-sync?group=${groupId}`);
+      router.push(`${basePath}?group=${groupId}`);
     }
   };
 
-  // Handle tab change within a group (App Router)
+  // Handle tab change within a group
   const handleTabChange = (groupId: TabGroupId, tabId: string) => {
-    router.push(`/system/data-sync?group=${groupId}&tab=${tabId}`);
+    router.push(`${basePath}?group=${groupId}&tab=${tabId}`);
   };
 
   // Handle refresh
