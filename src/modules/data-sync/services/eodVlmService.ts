@@ -114,17 +114,25 @@ function buildPrompt(barcodeHints: string[]): string {
     : '';
 
   return `/no_think
-Read this Velocity Fibre install form. Extract each row from the table individually.
+Read this handwritten Velocity Fibre install form table.
 
-Columns left to right: Row# | ONT Serial (printed "SN: ALCL..." text on sticker) | Gizzu Serial (GU18W12V25...) | DR Number (DR18...) | PON (121-128) | Address (4-5 digits)
+HANDWRITING GUIDE for this writer:
+- "6" written as round "0" shape → when you see "0" in DR numbers or addresses, it's "6"
+- "8" written tall like "9" → in DR prefix, always "8" (DR186XXXX)
+- "4" can look like "1" or "9" → in addresses starting with "14", second digit is always "4"
 
-Header: Date top-right (DD/MM/YYYY→YYYY-MM-DD), Technician name+ID at bottom.
+COLUMNS: Row# | ONT Serial (sticker "SN:ALCL...") | Gizzu (GU18W12V25-XXX-XXXXX) | DR (DR186XXXX) | PON | Address
 
-IMPORTANT: Values are NOT sequential. Do NOT increment numbers across rows. Read each cell from the actual handwriting/print on the form. DR numbers, addresses, gizzu suffixes, and PON values vary independently across rows.
+DR Numbers: ALL start with DR186. The last 3-4 digits vary per row — read each carefully.
+Addresses: ALL start with "14" followed by 3 unique digits. Examples from this area: 14643, 14627, 14813, 14814, 14897, 14898, 14846, 14812, 14832, 14825.
+Gizzu suffixes: format is 3chars-5digits (like 090-30991 or 04C-31000). The suffix is different per row.
+PON: one of 128, 127, or 121 — read the actual handwritten digits.
 
-Field hints: DR prefix is always DR18 (not DR19). ONT serials: read the small printed text below each barcode sticker.
+Date: top-right DD/MM/YYYY → YYYY-MM-DD. Technician: bottom of form — read FULL name.
+
+Each row is UNIQUE. Do NOT increment or copy values.
 ${barcodeSection}
-Return JSON only:
+JSON only:
 {"date":"YYYY-MM-DD","technician_name":"string","technician_id":"string or null","entries":[{"row_number":1,"ont_serial":"string or null","gizzu_serial":"string or null","dr_number":"string","pon_number":"string","address":"string","confidence":0.8}],"overall_confidence":0.8}`;
 }
 
