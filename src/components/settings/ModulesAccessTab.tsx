@@ -3,12 +3,13 @@
  * Shows all modules in an expandable tree with who has access in a grid view
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ChevronRight, ChevronDown, Loader2, Search,
   Eye, Plus, Pencil, Trash2, ShieldCheck, ShieldOff,
-  Layers, FileText, LayoutGrid, Users
+  Layers, FileText, LayoutGrid, Users, RotateCcw
 } from 'lucide-react';
+import { log } from '@/lib/logger';
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -74,22 +75,42 @@ const ROLE_DISPLAY: Record<string, string> = {
 
 // ─── Action icon helper ─────────────────────────────────────
 
-function ActionBadge({ action, enabled }: { action: string; enabled: boolean }) {
+function ActionBadge({
+  action,
+  enabled,
+  onClick,
+  saving,
+}: {
+  action: string;
+  enabled: boolean;
+  onClick?: () => void;
+  saving?: boolean;
+}) {
   const icons: Record<string, typeof Eye> = { view: Eye, create: Plus, edit: Pencil, delete: Trash2 };
   const labels: Record<string, string> = { view: 'View', create: 'Create', edit: 'Edit', delete: 'Delete' };
   const Icon = icons[action] || Eye;
 
+  if (saving) {
+    return (
+      <span className="inline-flex items-center justify-center w-6 h-6 rounded text-xs bg-blue-500/20">
+        <Loader2 className="w-3 h-3 animate-spin text-blue-400" />
+      </span>
+    );
+  }
+
   return (
-    <span
-      title={`${labels[action]}: ${enabled ? 'Yes' : 'No'}`}
-      className={`inline-flex items-center justify-center w-6 h-6 rounded text-xs ${
+    <button
+      type="button"
+      onClick={onClick}
+      title={`${labels[action]}: ${enabled ? 'Yes' : 'No'} — click to toggle`}
+      className={`inline-flex items-center justify-center w-6 h-6 rounded text-xs cursor-pointer transition-colors ${
         enabled
-          ? 'bg-green-500/20 text-green-400'
-          : 'bg-gray-700/50 text-gray-600'
+          ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+          : 'bg-gray-700/50 text-gray-600 hover:bg-gray-600/50 hover:text-gray-400'
       }`}
     >
       <Icon className="w-3 h-3" />
-    </span>
+    </button>
   );
 }
 
@@ -116,6 +137,9 @@ export function ModulesAccessTab() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showNoAccess, setShowNoAccess] = useState(false);
+  const [savingCell, setSavingCell] = useState<string | null>(null); // "userId:action"
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const successTimeout = useRef<ReturnType<typeof setTimeout>>();
 
   // Fetch module tree
   const fetchTree = useCallback(async () => {
@@ -154,6 +178,76 @@ export function ModulesAccessTab() {
       setDetailLoading(false);
     }
   }, []);
+
+  // Toggle a single permission action for a user
+  const togglePermission = useCallback(async (
+    userId: string,
+    permissionKey: string,
+    action: 'view' | 'create' | 'edit' | 'delete',
+    currentActions: { view: boolean; create: boolean; edit: boolean; delete: boolean },
+  ) => {
+    const cellKey = `${userId}:${action}`;
+    setSavingCell(cellKey);
+
+    const newActions = { ...currentActions, [action]: !currentActions[action] };
+
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/permissions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          permissionKey,
+          overrideType: 'grant',
+          actions: newActions,
+          reason: `Toggled ${action} from Modules tab`,
+        }),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error?.message || 'Failed to update permission');
+      }
+
+      setSuccessMsg(`Updated ${action} permission`);
+      if (successTimeout.current) clearTimeout(successTimeout.current);
+      successTimeout.current = setTimeout(() => setSuccessMsg(null), 2000);
+
+      if (selectedKey) await fetchDetail(selectedKey);
+    } catch (err) {
+      log.error('Failed to toggle permission', { userId, permissionKey, action, error: err });
+    } finally {
+      setSavingCell(null);
+    }
+  }, [selectedKey, fetchDetail]);
+
+  // Reset user override back to role defaults
+  const resetToRole = useCallback(async (userId: string, permissionKey: string) => {
+    const cellKey = `${userId}:reset`;
+    setSavingCell(cellKey);
+
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/permissions`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ permissionKey }),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error?.message || 'Failed to reset permission');
+      }
+
+      setSuccessMsg('Reset to role defaults');
+      if (successTimeout.current) clearTimeout(successTimeout.current);
+      successTimeout.current = setTimeout(() => setSuccessMsg(null), 2000);
+
+      if (selectedKey) await fetchDetail(selectedKey);
+    } catch (err) {
+      log.error('Failed to reset permission', { userId, permissionKey, error: err });
+    } finally {
+      setSavingCell(null);
+    }
+  }, [selectedKey, fetchDetail]);
 
   useEffect(() => { fetchTree(); }, [fetchTree]);
 
@@ -348,14 +442,17 @@ export function ModulesAccessTab() {
                 </div>
               )}
 
-              {/* Toggle: show no-access users */}
-              <div className="mt-3">
+              {/* Toggle + success message */}
+              <div className="mt-3 flex items-center gap-4">
                 <button
                   onClick={() => setShowNoAccess(!showNoAccess)}
                   className="text-xs text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]"
                 >
                   {showNoAccess ? 'Hide users without access' : `Show ${detail.totalWithoutAccess} users without access`}
                 </button>
+                {successMsg && (
+                  <span className="text-xs text-green-400 animate-pulse">{successMsg}</span>
+                )}
               </div>
             </div>
 
@@ -392,13 +489,30 @@ export function ModulesAccessTab() {
                           {ROLE_DISPLAY[user.role] || user.role}
                         </span>
                       </td>
-                      <td className="text-center px-3 py-2.5"><ActionBadge action="view" enabled={user.effectiveActions.view} /></td>
-                      <td className="text-center px-3 py-2.5"><ActionBadge action="create" enabled={user.effectiveActions.create} /></td>
-                      <td className="text-center px-3 py-2.5"><ActionBadge action="edit" enabled={user.effectiveActions.edit} /></td>
-                      <td className="text-center px-3 py-2.5"><ActionBadge action="delete" enabled={user.effectiveActions.delete} /></td>
+                      {(['view', 'create', 'edit', 'delete'] as const).map(action => (
+                        <td key={action} className="text-center px-3 py-2.5">
+                          <ActionBadge
+                            action={action}
+                            enabled={user.effectiveActions[action]}
+                            saving={savingCell === `${user.userId}:${action}`}
+                            onClick={() => togglePermission(user.userId, detail.permissionKey, action, user.effectiveActions)}
+                          />
+                        </td>
+                      ))}
                       <td className="text-center px-3 py-2.5">
                         {user.hasOverride ? (
-                          <span className="text-xs text-amber-400" title="User has a permission override">Override</span>
+                          <button
+                            onClick={() => resetToRole(user.userId, detail.permissionKey)}
+                            className="inline-flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300"
+                            title="Reset to role defaults (remove override)"
+                          >
+                            {savingCell === `${user.userId}:reset` ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <RotateCcw className="w-3 h-3" />
+                            )}
+                            Override
+                          </button>
                         ) : (
                           <span className="text-xs text-[var(--ff-text-tertiary)]">Role</span>
                         )}
@@ -407,7 +521,7 @@ export function ModulesAccessTab() {
                   ))}
 
                   {showNoAccess && detail.usersWithoutAccess.map(user => (
-                    <tr key={user.userId} className="border-b border-[var(--ff-border-light)] opacity-40">
+                    <tr key={user.userId} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] opacity-60 hover:opacity-100">
                       <td className="px-6 py-2.5">
                         <div className="flex items-center gap-2">
                           <Users className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
@@ -424,12 +538,33 @@ export function ModulesAccessTab() {
                           {ROLE_DISPLAY[user.role] || user.role}
                         </span>
                       </td>
-                      <td className="text-center px-3 py-2.5"><ActionBadge action="view" enabled={false} /></td>
-                      <td className="text-center px-3 py-2.5"><ActionBadge action="create" enabled={false} /></td>
-                      <td className="text-center px-3 py-2.5"><ActionBadge action="edit" enabled={false} /></td>
-                      <td className="text-center px-3 py-2.5"><ActionBadge action="delete" enabled={false} /></td>
+                      {(['view', 'create', 'edit', 'delete'] as const).map(action => (
+                        <td key={action} className="text-center px-3 py-2.5">
+                          <ActionBadge
+                            action={action}
+                            enabled={user.effectiveActions[action]}
+                            saving={savingCell === `${user.userId}:${action}`}
+                            onClick={() => togglePermission(user.userId, detail.permissionKey, action, user.effectiveActions)}
+                          />
+                        </td>
+                      ))}
                       <td className="text-center px-3 py-2.5">
-                        <span className="text-xs text-red-400">No access</span>
+                        {user.hasOverride ? (
+                          <button
+                            onClick={() => resetToRole(user.userId, detail.permissionKey)}
+                            className="inline-flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300"
+                            title="Reset to role defaults (remove override)"
+                          >
+                            {savingCell === `${user.userId}:reset` ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <RotateCcw className="w-3 h-3" />
+                            )}
+                            Override
+                          </button>
+                        ) : (
+                          <span className="text-xs text-red-400">No access</span>
+                        )}
                       </td>
                     </tr>
                   ))}
