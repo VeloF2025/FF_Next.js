@@ -51,6 +51,11 @@ export default function CommunicationsHub() {
   const [showCreateActionItem, setShowCreateActionItem] = useState(false);
   const { data, stats, isLoading, isLoadingMore, hasMoreMeetings, loadMoreMeetings, getStatusColor, refetch } = useCommunications();
 
+  // Read ?meeting= param for deep-linking
+  const initialMeetingId = router.query.meeting
+    ? Number(router.query.meeting)
+    : undefined;
+
   // Sync active tab with URL param
   useEffect(() => {
     const tabParam = router.query.tab as string | undefined;
@@ -58,7 +63,11 @@ export default function CommunicationsHub() {
       const valid = TABS.find(t => t.key === tabParam);
       if (valid) setActiveTab(valid.key);
     }
-  }, [router.query.tab]);
+    // If meeting param present, force meetings tab
+    if (router.query.meeting) {
+      setActiveTab('meetings');
+    }
+  }, [router.query.tab, router.query.meeting]);
 
   const handleTabChange = (tab: CommsTab) => {
     setActiveTab(tab);
@@ -318,6 +327,7 @@ export default function CommunicationsHub() {
                   hasMore={hasMoreMeetings}
                   isLoadingMore={isLoadingMore}
                   onLoadMore={loadMoreMeetings}
+                  initialMeetingId={initialMeetingId}
                 />
               )
             )}

@@ -5,7 +5,8 @@
  */
 
 import { useState } from 'react';
-import { X, FileText, MessageSquare, Film, CheckCircle, Loader2, AlertCircle, Download, FileDown } from 'lucide-react';
+import { X, FileText, MessageSquare, Film, CheckCircle, Loader2, AlertCircle, Download, FileDown, Link2, Check } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import type { Meeting } from '../types/meeting.types';
 import { getSourceColor, getSourceLabel, getProcessingStatusLabel } from '../utils/meetingUtils';
 import { generateMeetingMinutesPdf } from '../utils/generateMeetingMinutesPdf';
@@ -29,8 +30,21 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
   const [isGeneratingMinutes, setIsGeneratingMinutes] = useState(false);
   const [minutesBlob, setMinutesBlob] = useState<Blob | null>(null);
   const [showMinutesPreview, setShowMinutesPreview] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   if (!isOpen || !meeting) return null;
+
+  const handleCopyLink = async () => {
+    const url = `${window.location.origin}/communications?tab=meetings&meeting=${meeting.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setLinkCopied(true);
+      toast.success('Meeting link copied');
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      toast.error('Failed to copy link');
+    }
+  };
 
   const tabs: { key: DetailTab; label: string; icon: typeof FileText; disabled?: boolean }[] = [
     { key: 'summary', label: 'Summary', icon: FileText },
@@ -68,12 +82,21 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
                 {getSourceLabel(meeting.source)}
               </span>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-[var(--ff-bg-hover)] rounded"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleCopyLink}
+                className="p-2 hover:bg-[var(--ff-bg-hover)] rounded text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
+                title="Copy meeting link"
+              >
+                {linkCopied ? <Check className="w-5 h-5 text-green-400" /> : <Link2 className="w-5 h-5" />}
+              </button>
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-[var(--ff-bg-hover)] rounded"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Processing Status Banner */}

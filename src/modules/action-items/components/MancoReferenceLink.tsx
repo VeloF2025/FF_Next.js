@@ -14,9 +14,28 @@ interface MancoReferenceLinkProps {
 }
 
 /**
+ * Detect if a URL is a FibreFlow meeting link and extract the meeting ID.
+ * Matches: /communications?tab=meetings&meeting={id}
+ */
+function parseMeetingId(url: string): number | null {
+  try {
+    const parsed = new URL(url);
+    if (
+      parsed.pathname === '/communications' &&
+      parsed.searchParams.get('tab') === 'meetings' &&
+      parsed.searchParams.get('meeting')
+    ) {
+      const id = parseInt(parsed.searchParams.get('meeting')!, 10);
+      return Number.isFinite(id) && id > 0 ? id : null;
+    }
+  } catch { /* not a valid URL */ }
+  return null;
+}
+
+/**
  * Inline editor for the reference_link field of a manco action item.
  * Displays the current link (read-only) and an editable input + Save button.
- * Validates the URL client-side before submitting, and shows toast feedback.
+ * Auto-detects meeting URLs and links the meeting context + extracts discussion.
  */
 export function MancoReferenceLink({ item, onUpdated }: MancoReferenceLinkProps) {
   const [linkInput, setLinkInput] = useState<string>(item.reference_link ?? '');
@@ -38,13 +57,26 @@ export function MancoReferenceLink({ item, onUpdated }: MancoReferenceLinkProps)
       return;
     }
 
+    // Detect meeting URL
+    const meetingId = trimmed ? parseMeetingId(trimmed) : null;
+
     setSaving(true);
     try {
+      // Build PATCH body — include source_meeting_id if meeting URL detected or cleared
+      const patchBody: Record<string, unknown> = {
+        reference_link: trimmed || null,
+      };
+      if (meetingId) {
+        patchBody.source_meeting_id = meetingId;
+      } else if (!trimmed) {
+        // Clearing the link also clears the meeting association
+        patchBody.source_meeting_id = null;
+      }
+
       const res = await fetch(`/api/manco-action-items/${item.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        // Send null explicitly to allow clearing the link.
-        body: JSON.stringify({ reference_link: trimmed || null }),
+        body: JSON.stringify(patchBody),
       });
 
       if (!res.ok) {
@@ -55,9 +87,36 @@ export function MancoReferenceLink({ item, onUpdated }: MancoReferenceLinkProps)
         return;
       }
 
-      toast.success('Reference link saved');
-      log.info('Reference link saved', { itemId: item.id });
-      onUpdated();
+      if (meetingId) {
+        toast.success('Meeting linked — extracting discussion...');
+
+        // Fire-and-forget: extract relevant transcript excerpts as comments
+        fetch('/api/manco-action-items/extract-meeting-comments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            manco_action_item_id: item.id,
+            meeting_id: meetingId,
+          }),
+        })
+          .then(r => r.json())
+          .then(json => {
+            const count = (json as { data?: { comments_inserted?: number } }).data?.comments_inserted ?? 0;
+            if (count > 0) {
+              toast.success(`${count} discussion excerpt${count > 1 ? 's' : ''} added as comments`);
+            }
+            onUpdated(); // Refresh to show new comments + meeting context
+          })
+          .catch(err => {
+            log.error('Failed to extract meeting comments', { err, itemId: item.id, meetingId });
+            onUpdated(); // Still refresh for the meeting context link
+          });
+      } else {
+        toast.success('Reference link saved');
+        onUpdated();
+      }
+
+      log.info('Reference link saved', { itemId: item.id, meetingId });
     } catch (error) {
       toast.error('Error saving reference link');
       log.error('Error saving reference link', { error, itemId: item.id });

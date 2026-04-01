@@ -9,8 +9,9 @@
  * - Sub-tab filters (all/upcoming/past/cancelled)
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Calendar, Search, RefreshCw } from 'lucide-react';
+import { log } from '@/lib/logger';
 import type { Meeting } from '@/modules/meetings/types/meeting.types';
 import { MeetingsList } from '@/modules/meetings/components/MeetingsList';
 import { MeetingDetailModal } from '@/modules/meetings/components/MeetingDetailModal';
@@ -23,6 +24,8 @@ interface CommunicationsMeetingsTabProps {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
+  /** When set, auto-open the meeting detail modal for this meeting ID (deep-link). */
+  initialMeetingId?: number;
 }
 
 type MeetingFilter = 'all' | 'upcoming' | 'past' | 'cancelled';
@@ -36,6 +39,7 @@ export function CommunicationsMeetingsTab({
   hasMore,
   isLoadingMore,
   onLoadMore,
+  initialMeetingId,
 }: CommunicationsMeetingsTabProps) {
   const [activeFilter, setActiveFilter] = useState<MeetingFilter>('all');
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
@@ -43,6 +47,31 @@ export function CommunicationsMeetingsTab({
   const [dateFilter, setDateFilter] = useState('');
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const hasAutoOpened = useRef(false);
+
+  // Auto-open meeting modal from deep-link URL param
+  useEffect(() => {
+    if (!initialMeetingId || hasAutoOpened.current || meetings.length === 0) return;
+
+    const match = meetings.find(m => String(m.id) === String(initialMeetingId));
+    if (match) {
+      setSelectedMeeting(match);
+      setShowDetailModal(true);
+      hasAutoOpened.current = true;
+    } else {
+      // Meeting not in loaded list — fetch it directly
+      fetch(`/api/meetings?id=${initialMeetingId}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(json => {
+          if (json?.data) {
+            setSelectedMeeting(json.data);
+            setShowDetailModal(true);
+          }
+          hasAutoOpened.current = true;
+        })
+        .catch(err => log.error('Failed to fetch meeting for deep-link', { err, meetingId: initialMeetingId }));
+    }
+  }, [initialMeetingId, meetings]);
 
   // Search + date filter (client-side)
   const searchedMeetings = useMemo(() => {
