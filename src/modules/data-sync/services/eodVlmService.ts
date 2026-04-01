@@ -1,6 +1,8 @@
 /**
  * EOD Install Sheet VLM Extraction Service
- * Extracts data from photographed "Home Drop and Activation - Equipment Allocation Form"
+ * Two-pass extraction:
+ *   Pass 1: zxing barcode scanner finds all ONT serial barcodes
+ *   Pass 2: VLM extracts table data with barcode hints for accurate serial matching
  */
 
 import {
@@ -8,35 +10,40 @@ import {
   VLM_MODEL,
   VLM_TEMPERATURE,
   VLM_TIMEOUT_MS,
-  vlmLogger,
 } from '@/modules/activate/services/vlmClient';
+import { scanAllBarcodes } from '@/modules/activate/services/enhancedBarcodeService';
 import type { EodVlmExtraction } from '../types';
 import { log } from '@/lib/logger';
 
-/** Higher max_tokens than default — EOD sheets produce large structured JSON */
 const EOD_MAX_TOKENS = 4000;
 
-const EOD_EXTRACT_PROMPT = `You are extracting data from a physical "Home Drop and Activation - Equipment Allocation Form" used by Velocity Fibre field technicians.
+function buildPrompt(barcodeHints: string[]): string {
+  const barcodeSection = barcodeHints.length > 0
+    ? `\n\nBARCODE SCANNER RESULTS (high-accuracy ONT serials detected in this image):\n${barcodeHints.map((b, i) => `  ${i + 1}. ${b}`).join('\n')}\nAssign these serials to the matching rows based on their visual position in the table. These are MORE accurate than OCR — prefer these values for ont_serial.\n`
+    : '\n\nNo barcode stickers were machine-decoded. Try to read ONT serial text manually.\n';
+
+  return `You are extracting data from a physical "Home Drop and Activation - Equipment Allocation Form" used by Velocity Fibre field technicians.
 
 The form is a table with up to 10 numbered rows. Extract ALL rows that have data.
 
+IMPORTANT CONTEXT: DR numbers in this system start with "DR18" (not DR19). The "1" and "8" in handwriting can look like "1" and "9" — always assume DR18xxxxx.
+
 For EACH row, extract:
 - row_number: The row number (1-10)
-- ont_serial: ONT Serial # (barcode sticker). Format: ALCLB4 followed by 6 hex characters (12 chars total). Look for sticker text starting with "ALCL".
-- gizzu_serial: Gizzu Serial Number (UPS device). Format: starts with "GU" followed by alphanumeric characters (e.g. GU18W12V25...).
-- dr_number: DR Number. Format: "DR" followed by 5-7 digits (e.g. DR1865310). May be handwritten.
-- pon_number: PON number. Usually a 2-3 digit number (e.g. 128).
-- address: Address or stand number. Could be a numeric stand number (e.g. 14643).
+- ont_serial: ONT Serial # from the barcode sticker column. Use the barcode scanner results below if available.
+- gizzu_serial: Gizzu Serial Number (UPS device). Format: starts with "GU18W12V25" followed by digits.
+- dr_number: DR Number. Format: "DR18" followed by 3-5 digits. ALWAYS starts with DR18.
+- pon_number: PON number. Usually 121-128.
+- address: Address or stand number (4-5 digit number).
 
 Also extract from the form header/footer:
 - date: Install date. Convert from DD/MM/YYYY to YYYY-MM-DD format.
-- technician_name: Technician name from the bottom of the form (next to "NAME & ID NUMBER").
-- technician_id: Technician ID number if visible.
-
-IMPORTANT:
-- Read handwritten text carefully. Set confidence < 0.7 if uncertain.
-- ONT serials MUST start with "ALCL". If it doesn't match, set confidence low.
-- DR numbers MUST start with "DR". If you see just digits, prepend "DR".
+- technician_name: Full name from the bottom of the form (next to "NAME & ID NUMBER").
+- technician_id: ID number if visible.
+${barcodeSection}
+RULES:
+- DR numbers MUST start with "DR18". If you read "DR19", it's likely "DR18" misread.
+- Read each digit carefully. Handwritten 8 and 9 look similar — default to 8 for DR prefix.
 - Skip completely empty rows.
 - If a cell is blank or unreadable, set the value to null.
 
@@ -50,7 +57,7 @@ Respond in this exact JSON format:
       "row_number": 1,
       "ont_serial": "ALCLXXXXXXXX or null",
       "gizzu_serial": "GU... or null",
-      "dr_number": "DR1234567 or null",
+      "dr_number": "DR18XXXXX or null",
       "pon_number": "128 or null",
       "address": "string or null",
       "confidence": 0.85
@@ -58,24 +65,42 @@ Respond in this exact JSON format:
   ],
   "overall_confidence": 0.8
 }`;
+}
 
 /**
- * Extract data from an EOD install sheet photo using VLM.
- * Uses higher max_tokens than the default callVlmExtraction to handle 10-row form output.
+ * Extract data from an EOD install sheet photo.
+ * Pass 1: Barcode scan for ONT serials. Pass 2: VLM for all other fields.
  */
 export async function extractEodSheet(
   base64Image: string
 ): Promise<{ success: boolean; data: EodVlmExtraction | null; error?: string }> {
   const startTime = Date.now();
 
+  // Pass 1: Barcode extraction
+  let barcodeHints: string[] = [];
   try {
+    const barcodeResult = await scanAllBarcodes(base64Image);
+    if (barcodeResult.success && barcodeResult.barcodes.length > 0) {
+      barcodeHints = barcodeResult.barcodes.map((b) => b.value);
+      log.info('[EOD-VLM] Barcode scan found serials', {
+        count: barcodeHints.length,
+        serials: barcodeHints,
+      });
+    }
+  } catch (err) {
+    log.warn('[EOD-VLM] Barcode scan failed, proceeding with VLM only', { error: err });
+  }
+
+  // Pass 2: VLM extraction with barcode hints
+  try {
+    const prompt = buildPrompt(barcodeHints);
     const requestBody = {
       model: VLM_MODEL,
       messages: [
         {
           role: 'user',
           content: [
-            { type: 'text', text: EOD_EXTRACT_PROMPT },
+            { type: 'text', text: prompt },
             {
               type: 'image_url',
               image_url: { url: `data:image/jpeg;base64,${base64Image}` },
@@ -111,15 +136,12 @@ export async function extractEodSheet(
       throw new Error('No content in VLM response');
     }
 
-    // Extract JSON from response (handle markdown code blocks)
     const jsonMatch =
       content.match(/```json\n([\s\S]*?)\n```/) ||
       content.match(/```\n([\s\S]*?)\n```/) ||
       [null, content];
 
     const parsed: EodVlmExtraction = JSON.parse(jsonMatch[1] || content);
-
-    const processingTimeMs = Date.now() - startTime;
 
     // Normalize entries
     parsed.entries = parsed.entries.map((entry) => ({
@@ -128,8 +150,10 @@ export async function extractEodSheet(
       ont_serial: entry.ont_serial?.toUpperCase() || null,
     }));
 
+    const processingTimeMs = Date.now() - startTime;
     log.info('[EOD-VLM] Extraction complete', {
       entries: parsed.entries.length,
+      barcodesFound: barcodeHints.length,
       confidence: parsed.overall_confidence,
       processingTimeMs,
     });
@@ -145,7 +169,11 @@ export async function extractEodSheet(
 
 function normalizeDrNumber(dr: string | null): string | null {
   if (!dr) return null;
-  const cleaned = dr.replace(/\s+/g, '').toUpperCase();
+  let cleaned = dr.replace(/\s+/g, '').toUpperCase();
+  // Fix common misread: DR19 → DR18
+  if (cleaned.startsWith('DR19')) {
+    cleaned = 'DR18' + cleaned.slice(4);
+  }
   if (cleaned.startsWith('DR')) return cleaned;
   if (/^\d{5,7}$/.test(cleaned)) return `DR${cleaned}`;
   return cleaned;
