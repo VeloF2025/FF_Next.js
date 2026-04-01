@@ -215,14 +215,11 @@ function isSequential(nums: number[]): boolean {
 // ============================================================================
 
 const ONT_SERIAL_PROMPT = `/no_think
-Look at this form. It has barcode stickers in the leftmost data column (after the row numbers).
-Each sticker has small PRINTED TEXT below the barcode bars that starts with "SN: ALCL" or just "ALCL".
-
-Read ONLY the printed serial number text from each sticker, row by row (1-10).
-Each serial is UNIQUE — format: ALCLB4 followed by 4-6 hex characters (0-9, A-F).
-
-Output JSON array only:
-[{"row":1,"serial":"ALCLB4XXXXXX"},{"row":2,"serial":"ALCLB48XXXXX"}]`;
+This form has barcode stickers with small printed text "SN: ALCL..." below each barcode.
+Read the printed serial text from each sticker, row 1-10. Format: ALCLB4 or ALCLB48 followed by hex chars.
+Each is UNIQUE. Do NOT increment — if you can't read a sticker, output null for that row.
+JSON array only:
+[{"row":1,"serial":"ALCLB4E5A300"},{"row":2,"serial":"ALCLB48EEEE"},{"row":3,"serial":null}]`;
 
 async function extractOntSerials(fullResBase64: string, rowCount: number): Promise<Map<number, string>> {
   const result = new Map<number, string>();
@@ -266,20 +263,29 @@ async function extractOntSerials(fullResBase64: string, rowCount: number): Promi
       }
     }
 
-    // Check for duplicates — if >50% same value, clear them
-    const vals = Array.from(result.values());
-    const counts = new Map<string, number>();
-    for (const v of vals) counts.set(v, (counts.get(v) || 0) + 1);
-    for (const [serial, count] of counts) {
-      if (count > rowCount * 0.4) {
-        log.warn(`[EOD-ONT] Serial "${serial}" repeated ${count}x — hallucination`);
-        for (const [row, val] of result) {
-          if (val === serial) result.delete(row);
-        }
+    // Detect sequential hex suffix — keep only before the run starts
+    const candidates = Array.from(result.entries()).sort((a, b) => a[0] - b[0]);
+    let seqStart = candidates.length;
+    for (let i = 1; i < candidates.length; i++) {
+      const prevSuffix = parseInt(candidates[i - 1]![1].slice(-3), 16);
+      const currSuffix = parseInt(candidates[i]![1].slice(-3), 16);
+      if (!isNaN(prevSuffix) && !isNaN(currSuffix) && currSuffix === prevSuffix + 1) {
+        if (i < seqStart) seqStart = i;
       }
     }
+    if (seqStart < candidates.length) {
+      log.warn('[EOD-ONT] Sequential at index ' + seqStart + ' — trimming');
+      for (let i = seqStart; i < candidates.length; i++) result.delete(candidates[i]![0]);
+    }
 
-    log.info('[EOD-ONT] Focused extraction done', { found: result.size });
+    // Also reject duplicates
+    const counts = new Map<string, number>();
+    for (const [, val] of result) counts.set(val, (counts.get(val) || 0) + 1);
+    for (const [serial, count] of counts) {
+      if (count > 1) { for (const [row, val] of result) if (val === serial) result.delete(row); }
+    }
+
+    log.info('[EOD-ONT] Focused extraction', { total: candidates.length, kept: result.size, seqStart });
   } catch (err) {
     log.warn('[EOD-ONT] Focused extraction failed', { error: err });
   }
