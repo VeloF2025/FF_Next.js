@@ -211,6 +211,83 @@ function isSequential(nums: number[]): boolean {
 }
 
 // ============================================================================
+// ONT SERIAL FOCUSED EXTRACTION (Pass 2b)
+// ============================================================================
+
+const ONT_SERIAL_PROMPT = `/no_think
+Look at this form. It has barcode stickers in the leftmost data column (after the row numbers).
+Each sticker has small PRINTED TEXT below the barcode bars that starts with "SN: ALCL" or just "ALCL".
+
+Read ONLY the printed serial number text from each sticker, row by row (1-10).
+Each serial is UNIQUE — format: ALCLB4 followed by 4-6 hex characters (0-9, A-F).
+
+Output JSON array only:
+[{"row":1,"serial":"ALCLB4XXXXXX"},{"row":2,"serial":"ALCLB48XXXXX"}]`;
+
+async function extractOntSerials(fullResBase64: string, rowCount: number): Promise<Map<number, string>> {
+  const result = new Map<number, string>();
+
+  try {
+    const response = await fetch(VLM_API_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: VLM_MODEL,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: ONT_SERIAL_PROMPT },
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${fullResBase64}` } },
+          ],
+        }],
+        max_tokens: 1024,
+        temperature: 0,
+      }),
+      signal: AbortSignal.timeout(VLM_TIMEOUT_MS),
+    });
+
+    if (!response.ok) return result;
+
+    const data = await response.json();
+    let content = data.choices?.[0]?.message?.content || '';
+
+    // Parse
+    const block = content.match(/```(?:json)?\n([\s\S]*?)\n```/);
+    if (block) content = block[1];
+    const thinkEnd = content.indexOf('</think>');
+    if (thinkEnd !== -1) content = content.slice(thinkEnd + 8).trim();
+
+    const serials: Array<{ row: number; serial: string }> = JSON.parse(content);
+
+    for (const s of serials) {
+      if (s.serial && s.row >= 1 && s.row <= rowCount) {
+        const cleaned = cleanOntSerial(s.serial);
+        if (cleaned) result.set(s.row, cleaned);
+      }
+    }
+
+    // Check for duplicates — if >50% same value, clear them
+    const vals = Array.from(result.values());
+    const counts = new Map<string, number>();
+    for (const v of vals) counts.set(v, (counts.get(v) || 0) + 1);
+    for (const [serial, count] of counts) {
+      if (count > rowCount * 0.4) {
+        log.warn(`[EOD-ONT] Serial "${serial}" repeated ${count}x — hallucination`);
+        for (const [row, val] of result) {
+          if (val === serial) result.delete(row);
+        }
+      }
+    }
+
+    log.info('[EOD-ONT] Focused extraction done', { found: result.size });
+  } catch (err) {
+    log.warn('[EOD-ONT] Focused extraction failed', { error: err });
+  }
+
+  return result;
+}
+
+// ============================================================================
 // MAIN EXTRACTION
 // ============================================================================
 
@@ -220,19 +297,25 @@ export async function extractEodSheet(
   const startTime = Date.now();
 
   let vlmBase64 = base64Image;
+  let fullResBase64 = base64Image;
   let barcodeHints: string[] = [];
 
   // Pass 0 + 1: Preprocess + Barcode scan
   try {
     const { vlmBase64: processed, barcodeVariants } = await preprocessEodImage(base64Image);
     vlmBase64 = processed;
+    // Keep full-res version for ONT serial focused extraction
+    const raw = Buffer.from(base64Image, 'base64');
+    const rotated = await sharp(raw).rotate().normalise().jpeg({ quality: 92 }).toBuffer();
+    fullResBase64 = rotated.toString('base64');
+
     barcodeHints = await findAllBarcodes(barcodeVariants);
     log.info('[EOD] Pass 0+1', { barcodes: barcodeHints.length, serials: barcodeHints, ms: Date.now() - startTime });
   } catch (err) {
     log.warn('[EOD] Preprocess failed', { error: err });
   }
 
-  // Pass 2: VLM
+  // Pass 2a: VLM main extraction (table data at 1280x960)
   try {
     const response = await fetch(VLM_API_ENDPOINT, {
       method: 'POST',
@@ -319,6 +402,22 @@ export async function extractEodSheet(
       if (addrs.length >= 3 && isSequential(addrs)) {
         log.warn('[EOD] Sequential addresses detected — hallucination');
         parsed.entries = parsed.entries.map((e) => ({ ...e, address: null }));
+      }
+    }
+
+    // Pass 2b: Focused ONT serial extraction at full resolution
+    // Only run if ONT serials are mostly null (main extraction failed to read stickers)
+    const ontNulls = parsed.entries.filter((e) => !e.ont_serial).length;
+    if (ontNulls > parsed.entries.length * 0.5) {
+      log.info('[EOD] Most ONT serials null — running focused extraction at full res');
+      const ontMap = await extractOntSerials(fullResBase64, parsed.entries.length);
+      if (ontMap.size > 0) {
+        parsed.entries = parsed.entries.map((e) => {
+          const focused = ontMap.get(e.row_number);
+          if (focused && !e.ont_serial) return { ...e, ont_serial: focused };
+          return e;
+        });
+        log.info(`[EOD] ONT focused pass filled ${ontMap.size} serials`);
       }
     }
 
