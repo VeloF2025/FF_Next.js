@@ -5,7 +5,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { withAuth } from '@/lib/withAuth';
+import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { createSheet, listSheets, getSheetStats } from '@/modules/data-sync/services/eodSheetService';
 import { log } from '@/lib/logger';

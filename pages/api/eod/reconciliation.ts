@@ -4,7 +4,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { withAuth } from '@/lib/withAuth';
+import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { getReconciliation } from '@/modules/data-sync/services/eodReconciliationService';
 import { log } from '@/lib/logger';
