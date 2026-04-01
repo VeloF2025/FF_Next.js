@@ -278,6 +278,113 @@ export function rowToWorkflowStep(row: WorkflowStepRow): WorkflowStepDefinition 
   };
 }
 
+// ============================================================================
+// CONFIRMED CORRECT RECORDS (Positive Examples)
+// ============================================================================
+
+/**
+ * A photo confirmed correct by a human operator (no edits made)
+ */
+export interface ConfirmedCorrectRecord {
+  id: string;
+  workflowType: WorkflowType;
+  dropNumber: string;
+  photoFilename: string;
+  photoDescription: string | null;
+  vlmPredictedStep: number;
+  vlmPredictedCategory: string;
+  vlmConfidence: number;
+  vlmReasoning: string | null;
+  confirmedBy: string;
+  isCanonical: boolean;
+  reviewedCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * Input for recording a confirmed-correct photo
+ */
+export interface RecordConfirmedCorrectInput {
+  workflowType: WorkflowType;
+  dropNumber: string;
+  photoFilename: string;
+  photoDescription?: string;
+  vlmPredictedStep: number;
+  vlmPredictedCategory: string;
+  vlmConfidence: number;
+  vlmReasoning?: string;
+  confirmedBy: string;
+}
+
+/**
+ * Database row format (snake_case) for qa_confirmed_correct
+ */
+export interface ConfirmedCorrectRow {
+  id: string;
+  workflow_type: string;
+  drop_number: string;
+  photo_filename: string;
+  photo_description: string | null;
+  vlm_predicted_step: number;
+  vlm_predicted_category: string;
+  vlm_confidence: string;
+  vlm_reasoning: string | null;
+  confirmed_by: string;
+  is_canonical: boolean;
+  reviewed_count: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Simplified positive example for VLM prompt injection
+ */
+export interface PositiveExample {
+  photoDescription: string;
+  step: number;
+  category: string;
+  confidence: number;
+}
+
+/**
+ * Convert database row to ConfirmedCorrectRecord
+ */
+export function rowToConfirmedCorrect(row: ConfirmedCorrectRow): ConfirmedCorrectRecord {
+  return {
+    id: row.id,
+    workflowType: row.workflow_type as WorkflowType,
+    dropNumber: row.drop_number,
+    photoFilename: row.photo_filename,
+    photoDescription: row.photo_description,
+    vlmPredictedStep: row.vlm_predicted_step,
+    vlmPredictedCategory: row.vlm_predicted_category,
+    vlmConfidence: parseFloat(row.vlm_confidence),
+    vlmReasoning: row.vlm_reasoning,
+    confirmedBy: row.confirmed_by,
+    isCanonical: row.is_canonical,
+    reviewedCount: row.reviewed_count,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/**
+ * Convert ConfirmedCorrectRecord to PositiveExample for prompt
+ */
+export function confirmedToPositiveExample(record: ConfirmedCorrectRecord): PositiveExample {
+  return {
+    photoDescription: record.photoDescription || 'Unknown photo content',
+    step: record.vlmPredictedStep,
+    category: record.vlmPredictedCategory,
+    confidence: record.vlmConfidence,
+  };
+}
+
+// ============================================================================
+// CONVERTERS (Corrections)
+// ============================================================================
+
 /**
  * Convert CorrectionRecord to FewShotExample
  */

@@ -21,6 +21,10 @@ import {
   getRelevantExamples,
   buildFewShotPromptSection,
   hasCorrections,
+  PositiveExample,
+  getPositiveExamples,
+  buildPositiveExamplesPromptSection,
+  hasConfirmedCorrect,
 } from '@/modules/qa-learning';
 
 // ============================================================================
@@ -59,11 +63,13 @@ export class CategorizationError extends Error {
  * @param photoCount - Number of photos in batch
  * @param drNumber - DR number for context
  * @param fewShotExamples - Optional few-shot examples from human corrections
+ * @param positiveExamples - Optional confirmed-correct examples for positive reinforcement
  */
 function buildCategorizationPrompt(
   photoCount: number,
   drNumber: string,
-  fewShotExamples?: FewShotExample[]
+  fewShotExamples?: FewShotExample[],
+  positiveExamples?: PositiveExample[]
 ): string {
   let prompt = `You are an expert fiber optic installation photo categorizer for ${drNumber}.
 
@@ -103,6 +109,11 @@ Based on 2336 human corrections, the #1 VLM error is wrongly discarding valid in
   // Inject few-shot examples from human corrections (HITL learning)
   if (fewShotExamples && fewShotExamples.length > 0) {
     prompt += buildFewShotPromptSection(fewShotExamples);
+  }
+
+  // Inject confirmed-correct examples (positive reinforcement)
+  if (positiveExamples && positiveExamples.length > 0) {
+    prompt += buildPositiveExamplesPromptSection(positiveExamples);
   }
 
   prompt += `
@@ -202,14 +213,16 @@ async function fetchImageAsBase64(imageUrl: string): Promise<string> {
  * @param photos - Array of photos to categorize
  * @param base64Images - Base64 encoded images
  * @param fewShotExamples - Optional few-shot examples for prompt enhancement
+ * @param positiveExamples - Optional confirmed-correct examples for positive reinforcement
  */
 async function callVlmForCategorization(
   drNumber: string,
   photos: Array<{ filename: string; url: string; original_type: string | null }>,
   base64Images: string[],
-  fewShotExamples?: FewShotExample[]
+  fewShotExamples?: FewShotExample[],
+  positiveExamples?: PositiveExample[]
 ): Promise<VlmBatchCategorizationResponse> {
-  const prompt = buildCategorizationPrompt(photos.length, drNumber, fewShotExamples);
+  const prompt = buildCategorizationPrompt(photos.length, drNumber, fewShotExamples, positiveExamples);
 
   const requestBody = {
     model: VLM_MODEL,
@@ -368,6 +381,34 @@ export async function categorizePhotos(
     }, 'CategorizationVlm');
   }
 
+  // HITL Learning: Fetch positive examples from confirmed-correct DRs
+  let positiveExamples: PositiveExample[] = [];
+  try {
+    const hasPositiveData = await hasConfirmedCorrect('dr_photo');
+    if (hasPositiveData) {
+      const positiveResult = await getPositiveExamples({
+        workflowType: 'dr_photo',
+        maxExamples: 3,
+        minConfidence: 0.9,
+      });
+      positiveExamples = positiveResult.examples;
+
+      if (positiveExamples.length > 0) {
+        log.info('Positive examples loaded for categorization', {
+          action: 'positiveExamplesLoaded',
+          drNumber,
+          exampleCount: positiveExamples.length,
+        }, 'CategorizationVlm');
+      }
+    }
+  } catch (error) {
+    log.warn('Positive example loading failed', {
+      action: 'positiveExamplesLoadFailed',
+      drNumber,
+      error: error instanceof Error ? error.message : String(error),
+    }, 'CategorizationVlm');
+  }
+
   // Process in batches
   for (let i = 0; i < photos.length; i += batchSize) {
     const batch = photos.slice(i, i + batchSize);
@@ -415,7 +456,8 @@ export async function categorizePhotos(
         drNumber,
         validPhotos,
         base64Images,
-        fewShotExamples
+        fewShotExamples,
+        positiveExamples
       );
 
       // Map VLM response to results

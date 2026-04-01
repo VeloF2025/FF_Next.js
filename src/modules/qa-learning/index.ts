@@ -66,6 +66,35 @@ export {
 } from './services/fewShotService';
 
 // ============================================================================
+// CONFIRMED CORRECT SERVICE (Positive Examples)
+// ============================================================================
+
+export type {
+  ConfirmedCorrectRecord,
+  RecordConfirmedCorrectInput,
+  PositiveExample,
+} from './types/learning.types';
+
+export {
+  confirmedToPositiveExample,
+} from './types/learning.types';
+
+export {
+  recordConfirmedCorrectBatch,
+  hasConfirmedCorrect,
+} from './services/confirmedCorrectService';
+
+export {
+  getPositiveExamples,
+  buildPositiveExamplesPromptSection,
+} from './services/positiveExampleService';
+
+export type {
+  PositiveExampleOptions,
+  PositiveExampleResult,
+} from './services/positiveExampleService';
+
+// ============================================================================
 // OCR LEARNING SERVICE (Field Extraction) - NEW
 // ============================================================================
 

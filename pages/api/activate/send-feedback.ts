@@ -19,6 +19,8 @@ import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
 import { PHOTO_TYPE_TO_STEP, STEP_LABELS, STEP_DESCRIPTIONS } from '@/modules/activate/utils/stepMapper';
 import { logFeedbackSent } from '@/modules/activate/services/activityLogService';
+import { recordConfirmedCorrectBatch } from '@/modules/qa-learning';
+import type { RecordConfirmedCorrectInput } from '@/modules/qa-learning';
 
 interface HumanEdit {
   filename: string;
@@ -266,6 +268,16 @@ async function handlePost(
     // 8b. Persist HITL corrections to auto_qa_results snapshot so they survive page reloads
     if (humanEdits && humanEdits.length > 0) {
       await persistHumanEditsToSnapshot(dropNumber, humanEdits, decision);
+    }
+
+    // 8c. HITL Learning: Save confirmed-correct examples when human accepted AI's QA as-is
+    const noHumanEdits = !humanEdits || humanEdits.length === 0;
+    if (noHumanEdits) {
+      try {
+        await saveConfirmedCorrectExamples(dropNumber, reviewerUserId || 'unknown');
+      } catch (err) {
+        log.warn('Failed to save confirmed-correct examples (non-fatal)', { dropNumber, err });
+      }
     }
 
     // 9. Create follow-up task if requested or if decision is FAIL/REWORK_NEEDED
@@ -855,6 +867,48 @@ async function logWhatsAppMessage(params: WaMessageLogParams): Promise<void> {
   } catch (error) {
     // Don't fail the main operation if logging fails
     log.error('Failed to log WhatsApp message', { error, params });
+  }
+}
+
+/**
+ * Save confirmed-correct examples from a DR's auto QA results.
+ * Only saves photos with step > 0 and reasonable confidence.
+ */
+async function saveConfirmedCorrectExamples(
+  dropNumber: string,
+  confirmedBy: string
+): Promise<void> {
+  const result = await pool.query(
+    `SELECT auto_qa_results FROM dr_photo_unified_reviews WHERE drop_number = $1`,
+    [dropNumber]
+  );
+  const snapshot = result.rows[0]?.auto_qa_results;
+  if (!snapshot?.photos) return;
+
+  const inputs: RecordConfirmedCorrectInput[] = [];
+
+  for (const photo of snapshot.photos) {
+    // Skip synthetic entries, discards, and duplicates
+    if (photo.filename?.startsWith('missing_step_')) continue;
+    if (photo.step <= 0) continue;
+    if (photo.decision !== 'PASS') continue;
+
+    inputs.push({
+      workflowType: 'dr_photo',
+      dropNumber,
+      photoFilename: photo.filename,
+      photoDescription: photo.identifiedAs || photo.stepLabel || null,
+      vlmPredictedStep: photo.step,
+      vlmPredictedCategory: photo.stepLabel || `Step ${photo.step}`,
+      vlmConfidence: photo.confidence ?? 0,
+      vlmReasoning: photo.reasoning || null,
+      confirmedBy,
+    });
+  }
+
+  if (inputs.length > 0) {
+    await recordConfirmedCorrectBatch(inputs);
+    log.info(`Saved ${inputs.length} confirmed-correct examples for ${dropNumber}`);
   }
 }
 
