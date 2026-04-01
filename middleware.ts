@@ -182,10 +182,34 @@ function getArcjetProtection(pathname: string, method: string) {
   return ajGeneral;
 }
 
+// Decommissioned modules — routes blocked, code retained
+const DECOMMISSIONED_MODULES = [
+  '/accounting',                      // Decommissioned 2026-04-01
+  '/api/accounting',                  // Decommissioned 2026-04-01
+  '/api/sage',                        // Sage integration tied to accounting
+  '/api/cron/sage-sync',              // Sage sync cron
+  '/api/cron/recurring-journals',     // Accounting journals cron
+  '/api/cron/recurring-invoices',     // Accounting invoices cron
+];
+
 export async function middleware(request: NextRequest) {
   const startTime = Date.now();
   const { pathname, searchParams } = request.nextUrl;
-  
+
+  // Block decommissioned modules
+  for (const prefix of DECOMMISSIONED_MODULES) {
+    if (pathname === prefix || pathname.startsWith(prefix + '/')) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json(
+          { success: false, error: { code: 'MODULE_DECOMMISSIONED', message: 'The accounting module has been decommissioned.' } },
+          { status: 410 }
+        );
+      }
+      // Page routes — redirect to dashboard
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
+  }
+
   // Skip static files and Next.js internals
   if (
     pathname.startsWith('/_next') ||

@@ -6,7 +6,7 @@ import {
   peopleSection,
   clientsSection,
   procurementSection,
-  accountingSection,
+  // accountingSection,   // DECOMMISSIONED 2026-04-01 — module disabled, routes blocked in middleware
   contractorsSection,
   assetsSection,
   fleetSection,
@@ -25,7 +25,7 @@ export const navItems: NavSection[] = [
   activateSection,        // 3. ACTIVATE - QA review of field work
   nocSection,             // 4. NOC - Network Operations Centre
   procurementSection,     // 5. PROCUREMENT - Materials for projects
-  accountingSection,      // 6. ACCOUNTING - GL, Journal Entries, Reports
+  // accountingSection,   // 6. ACCOUNTING - DECOMMISSIONED 2026-04-01
   assetsSection,          // 7. ASSETS - Equipment management
   fleetSection,           // 8. FLEET - Vehicles for field ops
   peopleSection,          // 9. HUMAN RESOURCES - Staff

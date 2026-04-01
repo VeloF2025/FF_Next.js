@@ -11,6 +11,7 @@ import {
   ShieldCheck, ShieldOff, UserCheck, UserX, Save, RotateCcw
 } from 'lucide-react';
 import { UserPermissionsModal } from './UserPermissionsModal';
+import { ModulesAccessTab } from './ModulesAccessTab';
 import { formatDisplayDate } from '@/utils/dateFormat';
 
 // Custom Toggle Switch Component
@@ -110,7 +111,7 @@ interface PermissionNode {
 
 type ActionFlags = { view: boolean; create: boolean; edit: boolean; delete: boolean };
 
-type SubTab = 'users' | 'roles' | 'permissions';
+type SubTab = 'users' | 'roles' | 'permissions' | 'modules';
 
 export function AccessControlTab() {
   const [subTab, setSubTab] = useState<SubTab>('users');
@@ -1519,6 +1520,17 @@ export function AccessControlTab() {
             <Key className="w-4 h-4" />
             <span>Permissions</span>
           </button>
+          <button
+            onClick={() => setSubTab('modules')}
+            className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm ${
+              subTab === 'modules'
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-medium)]'
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+            <span>Modules</span>
+          </button>
         </nav>
       </div>
 
@@ -1526,6 +1538,7 @@ export function AccessControlTab() {
       {subTab === 'users' && renderUsersTab()}
       {subTab === 'roles' && renderRolesTab()}
       {subTab === 'permissions' && renderPermissionsTab()}
+      {subTab === 'modules' && <ModulesAccessTab />}
 
       {/* User Permissions Modal */}
       {selectedUserForPermissions && (
