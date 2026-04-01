@@ -16,6 +16,7 @@ import {
 import { optimizeForVlm } from '@/modules/activate/services/imagePreprocessService';
 import { scanAllBarcodes } from '@/modules/activate/services/enhancedBarcodeService';
 import { normalizeSerial } from '@/modules/activate/services/serialExtractor';
+import { getVlmFewShotExamples, buildVlmFewShotPrompt } from '@/services/vlmLearningService';
 import type { EodVlmExtraction, EodVlmEntry } from '../types';
 import { log } from '@/lib/logger';
 import sharp from 'sharp';
@@ -108,10 +109,24 @@ async function findAllBarcodes(variants: string[]): Promise<string[]> {
 // PASS 2: VLM EXTRACTION
 // ============================================================================
 
-function buildPrompt(barcodeHints: string[]): string {
+async function buildPrompt(barcodeHints: string[]): Promise<string> {
   const barcodeSection = barcodeHints.length > 0
     ? `\nBarcodes decoded: ${barcodeHints.join(', ')}\n`
     : '';
+
+  // Fetch few-shot corrections from VLM Learning system
+  let fewShotSection = '';
+  try {
+    const drExamples = await getVlmFewShotExamples({ module: 'data-sync', analysisType: 'eod_sheet_dr', maxExamples: 3 });
+    const addrExamples = await getVlmFewShotExamples({ module: 'data-sync', analysisType: 'eod_sheet_address', maxExamples: 2 });
+    const allExamples = [...drExamples, ...addrExamples];
+    if (allExamples.length > 0) {
+      fewShotSection = `\nPAST CORRECTION EXAMPLES (learn from these):\n${buildVlmFewShotPrompt(allExamples)}\n`;
+      log.info(`[EOD-VLM] Injecting ${allExamples.length} few-shot examples`);
+    }
+  } catch {
+    // Non-blocking — continue without few-shot
+  }
 
   return `/no_think
 Read this handwritten Velocity Fibre install form table.
@@ -131,7 +146,7 @@ PON: one of 128, 127, or 121 — read the actual handwritten digits.
 Date: top-right DD/MM/YYYY → YYYY-MM-DD. Technician: bottom of form — read FULL name.
 
 Each row is UNIQUE. Do NOT increment or copy values.
-${barcodeSection}
+${fewShotSection}${barcodeSection}
 JSON only:
 {"date":"YYYY-MM-DD","technician_name":"string","technician_id":"string or null","entries":[{"row_number":1,"ont_serial":"string or null","gizzu_serial":"string or null","dr_number":"string","pon_number":"string","address":"string","confidence":0.8}],"overall_confidence":0.8}`;
 }
@@ -226,7 +241,7 @@ export async function extractEodSheet(
         messages: [{
           role: 'user',
           content: [
-            { type: 'text', text: buildPrompt(barcodeHints) },
+            { type: 'text', text: await buildPrompt(barcodeHints) },
             { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${vlmBase64}` } },
           ],
         }],

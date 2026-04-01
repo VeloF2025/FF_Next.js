@@ -14,7 +14,7 @@
 /**
  * Modules that use VLM extraction
  */
-export type VlmModule = 'activate' | 'fleet' | 'procurement' | 'assets' | 'staff' | 'qfield' | 'construction_qa';
+export type VlmModule = 'activate' | 'fleet' | 'procurement' | 'assets' | 'staff' | 'qfield' | 'construction_qa' | 'data-sync';
 
 /**
  * Analysis types by module
@@ -50,7 +50,12 @@ export type VlmAnalysisType =
   // QField module
   | 'qfield_photo_qa'
   // Construction QA module
-  | 'construction_photo_qa';
+  | 'construction_photo_qa'
+  // Data Sync module (EOD sheets)
+  | 'eod_sheet_dr'
+  | 'eod_sheet_address'
+  | 'eod_sheet_gizzu'
+  | 'eod_sheet_pon';
 
 /**
  * Analysis types grouped by module (for UI filtering)
@@ -72,6 +77,7 @@ export const ANALYSIS_TYPES_BY_MODULE: Record<VlmModule, VlmAnalysisType[]> = {
   staff: ['id_extraction', 'photo_match'],
   qfield: ['qfield_photo_qa'],
   construction_qa: ['construction_photo_qa'],
+  'data-sync': ['eod_sheet_dr', 'eod_sheet_address', 'eod_sheet_gizzu', 'eod_sheet_pon'],
 };
 
 // ============================================================================
