@@ -49,10 +49,10 @@ export const PPDataRow = React.memo(function PPDataRow({
         {record.date_registered ? formatDisplayDate(record.date_registered) : '-'}
       </td>
       <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs">
-        {record.oes_team || '-'}
+        {record.activation_date ? formatDisplayDate(record.activation_date) : '-'}
       </td>
       <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs">
-        {record.activation_date ? formatDisplayDate(record.activation_date) : '-'}
+        {record.oes_team || '-'}
       </td>
       <td className="px-3 py-2 text-xs">
         {record.wa_name ? (
@@ -109,7 +109,7 @@ export const PPDataRow = React.memo(function PPDataRow({
 
 export const TABLE_HEADERS = [
   'Serial', 'Project', 'Status', 'DR', 'Zone', 'PON', 'Registered',
-  'Install Team', 'Activation', 'WA Technician', 'Source', 'Ticket', 'Priority',
+  'Activation', 'Install Team', 'WA Technician', 'Source', 'Ticket', 'Priority',
 ] as const;
 
 export function PPDataTableHead({
