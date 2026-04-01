@@ -44,91 +44,56 @@ export function EodEntryTable({ entries, editable = false, onChange }: EodEntryT
           </tr>
         </thead>
         <tbody>
-          {entries.map((entry, i) => (
-            <tr
-              key={i}
-              className={\`border-b border-[var(--ff-border-light)] \${
-                entry.confidence < 0.7 ? 'bg-amber-500/5' : ''
-              }\`}
-            >
-              <td className="px-2 py-1.5 text-[var(--ff-text-tertiary)]">{entry.row_number}</td>
-              <td className="px-2 py-1.5">
-                {editable ? (
-                  <input
-                    className={cellClass}
-                    value={entry.dr_number || ''}
-                    onChange={(e) => updateEntry(i, 'dr_number', e.target.value)}
-                    placeholder="DR..."
-                  />
-                ) : (
-                  <span className={cellClass}>{entry.dr_number || '—'}</span>
-                )}
-              </td>
-              <td className="px-2 py-1.5">
-                {editable ? (
-                  <input
-                    className={cellClass}
-                    value={entry.ont_serial || ''}
-                    onChange={(e) => updateEntry(i, 'ont_serial', e.target.value)}
-                    placeholder="ALCL..."
-                  />
-                ) : (
-                  <span className={\`\${cellClass} font-mono text-xs\`}>{entry.ont_serial || '—'}</span>
-                )}
-              </td>
-              <td className="px-2 py-1.5">
-                {editable ? (
-                  <input
-                    className={cellClass}
-                    value={entry.gizzu_serial || ''}
-                    onChange={(e) => updateEntry(i, 'gizzu_serial', e.target.value)}
-                    placeholder="GU..."
-                  />
-                ) : (
-                  <span className={\`\${cellClass} font-mono text-xs\`}>{entry.gizzu_serial || '—'}</span>
-                )}
-              </td>
-              <td className="px-2 py-1.5">
-                {editable ? (
-                  <input
-                    className={cellClass}
-                    value={entry.pon_number || ''}
-                    onChange={(e) => updateEntry(i, 'pon_number', e.target.value)}
-                    placeholder="128"
-                  />
-                ) : (
-                  <span className={cellClass}>{entry.pon_number || '—'}</span>
-                )}
-              </td>
-              <td className="px-2 py-1.5">
-                {editable ? (
-                  <input
-                    className={cellClass}
-                    value={entry.address || ''}
-                    onChange={(e) => updateEntry(i, 'address', e.target.value)}
-                    placeholder="Address"
-                  />
-                ) : (
-                  <span className={cellClass}>{entry.address || '—'}</span>
-                )}
-              </td>
-              {!editable && (
+          {entries.map((entry, i) => {
+            const rowBg = entry.confidence < 0.7 ? 'bg-amber-500/5' : '';
+            return (
+              <tr key={i} className={`border-b border-[var(--ff-border-light)] ${rowBg}`}>
+                <td className="px-2 py-1.5 text-[var(--ff-text-tertiary)]">{entry.row_number}</td>
                 <td className="px-2 py-1.5">
-                  <span
-                    className={\`text-xs font-medium \${
-                      entry.confidence >= 0.8
-                        ? 'text-green-400'
-                        : entry.confidence >= 0.7
-                        ? 'text-amber-400'
-                        : 'text-red-400'
-                    }\`}
-                  >
-                    {Math.round(entry.confidence * 100)}%
-                  </span>
+                  {editable ? (
+                    <input className={cellClass} value={entry.dr_number || ''} onChange={(e) => updateEntry(i, 'dr_number', e.target.value)} placeholder="DR..." />
+                  ) : (
+                    <span className={cellClass}>{entry.dr_number || '\u2014'}</span>
+                  )}
                 </td>
-              )}
-            </tr>
-          ))}
+                <td className="px-2 py-1.5">
+                  {editable ? (
+                    <input className={cellClass} value={entry.ont_serial || ''} onChange={(e) => updateEntry(i, 'ont_serial', e.target.value)} placeholder="ALCL..." />
+                  ) : (
+                    <span className={`${cellClass} font-mono text-xs`}>{entry.ont_serial || '\u2014'}</span>
+                  )}
+                </td>
+                <td className="px-2 py-1.5">
+                  {editable ? (
+                    <input className={cellClass} value={entry.gizzu_serial || ''} onChange={(e) => updateEntry(i, 'gizzu_serial', e.target.value)} placeholder="GU..." />
+                  ) : (
+                    <span className={`${cellClass} font-mono text-xs`}>{entry.gizzu_serial || '\u2014'}</span>
+                  )}
+                </td>
+                <td className="px-2 py-1.5">
+                  {editable ? (
+                    <input className={cellClass} value={entry.pon_number || ''} onChange={(e) => updateEntry(i, 'pon_number', e.target.value)} placeholder="128" />
+                  ) : (
+                    <span className={cellClass}>{entry.pon_number || '\u2014'}</span>
+                  )}
+                </td>
+                <td className="px-2 py-1.5">
+                  {editable ? (
+                    <input className={cellClass} value={entry.address || ''} onChange={(e) => updateEntry(i, 'address', e.target.value)} placeholder="Address" />
+                  ) : (
+                    <span className={cellClass}>{entry.address || '\u2014'}</span>
+                  )}
+                </td>
+                {!editable && (
+                  <td className="px-2 py-1.5">
+                    <span className={`text-xs font-medium ${entry.confidence >= 0.8 ? 'text-green-400' : entry.confidence >= 0.7 ? 'text-amber-400' : 'text-red-400'}`}>
+                      {Math.round(entry.confidence * 100)}%
+                    </span>
+                  </td>
+                )}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
