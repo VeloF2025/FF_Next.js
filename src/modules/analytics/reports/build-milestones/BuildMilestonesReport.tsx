@@ -41,13 +41,15 @@ const PCT_NONE   = '#6b7280'; // --ff-text-tertiary
 const pctColor = (p: number) => p >= 80 ? PCT_HIGH : p >= 50 ? PCT_MED : p > 0 ? PCT_LOW : PCT_NONE;
 
 const ProgressCell = ({ pct }: { pct: number }) => (
-  <div className="flex items-center gap-2">
-    <div className="w-14 h-3 bg-gray-700 rounded overflow-hidden flex-shrink-0">
-      <div style={{ width: `${pct}%`, backgroundColor: pctColor(pct) }} className="h-full" />
+  <div className="flex justify-center">
+    <div className="flex items-center gap-2">
+      <div className="w-14 h-3 bg-gray-700 rounded overflow-hidden flex-shrink-0">
+        <div style={{ width: `${pct}%`, backgroundColor: pctColor(pct) }} className="h-full" />
+      </div>
+      <span style={{ color: pctColor(pct) }} className="font-semibold text-sm w-12 text-right">
+        {pct.toFixed(1)}%
+      </span>
     </div>
-    <span style={{ color: pctColor(pct) }} className="font-semibold text-sm w-12 text-right">
-      {pct.toFixed(1)}%
-    </span>
   </div>
 );
 
