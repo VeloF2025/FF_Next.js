@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Upload, Loader2, CheckCircle, Camera, XCircle } from 'lucide-react';
+import { Upload, Loader2, CheckCircle, Camera, XCircle, AlertTriangle } from 'lucide-react';
 import type { EodVlmExtraction, EodVlmEntry } from '../../../types';
 import { EodEntryTable } from './EodEntryTable';
 
@@ -22,6 +22,8 @@ export function EodUploadTab() {
   const [techId, setTechId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [lowRes, setLowRes] = useState(false);
+  const [imageRes, setImageRes] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleFile = async (f: File) => {
@@ -29,10 +31,23 @@ export function EodUploadTab() {
     setError(null);
     setSaved(false);
     setExtraction(null);
+    setLowRes(false);
+
+    // Check image resolution
+    const img = new Image();
+    img.onload = () => {
+      const mp = (img.width * img.height) / 1_000_000;
+      setImageRes(`${img.width}x${img.height} (${mp.toFixed(1)}MP)`);
+      if (mp < 2) setLowRes(true);
+    };
 
     // Create preview
     const reader = new FileReader();
-    reader.onload = () => setPreview(reader.result as string);
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setPreview(dataUrl);
+      img.src = dataUrl;
+    };
     reader.readAsDataURL(f);
   };
 
@@ -171,7 +186,7 @@ export function EodUploadTab() {
           {preview ? (
             <div className="space-y-4">
               <img src={preview} alt="EOD sheet" className="max-h-64 mx-auto rounded-lg" />
-              <p className="text-sm text-[var(--ff-text-secondary)]">{file?.name}</p>
+              <p className="text-sm text-[var(--ff-text-secondary)]">{file?.name} {imageRes && `\u2014 ${imageRes}`}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -187,6 +202,21 @@ export function EodUploadTab() {
               </p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Low Resolution Warning */}
+      {lowRes && preview && !extraction && (
+        <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+          <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-amber-400">Low resolution image ({imageRes})</p>
+            <p className="text-xs text-[var(--ff-text-secondary)] mt-1">
+              WhatsApp compresses photos to low resolution, making barcode stickers unreadable.
+              For better ONT serial extraction, ask the field team to send the <strong>original photo</strong> from
+              their camera roll (not via WhatsApp), or take the photo directly using the camera button above.
+            </p>
+          </div>
         </div>
       )}
 
