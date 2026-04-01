@@ -97,7 +97,12 @@ const TAB_GROUPS: {
   },
 ];
 
-export function DataSyncPage() {
+interface DataSyncPageProps {
+  /** Optional filter to show only specific groups (e.g. ['activate','olt'] for Activation Ops) */
+  groupFilter?: TabGroupId[];
+}
+
+export function DataSyncPage({ groupFilter }: DataSyncPageProps) {
   const router = useRouter();
   const searchParams = { get: (key: string) => (router.query[key] as string) || null };
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
@@ -121,7 +126,11 @@ export function DataSyncPage() {
       return [];
     }
 
-    return TAB_GROUPS.filter((group) => {
+    const filtered = groupFilter
+      ? TAB_GROUPS.filter((g) => groupFilter.includes(g.id))
+      : TAB_GROUPS;
+
+    return filtered.filter((group) => {
       const permissionKey = GROUP_PERMISSION_KEYS[group.id];
 
       // Check RBAC permission
@@ -132,7 +141,7 @@ export function DataSyncPage() {
 
       return hasPermission && featureEnabled;
     });
-  }, [permissionsLoading, featuresLoading, can, isFeatureEnabled]);
+  }, [permissionsLoading, featuresLoading, can, isFeatureEnabled, groupFilter]);
 
   // Check if current group is accessible
   const currentGroupAccessible = useMemo(() => {
