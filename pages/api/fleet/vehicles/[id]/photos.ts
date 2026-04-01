@@ -218,15 +218,14 @@ async function handleGet(
       longitude: number | null;
       storage_service_url: string | null;
       captured_at: string;
-      vlm_processed: boolean;
-      vlm_result: unknown;
-      vlm_confidence: number | null;
       check_date: string;
       check_time: string;
       driver_name: string;
       check_type: string | null;
       odometer_reading: number | null;
       status: string | null;
+      vlm_processed: boolean;
+      vlm_confidence: number | null;
     }
 
     let checkRows: CheckPhotoRow[];
@@ -234,11 +233,16 @@ async function handleGet(
       checkRows = await sql`
         SELECT p.id, p.record_id, p.response_id, p.photo_type, p.is_required,
                p.file_url, p.file_path, p.file_size, p.latitude, p.longitude,
-               p.storage_service_url, p.captured_at, p.vlm_processed, p.vlm_result,
-               p.vlm_confidence, r.check_date, r.check_time, r.driver_name,
-               r.check_type, r.odometer_reading, r.status
+               p.storage_service_url, p.captured_at,
+               r.check_date, r.check_time, r.driver_name,
+               r.check_type, r.odometer_reading, r.status,
+               (pvr.id IS NOT NULL) as vlm_processed,
+               pvr.confidence as vlm_confidence
         FROM fleet_check_photos p
         JOIN fleet_check_records r ON r.id = p.record_id
+        LEFT JOIN LATERAL (
+          SELECT id, confidence FROM fleet_photo_vlm_results WHERE photo_id = p.id ORDER BY created_at DESC LIMIT 1
+        ) pvr ON true
         WHERE r.vehicle_id = ${vehicleId} AND p.photo_type = ${type}
         ORDER BY p.captured_at DESC
       ` as CheckPhotoRow[];
@@ -246,11 +250,16 @@ async function handleGet(
       checkRows = await sql`
         SELECT p.id, p.record_id, p.response_id, p.photo_type, p.is_required,
                p.file_url, p.file_path, p.file_size, p.latitude, p.longitude,
-               p.storage_service_url, p.captured_at, p.vlm_processed, p.vlm_result,
-               p.vlm_confidence, r.check_date, r.check_time, r.driver_name,
-               r.check_type, r.odometer_reading, r.status
+               p.storage_service_url, p.captured_at,
+               r.check_date, r.check_time, r.driver_name,
+               r.check_type, r.odometer_reading, r.status,
+               (pvr.id IS NOT NULL) as vlm_processed,
+               pvr.confidence as vlm_confidence
         FROM fleet_check_photos p
         JOIN fleet_check_records r ON r.id = p.record_id
+        LEFT JOIN LATERAL (
+          SELECT id, confidence FROM fleet_photo_vlm_results WHERE photo_id = p.id ORDER BY created_at DESC LIMIT 1
+        ) pvr ON true
         WHERE r.vehicle_id = ${vehicleId}
         ORDER BY p.captured_at DESC
       ` as CheckPhotoRow[];
@@ -267,9 +276,9 @@ async function handleGet(
       mimeType: 'image/jpeg',
       checkRecordId: row.record_id,
       fuelTransactionId: null,
-      vlmProcessed: row.vlm_processed,
-      vlmResult: row.vlm_result,
-      vlmConfidence: row.vlm_confidence,
+      vlmProcessed: row.vlm_processed ?? false,
+      vlmResult: null,
+      vlmConfidence: row.vlm_confidence ?? null,
       capturedAt: row.captured_at,
       capturedBy: row.driver_name,
       notes: null,
