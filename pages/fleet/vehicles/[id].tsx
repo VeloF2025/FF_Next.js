@@ -3,7 +3,7 @@
  * View and edit vehicle details with tabbed ownership data
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
@@ -45,6 +45,7 @@ import {
   Search,
   Upload,
   History,
+  Layers,
 } from 'lucide-react';
 import type {
   VehicleDocument,
@@ -179,6 +180,10 @@ interface VehiclePhoto {
   source: 'vehicle_photos' | 'check_photos';
   checkDate?: string;
   checkTime?: string;
+  checkType?: string | null;
+  odometerReading?: number | null;
+  fuelLevel?: number | null;
+  checkStatus?: string | null;
 }
 
 interface VehicleStatistics {
@@ -1307,6 +1312,268 @@ function InsuranceTab({
   );
 }
 
+type PhotoView = 'timeline' | 'by-type' | 'by-section';
+
+const PHOTO_TYPE_LABELS: Record<string, string> = {
+  dashboard: 'Dashboard/Odometer',
+  odometer: 'Odometer',
+  fuel_gauge: 'Fuel Gauge',
+  front: 'Exterior Front',
+  rear: 'Exterior Rear',
+  exterior_front: 'Exterior Front',
+  exterior_rear: 'Exterior Rear',
+  under_vehicle: 'Under Vehicle',
+  license_disk: 'License Disk',
+  damage: 'Damage',
+  receipt: 'Receipt',
+  licence_plate_front: 'License Plate Front',
+  licence_plate_rear: 'License Plate Rear',
+  odometer_override: 'Odometer Override',
+};
+
+function PhotoCard({ photo, onClick }: { photo: VehiclePhoto; onClick: () => void }) {
+  return (
+    <div
+      onClick={onClick}
+      className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)] overflow-hidden cursor-pointer hover:border-[var(--ff-primary)] transition-colors group"
+    >
+      <div className="aspect-square relative">
+        <img src={photo.fileUrl} alt={photo.photoType} className="w-full h-full object-cover" />
+        {photo.vlmProcessed && (
+          <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded">VLM</div>
+        )}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+      </div>
+      <div className="p-2">
+        <p className="text-xs font-medium text-[var(--ff-text-primary)] truncate">
+          {PHOTO_TYPE_LABELS[photo.photoType] || photo.photoType}
+        </p>
+        <p className="text-[10px] text-[var(--ff-text-secondary)]">
+          {new Date(photo.capturedAt).toLocaleDateString('en-ZA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function PhotoLightbox({ photo, vehicleId, onClose }: { photo: VehiclePhoto; vehicleId: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg max-w-4xl max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="relative">
+          <img src={photo.fileUrl} alt={photo.photoType} className="w-full h-auto" />
+          <button onClick={onClose} className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/70">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-4 border-t border-[var(--ff-border-light)]">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+                {PHOTO_TYPE_LABELS[photo.photoType] || photo.photoType}
+              </h3>
+              <p className="text-sm text-[var(--ff-text-secondary)]">
+                Captured: {new Date(photo.capturedAt).toLocaleString('en-ZA')}
+                {photo.capturedBy && ` by ${photo.capturedBy}`}
+              </p>
+              {photo.odometerReading && (
+                <p className="text-sm text-[var(--ff-text-secondary)]">Odometer: {photo.odometerReading.toLocaleString()} km</p>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {photo.vlmProcessed && <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-sm">VLM Processed</span>}
+              {photo.vlmConfidence !== null && (
+                <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm">{Math.round(photo.vlmConfidence * 100)}%</span>
+              )}
+            </div>
+          </div>
+          {photo.checkRecordId && (
+            <Link href={`/fleet/vehicles/${vehicleId}/check-in-history?recordId=${photo.checkRecordId}`}
+              className="mt-3 inline-flex items-center gap-1 text-sm text-[var(--ff-primary)] hover:underline">
+              <ExternalLink className="w-4 h-4" /> View Check-In Record
+            </Link>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** View A: Timeline — grouped by check-in record */
+function TimelineView({ photos, onSelect }: { photos: VehiclePhoto[]; onSelect: (p: VehiclePhoto) => void }) {
+  const grouped = useMemo(() => {
+    const map = new Map<string, { checkType: string | null; date: string; driver: string | null; odometer: number | null; fuelLevel: number | null; status: string | null; photos: VehiclePhoto[] }>();
+    const standalone: VehiclePhoto[] = [];
+    for (const p of photos) {
+      if (p.checkRecordId) {
+        const key = p.checkRecordId;
+        if (!map.has(key)) {
+          map.set(key, { checkType: p.checkType || null, date: p.checkDate || p.capturedAt, driver: p.capturedBy, odometer: p.odometerReading || null, fuelLevel: p.fuelLevel || null, status: p.checkStatus || null, photos: [] });
+        }
+        map.get(key)!.photos.push(p);
+      } else {
+        standalone.push(p);
+      }
+    }
+    const records = Array.from(map.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return { records, standalone };
+  }, [photos]);
+
+  if (grouped.records.length === 0 && grouped.standalone.length === 0) {
+    return <EmptyPhotos />;
+  }
+
+  return (
+    <div className="space-y-4">
+      {grouped.records.map((rec, i) => (
+        <div key={i} className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                rec.checkType === 'weekly' ? 'bg-purple-900/30 text-purple-400' : 'bg-blue-900/30 text-blue-400'
+              }`}>
+                {rec.checkType === 'weekly' ? 'Weekly Pre-Trip' : 'Daily Quick Check'}
+              </span>
+              <span className="text-sm text-[var(--ff-text-primary)] font-medium">
+                {new Date(rec.date).toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+              </span>
+              {rec.status && (
+                <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                  rec.status === 'approved' ? 'bg-green-900/30 text-green-400' : rec.status === 'rejected' ? 'bg-red-900/30 text-red-400' : 'bg-yellow-900/30 text-yellow-400'
+                }`}>{rec.status}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-4 text-xs text-[var(--ff-text-secondary)]">
+              {rec.driver && <span>Driver: {rec.driver}</span>}
+              {rec.odometer && <span>{rec.odometer.toLocaleString()} km</span>}
+              {rec.fuelLevel !== null && <span>Fuel: {rec.fuelLevel}%</span>}
+            </div>
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+            {rec.photos.map(p => <PhotoCard key={p.id} photo={p} onClick={() => onSelect(p)} />)}
+          </div>
+        </div>
+      ))}
+      {grouped.standalone.length > 0 && (
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
+          <h4 className="text-sm font-medium text-[var(--ff-text-primary)] mb-3">Other Photos</h4>
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+            {grouped.standalone.map(p => <PhotoCard key={p.id} photo={p} onClick={() => onSelect(p)} />)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** View B: By Photo Type — compare same type over time */
+function ByTypeView({ photos, onSelect }: { photos: VehiclePhoto[]; onSelect: (p: VehiclePhoto) => void }) {
+  const [selectedType, setSelectedType] = useState<string>('all');
+
+  const byType = useMemo(() => {
+    const map: Record<string, VehiclePhoto[]> = {};
+    for (const p of photos) {
+      const t = p.photoType;
+      if (!map[t]) map[t] = [];
+      map[t].push(p);
+    }
+    return map;
+  }, [photos]);
+
+  const typeKeys = Object.keys(byType).sort();
+  const displayPhotos = selectedType === 'all' ? photos : (byType[selectedType] || []);
+
+  if (photos.length === 0) return <EmptyPhotos />;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        <button onClick={() => setSelectedType('all')}
+          className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${selectedType === 'all' ? 'bg-[var(--ff-primary)] text-white' : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]'}`}>
+          All ({photos.length})
+        </button>
+        {typeKeys.map(t => (
+          <button key={t} onClick={() => setSelectedType(t)}
+            className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${selectedType === t ? 'bg-[var(--ff-primary)] text-white' : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]'}`}>
+            {PHOTO_TYPE_LABELS[t] || t} ({byType[t]?.length ?? 0})
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {displayPhotos.map(p => <PhotoCard key={p.id} photo={p} onClick={() => onSelect(p)} />)}
+      </div>
+    </div>
+  );
+}
+
+/** View C: By Section — check type sections, then photo type within */
+function BySectionView({ photos, onSelect }: { photos: VehiclePhoto[]; onSelect: (p: VehiclePhoto) => void }) {
+  const sections = useMemo(() => {
+    const daily: Record<string, VehiclePhoto[]> = {};
+    const weekly: Record<string, VehiclePhoto[]> = {};
+    const other: Record<string, VehiclePhoto[]> = {};
+
+    for (const p of photos) {
+      const target = p.checkType === 'weekly' ? weekly : p.checkType === 'daily' ? daily : other;
+      const t = p.photoType;
+      if (!target[t]) target[t] = [];
+      target[t].push(p);
+    }
+
+    return [
+      { label: 'Daily Quick Checks', data: daily, color: 'blue' },
+      { label: 'Weekly Pre-Trip Inspections', data: weekly, color: 'purple' },
+      { label: 'Other / Fuel Receipts', data: other, color: 'gray' },
+    ].filter(s => Object.keys(s.data).length > 0);
+  }, [photos]);
+
+  if (sections.length === 0) return <EmptyPhotos />;
+
+  return (
+    <div className="space-y-6">
+      {sections.map(section => {
+        const totalCount = Object.values(section.data).reduce((sum, arr) => sum + arr.length, 0);
+        return (
+          <div key={section.label} className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
+            <h4 className="text-sm font-semibold text-[var(--ff-text-primary)] mb-4 flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full bg-${section.color}-500`} />
+              {section.label}
+              <span className="text-xs text-[var(--ff-text-tertiary)] font-normal">({totalCount} photos)</span>
+            </h4>
+            <div className="space-y-4">
+              {Object.entries(section.data).sort(([a], [b]) => a.localeCompare(b)).map(([type, typePhotos]) => (
+                <div key={type}>
+                  <p className="text-xs text-[var(--ff-text-secondary)] mb-2 font-medium">
+                    {PHOTO_TYPE_LABELS[type] || type} ({typePhotos.length})
+                  </p>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                    {typePhotos.slice(0, 12).map(p => <PhotoCard key={p.id} photo={p} onClick={() => onSelect(p)} />)}
+                    {typePhotos.length > 12 && (
+                      <div className="aspect-square rounded-lg bg-[var(--ff-bg-tertiary)] flex items-center justify-center text-sm text-[var(--ff-text-secondary)]">
+                        +{typePhotos.length - 12} more
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function EmptyPhotos() {
+  return (
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)] p-12 text-center">
+      <ImageIcon className="w-16 h-16 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
+      <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">No photos yet</h3>
+      <p className="text-[var(--ff-text-secondary)]">Photos from vehicle check-ins and fuel receipts will appear here.</p>
+    </div>
+  );
+}
+
 function PhotosTab({
   vehicleId,
   photos,
@@ -1322,29 +1589,8 @@ function PhotosTab({
   loading: boolean;
   onRefresh: () => void;
 }) {
-  const [selectedType, setSelectedType] = useState<string>('all');
+  const [view, setView] = useState<PhotoView>('timeline');
   const [lightboxPhoto, setLightboxPhoto] = useState<VehiclePhoto | null>(null);
-
-  const photoTypeLabels: Record<string, string> = {
-    dashboard: 'Dashboard/Odometer',
-    odometer: 'Odometer',
-    fuel_gauge: 'Fuel Gauge',
-    front: 'Exterior Front',
-    rear: 'Exterior Rear',
-    exterior_front: 'Exterior Front',
-    exterior_rear: 'Exterior Rear',
-    under_vehicle: 'Under Vehicle',
-    license_disk: 'License Disk',
-    damage: 'Damage',
-    receipt: 'Receipt',
-    licence_plate_front: 'License Plate Front',
-    licence_plate_rear: 'License Plate Rear',
-    odometer_override: 'Odometer Override',
-  };
-
-  const filteredPhotos = selectedType === 'all'
-    ? photos
-    : photos.filter(p => p.photoType === selectedType);
 
   if (loading) {
     return (
@@ -1355,200 +1601,63 @@ function PhotosTab({
     );
   }
 
+  const viewOptions: { key: PhotoView; label: string; desc: string; icon: React.ElementType }[] = [
+    { key: 'timeline', label: 'Timeline', desc: 'Grouped by check-in record', icon: History },
+    { key: 'by-type', label: 'By Photo Type', desc: 'Compare same type over time', icon: ImageIcon },
+    { key: 'by-section', label: 'By Check Type', desc: 'Daily vs Weekly vs Receipts', icon: Layers },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Summary Card */}
+      {/* Header */}
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)] p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] flex items-center gap-2">
             <Camera className="w-5 h-5 text-[var(--ff-primary)]" />
             Vehicle Photos
+            <span className="text-sm font-normal text-[var(--ff-text-secondary)]">({photos.length})</span>
           </h2>
           <div className="flex gap-2">
             <Link href={`/fleet/vehicles/${vehicleId}/check-in-history`}>
               <button className="px-3 py-1.5 text-sm border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] flex items-center gap-1.5">
-                <History className="w-4 h-4" />
-                Check-In History
+                <History className="w-4 h-4" /> Check-In History
               </button>
             </Link>
-            <button
-              onClick={onRefresh}
-              className="px-3 py-1.5 text-sm border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] flex items-center gap-1.5"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Refresh
+            <button onClick={onRefresh}
+              className="px-3 py-1.5 text-sm border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] flex items-center gap-1.5">
+              <RefreshCw className="w-4 h-4" /> Refresh
             </button>
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-          <div className="bg-[var(--ff-bg-primary)] rounded-lg p-3">
-            <p className="text-xs text-[var(--ff-text-secondary)]">Total Photos</p>
-            <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{photos.length}</p>
-          </div>
-          <div className="bg-[var(--ff-bg-primary)] rounded-lg p-3">
-            <p className="text-xs text-[var(--ff-text-secondary)]">From Check-Ins</p>
-            <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{photosBySource.check_photos}</p>
-          </div>
-          <div className="bg-[var(--ff-bg-primary)] rounded-lg p-3">
-            <p className="text-xs text-[var(--ff-text-secondary)]">Vehicle Photos</p>
-            <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{photosBySource.vehicle_photos}</p>
-          </div>
-          <div className="bg-[var(--ff-bg-primary)] rounded-lg p-3">
-            <p className="text-xs text-[var(--ff-text-secondary)]">Photo Types</p>
-            <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{Object.keys(photosByType).length}</p>
-          </div>
-        </div>
-
-        {/* Type Filter */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          <button
-            onClick={() => setSelectedType('all')}
-            className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-              selectedType === 'all'
-                ? 'bg-[var(--ff-primary)] text-white'
-                : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)]'
-            }`}
-          >
-            All ({photos.length})
-          </button>
-          {Object.entries(photosByType).map(([type, count]) => (
-            <button
-              key={type}
-              onClick={() => setSelectedType(type)}
-              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                selectedType === type
-                  ? 'bg-[var(--ff-primary)] text-white'
-                  : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)]'
-              }`}
-            >
-              {photoTypeLabels[type] || type} ({count})
-            </button>
-          ))}
+        {/* View Selector Cards */}
+        <div className="grid grid-cols-3 gap-3">
+          {viewOptions.map(opt => {
+            const Icon = opt.icon;
+            const active = view === opt.key;
+            return (
+              <button key={opt.key} onClick={() => setView(opt.key)}
+                className={`text-left p-3 rounded-lg border-2 transition-colors ${
+                  active ? 'border-[var(--ff-primary)] bg-[var(--ff-primary)]/10' : 'border-[var(--ff-border-light)] hover:border-[var(--ff-primary)]/50'
+                }`}>
+                <div className="flex items-center gap-2 mb-1">
+                  <Icon className={`w-4 h-4 ${active ? 'text-[var(--ff-primary)]' : 'text-[var(--ff-text-secondary)]'}`} />
+                  <span className={`text-sm font-medium ${active ? 'text-[var(--ff-primary)]' : 'text-[var(--ff-text-primary)]'}`}>{opt.label}</span>
+                </div>
+                <p className="text-[10px] text-[var(--ff-text-tertiary)]">{opt.desc}</p>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Photo Grid */}
-      {filteredPhotos.length === 0 ? (
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)] p-12 text-center">
-          <ImageIcon className="w-16 h-16 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">No photos yet</h3>
-          <p className="text-[var(--ff-text-secondary)]">
-            Photos from vehicle check-ins and fuel receipts will appear here.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {filteredPhotos.map((photo) => (
-            <div
-              key={photo.id}
-              onClick={() => setLightboxPhoto(photo)}
-              className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)] overflow-hidden cursor-pointer hover:border-[var(--ff-primary)] transition-colors group"
-            >
-              <div className="aspect-square relative">
-                <img
-                  src={photo.fileUrl}
-                  alt={photo.photoType}
-                  className="w-full h-full object-cover"
-                />
-                {photo.vlmProcessed && (
-                  <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded">
-                    VLM
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-              </div>
-              <div className="p-3">
-                <p className="text-sm font-medium text-[var(--ff-text-primary)]">
-                  {photoTypeLabels[photo.photoType] || photo.photoType}
-                </p>
-                <p className="text-xs text-[var(--ff-text-secondary)]">
-                  {new Date(photo.capturedAt).toLocaleDateString('en-ZA', {
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </p>
-                {photo.capturedBy && (
-                  <p className="text-xs text-[var(--ff-text-tertiary)]">
-                    By: {photo.capturedBy}
-                  </p>
-                )}
-                <span className={`text-xs px-1.5 py-0.5 rounded mt-1 inline-block ${
-                  photo.source === 'check_photos'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-gray-100 text-gray-700'
-                }`}>
-                  {photo.source === 'check_photos' ? 'Check-In' : 'Vehicle'}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Active View */}
+      {view === 'timeline' && <TimelineView photos={photos} onSelect={setLightboxPhoto} />}
+      {view === 'by-type' && <ByTypeView photos={photos} onSelect={setLightboxPhoto} />}
+      {view === 'by-section' && <BySectionView photos={photos} onSelect={setLightboxPhoto} />}
 
-      {/* Lightbox Modal */}
-      {lightboxPhoto && (
-        <div
-          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
-          onClick={() => setLightboxPhoto(null)}
-        >
-          <div
-            className="bg-[var(--ff-bg-secondary)] rounded-lg max-w-4xl max-h-[90vh] overflow-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="relative">
-              <img
-                src={lightboxPhoto.fileUrl}
-                alt={lightboxPhoto.photoType}
-                className="w-full h-auto"
-              />
-              <button
-                onClick={() => setLightboxPhoto(null)}
-                className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/70"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4 border-t border-[var(--ff-border-light)]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
-                    {photoTypeLabels[lightboxPhoto.photoType] || lightboxPhoto.photoType}
-                  </h3>
-                  <p className="text-sm text-[var(--ff-text-secondary)]">
-                    Captured: {new Date(lightboxPhoto.capturedAt).toLocaleString('en-ZA')}
-                    {lightboxPhoto.capturedBy && ` by ${lightboxPhoto.capturedBy}`}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  {lightboxPhoto.vlmProcessed && (
-                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-sm">
-                      VLM Processed
-                    </span>
-                  )}
-                  {lightboxPhoto.vlmConfidence !== null && (
-                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm">
-                      {Math.round(lightboxPhoto.vlmConfidence * 100)}% confidence
-                    </span>
-                  )}
-                </div>
-              </div>
-              {lightboxPhoto.checkRecordId && (
-                <Link
-                  href={`/fleet/vehicles/${vehicleId}/check-in-history?recordId=${lightboxPhoto.checkRecordId}`}
-                  className="mt-3 inline-flex items-center gap-1 text-sm text-[var(--ff-primary)] hover:underline"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  View Check-In Record
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Lightbox */}
+      {lightboxPhoto && <PhotoLightbox photo={lightboxPhoto} vehicleId={vehicleId} onClose={() => setLightboxPhoto(null)} />}
     </div>
   );
 }

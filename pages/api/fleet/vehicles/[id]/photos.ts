@@ -164,6 +164,10 @@ async function handleGet(
     source: 'vehicle_photos' | 'check_photos';
     checkDate?: string;
     checkTime?: string;
+    checkType?: string | null;
+    odometerReading?: number | null;
+    fuelLevel?: number | null;
+    checkStatus?: string | null;
   }
 
   let vehiclePhotos: CombinedPhoto[] = [];
@@ -221,6 +225,10 @@ async function handleGet(
       check_date: string;
       check_time: string;
       driver_name: string;
+      check_type: string | null;
+      odometer_reading: number | null;
+      fuel_level: number | null;
+      status: string | null;
     }
 
     let checkRows: CheckPhotoRow[];
@@ -229,7 +237,8 @@ async function handleGet(
         SELECT p.id, p.record_id, p.response_id, p.photo_type, p.is_required,
                p.file_url, p.file_path, p.file_size, p.latitude, p.longitude,
                p.storage_service_url, p.captured_at, p.vlm_processed, p.vlm_result,
-               p.vlm_confidence, r.check_date, r.check_time, r.driver_name
+               p.vlm_confidence, r.check_date, r.check_time, r.driver_name,
+               r.check_type, r.odometer_reading, r.fuel_level, r.status
         FROM fleet_check_photos p
         JOIN fleet_check_records r ON r.id = p.record_id
         WHERE r.vehicle_id = ${vehicleId} AND p.photo_type = ${type}
@@ -240,7 +249,8 @@ async function handleGet(
         SELECT p.id, p.record_id, p.response_id, p.photo_type, p.is_required,
                p.file_url, p.file_path, p.file_size, p.latitude, p.longitude,
                p.storage_service_url, p.captured_at, p.vlm_processed, p.vlm_result,
-               p.vlm_confidence, r.check_date, r.check_time, r.driver_name
+               p.vlm_confidence, r.check_date, r.check_time, r.driver_name,
+               r.check_type, r.odometer_reading, r.fuel_level, r.status
         FROM fleet_check_photos p
         JOIN fleet_check_records r ON r.id = p.record_id
         WHERE r.vehicle_id = ${vehicleId}
@@ -253,7 +263,7 @@ async function handleGet(
       vehicleId,
       photoType: row.photo_type,
       // Use file_url (which has /storage/ prefix) or construct from file_path
-      fileUrl: row.file_url || (row.file_path ? `/storage/${row.file_path}` : row.storage_service_url),
+      fileUrl: row.file_url || (row.file_path ? `/storage/${row.file_path}` : row.storage_service_url) || '',
       fileKey: row.file_path,
       fileSize: row.file_size,
       mimeType: 'image/jpeg',
@@ -269,6 +279,10 @@ async function handleGet(
       source: 'check_photos' as const,
       checkDate: row.check_date,
       checkTime: row.check_time,
+      checkType: row.check_type,
+      odometerReading: row.odometer_reading,
+      fuelLevel: row.fuel_level,
+      checkStatus: row.status,
     }));
     checkPhotoCount = checkRows.length;
   }
