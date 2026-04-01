@@ -159,15 +159,16 @@ bash scripts/promote.sh dev production       # Promote dev → production (after
 bash scripts/deploy-gate.sh status           # Show all environments
 ```
 
-**Direct Local Commands (we run on Velocity — no SSH needed):**
+**ALWAYS use the deploy script (stops service before build to prevent 500s):**
 ```bash
 # Dev (always allowed)
-sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && git pull origin master && npm run build'
-sudo systemctl restart fibreflow-dev.service
+bash scripts/deploy-local.sh dev
 
-# Production (after hours only — promotes EXACT commit from dev)
-sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git pull origin master && npm run build'
-sudo systemctl restart fibreflow-production.service
+# Production (after hours only)
+bash scripts/deploy-local.sh production
+
+# NEVER do manual git pull + build + restart — this causes 500 errors
+# because the running service serves broken responses during the build.
 ```
 
 **Maintenance page:** Nginx serves `/var/www/html/maintenance.html` on 502/503 during restarts (auto-refreshes every 8s).
