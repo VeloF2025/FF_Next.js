@@ -43,12 +43,11 @@ async function preprocessEodImage(base64Image: string): Promise<{
   const rotated = await sharp(raw).rotate().toBuffer();
   const rotatedBase64 = rotated.toString('base64');
 
-  // VLM version: higher res than standard (1280x960) because EOD sheets have
-  // small printed text on stickers that needs to be readable
+  // VLM: 1280x960 is Qwen3's sweet spot — higher res breaks other field extraction
   const vlmBase64 = await optimizeForVlm(rotatedBase64, {
-    maxWidth: 1920,
-    maxHeight: 1440,
-    quality: 92,
+    maxWidth: 1280,
+    maxHeight: 960,
+    quality: 90,
     enhanceContrast: true,
   });
 
@@ -111,34 +110,25 @@ async function findAllBarcodes(variants: string[]): Promise<string[]> {
 
 function buildPrompt(barcodeHints: string[]): string {
   const barcodeSection = barcodeHints.length > 0
-    ? `\nMACHINE-DECODED BARCODES (ONT serials, high accuracy — use these):\n${barcodeHints.map((b, i) => `  Row ${i + 1}: ${b}`).join('\n')}\n`
+    ? `\nMACHINE-DECODED BARCODES:\n${barcodeHints.map((b, i) => `  ${i + 1}. ${b}`).join('\n')}\n`
     : '';
 
   return `/no_think
-Extract the table from this Velocity Fibre "Home Drop and Activation" form.
+Read this Velocity Fibre install form table. Extract ALL rows (up to 10). Every row has DIFFERENT values.
 
-TABLE STRUCTURE (columns left to right):
-  Row# | ONT Serial (barcode sticker) | Gizzu Serial | DR Number | PON | Address
+Columns: Row# | ONT Serial (sticker text starting "SN: ALCL...") | Gizzu Serial (GU18W12V25...) | DR Number (DR18...) | PON (121-128) | Address (4-5 digits)
 
-FORM METADATA:
-  - Date: top-right corner, DD/MM/YYYY format → output as YYYY-MM-DD
-  - Technician name: bottom of form next to "NAME & ID NUMBER"
+Date: top-right DD/MM/YYYY → YYYY-MM-DD. Technician: bottom "NAME & ID NUMBER".
 
-ONT SERIAL STICKERS — CRITICAL:
-  Each row has a barcode sticker in the first data column. Below the barcode bars there is PRINTED TEXT starting with "SN: ALCL" followed by more characters.
-  READ THE PRINTED TEXT, not the barcode bars. Each sticker has a UNIQUE serial.
-  Format: "ALCLB" followed by 5-7 hex characters (e.g. ALCLB4E5A300, ALCLB48EEEE, ALCLB4E5F7D).
-  Each row has a DIFFERENT serial — read each sticker individually.
+Rules:
+- ONT Serial: read printed text "SN: ALCLB..." on each barcode sticker. Each is UNIQUE (e.g. ALCLB4E5A300, ALCLB48EEEE, ALCLB4E5F7D).
+- DR Number: ALWAYS "DR18" prefix (8 not 9). Each row different.
+- Gizzu: "GU18W12V25" + unique suffix per row.
+- PON: read actual value per row (128, 127, or 121 etc), don't assume same for all.
+- Address: each row different.
 ${barcodeSection}
-OTHER FIELD RULES:
-  - DR Number: starts with "DR18" + 3-5 digits (handwritten 8 looks like 9 — ALWAYS use 8)
-  - Gizzu Serial: "GU18W12V25" + varying suffix per row
-  - PON: integer in range 121–128, read the actual value (don't assume 128 for all)
-  - Address: 4-5 digit stand number, DIFFERENT per row
-  - EVERY row has DIFFERENT values in every column
-
-Output ONLY this JSON (no markdown, no explanation):
-{"date":"YYYY-MM-DD","technician_name":"string","technician_id":"string or null","entries":[{"row_number":1,"ont_serial":"ALCLB4E5A300","gizzu_serial":"GU18W12V25-090-30991","dr_number":"DR1865110","pon_number":"128","address":"14643","confidence":0.8}],"overall_confidence":0.8}`;
+JSON only:
+{"date":"2026-03-30","technician_name":"Doctor Onalenna","technician_id":"014825","entries":[{"row_number":1,"ont_serial":"ALCLB4E5A300","gizzu_serial":"GU18W12V25-090-30991","dr_number":"DR1865110","pon_number":"128","address":"14643","confidence":0.8}],"overall_confidence":0.8}`;
 }
 
 // ============================================================================
