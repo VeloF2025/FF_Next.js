@@ -62,7 +62,7 @@ export type VlmProcessingStatus = 'pending' | 'completed' | 'failed';
  * - 'check_in': Submitted during check-in (may be VLM auto-filled or manual)
  * - 'manual_override': HITL correction after VLM extraction
  */
-export type OdometerSource = 'manual' | 'vlm' | 'check_in' | 'manual_override';
+export type OdometerSource = 'manual' | 'vlm' | 'check_in' | 'manual_override' | 'admin_correction';
 
 /**
  * Reminder channel

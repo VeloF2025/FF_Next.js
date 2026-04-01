@@ -13,6 +13,7 @@ import {
   Car,
   FileSearch,
   MapPin,
+  Upload,
   ScanLine,
   ClipboardList,
 } from 'lucide-react';
@@ -93,6 +94,13 @@ export const fleetConfig: ModuleNavigationConfig = {
       icon: TrendingUp,
       path: '/fleet/analytics',
       rbacKey: 'fleet.analytics',
+    },
+    {
+      id: 'import',
+      label: 'Import',
+      icon: Upload,
+      path: '/fleet/import',
+      rbacKey: 'fleet.import',
     },
     {
       id: 'portal',

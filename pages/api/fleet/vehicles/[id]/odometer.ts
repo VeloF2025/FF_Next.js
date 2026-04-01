@@ -2,6 +2,7 @@
  * Fleet Vehicle Odometer API
  * GET: List odometer history for a vehicle
  * POST: Add a manual odometer reading
+ * PATCH: Admin correction of an existing reading
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -44,8 +45,10 @@ async function handler(
         return handleGet(req, res, vehicleId);
       case 'POST':
         return handlePost(req, res, vehicleId);
+      case 'PATCH':
+        return handlePatch(req, res, vehicleId);
       default:
-        return apiResponse.methodNotAllowed(res, req.method || 'Unknown', ['GET', 'POST']);
+        return apiResponse.methodNotAllowed(res, req.method || 'Unknown', ['GET', 'POST', 'PATCH']);
     }
   } catch (error) {
     log.error('Fleet odometer API error', { error, vehicleId });
@@ -235,6 +238,53 @@ async function handlePost(
     },
     discrepancy: discrepancyResult,
   });
+}
+
+/**
+ * PATCH: Admin correction of an existing odometer reading
+ */
+async function handlePatch(req: NextApiRequest, res: NextApiResponse, vehicleId: string) {
+  const { recordId } = req.query;
+  const { reading: newReading } = req.body;
+
+  if (!recordId || typeof recordId !== 'string') {
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'recordId query parameter is required');
+  }
+  if (newReading === undefined || newReading === null || newReading < 0) {
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Valid reading is required');
+  }
+
+  const existing = await sql`
+    SELECT id, reading, previous_reading, recorded_at FROM fleet_odometer_history
+    WHERE id = ${recordId} AND vehicle_id = ${vehicleId}
+  ` as Array<{ id: string; reading: number; previous_reading: number | null; recorded_at: string }>;
+
+  if (existing.length === 0) return apiResponse.notFound(res, 'Odometer reading', recordId);
+
+  const oldReading = existing[0].reading;
+  const prevReading = existing[0].previous_reading;
+  const recordedAt = existing[0].recorded_at;
+  const newKmSinceLast = prevReading !== null ? newReading - prevReading : null;
+
+  await sql`UPDATE fleet_odometer_history
+    SET reading = ${newReading}, km_since_last = ${newKmSinceLast}, source = 'admin_correction', updated_at = NOW()
+    WHERE id = ${recordId}`;
+
+  // Recalculate next record's km_since_last
+  const nextRecord = await sql`
+    SELECT id, reading FROM fleet_odometer_history
+    WHERE vehicle_id = ${vehicleId} AND recorded_at > ${recordedAt}
+    ORDER BY recorded_at ASC LIMIT 1
+  ` as Array<{ id: string; reading: number }>;
+
+  if (nextRecord.length > 0) {
+    await sql`UPDATE fleet_odometer_history
+      SET previous_reading = ${newReading}, km_since_last = ${nextRecord[0].reading - newReading}
+      WHERE id = ${nextRecord[0].id}`;
+  }
+
+  log.info('Admin corrected odometer reading', { vehicleId, recordId, oldReading, newReading });
+  return apiResponse.success(res, { id: recordId, oldReading, newReading, kmSinceLast: newKmSinceLast });
 }
 
 /**

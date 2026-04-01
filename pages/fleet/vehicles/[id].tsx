@@ -102,7 +102,7 @@ type TabId = 'overview' | 'odometer' | 'fuel' | 'ownership' | 'documents' | 'ins
 interface OdometerReading {
   id: string;
   reading: number;
-  source: 'manual' | 'vlm';
+  source: string;
   vlmConfidence: number | null;
   previousReading: number | null;
   kmSinceLast: number | null;
@@ -1680,6 +1680,7 @@ function OdometerTab({
   loading: boolean;
   onRefresh: () => void;
   currentUserId?: string;
+  userRole?: string;
 }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [manualReading, setManualReading] = useState('');
@@ -1687,6 +1688,27 @@ function OdometerTab({
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [resolveNotes, setResolveNotes] = useState('');
   const [resolveSubmitting, setResolveSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+
+  const handleEditSave = async (readingId: string) => {
+    const val = parseInt(editValue);
+    if (isNaN(val) || val < 0) { toast.error('Invalid reading'); return; }
+    setEditSubmitting(true);
+    try {
+      const r = await fetch(`/api/fleet/vehicles/${vehicleId}/odometer?recordId=${readingId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reading: val }),
+      });
+      if (!r.ok) { const err = await r.json(); throw new Error(err.error?.message || 'Failed'); }
+      toast.success('Reading updated');
+      setEditingId(null);
+      onRefresh();
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Failed'); }
+    finally { setEditSubmitting(false); }
+  };
 
   const handleResolveAnomaly = async (anomalyId: string) => {
     if (!currentUserId) {
@@ -1962,6 +1984,7 @@ function OdometerTab({
                   <th className="text-right py-2 px-3 text-sm font-medium text-[var(--ff-text-secondary)]">KM Traveled</th>
                   <th className="text-center py-2 px-3 text-sm font-medium text-[var(--ff-text-secondary)]">Source</th>
                   <th className="text-center py-2 px-3 text-sm font-medium text-[var(--ff-text-secondary)]">Status</th>
+                  {isAdmin && <th className="text-center py-2 px-3 text-sm font-medium text-[var(--ff-text-secondary)]">Edit</th>}
                 </tr>
               </thead>
               <tbody>
@@ -1974,7 +1997,22 @@ function OdometerTab({
                       {formatDate(reading.recordedAt)}
                     </td>
                     <td className="py-3 px-3 text-sm text-right font-mono text-[var(--ff-text-primary)]">
-                      {reading.reading.toLocaleString()} km
+                      {editingId === reading.id ? (
+                        <div className="flex items-center justify-end gap-1">
+                          <input type="number" value={editValue}
+                            onChange={e => setEditValue(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') handleEditSave(reading.id); if (e.key === 'Escape') setEditingId(null); }}
+                            className="w-24 px-2 py-1 bg-[#1a1d23] text-white border border-blue-500 rounded text-sm text-right" autoFocus />
+                          <button onClick={() => handleEditSave(reading.id)} disabled={editSubmitting}
+                            className="p-1 text-green-400 hover:text-green-300"><Save className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => setEditingId(null)}
+                            className="p-1 text-red-400 hover:text-red-300"><X className="w-3.5 h-3.5" /></button>
+                        </div>
+                      ) : (
+                        <span>{reading.reading.toLocaleString()} km
+                          {reading.source === 'admin_correction' && <span className="ml-1 text-[10px] text-yellow-400">(edited)</span>}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-3 text-sm text-right text-[var(--ff-text-secondary)]">
                       {reading.kmSinceLast !== null ? (
@@ -2026,6 +2064,15 @@ function OdometerTab({
                         </span>
                       )}
                     </td>
+                    {isAdmin && (
+                      <td className="py-3 px-3 text-sm text-center">
+                        {editingId !== reading.id && (
+                          <button onClick={() => { setEditingId(reading.id); setEditValue(String(reading.reading)); }}
+                            className="p-1 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-primary)] transition-colors"
+                            title="Edit reading"><Pencil className="w-3.5 h-3.5" /></button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -3914,6 +3961,7 @@ export default function VehicleDetailPage() {
                 loading={loadingOdometer}
                 onRefresh={fetchOdometerData}
                 currentUserId={currentUser?.id}
+                userRole={currentUser?.role}
               />
             )}
             {activeTab === 'fuel' && (
