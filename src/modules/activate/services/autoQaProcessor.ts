@@ -192,7 +192,7 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
       };
     });
 
-    // --- WITHIN-DR DEDUP: for steps 1-10, keep first photo, discard extras to step 0 ---
+    // --- WITHIN-DR DEDUP: for steps 1-10, keep first photo, mark extras as duplicates (step -1) ---
     const seenSteps = new Set<number>();
     let autoDiscardedCount = 0;
     const discardedPhotos: Array<{ filename: string; originalStep: number; reason: string }> = [];
@@ -202,10 +202,10 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
       if (step >= 1 && step <= 10) {
         if (seenSteps.has(step)) {
           const originalLabel = STEP_LABELS[step] || `Step ${step}`;
-          const reason = `Auto-discarded: duplicate of ${originalLabel} — only one photo per step is kept`;
+          const reason = `Duplicate of ${originalLabel} — only one photo per step is kept`;
           discardedPhotos.push({ filename: photo.filename, originalStep: step, reason });
-          photo.step = 0;
-          photo.stepLabel = 'Discard - Rubbish';
+          photo.step = -1;
+          photo.stepLabel = 'Duplicate Photo';
           photo.decision = 'FAIL';
           photo.comment = reason;
           autoDiscardedCount++;

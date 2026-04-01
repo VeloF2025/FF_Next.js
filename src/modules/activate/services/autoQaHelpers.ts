@@ -94,7 +94,7 @@ export async function persistAutoQaResults(
       for (let i = 0; i < photos.length; i++) {
         const discard = discardMap.get(photos[i].filename);
         if (discard) {
-          photos[i] = { ...photos[i], step: 0 };
+          photos[i] = { ...photos[i], step: -1 };
           patchNeeded = true;
         }
       }
@@ -104,7 +104,7 @@ export async function persistAutoQaResults(
         if (discard) {
           vlmResults[i] = {
             ...vlmResults[i],
-            human_override_step: 0,
+            human_override_step: -1,
             human_override_reason: discard.reason,
           };
           patchNeeded = true;
