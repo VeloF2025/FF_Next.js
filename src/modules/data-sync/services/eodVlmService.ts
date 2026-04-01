@@ -27,6 +27,7 @@ const ONT_PATTERN = /^(SN:)?ALC[LB][A-Z0-9]{5,10}$/i;
 // Known hallucination values the VLM tends to repeat
 const HALLUCINATION_BLOCKLIST = new Set([
   'ALCLB4A00000', 'ALCLBRE400', 'ALCLBMEF7D', 'ALCLB40000',
+  'ALCLBREAFAD0', 'ALCLBREAFA00', 'ALCLB4E5A300',
   'GU18W12V25-0030103', 'GU18W12V25-04C30103',
 ]);
 
@@ -282,6 +283,28 @@ export async function extractEodSheet(
       if (gzSet.size === 1) {
         log.warn('[EOD] All Gizzu identical — hallucination');
         parsed.entries = parsed.entries.map((e) => ({ ...e, gizzu_serial: null }));
+      }
+
+      // ONT serial duplicate detection — if all identical, VLM hallucinated
+      const ontSet = new Set(parsed.entries.map((e) => e.ont_serial).filter(Boolean));
+      if (ontSet.size === 1 && parsed.entries.length > 1) {
+        log.warn('[EOD] All ONT serials identical — hallucination, clearing');
+        parsed.entries = parsed.entries.map((e) => ({ ...e, ont_serial: null }));
+      }
+      // Also check if >50% are the same value — partial hallucination
+      if (ontSet.size > 0) {
+        const counts = new Map<string, number>();
+        for (const e of parsed.entries) {
+          if (e.ont_serial) counts.set(e.ont_serial, (counts.get(e.ont_serial) || 0) + 1);
+        }
+        for (const [serial, count] of counts) {
+          if (count > parsed.entries.length * 0.5) {
+            log.warn(`[EOD] ONT serial "${serial}" repeated ${count}x — hallucination, clearing`);
+            parsed.entries = parsed.entries.map((e) =>
+              e.ont_serial === serial ? { ...e, ont_serial: null } : e
+            );
+          }
+        }
       }
 
       // Sequential pattern detection — if values increment by 1, it's hallucination
