@@ -54,52 +54,61 @@ const ProgressCell = ({ pct }: { pct: number }) => (
 // ─── Report 1: Scope vs Actual ───────────────────────────────────────────────
 
 const ScopeTable = ({ rows, totals, syncedAt }: { rows: BuildMilestoneRow[]; totals: BuildMilestonesData['totals']; syncedAt?: string }) => {
-  const syncTime = syncedAt ? new Date(syncedAt).toLocaleString('en-ZA', { 
-    dateStyle: 'short', 
-    timeStyle: 'short', 
-    timeZone: 'Africa/Johannesburg' 
+  const syncTime = syncedAt ? new Date(syncedAt).toLocaleString('en-ZA', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: 'Africa/Johannesburg'
   }) : 'Unknown';
+
+  const COL_DIV = 'border-r border-[#2d3748]'; // dark-theme column divider
 
   return (
     <div>
       <div className="mb-3 text-xs text-[var(--ff-text-tertiary)]">
         Last synced: <span className="font-medium text-[var(--ff-text-secondary)]">{syncTime} SAST</span>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm" role="table" aria-label="Build milestones scope vs actual">
+      <div className="overflow-x-auto rounded-md border border-[#2d3748]">
+        <table className="w-full text-sm border-collapse" role="table" aria-label="Build milestones scope vs actual">
           <thead>
-            <tr className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] text-[var(--ff-text-primary)]">
-              <th scope="col" className="px-4 py-3 text-left font-semibold border-r border-[#e5e7eb]">Project</th>
-              <th scope="col" className="px-4 py-3 text-center font-semibold border-r border-[#e5e7eb]">PON Scope</th>
-              <th scope="col" className="px-4 py-3 text-center font-semibold border-r border-[#e5e7eb]">RFO Done</th>
-              <th scope="col" className="px-4 py-3 text-center font-semibold border-r border-[#e5e7eb]" style={{ minWidth: 150 }}>RFO %</th>
-              <th scope="col" className="px-4 py-3 text-center font-semibold border-r border-[#e5e7eb]">ATP Done</th>
-              <th scope="col" className="px-4 py-3 text-center font-semibold border-r border-[#e5e7eb]" style={{ minWidth: 150 }}>ATP %</th>
-              <th scope="col" className="px-4 py-3 text-center font-semibold text-[var(--ff-warning)]" title="RFO Done minus ATP Done — PONs awaiting ATP">Lag (RFO−ATP)</th>
+            {/* Group header row */}
+            <tr className="text-xs font-bold tracking-wide uppercase">
+              <th scope="col" className={`px-4 py-2 text-left bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)] ${COL_DIV}`} rowSpan={2}>Project</th>
+              <th scope="col" className={`px-4 py-2 text-center bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)] ${COL_DIV}`} rowSpan={2}>PON Scope</th>
+              <th scope="col" className={`px-4 py-2 text-center bg-[#1e3a5f] text-[#3b82f6] ${COL_DIV}`} colSpan={2}>RFO</th>
+              <th scope="col" className={`px-4 py-2 text-center bg-[#14532d] text-[#22c55e] ${COL_DIV}`} colSpan={2}>ATP</th>
+              <th scope="col" className="px-4 py-2 text-center bg-[#3d2800] text-[#f97316]">Lag</th>
+            </tr>
+            {/* Sub-header row */}
+            <tr className="bg-[var(--ff-bg-secondary)] border-b border-[#2d3748] text-xs text-[var(--ff-text-tertiary)]">
+              <th scope="col" className={`px-4 py-2 text-center font-semibold ${COL_DIV}`}>Done</th>
+              <th scope="col" className={`px-4 py-2 text-center font-semibold ${COL_DIV}`} style={{ minWidth: 160 }}>%</th>
+              <th scope="col" className={`px-4 py-2 text-center font-semibold ${COL_DIV}`}>Done</th>
+              <th scope="col" className={`px-4 py-2 text-center font-semibold ${COL_DIV}`} style={{ minWidth: 160 }}>%</th>
+              <th scope="col" className="px-4 py-2 text-center font-semibold text-[var(--ff-warning)]" title="RFO Done minus ATP Done — PONs awaiting ATP">(RFO−ATP)</th>
             </tr>
           </thead>
-          <tbody>
-            {rows.map((row, idx) => {
+          <tbody className="divide-y divide-[#2d3748]">
+            {rows.map((row) => {
               const lag = row.rfoDone - row.atpDone;
               return (
-                <tr key={row.projectId} className={idx % 2 === 0 ? 'bg-[var(--ff-bg-primary)]' : 'bg-[var(--ff-bg-secondary)]'}>
-                  <td className="px-4 py-3 text-[var(--ff-text-primary)] font-medium border-r border-[#e5e7eb]">{row.projectName}</td>
-                  <td className="px-4 py-3 text-center text-[var(--ff-text-secondary)] border-r border-[#e5e7eb]">{row.ponScope.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-center text-[var(--ff-text-secondary)] border-r border-[#e5e7eb]">{row.rfoDone.toLocaleString()}</td>
-                  <td className="px-4 py-3 border-r border-[#e5e7eb]"><ProgressCell pct={row.rfoPct} /></td>
-                  <td className="px-4 py-3 text-center text-[var(--ff-text-secondary)] border-r border-[#e5e7eb]">{row.atpDone.toLocaleString()}</td>
-                  <td className="px-4 py-3 border-r border-[#e5e7eb]"><ProgressCell pct={row.atpPct} /></td>
+                <tr key={row.projectId} className="hover:bg-[var(--ff-bg-hover)] transition-colors">
+                  <td className={`px-4 py-3 text-[var(--ff-text-primary)] font-medium ${COL_DIV}`}>{row.projectName}</td>
+                  <td className={`px-4 py-3 text-center text-[var(--ff-text-secondary)] ${COL_DIV}`}>{row.ponScope.toLocaleString()}</td>
+                  <td className={`px-4 py-3 text-center text-[#3b82f6] font-medium ${COL_DIV}`}>{row.rfoDone.toLocaleString()}</td>
+                  <td className={`px-4 py-3 ${COL_DIV}`}><ProgressCell pct={row.rfoPct} /></td>
+                  <td className={`px-4 py-3 text-center text-[#22c55e] font-medium ${COL_DIV}`}>{row.atpDone.toLocaleString()}</td>
+                  <td className={`px-4 py-3 ${COL_DIV}`}><ProgressCell pct={row.atpPct} /></td>
                   <td className="px-4 py-3 text-center font-semibold" style={{ color: lag > 0 ? PCT_MED : PCT_NONE }}>{lag}</td>
                 </tr>
               );
             })}
-            <tr className="bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] font-semibold border-t-2 border-[var(--ff-border-light)]">
-              <td className="px-4 py-3 border-r border-[#e5e7eb]">Total</td>
-              <td className="px-4 py-3 text-center border-r border-[#e5e7eb]">{totals.ponScope.toLocaleString()}</td>
-              <td className="px-4 py-3 text-center border-r border-[#e5e7eb]">{totals.rfoDone.toLocaleString()}</td>
-              <td className="px-4 py-3 border-r border-[#e5e7eb]"><ProgressCell pct={totals.rfoPct} /></td>
-              <td className="px-4 py-3 text-center border-r border-[#e5e7eb]">{totals.atpDone.toLocaleString()}</td>
-              <td className="px-4 py-3 border-r border-[#e5e7eb]"><ProgressCell pct={totals.atpPct} /></td>
+            <tr className="bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] font-semibold border-t-2 border-[#4b5563]">
+              <td className={`px-4 py-3 ${COL_DIV}`}>Total</td>
+              <td className={`px-4 py-3 text-center ${COL_DIV}`}>{totals.ponScope.toLocaleString()}</td>
+              <td className={`px-4 py-3 text-center text-[#3b82f6] ${COL_DIV}`}>{totals.rfoDone.toLocaleString()}</td>
+              <td className={`px-4 py-3 ${COL_DIV}`}><ProgressCell pct={totals.rfoPct} /></td>
+              <td className={`px-4 py-3 text-center text-[#22c55e] ${COL_DIV}`}>{totals.atpDone.toLocaleString()}</td>
+              <td className={`px-4 py-3 ${COL_DIV}`}><ProgressCell pct={totals.atpPct} /></td>
               <td className="px-4 py-3 text-center font-semibold text-[var(--ff-warning)]">{totals.rfoDone - totals.atpDone}</td>
             </tr>
           </tbody>
