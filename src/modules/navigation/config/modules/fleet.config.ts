@@ -8,6 +8,7 @@ import {
   TrendingUp,
   Users,
   Fuel,
+  Gauge,
   Wrench,
   Car,
   FileSearch,
@@ -69,6 +70,13 @@ export const fleetConfig: ModuleNavigationConfig = {
       icon: Fuel,
       path: '/fleet/fuel',
       rbacKey: 'fleet.fuel',
+    },
+    {
+      id: 'mileage',
+      label: 'Mileage',
+      icon: Gauge,
+      path: '/fleet/mileage',
+      rbacKey: 'fleet.mileage',
     },
     {
       id: 'maintenance',

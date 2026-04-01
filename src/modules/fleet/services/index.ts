@@ -61,6 +61,13 @@ export {
   getDriverScorecard,
 } from './driverScoreService';
 
+// Mileage Service
+export {
+  fleetMileageService,
+  getFleetMileage,
+  getProjectMileageSummaries,
+} from './fleetMileageService';
+
 // Fuel Analytics Service
 export {
   fuelAnalyticsService,

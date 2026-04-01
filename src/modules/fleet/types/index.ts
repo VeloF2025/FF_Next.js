@@ -17,3 +17,6 @@ export * from './ownership.types';
 
 // Driver types (driver listing, dashboard stats)
 export * from './driver.types';
+
+// Mileage report types
+export * from './mileage.types';
