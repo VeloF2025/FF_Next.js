@@ -10,7 +10,7 @@ import {
   ArrowLeft, FileText, Calendar, Package, Edit2, Save, X,
   Trash2, Download, Loader2, XCircle, CheckCircle, Clock,
   User, Upload, ChevronDown, Eye, EyeOff, History, ArrowRight, Search, Filter,
-  ShoppingCart,
+  ShoppingCart, GitBranch, RotateCcw, Plus, Minus, PenLine,
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import StockItemMapper from '@/components/procurement/boq/StockItemMapper';
@@ -75,6 +75,15 @@ interface ChangeEntry {
   changeSummary: string;
   createdAt: string;
   itemCode: string | null;
+}
+
+interface VersionComparisonData {
+  from: { id: string; version: string; title: string };
+  to: { id: string; version: string; title: string };
+  summary: { added: number; removed: number; modified: number; unchanged: number };
+  added: Array<{ itemCode: string; description: string; quantity: number; rate: number; amount: number; category: string }>;
+  removed: Array<{ itemCode: string; description: string; quantity: number; rate: number; amount: number; category: string }>;
+  modified: Array<{ itemCode: string; description: string; changes: Array<{ field: string; from: string | number; to: string | number }> }>;
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
@@ -146,6 +155,13 @@ export default function BOQDetailPage() {
   const [lifecycleData, setLifecycleData] = useState<BOQLifecycleResponse | null>(null);
   const [lifecycleLoading, setLifecycleLoading] = useState(false);
 
+  // Version history states
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [compareFromId, setCompareFromId] = useState<string | null>(null);
+  const [comparisonData, setComparisonData] = useState<VersionComparisonData | null>(null);
+  const [isComparing, setIsComparing] = useState(false);
+  const [isRollingBack, setIsRollingBack] = useState(false);
+
   useEffect(() => {
     if (id && typeof id === 'string') {
       fetchBOQ(id);
@@ -200,6 +216,52 @@ export default function BOQDetailPage() {
       }
     } catch (err) {
       log.error('Failed to fetch change history', err);
+    }
+  };
+
+  const handleCompareVersions = async (fromVersionId: string) => {
+    if (!boq) return;
+    setIsComparing(true);
+    setCompareFromId(fromVersionId);
+    try {
+      const res = await fetch(`/api/procurement/boq/compare-versions?fromId=${fromVersionId}&toId=${boq.id}`);
+      const data = await res.json();
+      if (data.data) {
+        setComparisonData(data.data);
+      } else {
+        notificationService.error(data.error?.message || 'Failed to compare versions');
+      }
+    } catch (err) {
+      log.error('Failed to compare versions', err);
+      notificationService.error('Failed to compare versions');
+    } finally {
+      setIsComparing(false);
+    }
+  };
+
+  const handleRollback = async (sourceBoqId: string, sourceVersion: string) => {
+    if (!confirm(`Restore version ${sourceVersion}? This creates a new version with those items. The current version will be marked as superseded.`)) {
+      return;
+    }
+    setIsRollingBack(true);
+    try {
+      const res = await fetch('/api/procurement/boq/rollback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceBoqId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.data?.id) {
+        notificationService.success(data.data.message || `Restored to ${sourceVersion}`);
+        router.push(`/procurement/boq/${data.data.id}`);
+      } else {
+        notificationService.error(data.error?.message || 'Failed to restore version');
+      }
+    } catch (err) {
+      log.error('Failed to rollback BOQ', err);
+      notificationService.error('Failed to restore version');
+    } finally {
+      setIsRollingBack(false);
     }
   };
 
@@ -991,6 +1053,214 @@ export default function BOQDetailPage() {
             }))}
             onMappingComplete={() => { if (id && typeof id === 'string') fetchBOQ(id); }}
           />
+
+          {/* Version History */}
+          {versions.length > 1 && (
+            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
+              <button
+                onClick={() => { setShowVersionHistory(!showVersionHistory); setComparisonData(null); setCompareFromId(null); }}
+                className="w-full px-6 py-4 flex items-center justify-between hover:bg-[var(--ff-bg-hover)] transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <GitBranch className="h-5 w-5 text-[var(--ff-text-secondary)]" />
+                  <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Version History</h3>
+                  <span className="bg-blue-500/20 text-blue-400 text-xs font-medium px-2 py-0.5 rounded-full">
+                    {versions.length}
+                  </span>
+                </div>
+                <ChevronDown className={`h-5 w-5 text-[var(--ff-text-secondary)] transition-transform ${showVersionHistory ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showVersionHistory && (
+                <div className="border-t border-[var(--ff-border-light)]">
+                  {/* Version list */}
+                  <div className="divide-y divide-[var(--ff-border-light)]">
+                    {versions.map((v) => {
+                      const isCurrent = v.id === boq.id;
+                      const vStatus = statusConfig[v.status] || statusConfig.draft;
+                      return (
+                        <div key={v.id} className={`px-6 py-4 ${isCurrent ? 'bg-blue-500/5' : ''}`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-mono font-semibold text-[var(--ff-text-primary)]">
+                                v{v.version}
+                              </span>
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${vStatus.color}`}>
+                                {vStatus.label}
+                              </span>
+                              {isCurrent && (
+                                <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-500/20 text-blue-400">
+                                  Current
+                                </span>
+                              )}
+                              <span className="text-sm text-[var(--ff-text-secondary)] truncate max-w-[300px]">
+                                {v.title || ''}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <span className="text-xs text-[var(--ff-text-secondary)]">
+                                {v.itemCount} items &middot; {formatCurrency(v.totalValue)}
+                              </span>
+                              <span className="text-xs text-[var(--ff-text-tertiary)]">
+                                {formatDate(v.createdAt)}
+                              </span>
+                              {!isCurrent && (
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => handleCompareVersions(v.id)}
+                                    disabled={isComparing}
+                                    className="px-2.5 py-1 text-xs font-medium text-blue-400 hover:text-blue-300 bg-blue-500/10 border border-blue-500/30 rounded hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+                                    title="Compare with current version"
+                                  >
+                                    {isComparing && compareFromId === v.id ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      'Compare'
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={() => handleRollback(v.id, v.version)}
+                                    disabled={isRollingBack}
+                                    className="px-2.5 py-1 text-xs font-medium text-amber-400 hover:text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded hover:bg-amber-500/20 transition-colors disabled:opacity-50"
+                                    title="Restore this version"
+                                  >
+                                    {isRollingBack ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <><RotateCcw className="h-3 w-3 inline mr-1" />Restore</>
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={() => router.push(`/procurement/boq/${v.id}`)}
+                                    className="px-2.5 py-1 text-xs font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-hover)] transition-colors"
+                                    title="View this version"
+                                  >
+                                    View
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Comparison results */}
+                  {comparisonData && (
+                    <div className="border-t border-[var(--ff-border-light)] px-6 py-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-semibold text-[var(--ff-text-primary)]">
+                          Comparing v{comparisonData.from.version} → v{comparisonData.to.version} (current)
+                        </h4>
+                        <button
+                          onClick={() => { setComparisonData(null); setCompareFromId(null); }}
+                          className="text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      {/* Summary badges */}
+                      <div className="flex items-center gap-3">
+                        <span className="flex items-center gap-1 text-xs font-medium text-green-400 bg-green-500/10 px-2 py-1 rounded">
+                          <Plus className="h-3 w-3" /> {comparisonData.summary.added} added
+                        </span>
+                        <span className="flex items-center gap-1 text-xs font-medium text-red-400 bg-red-500/10 px-2 py-1 rounded">
+                          <Minus className="h-3 w-3" /> {comparisonData.summary.removed} removed
+                        </span>
+                        <span className="flex items-center gap-1 text-xs font-medium text-blue-400 bg-blue-500/10 px-2 py-1 rounded">
+                          <PenLine className="h-3 w-3" /> {comparisonData.summary.modified} modified
+                        </span>
+                        <span className="text-xs text-[var(--ff-text-tertiary)]">
+                          {comparisonData.summary.unchanged} unchanged
+                        </span>
+                      </div>
+
+                      {/* No changes */}
+                      {comparisonData.summary.added === 0 && comparisonData.summary.removed === 0 && comparisonData.summary.modified === 0 && (
+                        <p className="text-sm text-[var(--ff-text-secondary)] py-4 text-center">
+                          These versions are identical.
+                        </p>
+                      )}
+
+                      {/* Added items */}
+                      {comparisonData.added.length > 0 && (
+                        <div>
+                          <h5 className="text-xs font-semibold text-green-400 uppercase tracking-wide mb-2">
+                            Added in current version
+                          </h5>
+                          <div className="space-y-1">
+                            {comparisonData.added.map((item, i) => (
+                              <div key={i} className="flex items-center gap-3 text-sm bg-green-500/5 border border-green-500/10 rounded px-3 py-2">
+                                <Plus className="h-3 w-3 text-green-400 flex-shrink-0" />
+                                <span className="font-mono text-xs text-[var(--ff-text-secondary)] w-28 truncate">{item.itemCode || '-'}</span>
+                                <span className="text-[var(--ff-text-primary)] flex-1 truncate">{item.description}</span>
+                                <span className="text-xs text-[var(--ff-text-secondary)]">{item.quantity} × {formatCurrency(item.rate)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Removed items */}
+                      {comparisonData.removed.length > 0 && (
+                        <div>
+                          <h5 className="text-xs font-semibold text-red-400 uppercase tracking-wide mb-2">
+                            Removed in current version
+                          </h5>
+                          <div className="space-y-1">
+                            {comparisonData.removed.map((item, i) => (
+                              <div key={i} className="flex items-center gap-3 text-sm bg-red-500/5 border border-red-500/10 rounded px-3 py-2">
+                                <Minus className="h-3 w-3 text-red-400 flex-shrink-0" />
+                                <span className="font-mono text-xs text-[var(--ff-text-secondary)] w-28 truncate">{item.itemCode || '-'}</span>
+                                <span className="text-[var(--ff-text-primary)] flex-1 truncate">{item.description}</span>
+                                <span className="text-xs text-[var(--ff-text-secondary)]">{item.quantity} × {formatCurrency(item.rate)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Modified items */}
+                      {comparisonData.modified.length > 0 && (
+                        <div>
+                          <h5 className="text-xs font-semibold text-blue-400 uppercase tracking-wide mb-2">
+                            Modified items
+                          </h5>
+                          <div className="space-y-2">
+                            {comparisonData.modified.map((item, i) => (
+                              <div key={i} className="bg-blue-500/5 border border-blue-500/10 rounded px-3 py-2">
+                                <div className="flex items-center gap-3 text-sm mb-1">
+                                  <PenLine className="h-3 w-3 text-blue-400 flex-shrink-0" />
+                                  <span className="font-mono text-xs text-[var(--ff-text-secondary)] w-28 truncate">{item.itemCode || '-'}</span>
+                                  <span className="text-[var(--ff-text-primary)] truncate">{item.description}</span>
+                                </div>
+                                <div className="ml-6 space-y-1">
+                                  {item.changes.map((ch, j) => (
+                                    <div key={j} className="flex items-center gap-2 text-xs">
+                                      <span className="text-[var(--ff-text-tertiary)] w-20">{ch.field}:</span>
+                                      <span className="text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded font-mono">
+                                        {typeof ch.from === 'number' ? ch.from : String(ch.from).slice(0, 40)}
+                                      </span>
+                                      <ArrowRight className="h-3 w-3 text-[var(--ff-text-tertiary)]" />
+                                      <span className="text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded font-mono">
+                                        {typeof ch.to === 'number' ? ch.to : String(ch.to).slice(0, 40)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Change History */}
           <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
