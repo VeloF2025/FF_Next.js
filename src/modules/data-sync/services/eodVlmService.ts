@@ -1,8 +1,9 @@
 /**
  * EOD Install Sheet VLM Extraction Service
  * Two-pass extraction:
- *   Pass 1: zxing barcode scanner finds all ONT serial barcodes
- *   Pass 2: VLM extracts table data with barcode hints for accurate serial matching
+ *   Pass 0: Image preprocessing (auto-rotate, contrast, sharpen)
+ *   Pass 1: Enhanced barcode scanner with multi-strategy preprocessing
+ *   Pass 2: VLM extracts table data with barcode hints
  */
 
 import {
@@ -11,41 +12,101 @@ import {
   VLM_TEMPERATURE,
   VLM_TIMEOUT_MS,
 } from '@/modules/activate/services/vlmClient';
-import { scanAllBarcodes } from '@/modules/activate/services/enhancedBarcodeService';
+import { scanBarcodeEnhanced } from '@/modules/activate/services/enhancedBarcodeService';
 import type { EodVlmExtraction } from '../types';
 import { log } from '@/lib/logger';
+import sharp from 'sharp';
 
 const EOD_MAX_TOKENS = 4000;
 
+/**
+ * Preprocess image for barcode scanning and VLM:
+ * - Auto-rotate using EXIF data
+ * - Enhance contrast and sharpen
+ * - Return both preprocessed buffer and base64
+ */
+async function preprocessEodImage(base64Image: string): Promise<{
+  processedBase64: string;
+  rotations: string[];  // base64 images at 0°, 90°, 180°, 270° for barcode scanning
+}> {
+  const imageBuffer = Buffer.from(base64Image, 'base64');
+
+  // Auto-rotate from EXIF + enhance for VLM
+  const processed = await sharp(imageBuffer)
+    .rotate() // Auto-rotate based on EXIF orientation
+    .normalise()
+    .sharpen({ sigma: 1.5 })
+    .resize(2048, 2048, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 90 })
+    .toBuffer();
+
+  const processedBase64 = processed.toString('base64');
+
+  // Create rotated versions for barcode scanning
+  const rotations: string[] = [processedBase64];
+  for (const angle of [90, 180, 270] as const) {
+    const rotated = await sharp(processed).rotate(angle).jpeg({ quality: 90 }).toBuffer();
+    rotations.push(rotated.toString('base64'));
+  }
+
+  return { processedBase64, rotations };
+}
+
+/**
+ * Scan for all ONT serial barcodes across all rotations
+ */
+async function scanBarcodesMultiRotation(rotations: string[]): Promise<string[]> {
+  const found = new Set<string>();
+  const ONT_PATTERN = /^ALC[LB][A-Z0-9]{7,9}$/i;
+
+  for (let i = 0; i < rotations.length; i++) {
+    try {
+      const result = await scanBarcodeEnhanced(rotations[i]!, { maxAttempts: 5 });
+      if (result.success && result.value && ONT_PATTERN.test(result.value)) {
+        found.add(result.value.toUpperCase());
+        log.info(`[EOD-Barcode] Found serial at rotation ${i * 90}°: ${result.value}`);
+      }
+    } catch {
+      // Continue with next rotation
+    }
+  }
+
+  return Array.from(found);
+}
+
 function buildPrompt(barcodeHints: string[]): string {
   const barcodeSection = barcodeHints.length > 0
-    ? `\n\nBARCODE SCANNER RESULTS (high-accuracy ONT serials detected in this image):\n${barcodeHints.map((b, i) => `  ${i + 1}. ${b}`).join('\n')}\nAssign these serials to the matching rows based on their visual position in the table. These are MORE accurate than OCR — prefer these values for ont_serial.\n`
-    : '\n\nNo barcode stickers were machine-decoded. Try to read ONT serial text manually.\n';
+    ? `\n\nBARCODE SCANNER RESULTS (machine-decoded ONT serials from this image):\n${barcodeHints.map((b, i) => `  ${i + 1}. ${b}`).join('\n')}\nThese are accurate. Assign them to the matching rows. If there are fewer barcodes than rows, some stickers may be unreadable — set those to null.\n`
+    : '\n\nNo barcode stickers were machine-decoded. Try to read ONT serial text manually if visible.\n';
 
   return `You are extracting data from a physical "Home Drop and Activation - Equipment Allocation Form" used by Velocity Fibre field technicians.
 
-The form is a table with up to 10 numbered rows. Extract ALL rows that have data.
+The form is a table with up to 10 numbered rows. Extract ALL rows that have data. Each row has DIFFERENT values — do NOT duplicate rows.
 
-IMPORTANT CONTEXT: DR numbers in this system start with "DR18" (not DR19). The "1" and "8" in handwriting can look like "1" and "9" — always assume DR18xxxxx.
+CRITICAL: Each row in the table has UNIQUE values. Read each row individually and carefully. Common patterns:
+- DR numbers change per row (e.g. DR1865110, DR1864446, DR1865342 — each is different)
+- Addresses change per row (e.g. 14643, 14627, 14813 — each is different)
+- PON numbers may vary (e.g. 128, 127, 121)
+- Gizzu serials change per row (different suffix after GU18W12V25)
 
 For EACH row, extract:
 - row_number: The row number (1-10)
-- ont_serial: ONT Serial # from the barcode sticker column. Use the barcode scanner results below if available.
-- gizzu_serial: Gizzu Serial Number (UPS device). Format: starts with "GU18W12V25" followed by digits.
-- dr_number: DR Number. Format: "DR18" followed by 3-5 digits. ALWAYS starts with DR18.
-- pon_number: PON number. Usually 121-128.
-- address: Address or stand number (4-5 digit number).
+- ont_serial: ONT Serial # from barcode sticker. Use barcode scanner results if available.
+- gizzu_serial: Gizzu Serial Number. Format: GU18W12V25 followed by varying digits per row.
+- dr_number: DR Number. ALWAYS starts with "DR18" followed by 3-5 digits. Each row has a DIFFERENT DR number.
+- pon_number: PON number (121-128 range).
+- address: Stand number (4-5 digit number). Each row has a DIFFERENT address.
 
 Also extract from the form header/footer:
-- date: Install date. Convert from DD/MM/YYYY to YYYY-MM-DD format.
-- technician_name: Full name from the bottom of the form (next to "NAME & ID NUMBER").
+- date: Install date in YYYY-MM-DD format (convert from DD/MM/YYYY).
+- technician_name: Full name from bottom of form.
 - technician_id: ID number if visible.
 ${barcodeSection}
 RULES:
-- DR numbers MUST start with "DR18". If you read "DR19", it's likely "DR18" misread.
-- Read each digit carefully. Handwritten 8 and 9 look similar — default to 8 for DR prefix.
-- Skip completely empty rows.
-- If a cell is blank or unreadable, set the value to null.
+- DR numbers MUST start with "DR18". Handwritten 8 often looks like 9 — always use 8.
+- EVERY row must have UNIQUE values. If you find yourself repeating values, re-read the form.
+- Read each cell position carefully — the handwriting varies per row.
+- If a cell is blank or unreadable, set to null.
 
 Respond in this exact JSON format:
 {
@@ -56,7 +117,7 @@ Respond in this exact JSON format:
     {
       "row_number": 1,
       "ont_serial": "ALCLXXXXXXXX or null",
-      "gizzu_serial": "GU... or null",
+      "gizzu_serial": "GU18W12V25... or null",
       "dr_number": "DR18XXXXX or null",
       "pon_number": "128 or null",
       "address": "string or null",
@@ -69,29 +130,35 @@ Respond in this exact JSON format:
 
 /**
  * Extract data from an EOD install sheet photo.
- * Pass 1: Barcode scan for ONT serials. Pass 2: VLM for all other fields.
+ * Pass 0: Preprocess image (auto-rotate, enhance)
+ * Pass 1: Multi-rotation barcode scan for ONT serials
+ * Pass 2: VLM extraction with barcode hints and domain context
  */
 export async function extractEodSheet(
   base64Image: string
 ): Promise<{ success: boolean; data: EodVlmExtraction | null; error?: string }> {
   const startTime = Date.now();
 
-  // Pass 1: Barcode extraction
+  // Pass 0: Preprocess
+  let processedBase64 = base64Image;
   let barcodeHints: string[] = [];
+
   try {
-    const barcodeResult = await scanAllBarcodes(base64Image);
-    if (barcodeResult.success && barcodeResult.barcodes.length > 0) {
-      barcodeHints = barcodeResult.barcodes.map((b) => b.value);
-      log.info('[EOD-VLM] Barcode scan found serials', {
-        count: barcodeHints.length,
-        serials: barcodeHints,
-      });
-    }
+    const preprocessed = await preprocessEodImage(base64Image);
+    processedBase64 = preprocessed.processedBase64;
+
+    // Pass 1: Barcode scan across all rotations
+    barcodeHints = await scanBarcodesMultiRotation(preprocessed.rotations);
+    log.info('[EOD] Preprocessing + barcode scan done', {
+      barcodesFound: barcodeHints.length,
+      serials: barcodeHints,
+      preprocessTimeMs: Date.now() - startTime,
+    });
   } catch (err) {
-    log.warn('[EOD-VLM] Barcode scan failed, proceeding with VLM only', { error: err });
+    log.warn('[EOD] Preprocessing/barcode scan failed, continuing with VLM only', { error: err });
   }
 
-  // Pass 2: VLM extraction with barcode hints
+  // Pass 2: VLM extraction
   try {
     const prompt = buildPrompt(barcodeHints);
     const requestBody = {
@@ -103,7 +170,7 @@ export async function extractEodSheet(
             { type: 'text', text: prompt },
             {
               type: 'image_url',
-              image_url: { url: `data:image/jpeg;base64,${base64Image}` },
+              image_url: { url: `data:image/jpeg;base64,${processedBase64}` },
             },
           ],
         },
@@ -113,7 +180,7 @@ export async function extractEodSheet(
     };
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_MS);
+    const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_MS * 2); // 2min for EOD
 
     const response = await fetch(VLM_API_ENDPOINT, {
       method: 'POST',
@@ -170,7 +237,6 @@ export async function extractEodSheet(
 function normalizeDrNumber(dr: string | null): string | null {
   if (!dr) return null;
   let cleaned = dr.replace(/\s+/g, '').toUpperCase();
-  // Fix common misread: DR19 → DR18
   if (cleaned.startsWith('DR19')) {
     cleaned = 'DR18' + cleaned.slice(4);
   }
