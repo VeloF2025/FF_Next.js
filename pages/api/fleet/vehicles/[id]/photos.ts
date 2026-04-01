@@ -166,7 +166,6 @@ async function handleGet(
     checkTime?: string;
     checkType?: string | null;
     odometerReading?: number | null;
-    fuelLevel?: number | null;
     checkStatus?: string | null;
   }
 
@@ -227,7 +226,6 @@ async function handleGet(
       driver_name: string;
       check_type: string | null;
       odometer_reading: number | null;
-      fuel_level: number | null;
       status: string | null;
     }
 
@@ -238,7 +236,7 @@ async function handleGet(
                p.file_url, p.file_path, p.file_size, p.latitude, p.longitude,
                p.storage_service_url, p.captured_at, p.vlm_processed, p.vlm_result,
                p.vlm_confidence, r.check_date, r.check_time, r.driver_name,
-               r.check_type, r.odometer_reading, r.fuel_level, r.status
+               r.check_type, r.odometer_reading, r.status
         FROM fleet_check_photos p
         JOIN fleet_check_records r ON r.id = p.record_id
         WHERE r.vehicle_id = ${vehicleId} AND p.photo_type = ${type}
@@ -250,7 +248,7 @@ async function handleGet(
                p.file_url, p.file_path, p.file_size, p.latitude, p.longitude,
                p.storage_service_url, p.captured_at, p.vlm_processed, p.vlm_result,
                p.vlm_confidence, r.check_date, r.check_time, r.driver_name,
-               r.check_type, r.odometer_reading, r.fuel_level, r.status
+               r.check_type, r.odometer_reading, r.status
         FROM fleet_check_photos p
         JOIN fleet_check_records r ON r.id = p.record_id
         WHERE r.vehicle_id = ${vehicleId}
@@ -281,7 +279,6 @@ async function handleGet(
       checkTime: row.check_time,
       checkType: row.check_type,
       odometerReading: row.odometer_reading,
-      fuelLevel: row.fuel_level,
       checkStatus: row.status,
     }));
     checkPhotoCount = checkRows.length;

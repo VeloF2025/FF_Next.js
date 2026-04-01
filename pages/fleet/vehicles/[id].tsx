@@ -182,7 +182,6 @@ interface VehiclePhoto {
   checkTime?: string;
   checkType?: string | null;
   odometerReading?: number | null;
-  fuelLevel?: number | null;
   checkStatus?: string | null;
 }
 
@@ -1402,13 +1401,13 @@ function PhotoLightbox({ photo, vehicleId, onClose }: { photo: VehiclePhoto; veh
 /** View A: Timeline — grouped by check-in record */
 function TimelineView({ photos, onSelect }: { photos: VehiclePhoto[]; onSelect: (p: VehiclePhoto) => void }) {
   const grouped = useMemo(() => {
-    const map = new Map<string, { checkType: string | null; date: string; driver: string | null; odometer: number | null; fuelLevel: number | null; status: string | null; photos: VehiclePhoto[] }>();
+    const map = new Map<string, { checkType: string | null; date: string; driver: string | null; odometer: number | null; status: string | null; photos: VehiclePhoto[] }>();
     const standalone: VehiclePhoto[] = [];
     for (const p of photos) {
       if (p.checkRecordId) {
         const key = p.checkRecordId;
         if (!map.has(key)) {
-          map.set(key, { checkType: p.checkType || null, date: p.checkDate || p.capturedAt, driver: p.capturedBy, odometer: p.odometerReading || null, fuelLevel: p.fuelLevel || null, status: p.checkStatus || null, photos: [] });
+          map.set(key, { checkType: p.checkType || null, date: p.checkDate || p.capturedAt, driver: p.capturedBy, odometer: p.odometerReading || null, status: p.checkStatus || null, photos: [] });
         }
         map.get(key)!.photos.push(p);
       } else {
@@ -1446,7 +1445,6 @@ function TimelineView({ photos, onSelect }: { photos: VehiclePhoto[]; onSelect: 
             <div className="flex items-center gap-4 text-xs text-[var(--ff-text-secondary)]">
               {rec.driver && <span>Driver: {rec.driver}</span>}
               {rec.odometer && <span>{rec.odometer.toLocaleString()} km</span>}
-              {rec.fuelLevel !== null && <span>Fuel: {rec.fuelLevel}%</span>}
             </div>
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
