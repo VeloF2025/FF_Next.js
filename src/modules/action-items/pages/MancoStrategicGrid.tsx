@@ -308,6 +308,7 @@ export function MancoStrategicGrid() {
                       <th className="px-4 py-3 text-center font-semibold text-[var(--ff-text-secondary)]">FF Dev</th>
                       <th className="px-4 py-3 text-left font-semibold text-[var(--ff-text-secondary)]">FF Module</th>
                       <th className="px-4 py-3 text-left font-semibold text-[var(--ff-text-secondary)]">Comment</th>
+                      <th className="px-4 py-3 text-left font-semibold text-[var(--ff-text-secondary)]">Last Edited</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -395,6 +396,9 @@ export function MancoStrategicGrid() {
                           </td>
                           <td className="px-4 py-3 text-[var(--ff-text-secondary)]" title={item.comment}>
                             {truncateText(item.comment, 40)}
+                          </td>
+                          <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
+                            {item.updated_at ? formatDate(item.updated_at) : '—'}
                           </td>
                         </tr>
                       );
