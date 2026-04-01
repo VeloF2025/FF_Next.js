@@ -94,7 +94,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse<MeetingContextR
 
     // Fetch the manco action item
     const itemResult = await sql`
-      SELECT id, action_item, source_meeting_id, responsible_person
+      SELECT id, action_item, responsible_person
       FROM manco_action_items
       WHERE id = ${item_id}
     `;
@@ -106,12 +106,31 @@ async function handler(req: NextApiRequest, res: NextApiResponse<MeetingContextR
     const item = itemResult[0] as {
       id: string;
       action_item: string;
-      source_meeting_id?: number;
       responsible_person?: string;
     };
 
-    // If no meeting linked, return early
-    if (!item.source_meeting_id) {
+    // Look up linked meetings from junction table (fallback to source_meeting_id)
+    const linkedMeetings = await sql`
+      SELECT meeting_id FROM manco_action_item_meetings
+      WHERE manco_action_item_id = ${item_id}::uuid
+      ORDER BY linked_at ASC
+      LIMIT 1
+    `;
+
+    let meetingId: number | null = null;
+    if (linkedMeetings.length > 0) {
+      meetingId = Number(linkedMeetings[0].meeting_id);
+    } else {
+      const legacy = await sql`
+        SELECT source_meeting_id FROM manco_action_items
+        WHERE id = ${item_id} AND source_meeting_id IS NOT NULL
+      `;
+      if (legacy.length > 0 && legacy[0].source_meeting_id) {
+        meetingId = Number(legacy[0].source_meeting_id);
+      }
+    }
+
+    if (!meetingId) {
       const emptyResponse: MeetingContextResponse = {
         meeting: null,
         excerpts: [],
@@ -124,7 +143,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse<MeetingContextR
     const meetingResult = await sql`
       SELECT id, title, meeting_date, raw_transcript, summary
       FROM meetings
-      WHERE id = ${item.source_meeting_id}
+      WHERE id = ${meetingId}
     `;
 
     if (meetingResult.length === 0) {
