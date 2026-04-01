@@ -75,7 +75,7 @@ STEP CATEGORIES:
 2. Cable from Pole - Fiber cable visibly spanning open air between a utility pole and the building fascia. Must show cable crossing sky. Pole J-hook, service drop wire, messenger wire are indicators. A pole alone without visible cable span = low confidence.
 3. Cable Entry Outside - EXTERIOR close-up of where cable ENTERS the building through wall/roof. Cable penetrating exterior wall, conduit, grommet. Drip loop before entry point is a strong indicator. Cable transitioning from OUTSIDE to INSIDE.
 4. Cable Entry Inside - INTERIOR view showing cable ROUTING from entry point along walls/ceiling. Cable running along interior wall, cable clips, indoor path. Cable is TRAVELING, not yet at destination.
-5. Wall for Installation - The DESTINATION wall surface where ONT will be mounted. Mounting bracket, power outlet nearby, clean wall section. NO cable routing as main subject.
+5. Wall for Installation - The DESTINATION wall surface where ONT will be mounted. Mounting bracket, power outlet nearby, clean wall section. NO cable routing as main subject. Also includes a bare pole (with nothing on it) inside a house or shack — in informal housing the pole IS the wall/mounting point.
 6. ONT Back After Install - BACK panel of ONT showing fiber port and power cable connections. Yellow fiber connector, power cable. Camera angle BEHIND the ONT.
 7. Power Meter Reading - Optical power meter display showing dBm reading (valid range: -18 to -24 dBm). Handheld meter screen with numbers.
 8. Final Installation - WIDE shot of COMPLETE setup from a distance: ONT + UPS/GIZZU + wall + surroundings. Key = WIDE FRAMING showing full context, even if green lights visible.
@@ -87,6 +87,7 @@ KEY DIFFERENTIATORS for commonly confused categories:
 - Step 2 vs Step 3: Step 2 = cable spanning open AIR between pole and building (sky visible). Step 3 = cable at WALL entering building (conduit, grommet, drip loop visible). Cable along roofline/wall approaching entry = Step 3. Cable crossing open sky = Step 2.
 - Step 3 vs Step 4: Step 3 = OUTSIDE (exterior wall, daylight). Step 4 = INSIDE (interior wall, indoor lighting). Sky or exterior materials = Step 3. Enclosed indoor = Step 4.
 - Step 4 vs Step 5: Step 4 = cable ROUTING/traveling along walls. Step 5 = TARGET wall (bracket, outlet). Cable as main subject = Step 4. Wall surface as main subject = Step 5.
+- Step 2 vs Step 5: Step 2 = pole OUTSIDE with cable in the air/sky. Step 5 = bare pole INSIDE a house/shack (no cable span, indoor setting, walls/roof visible around it). Indoor pole = Step 5 (wall/mounting point).
 - Step 6 vs Step 8: ONT BACK only (cables) vs FULL SETUP wide shot (ONT + UPS + cables)
 - Step 8 vs Step 9: FRAMING is key. Step 8 = WIDE shot (ONT + UPS + wall + surroundings). Step 9 = CLOSE-UP of front panel lights only. UPS and wall visible = Step 8 even if lights visible.
 
