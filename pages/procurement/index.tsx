@@ -350,9 +350,16 @@ export default function ProcurementPage({
                       <span>Spiderweb</span>
                     </button>
                   </nav>
-                  {(activeTab === 'stock-view-boq' || activeTab === 'stock-view') && <BOQStockView selectedProject={selectedProject} />}
-                  {activeTab === 'stock-view-soh' && <SOHAuditView selectedProject={selectedProject} />}
-                  {activeTab === 'stock-view-spider' && <SOHSpiderView />}
+                  {/* Keep all 3 panels mounted — hide with CSS to prevent remount/refetch on tab switch */}
+                  <div style={{ display: (activeTab === 'stock-view-boq' || activeTab === 'stock-view') ? 'block' : 'none' }}>
+                    <BOQStockView selectedProject={selectedProject} />
+                  </div>
+                  <div style={{ display: activeTab === 'stock-view-soh' ? 'block' : 'none' }}>
+                    <SOHAuditView selectedProject={selectedProject} />
+                  </div>
+                  <div style={{ display: activeTab === 'stock-view-spider' ? 'block' : 'none' }}>
+                    <SOHSpiderView />
+                  </div>
                 </div>
               )}
               {activeTab === 'rfq' && <PlaceholderTab title="Request for Quotations" icon={Send} description="Create and manage RFQs" />}
