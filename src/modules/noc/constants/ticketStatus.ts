@@ -87,19 +87,26 @@ export const TICKET_STATUS_DEFINITIONS: Record<TicketStatus, TicketStatusMetadat
     color: 'secondary',
     order: 9,
   },
+  [TicketStatus.RESOLVED]: {
+    value: TicketStatus.RESOLVED,
+    label: 'Resolved',
+    description: 'Work completed, pending team lead approval to close',
+    color: 'info',
+    order: 10,
+  },
   [TicketStatus.CLOSED]: {
     value: TicketStatus.CLOSED,
     label: 'Closed',
-    description: 'Ticket completed and closed',
+    description: 'Ticket approved and closed by team lead',
     color: 'success',
-    order: 10,
+    order: 11,
   },
   [TicketStatus.CANCELLED]: {
     value: TicketStatus.CANCELLED,
     label: 'Cancelled',
     description: 'Ticket cancelled or deleted (soft delete)',
     color: 'default',
-    order: 11,
+    order: 12,
   },
 };
 
@@ -143,6 +150,7 @@ export const WAITING_STATUSES = [
   TicketStatus.OPEN,
   TicketStatus.PENDING_QA,
   TicketStatus.PENDING_HANDOVER,
+  TicketStatus.RESOLVED,
 ];
 
 /**
@@ -242,14 +250,18 @@ export const VALID_STATUS_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   ],
   [TicketStatus.QA_APPROVED]: [
     TicketStatus.PENDING_HANDOVER,
-    TicketStatus.CLOSED,
+    TicketStatus.RESOLVED,
   ],
   [TicketStatus.PENDING_HANDOVER]: [
     TicketStatus.HANDED_TO_OPS,
     TicketStatus.QA_APPROVED,
   ],
   [TicketStatus.HANDED_TO_OPS]: [
-    TicketStatus.CLOSED,
+    TicketStatus.RESOLVED,
+  ],
+  [TicketStatus.RESOLVED]: [
+    TicketStatus.CLOSED,       // Team lead approves → closed
+    TicketStatus.IN_PROGRESS,  // Team lead rejects → back to work
   ],
   [TicketStatus.CLOSED]: [],
   [TicketStatus.CANCELLED]: [],

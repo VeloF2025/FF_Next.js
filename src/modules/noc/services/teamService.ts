@@ -470,3 +470,24 @@ export async function getUsersForDropdown(): Promise<UserDropdownOption[]> {
     throw error;
   }
 }
+
+/**
+ * Check if a user is the lead of a specific team
+ * Checks both the team's lead_user_id and the team_members is_team_lead flag
+ */
+export async function isTeamLead(userId: string, teamId: string): Promise<boolean> {
+  if (!isValidUUID(userId) || !isValidUUID(teamId)) return false;
+
+  const sql = `
+    SELECT EXISTS(
+      SELECT 1 FROM maintenance_teams
+      WHERE id = $1 AND lead_user_id = $2 AND is_active = true
+      UNION
+      SELECT 1 FROM maintenance_team_members
+      WHERE team_id = $1 AND user_id = $2 AND is_team_lead = true AND is_active = true
+    ) AS is_lead
+  `;
+
+  const result = await queryOne<{ is_lead: boolean }>(sql, [teamId, userId]);
+  return result?.is_lead ?? false;
+}

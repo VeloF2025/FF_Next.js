@@ -26,6 +26,7 @@ import {
   logTicketChanges,
   logTicketActivity,
 } from '@/modules/noc/services/ticketService';
+import { isTeamLead } from '@/modules/noc/services/teamService';
 import { enrichTicketData } from '@/modules/noc/services/ticketEnrichmentService';
 import { syncOutboundUpdate } from '@/modules/noc/services/qcontactSyncOutbound';
 import {
@@ -195,16 +196,32 @@ export async function PUT(
     // Extract authenticated user for activity logging
     const cookieStore = await cookies();
     const token = cookieStore.get('ff_auth_token')?.value;
-    let actingUser: { id?: string; name?: string; email?: string } = {};
+    let actingUser: { id?: string; name?: string; email?: string; role?: string } = {};
     if (token) {
       const jwt = await verifyToken(token);
       if (jwt) {
-        actingUser = { id: jwt.sub, name: jwt.name as string, email: jwt.email as string };
+        actingUser = { id: jwt.sub, name: jwt.name as string, email: jwt.email as string, role: jwt.role as string };
       }
     }
 
     // Capture old state for change detection
     const oldTicket = await getTicketById(ticketId);
+
+    // Team lead approval check: only team leads (or super_admin) can move resolved → closed
+    if (
+      body.status === 'closed' &&
+      oldTicket?.status === 'resolved' &&
+      oldTicket.assigned_team_id &&
+      actingUser.id &&
+      actingUser.role !== 'super_admin'
+    ) {
+      const userIsLead = await isTeamLead(actingUser.id, oldTicket.assigned_team_id);
+      if (!userIsLead) {
+        return validationError(
+          'Only the team lead can approve and close a resolved ticket'
+        );
+      }
+    }
 
     const updatedTicket = await updateTicket(ticketId, body);
 
