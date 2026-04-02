@@ -22,7 +22,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const rows = await sql`
       SELECT
         p.id                    AS project_id,
-        p.name                  AS project_name,
+        p.project_name                  AS project_name,
         COUNT(s.id)             AS total,
         COUNT(s.id) FILTER (WHERE s.status = 'open')        AS open,
         COUNT(s.id) FILTER (WHERE s.status = 'assigned')    AS assigned,
@@ -43,8 +43,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ORDER BY sr.audit_date DESC
         LIMIT 1
       ) lr ON TRUE
-      GROUP BY p.id, p.name, lr.report_number, lr.audit_date, lr.id
-      ORDER BY p.name ASC
+      GROUP BY p.id, p.project_name, lr.report_number, lr.audit_date, lr.id
+      ORDER BY p.project_name ASC
     ` as Array<{
       project_id: string;
       project_name: string;

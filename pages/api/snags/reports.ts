@@ -39,7 +39,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     const rows = await sql`
       SELECT
         sr.*,
-        p.name AS project_name
+        p.project_name AS project_name
       FROM snag_reports sr
       INNER JOIN projects p ON p.id = sr.project_id
       WHERE sr.project_id = ${projectId}
@@ -66,7 +66,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   const rows = await sql`
     SELECT
       sr.*,
-      p.name AS project_name
+      p.project_name AS project_name
     FROM snag_reports sr
     INNER JOIN projects p ON p.id = sr.project_id
     ORDER BY sr.audit_date DESC
