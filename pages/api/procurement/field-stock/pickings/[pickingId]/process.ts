@@ -2,6 +2,9 @@
  * Process Picking API
  * POST /api/procurement/field-stock/pickings/[pickingId]/process
  * Execute the picking - move stock between locations
+ *
+ * Fix VF-20260331-048: Added stock availability validation and explicit
+ * transaction wrapping to prevent silent stock quant drift.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -20,6 +23,48 @@ interface PickingLine {
   serial_ids?: string[];
 }
 
+interface StockQuantRow {
+  quantity: number;
+}
+
+/** Verify every picking line has sufficient stock at the source location. */
+async function validateStockAvailability(
+  lines: PickingLine[],
+  sourceLocationId: string
+): Promise<{ valid: true } | { valid: false; errors: Record<string, string> }> {
+  const errors: Record<string, string> = {};
+
+  for (const line of lines) {
+    if (!line || !line.stock_item_id) continue;
+
+    // 🟢 WORKING: SELECT with FOR UPDATE to lock the row inside the transaction
+    const quants = (await sql`
+      SELECT quantity
+      FROM stock_quants
+      WHERE stock_item_id = ${line.stock_item_id}
+        AND location_id = ${sourceLocationId}
+      FOR UPDATE
+    `) as StockQuantRow[];
+
+    if (quants.length === 0) {
+      errors[line.stock_item_id] =
+        `No stock record found for item ${line.stock_item_id} at source location ${sourceLocationId}`;
+      continue;
+    }
+
+    const available = Number(quants[0]!.quantity);
+    if (available < line.planned_quantity) {
+      errors[line.stock_item_id] =
+        `Insufficient stock for item ${line.stock_item_id}: required ${line.planned_quantity}, available ${available}`;
+    }
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { valid: false, errors };
+  }
+  return { valid: true };
+}
+
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { pickingId } = req.query;
 
@@ -31,8 +76,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
+  // 🟢 WORKING: Explicit transaction — BEGIN before any mutations
+  await sql`BEGIN`;
+
   try {
-    // Get picking with lines
+    // Get picking with lines — inside the transaction for consistent read
     const existing = await sql`
       SELECT
         p.*,
@@ -52,32 +100,46 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const picking = existing[0];
     if (!picking) {
+      await sql`ROLLBACK`;
       return apiResponse.notFound(res, 'Picking', pickingId);
     }
 
     if (picking.status !== 'confirmed') {
+      await sql`ROLLBACK`;
       return apiResponse.validationError(res, {
-        status: `Cannot process picking with status "${picking.status}". Only confirmed pickings can be processed.`
+        status: `Cannot process picking with status "${picking.status}". Only confirmed pickings can be processed.`,
       });
     }
 
     const sourceLocationId = picking.source_location_id as string;
     const destinationLocationId = picking.destination_location_id as string;
     const pickingType = picking.picking_type as string;
+    const lines: PickingLine[] = (picking.lines as PickingLine[]) || [];
 
-    // Update status to processing first
+    // Filter out null/invalid lines before validation
+    const validLines = lines.filter((l) => l && l.stock_item_id);
+
+    // 🟢 WORKING: Stock availability check — runs inside transaction with FOR UPDATE
+    const availabilityCheck = await validateStockAvailability(validLines, sourceLocationId);
+    if (!availabilityCheck.valid) {
+      await sql`ROLLBACK`;
+      log.warn('Stock transfer blocked: insufficient stock', {
+        pickingId,
+        errors: availabilityCheck.errors,
+      }, 'field-stock');
+      return apiResponse.validationError(res, availabilityCheck.errors);
+    }
+
+    // Mark as processing — status guard prevents double-processing
     await sql`
       UPDATE stock_pickings
       SET status = 'processing', updated_at = NOW()
       WHERE id = ${pickingId}
     `;
 
-    // Process each line - update stock quants and serials
-    const lines: PickingLine[] = (picking.lines as PickingLine[]) || [];
-    for (const line of lines) {
-      if (!line || !line.stock_item_id) continue;
-
-      // Decrease source quant
+    // Process each picking line — decrease source, increase/upsert destination
+    for (const line of validLines) {
+      // Decrease source quant — row guaranteed to exist (validated above)
       await sql`
         UPDATE stock_quants
         SET
@@ -99,10 +161,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           updated_at = NOW()
       `;
 
-      // Update serials if applicable
-      if (line.serial_ids && Array.isArray(line.serial_ids)) {
+      // Update serial records if applicable
+      if (Array.isArray(line.serial_ids)) {
+        const newStatus = pickingType === 'issue' ? 'issued' : 'available';
         for (const serialId of line.serial_ids) {
-          const newStatus = pickingType === 'issue' ? 'issued' : 'available';
           await sql`
             UPDATE stock_serials
             SET
@@ -114,7 +176,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
       }
 
-      // Record movement
+      // Record the movement for audit trail
       await sql`
         INSERT INTO stock_movements (
           picking_id,
@@ -135,7 +197,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         )
       `;
 
-      // Update line status
+      // Mark line as done with actual quantity
       await sql`
         UPDATE stock_picking_lines
         SET
@@ -145,7 +207,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
     }
 
-    // Update picking to done
+    // Finalise picking
     const result = await sql`
       UPDATE stock_pickings
       SET
@@ -156,27 +218,33 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       RETURNING *
     `;
 
-    log.info('Picking processed', { pickingId, linesProcessed: lines.length }, 'field-stock');
+    await sql`COMMIT`;
+
+    log.info('Picking processed successfully', { pickingId, linesProcessed: validLines.length }, 'field-stock');
 
     createAuditLog({
       entityType: 'picking',
       entityId: pickingId,
       action: 'update',
       performedBy: 'system',
-      newValues: { status: 'done', linesProcessed: lines.length },
+      newValues: { status: 'done', linesProcessed: validLines.length },
     });
 
     return apiResponse.success(res, result[0]);
   } catch (error: unknown) {
-    log.error('[pickingId]-process', { error: error instanceof Error ? error.message : String(error) });
-    // Rollback status on error
-    await sql`
-      UPDATE stock_pickings
-      SET status = 'confirmed', updated_at = NOW()
-      WHERE id = ${pickingId}
-    `.catch((e) => log.warn('DB operation failed (non-critical)', { error: e instanceof Error ? e.message : 'unknown' }, 'field-stock'));
+    // Roll back the entire transaction — no partial stock mutations persist
+    await sql`ROLLBACK`.catch((rollbackErr: unknown) =>
+      log.warn('Rollback failed after picking process error', {
+        rollbackError: rollbackErr instanceof Error ? rollbackErr.message : 'unknown',
+        pickingId,
+      }, 'field-stock')
+    );
 
-    log.error('Error processing picking', { error, pickingId }, 'field-stock');
+    log.error('Error processing picking', {
+      error: error instanceof Error ? error.message : String(error),
+      pickingId,
+    }, 'field-stock');
+
     return apiResponse.internalError(res, error);
   }
 }
