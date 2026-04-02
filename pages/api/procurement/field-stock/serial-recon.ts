@@ -33,10 +33,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const waMatched = await getWaMatched(itemCode, type, project);
     const oesMatched = type === 'ont' ? await getOesMatched(project) : 0;
     const ppFlagged = type === 'ont' ? await getPpFlagged(project) : 0;
+    const ppActivated = type === 'ont' ? await getPpActivated(project) : 0;
     const { rows, total } = await getDetailRows(itemCode, type, project, filter, search, limit, offset);
 
     return apiResponse.success(res, {
-      stats: { ...stats, oesMatched, waMatched, ppFlagged },
+      stats: { ...stats, oesMatched, waMatched, ppFlagged, ppActivated },
       rows,
       page,
       limit,
@@ -330,6 +331,15 @@ async function getPpFlagged(project: string) {
     return row?.c || 0;
   }
   const [row] = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id WHERE si.item_code = 'FT-ONT' AND ss.pp_flagged = TRUE`;
+  return row?.c || 0;
+}
+
+async function getPpActivated(project: string) {
+  if (project) {
+    const [row] = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN stock_locations sl ON ss.current_location_id = sl.id WHERE si.item_code = 'FT-ONT' AND ss.pp_flagged = TRUE AND ss.pp_resolution_status = 'activated' AND sl.name ILIKE ${'%' + project + '%'}`;
+    return row?.c || 0;
+  }
+  const [row] = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id WHERE si.item_code = 'FT-ONT' AND ss.pp_flagged = TRUE AND ss.pp_resolution_status = 'activated'`;
   return row?.c || 0;
 }
 

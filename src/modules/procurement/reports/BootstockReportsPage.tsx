@@ -101,7 +101,7 @@ export function BootstockReportsPage() {
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           <StatCard icon={Package} label="Total from FT" value={stats.total} color="text-blue-400" onClick={() => { setFilterMode('all'); setPage(1); }} active={filterMode === 'all'} />
-          <StatCard icon={Package} label="Not Installed" value={stats.total - stats.waMatched} color="text-amber-400" onClick={() => { setFilterMode('not_installed'); setPage(1); }} active={filterMode === 'not_installed'} />
+          <StatCard icon={Package} label="In Stock" value={type === 'ont' ? stats.total - stats.oesMatched - ((stats.ppFlagged || 0) - (stats.ppActivated || 0)) : stats.total - stats.waMatched} color="text-green-400" onClick={() => { setFilterMode('not_installed'); setPage(1); }} active={filterMode === 'not_installed'} />
           <StatCard icon={Zap} label="Installed (WA)" value={stats.waMatched} color="text-purple-400" onClick={() => { setFilterMode('installed'); setPage(1); }} active={filterMode === 'installed'} />
           {type === 'ont' && (
             <StatCard icon={CheckCircle} label="Activated (OES)" value={stats.oesMatched} color="text-teal-400" onClick={() => { setFilterMode('activated'); setPage(1); }} active={filterMode === 'activated'} />
@@ -109,7 +109,7 @@ export function BootstockReportsPage() {
           {type === 'ont' && (
             <StatCard icon={AlertTriangle} label="PP Flagged" value={stats.ppFlagged || 0} color="text-red-400" onClick={() => { setFilterMode('pp_flagged'); setPage(1); }} active={filterMode === 'pp_flagged'} />
           )}
-          <StatCard icon={Package} label="In Stock" value={stats.available + stats.issued} color="text-green-400" onClick={() => { setFilterMode('all'); setProjectFilter(''); setPage(1); }} active={false} />
+          <StatCard icon={AlertTriangle} label="Not Installed" value={stats.total - stats.waMatched} color="text-amber-400" onClick={() => { setFilterMode('not_installed'); setPage(1); }} active={false} />
           <StatCard
             icon={CheckCircle}
             label="Install Rate"
