@@ -181,17 +181,27 @@ for attempt in $(seq 1 $MAX_RETRIES); do
 done
 
 if [[ "$BUILD_SUCCESS" != true ]]; then
-  error "Build failed after $MAX_RETRIES attempts. Restoring backup..."
+  echo -e "${RED}[$(date +%H:%M:%S)] ERROR:${NC} Build failed after $MAX_RETRIES attempts."
+  # Restore backup BEFORE exiting — never leave the environment without a .next
   if sudo -u velo test -d "$DIR/.next-backup-$TIMESTAMP"; then
+    log "Restoring .next from backup..."
     sudo -u velo bash -c "cd $DIR && mv .next-backup-$TIMESTAMP .next"
   fi
+  log "Starting $SVC on previous build..."
   sudo /usr/bin/systemctl start "$SVC" 2>/dev/null || true
   exit 1
 fi
 
 # --- Step 7: Validate build ---
 if ! sudo -u velo test -f "$DIR/.next/BUILD_ID"; then
-  error "BUILD_ID missing after build — build is incomplete"
+  echo -e "${RED}[$(date +%H:%M:%S)] ERROR:${NC} BUILD_ID missing after build — build is incomplete"
+  if sudo -u velo test -d "$DIR/.next-backup-$TIMESTAMP"; then
+    log "Restoring .next from backup..."
+    sudo -u velo bash -c "cd $DIR && mv .next-backup-$TIMESTAMP .next"
+  fi
+  log "Starting $SVC on previous build..."
+  sudo /usr/bin/systemctl start "$SVC" 2>/dev/null || true
+  exit 1
 fi
 BUILD_ID=$(sudo -u velo cat "$DIR/.next/BUILD_ID")
 log "Build validated (BUILD_ID: $BUILD_ID)"
@@ -202,7 +212,16 @@ sudo /usr/bin/systemctl start "$SVC"
 sleep 5
 
 if ! systemctl is-active --quiet "$SVC"; then
-  error "Service $SVC failed to start. Check: journalctl -u $SVC -n 50"
+  echo -e "${RED}[$(date +%H:%M:%S)] ERROR:${NC} Service $SVC failed to start. Check: journalctl -u $SVC -n 50"
+  # Try once more after a brief pause
+  sleep 3
+  sudo /usr/bin/systemctl start "$SVC" 2>/dev/null || true
+  sleep 5
+  if ! systemctl is-active --quiet "$SVC"; then
+    warn "Service still not running — manual intervention may be needed"
+    exit 1
+  fi
+  log "Service started on retry"
 fi
 log "Service $SVC is active"
 

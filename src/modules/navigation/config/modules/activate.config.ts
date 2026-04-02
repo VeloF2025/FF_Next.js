@@ -55,7 +55,7 @@ export const activateConfig: ModuleNavigationConfig = {
       shortLabel: 'Act Ops',
       icon: Database,
       path: '/activate/data-sync',
-      rbacKey: 'system.data-sync',
+      rbacKey: 'activate.data-sync',
     },
   ],
 };

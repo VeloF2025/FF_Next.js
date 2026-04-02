@@ -166,6 +166,20 @@ PROMOTE_START=$(date +%s)
 ssh ${VELOCITY_USER}@${VELOCITY_HOST} bash -s <<PROMOTE_SCRIPT
   set -e
 
+  # --- Deploy lock ---
+  LOCKFILE="/tmp/fibreflow-deploy-${TARGET}.lock"
+  if [ -f "\$LOCKFILE" ]; then
+    LOCK_PID=\$(cat "\$LOCKFILE" 2>/dev/null | head -1)
+    LOCK_AGE=\$(( \$(date +%s) - \$(stat -c %Y "\$LOCKFILE" 2>/dev/null || echo 0) ))
+    if kill -0 "\$LOCK_PID" 2>/dev/null && [ "\$LOCK_AGE" -lt 600 ]; then
+      echo "[promote] ERROR: Another deploy to $TARGET is running (PID \$LOCK_PID, \${LOCK_AGE}s ago)"
+      exit 1
+    fi
+    rm -f "\$LOCKFILE"
+  fi
+  echo \$\$ > "\$LOCKFILE"
+  trap 'rm -f "\$LOCKFILE"' EXIT
+
   cd $TGT_DIR
   echo "[promote] Target directory: \$(pwd)"
 
@@ -187,6 +201,10 @@ ssh ${VELOCITY_USER}@${VELOCITY_HOST} bash -s <<PROMOTE_SCRIPT
     npm install
   fi
 
+  # Stop service BEFORE touching .next
+  echo "[promote] Stopping $TGT_SVC..."
+  echo '$SUDO_PASS' | sudo -S systemctl stop $TGT_SVC 2>/dev/null || true
+
   # Backup current build
   TIMESTAMP=\$(date +%Y%m%d_%H%M%S)
   if [ -d .next ]; then
@@ -197,10 +215,11 @@ ssh ${VELOCITY_USER}@${VELOCITY_HOST} bash -s <<PROMOTE_SCRIPT
   # Build
   echo "[promote] Building..."
   npm run build || {
-    echo "[promote] Build FAILED — restoring backup"
+    echo "[promote] Build FAILED — restoring backup and restarting service"
     if [ -d .next-backup-\$TIMESTAMP ]; then
       mv .next-backup-\$TIMESTAMP .next
     fi
+    echo '$SUDO_PASS' | sudo -S systemctl start $TGT_SVC 2>/dev/null || true
     exit 1
   }
 
@@ -211,9 +230,9 @@ ssh ${VELOCITY_USER}@${VELOCITY_HOST} bash -s <<PROMOTE_SCRIPT
   fi
   echo "[promote] Build validated (BUILD_ID: \$(cat .next/BUILD_ID))"
 
-  # Restart service
-  echo "[promote] Restarting $TGT_SVC..."
-  echo '$SUDO_PASS' | sudo -S systemctl restart $TGT_SVC
+  # Start service (was stopped before build)
+  echo "[promote] Starting $TGT_SVC..."
+  echo '$SUDO_PASS' | sudo -S systemctl start $TGT_SVC
 
   # Wait for startup
   sleep 5
