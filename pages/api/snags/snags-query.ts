@@ -28,7 +28,7 @@ export async function querySnagsByReport(
 ) {
   if (status && category && severity && searchTerm) {
     const rows = await sql`
-      SELECT s.*, u.name AS assigned_to_name, sr.report_number, sr.audit_date
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
@@ -47,7 +47,7 @@ export async function querySnagsByReport(
 
   if (status && category && severity) {
     const rows = await sql`
-      SELECT s.*, u.name AS assigned_to_name, sr.report_number, sr.audit_date
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
@@ -64,7 +64,7 @@ export async function querySnagsByReport(
 
   if (status && category) {
     const rows = await sql`
-      SELECT s.*, u.name AS assigned_to_name, sr.report_number, sr.audit_date
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
@@ -80,7 +80,7 @@ export async function querySnagsByReport(
 
   if (status) {
     const rows = await sql`
-      SELECT s.*, u.name AS assigned_to_name, sr.report_number, sr.audit_date
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
@@ -94,7 +94,7 @@ export async function querySnagsByReport(
   }
 
   const rows = await sql`
-    SELECT s.*, u.name AS assigned_to_name, sr.report_number, sr.audit_date
+    SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date
     FROM snags s
     LEFT JOIN users u ON u.id = s.assigned_to
     LEFT JOIN snag_reports sr ON sr.id = s.report_id
@@ -123,7 +123,7 @@ export async function querySnagsByProject(
 ) {
   if (status && category && severity) {
     const rows = await sql`
-      SELECT s.*, u.name AS assigned_to_name, sr.report_number, sr.audit_date
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
@@ -140,7 +140,7 @@ export async function querySnagsByProject(
 
   if (status && category) {
     const rows = await sql`
-      SELECT s.*, u.name AS assigned_to_name, sr.report_number, sr.audit_date
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
@@ -156,7 +156,7 @@ export async function querySnagsByProject(
 
   if (status) {
     const rows = await sql`
-      SELECT s.*, u.name AS assigned_to_name, sr.report_number, sr.audit_date
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
@@ -170,7 +170,7 @@ export async function querySnagsByProject(
   }
 
   const rows = await sql`
-    SELECT s.*, u.name AS assigned_to_name, sr.report_number, sr.audit_date
+    SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date
     FROM snags s
     LEFT JOIN users u ON u.id = s.assigned_to
     LEFT JOIN snag_reports sr ON sr.id = s.report_id
