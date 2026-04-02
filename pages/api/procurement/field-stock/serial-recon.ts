@@ -21,6 +21,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const project = (req.query.project as string) || '';
   const filter = (req.query.filter as string) || 'all';
   const search = (req.query.search as string) || '';
+  const ppStatus = (req.query.ppStatus as string) || '';
   const type = (req.query.type as string) || 'ont';
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 50;
@@ -34,7 +35,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const oesMatched = type === 'ont' ? await getOesMatched(project) : 0;
     const ppFlagged = type === 'ont' ? await getPpFlagged(project) : 0;
     const ppActivated = type === 'ont' ? await getPpActivated(project) : 0;
-    const { rows, total } = await getDetailRows(itemCode, type, project, filter, search, limit, offset);
+    const { rows, total } = await getDetailRows(itemCode, type, project, filter, search, ppStatus, limit, offset);
 
     return apiResponse.success(res, {
       stats: { ...stats, oesMatched, waMatched, ppFlagged, ppActivated },
@@ -107,7 +108,7 @@ async function getOesMatched(project: string) {
  * filter: all | installed (has WA DR) | not_installed (no WA DR) | activated (has OES)
  */
 async function getDetailRows(
-  itemCode: string, type: string, project: string, filter: string, search: string, limit: number, offset: number
+  itemCode: string, type: string, project: string, filter: string, search: string, ppStatusFilter: string, limit: number, offset: number
 ): Promise<{ rows: any[]; total: number }> {
   const drField = type === 'ups' ? 'dr.ups_serial_scanned' : 'dr.ont_serial_scanned';
   const isOnt = type === 'ont';
@@ -149,7 +150,7 @@ async function getDetailRows(
   }
 
   if (filter === 'pp_flagged' && isOnt) {
-    return getPpFlaggedRows(itemCode, project, limit, offset);
+    return getPpFlaggedRows(itemCode, project, ppStatusFilter, limit, offset);
   }
 
   if (filter === 'not_installed') {
@@ -343,7 +344,7 @@ async function getPpActivated(project: string) {
   return row?.c || 0;
 }
 
-async function getPpFlaggedRows(itemCode: string, project: string, limit: number, offset: number) {
+async function getPpFlaggedRows(itemCode: string, project: string, ppStatusFilter: string, limit: number, offset: number) {
   if (project) {
     const rows = await sql`
       SELECT ss.serial_number, ss.status, sl.name as location_name, ss.pp_resolution_status,

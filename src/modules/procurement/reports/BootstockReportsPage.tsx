@@ -6,8 +6,8 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Cpu, BatteryCharging, Loader2, Package, CheckCircle, AlertTriangle, Zap } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Cpu, BatteryCharging, Loader2, Package, CheckCircle, AlertTriangle, Zap, Download } from 'lucide-react';
 
 interface ReconStats {
   total: number;
@@ -41,7 +41,9 @@ export function BootstockReportsPage() {
   const [total, setTotal] = useState(0);
   const [projectFilter, setProjectFilter] = useState('');
   const [filterMode, setFilterMode] = useState('all');
+  const [ppStatus, setPpStatus] = useState('');
   const [search, setSearch] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -49,6 +51,7 @@ export function BootstockReportsPage() {
       const params = new URLSearchParams({ type, page: String(page), limit: '50', filter: filterMode });
       if (projectFilter) params.set('project', projectFilter);
       if (search) params.set('search', search);
+      if (ppStatus && filterMode === 'pp_flagged') params.set('ppStatus', ppStatus);
 
       const res = await fetch(`/api/procurement/field-stock/serial-recon?${params}`);
       const json = await res.json();
@@ -62,7 +65,31 @@ export function BootstockReportsPage() {
     }
   };
 
-  useEffect(() => { fetchData(); }, [type, page, projectFilter, filterMode, search]);
+  useEffect(() => { fetchData(); }, [type, page, projectFilter, filterMode, ppStatus, search]);
+
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({ type, filter: filterMode });
+      if (projectFilter) params.set('project', projectFilter);
+      if (search) params.set('search', search);
+      if (ppStatus && filterMode === 'pp_flagged') params.set('ppStatus', ppStatus);
+
+      const res = await fetch(`/api/procurement/field-stock/export-serials?${params}`);
+      if (!res.ok) throw new Error('Export failed');
+
+      const blob = await res.blob();
+      const count = res.headers.get('X-Export-Count') || '?';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bootstock-${type}-${filterMode}-${new Date().toISOString().split('T')[0]}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  }, [type, filterMode, projectFilter, search, ppStatus]);
 
   const totalPages = Math.ceil(total / 50);
 
@@ -144,6 +171,21 @@ export function BootstockReportsPage() {
           {type === 'ont' && <option value="activated">Activated (OES)</option>}
           {type === 'ont' && <option value="pp_flagged">PP Flagged</option>}
         </select>
+        {filterMode === 'pp_flagged' && type === 'ont' && (
+          <select
+            value={ppStatus}
+            onChange={(e) => { setPpStatus(e.target.value); setPage(1); }}
+            className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg px-3 py-2 text-sm text-[var(--ff-text-primary)]"
+          >
+            <option value="">All PP Statuses</option>
+            <option value="activated">Activated</option>
+            <option value="not_found">Not Found</option>
+            <option value="located_1map">Found (1Map)</option>
+            <option value="located_unified">Found (Unified)</option>
+            <option value="located_local">Found (Local)</option>
+            <option value="located_oes">Found (OES)</option>
+          </select>
+        )}
         <input
           type="text"
           placeholder="Search serial..."
@@ -154,6 +196,14 @@ export function BootstockReportsPage() {
         <span className="text-xs text-[var(--ff-text-tertiary)]">
           {total.toLocaleString()} {type === 'ont' ? 'ONTs' : 'UPS devices'}
         </span>
+        <button
+          onClick={handleExport}
+          disabled={exporting}
+          className="ml-auto px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+        >
+          <Download className={`w-4 h-4 ${exporting ? 'animate-bounce' : ''}`} />
+          {exporting ? 'Exporting...' : 'Export Excel'}
+        </button>
       </div>
 
       {/* Loading */}
