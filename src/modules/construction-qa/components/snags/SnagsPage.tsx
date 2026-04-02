@@ -27,6 +27,7 @@ export function SnagsPage() {
   const {
     stats,
     statsLoading,
+    projects,
     selectedProjectId,
     selectedProjectName,
     snagGroups,
@@ -40,8 +41,6 @@ export function SnagsPage() {
     handlePhotoAdded,
     handleImported,
   } = useSnagsPage();
-
-  const projects = stats.map((s) => ({ id: s.project_id, name: s.project_name }));
 
   const onImported = (reportId: string) => {
     setShowImport(false);

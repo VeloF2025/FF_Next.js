@@ -146,3 +146,20 @@ export async function uploadSnagPhoto(data: CreateSnagPhotoRequest): Promise<Sna
   const json = await res.json() as { data: SnagPhoto };
   return json.data;
 }
+
+// ============================================================
+// Projects (for import dialog)
+// ============================================================
+
+interface ProjectOption {
+  id: string;
+  name: string;
+}
+
+/** Fetch all projects for the import dropdown. */
+export async function fetchProjects(): Promise<ProjectOption[]> {
+  const res = await fetch('/api/projects');
+  if (!res.ok) throw new Error(`Failed to fetch projects: ${res.status}`);
+  const json = await res.json() as { data: Array<{ id: string; name: string }> };
+  return (json.data ?? []).map((p) => ({ id: p.id, name: p.name }));
+}

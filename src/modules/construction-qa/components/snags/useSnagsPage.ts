@@ -9,6 +9,7 @@ import {
   fetchSnagStats,
   fetchSnags,
   fetchSnagPhotos,
+  fetchProjects,
 } from '../../services/snagService';
 import { log } from '@/lib/logger';
 import type {
@@ -47,9 +48,10 @@ export function useSnagsPage() {
 
   const [photosBySnag, setPhotosBySnag] = useState<Record<string, SnagPhoto[]>>({});
   const [filters, setFilters] = useState<SnagFilters>(DEFAULT_FILTERS);
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
 
   // -------------------------------------------------------
-  // Stats
+  // Stats + Projects
   // -------------------------------------------------------
 
   const loadStats = useCallback(async () => {
@@ -66,6 +68,7 @@ export function useSnagsPage() {
 
   useEffect(() => {
     void loadStats();
+    void fetchProjects().then(setProjects).catch(() => setProjects([]));
   }, [loadStats]);
 
   // -------------------------------------------------------
@@ -181,6 +184,7 @@ export function useSnagsPage() {
   return {
     stats,
     statsLoading,
+    projects,
     selectedProjectId,
     selectedProjectName,
     snagGroups,
