@@ -113,6 +113,7 @@ interface OdometerReading {
 
 interface OdometerAnomaly {
   id: string;
+  odometerHistoryId: string | null;
   anomalyType: string;
   odometerReading: number;
   previousReading: number | null;
@@ -125,7 +126,7 @@ interface FuelReading {
   id: string;
   vehicleId: string;
   fuelLevel: number;
-  source: 'manual' | 'vlm';
+  source: 'manual' | 'vlm' | 'admin_correction';
   vlmConfidence: number | null;
   previousLevel: number | null;
   levelChange: number | null;
@@ -1687,10 +1688,14 @@ function OdometerTab({
   const [submitting, setSubmitting] = useState(false);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [resolveNotes, setResolveNotes] = useState('');
+  const [resolveCorrectValue, setResolveCorrectValue] = useState('');
   const [resolveSubmitting, setResolveSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
+  const [fuelEditingId, setFuelEditingId] = useState<string | null>(null);
+  const [fuelEditValue, setFuelEditValue] = useState('');
+  const [fuelEditSubmitting, setFuelEditSubmitting] = useState(false);
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
 
   const handleEditSave = async (readingId: string) => {
@@ -1710,13 +1715,49 @@ function OdometerTab({
     finally { setEditSubmitting(false); }
   };
 
-  const handleResolveAnomaly = async (anomalyId: string) => {
+  const handleFuelEditSave = async (recordId: string) => {
+    const val = parseInt(fuelEditValue, 10);
+    if (isNaN(val) || val < 0 || val > 100) { toast.error('Fuel level must be 0–100'); return; }
+    setFuelEditSubmitting(true);
+    try {
+      const r = await fetch(`/api/fleet/vehicles/${vehicleId}/fuel?recordId=${recordId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fuelLevel: val }),
+      });
+      if (!r.ok) { const err = await r.json(); throw new Error(err.error?.message || 'Failed'); }
+      toast.success('Fuel level updated');
+      setFuelEditingId(null);
+      onRefresh();
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Failed'); }
+    finally { setFuelEditSubmitting(false); }
+  };
+
+  const handleResolveAnomaly = async (anomalyId: string, odometerHistoryId: string | null) => {
     if (!currentUserId) {
       toast.error('Unable to resolve — user not identified');
       return;
     }
     setResolveSubmitting(true);
     try {
+      // If admin provided a correction value and the anomaly has a linked history record, patch it first
+      const correctedVal = resolveCorrectValue.trim() ? parseInt(resolveCorrectValue.trim(), 10) : NaN;
+      if (!isNaN(correctedVal) && correctedVal >= 0 && odometerHistoryId) {
+        const patchRes = await fetch(
+          `/api/fleet/vehicles/${vehicleId}/odometer?recordId=${odometerHistoryId}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reading: correctedVal }),
+          }
+        );
+        if (!patchRes.ok) {
+          const err = await patchRes.json();
+          toast.error(err.error?.message || 'Failed to correct reading');
+          setResolveSubmitting(false);
+          return;
+        }
+      }
+
       const res = await fetch(`/api/fleet/vehicles/${vehicleId}/odometer-anomalies`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -1731,6 +1772,7 @@ function OdometerTab({
         toast.success('Anomaly resolved');
         setResolvingId(null);
         setResolveNotes('');
+        setResolveCorrectValue('');
         onRefresh();
       } else {
         toast.error(data.error?.message || 'Failed to resolve anomaly');
@@ -1930,23 +1972,31 @@ function OdometerTab({
                       )}
                     </div>
                     {resolvingId === anomaly.id && (
-                      <div className="mt-2 flex items-center gap-2">
+                      <div className="mt-2 flex items-center gap-2 flex-wrap">
                         <input
                           type="text"
                           value={resolveNotes}
                           onChange={(e) => setResolveNotes(e.target.value)}
                           placeholder="Resolution notes (e.g. VLM misread, correct reading is 77,938 km)"
-                          className="flex-1 px-3 py-1.5 text-sm border border-red-300 rounded bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-red-400"
+                          className="flex-1 min-w-0 px-3 py-1.5 text-sm border border-red-300 rounded bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-red-400"
+                        />
+                        <input
+                          type="number"
+                          value={resolveCorrectValue}
+                          onChange={(e) => setResolveCorrectValue(e.target.value)}
+                          placeholder="Correct reading (km)"
+                          min={0}
+                          className="w-40 px-3 py-1.5 text-sm border border-red-300 rounded bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-red-400"
                         />
                         <button
-                          onClick={() => handleResolveAnomaly(anomaly.id)}
+                          onClick={() => handleResolveAnomaly(anomaly.id, anomaly.odometerHistoryId)}
                           disabled={resolveSubmitting}
                           className="px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition-colors"
                         >
                           {resolveSubmitting ? 'Saving...' : 'Confirm'}
                         </button>
                         <button
-                          onClick={() => setResolvingId(null)}
+                          onClick={() => { setResolvingId(null); setResolveCorrectValue(''); }}
                           className="px-3 py-1.5 text-xs font-medium bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
                         >
                           Cancel
@@ -2148,6 +2198,7 @@ function OdometerTab({
                     <th className="text-center py-2 px-3 text-sm font-medium text-[var(--ff-text-secondary)]">Level</th>
                     <th className="text-right py-2 px-3 text-sm font-medium text-[var(--ff-text-secondary)]">Change</th>
                     <th className="text-center py-2 px-3 text-sm font-medium text-[var(--ff-text-secondary)]">Source</th>
+                    {isAdmin && <th className="text-center py-2 px-3 text-sm font-medium text-[var(--ff-text-secondary)]">Edit</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -2157,20 +2208,46 @@ function OdometerTab({
                         {formatDate(reading.recordedAt)}
                       </td>
                       <td className="py-3 px-3">
-                        <div className="flex items-center gap-2 justify-center">
-                          <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full ${
-                                reading.fuelLevel > 50 ? 'bg-green-500' :
-                                reading.fuelLevel > 25 ? 'bg-amber-500' : 'bg-red-500'
-                              }`}
-                              style={{ width: `${reading.fuelLevel}%` }}
+                        {fuelEditingId === reading.id ? (
+                          <div className="flex items-center justify-center gap-1">
+                            <input
+                              type="number"
+                              value={fuelEditValue}
+                              min={0}
+                              max={100}
+                              onChange={e => setFuelEditValue(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') handleFuelEditSave(reading.id);
+                                if (e.key === 'Escape') setFuelEditingId(null);
+                              }}
+                              className="w-20 px-2 py-1 bg-[#1a1d23] text-white border border-blue-500 rounded text-sm text-right"
+                              autoFocus
                             />
+                            <span className="text-sm text-[var(--ff-text-secondary)]">%</span>
+                            <button onClick={() => handleFuelEditSave(reading.id)} disabled={fuelEditSubmitting}
+                              className="p-1 text-green-400 hover:text-green-300"><Save className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => setFuelEditingId(null)}
+                              className="p-1 text-red-400 hover:text-red-300"><X className="w-3.5 h-3.5" /></button>
                           </div>
-                          <span className="text-sm font-medium text-[var(--ff-text-primary)]">
-                            {reading.fuelLevel}%
-                          </span>
-                        </div>
+                        ) : (
+                          <div className="flex items-center gap-2 justify-center">
+                            <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full ${
+                                  reading.fuelLevel > 50 ? 'bg-green-500' :
+                                  reading.fuelLevel > 25 ? 'bg-amber-500' : 'bg-red-500'
+                                }`}
+                                style={{ width: `${reading.fuelLevel}%` }}
+                              />
+                            </div>
+                            <span className="text-sm font-medium text-[var(--ff-text-primary)]">
+                              {reading.fuelLevel}%
+                              {reading.source === 'admin_correction' && (
+                                <span className="ml-1 text-[10px] text-yellow-400">(edited)</span>
+                              )}
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="py-3 px-3 text-sm text-right">
                         {reading.levelChange !== null ? (
@@ -2188,8 +2265,8 @@ function OdometerTab({
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
                           reading.source === 'vlm'
                             ? 'bg-purple-100 text-purple-700'
-                            : reading.source === 'fuel_transaction'
-                            ? 'bg-green-100 text-green-700'
+                            : reading.source === 'admin_correction'
+                            ? 'bg-yellow-100 text-yellow-700'
                             : 'bg-gray-100 text-gray-700'
                         }`}>
                           {reading.source === 'vlm' ? (
@@ -2202,16 +2279,26 @@ function OdometerTab({
                                 </span>
                               )}
                             </>
-                          ) : reading.source === 'fuel_transaction' ? (
-                            <>
-                              <Fuel className="w-3 h-3" />
-                              Fuel
-                            </>
+                          ) : reading.source === 'admin_correction' ? (
+                            'Corrected'
                           ) : (
                             'Manual'
                           )}
                         </span>
                       </td>
+                      {isAdmin && (
+                        <td className="py-3 px-3 text-sm text-center">
+                          {fuelEditingId !== reading.id && (
+                            <button
+                              onClick={() => { setFuelEditingId(reading.id); setFuelEditValue(String(reading.fuelLevel)); }}
+                              className="p-1 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-primary)] transition-colors"
+                              title="Edit fuel level"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

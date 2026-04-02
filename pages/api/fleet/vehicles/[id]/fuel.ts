@@ -2,6 +2,7 @@
  * Fleet Vehicle Fuel History API
  * GET: List fuel level history for a vehicle
  * POST: Add a manual fuel level reading
+ * PATCH: Admin correction of an existing fuel level reading
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -24,6 +25,10 @@ interface CreateFuelReadingRequest {
   notes?: string;
 }
 
+interface PatchFuelReadingRequest {
+  fuelLevel: number;
+}
+
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -40,8 +45,10 @@ async function handler(
         return handleGet(req, res, vehicleId);
       case 'POST':
         return handlePost(req, res, vehicleId);
+      case 'PATCH':
+        return handlePatch(req, res, vehicleId);
       default:
-        return apiResponse.methodNotAllowed(res, req.method || 'Unknown', ['GET', 'POST']);
+        return apiResponse.methodNotAllowed(res, req.method || 'Unknown', ['GET', 'POST', 'PATCH']);
     }
   } catch (error) {
     log.error('Fleet fuel API error', { error, vehicleId });
@@ -182,6 +189,78 @@ async function handlePost(
       levelChange,
     },
   });
+}
+
+/**
+ * PATCH: Admin correction of an existing fuel level reading
+ */
+async function handlePatch(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  vehicleId: string
+) {
+  const { recordId } = req.query;
+  const body = req.body as PatchFuelReadingRequest;
+
+  if (!recordId || typeof recordId !== 'string') {
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'recordId query parameter is required');
+  }
+
+  if (body.fuelLevel === undefined || body.fuelLevel === null) {
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'fuelLevel is required');
+  }
+
+  if (body.fuelLevel < 0 || body.fuelLevel > 100) {
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Fuel level must be between 0 and 100');
+  }
+
+  // Fetch the existing record
+  const existing = await sql`
+    SELECT id, fuel_level, previous_level, recorded_at
+    FROM fleet_fuel_history
+    WHERE id = ${recordId} AND vehicle_id = ${vehicleId}
+  ` as Array<{ id: string; fuel_level: number; previous_level: number | null; recorded_at: string }>;
+
+  if (existing.length === 0) {
+    return apiResponse.notFound(res, 'Fuel reading', recordId);
+  }
+
+  const oldLevel = existing[0].fuel_level;
+  const prevLevel = existing[0].previous_level;
+  const recordedAt = existing[0].recorded_at;
+
+  // Recalculate level_change for this record based on its previous_level
+  const newLevelChange = prevLevel !== null ? body.fuelLevel - prevLevel : null;
+
+  await sql`
+    UPDATE fleet_fuel_history
+    SET fuel_level = ${body.fuelLevel},
+        level_change = ${newLevelChange},
+        source = 'admin_correction',
+        updated_at = NOW()
+    WHERE id = ${recordId}
+  `;
+
+  // Recalculate the next record's previous_level and level_change
+  const nextRecord = await sql`
+    SELECT id, fuel_level FROM fleet_fuel_history
+    WHERE vehicle_id = ${vehicleId} AND recorded_at > ${recordedAt}
+    ORDER BY recorded_at ASC
+    LIMIT 1
+  ` as Array<{ id: string; fuel_level: number }>;
+
+  if (nextRecord.length > 0) {
+    const nextLevelChange = nextRecord[0].fuel_level - body.fuelLevel;
+    await sql`
+      UPDATE fleet_fuel_history
+      SET previous_level = ${body.fuelLevel},
+          level_change = ${nextLevelChange}
+      WHERE id = ${nextRecord[0].id}
+    `;
+  }
+
+  log.info('Admin corrected fuel level reading', { vehicleId, recordId, oldLevel, newLevel: body.fuelLevel });
+  return apiResponse.success(res, { id: recordId, oldLevel, newLevel: body.fuelLevel, levelChange: newLevelChange });
 }
 
 export default withAuth(handler);
