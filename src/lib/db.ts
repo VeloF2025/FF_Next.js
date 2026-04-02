@@ -25,16 +25,23 @@
  */
 
 import { Pool } from 'pg';
+import { log } from '@/lib/logger';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+  ssl: true,
   max: 20,
+  min: 2,                           // keep 2 idle connections ready
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 30_000,  // 30s — Neon cold starts can take 10-15s
   keepAlive: true,
   keepAliveInitialDelayMillis: 10_000,
 });
+
+// Warm up pool on startup so first user request doesn't hit a cold Neon connection
+pool.connect()
+  .then(client => { client.release(); log.info('[db] pool warmed up'); })
+  .catch(err => log.warn('[db] pool warm-up failed, will retry on first query:', err.message));
 
 export default pool;
 export { pool };
