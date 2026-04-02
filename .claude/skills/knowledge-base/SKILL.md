@@ -182,7 +182,29 @@ When generating new `.claude.md` files, use this template (max 50 lines):
    - `*-smoke.md` — Auto-generated, basic page-loads check (4 steps)
    - Other `.md` — Manually authored workflow stories (kept as-is)
 
-8. **Report results**
+8. **RBAC sync (access_permissions):**
+   ```bash
+   # Dry-run first to see what's missing
+   node scripts/rbac-sync.mjs
+
+   # If missing permissions found, apply them
+   node scripts/rbac-sync.mjs --apply
+   ```
+
+   This step:
+   - Scans `src/modules/navigation/config/modules/*.config.ts` for `rbacKey` values
+   - Scans `app/(main)/**/page.tsx` for page routes
+   - Compares against `access_permissions` table in the database
+   - Seeds missing permissions with `ON CONFLICT` upsert
+   - Grants default role permissions (super_admin/admin=full, manager=no delete,
+     viewer=view-only, technician/storeman/contractor=no access by default)
+   - Reports what was added
+
+   **Always dry-run first** — review the list before applying. New permissions
+   default to restrictive (technician/storeman/contractor get no access).
+   Adjust role grants manually in Access Control if needed.
+
+9. **Report results**
 
 ---
 
@@ -202,3 +224,4 @@ When generating new `.claude.md` files, use this template (max 50 lines):
 | `scripts/playwright-qa/generate-stories.mjs` | Auto-generates smoke stories |
 | `scripts/playwright-qa/setup-auth.mjs` | Playwright auth state setup |
 | `scripts/playwright-qa/qa-screenshot.mjs` | Quick authenticated screenshots |
+| `scripts/rbac-sync.mjs` | RBAC permission sync (nav configs → DB) |
