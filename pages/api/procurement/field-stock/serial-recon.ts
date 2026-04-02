@@ -167,7 +167,7 @@ async function getDetailRows(
 async function getInstalledOnt(itemCode: string, project: string, limit: number, offset: number) {
   if (project) {
     const rows = await sql`
-      SELECT ss.serial_number, ss.status, sl.name as location_name, dr.drop_number as wa_drop, oes.drop_number as oes_drop, oes.activation_date::text as activation_date
+      SELECT ss.serial_number, ss.status, sl.name as location_name, dr.drop_number as wa_drop, oes.drop_number as oes_drop, oes.activation_date::text as activation_date, ss.pp_flagged, ss.pp_flagged_at::text as pp_date, ss.pp_resolution_status
       FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id LEFT JOIN stock_locations sl ON ss.current_location_id = sl.id
       JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ont_serial_scanned)) = UPPER(TRIM(ss.serial_number))
       LEFT JOIN oes_activations oes ON UPPER(TRIM(oes.serial_number)) = UPPER(TRIM(ss.serial_number))
@@ -178,7 +178,7 @@ async function getInstalledOnt(itemCode: string, project: string, limit: number,
     return { rows, total: c.c };
   }
   const rows = await sql`
-    SELECT ss.serial_number, ss.status, sl.name as location_name, dr.drop_number as wa_drop, oes.drop_number as oes_drop, oes.activation_date::text as activation_date
+    SELECT ss.serial_number, ss.status, sl.name as location_name, dr.drop_number as wa_drop, oes.drop_number as oes_drop, oes.activation_date::text as activation_date, ss.pp_flagged, ss.pp_flagged_at::text as pp_date, ss.pp_resolution_status
     FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id LEFT JOIN stock_locations sl ON ss.current_location_id = sl.id
     JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ont_serial_scanned)) = UPPER(TRIM(ss.serial_number))
     LEFT JOIN oes_activations oes ON UPPER(TRIM(oes.serial_number)) = UPPER(TRIM(ss.serial_number))
@@ -261,7 +261,7 @@ async function getNotInstalledUps(itemCode: string, project: string, limit: numb
 async function getActivatedOnt(itemCode: string, project: string, limit: number, offset: number) {
   if (project) {
     const rows = await sql`
-      SELECT ss.serial_number, ss.status, sl.name as location_name, dr.drop_number as wa_drop, oes.drop_number as oes_drop, oes.activation_date::text as activation_date
+      SELECT ss.serial_number, ss.status, sl.name as location_name, dr.drop_number as wa_drop, oes.drop_number as oes_drop, oes.activation_date::text as activation_date, ss.pp_flagged, ss.pp_flagged_at::text as pp_date, ss.pp_resolution_status
       FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id LEFT JOIN stock_locations sl ON ss.current_location_id = sl.id
       JOIN oes_activations oes ON UPPER(TRIM(oes.serial_number)) = UPPER(TRIM(ss.serial_number))
       LEFT JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ont_serial_scanned)) = UPPER(TRIM(ss.serial_number))
@@ -272,7 +272,7 @@ async function getActivatedOnt(itemCode: string, project: string, limit: number,
     return { rows, total: c.c };
   }
   const rows = await sql`
-    SELECT ss.serial_number, ss.status, sl.name as location_name, dr.drop_number as wa_drop, oes.drop_number as oes_drop, oes.activation_date::text as activation_date
+    SELECT ss.serial_number, ss.status, sl.name as location_name, dr.drop_number as wa_drop, oes.drop_number as oes_drop, oes.activation_date::text as activation_date, ss.pp_flagged, ss.pp_flagged_at::text as pp_date, ss.pp_resolution_status
     FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id LEFT JOIN stock_locations sl ON ss.current_location_id = sl.id
     JOIN oes_activations oes ON UPPER(TRIM(oes.serial_number)) = UPPER(TRIM(ss.serial_number))
     LEFT JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ont_serial_scanned)) = UPPER(TRIM(ss.serial_number))
@@ -287,7 +287,7 @@ async function getAllWithMatches(itemCode: string, type: string, project: string
   if (project) {
     const rows = type === 'ont'
       ? await sql`
-          SELECT ss.serial_number, ss.status, sl.name as location_name, dr.drop_number as wa_drop, oes.drop_number as oes_drop, oes.activation_date::text as activation_date
+          SELECT ss.serial_number, ss.status, sl.name as location_name, dr.drop_number as wa_drop, oes.drop_number as oes_drop, oes.activation_date::text as activation_date, ss.pp_flagged, ss.pp_flagged_at::text as pp_date, ss.pp_resolution_status
           FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id LEFT JOIN stock_locations sl ON ss.current_location_id = sl.id
           LEFT JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ont_serial_scanned)) = UPPER(TRIM(ss.serial_number))
           LEFT JOIN oes_activations oes ON UPPER(TRIM(oes.serial_number)) = UPPER(TRIM(ss.serial_number))
@@ -306,7 +306,7 @@ async function getAllWithMatches(itemCode: string, type: string, project: string
   }
   const rows = type === 'ont'
     ? await sql`
-        SELECT ss.serial_number, ss.status, sl.name as location_name, dr.drop_number as wa_drop, oes.drop_number as oes_drop, oes.activation_date::text as activation_date
+        SELECT ss.serial_number, ss.status, sl.name as location_name, dr.drop_number as wa_drop, oes.drop_number as oes_drop, oes.activation_date::text as activation_date, ss.pp_flagged, ss.pp_flagged_at::text as pp_date, ss.pp_resolution_status
         FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id LEFT JOIN stock_locations sl ON ss.current_location_id = sl.id
         LEFT JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ont_serial_scanned)) = UPPER(TRIM(ss.serial_number))
         LEFT JOIN oes_activations oes ON UPPER(TRIM(oes.serial_number)) = UPPER(TRIM(ss.serial_number))

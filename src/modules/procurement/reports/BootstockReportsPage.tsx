@@ -27,6 +27,9 @@ interface ReconRow {
   wa_drop: string | null;
   oes_drop: string | null;
   activation_date: string | null;
+  pp_flagged: boolean;
+  pp_date: string | null;
+  pp_resolution_status: string | null;
 }
 
 export function BootstockReportsPage() {
@@ -94,24 +97,19 @@ export function BootstockReportsPage() {
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Summary Cards — clickable to filter */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          <StatCard icon={Package} label="Total from FT" value={stats.total} color="text-blue-400" />
-          <StatCard icon={Package} label="In Stock" value={stats.available + stats.issued} color="text-green-400" />
-          <StatCard icon={Zap} label="Installed (WA)" value={stats.waMatched} color="text-purple-400" />
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          <StatCard icon={Package} label="Total from FT" value={stats.total} color="text-blue-400" onClick={() => { setFilterMode('all'); setPage(1); }} active={filterMode === 'all'} />
+          <StatCard icon={Package} label="Not Installed" value={stats.total - stats.waMatched} color="text-amber-400" onClick={() => { setFilterMode('not_installed'); setPage(1); }} active={filterMode === 'not_installed'} />
+          <StatCard icon={Zap} label="Installed (WA)" value={stats.waMatched} color="text-purple-400" onClick={() => { setFilterMode('installed'); setPage(1); }} active={filterMode === 'installed'} />
           {type === 'ont' && (
-            <StatCard icon={AlertTriangle} label="PP Flagged" value={stats.ppFlagged || 0} color="text-red-400" />
+            <StatCard icon={CheckCircle} label="Activated (OES)" value={stats.oesMatched} color="text-teal-400" onClick={() => { setFilterMode('activated'); setPage(1); }} active={filterMode === 'activated'} />
           )}
           {type === 'ont' && (
-            <StatCard icon={CheckCircle} label="Activated (OES)" value={stats.oesMatched} color="text-teal-400" />
+            <StatCard icon={AlertTriangle} label="PP Flagged" value={stats.ppFlagged || 0} color="text-red-400" onClick={() => { setFilterMode('pp_flagged'); setPage(1); }} active={filterMode === 'pp_flagged'} />
           )}
-          <StatCard
-            icon={AlertTriangle}
-            label="Not Installed"
-            value={stats.total - stats.waMatched}
-            color="text-amber-400"
-          />
+          <StatCard icon={Package} label="In Stock" value={stats.available + stats.issued} color="text-green-400" onClick={() => { setFilterMode('all'); setProjectFilter(''); setPage(1); }} active={false} />
           <StatCard
             icon={CheckCircle}
             label="Install Rate"
@@ -189,6 +187,7 @@ export function BootstockReportsPage() {
                   <th className="text-left px-4 py-2 text-[var(--ff-text-secondary)] font-medium">Project</th>
                   <th className="text-left px-4 py-2 text-[var(--ff-text-secondary)] font-medium">WA DR</th>
                   {type === 'ont' && <th className="text-left px-4 py-2 text-[var(--ff-text-secondary)] font-medium">OES Drop</th>}
+                  {type === 'ont' && <th className="text-left px-4 py-2 text-[var(--ff-text-secondary)] font-medium">PP Status</th>}
                   {type === 'ont' && <th className="text-left px-4 py-2 text-[var(--ff-text-secondary)] font-medium">Activated</th>}
                   <th className="text-left px-4 py-2 text-[var(--ff-text-secondary)] font-medium">Status</th>
                 </tr>
@@ -200,6 +199,15 @@ export function BootstockReportsPage() {
                     <td className="px-4 py-2 text-[var(--ff-text-secondary)]">{row.location_name || '\u2014'}</td>
                     <td className="px-4 py-2 text-[var(--ff-text-primary)]">{row.wa_drop || '\u2014'}</td>
                     {type === 'ont' && <td className="px-4 py-2 text-[var(--ff-text-primary)]">{row.oes_drop || '\u2014'}</td>}
+                    {type === 'ont' && (
+                      <td className="px-4 py-2">
+                        {row.pp_resolution_status ? (
+                          <PpBadge status={row.pp_resolution_status} />
+                        ) : row.pp_flagged ? (
+                          <span className="text-xs text-amber-400">PP</span>
+                        ) : '\u2014'}
+                      </td>
+                    )}
                     {type === 'ont' && <td className="px-4 py-2 text-[var(--ff-text-secondary)] text-xs">{row.activation_date || '\u2014'}</td>}
                     <td className="px-4 py-2">
                       <StatusBadge status={row.wa_drop ? 'installed' : row.status} />
@@ -227,9 +235,14 @@ export function BootstockReportsPage() {
   );
 }
 
-function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType; label: string; value: number | string; color: string }) {
+function StatCard({ icon: Icon, label, value, color, onClick, active }: { icon: React.ElementType; label: string; value: number | string; color: string; onClick?: () => void; active?: boolean }) {
   return (
-    <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
+    <div
+      onClick={onClick}
+      className={`bg-[var(--ff-bg-secondary)] rounded-lg p-4 border transition-colors ${
+        active ? 'border-[var(--ff-accent)] ring-1 ring-[var(--ff-accent)]' : 'border-[var(--ff-border-light)]'
+      } ${onClick ? 'cursor-pointer hover:border-[var(--ff-accent)]' : ''}`}
+    >
       <div className="flex items-center gap-2 mb-1">
         <Icon className={`w-4 h-4 ${color}`} />
         <span className="text-xs text-[var(--ff-text-secondary)]">{label}</span>
@@ -251,6 +264,23 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${c.bg} ${c.text}`}>
       {status}
+    </span>
+  );
+}
+
+function PpBadge({ status }: { status: string }) {
+  const config: Record<string, { bg: string; text: string; label: string }> = {
+    activated: { bg: 'bg-green-500/10', text: 'text-green-400', label: 'Activated' },
+    not_found: { bg: 'bg-red-500/10', text: 'text-red-400', label: 'Not Found' },
+    located_1map: { bg: 'bg-blue-500/10', text: 'text-blue-400', label: 'Found (1Map)' },
+    located_unified: { bg: 'bg-purple-500/10', text: 'text-purple-400', label: 'Found (Unified)' },
+    located_local: { bg: 'bg-teal-500/10', text: 'text-teal-400', label: 'Found (Local)' },
+    located_oes: { bg: 'bg-green-500/10', text: 'text-green-400', label: 'Found (OES)' },
+  };
+  const c = config[status] || { bg: 'bg-gray-500/10', text: 'text-gray-400', label: status };
+  return (
+    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${c.bg} ${c.text}`}>
+      {c.label}
     </span>
   );
 }
