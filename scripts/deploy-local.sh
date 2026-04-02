@@ -81,6 +81,34 @@ fi
 
 IFS='|' read -r SVC PORT DIR URL <<< "${ENV_MAP[$TARGET]}"
 
+# --- Deploy lock (prevents concurrent deploys to same environment) ---
+LOCKFILE="/tmp/fibreflow-deploy-${TARGET}.lock"
+
+acquire_lock() {
+  if [[ -f "$LOCKFILE" ]]; then
+    local lock_pid lock_age
+    lock_pid=$(cat "$LOCKFILE" 2>/dev/null | head -1)
+    lock_age=$(( $(date +%s) - $(stat -c %Y "$LOCKFILE" 2>/dev/null || echo 0) ))
+
+    # If lock holder is still alive and lock is < 10 minutes old, abort
+    if kill -0 "$lock_pid" 2>/dev/null && [[ $lock_age -lt 600 ]]; then
+      error "Another deploy to $TARGET is already running (PID $lock_pid, ${lock_age}s ago). Wait for it to finish."
+    fi
+
+    # Stale lock — remove it
+    warn "Removing stale deploy lock (PID $lock_pid, ${lock_age}s old)"
+    rm -f "$LOCKFILE"
+  fi
+  echo $$ > "$LOCKFILE"
+}
+
+release_lock() {
+  rm -f "$LOCKFILE"
+}
+
+trap release_lock EXIT
+acquire_lock
+
 # --- Time gate enforcement ---
 if [[ "$TARGET" != "dev" ]] && is_business_hours; then
   if [[ "$FORCE" != true ]]; then
