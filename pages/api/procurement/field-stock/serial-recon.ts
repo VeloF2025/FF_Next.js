@@ -32,10 +32,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const stats = await getStats(itemCode, project);
     const waMatched = await getWaMatched(itemCode, type, project);
     const oesMatched = type === 'ont' ? await getOesMatched(project) : 0;
+    const ppFlagged = type === 'ont' ? await getPpFlagged(project) : 0;
     const { rows, total } = await getDetailRows(itemCode, type, project, filter, search, limit, offset);
 
     return apiResponse.success(res, {
-      stats: { ...stats, oesMatched, waMatched },
+      stats: { ...stats, oesMatched, waMatched, ppFlagged },
       rows,
       page,
       limit,
@@ -143,8 +144,11 @@ async function getDetailRows(
   }
 
   if (filter === 'installed') {
-    // Show serials that have a WA DR match
     return isOnt ? getInstalledOnt(itemCode, project, limit, offset) : getInstalledUps(itemCode, project, limit, offset);
+  }
+
+  if (filter === 'pp_flagged' && isOnt) {
+    return getPpFlaggedRows(itemCode, project, limit, offset);
   }
 
   if (filter === 'not_installed') {
@@ -317,6 +321,42 @@ async function getAllWithMatches(itemCode: string, type: string, project: string
         ORDER BY ss.serial_number LIMIT ${limit} OFFSET ${offset}
       `;
   const [c] = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id WHERE si.item_code = ${itemCode}`;
+  return { rows, total: c.c };
+}
+
+async function getPpFlagged(project: string) {
+  if (project) {
+    const [row] = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN stock_locations sl ON ss.current_location_id = sl.id WHERE si.item_code = 'FT-ONT' AND ss.pp_flagged = TRUE AND sl.name ILIKE ${'%' + project + '%'}`;
+    return row?.c || 0;
+  }
+  const [row] = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id WHERE si.item_code = 'FT-ONT' AND ss.pp_flagged = TRUE`;
+  return row?.c || 0;
+}
+
+async function getPpFlaggedRows(itemCode: string, project: string, limit: number, offset: number) {
+  if (project) {
+    const rows = await sql`
+      SELECT ss.serial_number, ss.status, sl.name as location_name, ss.pp_resolution_status,
+        dr.drop_number as wa_drop, oes.drop_number as oes_drop, oes.activation_date::text as activation_date
+      FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id LEFT JOIN stock_locations sl ON ss.current_location_id = sl.id
+      LEFT JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ont_serial_scanned)) = UPPER(TRIM(ss.serial_number))
+      LEFT JOIN oes_activations oes ON UPPER(TRIM(oes.serial_number)) = UPPER(TRIM(ss.serial_number))
+      WHERE si.item_code = ${itemCode} AND ss.pp_flagged = TRUE AND sl.name ILIKE ${'%' + project + '%'}
+      ORDER BY ss.pp_resolution_status, ss.serial_number LIMIT ${limit} OFFSET ${offset}
+    `;
+    const [c] = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN stock_locations sl ON ss.current_location_id = sl.id WHERE si.item_code = ${itemCode} AND ss.pp_flagged = TRUE AND sl.name ILIKE ${'%' + project + '%'}`;
+    return { rows, total: c.c };
+  }
+  const rows = await sql`
+    SELECT ss.serial_number, ss.status, sl.name as location_name, ss.pp_resolution_status,
+      dr.drop_number as wa_drop, oes.drop_number as oes_drop, oes.activation_date::text as activation_date
+    FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id LEFT JOIN stock_locations sl ON ss.current_location_id = sl.id
+    LEFT JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ont_serial_scanned)) = UPPER(TRIM(ss.serial_number))
+    LEFT JOIN oes_activations oes ON UPPER(TRIM(oes.serial_number)) = UPPER(TRIM(ss.serial_number))
+    WHERE si.item_code = ${itemCode} AND ss.pp_flagged = TRUE
+    ORDER BY ss.pp_resolution_status, ss.serial_number LIMIT ${limit} OFFSET ${offset}
+  `;
+  const [c] = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id WHERE si.item_code = ${itemCode} AND ss.pp_flagged = TRUE`;
   return { rows, total: c.c };
 }
 

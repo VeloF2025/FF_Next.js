@@ -101,6 +101,9 @@ export function BootstockReportsPage() {
           <StatCard icon={Package} label="In Stock" value={stats.available + stats.issued} color="text-green-400" />
           <StatCard icon={Zap} label="Installed (WA)" value={stats.waMatched} color="text-purple-400" />
           {type === 'ont' && (
+            <StatCard icon={AlertTriangle} label="PP Flagged" value={stats.ppFlagged || 0} color="text-red-400" />
+          )}
+          {type === 'ont' && (
             <StatCard icon={CheckCircle} label="Activated (OES)" value={stats.oesMatched} color="text-teal-400" />
           )}
           <StatCard
@@ -141,6 +144,7 @@ export function BootstockReportsPage() {
           <option value="installed">Installed (has WA DR)</option>
           <option value="not_installed">Not Installed</option>
           {type === 'ont' && <option value="activated">Activated (OES)</option>}
+          {type === 'ont' && <option value="pp_flagged">PP Flagged</option>}
         </select>
         <input
           type="text"
