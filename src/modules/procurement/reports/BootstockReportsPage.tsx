@@ -97,15 +97,15 @@ export function BootstockReportsPage() {
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
           <StatCard icon={Package} label="Total from FT" value={stats.total} color="text-blue-400" />
-          <StatCard icon={Package} label="Available" value={stats.available} color="text-green-400" />
+          <StatCard icon={Package} label="In Stock" value={stats.available + stats.issued} color="text-green-400" />
           <StatCard icon={Zap} label="Installed (WA)" value={stats.waMatched} color="text-purple-400" />
           {type === 'ont' && (
             <StatCard icon={CheckCircle} label="Activated (OES)" value={stats.oesMatched} color="text-teal-400" />
           )}
           <StatCard
             icon={AlertTriangle}
-            label="Unaccounted"
-            value={stats.total - stats.available - stats.waMatched}
+            label="Not Installed"
+            value={stats.total - stats.waMatched}
             color="text-amber-400"
           />
           <StatCard
