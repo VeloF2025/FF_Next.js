@@ -134,10 +134,9 @@ export default function NewGRNPage() {
           setLocations(warehouses);
         }
 
-        // Pre-select PO if provided in URL
+        // Pre-select PO if provided in URL (items loaded via the selectedPOId effect)
         if (purchaseOrderId && typeof purchaseOrderId === 'string') {
           setSelectedPOId(purchaseOrderId);
-          // TODO: Load PO items
         }
       } catch (err) {
         log.error('Failed to load reference data', err);
@@ -148,13 +147,41 @@ export default function NewGRNPage() {
     loadData();
   }, [purchaseOrderId]);
 
-  // When PO is selected, auto-fill supplier
+  // When PO is selected, auto-fill supplier and load PO items
   useEffect(() => {
     if (selectedPOId) {
       const po = purchaseOrders.find((p) => p.id === selectedPOId);
       if (po) {
         setSupplierId(po.supplierId);
       }
+      // Load PO line items to pre-populate GRN items grid
+      fetch(`/api/procurement/purchase-orders/${selectedPOId}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.data?.items?.length > 0) {
+            const poItems: FormItem[] = data.data.items.map((item: {
+              id: string;
+              itemCode: string | null;
+              itemDescription: string;
+              quantityOrdered: number;
+              quantityReceived: number;
+              uom: string;
+            }) => ({
+              id: crypto.randomUUID(),
+              poItemId: item.id,
+              itemCode: item.itemCode || '',
+              itemDescription: item.itemDescription || '',
+              quantityExpected: String(Math.max(0, (item.quantityOrdered || 0) - (item.quantityReceived || 0))),
+              quantityReceived: '',
+              quantityRejected: '',
+              uom: item.uom || 'units',
+              lotNumber: '',
+              notes: '',
+            }));
+            setItems(poItems);
+          }
+        })
+        .catch(err => log.error('Failed to load PO items', err));
     }
   }, [selectedPOId, purchaseOrders]);
 
