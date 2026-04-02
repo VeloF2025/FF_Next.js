@@ -23,10 +23,10 @@ interface ReconStats {
 interface ReconRow {
   serial_number: string;
   status: string;
-  installed_at_drop_number: string | null;
-  installed_date: string | null;
   location_name: string | null;
-  location_code: string | null;
+  wa_drop: string | null;
+  oes_drop: string | null;
+  activation_date: string | null;
 }
 
 export function BootstockReportsPage() {
@@ -37,14 +37,15 @@ export function BootstockReportsPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [projectFilter, setProjectFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [filterMode, setFilterMode] = useState('all');
+  const [search, setSearch] = useState('');
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ type, page: String(page), limit: '50' });
+      const params = new URLSearchParams({ type, page: String(page), limit: '50', filter: filterMode });
       if (projectFilter) params.set('project', projectFilter);
-      if (statusFilter) params.set('status', statusFilter);
+      if (search) params.set('search', search);
 
       const res = await fetch(`/api/procurement/field-stock/serial-recon?${params}`);
       const json = await res.json();
@@ -58,7 +59,7 @@ export function BootstockReportsPage() {
     }
   };
 
-  useEffect(() => { fetchData(); }, [type, page, projectFilter, statusFilter]);
+  useEffect(() => { fetchData(); }, [type, page, projectFilter, filterMode, search]);
 
   const totalPages = Math.ceil(total / 50);
 
@@ -118,7 +119,7 @@ export function BootstockReportsPage() {
       )}
 
       {/* Filters */}
-      <div className="flex gap-4 items-center">
+      <div className="flex gap-3 items-center flex-wrap">
         <select
           value={projectFilter}
           onChange={(e) => { setProjectFilter(e.target.value); setPage(1); }}
@@ -132,17 +133,22 @@ export function BootstockReportsPage() {
           <option value="Etwatwa">Etwatwa</option>
         </select>
         <select
-          value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+          value={filterMode}
+          onChange={(e) => { setFilterMode(e.target.value); setPage(1); }}
           className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg px-3 py-2 text-sm text-[var(--ff-text-primary)]"
         >
-          <option value="">All Statuses</option>
-          <option value="available">Available</option>
-          <option value="issued">Issued</option>
-          <option value="installed">Installed</option>
-          <option value="faulty">Faulty</option>
-          <option value="returned">Returned</option>
+          <option value="all">All Serials</option>
+          <option value="installed">Installed (has WA DR)</option>
+          <option value="not_installed">Not Installed</option>
+          {type === 'ont' && <option value="activated">Activated (OES)</option>}
         </select>
+        <input
+          type="text"
+          placeholder="Search serial..."
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg px-3 py-2 text-sm text-[var(--ff-text-primary)] w-48 focus:outline-none focus:border-[var(--ff-accent)]"
+        />
         <span className="text-xs text-[var(--ff-text-tertiary)]">
           {total.toLocaleString()} {type === 'ont' ? 'ONTs' : 'UPS devices'}
         </span>
@@ -176,20 +182,24 @@ export function BootstockReportsPage() {
               <thead>
                 <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
                   <th className="text-left px-4 py-2 text-[var(--ff-text-secondary)] font-medium">Serial</th>
+                  <th className="text-left px-4 py-2 text-[var(--ff-text-secondary)] font-medium">Project</th>
+                  <th className="text-left px-4 py-2 text-[var(--ff-text-secondary)] font-medium">WA DR</th>
+                  {type === 'ont' && <th className="text-left px-4 py-2 text-[var(--ff-text-secondary)] font-medium">OES Drop</th>}
+                  {type === 'ont' && <th className="text-left px-4 py-2 text-[var(--ff-text-secondary)] font-medium">Activated</th>}
                   <th className="text-left px-4 py-2 text-[var(--ff-text-secondary)] font-medium">Status</th>
-                  <th className="text-left px-4 py-2 text-[var(--ff-text-secondary)] font-medium">Location</th>
-                  <th className="text-left px-4 py-2 text-[var(--ff-text-secondary)] font-medium">Drop #</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row, i) => (
                   <tr key={i} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">
                     <td className="px-4 py-2 font-mono text-xs text-[var(--ff-text-primary)]">{row.serial_number}</td>
-                    <td className="px-4 py-2">
-                      <StatusBadge status={row.status} />
-                    </td>
                     <td className="px-4 py-2 text-[var(--ff-text-secondary)]">{row.location_name || '\u2014'}</td>
-                    <td className="px-4 py-2 text-[var(--ff-text-primary)]">{row.installed_at_drop_number || '\u2014'}</td>
+                    <td className="px-4 py-2 text-[var(--ff-text-primary)]">{row.wa_drop || '\u2014'}</td>
+                    {type === 'ont' && <td className="px-4 py-2 text-[var(--ff-text-primary)]">{row.oes_drop || '\u2014'}</td>}
+                    {type === 'ont' && <td className="px-4 py-2 text-[var(--ff-text-secondary)] text-xs">{row.activation_date || '\u2014'}</td>}
+                    <td className="px-4 py-2">
+                      <StatusBadge status={row.wa_drop ? 'installed' : row.status} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
