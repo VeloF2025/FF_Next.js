@@ -13,7 +13,6 @@ export function ProjectList() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string[]>([]);
   const [selectedPriority, setSelectedPriority] = useState<string[]>([]);
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const { projects, loading: isLoading, error, refetch } = useNeonProjects();
   
