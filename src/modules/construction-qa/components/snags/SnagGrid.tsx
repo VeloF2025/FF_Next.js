@@ -1,0 +1,169 @@
+/**
+ * SnagGrid — Grid of snag cards for a selected project.
+ * Groups by TQR report with collapsible headers.
+ * Inline accordion detail on card click.
+ */
+
+'use client';
+
+import { useState, useCallback } from 'react';
+import { ChevronLeft, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { SnagCard } from './SnagCard';
+import { SnagDetail } from './SnagDetail';
+import type { Snag, SnagPhoto } from '../../types/snag.types';
+import type { ReportGroup } from './useSnagsPage';
+
+interface SnagGridProps {
+  projectName: string;
+  groups: ReportGroup[];
+  photosBySnag: Record<string, SnagPhoto[]>;
+  loading: boolean;
+  onBack: () => void;
+  onSnagUpdated: (snag: Snag) => void;
+  onPhotoAdded: (snagId: string, photo: SnagPhoto) => void;
+}
+
+/** 🟢 WORKING: Snag card grid grouped by report */
+export function SnagGrid({
+  projectName,
+  groups,
+  photosBySnag,
+  loading,
+  onBack,
+  onSnagUpdated,
+  onPhotoAdded,
+}: SnagGridProps) {
+  const [expandedSnagId, setExpandedSnagId] = useState<string | null>(null);
+  const [collapsedReports, setCollapsedReports] = useState<Set<string>>(new Set());
+
+  const toggleReport = useCallback((reportId: string) => {
+    setCollapsedReports((prev) => {
+      const next = new Set(prev);
+      if (next.has(reportId)) {
+        next.delete(reportId);
+      } else {
+        next.add(reportId);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleCardClick = useCallback((snagId: string) => {
+    setExpandedSnagId((prev) => (prev === snagId ? null : snagId));
+  }, []);
+
+  const handleSnagUpdated = useCallback((updated: Snag) => {
+    onSnagUpdated(updated);
+  }, [onSnagUpdated]);
+
+  const handlePhotoAdded = useCallback((snagId: string, photo: SnagPhoto) => {
+    onPhotoAdded(snagId, photo);
+  }, [onPhotoAdded]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-48">
+        <Loader2 className="h-6 w-6 text-zinc-400 animate-spin" />
+      </div>
+    );
+  }
+
+  if (groups.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-48 text-zinc-500">
+        <p className="text-sm">No snags found</p>
+        <p className="text-xs mt-1">Import a TQR report to get started</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Back button */}
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
+      >
+        <ChevronLeft className="h-4 w-4" />
+        Back to {projectName}
+      </button>
+
+      {/* Report groups */}
+      {groups.map((group) => {
+        const isCollapsed = collapsedReports.has(group.report.id);
+        const auditDate = new Date(group.report.audit_date).toLocaleDateString('en-ZA');
+        const openCount = group.snags.filter(
+          (s) => ['open', 'assigned', 'in_progress', 'reopened'].includes(s.status)
+        ).length;
+        const fixedCount = group.snags.filter(
+          (s) => ['fixed', 'verified', 'closed'].includes(s.status)
+        ).length;
+
+        return (
+          <div key={group.report.id} className="space-y-2">
+            {/* Report header */}
+            <button
+              type="button"
+              onClick={() => toggleReport(group.report.id)}
+              className="w-full flex items-center gap-2 text-left bg-zinc-800 hover:bg-zinc-750 border border-zinc-700 rounded-md px-3 py-2 transition-colors"
+            >
+              {isCollapsed ? (
+                <ChevronRight className="h-4 w-4 text-zinc-500 shrink-0" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-zinc-500 shrink-0" />
+              )}
+              <span className="text-sm font-medium text-zinc-200 flex-1">
+                {group.report.report_number} — {auditDate}
+              </span>
+              <span className="text-xs text-zinc-400">
+                {group.snags.length} findings
+              </span>
+              {openCount > 0 && (
+                <span className="text-xs bg-red-900/60 text-red-300 px-1.5 py-0.5 rounded">
+                  {openCount} open
+                </span>
+              )}
+              {fixedCount > 0 && (
+                <span className="text-xs bg-green-900/60 text-green-300 px-1.5 py-0.5 rounded">
+                  {fixedCount} resolved
+                </span>
+              )}
+            </button>
+
+            {/* Snag cards grid */}
+            {!isCollapsed && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+                {group.snags.map((snag) => {
+                  const photos = photosBySnag[snag.id] ?? [];
+                  const isExpanded = expandedSnagId === snag.id;
+
+                  return (
+                    <div key={snag.id} className="flex flex-col">
+                      <SnagCard
+                        snag={snag}
+                        photos={photos}
+                        isExpanded={isExpanded}
+                        onClick={() => handleCardClick(snag.id)}
+                      />
+
+                      {isExpanded && (
+                        <SnagDetail
+                          snag={snag}
+                          photos={photos}
+                          onClose={() => setExpandedSnagId(null)}
+                          onUpdated={handleSnagUpdated}
+                          onPhotoAdded={(photo) => handlePhotoAdded(snag.id, photo)}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}

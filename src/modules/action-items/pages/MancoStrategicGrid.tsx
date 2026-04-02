@@ -144,30 +144,36 @@ export function MancoStrategicGrid() {
           </p>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        {/* Stats — counts match what the grid tabs actually display (ongoing excluded from main counts) */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
             <p className="text-xs text-[var(--ff-text-secondary)] uppercase font-semibold">Total</p>
             <p className="text-2xl font-bold text-[var(--ff-text-primary)] mt-1">
-              {stats?.total || 0}
+              {stats?.total ?? 0}
             </p>
           </div>
           <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
             <p className="text-xs text-[var(--ff-text-secondary)] uppercase font-semibold">Pending</p>
             <p className="text-2xl font-bold mt-1" style={{ color: 'var(--ff-warning)' }}>
-              {stats?.pending || 0}
+              {stats?.pending ?? 0}
             </p>
           </div>
           <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
             <p className="text-xs text-[var(--ff-text-secondary)] uppercase font-semibold">In Progress</p>
             <p className="text-2xl font-bold mt-1" style={{ color: 'var(--ff-info)' }}>
-              {stats?.in_progress || 0}
+              {stats?.in_progress ?? 0}
             </p>
           </div>
           <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
             <p className="text-xs text-[var(--ff-text-secondary)] uppercase font-semibold">Overdue</p>
             <p className="text-2xl font-bold mt-1" style={{ color: 'var(--ff-danger)' }}>
-              {stats?.overdue || 0}
+              {stats?.overdue ?? 0}
+            </p>
+          </div>
+          <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
+            <p className="text-xs text-[var(--ff-text-secondary)] uppercase font-semibold">Ongoing</p>
+            <p className="text-2xl font-bold mt-1" style={{ color: 'var(--ff-accent)' }}>
+              {stats?.ongoing ?? 0}
             </p>
           </div>
         </div>

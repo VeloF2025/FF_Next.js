@@ -8,3 +8,4 @@
  *   import type { ConstructionQaReview, Discipline, QaDecision } from '@/modules/construction-qa/types';
  */
 export * from './construction.types';
+export * from './snag.types';

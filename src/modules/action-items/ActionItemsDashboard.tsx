@@ -4,19 +4,28 @@ import { useEffect, useState } from 'react';
 import { CheckCircle, Clock, AlertCircle, Calendar, Users, Filter, Inbox, Target } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { ActionItemStats } from '@/types/action-items.types';
+import { MancoActionItemStats } from '@/types/manco-action-items.types';
 import { actionItemsService } from '@/services/action-items/actionItemsService';
 import { log } from '@/lib/logger';
 
 export function ActionItemsDashboard() {
   const router = useRouter();
   const [stats, setStats] = useState<ActionItemStats | null>(null);
+  const [mancoStats, setMancoStats] = useState<MancoActionItemStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const data = await actionItemsService.getStats();
-        setStats(data);
+        const [actionStats, mancoRes] = await Promise.all([
+          actionItemsService.getStats(),
+          fetch('/api/manco-action-items/stats'),
+        ]);
+        setStats(actionStats);
+        if (mancoRes.ok) {
+          const mancoData = await mancoRes.json();
+          setMancoStats(mancoData.data || mancoData);
+        }
       } catch (error) {
         log.error('Error fetching stats', { error }, 'ActionItemsDashboard');
       } finally {
@@ -85,6 +94,7 @@ export function ActionItemsDashboard() {
       description: 'Executive strategic action items from Manco meetings',
       icon: Target,
       color: 'bg-amber-600',
+      count: mancoStats?.pending,
       onClick: () => router.push('/action-items/manco'),
     },
   ];

@@ -42,11 +42,14 @@ export interface MancoActionItemFilters {
 }
 
 export interface MancoActionItemStats {
+  /** All items (excluding ongoing) */
   total: number;
   pending: number;
   in_progress: number;
   completed: number;
   overdue: number;
+  /** Ongoing items (shown only on the ONGOING tab) */
+  ongoing: number;
 }
 
 export interface MancoMeetingContext {

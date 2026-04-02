@@ -16,14 +16,18 @@ async function handler(
   try {
     const [stats] = await sql`
       SELECT
-        COUNT(*)::int                                                          AS total,
-        COUNT(*) FILTER (WHERE status = 'pending')::int                       AS pending,
-        COUNT(*) FILTER (WHERE status = 'in_progress')::int                   AS in_progress,
-        COUNT(*) FILTER (WHERE status = 'completed')::int                     AS completed,
+        -- Non-ongoing items (matches ALL/PENDING/etc tabs which exclude ongoing)
+        COUNT(*) FILTER (WHERE NOT is_ongoing)::int                           AS total,
+        COUNT(*) FILTER (WHERE status = 'pending' AND NOT is_ongoing)::int    AS pending,
+        COUNT(*) FILTER (WHERE status = 'in_progress' AND NOT is_ongoing)::int AS in_progress,
+        COUNT(*) FILTER (WHERE status = 'completed' AND NOT is_ongoing)::int  AS completed,
         COUNT(*) FILTER (
           WHERE status NOT IN ('completed', 'cancelled')
+            AND NOT is_ongoing
             AND completion_eta < CURRENT_DATE
-        )::int                                                                 AS overdue
+        )::int                                                                 AS overdue,
+        -- Ongoing items (matches ONGOING tab)
+        COUNT(*) FILTER (WHERE is_ongoing)::int                               AS ongoing
       FROM manco_action_items
     `;
 
