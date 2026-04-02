@@ -5,7 +5,12 @@
 
 import { log } from '@/lib/logger';
 
-export interface Project {
+/**
+ * Project record as returned by the /api/projects endpoint.
+ * This is the service-layer representation (camelCase, Date fields).
+ * For the canonical project type, see @/modules/projects/types/core.types.ts
+ */
+export interface ProjectRecord {
   id: string;
   name: string;
   code: string;
@@ -27,6 +32,9 @@ export interface Project {
   updatedBy?: string;
 }
 
+/** @deprecated Use ProjectRecord instead */
+export type Project = ProjectRecord;
+
 export interface ProjectFormData {
   name: string;
   code: string;
@@ -44,7 +52,7 @@ export interface ProjectFormData {
 class ProjectsService {
   private baseUrl = '/api/projects';
 
-  async getAll(): Promise<Project[]> {
+  async getAll(): Promise<ProjectRecord[]> {
     try {
       const response = await fetch(this.baseUrl);
       if (!response.ok) {
@@ -58,7 +66,7 @@ class ProjectsService {
     }
   }
 
-  async getById(id: string): Promise<Project | null> {
+  async getById(id: string): Promise<ProjectRecord | null> {
     try {
       const response = await fetch(`${this.baseUrl}/${id}`);
       if (!response.ok) {
@@ -73,7 +81,7 @@ class ProjectsService {
     }
   }
 
-  async create(projectData: ProjectFormData): Promise<Project> {
+  async create(projectData: ProjectFormData): Promise<ProjectRecord> {
     try {
       const response = await fetch(this.baseUrl, {
         method: 'POST',
@@ -93,7 +101,7 @@ class ProjectsService {
     }
   }
 
-  async update(id: string, projectData: Partial<ProjectFormData>): Promise<Project> {
+  async update(id: string, projectData: Partial<ProjectFormData>): Promise<ProjectRecord> {
     try {
       const response = await fetch(`${this.baseUrl}/${id}`, {
         method: 'PUT',
@@ -127,7 +135,7 @@ class ProjectsService {
     }
   }
 
-  async getByClient(clientId: string): Promise<Project[]> {
+  async getByClient(clientId: string): Promise<ProjectRecord[]> {
     try {
       const response = await fetch(`${this.baseUrl}?clientId=${clientId}`);
       if (!response.ok) {
@@ -155,7 +163,7 @@ class ProjectsService {
     }
   }
 
-  async search(query: string): Promise<Project[]> {
+  async search(query: string): Promise<ProjectRecord[]> {
     try {
       const response = await fetch(`${this.baseUrl}/search?q=${encodeURIComponent(query)}`);
       if (!response.ok) {

@@ -27,7 +27,11 @@ interface DbProject {
   updated_at?: string;
 }
 
-interface Project {
+/**
+ * CamelCase project shape used within this API service layer.
+ * Transformed from snake_case DB rows via transformDbToProject.
+ */
+interface ProjectApiData {
   id?: string;
   projectCode?: string;
   projectName: string;
@@ -58,7 +62,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return data.data || data;
 }
 
-function transformDbToProject(dbProject: DbProject): Project {
+function transformDbToProject(dbProject: DbProject): ProjectApiData {
   // Database returns 'name' field, but we support both 'name' and 'project_name'
   const projectName = dbProject.name || dbProject.project_name || '';
 
@@ -84,7 +88,7 @@ function transformDbToProject(dbProject: DbProject): Project {
   };
 }
 
-function transformProjectToDb(project: Partial<Project>): Partial<DbProject> {
+function transformProjectToDb(project: Partial<ProjectApiData>): Partial<DbProject> {
   return {
     id: project.id,
     project_code: project.projectCode,
@@ -105,19 +109,19 @@ function transformProjectToDb(project: Partial<Project>): Partial<DbProject> {
 }
 
 export const projectApiService = {
-  async getAll(): Promise<Project[]> {
+  async getAll(): Promise<ProjectApiData[]> {
     const response = await fetch(`${API_BASE}/projects`);
     const dbProjects = await handleResponse<DbProject[]>(response);
     return dbProjects.map(transformDbToProject);
   },
 
-  async getById(id: string): Promise<Project | null> {
+  async getById(id: string): Promise<ProjectApiData | null> {
     const response = await fetch(`${API_BASE}/projects?id=${id}`);
     const dbProject = await handleResponse<DbProject | null>(response);
     return dbProject ? transformDbToProject(dbProject) : null;
   },
 
-  async create(projectData: Omit<Project, 'id' | 'created_at' | 'updated_at'>): Promise<Project> {
+  async create(projectData: Omit<ProjectApiData, 'id' | 'created_at' | 'updated_at'>): Promise<ProjectApiData> {
     const dbData = transformProjectToDb(projectData);
     const response = await fetch(`${API_BASE}/projects`, {
       method: 'POST',
@@ -128,7 +132,7 @@ export const projectApiService = {
     return transformDbToProject(dbProject);
   },
 
-  async update(id: string, updates: Partial<Project>): Promise<Project> {
+  async update(id: string, updates: Partial<ProjectApiData>): Promise<ProjectApiData> {
     const dbUpdates = transformProjectToDb(updates);
     const response = await fetch(`${API_BASE}/projects?id=${id}`, {
       method: 'PUT',
@@ -147,12 +151,12 @@ export const projectApiService = {
   },
 
   // Compatibility methods to match existing service interface
-  async getActiveProjects(): Promise<Project[]> {
+  async getActiveProjects(): Promise<ProjectApiData[]> {
     const projects = await this.getAll();
     return projects.filter(p => p.status === 'active' || p.status === 'in_progress');
   },
 
-  async getProjectsByClient(clientId: string): Promise<Project[]> {
+  async getProjectsByClient(clientId: string): Promise<ProjectApiData[]> {
     const projects = await this.getAll();
     return projects.filter(p => p.clientId === clientId);
   },

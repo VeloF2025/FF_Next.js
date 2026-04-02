@@ -21,7 +21,8 @@ import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('StaffProjectAssignment');
 
-interface Project {
+/** Slim project option for display in assignment dropdown */
+interface ProjectOption {
   id: string;
   name: string;
   status?: string;
@@ -35,7 +36,7 @@ interface StaffProjectAssignmentProps {
 
 export function StaffProjectAssignment({ staffId, staffName }: StaffProjectAssignmentProps) {
   const [assignments, setAssignments] = useState<StaffProject[]>([]);
-  const [availableProjects, setAvailableProjects] = useState<Project[]>([]);
+  const [availableProjects, setAvailableProjects] = useState<ProjectOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { projectsService, Project } from '@/services/projectsService';
+import { projectsService, ProjectRecord } from '@/services/projectsService';
 import { log } from '@/lib/logger';
 
 export function useNeonProjects() {
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

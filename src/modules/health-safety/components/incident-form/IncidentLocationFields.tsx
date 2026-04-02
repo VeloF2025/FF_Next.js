@@ -5,7 +5,8 @@
 import React from 'react';
 import { MapPin } from 'lucide-react';
 
-interface Project {
+/** Slim project option for incident location form dropdown */
+interface ProjectOption {
   id: number;
   project_name: string;
 }
@@ -19,7 +20,7 @@ interface IncidentLocationFieldsProps {
   location: string;
   projectId: string;
   contractorId: string;
-  projects: Project[];
+  projects: ProjectOption[];
   contractors: Contractor[];
   onChange: (field: string, value: string) => void;
 }

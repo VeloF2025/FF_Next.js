@@ -31,7 +31,7 @@ import {
   AlertTriangle,
   Zap,
 } from 'lucide-react';
-import { TrendChart, GaugeChart } from '@/modules/activate/components/reporting/shared/TrendChart';
+import { TrendChart, GaugeChart } from '@/components/ui/charts';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import { log } from '@/lib/logger';
 

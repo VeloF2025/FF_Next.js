@@ -18,7 +18,8 @@ interface AssignProjectFormProps {
   onCancel: () => void;
 }
 
-interface Project {
+/** Slim project option shape for contractor assignment dropdown */
+interface ProjectOption {
   id: string;
   project_name: string;
   project_code: string;
@@ -26,7 +27,7 @@ interface Project {
 }
 
 export function AssignProjectForm({ contractorId, onSuccess, onCancel }: AssignProjectFormProps) {
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

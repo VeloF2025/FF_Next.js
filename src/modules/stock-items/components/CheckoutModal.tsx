@@ -20,7 +20,8 @@ interface Serial {
   status: string;
 }
 
-interface Project {
+/** Minimal project option for checkout dropdown selection */
+interface ProjectOption {
   id: string;
   name: string;
 }
@@ -39,7 +40,7 @@ export function CheckoutModal({ stockItemId, stockItemName, serials, onClose, on
   const [projectId, setProjectId] = useState('');
   const [jobSiteName, setJobSiteName] = useState('');
   const [expectedReturnDate, setExpectedReturnDate] = useState('');
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [projectSearch, setProjectSearch] = useState('');
   const [conditionPhotos, setConditionPhotos] = useState<CapturedPhoto[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);

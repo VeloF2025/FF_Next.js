@@ -30,7 +30,8 @@ interface SiteMapping {
   project_status: string | null;
 }
 
-interface Project {
+/** Slim project option for Sage site-to-project mapping dropdown */
+interface ProjectOption {
   id: string;
   name: string;
   status: string;
@@ -48,7 +49,7 @@ interface BusinessUnit {
 
 export function SageMappingTab() {
   const [sites, setSites] = useState<SiteMapping[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);

@@ -6,10 +6,14 @@ export interface TabPanelProps {
   value: number;
 }
 
-export interface Project {
+/** Minimal project option for SOW imports data grid */
+export interface ProjectOption {
   id: string;
   name: string;
 }
+
+/** @deprecated Use ProjectOption instead */
+export type Project = ProjectOption;
 
 export interface LinkingStats {
   total: number;

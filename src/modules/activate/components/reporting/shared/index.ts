@@ -12,7 +12,8 @@ export type {
   ReportCardGridProps,
 } from './ReportCard';
 
-export { TrendChart, FunnelChart, GaugeChart } from './TrendChart';
+// Re-export from canonical shared location
+export { TrendChart, FunnelChart, GaugeChart } from '@/components/ui/charts';
 export type {
   TrendChartProps,
   ChartType,
@@ -20,4 +21,4 @@ export type {
   FunnelChartProps,
   FunnelStage,
   GaugeChartProps,
-} from './TrendChart';
+} from '@/components/ui/charts';

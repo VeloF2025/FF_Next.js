@@ -169,7 +169,8 @@ export interface StaffMember {
   position: string;
 }
 
-export interface Project {
+/** Project shape used within workflow module context */
+export interface WorkflowProject {
   id: string;
   name: string;
   description?: string;
@@ -179,6 +180,9 @@ export interface Project {
   startDate: string;
   endDate: string;
 }
+
+/** @deprecated Use WorkflowProject instead */
+export type Project = WorkflowProject;
 
 // API Request/Response types
 export interface CreateWorkflowTemplateRequest {

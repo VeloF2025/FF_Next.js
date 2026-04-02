@@ -18,7 +18,8 @@ import {
 import toast from 'react-hot-toast';
 import { log } from '@/lib/logger';
 
-interface Project {
+/** Project option shape for pipeline linking modal */
+interface ProjectOption {
   id: string;
   project_code: string;
   project_name: string;
@@ -72,10 +73,10 @@ export function LinkToProjectModal({
   onLinkCreated,
 }: LinkToProjectModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedProject, setSelectedProject] = useState<ProjectOption | null>(null);
   const [setAsPrimary, setSetAsPrimary] = useState(true);
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 
-interface Project {
+/** Slim project shape stored in React context (display-only fields) */
+interface ProjectContextData {
   id: string;
   name: string;
   code: string;
@@ -10,17 +11,17 @@ interface Project {
 }
 
 interface ProjectContextType {
-  currentProject: Project | null;
-  setCurrentProject: (project: Project | null) => void;
-  projects: Project[];
-  setProjects: (projects: Project[]) => void;
+  currentProject: ProjectContextData | null;
+  setCurrentProject: (project: ProjectContextData | null) => void;
+  projects: ProjectContextData[];
+  setProjects: (projects: ProjectContextData[]) => void;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
-  const [currentProject, setCurrentProject] = useState<Project | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [currentProject, setCurrentProject] = useState<ProjectContextData | null>(null);
+  const [projects, setProjects] = useState<ProjectContextData[]>([]);
 
   return (
     <ProjectContext.Provider 

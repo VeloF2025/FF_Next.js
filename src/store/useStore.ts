@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { subscribeWithSelector, persist } from 'zustand/middleware';
 
-// Types for the store
-interface Project {
+/** Slim project shape stored in global app state (selected project context) */
+interface SelectedProjectState {
   id: string;
   name: string;
   description?: string;
@@ -36,7 +36,7 @@ interface ProjectFilters {
 
 interface AppState {
   // Projects
-  selectedProject: Project | null;
+  selectedProject: SelectedProjectState | null;
   projectFilters: ProjectFilters;
   
   // UI State
@@ -50,7 +50,7 @@ interface AppState {
   isLoading: Record<string, boolean>;
   
   // Actions
-  setSelectedProject: (project: Project | null) => void;
+  setSelectedProject: (project: SelectedProjectState | null) => void;
   setProjectFilters: (filters: Partial<ProjectFilters>) => void;
   clearProjectFilters: () => void;
   
@@ -155,6 +155,8 @@ export const useStore = create<AppState>()(
 
 // Selector hooks for performance optimization
 export const useSelectedProject = () => useStore((state) => state.selectedProject);
+// Re-export type for consumers that need to type-check the selected project state
+export type { SelectedProjectState };
 export const useProjectFilters = () => useStore((state) => state.projectFilters);
 export const useSidebarOpen = () => useStore((state) => state.sidebarOpen);
 export const useNotifications = () => useStore((state) => state.notifications);

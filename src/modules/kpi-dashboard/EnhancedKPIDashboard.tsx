@@ -30,7 +30,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useKPIDashboardData } from '@/hooks/useDashboardData';
-import { TrendChart, FunnelChart, GaugeChart } from '@/modules/activate/components/reporting/shared/TrendChart';
+import { TrendChart, FunnelChart, GaugeChart } from '@/components/ui/charts';
 import { log } from '@/lib/logger';
 
 // Types for API responses

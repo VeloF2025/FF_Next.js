@@ -3,13 +3,17 @@
 
 import { ProcurementBase, ProjectScoped, Money } from './base.types';
 
-export interface Project extends ProcurementBase, ProjectScoped {
+/** Procurement-specific project shape (extends ProcurementBase + ProjectScoped) */
+export interface ProcurementProject extends ProcurementBase, ProjectScoped {
   name: string;
   code: string;
   status: ProjectStatus;
   budget: ProjectBudget;
   procurement: ProcurementConfig;
 }
+
+/** @deprecated Use ProcurementProject instead */
+export type Project = ProcurementProject;
 
 export interface ProjectBudget {
   total: Money;

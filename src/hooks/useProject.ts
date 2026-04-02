@@ -8,7 +8,8 @@ import { useRouter } from 'next/router';
 import { projectsService } from '@/services/projectsService';
 import { log } from '@/lib/logger';
 
-export interface Project {
+/** Slim project shape returned by the useProject hook (subset of full project data) */
+export interface ProjectHookData {
   id: string;
   name: string;
   code: string;
@@ -19,21 +20,24 @@ export interface Project {
   startDate?: Date;
   endDate?: Date;
   budget?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
+/** @deprecated Use ProjectHookData instead */
+export type Project = ProjectHookData;
+
 interface UseProjectResult {
-  currentProject: Project | null;
+  currentProject: ProjectHookData | null;
   isLoading: boolean;
   error: string | null;
-  setCurrentProject: (project: Project | null) => void;
+  setCurrentProject: (project: ProjectHookData | null) => void;
   refreshProject: () => Promise<void>;
 }
 
 export function useProject(): UseProjectResult {
   const router = useRouter();
   const { projectId } = router.query as Record<string, string>;
-  const [currentProject, setCurrentProject] = useState<Project | null>(null);
+  const [currentProject, setCurrentProject] = useState<ProjectHookData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
