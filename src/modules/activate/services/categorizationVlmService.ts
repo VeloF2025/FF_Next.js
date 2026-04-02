@@ -73,7 +73,7 @@ function buildCategorizationPrompt(
 ): string {
   let prompt = `You are an expert fiber optic installation photo categorizer for ${drNumber}.
 
-Your task is to analyze ${photoCount} photos and categorize each one into one of these 11 installation steps:
+Your task is to analyze ${photoCount} photos and categorize each one into one of these 13 installation steps:
 
 STEP CATEGORIES:
 0. Unclassifiable/Discard - ONLY for: completely blank photos, accidental selfies, unrelated objects (food, pets, vehicles). NOT for blurry/dark installation photos.
@@ -87,6 +87,8 @@ STEP CATEGORIES:
 8. Final Installation - WIDE shot of COMPLETE setup from a distance: ONT + UPS/GIZZU + wall + surroundings. Key = WIDE FRAMING showing full context, even if green lights visible.
 9. Green Lights on ONT - CLOSE-UP of ONT FRONT panel focused on indicator lights (POWER, LINK, LAN, 2.4GHz, 5GHz, INTERNET). Nokia/Fibertime branding, LED labels, green dots.
 10. Signature - Customer signature on paper/tablet completion form. Handwriting, form fields, sign here marks.
+11. Dome Joint Open - The dome joint (handhole/splice closure) with its LID REMOVED, showing the INSIDE: fibre splice tray, cables routed into the enclosure, inner compartments visible. Key = you can see INSIDE the box with cables/fibres.
+12. Dome Joint Closed - The dome joint (handhole/splice closure) with its LID SEALED shut. Just the outer black/grey enclosure casing visible, no internal components showing. Key = the box is CLOSED, lid on, you CANNOT see inside.
 
 KEY DIFFERENTIATORS for commonly confused categories:
 - Step 1 vs Step 2: Step 1 = BUILDING/HOUSE visible. Step 2 = CABLE in AIR between pole and house. Pole+sky with no house = Step 2, not Step 1.
@@ -96,6 +98,7 @@ KEY DIFFERENTIATORS for commonly confused categories:
 - Step 2 vs Step 5: Step 2 = pole OUTSIDE with cable in the air/sky. Step 5 = bare pole INSIDE a house/shack (no cable span, indoor setting, walls/roof visible around it). Indoor pole = Step 5 (wall/mounting point).
 - Step 6 vs Step 8: ONT BACK only (cables) vs FULL SETUP wide shot (ONT + UPS + cables)
 - Step 8 vs Step 9: FRAMING is key. Step 8 = WIDE shot (ONT + UPS + wall + surroundings). Step 9 = CLOSE-UP of front panel lights only. UPS and wall visible = Step 8 even if lights visible.
+- Step 11 vs Step 12: Step 11 (OPEN) = you can see INSIDE the dome joint — splice tray, cables, inner compartments visible. Step 12 (CLOSED) = lid is ON, sealed shut, only the outer casing visible. Cables visible inside = Step 11. Sealed box = Step 12.
 
 ⚠️ CRITICAL — DO NOT DISCARD (Step 0) unless the photo is truly rubbish:
 Based on 2336 human corrections, the #1 VLM error is wrongly discarding valid installation photos.
@@ -125,7 +128,7 @@ For EACH photo (numbered 1-${photoCount}), respond in this JSON format:
       "photo_index": 1,
       "identified_as": "Brief description of what this photo actually shows",
       "predicted_category": "Category name from list above",
-      "predicted_step": <number 0-10>,
+      "predicted_step": <number 0-12>,
       "confidence": <0.0-1.0>,
       "reasoning": "Visual elements that led to this classification"
     }
