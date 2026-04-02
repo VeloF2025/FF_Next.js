@@ -243,7 +243,7 @@ export function StockItemSelector({
                   value={newItemPrice}
                   onChange={(e) => setNewItemPrice(Number(e.target.value))}
                   min="0"
-                  step="0.01"
+                  step="0.0001"
                   className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md"
                 />
               </div>

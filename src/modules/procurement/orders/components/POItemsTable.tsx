@@ -233,7 +233,7 @@ export function POItemsTable({ poId, items, canEdit = false, onItemsUpdated }: P
                       onChange={(e) => updateRow(item.id, 'unitPrice', e.target.value)}
                       className="w-28 px-2 py-1 text-right bg-[var(--ff-bg-tertiary)] border border-amber-500/50 rounded text-[var(--ff-text-primary)] text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
                       min="0"
-                      step="0.01"
+                      step="0.0001"
                     />
                   ) : (
                     <span className="text-[var(--ff-text-primary)]">{fmtZAR(item.unitPrice)}</span>

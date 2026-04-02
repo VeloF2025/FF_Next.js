@@ -78,7 +78,7 @@ export const LineItemCard: React.FC<LineItemCardProps> = ({
           </label>
           <input
             type="number"
-            step="0.01"
+            step="0.0001"
             value={item.unitPrice}
             onChange={(e) => onUpdate(index, 'unitPrice', parseFloat(e.target.value) || 0)}
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${

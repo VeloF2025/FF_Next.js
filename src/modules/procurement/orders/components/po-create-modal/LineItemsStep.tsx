@@ -134,7 +134,7 @@ export const LineItemsStep: React.FC<LineItemsStepProps> = ({
                   <input
                     type="number"
                     min="0"
-                    step="0.01"
+                    step="0.0001"
                     value={item.unitPrice}
                     onChange={(e) => updateItem(item.tempId, { unitPrice: parseFloat(e.target.value) || 0 })}
                     className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"

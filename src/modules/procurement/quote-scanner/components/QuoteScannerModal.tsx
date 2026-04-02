@@ -699,7 +699,7 @@ export function QuoteScannerModal({
                   </label>
                   <input
                     type="number"
-                    step="0.01"
+                    step="0.0001"
                     value={editableData.subtotal}
                     onChange={(e) => setEditableData(prev => ({ ...prev, subtotal: e.target.value }))}
                     className="w-full px-3 py-2 rounded-lg border border-border bg-card text-foreground"
@@ -713,7 +713,7 @@ export function QuoteScannerModal({
                   </label>
                   <input
                     type="number"
-                    step="0.01"
+                    step="0.0001"
                     value={editableData.vatAmount}
                     onChange={(e) => setEditableData(prev => ({ ...prev, vatAmount: e.target.value }))}
                     className="w-full px-3 py-2 rounded-lg border border-border bg-card text-foreground"
@@ -727,7 +727,7 @@ export function QuoteScannerModal({
                   </label>
                   <input
                     type="number"
-                    step="0.01"
+                    step="0.0001"
                     value={editableData.total}
                     onChange={(e) => setEditableData(prev => ({ ...prev, total: e.target.value }))}
                     className="w-full px-3 py-2 rounded-lg border border-border bg-card text-foreground"

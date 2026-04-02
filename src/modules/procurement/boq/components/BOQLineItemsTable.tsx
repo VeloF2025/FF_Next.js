@@ -164,7 +164,7 @@ export function BOQLineItemsTable({ items, onChange }: BOQLineItemsTableProps) {
                     <input
                       type="number"
                       min={0}
-                      step={0.01}
+                      step={0.0001}
                       value={item.unitPrice || ''}
                       onChange={(e) => handleFieldChange(idx, 'unitPrice', Number(e.target.value))}
                       className={inputClass}

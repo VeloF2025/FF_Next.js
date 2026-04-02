@@ -244,7 +244,7 @@ export function RequisitionItemsTable({
                       }
                       placeholder="0.00"
                       min="0"
-                      step="0.01"
+                      step="0.0001"
                       className="w-full pl-7 pr-3 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                     />
                   </div>

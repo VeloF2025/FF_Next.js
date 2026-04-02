@@ -133,7 +133,7 @@ export default function BOQViewerTableRow({
           {isEditing ? (
             <input
               type="number"
-              step="0.01"
+              step="0.0001"
               value={editing!.data.unitPrice || ''}
               onChange={(e) => onUpdateEdit(item.id, 'unitPrice', parseFloat(e.target.value))}
               className="w-24 px-2 py-1 border border-border rounded text-sm"
