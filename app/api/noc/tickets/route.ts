@@ -267,13 +267,12 @@ export async function POST(req: NextRequest) {
     });
 
     // Fire notifications for initial assignment (non-blocking)
+    // Only one path: individual OR team — never both to avoid doubles
     if (ticket.assigned_to) {
       triggerOnTicketAssignment(ticket, ticket.status).catch(err => {
         logger.error('Assignment notification error on create', { ticketId: ticket.id, error: err.message });
       });
-    }
-
-    if (ticket.assigned_team_id) {
+    } else if (ticket.assigned_team_id) {
       triggerOnTeamAssignment(ticket).catch(err => {
         logger.error('Team assignment notification error on create', { ticketId: ticket.id, error: err.message });
       });

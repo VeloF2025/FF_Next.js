@@ -106,6 +106,7 @@ function buildDefaultEmailHtml(payload: NotifyPayload, firstName: string): strin
   };
   const color = severityColors[payload.severity || 'info'] || '#3b82f6';
   const ctaUrl = payload.action_url ? `${APP_BASE_URL}${payload.action_url}` : APP_BASE_URL;
+  const logoUrl = `${APP_BASE_URL}/assets/vf/velocity-fibre-logo.jpg`;
 
   return `
 <!DOCTYPE html>
@@ -114,30 +115,39 @@ function buildDefaultEmailHtml(payload: NotifyPayload, firstName: string): strin
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f3f4f6;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:40px 20px;">
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#0f172a;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0f172a;padding:40px 20px;">
     <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+      <table width="600" cellpadding="0" cellspacing="0" style="background-color:#1e293b;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.4);border:1px solid #334155;">
+        <!-- Logo Bar -->
+        <tr><td style="padding:28px 40px 20px;text-align:center;border-radius:12px 12px 0 0;background-color:#0f172a;">
+          <div style="display:inline-block;background-color:#ffffff;border-radius:10px;padding:12px 24px;">
+            <img src="${logoUrl}" alt="Velocity Fibre" width="160" style="display:block;max-width:160px;height:auto;" />
+          </div>
+        </td></tr>
         <!-- Header -->
-        <tr><td style="padding:32px 40px;background:linear-gradient(135deg,${color},${color}dd);border-radius:8px 8px 0 0;">
-          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:600;">${escapeHtml(payload.title)}</h1>
+        <tr><td style="padding:0 40px 24px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr><td style="height:3px;background:linear-gradient(90deg,${color},${color}88,transparent);border-radius:2px;"></td></tr>
+          </table>
+          <h1 style="margin:20px 0 0;color:#f1f5f9;font-size:20px;font-weight:600;">${escapeHtml(payload.title)}</h1>
         </td></tr>
         <!-- Body -->
-        <tr><td style="padding:32px 40px;">
-          <p style="margin:0 0 16px;font-size:15px;color:#374151;">Hi ${escapeHtml(firstName)},</p>
-          ${payload.body ? `<p style="margin:0 0 24px;font-size:15px;color:#374151;">${escapeHtml(payload.body)}</p>` : ''}
+        <tr><td style="padding:0 40px 32px;">
+          <p style="margin:0 0 16px;font-size:15px;color:#94a3b8;">Hi ${escapeHtml(firstName)},</p>
+          ${payload.body ? `<p style="margin:0 0 24px;font-size:15px;color:#cbd5e1;line-height:1.6;white-space:pre-line;">${escapeHtml(payload.body)}</p>` : ''}
           ${payload.action_url ? `
-          <table cellpadding="0" cellspacing="0"><tr><td style="background-color:${color};border-radius:6px;">
-            <a href="${ctaUrl}" style="display:inline-block;padding:12px 24px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;">
-              View Details
+          <table cellpadding="0" cellspacing="0"><tr><td style="background:linear-gradient(135deg,${color},${color}cc);border-radius:8px;">
+            <a href="${ctaUrl}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;letter-spacing:0.3px;">
+              View Details &rarr;
             </a>
           </td></tr></table>` : ''}
         </td></tr>
         <!-- Footer -->
-        <tr><td style="padding:24px 40px;background-color:#f9fafb;border-radius:0 0 8px 8px;border-top:1px solid #e5e7eb;">
-          <p style="margin:0;font-size:12px;color:#6b7280;text-align:center;">
-            FibreFlow Notifications |
-            <a href="${APP_BASE_URL}/app/settings/notifications" style="color:#2563eb;text-decoration:none;">Manage Preferences</a>
+        <tr><td style="padding:20px 40px;background-color:#0f172a;border-radius:0 0 12px 12px;border-top:1px solid #334155;">
+          <p style="margin:0;font-size:12px;color:#475569;text-align:center;">
+            FibreFlow &mdash; Velocity Fibre &nbsp;|&nbsp;
+            <a href="${APP_BASE_URL}/app/settings/notifications" style="color:${color};text-decoration:none;">Manage Preferences</a>
           </p>
         </td></tr>
       </table>

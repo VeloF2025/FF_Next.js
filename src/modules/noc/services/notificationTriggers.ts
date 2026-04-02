@@ -224,10 +224,11 @@ export class NotificationTriggerService {
         };
       }
 
-      // Check for duplicate notifications
+      // Check for duplicate notifications (scoped to recipient to allow team members)
       const isDuplicate = await this.isDuplicateNotification(
         event.ticket_id,
-        this.getTemplateForEvent(event.type)
+        this.getTemplateForEvent(event.type),
+        recipient.phone ?? undefined
       );
 
       if (isDuplicate) {
@@ -449,22 +450,34 @@ export class NotificationTriggerService {
    */
   private async isDuplicateNotification(
     ticketId: string,
-    template: NotificationUseCase
+    template: NotificationUseCase,
+    recipientPhone?: string
   ): Promise<boolean> {
     try {
       const windowStart = new Date(
         Date.now() - this.duplicateWindowMinutes * 60 * 1000
       );
 
-      const existingNotification = await queryOne(
-        `SELECT id
-         FROM maintenance_whatsapp_notifications
-         WHERE ticket_id = $1
-           AND message_template = $2
-           AND created_at >= $3
-         LIMIT 1`,
-        [ticketId, template, windowStart]
-      );
+      const existingNotification = recipientPhone
+        ? await queryOne(
+            `SELECT id
+             FROM maintenance_whatsapp_notifications
+             WHERE ticket_id = $1
+               AND message_template = $2
+               AND recipient_phone = $3
+               AND created_at >= $4
+             LIMIT 1`,
+            [ticketId, template, recipientPhone, windowStart]
+          )
+        : await queryOne(
+            `SELECT id
+             FROM maintenance_whatsapp_notifications
+             WHERE ticket_id = $1
+               AND message_template = $2
+               AND created_at >= $3
+             LIMIT 1`,
+            [ticketId, template, windowStart]
+          );
 
       return existingNotification !== null;
     } catch (error) {
