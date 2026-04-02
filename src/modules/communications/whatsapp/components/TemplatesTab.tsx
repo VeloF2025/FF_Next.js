@@ -16,7 +16,7 @@ import {
   AlertCircle,
   RefreshCw,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { waAdminApi } from '../services/waAdminApiService';
 import type { WaMessageTemplate } from '../types/wa-admin.types';
 
@@ -73,7 +73,7 @@ const TemplatesTab: React.FC = () => {
     if (result.success && result.data) {
       setPreview(result.data.preview);
     } else {
-      toast.error(result.error || 'Failed to generate preview');
+      notificationService.error(result.error || 'Failed to generate preview');
     }
   };
 
@@ -90,9 +90,9 @@ const TemplatesTab: React.FC = () => {
       setSelectedTemplate(result.data);
       setEditMode(false);
       fetchTemplates(false); // Don't re-select first template
-      toast.success('Template saved successfully');
+      notificationService.success('Template saved successfully');
     } else {
-      toast.error(result.error || 'Failed to save template');
+      notificationService.error(result.error || 'Failed to save template');
     }
 
     setSaving(false);

@@ -15,7 +15,7 @@ import {
   AlertCircle,
   RefreshCw,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { waAdminApi } from '../services/waAdminApiService';
 import type { WaMonitoredGroup, WaMonitoredGroupInput, WaGroupType } from '../types/wa-admin.types';
 
@@ -59,9 +59,9 @@ const GroupsTab: React.FC = () => {
     if (result.success) {
       setIsCreating(false);
       fetchGroups();
-      toast.success('Group created successfully. Bridge will auto-reload.');
+      notificationService.success('Group created successfully. Bridge will auto-reload.');
     } else {
-      toast.error(result.error || 'Failed to create group');
+      notificationService.error(result.error || 'Failed to create group');
     }
   };
 
@@ -71,9 +71,9 @@ const GroupsTab: React.FC = () => {
     if (result.success) {
       setEditingGroup(null);
       fetchGroups();
-      toast.success('Group updated successfully. Bridge will auto-reload.');
+      notificationService.success('Group updated successfully. Bridge will auto-reload.');
     } else {
-      toast.error(result.error || 'Failed to update group');
+      notificationService.error(result.error || 'Failed to update group');
     }
   };
 
@@ -84,9 +84,9 @@ const GroupsTab: React.FC = () => {
 
     if (result.success) {
       fetchGroups();
-      toast.success('Group deleted successfully. Bridge will auto-reload.');
+      notificationService.success('Group deleted successfully. Bridge will auto-reload.');
     } else {
-      toast.error(result.error || 'Failed to delete group');
+      notificationService.error(result.error || 'Failed to delete group');
     }
 
     setDeletingGroup(null);
@@ -98,9 +98,9 @@ const GroupsTab: React.FC = () => {
     const result = await waAdminApi.groups.test(group.id);
 
     if (result.success) {
-      toast.success(`Test message sent to "${group.group_name}"`);
+      notificationService.success(`Test message sent to "${group.group_name}"`);
     } else {
-      toast.error(`Failed to send test message: ${result.error}`);
+      notificationService.error(`Failed to send test message: ${result.error}`);
     }
 
     setTestingGroupId(null);

@@ -15,7 +15,7 @@ import {
   RefreshCw,
   MessageSquare,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { waAdminApi } from '../services/waAdminApiService';
 import type { WaMonitoredGroup, WaMonitoredGroupInput, WaGroupType } from '../types/wa-admin.types';
 import { MonitoredGroupFormModal } from './MonitoredGroupFormModal';
@@ -101,9 +101,9 @@ const MonitoredGroupsTab: React.FC = () => {
     if (result.success) {
       setIsCreating(false);
       fetchGroups();
-      toast.success('Group added to monitoring');
+      notificationService.success('Group added to monitoring');
     } else {
-      toast.error(result.error || 'Failed to add group');
+      notificationService.error(result.error || 'Failed to add group');
     }
   };
 
@@ -112,9 +112,9 @@ const MonitoredGroupsTab: React.FC = () => {
     if (result.success) {
       setEditingGroup(null);
       fetchGroups();
-      toast.success('Group updated');
+      notificationService.success('Group updated');
     } else {
-      toast.error(result.error || 'Failed to update group');
+      notificationService.error(result.error || 'Failed to update group');
     }
   };
 
@@ -123,9 +123,9 @@ const MonitoredGroupsTab: React.FC = () => {
     const result = await waAdminApi.monitoredGroups.delete(deletingGroup.id);
     if (result.success) {
       fetchGroups();
-      toast.success('Group deactivated');
+      notificationService.success('Group deactivated');
     } else {
-      toast.error(result.error || 'Failed to deactivate group');
+      notificationService.error(result.error || 'Failed to deactivate group');
     }
     setDeletingGroup(null);
   };
@@ -134,9 +134,9 @@ const MonitoredGroupsTab: React.FC = () => {
     const result = await waAdminApi.monitoredGroups.update(group.id, { is_active: !group.is_active });
     if (result.success) {
       fetchGroups();
-      toast.success(group.is_active ? 'Group deactivated' : 'Group activated');
+      notificationService.success(group.is_active ? 'Group deactivated' : 'Group activated');
     } else {
-      toast.error(result.error || 'Failed to update group');
+      notificationService.error(result.error || 'Failed to update group');
     }
   };
 

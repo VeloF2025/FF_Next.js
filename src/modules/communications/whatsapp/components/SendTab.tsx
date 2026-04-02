@@ -13,7 +13,7 @@ import {
   Clock,
   RefreshCw,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { waAdminApi } from '../services/waAdminApiService';
 import type { WaMonitoredGroup, WaMessageLog } from '../types/wa-admin.types';
 
@@ -85,12 +85,12 @@ const SendTab: React.FC = () => {
     e.preventDefault();
 
     if (!selectedGroup) {
-      toast.error('Please select a group');
+      notificationService.error('Please select a group');
       return;
     }
 
     if (!message.trim()) {
-      toast.error('Please enter a message');
+      notificationService.error('Please enter a message');
       return;
     }
 
@@ -118,14 +118,14 @@ const SendTab: React.FC = () => {
     const result = await waAdminApi.messages.send(input);
 
     if (result.success) {
-      toast.success('Message sent successfully!');
+      notificationService.success('Message sent successfully!');
       setMessage('');
       setMentionPhone('');
       setCharCount(0);
       // Refresh recent messages
       fetchRecentMessages();
     } else {
-      toast.error(`Failed to send: ${result.error}`);
+      notificationService.error(`Failed to send: ${result.error}`);
     }
 
     setSending(false);

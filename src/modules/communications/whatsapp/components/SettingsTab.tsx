@@ -14,7 +14,7 @@ import {
   ToggleLeft,
   Settings2,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { waAdminApi } from '../services/waAdminApiService';
 import type { WaServiceConfig } from '../types/wa-admin.types';
 
@@ -81,9 +81,9 @@ const SettingsTab: React.FC = () => {
       setSuccessKey(config.config_key);
       setTimeout(() => setSuccessKey(null), 2000);
       fetchConfigs();
-      toast.success('Configuration saved successfully');
+      notificationService.success('Configuration saved successfully');
     } else {
-      toast.error(result.error || 'Failed to save configuration');
+      notificationService.error(result.error || 'Failed to save configuration');
     }
 
     setSavingKey(null);

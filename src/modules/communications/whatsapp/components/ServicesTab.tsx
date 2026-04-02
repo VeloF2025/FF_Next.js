@@ -17,7 +17,7 @@ import {
   Copy,
   CheckCheck,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { waAdminApi } from '../services/waAdminApiService';
 import type { WaServicesStatusResponse, WaServiceStatus, ServiceStatus, WaPhoneNumber } from '../types/wa-admin.types';
 
@@ -66,7 +66,7 @@ const PairingModal: React.FC<PairingModalProps> = ({
       if (result.success && result.data) {
         if (result.data.status === 'connected') {
           setStatus('connected');
-          toast.success(`${serviceName} paired successfully!`);
+          notificationService.success(`${serviceName} paired successfully!`);
           setTimeout(onClose, 2000);
         } else if (result.data.status === 'failed') {
           setStatus('failed');
@@ -102,7 +102,7 @@ const PairingModal: React.FC<PairingModalProps> = ({
     if (pairingCode) {
       navigator.clipboard.writeText(pairingCode);
       setCopied(true);
-      toast.success('Code copied to clipboard');
+      notificationService.success('Code copied to clipboard');
       setTimeout(() => setCopied(false), 2000);
     }
   };
@@ -300,13 +300,13 @@ const ServicesTab: React.FC = () => {
     const result = await waAdminApi.services.restart(service);
 
     if (result.success) {
-      toast.success(`${service} service restart initiated`);
+      notificationService.success(`${service} service restart initiated`);
       setTimeout(() => {
         fetchStatus();
         setRestartingService(null);
       }, 3000);
     } else {
-      toast.error(result.error || 'Failed to restart service');
+      notificationService.error(result.error || 'Failed to restart service');
       setRestartingService(null);
     }
   };
@@ -328,10 +328,10 @@ const ServicesTab: React.FC = () => {
     const result = await waAdminApi.services.logout(service);
 
     if (result.success) {
-      toast.success(`${serviceName} logged out`);
+      notificationService.success(`${serviceName} logged out`);
       fetchStatus();
     } else {
-      toast.error(result.error || 'Failed to logout');
+      notificationService.error(result.error || 'Failed to logout');
     }
   };
 

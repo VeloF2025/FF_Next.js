@@ -14,7 +14,7 @@ import {
   Clock,
   AlertCircle,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { waAdminApi } from '../services/waAdminApiService';
 import type { WaMonitoredGroup } from '../types/wa-admin.types';
 import { log } from '@/lib/logger';
@@ -170,7 +170,7 @@ const ChatTab: React.FC = () => {
       // Immediately fetch new messages
       setTimeout(() => fetchMessages(lastMessageTime.current || undefined), 500);
     } else {
-      toast.error(`Failed to send: ${result.error}`);
+      notificationService.error(`Failed to send: ${result.error}`);
     }
 
     setSending(false);

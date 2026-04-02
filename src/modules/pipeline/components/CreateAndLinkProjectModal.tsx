@@ -13,7 +13,7 @@ import {
   Calendar,
   AlertCircle,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 import { useClientSelection } from '@/hooks/useClients';
 import { useProjectManagerSelection } from '@/hooks/staff';
@@ -128,7 +128,7 @@ export function CreateAndLinkProjectModal({
         pipelineProjectId,
       }, 'CreateAndLinkProjectModal');
 
-      toast.success(`Project "${projectName.trim()}" created and linked successfully`);
+      notificationService.success(`Project "${projectName.trim()}" created and linked successfully`);
       onProjectCreated();
       onClose();
     } catch (err) {
