@@ -69,6 +69,8 @@ export default function NewGRNPage() {
   const router = useRouter();
   // Accept both ?purchaseOrderId= and ?po= (PO detail page uses ?po=)
   const purchaseOrderId = (router.query.purchaseOrderId || router.query.po) as string | undefined;
+  // When arrived via a PO detail page link, lock the PO selection
+  const isLinkedFromPO = !!purchaseOrderId;
 
   // Form state
   const [selectedPOId, setSelectedPOId] = useState<string>('');
@@ -372,16 +374,40 @@ export default function NewGRNPage() {
           )}
 
           {/* Purchase Order Selection */}
-          <div className="mb-6 p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
-            <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-4">
-              Source Purchase Order (Optional)
-            </h3>
+          <div className={`mb-6 p-4 border rounded-lg ${isLinkedFromPO ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)]'}`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium text-[var(--ff-text-primary)]">
+                {isLinkedFromPO ? 'Linked Purchase Order' : 'Source Purchase Order (Optional)'}
+              </h3>
+              {isLinkedFromPO && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  <PackageCheck className="h-3.5 w-3.5" />
+                  Linked from PO
+                </span>
+              )}
+            </div>
+            {isLinkedFromPO && selectedPOId && (
+              <div className="mb-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                <p className="text-sm text-emerald-400 font-medium">
+                  {purchaseOrders.find((p) => p.id === selectedPOId)
+                    ? `GRN linked to ${purchaseOrders.find((p) => p.id === selectedPOId)!.poNumber} — ${purchaseOrders.find((p) => p.id === selectedPOId)!.supplierName}`
+                    : `GRN linked to PO #${selectedPOId}`}
+                </p>
+                <p className="text-xs text-[var(--ff-text-tertiary)] mt-0.5">
+                  PO and supplier are pre-filled from the source purchase order and cannot be changed.
+                </p>
+              </div>
+            )}
             <div className="relative">
               <select
                 value={selectedPOId}
                 onChange={(e) => setSelectedPOId(e.target.value)}
-                disabled={isLoadingData}
-                className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50 appearance-none"
+                disabled={isLoadingData || isLinkedFromPO}
+                className={`w-full px-4 py-2 border rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50 appearance-none ${
+                  isLinkedFromPO
+                    ? 'bg-[var(--ff-bg-tertiary)] border-emerald-500/30 opacity-75 cursor-not-allowed'
+                    : 'bg-[var(--ff-bg-tertiary)] border-[var(--ff-border-light)]'
+                }`}
               >
                 <option value="">No linked PO (standalone receipt)</option>
                 {purchaseOrders.map((po) => {
@@ -408,9 +434,11 @@ export default function NewGRNPage() {
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)] pointer-events-none" />
             </div>
-            <p className="mt-2 text-xs text-[var(--ff-text-tertiary)]">
-              Fully received POs are disabled. POs with outstanding quantities can receive additional GRNs.
-            </p>
+            {!isLinkedFromPO && (
+              <p className="mt-2 text-xs text-[var(--ff-text-tertiary)]">
+                Fully received POs are disabled. POs with outstanding quantities can receive additional GRNs.
+              </p>
+            )}
           </div>
 
           {/* Delivery Info */}

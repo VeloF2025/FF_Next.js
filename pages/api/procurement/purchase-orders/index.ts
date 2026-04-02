@@ -46,7 +46,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     }
 
     if (search) {
-      whereConditions.push(`(po.po_number ILIKE $${paramIndex} OR s.name ILIKE $${paramIndex} OR p.project_name ILIKE $${paramIndex} OR CAST(po.odoo_po_id AS TEXT) ILIKE $${paramIndex})`);
+      whereConditions.push(`(po.po_number ILIKE $${paramIndex} OR s.name ILIKE $${paramIndex} OR p.project_name ILIKE $${paramIndex} OR CAST(po.odoo_po_id AS TEXT) ILIKE $${paramIndex} OR po.sage_po_number ILIKE $${paramIndex})`);
       params.push(`%${search}%`);
       paramIndex++;
     }
