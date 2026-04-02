@@ -124,17 +124,17 @@ export function TicketFilters({ filters, onFiltersChange, compact = false }: Tic
               className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             >
               <option value="">All Statuses</option>
-              <option value="open">Open</option>
               <option value="assigned">Assigned</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="closed">Closed</option>
+              <option value="handed_to_maintenance">Handed to Maintenance</option>
               <option value="in_progress">In Progress</option>
+              <option value="open">Open</option>
+              <option value="pending_handover">Pending Handover</option>
               <option value="pending_qa">Pending QA</option>
+              <option value="qa_approved">QA Approved</option>
               <option value="qa_in_progress">QA In Progress</option>
               <option value="qa_rejected">QA Rejected</option>
-              <option value="qa_approved">QA Approved</option>
-              <option value="pending_handover">Pending Handover</option>
-              <option value="handed_to_maintenance">Handed to Maintenance</option>
-              <option value="closed">Closed</option>
-              <option value="cancelled">Cancelled</option>
             </select>
           </div>
 
@@ -149,11 +149,11 @@ export function TicketFilters({ filters, onFiltersChange, compact = false }: Tic
               className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             >
               <option value="">All Types</option>
-              <option value="maintenance">Maintenance</option>
-              <option value="new_installation">New Installation</option>
-              <option value="modification">Modification</option>
-              <option value="ont_swap">ONT Swap</option>
               <option value="incident">Incident</option>
+              <option value="maintenance">Maintenance</option>
+              <option value="modification">Modification</option>
+              <option value="new_installation">New Installation</option>
+              <option value="ont_swap">ONT Swap</option>
             </select>
           </div>
 

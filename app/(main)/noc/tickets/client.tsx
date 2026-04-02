@@ -223,17 +223,17 @@ export default function TicketsListPageClient() {
                   }`}
               >
                 <option value="">All Types</option>
+                <option value="dev_ops">DevOps</option>
                 <option value="fault_repair">Fault Repair</option>
-                <option value="new_installation">New Installation</option>
+                <option value="hse_incident">HSE Incident</option>
+                <option value="hse_near_miss">HSE Near Miss</option>
+                <option value="incident">Incident</option>
                 <option value="modification">Modification</option>
+                <option value="new_installation">New Installation</option>
+                <option value="olt_investigation">OLT Investigation</option>
                 <option value="ont_swap">ONT Swap</option>
                 <option value="pre_provision">Pre-Provision</option>
                 <option value="serial_mismatch">Serial Mismatch</option>
-                <option value="olt_investigation">OLT Investigation</option>
-                <option value="incident">Incident</option>
-                <option value="hse_incident">HSE Incident</option>
-                <option value="hse_near_miss">HSE Near Miss</option>
-                <option value="dev_ops">DevOps</option>
               </select>
               <select
                 value={filterSource}
@@ -245,16 +245,16 @@ export default function TicketsListPageClient() {
                   }`}
               >
                 <option value="">All Sources</option>
-                <option value="pp_data">PP Data</option>
-                <option value="qcontact">QContact</option>
+                <option value="ad_hoc">Ad Hoc</option>
+                <option value="construction">Construction</option>
+                <option value="dev_ops">DevOps</option>
                 <option value="manual">Manual</option>
+                <option value="olt_mismatch">OLT Mismatch</option>
+                <option value="pp_data">PP Data</option>
+                <option value="qa_review">QA Review</option>
+                <option value="qcontact">QContact</option>
                 <option value="wa_maintenance">WhatsApp</option>
                 <option value="weekly_report">Weekly Report</option>
-                <option value="construction">Construction</option>
-                <option value="olt_mismatch">OLT Mismatch</option>
-                <option value="qa_review">QA Review</option>
-                <option value="ad_hoc">Ad Hoc</option>
-                <option value="dev_ops">DevOps</option>
               </select>
               <select
                 value={filterDatePreset}
