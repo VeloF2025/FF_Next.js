@@ -20,8 +20,10 @@ interface SnagFiltersProps {
   onChange: (updated: Partial<SnagFilters>) => void;
 }
 
+const ALL = '__all__';
+
 const STATUS_OPTIONS = [
-  { value: '', label: 'All Statuses' },
+  { value: ALL, label: 'All Statuses' },
   { value: 'open', label: 'Open' },
   { value: 'assigned', label: 'Assigned' },
   { value: 'in_progress', label: 'In Progress' },
@@ -32,7 +34,7 @@ const STATUS_OPTIONS = [
 ];
 
 const CATEGORY_OPTIONS = [
-  { value: '', label: 'All Categories' },
+  { value: ALL, label: 'All Categories' },
   { value: 'quality', label: 'Quality' },
   { value: 'safety', label: 'Safety' },
   { value: 'health', label: 'Health' },
@@ -41,38 +43,25 @@ const CATEGORY_OPTIONS = [
 ];
 
 const SEVERITY_OPTIONS = [
-  { value: '', label: 'All Severities' },
+  { value: ALL, label: 'All Severities' },
   { value: 'critical', label: 'Critical' },
   { value: 'major', label: 'Major' },
   { value: 'minor', label: 'Minor' },
 ];
 
+/** Convert ALL sentinel to empty string for API */
+function toFilter(v: string): string { return v === ALL ? '' : v; }
+/** Convert empty string to ALL sentinel for Select */
+function fromFilter(v: string): string { return v === '' ? ALL : v; }
+
 /** 🟢 WORKING: Filter bar for snag grid */
 export function SnagFiltersBar({ filters, projects, onChange }: SnagFiltersProps) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {/* Project filter */}
-      <Select
-        value={filters.projectId}
-        onValueChange={(v) => onChange({ projectId: v, page: 1 })}
-      >
-        <SelectTrigger className="w-44 bg-zinc-800 border-zinc-700 text-zinc-100">
-          <SelectValue placeholder="All Projects" />
-        </SelectTrigger>
-        <SelectContent className="bg-zinc-800 border-zinc-700">
-          <SelectItem value="" className="text-zinc-100">All Projects</SelectItem>
-          {projects.map((p) => (
-            <SelectItem key={p.id} value={String(p.id)} className="text-zinc-100">
-              {p.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
       {/* Status filter */}
       <Select
-        value={filters.status}
-        onValueChange={(v) => onChange({ status: v, page: 1 })}
+        value={fromFilter(filters.status)}
+        onValueChange={(v) => onChange({ status: toFilter(v), page: 1 })}
       >
         <SelectTrigger className="w-40 bg-zinc-800 border-zinc-700 text-zinc-100">
           <SelectValue placeholder="Status" />
@@ -88,8 +77,8 @@ export function SnagFiltersBar({ filters, projects, onChange }: SnagFiltersProps
 
       {/* Category filter */}
       <Select
-        value={filters.category}
-        onValueChange={(v) => onChange({ category: v, page: 1 })}
+        value={fromFilter(filters.category)}
+        onValueChange={(v) => onChange({ category: toFilter(v), page: 1 })}
       >
         <SelectTrigger className="w-40 bg-zinc-800 border-zinc-700 text-zinc-100">
           <SelectValue placeholder="Category" />
@@ -105,8 +94,8 @@ export function SnagFiltersBar({ filters, projects, onChange }: SnagFiltersProps
 
       {/* Severity filter */}
       <Select
-        value={filters.severity}
-        onValueChange={(v) => onChange({ severity: v, page: 1 })}
+        value={fromFilter(filters.severity)}
+        onValueChange={(v) => onChange({ severity: toFilter(v), page: 1 })}
       >
         <SelectTrigger className="w-36 bg-zinc-800 border-zinc-700 text-zinc-100">
           <SelectValue placeholder="Severity" />
