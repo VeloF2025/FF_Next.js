@@ -36,11 +36,11 @@ export function BasicMeetingFields({ register, errors }: BasicMeetingFieldsProps
             {...register('type')}
             className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-md bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="team">Team Meeting</option>
-            <option value="client">Client Meeting</option>
             <option value="board">Board Meeting</option>
-            <option value="standup">Standup</option>
+            <option value="client">Client Meeting</option>
             <option value="review">Review</option>
+            <option value="standup">Standup</option>
+            <option value="team">Team Meeting</option>
           </select>
         </div>
 

@@ -235,8 +235,8 @@ export default function OpenOrdersPage() {
                 className="px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)] focus:outline-none focus:ring-1 focus:ring-purple-500/50"
               >
                 <option value="all">All Types</option>
-                <option value="pr">Requisitions</option>
                 <option value="po">Purchase Orders</option>
+                <option value="pr">Requisitions</option>
               </select>
               <select
                 value={statusFilter}

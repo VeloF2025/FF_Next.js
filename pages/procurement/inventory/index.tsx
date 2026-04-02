@@ -683,11 +683,11 @@ function BundlesTabContent() {
                   onChange={(e) => setFormData({ ...formData, bundle_type: e.target.value })}
                   className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
                 >
+                  <option value="custom">Custom</option>
                   <option value="installation">Installation</option>
                   <option value="maintenance">Maintenance</option>
-                  <option value="repair">Repair</option>
                   <option value="project">Project</option>
-                  <option value="custom">Custom</option>
+                  <option value="repair">Repair</option>
                 </select>
               </div>
 
@@ -947,9 +947,9 @@ function StockTakesTabContent() {
                   onChange={(e) => setFormData({ ...formData, stock_take_type: e.target.value })}
                   className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
                 >
+                  <option value="cycle">Cycle Count</option>
                   <option value="full">Full Stock Take</option>
                   <option value="partial">Partial Stock Take</option>
-                  <option value="cycle">Cycle Count</option>
                   <option value="spot">Spot Check</option>
                 </select>
               </div>
@@ -1139,11 +1139,11 @@ function BundleReportsTabContent() {
             className="px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)]"
           >
             <option value="">All Types</option>
+            <option value="custom">Custom</option>
             <option value="installation">Installation</option>
             <option value="maintenance">Maintenance</option>
-            <option value="repair">Repair</option>
             <option value="project">Project</option>
-            <option value="custom">Custom</option>
+            <option value="repair">Repair</option>
           </select>
         </div>
 

@@ -18,19 +18,19 @@ interface DevOpsSectionProps {
 }
 
 const FIBREFLOW_MODULES = [
-  'Dashboard',
-  'NOC',
-  'Activate',
-  'Procurement',
   'Accounting',
+  'Activate',
   'Assets',
-  'Projects',
+  'Dashboard',
   'Data Sync',
-  'Fleet',
-  'QField',
   'Field Ops',
-  'Stock Portal',
+  'Fleet',
+  'NOC',
+  'Procurement',
+  'Projects',
+  'QField',
   'Reports',
+  'Stock Portal',
   'Other',
 ] as const;
 

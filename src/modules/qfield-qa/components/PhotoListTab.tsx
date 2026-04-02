@@ -226,10 +226,10 @@ export function PhotoListTab({
               className="px-3 py-2 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             >
               <option value="">All Types</option>
-              <option value="pole_installation">Pole Installation</option>
+              <option value="activation">Activation</option>
               <option value="cable_stringing">Cable Stringing</option>
               <option value="dome_joint">Dome Joint</option>
-              <option value="activation">Activation</option>
+              <option value="pole_installation">Pole Installation</option>
             </select>
 
             {/* Status Filter */}

@@ -42,7 +42,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       WHERE is_active = true
       ORDER BY
         CASE type WHEN 'module' THEN 1 WHEN 'page' THEN 2 WHEN 'tab' THEN 3 WHEN 'action' THEN 4 END,
-        sort_order
+        label
     `;
 
     // 2. If a specific key is requested, get detailed access info

@@ -316,9 +316,9 @@ export default function NewBOQPage() {
                           onChange={(e) => updateItem(index, 'category', e.target.value)}
                           className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md"
                         >
-                          <option value="Materials">Materials</option>
                           <option value="Equipment">Equipment</option>
                           <option value="Labor">Labor</option>
+                          <option value="Materials">Materials</option>
                           <option value="Other">Other</option>
                         </select>
                       </div>

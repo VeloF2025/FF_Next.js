@@ -365,10 +365,10 @@ export function RepeatFaultMap({
             className="px-3 py-1.5 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded text-sm text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
           >
             <option value="all">All Scopes</option>
+            <option value="dr">DR Numbers</option>
             <option value="pole">Poles</option>
             <option value="pon">PONs</option>
             <option value="zone">Zones</option>
-            <option value="dr">DR Numbers</option>
           </select>
         </div>
 

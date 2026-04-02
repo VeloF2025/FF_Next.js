@@ -368,10 +368,10 @@ export function EscalationList({
             className="px-3 py-1.5 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded text-sm text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
           >
             <option value="all">All Scopes</option>
+            <option value="dr">DR Number</option>
             <option value="pole">Pole</option>
             <option value="pon">PON</option>
             <option value="zone">Zone</option>
-            <option value="dr">DR Number</option>
           </select>
 
           {/* Results count */}

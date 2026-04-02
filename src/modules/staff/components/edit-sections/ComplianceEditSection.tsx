@@ -237,14 +237,14 @@ export function ComplianceEditSection({ formData, handleInputChange }: Complianc
               >
                 <option value="">Select Bank</option>
                 <option value="ABSA">ABSA</option>
+                <option value="African Bank">African Bank</option>
                 <option value="Capitec">Capitec</option>
+                <option value="Discovery Bank">Discovery Bank</option>
                 <option value="FNB">First National Bank (FNB)</option>
+                <option value="Investec">Investec</option>
                 <option value="Nedbank">Nedbank</option>
                 <option value="Standard Bank">Standard Bank</option>
-                <option value="African Bank">African Bank</option>
                 <option value="TymeBank">TymeBank</option>
-                <option value="Discovery Bank">Discovery Bank</option>
-                <option value="Investec">Investec</option>
                 <option value="Other">Other</option>
               </select>
             </div>

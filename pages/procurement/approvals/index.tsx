@@ -183,9 +183,9 @@ export default function ApprovalsPage() {
               className="px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-amber-500/50"
             >
               <option value="all">All Types</option>
-              <option value="purchase_requisition">Requisitions</option>
-              <option value="purchase_order">Purchase Orders</option>
               <option value="goods_receipt">Goods Receipts</option>
+              <option value="purchase_order">Purchase Orders</option>
+              <option value="purchase_requisition">Requisitions</option>
             </select>
           </div>
 

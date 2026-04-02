@@ -177,11 +177,11 @@ export function DRPaymentStatusTab() {
           className="px-3 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-md text-sm text-[var(--ff-text-primary)]"
         >
           <option value="all">All Types</option>
+          <option value="note3">Degraded</option>
           <option value="note1">Low Signal</option>
           <option value="note2">No Field App</option>
-          <option value="note3">Degraded</option>
-          <option value="note4">Serial Mismatch</option>
           <option value="note5">Offline</option>
+          <option value="note4">Serial Mismatch</option>
         </select>
 
         <div className="relative flex-1 min-w-[180px] max-w-xs">
