@@ -100,6 +100,7 @@ export const TABS: Tab[] = [
       {
         section: 'Reports',
         items: [
+          { label: 'Bootstock Reports', href: '/procurement/reports/bootstock' },
           { label: 'Procurement Reports', href: '/procurement/reports' },
           { label: 'BOQ Spend Summary', href: '/procurement/reports?tab=boq-spend' },
           { label: 'Budget Overview', href: '/procurement/budget' },
@@ -157,7 +158,8 @@ export function getActiveTabId(
   if (pathname.startsWith('/procurement/approvals')) return 'approvals';
 
   // Reports
-  if (pathname.startsWith('/procurement/reports') ||
+  if (pathname.startsWith('/procurement/reports/bootstock') ||
+      pathname.startsWith('/procurement/reports') ||
       pathname.startsWith('/procurement/audit') ||
       pathname.startsWith('/procurement/budget') ||
       pathname.startsWith('/procurement/cost-centers') ||

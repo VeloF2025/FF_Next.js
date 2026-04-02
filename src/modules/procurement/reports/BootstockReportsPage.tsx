@@ -1,0 +1,304 @@
+/**
+ * Bootstock Reports Page
+ * ONT and UPS serial stock tracking from FT delivery through installation.
+ * Toggle between ONT and UPS views.
+ */
+
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { Cpu, BatteryCharging, Loader2, Package, CheckCircle, AlertTriangle, Zap } from 'lucide-react';
+
+interface ReconStats {
+  total: number;
+  available: number;
+  issued: number;
+  installed: number;
+  faulty: number;
+  returned: number;
+  oesMatched: number;
+  waMatched: number;
+}
+
+interface ReconRow {
+  serial_number: string;
+  status: string;
+  installed_at_drop_number: string | null;
+  installed_date: string | null;
+  location_name: string | null;
+  location_code: string | null;
+}
+
+export function BootstockReportsPage() {
+  const [type, setType] = useState<'ont' | 'ups'>('ont');
+  const [stats, setStats] = useState<ReconStats | null>(null);
+  const [rows, setRows] = useState<ReconRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [projectFilter, setProjectFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ type, page: String(page), limit: '50' });
+      if (projectFilter) params.set('project', projectFilter);
+      if (statusFilter) params.set('status', statusFilter);
+
+      const res = await fetch(`/api/procurement/field-stock/serial-recon?${params}`);
+      const json = await res.json();
+      if (json.success) {
+        setStats(json.data.stats);
+        setRows(json.data.rows);
+        setTotal(json.data.total);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, [type, page, projectFilter, statusFilter]);
+
+  const totalPages = Math.ceil(total / 50);
+
+  return (
+    <div className="space-y-6">
+      {/* Toggle ONT / UPS */}
+      <div className="flex items-center gap-4">
+        <h2 className="text-xl font-semibold text-[var(--ff-text-primary)]">Bootstock Reports</h2>
+        <div className="flex bg-[var(--ff-bg-tertiary)] rounded-lg p-1 border border-[var(--ff-border-light)]">
+          <button
+            onClick={() => { setType('ont'); setPage(1); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              type === 'ont'
+                ? 'bg-[var(--ff-accent)] text-white'
+                : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
+            }`}
+          >
+            <Cpu className="w-4 h-4" />
+            ONT Devices
+          </button>
+          <button
+            onClick={() => { setType('ups'); setPage(1); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              type === 'ups'
+                ? 'bg-[var(--ff-accent)] text-white'
+                : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
+            }`}
+          >
+            <BatteryCharging className="w-4 h-4" />
+            UPS Devices
+          </button>
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <StatCard icon={Package} label="Total from FT" value={stats.total} color="text-blue-400" />
+          <StatCard icon={Package} label="Available" value={stats.available} color="text-green-400" />
+          <StatCard icon={Zap} label="Installed (WA)" value={stats.waMatched} color="text-purple-400" />
+          {type === 'ont' && (
+            <StatCard icon={CheckCircle} label="Activated (OES)" value={stats.oesMatched} color="text-teal-400" />
+          )}
+          <StatCard
+            icon={AlertTriangle}
+            label="Unaccounted"
+            value={stats.total - stats.available - stats.waMatched}
+            color="text-amber-400"
+          />
+          <StatCard
+            icon={CheckCircle}
+            label="Install Rate"
+            value={`${stats.total > 0 ? Math.round((stats.waMatched / stats.total) * 100) : 0}%`}
+            color="text-green-400"
+          />
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="flex gap-4 items-center">
+        <select
+          value={projectFilter}
+          onChange={(e) => { setProjectFilter(e.target.value); setPage(1); }}
+          className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg px-3 py-2 text-sm text-[var(--ff-text-primary)]"
+        >
+          <option value="">All Projects</option>
+          <option value="Lawley">Lawley</option>
+          <option value="Mohadin">Mohadin</option>
+          <option value="Mamelodi">Mamelodi</option>
+          <option value="Tembisa">Tembisa</option>
+          <option value="Etwatwa">Etwatwa</option>
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+          className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg px-3 py-2 text-sm text-[var(--ff-text-primary)]"
+        >
+          <option value="">All Statuses</option>
+          <option value="available">Available</option>
+          <option value="issued">Issued</option>
+          <option value="installed">Installed</option>
+          <option value="faulty">Faulty</option>
+          <option value="returned">Returned</option>
+        </select>
+        <span className="text-xs text-[var(--ff-text-tertiary)]">
+          {total.toLocaleString()} {type === 'ont' ? 'ONTs' : 'UPS devices'}
+        </span>
+      </div>
+
+      {/* Loading */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-accent)]" />
+        </div>
+      )}
+
+      {/* Per-Project Breakdown */}
+      {stats && !loading && !projectFilter && (
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
+          <div className="px-4 py-3 border-b border-[var(--ff-border-light)]">
+            <h3 className="text-sm font-semibold text-[var(--ff-text-primary)]">Stock by Project</h3>
+          </div>
+          <ProjectBreakdown type={type} />
+        </div>
+      )}
+
+      {/* Serial Detail Table */}
+      {!loading && rows.length > 0 && (
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
+          <div className="px-4 py-3 border-b border-[var(--ff-border-light)]">
+            <h3 className="text-sm font-semibold text-[var(--ff-text-primary)]">Serial Details</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
+                  <th className="text-left px-4 py-2 text-[var(--ff-text-secondary)] font-medium">Serial</th>
+                  <th className="text-left px-4 py-2 text-[var(--ff-text-secondary)] font-medium">Status</th>
+                  <th className="text-left px-4 py-2 text-[var(--ff-text-secondary)] font-medium">Location</th>
+                  <th className="text-left px-4 py-2 text-[var(--ff-text-secondary)] font-medium">Drop #</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, i) => (
+                  <tr key={i} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">
+                    <td className="px-4 py-2 font-mono text-xs text-[var(--ff-text-primary)]">{row.serial_number}</td>
+                    <td className="px-4 py-2">
+                      <StatusBadge status={row.status} />
+                    </td>
+                    <td className="px-4 py-2 text-[var(--ff-text-secondary)]">{row.location_name || '\u2014'}</td>
+                    <td className="px-4 py-2 text-[var(--ff-text-primary)]">{row.installed_at_drop_number || '\u2014'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--ff-border-light)]">
+              <span className="text-xs text-[var(--ff-text-tertiary)]">
+                Page {page} of {totalPages}
+              </span>
+              <div className="flex gap-2">
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 text-sm bg-[var(--ff-bg-tertiary)] rounded disabled:opacity-50 text-[var(--ff-text-secondary)]">Prev</button>
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="px-3 py-1 text-sm bg-[var(--ff-bg-tertiary)] rounded disabled:opacity-50 text-[var(--ff-text-secondary)]">Next</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType; label: string; value: number | string; color: string }) {
+  return (
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
+      <div className="flex items-center gap-2 mb-1">
+        <Icon className={`w-4 h-4 ${color}`} />
+        <span className="text-xs text-[var(--ff-text-secondary)]">{label}</span>
+      </div>
+      <p className={`text-2xl font-bold ${color}`}>{typeof value === 'number' ? value.toLocaleString() : value}</p>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const config: Record<string, { bg: string; text: string }> = {
+    available: { bg: 'bg-green-500/10', text: 'text-green-400' },
+    issued: { bg: 'bg-blue-500/10', text: 'text-blue-400' },
+    installed: { bg: 'bg-purple-500/10', text: 'text-purple-400' },
+    faulty: { bg: 'bg-red-500/10', text: 'text-red-400' },
+    returned: { bg: 'bg-amber-500/10', text: 'text-amber-400' },
+  };
+  const c = config[status] || { bg: 'bg-gray-500/10', text: 'text-gray-400' };
+  return (
+    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${c.bg} ${c.text}`}>
+      {status}
+    </span>
+  );
+}
+
+function ProjectBreakdown({ type }: { type: 'ont' | 'ups' }) {
+  const [data, setData] = useState<Array<{ project: string; total: number; available: number; waMatched: number; oesMatched: number }>>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const projects = ['Lawley', 'Mohadin', 'Mamelodi', 'Tembisa', 'Etwatwa'];
+        const results = await Promise.all(
+          projects.map(async (p) => {
+            const res = await fetch(`/api/procurement/field-stock/serial-recon?type=${type}&project=${p}&limit=1`);
+            const json = await res.json();
+            if (!json.success) return null;
+            return {
+              project: p,
+              total: json.data.stats.total,
+              available: json.data.stats.available,
+              waMatched: json.data.stats.waMatched,
+              oesMatched: json.data.stats.oesMatched,
+            };
+          })
+        );
+        setData(results.filter(Boolean) as any[]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [type]);
+
+  if (loading) return <div className="p-4"><Loader2 className="w-5 h-5 animate-spin text-[var(--ff-accent)]" /></div>;
+
+  return (
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
+          <th className="text-left px-4 py-2 text-[var(--ff-text-secondary)] font-medium">Project</th>
+          <th className="text-right px-4 py-2 text-[var(--ff-text-secondary)] font-medium">Total</th>
+          <th className="text-right px-4 py-2 text-[var(--ff-text-secondary)] font-medium">Available</th>
+          <th className="text-right px-4 py-2 text-[var(--ff-text-secondary)] font-medium">Installed (WA)</th>
+          {type === 'ont' && <th className="text-right px-4 py-2 text-[var(--ff-text-secondary)] font-medium">Activated (OES)</th>}
+          <th className="text-right px-4 py-2 text-[var(--ff-text-secondary)] font-medium">Install %</th>
+        </tr>
+      </thead>
+      <tbody>
+        {data.map((row) => (
+          <tr key={row.project} className="border-b border-[var(--ff-border-light)]">
+            <td className="px-4 py-2 text-[var(--ff-text-primary)] font-medium">{row.project}</td>
+            <td className="px-4 py-2 text-right text-[var(--ff-text-primary)]">{row.total.toLocaleString()}</td>
+            <td className="px-4 py-2 text-right text-green-400">{row.available.toLocaleString()}</td>
+            <td className="px-4 py-2 text-right text-purple-400">{row.waMatched.toLocaleString()}</td>
+            {type === 'ont' && <td className="px-4 py-2 text-right text-teal-400">{row.oesMatched.toLocaleString()}</td>}
+            <td className="px-4 py-2 text-right text-[var(--ff-text-primary)]">
+              {row.total > 0 ? Math.round((row.waMatched / row.total) * 100) : 0}%
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
