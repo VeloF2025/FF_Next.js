@@ -3,11 +3,13 @@ import { Search, Filter, Download } from 'lucide-react';
 import { useNeonProjects } from '@/hooks/neon/useNeonProjects';
 import { projectsService } from '@/services/projectsService';
 import { notificationService } from '@/services/core/NotificationService';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ProjectSummaryCards } from './ProjectSummaryCards';
 import { ProjectTable } from './ProjectTable';
 
 export function ProjectList() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string[]>([]);
   const [selectedPriority, setSelectedPriority] = useState<string[]>([]);
@@ -33,14 +35,16 @@ export function ProjectList() {
   // Search filters instantly as you type - no form submit needed
   // Form wrapper kept for accessibility (Enter key support)
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
-      return;
-    }
+  const handleDelete = (id: string) => {
+    setPendingDeleteId(id);
+  };
 
+  const handleDeleteConfirm = async () => {
+    if (!pendingDeleteId) return;
+    const id = pendingDeleteId;
+    setPendingDeleteId(null);
     try {
       await projectsService.delete(id);
-      // Refresh the projects list
       refetch();
       notificationService.success('Project deleted successfully');
     } catch (error: unknown) {
@@ -221,11 +225,21 @@ export function ProjectList() {
         )}
       </div>
 
-      <ProjectTable 
+      <ProjectTable
         projects={filteredProjects}
         isLoading={isLoading}
         error={error ? new Error(error) : null}
         onDelete={handleDelete}
+      />
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        title="Delete Project"
+        message="Are you sure you want to delete this project? This action cannot be undone."
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setPendingDeleteId(null)}
       />
     </div>
   );

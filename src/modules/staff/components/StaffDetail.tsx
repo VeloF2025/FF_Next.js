@@ -35,6 +35,7 @@ import { ActivityTab } from './tabs/ActivityTab';
 import { PerformanceTab } from './tabs/PerformanceTab';
 import { DisciplinaryIncidentForm } from './DisciplinaryIncidentForm';
 import { VehicleAssignmentForm } from './VehicleAssignmentForm';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import type { DisciplinaryIncident, VehicleAssignment } from '@/types/staff';
 
 type TabType = 'overview' | 'performance' | 'employment' | 'compliance' | 'vehicles' | 'disciplinary' | 'documents' | 'projects' | 'notes' | 'activity';
@@ -110,6 +111,17 @@ export function StaffDetail() {
   const [staffList, setStaffList] = useState<{ id: string; name: string }[]>([]);
   const [hasValidLicense, setHasValidLicense] = useState(false);
 
+  // Confirm dialog state: tracks which destructive action is pending
+  type ConfirmAction = 'deleteStaff' | 'deleteCv' | 'deletePhoto' | null;
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [pendingVehicleId, setPendingVehicleId] = useState<string | null>(null);
+
+  const confirmConfig = {
+    deleteStaff: { title: 'Delete Staff Member', message: 'Are you sure you want to delete this staff member? This action cannot be undone.' },
+    deleteCv: { title: 'Remove CV', message: 'Are you sure you want to remove the CV?' },
+    deletePhoto: { title: 'Remove Profile Photo', message: 'Are you sure you want to remove the profile photo?' },
+  } as const;
+
   // Fetch license status when staff ID changes
   useEffect(() => {
     if (!id) return;
@@ -142,9 +154,11 @@ export function StaffDetail() {
     }
   }, []);
 
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this staff member?')) return;
+  const handleDelete = () => {
+    setConfirmAction('deleteStaff');
+  };
 
+  const executeDeleteStaff = async () => {
     try {
       await deleteMutation.mutateAsync(id!);
       notificationService.success('Staff member deleted');
@@ -193,9 +207,11 @@ export function StaffDetail() {
     await refetch();
   };
 
-  const handleCvDelete = async () => {
-    if (!confirm('Are you sure you want to remove the CV?')) return;
+  const handleCvDelete = () => {
+    setConfirmAction('deleteCv');
+  };
 
+  const executeCvDelete = async () => {
     const response = await fetch(`/api/staff/${id}/cv-upload`, {
       method: 'DELETE',
     });
@@ -225,9 +241,11 @@ export function StaffDetail() {
     await refetch();
   };
 
-  const handleProfilePhotoDelete = async () => {
-    if (!confirm('Are you sure you want to remove the profile photo?')) return;
+  const handleProfilePhotoDelete = () => {
+    setConfirmAction('deletePhoto');
+  };
 
+  const executeProfilePhotoDelete = async () => {
     const response = await fetch(`/api/staff/${id}/profile-photo`, {
       method: 'DELETE',
     });
@@ -295,8 +313,14 @@ export function StaffDetail() {
     setShowVehicleForm(true);
   };
 
-  const handleRemoveVehicle = async (vehicleId: string) => {
-    if (!confirm('Are you sure you want to remove this vehicle assignment?')) return;
+  const handleRemoveVehicle = (vehicleId: string) => {
+    setPendingVehicleId(vehicleId);
+  };
+
+  const executeRemoveVehicle = async () => {
+    if (!pendingVehicleId) return;
+    const vehicleId = pendingVehicleId;
+    setPendingVehicleId(null);
 
     const response = await fetch(`/api/staff/${id}/vehicles?id=${vehicleId}`, {
       method: 'DELETE',
@@ -523,6 +547,36 @@ export function StaffDetail() {
           }}
         />
       )}
+
+      {/* Confirm Dialog — handles deleteStaff / deleteCv / deletePhoto */}
+      {confirmAction && (
+        <ConfirmDialog
+          open={true}
+          title={confirmConfig[confirmAction].title}
+          message={confirmConfig[confirmAction].message}
+          confirmLabel="Delete"
+          variant="danger"
+          onConfirm={() => {
+            const action = confirmAction;
+            setConfirmAction(null);
+            if (action === 'deleteStaff') void executeDeleteStaff();
+            else if (action === 'deleteCv') void executeCvDelete();
+            else if (action === 'deletePhoto') void executeProfilePhotoDelete();
+          }}
+          onCancel={() => setConfirmAction(null)}
+        />
+      )}
+
+      {/* Confirm Dialog — vehicle removal */}
+      <ConfirmDialog
+        open={pendingVehicleId !== null}
+        title="Remove Vehicle Assignment"
+        message="Are you sure you want to remove this vehicle assignment?"
+        confirmLabel="Remove"
+        variant="warning"
+        onConfirm={executeRemoveVehicle}
+        onCancel={() => setPendingVehicleId(null)}
+      />
     </div>
   );
 }

@@ -88,6 +88,7 @@ interface PurchaseOrderDetail {
   createdBy: string | null;
   createdAt: string;
   odooPoId: number | null;
+  sagePoNumber: string | null;
   supplierReference: string | null;
   quoteNumber: string | null;
   quoteAttachmentUrl: string | null;
@@ -140,6 +141,7 @@ export default function PurchaseOrderDetailPage() {
     deliveryAddress: '',
     paymentTerms: '',
     internalNotes: '',
+    sagePoNumber: '',
   });
 
   useEffect(() => {
@@ -234,6 +236,7 @@ export default function PurchaseOrderDetailPage() {
       deliveryAddress: purchaseOrder.deliveryAddress || '',
       paymentTerms: purchaseOrder.paymentTerms || '',
       internalNotes: purchaseOrder.notes || '',
+      sagePoNumber: purchaseOrder.sagePoNumber || '',
     });
     setIsEditing(true);
   };
@@ -253,6 +256,7 @@ export default function PurchaseOrderDetailPage() {
             deliveryAddress: editFields.deliveryAddress,
             paymentTerms: editFields.paymentTerms,
             internalNotes: editFields.internalNotes,
+            sagePoNumber: editFields.sagePoNumber || null,
           },
         }),
       });
@@ -327,7 +331,7 @@ export default function PurchaseOrderDetailPage() {
 
     return (
       <div className="flex items-center gap-2">
-        {['draft', 'pending_approval'].includes(purchaseOrder.status) && !isEditing && (
+        {!isEditing && (
           <button
             onClick={startEditing}
             disabled={actionLoading}
@@ -653,6 +657,22 @@ export default function PurchaseOrderDetailPage() {
                     <div>
                       <dt className="text-sm text-[var(--ff-text-tertiary)]">Supplier Reference</dt>
                       <dd className="text-[var(--ff-text-primary)]">{purchaseOrder.supplierReference}</dd>
+                    </div>
+                  )}
+                  {(purchaseOrder.sagePoNumber || isEditing) && (
+                    <div>
+                      <dt className="text-sm text-[var(--ff-text-tertiary)]">Sage PO Number</dt>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editFields.sagePoNumber}
+                          onChange={(e) => setEditFields({ ...editFields, sagePoNumber: e.target.value })}
+                          className="w-full px-2 py-1 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded text-[var(--ff-text-primary)] text-sm"
+                          placeholder="Sage PO number"
+                        />
+                      ) : (
+                        <dd className="text-[var(--ff-text-primary)]">{purchaseOrder.sagePoNumber}</dd>
+                      )}
                     </div>
                   )}
                   {purchaseOrder.quoteNumber && (

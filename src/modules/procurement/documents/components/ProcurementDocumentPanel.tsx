@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import {
   FileText,
   Image as ImageIcon,
@@ -16,6 +16,7 @@ import {
   type ProcurementDocumentType,
   type ProcurementEntityType,
 } from '@/types/procurement/document.types';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DocumentChecklist } from './DocumentChecklist';
 import { formatDisplayDate } from '@/utils/dateFormat';
 
@@ -66,6 +67,7 @@ export function ProcurementDocumentPanel({
   const [notes, setNotes] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadStatusMessage, setUploadStatusMessage] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadStatusRef = useRef<HTMLDivElement>(null);
 
@@ -93,10 +95,16 @@ export function ProcurementDocumentPanel({
     }
   };
 
-  const handleDelete = async (docId: string, docName: string) => {
-    if (!confirm(`Delete "${docName}"? This cannot be undone.`)) return;
-    await deleteDocument(docId);
-  };
+  const handleDelete = useCallback((docId: string, docName: string) => {
+    setPendingDelete({ id: docId, name: docName });
+  }, []);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!pendingDelete) return;
+    const { id } = pendingDelete;
+    setPendingDelete(null);
+    await deleteDocument(id);
+  }, [pendingDelete, deleteDocument]);
 
   return (
     <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
@@ -304,6 +312,16 @@ export function ProcurementDocumentPanel({
           })
         )}
       </div>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete Document"
+        message={pendingDelete ? `Delete "${pendingDelete.name}"? This cannot be undone.` : ''}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

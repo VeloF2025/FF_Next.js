@@ -89,6 +89,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
         po.created_at,
         po.order_date,
         po.odoo_po_id,
+        po.sage_po_number,
         po.supplier_reference,
         po.quote_number
       FROM purchase_orders po
@@ -119,6 +120,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       createdAt: row.created_at,
       orderDate: row.order_date || null,
       odooPoId: row.odoo_po_id || null,
+      sagePoNumber: row.sage_po_number || null,
       supplierReference: row.supplier_reference || null,
       quoteNumber: row.quote_number || null,
     }));
@@ -156,6 +158,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     const quoteNumber = body.quoteNumber;
     const quoteAttachmentUrl = body.quoteAttachmentUrl;
     const quoteAttachmentName = body.quoteAttachmentName;
+    const sagePoNumber = body.sagePoNumber;
     const items = body.items;
     const createdBy = body.createdBy || 'system';
 
@@ -237,13 +240,13 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
         project_id, department, delivery_address, expected_delivery_date, shipping_method,
         payment_terms, currency, tax_rate, subtotal, tax_amount, total_amount,
         internal_notes, supplier_notes, created_by, quote_number, quote_attachment_url,
-        quote_attachment_name, created_at, updated_at
+        quote_attachment_name, sage_po_number, created_at, updated_at
       ) VALUES (
         $1, 'draft', $2, $3, $4,
         $5, $6, $7, $8, $9,
         $10, $11, $12, $13, $14, $15,
         $16, $17, $18, $19, $20,
-        $21, NOW(), NOW()
+        $21, $22, NOW(), NOW()
       )
       RETURNING id, po_number
     `;
@@ -270,6 +273,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       quoteNumber || null,
       quoteAttachmentUrl || null,
       quoteAttachmentName || null,
+      sagePoNumber || null,
     ]);
 
     const poId = poResult[0]!.id;

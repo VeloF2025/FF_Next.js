@@ -13,6 +13,7 @@ import { StaffImport } from '@/components/staff/StaffImport';
 import { StaffListHeader } from './StaffListHeader';
 import { StaffFilters } from './StaffFilters';
 import { StaffTable } from './StaffTable';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { StaffFilter, StaffMember, StaffSummary } from '@/types/staff.types';
 import { log } from '@/lib/logger';
 import { formatLabel } from '@/lib/utils';
@@ -23,6 +24,7 @@ export function StaffList() {
   const [showImport, setShowImport] = useState(false);
   const [filter, setFilter] = useState<StaffFilter>({});
   const [showFilters, setShowFilters] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const { data: staff = [], isLoading, error, refetch } = useQuery({
     queryKey: ['staff', filter],
@@ -45,11 +47,14 @@ export function StaffList() {
     setFilter(prev => ({ ...prev, searchTerm }));
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this staff member?')) {
-      return;
-    }
-    
+  const handleDelete = (id: string) => {
+    setPendingDeleteId(id);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!pendingDeleteId) return;
+    const id = pendingDeleteId;
+    setPendingDeleteId(null);
     try {
       await staffService.delete(id);
       await refetch();
@@ -192,6 +197,16 @@ export function StaffList() {
           </button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        title="Delete Staff Member"
+        message="Are you sure you want to delete this staff member? This action cannot be undone."
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </div>
   );
 }

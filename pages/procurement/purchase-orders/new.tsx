@@ -101,6 +101,7 @@ export default function NewPurchaseOrderPage() {
   const [vatRate, setVatRate] = useState(15);
   const [notes, setNotes] = useState('');
   const [supplierReference, setSupplierReference] = useState('');
+  const [sagePoNumber, setSagePoNumber] = useState('');
   const [quoteNumber, setQuoteNumber] = useState('');
   const [quoteAttachmentUrl, setQuoteAttachmentUrl] = useState('');
   const [quoteAttachmentName, setQuoteAttachmentName] = useState('');
@@ -253,6 +254,7 @@ export default function NewPurchaseOrderPage() {
           vatRate,
           notes: notes || null,
           supplierReference: supplierReference || null,
+          sagePoNumber: sagePoNumber || null,
           quoteNumber: quoteNumber || null,
           quoteAttachmentUrl: quoteAttachmentUrl || null,
           quoteAttachmentName: quoteAttachmentName || null,
@@ -392,6 +394,19 @@ export default function NewPurchaseOrderPage() {
                   onChange={(e) => setSupplierReference(e.target.value)}
                   className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   placeholder="Supplier PO/ref number"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Sage PO Number
+                </label>
+                <input
+                  type="text"
+                  value={sagePoNumber}
+                  onChange={(e) => setSagePoNumber(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  placeholder="Sage purchase order number"
                 />
               </div>
 

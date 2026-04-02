@@ -68,6 +68,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         po.approved_by,
         po.approved_at,
         po.odoo_po_id,
+        po.sage_po_number,
         po.supplier_reference,
         po.quote_number,
         po.quote_attachment_url,
@@ -237,6 +238,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
       approvedAt: po.approved_at,
       // Odoo integration
       odooPoId: po.odoo_po_id || null,
+      // Sage integration
+      sagePoNumber: po.sage_po_number || null,
       // Quote / supplier reference
       supplierReference: po.supplier_reference || null,
       quoteNumber: po.quote_number || null,
@@ -519,9 +522,6 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
       }
 
       case 'update_fields': {
-        if (!['draft', 'pending_approval'].includes(currentStatus)) {
-          return apiResponse.badRequest(res, 'Fields can only be edited on draft or pending POs');
-        }
         const { fields } = req.body;
         if (!fields || typeof fields !== 'object') {
           return apiResponse.badRequest(res, 'Fields object is required');
@@ -534,7 +534,17 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
           paymentTerms: 'payment_terms',
           internalNotes: 'internal_notes',
           supplierNotes: 'supplier_notes',
+          sagePoNumber: 'sage_po_number',
+          supplierReference: 'supplier_reference',
         };
+        // Reference fields (sage_po_number, supplier_reference) can be updated on any status
+        const referenceOnlyFields = ['sagePoNumber', 'supplierReference'];
+        const hasNonReferenceFields = Object.keys(fields).some(
+          k => allowedFields[k] && !referenceOnlyFields.includes(k)
+        );
+        if (hasNonReferenceFields && !['draft', 'pending_approval'].includes(currentStatus)) {
+          return apiResponse.badRequest(res, 'Fields can only be edited on draft or pending POs');
+        }
 
         const updates: string[] = [];
         const values: (string | null)[] = [];

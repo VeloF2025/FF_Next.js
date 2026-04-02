@@ -45,6 +45,7 @@ interface POListItem {
   createdByName: string;
   createdAt: string;
   odooPoId: number | null;
+  sagePoNumber: string | null;
 }
 
 const statusConfig: Record<POStatus, { label: string; color: string; icon: typeof Clock }> = {
@@ -94,7 +95,8 @@ export default function PurchaseOrdersPage() {
       po.poNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       po.supplierName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       po.projectName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      String(po.odooPoId || '').includes(searchTerm);
+      String(po.odooPoId || '').includes(searchTerm) ||
+      (po.sagePoNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = statusFilter === 'all' || po.status === statusFilter;
 
@@ -299,6 +301,11 @@ export default function PurchaseOrdersPage() {
                             {po.odooPoId && (
                               <span className="inline-flex items-center rounded bg-orange-100 px-1.5 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
                                 Odoo
+                              </span>
+                            )}
+                            {po.sagePoNumber && (
+                              <span className="inline-flex items-center rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-300" title={`Sage: ${po.sagePoNumber}`}>
+                                Sage: {po.sagePoNumber}
                               </span>
                             )}
                           </div>

@@ -33,6 +33,10 @@ export {
 // Existing UI components
 export { LoadingSpinner } from './LoadingSpinner';
 
+// ConfirmDialog — replaces native window.confirm()
+export { ConfirmDialog } from './ConfirmDialog';
+export type { ConfirmDialogProps, ConfirmDialogVariant } from './ConfirmDialog';
+
 // VELOCITY Premium UI Components - Enhanced with theme integration
 export { 
   GlassCard, 

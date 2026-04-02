@@ -4,6 +4,7 @@ import { Search, Filter } from 'lucide-react';
 import { clientService } from '@/services/clientService';
 import { notificationService } from '@/services/core/NotificationService';
 import { ClientImport } from '@/components/clients/ClientImport';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ClientFilter } from '@/types/client.types';
 import { ClientListHeader } from './ClientListHeader';
 import { ClientSummaryCards } from './ClientSummaryCards';
@@ -14,6 +15,7 @@ export function ClientList() {
   const [showImport, setShowImport] = useState(false);
   const [filter, setFilter] = useState<ClientFilter>({});
   const [showFilters, setShowFilters] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const { data: clients, isLoading, error, refetch } = useQuery({
     queryKey: ['clients', filter],
@@ -43,11 +45,14 @@ export function ClientList() {
     setFilter(prev => ({ ...prev, searchTerm }));
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this client? This action cannot be undone.')) {
-      return;
-    }
-    
+  const handleDelete = (id: string) => {
+    setPendingDeleteId(id);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!pendingDeleteId) return;
+    const id = pendingDeleteId;
+    setPendingDeleteId(null);
     try {
       await clientService.delete(id);
       refetch();
@@ -140,6 +145,16 @@ export function ClientList() {
         isLoading={isLoading}
         error={error}
         onDelete={handleDelete}
+      />
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        title="Delete Client"
+        message="Are you sure you want to delete this client? This action cannot be undone."
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setPendingDeleteId(null)}
       />
     </div>
   );
