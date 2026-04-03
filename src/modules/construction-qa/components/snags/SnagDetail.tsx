@@ -88,7 +88,8 @@ export function SnagDetail({ snag: initialSnag, photos, onClose, onUpdated, onPh
   };
 
   return (
-    <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-4 mt-1">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm p-4 pt-16 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 w-full max-w-3xl shadow-2xl">
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div>
@@ -246,6 +247,7 @@ export function SnagDetail({ snag: initialSnag, photos, onClose, onUpdated, onPh
           </p>
         )}
       </div>
+    </div>
     </div>
   );
 }
