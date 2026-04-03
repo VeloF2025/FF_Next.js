@@ -49,7 +49,9 @@ npm run build && PORT=3005 npm start  # Production testing
 
 ## Key Commands
 ```bash
-npm run lint && npm run type-check  # Quality checks
+npm run ci:quick                    # Local CI lint gates (before PRs)
+npm run ci                          # Full CI: lint + tests + build
+npm run lint && npm run type-check  # Manual quality checks
 npm test                            # Vitest
 npm run antihall                    # Validate code references
 ```

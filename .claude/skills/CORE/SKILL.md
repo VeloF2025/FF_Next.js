@@ -122,11 +122,15 @@ Session context persists in `.claude/memories/`:
 ## VALIDATION COMMANDS
 
 ```bash
-npm run lint          # ESLint
-npm run type-check    # TypeScript checking
+npm run ci:quick      # Local CI lint gates (before PRs — mandatory)
+npm run ci            # Full CI: lint + tests + build
+npm run lint          # ESLint only
+npm run type-check    # TypeScript checking only
 npm run antihall      # Validate code references
 npm run build         # Full build validation
 ```
+
+**Ratchet baselines** (any regression blocks): 77 lint errors, 3765 warnings, 88 silent catches.
 
 ---
 

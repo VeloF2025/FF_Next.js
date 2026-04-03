@@ -159,32 +159,16 @@ The `/auto` skill uses TDD internally:
 PRD → /tdd spec → /tdd generate → /tdd implement → PR
 ```
 
-### With CI Pipeline
+### With Local CI Pipeline
 
-> **Note:** GitHub Actions CI workflows (`.github/workflows/`) are currently disabled for this project. TDD validation is enforced locally via `npm test` and pre-PR checks rather than automated CI runners.
+TDD validation is enforced locally via the CI pipeline before PRs and deploys:
 
-```yaml
-# .github/workflows/test.yml (currently disabled)
-jobs:
-  tdd-check:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check test coverage
-        run: npm run test:coverage
-
-      - name: Validate new code has tests
-        run: |
-          # Get new/modified src files
-          CHANGED=$(git diff --name-only origin/main | grep "^src/")
-          for file in $CHANGED; do
-            # Check corresponding test exists
-            test_file=$(echo $file | sed 's/src/tests\/unit/' | sed 's/\.ts/.test.ts/')
-            if [ ! -f "$test_file" ]; then
-              echo "Missing test for: $file"
-              exit 1
-            fi
-          done
+```bash
+npm run ci            # Full CI: lint gates + tests + build
+npm run ci:quick      # Lint gates only (fast, before PRs)
 ```
+
+Tests run as part of `npm run ci` (Gate 5). The `/pr` command runs `ci:quick` automatically before creating a PR.
 
 ## ENFORCEMENT LEVELS
 

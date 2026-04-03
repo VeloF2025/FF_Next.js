@@ -146,9 +146,9 @@ SELECT * FROM <related_table> WHERE <condition> LIMIT 10;
 
 1. Create a feature branch: `fix/noc-<ticket_uid>-<short-description>`
 2. Implement the fix
-3. Run quality checks: `npm run lint && npm run type-check`
+3. Run local CI: `npm run ci:quick`
 4. Run tests: `npm test`
-5. Create PR via `/pr` skill
+5. Create PR via `/pr` skill (runs CI gates automatically)
 6. Update the ticket with PR link
 
 **Update ticket status as you work:**

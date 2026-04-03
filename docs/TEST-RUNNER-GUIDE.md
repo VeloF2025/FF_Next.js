@@ -267,14 +267,17 @@ vi.mock('@/services/suppliers/neonSupplierService', () => ({
 
 ## CI Integration
 
-To run tests in CI, add to GitHub Actions workflow:
+Tests run as part of the local CI pipeline (Gate 5):
 
-```yaml
-- name: Run tests
-  run: npm run test -- --run
+```bash
+npm run ci            # Full CI: lint gates + tests + build
+npm run ci:quick      # Lint gates only (skips tests)
+```
 
-- name: Generate coverage
-  run: npm run test:coverage
+Tests are also available standalone:
+```bash
+npm test -- --run     # Run all tests
+npm run test:coverage # Generate coverage report
 ```
 
 ## Coverage Goals

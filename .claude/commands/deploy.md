@@ -115,10 +115,11 @@ sudo systemctl restart fibreflow-production.service
 
 ## CRITICAL RULES
 
-1. **NEVER deploy to production during business hours** unless it's an emergency
-2. **Always deploy to dev first** — test there before promoting
-3. **Promotions deploy the EXACT commit** from the source environment — no surprises
-4. **Emergency overrides require explicit user confirmation** — ask before using `--force`
+1. **Run `npm run ci:quick` before deploying** — lint gates are enforced by `deploy-local.sh` (blocks if lint regresses)
+2. **NEVER deploy to production during business hours** unless it's an emergency
+3. **Always deploy to dev first** — test there before promoting
+4. **Promotions deploy the EXACT commit** from the source environment — no surprises
+5. **Emergency overrides require explicit user confirmation** — ask before using `--force`
 5. **All environments share the production database** — schema changes affect everyone immediately
 
 ## Server Info

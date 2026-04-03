@@ -447,11 +447,15 @@ git push
 
 ### 7.3 CI Checks
 
-> **Note (Feb 2026):** GitHub Actions CI workflows are currently **disabled** (billing exhausted).
-> Workflows renamed to `.yml.disabled`. Run quality checks locally before merging:
-> ```bash
-> npm run lint && npm run type-check && npm test
-> ```
+CI runs locally via `scripts/ci-local.sh` (GitHub Actions disabled Apr 2026):
+
+```bash
+npm run ci:quick      # Lint gates only (mandatory before PR)
+npm run ci            # Full: lint + tests + build
+```
+
+Lint ratchet baselines block any regression: 77 errors, 3765 warnings, 88 silent catches.
+The `/pr` command and `deploy-local.sh` both enforce these gates automatically.
 
 ### 7.4 Merge to Master
 

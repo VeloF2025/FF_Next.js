@@ -12,7 +12,7 @@ This plan establishes consistent GitHub workflows for both developers using:
 - GitHub MCP Server (Claude integration)
 - gh CLI automation scripts
 - Shared slash commands
-- Optional GitHub Actions with Claude
+- Local CI pipeline (`scripts/ci-local.sh`)
 
 **Goal**: Same context, same standards, same output - regardless of who runs Claude.
 
@@ -422,13 +422,13 @@ git push
 
 ---
 
-## Phase 5: GitHub Actions Integration (Optional)
+## Phase 5: Local CI Pipeline (Active)
 
-> **Status (Feb 2026):** GitHub Actions billing exhausted. All CI workflows disabled
-> (renamed to `.yml.disabled`). Only `claude-pr-assistant.yml` remains active
-> (triggers on @claude mention only). To re-enable: rename `.yml.disabled` → `.yml`.
+> **Status (Apr 2026):** GitHub Actions replaced by local CI (`scripts/ci-local.sh`).
+> Old workflows archived in `.github/workflows-disabled/`.
+> CI runs locally before PRs (`/pr` command) and deploys (`deploy-local.sh`).
 
-**Effort**: 20 minutes | **Impact**: Medium | **Priority**: When billing restored
+**Effort**: Done | **Impact**: High | **Priority**: Complete
 
 ### File: `.github/workflows/claude-review.yml`
 
