@@ -190,7 +190,8 @@ async function uploadToVfStorage(
   const formData = new FormData();
   formData.append('file', new Blob([buffer as unknown as BlobPart], { type: 'image/jpeg' }), filename);
 
-  const uploadUrl = `${VF_STORAGE_BASE}/upload/snags/${encodeURIComponent(category)}`;
+  // VF Storage API route: /upload/:type/:category
+  const uploadUrl = `${VF_STORAGE_BASE}/upload/snags/${category}`;
 
   const response = await fetch(uploadUrl, {
     method: 'POST',
@@ -207,15 +208,16 @@ async function uploadToVfStorage(
   const result = (await response.json()) as {
     filename?: string;
     path?: string;
+    url?: string;
     size?: number;
   };
 
   const actualFilename = result.filename ?? filename;
-  const actualPath     = result.path ?? `snags/${category}/${actualFilename}`;
+  const storagePath = result.path ?? `snags/${category}/${actualFilename}`;
 
-  // Return relative /storage/ URL (nginx proxies this per-environment)
+  // Use https://vf.fibreflow.app/storage/ prefix for nginx proxy routing
   return {
-    url: `/storage/${actualPath}`,
+    url: `https://vf.fibreflow.app/storage/${storagePath}`,
     filename: actualFilename,
   };
 }
@@ -245,7 +247,7 @@ export async function uploadSourcePdf(
     filename
   );
 
-  const uploadUrl = `${VF_STORAGE_BASE}/upload/snags/${encodeURIComponent(category)}`;
+  const uploadUrl = `${VF_STORAGE_BASE}/upload/snags/${category}`;
 
   try {
     const response = await fetch(uploadUrl, { method: 'POST', body: formData });
@@ -254,8 +256,8 @@ export async function uploadSourcePdf(
       return '';
     }
     const result = (await response.json()) as { path?: string; filename?: string };
-    const actualPath = result.path ?? `snags/${category}/${result.filename ?? filename}`;
-    return `/storage/${actualPath}`;
+    const storagePath = result.path ?? `snags/${category}/${result.filename ?? filename}`;
+    return `https://vf.fibreflow.app/storage/${storagePath}`;
   } catch (err) {
     log.warn('TqrImageExtractor: source PDF upload failed', { error: err });
     return '';
