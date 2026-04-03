@@ -162,7 +162,7 @@ export interface SnagProjectStats {
 }
 
 // ============================================================
-// Filter State
+// Sort
 // ============================================================
 
 export type SnagSortBy =
@@ -171,6 +171,10 @@ export type SnagSortBy =
   | 'status'
   | 'severity'
   | 'needs_attention';
+
+// ============================================================
+// Filter State
+// ============================================================
 
 export interface SnagFilters {
   projectId: string;

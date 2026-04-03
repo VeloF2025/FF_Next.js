@@ -1,6 +1,6 @@
 /**
  * SnagFilters — Filter bar for snag grid.
- * Project, status, category, severity, and text search.
+ * Project, status, category, severity, sort, and text search.
  */
 
 'use client';
@@ -62,7 +62,7 @@ function toFilter(v: string): string { return v === ALL ? '' : v; }
 /** Convert empty string to ALL sentinel for Select */
 function fromFilter(v: string): string { return v === '' ? ALL : v; }
 
-/** 🟢 WORKING: Filter bar for snag grid */
+/** 🟢 WORKING: Filter bar for snag grid with sort */
 export function SnagFiltersBar({ filters, projects, onChange }: SnagFiltersProps) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -117,9 +117,9 @@ export function SnagFiltersBar({ filters, projects, onChange }: SnagFiltersProps
         </SelectContent>
       </Select>
 
-      {/* Sort order */}
+      {/* Sort */}
       <Select
-        value={filters.sortBy}
+        value={filters.sortBy ?? 'newest'}
         onValueChange={(v) => onChange({ sortBy: v as SnagSortBy })}
       >
         <SelectTrigger className="w-44 bg-zinc-800 border-zinc-700 text-zinc-100">

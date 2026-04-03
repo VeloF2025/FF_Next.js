@@ -39,8 +39,8 @@ export function SnagsPage() {
     handleFilterChange,
     handleSnagUpdated,
     handlePhotoAdded,
-    handlePhotoDeleted,
     handleReportDeleted,
+    handlePhotoDeleted,
     handleImported,
   } = useSnagsPage();
 
@@ -112,8 +112,8 @@ export function SnagsPage() {
           onBack={handleBack}
           onSnagUpdated={handleSnagUpdated}
           onPhotoAdded={handlePhotoAdded}
-          onPhotoDeleted={handlePhotoDeleted}
           onReportDeleted={handleReportDeleted}
+          onPhotoDeleted={handlePhotoDeleted}
         />
       )}
 

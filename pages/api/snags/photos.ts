@@ -133,13 +133,15 @@ async function handleDelete(req: NextApiRequest, res: NextApiResponse) {
   ` as Array<{ id: string }>;
 
   if (existing.length === 0) {
-    return apiResponse.notFound(res, 'SnagPhoto', id);
+    return apiResponse.notFound(res, 'Snag photo', id);
   }
 
-  await sql`DELETE FROM snag_photos WHERE id = ${id}`;
+  await sql`
+    DELETE FROM snag_photos WHERE id = ${id}
+  `;
 
   log.info('Snag photo deleted', { photoId: id });
-  return apiResponse.success(res, { id, deleted: true });
+  return apiResponse.success(res, { id }, 'Photo deleted');
 }
 
 export default withAuth(handler);

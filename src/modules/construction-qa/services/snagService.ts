@@ -147,27 +147,20 @@ export async function uploadSnagPhoto(data: CreateSnagPhotoRequest): Promise<Sna
   return json.data;
 }
 
-/**
- * Upload a photo file to VF Storage and create a snag_photo record.
- * POSTs multipart form to /api/snags/upload-photo.
- */
-export async function uploadSnagPhotoFile(file: File, snagId: string, phase: string): Promise<SnagPhoto> {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('snag_id', snagId);
-  formData.append('phase', phase);
-  const res = await fetch('/api/snags/upload-photo', { method: 'POST', body: formData });
+/** Delete a snag report (and all its snags/photos via CASCADE). */
+export async function deleteSnagReport(id: string): Promise<void> {
+  const res = await fetch(`/api/snags/reports?id=${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
   if (!res.ok) {
     const err = await res.json() as { error?: { message?: string } };
-    throw new Error(err.error?.message ?? 'Upload failed');
+    throw new Error(err.error?.message ?? 'Failed to delete report');
   }
-  const json = await res.json() as { data: SnagPhoto };
-  return json.data;
 }
 
 /** Delete a single snag photo record. */
-export async function deleteSnagPhoto(photoId: string): Promise<void> {
-  const res = await fetch(`/api/snags/photos?id=${encodeURIComponent(photoId)}`, {
+export async function deleteSnagPhoto(id: string): Promise<void> {
+  const res = await fetch(`/api/snags/photos?id=${encodeURIComponent(id)}`, {
     method: 'DELETE',
   });
   if (!res.ok) {
@@ -176,15 +169,27 @@ export async function deleteSnagPhoto(photoId: string): Promise<void> {
   }
 }
 
-/** Delete a TQR snag report (cascades to snags + photos via FK). */
-export async function deleteSnagReport(reportId: string): Promise<void> {
-  const res = await fetch(`/api/snags/reports?id=${encodeURIComponent(reportId)}`, {
-    method: 'DELETE',
+/** Upload a file directly to VF Storage and insert a snag_photo record. */
+export async function uploadSnagPhotoFile(
+  file: File,
+  snagId: string,
+  phase: string
+): Promise<SnagPhoto> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('snag_id', snagId);
+  formData.append('phase', phase);
+
+  const res = await fetch('/api/snags/upload-photo', {
+    method: 'POST',
+    body: formData,
   });
   if (!res.ok) {
     const err = await res.json() as { error?: { message?: string } };
-    throw new Error(err.error?.message ?? 'Failed to delete report');
+    throw new Error(err.error?.message ?? 'Failed to upload photo');
   }
+  const json = await res.json() as { data: SnagPhoto };
+  return json.data;
 }
 
 // ============================================================

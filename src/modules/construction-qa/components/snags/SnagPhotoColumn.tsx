@@ -1,134 +1,133 @@
 /**
- * SnagPhotoColumn — Photo column for the 3-column before/during/after layout in SnagDetail.
- * Supports file upload (drag-and-drop or click), URL input fallback, and photo delete.
+ * SnagPhotoColumn — Photo column for the 3-column before/during/after layout.
+ * - Before column: read-only (imported from TQR PDF)
+ * - During/After: file upload (primary) + URL input (secondary toggle)
+ * - All photos: hover X button to delete
  */
 
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
-import { Upload, ExternalLink, Link as LinkIcon, X, Loader2 } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Upload, ExternalLink, X, Link as LinkIcon, Loader2 } from 'lucide-react';
 import type { SnagPhoto } from '../../types/snag.types';
 import { uploadSnagPhoto, uploadSnagPhotoFile, deleteSnagPhoto } from '../../services/snagService';
 import { log } from '@/lib/logger';
 
 // ============================================================
-// FileUploadZone
+// PhotoUrlInput — secondary URL add mode
 // ============================================================
 
-interface FileUploadZoneProps {
-  onFile: (file: File) => void;
+function PhotoUrlInput({
+  onSubmit,
+  uploading,
+  onCancel,
+}: {
+  onSubmit: (url: string) => void;
   uploading: boolean;
-}
+  onCancel: () => void;
+}) {
+  const [url, setUrl] = useState('');
 
-function FileUploadZone({ onFile, uploading }: FileUploadZoneProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [dragOver, setDragOver] = useState(false);
-
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) onFile(file);
-  }, [onFile]);
-
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) onFile(file);
-    // Reset input so same file can be re-selected
-    if (inputRef.current) inputRef.current.value = '';
-  }, [onFile]);
+  const handleSubmit = () => {
+    if (url.trim()) {
+      onSubmit(url);
+      setUrl('');
+    }
+  };
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      aria-label="Upload photo"
-      onClick={() => inputRef.current?.click()}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click(); }}
-      onDrop={handleDrop}
-      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-      onDragLeave={() => setDragOver(false)}
-      className={`flex flex-col items-center justify-center gap-1 py-2 rounded border border-dashed cursor-pointer transition-colors text-xs select-none
-        ${dragOver ? 'border-blue-500 bg-blue-950/30 text-blue-300' : 'border-zinc-600 hover:border-zinc-400 text-zinc-400'}`}
-    >
-      {uploading ? (
-        <Loader2 className="h-4 w-4 animate-spin" />
-      ) : (
-        <Upload className="h-4 w-4" />
-      )}
-      <span>{uploading ? 'Uploading...' : 'Upload photo'}</span>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleChange}
-        disabled={uploading}
-      />
+    <div className="flex flex-col gap-1">
+      <div className="flex gap-1">
+        <input
+          type="text"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="VF Storage URL..."
+          className="flex-1 text-xs bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-500 min-w-0"
+          onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+        />
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={uploading || !url.trim()}
+          className="flex items-center gap-1 text-xs bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-200 px-2 py-1 rounded whitespace-nowrap"
+        >
+          {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+          {uploading ? 'Adding...' : 'Add'}
+        </button>
+      </div>
+      <button
+        type="button"
+        onClick={onCancel}
+        className="text-xs text-zinc-500 hover:text-zinc-300 text-left"
+      >
+        Cancel
+      </button>
     </div>
   );
 }
 
 // ============================================================
-// PhotoUrlInput (secondary/collapsed)
+// PhotoThumbnail — single photo with delete overlay
 // ============================================================
 
-interface PhotoUrlInputProps {
-  onSubmit: (url: string) => void;
-  uploading: boolean;
-}
+function PhotoThumbnail({
+  photo,
+  phaseLabel,
+  onDelete,
+}: {
+  photo: SnagPhoto;
+  phaseLabel: string;
+  onDelete: (id: string) => void;
+}) {
+  const [deleting, setDeleting] = useState(false);
 
-function PhotoUrlInput({ onSubmit, uploading }: PhotoUrlInputProps) {
-  const [url, setUrl] = useState('');
-  const [open, setOpen] = useState(false);
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
-      >
-        <LinkIcon className="h-3 w-3" />
-        Add by URL
-      </button>
-    );
-  }
-
-  const handleSubmit = () => {
-    if (url.trim()) {
-      onSubmit(url.trim());
-      setUrl('');
-      setOpen(false);
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!window.confirm('Delete this photo?')) return;
+    setDeleting(true);
+    try {
+      await deleteSnagPhoto(photo.id);
+      onDelete(photo.id);
+    } catch (err) {
+      log.error('Failed to delete snag photo', { err, photoId: photo.id });
+    } finally {
+      setDeleting(false);
     }
   };
 
   return (
-    <div className="flex gap-1">
-      <input
-        type="text"
-        value={url}
-        onChange={(e) => setUrl(e.target.value)}
-        placeholder="VF Storage URL..."
-        className="flex-1 text-xs bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-500 min-w-0"
-        onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-        autoFocus
-      />
+    <div className="relative group rounded overflow-hidden bg-zinc-800">
+      <a
+        href={photo.photo_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block hover:opacity-90 transition-opacity"
+      >
+        <img
+          src={photo.thumbnail_url ?? photo.photo_url}
+          alt={`${phaseLabel} photo`}
+          className="w-full h-32 object-cover"
+        />
+        <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-zinc-300 text-xs px-2 py-1 flex items-center justify-between">
+          <span>{photo.source.replace('_', ' ')}</span>
+          <ExternalLink className="h-3 w-3" />
+        </div>
+      </a>
+
+      {/* Delete button — visible on hover */}
       <button
         type="button"
-        onClick={handleSubmit}
-        disabled={uploading || !url.trim()}
-        className="flex items-center gap-1 text-xs bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-200 px-2 py-1 rounded whitespace-nowrap"
+        onClick={(e) => { void handleDelete(e); }}
+        disabled={deleting}
+        aria-label="Delete photo"
+        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 hover:bg-red-800 disabled:opacity-50 rounded p-0.5"
       >
-        {uploading ? 'Adding...' : 'Add'}
-      </button>
-      <button
-        type="button"
-        onClick={() => { setOpen(false); setUrl(''); }}
-        className="text-zinc-500 hover:text-zinc-300 px-1"
-        aria-label="Cancel URL input"
-      >
-        <X className="h-3 w-3" />
+        {deleting
+          ? <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
+          : <X className="h-3.5 w-3.5 text-white" />
+        }
       </button>
     </div>
   );
@@ -146,54 +145,58 @@ interface PhotoColumnProps {
   onPhotoDeleted: (photoId: string) => void;
 }
 
-/** 🟢 WORKING: Single phase column in the 3-column photo layout */
-export function PhotoColumn({ phase, photos, snagId, onPhotoAdded, onPhotoDeleted }: PhotoColumnProps) {
+/** 🟢 WORKING: Single phase column — file upload + URL add + photo delete */
+export function PhotoColumn({
+  phase,
+  photos,
+  snagId,
+  onPhotoAdded,
+  onPhotoDeleted,
+}: PhotoColumnProps) {
   const [uploading, setUploading] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const phasePhotos = photos.filter((p) => p.phase === phase);
   const canUpload = phase !== 'before';
   const phaseLabel = phase.charAt(0).toUpperCase() + phase.slice(1);
 
-  const handleFileUpload = async (file: File) => {
+  // ── File upload ─────────────────────────────────────────
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset so the same file can be re-selected if needed
+    e.target.value = '';
     setUploading(true);
     try {
       const photo = await uploadSnagPhotoFile(file, snagId, phase);
       onPhotoAdded(photo);
     } catch (err) {
-      log.error('Failed to upload snag photo file', { err, snagId, phase });
+      log.error('Failed to upload fix photo', { err, snagId, phase });
     } finally {
       setUploading(false);
     }
   };
 
+  // ── URL submit ──────────────────────────────────────────
+
   const handleUrlSubmit = async (url: string) => {
+    if (!url.trim()) return;
     setUploading(true);
     try {
       const photo = await uploadSnagPhoto({
         snag_id: snagId,
         phase,
-        photo_url: url,
+        photo_url: url.trim(),
         source: 'manual',
       });
       onPhotoAdded(photo);
+      setShowUrlInput(false);
     } catch (err) {
-      log.error('Failed to add snag photo by URL', { err, snagId, phase });
+      log.error('Failed to add snag photo by URL', { err });
     } finally {
       setUploading(false);
-    }
-  };
-
-  const handleDeletePhoto = async (photoId: string) => {
-    const confirmed = window.confirm('Delete this photo? This cannot be undone.');
-    if (!confirmed) return;
-    setDeletingId(photoId);
-    try {
-      await deleteSnagPhoto(photoId);
-      onPhotoDeleted(photoId);
-    } catch (err) {
-      log.error('Failed to delete snag photo', { err, photoId });
-    } finally {
-      setDeletingId(null);
     }
   };
 
@@ -201,43 +204,16 @@ export function PhotoColumn({ phase, photos, snagId, onPhotoAdded, onPhotoDelete
     <div className="flex flex-col gap-2">
       <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">{phaseLabel}</h4>
 
+      {/* Photo list */}
       {phasePhotos.length > 0 ? (
         <div className="grid gap-1">
           {phasePhotos.map((photo) => (
-            <div key={photo.id} className="relative group rounded overflow-hidden bg-zinc-800">
-              <a
-                href={photo.photo_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block hover:opacity-90 transition-opacity"
-              >
-                <img
-                  src={photo.thumbnail_url ?? photo.photo_url}
-                  alt={`${phaseLabel} photo`}
-                  className="w-full h-32 object-cover"
-                />
-                <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-zinc-300 text-xs px-2 py-1 flex items-center justify-between">
-                  <span>{photo.source.replace('_', ' ')}</span>
-                  <ExternalLink className="h-3 w-3" />
-                </div>
-              </a>
-
-              {/* Delete overlay button */}
-              <button
-                type="button"
-                onClick={() => { void handleDeletePhoto(photo.id); }}
-                disabled={deletingId === photo.id}
-                title="Delete photo"
-                aria-label="Delete photo"
-                className="absolute top-1 right-1 p-1 rounded bg-black/60 text-zinc-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-40"
-              >
-                {deletingId === photo.id ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <X className="h-3 w-3" />
-                )}
-              </button>
-            </div>
+            <PhotoThumbnail
+              key={photo.id}
+              photo={photo}
+              phaseLabel={phaseLabel}
+              onDelete={onPhotoDeleted}
+            />
           ))}
         </div>
       ) : (
@@ -246,12 +222,53 @@ export function PhotoColumn({ phase, photos, snagId, onPhotoAdded, onPhotoDelete
         </div>
       )}
 
+      {/* Upload controls (during / after only) */}
       {canUpload && (
-        <FileUploadZone onFile={handleFileUpload} uploading={uploading} />
-      )}
+        <>
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => { void handleFileChange(e); }}
+          />
 
-      {canUpload && (
-        <PhotoUrlInput onSubmit={handleUrlSubmit} uploading={uploading} />
+          {/* Primary: file upload button */}
+          {!showUrlInput && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center justify-center gap-1.5 text-xs bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-200 px-2 py-1.5 rounded w-full"
+            >
+              {uploading
+                ? <Loader2 className="h-3 w-3 animate-spin" />
+                : <Upload className="h-3 w-3" />
+              }
+              {uploading ? 'Uploading...' : 'Upload photo'}
+            </button>
+          )}
+
+          {/* Secondary: URL input toggle */}
+          {!showUrlInput ? (
+            <button
+              type="button"
+              onClick={() => setShowUrlInput(true)}
+              disabled={uploading}
+              className="flex items-center justify-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 disabled:opacity-50"
+            >
+              <LinkIcon className="h-3 w-3" />
+              Add by URL
+            </button>
+          ) : (
+            <PhotoUrlInput
+              onSubmit={handleUrlSubmit}
+              uploading={uploading}
+              onCancel={() => setShowUrlInput(false)}
+            />
+          )}
+        </>
       )}
     </div>
   );

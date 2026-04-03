@@ -151,20 +151,22 @@ async function handleDelete(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'id query parameter is required');
   }
 
-  // Verify exists before delete
+  // Verify the report exists before deleting
   const existing = await sql`
-    SELECT id, report_number FROM snag_reports WHERE id = ${id}
-  ` as Array<{ id: string; report_number: string }>;
+    SELECT id FROM snag_reports WHERE id = ${id}
+  ` as Array<{ id: string }>;
 
   if (existing.length === 0) {
-    return apiResponse.notFound(res, 'SnagReport', id);
+    return apiResponse.notFound(res, 'Snag report', id);
   }
 
-  // FK cascade on snag_reports → snags → snag_photos handles child rows
-  await sql`DELETE FROM snag_reports WHERE id = ${id}`;
+  // CASCADE in the DB schema handles snags and snag_photos deletion
+  await sql`
+    DELETE FROM snag_reports WHERE id = ${id}
+  `;
 
-  log.info('Snag report deleted', { reportId: id, reportNumber: existing[0]?.report_number });
-  return apiResponse.success(res, { id, deleted: true });
+  log.info('Snag report deleted', { reportId: id });
+  return apiResponse.success(res, { id }, 'Report deleted');
 }
 
 export default withAuth(handler);

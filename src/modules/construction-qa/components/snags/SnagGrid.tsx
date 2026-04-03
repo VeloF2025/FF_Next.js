@@ -10,6 +10,8 @@ import { useState, useCallback } from 'react';
 import { ChevronLeft, ChevronDown, ChevronRight, Loader2, Trash2 } from 'lucide-react';
 import { SnagCard } from './SnagCard';
 import { SnagDetail } from './SnagDetail';
+import { deleteSnagReport } from '../../services/snagService';
+import { log } from '@/lib/logger';
 import type { Snag, SnagPhoto } from '../../types/snag.types';
 import type { ReportGroup } from './useSnagsPage';
 
@@ -21,8 +23,8 @@ interface SnagGridProps {
   onBack: () => void;
   onSnagUpdated: (snag: Snag) => void;
   onPhotoAdded: (snagId: string, photo: SnagPhoto) => void;
+  onReportDeleted: (reportId: string) => void;
   onPhotoDeleted: (snagId: string, photoId: string) => void;
-  onReportDeleted: (reportId: string) => Promise<boolean>;
 }
 
 /** 🟢 WORKING: Snag card grid grouped by report */
@@ -34,8 +36,8 @@ export function SnagGrid({
   onBack,
   onSnagUpdated,
   onPhotoAdded,
-  onPhotoDeleted,
   onReportDeleted,
+  onPhotoDeleted,
 }: SnagGridProps) {
   const [expandedSnagId, setExpandedSnagId] = useState<string | null>(null);
   const [collapsedReports, setCollapsedReports] = useState<Set<string>>(new Set());
@@ -65,15 +67,14 @@ export function SnagGrid({
     onPhotoAdded(snagId, photo);
   }, [onPhotoAdded]);
 
-  const handlePhotoDeleted = useCallback((snagId: string, photoId: string) => {
-    onPhotoDeleted(snagId, photoId);
-  }, [onPhotoDeleted]);
-
-  const handleDeleteReport = useCallback(async (e: React.MouseEvent, reportId: string) => {
-    e.stopPropagation();
+  const handleDeleteReport = useCallback(async (reportId: string, reportNumber: string) => {
+    if (!window.confirm(`Delete report ${reportNumber} and all its findings? This cannot be undone.`)) return;
     setDeletingReportId(reportId);
     try {
-      await onReportDeleted(reportId);
+      await deleteSnagReport(reportId);
+      onReportDeleted(reportId);
+    } catch (err) {
+      log.error('Failed to delete snag report', { err, reportId });
     } finally {
       setDeletingReportId(null);
     }
@@ -111,7 +112,6 @@ export function SnagGrid({
       {/* Report groups */}
       {groups.map((group) => {
         const isCollapsed = collapsedReports.has(group.report.id);
-        const isDeleting = deletingReportId === group.report.id;
         const auditDate = new Date(group.report.audit_date).toLocaleDateString('en-ZA');
         const openCount = group.snags.filter(
           (s) => ['open', 'assigned', 'in_progress', 'reopened'].includes(s.status)
@@ -155,17 +155,15 @@ export function SnagGrid({
               {/* Delete report button */}
               <button
                 type="button"
-                onClick={(e) => { void handleDeleteReport(e, group.report.id); }}
-                disabled={isDeleting}
-                title="Delete this report and all its snags"
-                className="p-2 text-zinc-600 hover:text-red-400 disabled:opacity-40 transition-colors shrink-0"
-                aria-label="Delete report"
+                onClick={() => { void handleDeleteReport(group.report.id, group.report.report_number); }}
+                disabled={deletingReportId === group.report.id}
+                aria-label={`Delete report ${group.report.report_number}`}
+                className="p-2 text-zinc-500 hover:text-red-400 disabled:opacity-50 transition-colors border border-zinc-700 rounded-md bg-zinc-800 hover:bg-zinc-750"
               >
-                {isDeleting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4" />
-                )}
+                {deletingReportId === group.report.id
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <Trash2 className="h-4 w-4" />
+                }
               </button>
             </div>
 
@@ -192,7 +190,7 @@ export function SnagGrid({
                           onClose={() => setExpandedSnagId(null)}
                           onUpdated={handleSnagUpdated}
                           onPhotoAdded={(photo) => handlePhotoAdded(snag.id, photo)}
-                          onPhotoDeleted={(photoId) => handlePhotoDeleted(snag.id, photoId)}
+                          onPhotoDeleted={(photoId) => onPhotoDeleted(snag.id, photoId)}
                         />
                       )}
                     </div>
