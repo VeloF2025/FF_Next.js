@@ -78,7 +78,7 @@ export function listPdfImages(pdfPath: string): ImageListEntry[] {
     const type   = parts[2] ?? '';
     const width  = parseInt(parts[3] ?? '', 10);
     const height = parseInt(parts[4] ?? '', 10);
-    const enc    = parts[7] ?? '';
+    const enc    = parts[8] ?? '';
 
     if (isNaN(page) || isNaN(index)) continue;
     entries.push({ page, index, type, width, height, enc });
