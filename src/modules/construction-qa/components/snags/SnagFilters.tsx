@@ -7,7 +7,7 @@
 
 import { Search } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { SnagFilters } from '../../types/snag.types';
+import type { SnagFilters, SnagSortBy } from '../../types/snag.types';
 
 interface Project {
   id: string;
@@ -47,6 +47,14 @@ const SEVERITY_OPTIONS = [
   { value: 'critical', label: 'Critical' },
   { value: 'major', label: 'Major' },
   { value: 'minor', label: 'Minor' },
+];
+
+const SORT_OPTIONS: { value: SnagSortBy; label: string }[] = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'status', label: 'By status' },
+  { value: 'severity', label: 'By severity' },
+  { value: 'needs_attention', label: 'Needs attention' },
 ];
 
 /** Convert ALL sentinel to empty string for API */
@@ -102,6 +110,23 @@ export function SnagFiltersBar({ filters, projects, onChange }: SnagFiltersProps
         </SelectTrigger>
         <SelectContent className="bg-zinc-800 border-zinc-700">
           {SEVERITY_OPTIONS.map((o) => (
+            <SelectItem key={o.value} value={o.value} className="text-zinc-100">
+              {o.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Sort order */}
+      <Select
+        value={filters.sortBy}
+        onValueChange={(v) => onChange({ sortBy: v as SnagSortBy })}
+      >
+        <SelectTrigger className="w-44 bg-zinc-800 border-zinc-700 text-zinc-100">
+          <SelectValue placeholder="Sort by" />
+        </SelectTrigger>
+        <SelectContent className="bg-zinc-800 border-zinc-700">
+          {SORT_OPTIONS.map((o) => (
             <SelectItem key={o.value} value={o.value} className="text-zinc-100">
               {o.label}
             </SelectItem>

@@ -20,8 +20,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return await handleGet(req, res);
       case 'POST':
         return await handlePost(req, res);
+      case 'DELETE':
+        return await handleDelete(req, res);
       default:
-        return apiResponse.methodNotAllowed(res, req.method ?? 'Unknown', ['GET', 'POST']);
+        return apiResponse.methodNotAllowed(res, req.method ?? 'Unknown', ['GET', 'POST', 'DELETE']);
     }
   } catch (error) {
     log.error('Snag reports API error', { error });
@@ -140,6 +142,29 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
 
   log.info('Snag report created', { reportId: rows[0].id, reportNumber: rows[0].report_number });
   return apiResponse.created(res, rows[0]);
+}
+
+async function handleDelete(req: NextApiRequest, res: NextApiResponse) {
+  const { id } = req.query;
+
+  if (!id || typeof id !== 'string') {
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'id query parameter is required');
+  }
+
+  // Verify exists before delete
+  const existing = await sql`
+    SELECT id, report_number FROM snag_reports WHERE id = ${id}
+  ` as Array<{ id: string; report_number: string }>;
+
+  if (existing.length === 0) {
+    return apiResponse.notFound(res, 'SnagReport', id);
+  }
+
+  // FK cascade on snag_reports → snags → snag_photos handles child rows
+  await sql`DELETE FROM snag_reports WHERE id = ${id}`;
+
+  log.info('Snag report deleted', { reportId: id, reportNumber: existing[0]?.report_number });
+  return apiResponse.success(res, { id, deleted: true });
 }
 
 export default withAuth(handler);

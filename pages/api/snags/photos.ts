@@ -20,8 +20,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return await handleGet(req, res);
       case 'POST':
         return await handlePost(req, res);
+      case 'DELETE':
+        return await handleDelete(req, res);
       default:
-        return apiResponse.methodNotAllowed(res, req.method ?? 'Unknown', ['GET', 'POST']);
+        return apiResponse.methodNotAllowed(res, req.method ?? 'Unknown', ['GET', 'POST', 'DELETE']);
     }
   } catch (error) {
     log.error('Snag photos API error', { error });
@@ -117,6 +119,27 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   });
 
   return apiResponse.created(res, rows[0]);
+}
+
+async function handleDelete(req: NextApiRequest, res: NextApiResponse) {
+  const { id } = req.query;
+
+  if (!id || typeof id !== 'string') {
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'id query parameter is required');
+  }
+
+  const existing = await sql`
+    SELECT id FROM snag_photos WHERE id = ${id}
+  ` as Array<{ id: string }>;
+
+  if (existing.length === 0) {
+    return apiResponse.notFound(res, 'SnagPhoto', id);
+  }
+
+  await sql`DELETE FROM snag_photos WHERE id = ${id}`;
+
+  log.info('Snag photo deleted', { photoId: id });
+  return apiResponse.success(res, { id, deleted: true });
 }
 
 export default withAuth(handler);

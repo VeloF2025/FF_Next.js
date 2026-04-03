@@ -165,6 +165,13 @@ export interface SnagProjectStats {
 // Filter State
 // ============================================================
 
+export type SnagSortBy =
+  | 'newest'
+  | 'oldest'
+  | 'status'
+  | 'severity'
+  | 'needs_attention';
+
 export interface SnagFilters {
   projectId: string;
   reportId: string;
@@ -172,6 +179,7 @@ export interface SnagFilters {
   category: string;
   severity: string;
   search: string;
+  sortBy: SnagSortBy;
   page: number;
   pageSize: number;
 }

@@ -7,7 +7,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { ChevronLeft, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronRight, Loader2, Trash2 } from 'lucide-react';
 import { SnagCard } from './SnagCard';
 import { SnagDetail } from './SnagDetail';
 import type { Snag, SnagPhoto } from '../../types/snag.types';
@@ -21,6 +21,8 @@ interface SnagGridProps {
   onBack: () => void;
   onSnagUpdated: (snag: Snag) => void;
   onPhotoAdded: (snagId: string, photo: SnagPhoto) => void;
+  onPhotoDeleted: (snagId: string, photoId: string) => void;
+  onReportDeleted: (reportId: string) => Promise<boolean>;
 }
 
 /** 🟢 WORKING: Snag card grid grouped by report */
@@ -32,9 +34,12 @@ export function SnagGrid({
   onBack,
   onSnagUpdated,
   onPhotoAdded,
+  onPhotoDeleted,
+  onReportDeleted,
 }: SnagGridProps) {
   const [expandedSnagId, setExpandedSnagId] = useState<string | null>(null);
   const [collapsedReports, setCollapsedReports] = useState<Set<string>>(new Set());
+  const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
 
   const toggleReport = useCallback((reportId: string) => {
     setCollapsedReports((prev) => {
@@ -59,6 +64,20 @@ export function SnagGrid({
   const handlePhotoAdded = useCallback((snagId: string, photo: SnagPhoto) => {
     onPhotoAdded(snagId, photo);
   }, [onPhotoAdded]);
+
+  const handlePhotoDeleted = useCallback((snagId: string, photoId: string) => {
+    onPhotoDeleted(snagId, photoId);
+  }, [onPhotoDeleted]);
+
+  const handleDeleteReport = useCallback(async (e: React.MouseEvent, reportId: string) => {
+    e.stopPropagation();
+    setDeletingReportId(reportId);
+    try {
+      await onReportDeleted(reportId);
+    } finally {
+      setDeletingReportId(null);
+    }
+  }, [onReportDeleted]);
 
   if (loading) {
     return (
@@ -92,6 +111,7 @@ export function SnagGrid({
       {/* Report groups */}
       {groups.map((group) => {
         const isCollapsed = collapsedReports.has(group.report.id);
+        const isDeleting = deletingReportId === group.report.id;
         const auditDate = new Date(group.report.audit_date).toLocaleDateString('en-ZA');
         const openCount = group.snags.filter(
           (s) => ['open', 'assigned', 'in_progress', 'reopened'].includes(s.status)
@@ -103,33 +123,51 @@ export function SnagGrid({
         return (
           <div key={group.report.id} className="space-y-2">
             {/* Report header */}
-            <button
-              type="button"
-              onClick={() => toggleReport(group.report.id)}
-              className="w-full flex items-center gap-2 text-left bg-zinc-800 hover:bg-zinc-750 border border-zinc-700 rounded-md px-3 py-2 transition-colors"
-            >
-              {isCollapsed ? (
-                <ChevronRight className="h-4 w-4 text-zinc-500 shrink-0" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-zinc-500 shrink-0" />
-              )}
-              <span className="text-sm font-medium text-zinc-200 flex-1">
-                {group.report.report_number} — {auditDate}
-              </span>
-              <span className="text-xs text-zinc-400">
-                {group.snags.length} findings
-              </span>
-              {openCount > 0 && (
-                <span className="text-xs bg-red-900/60 text-red-300 px-1.5 py-0.5 rounded">
-                  {openCount} open
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => toggleReport(group.report.id)}
+                className="flex-1 flex items-center gap-2 text-left bg-zinc-800 hover:bg-zinc-750 border border-zinc-700 rounded-md px-3 py-2 transition-colors"
+              >
+                {isCollapsed ? (
+                  <ChevronRight className="h-4 w-4 text-zinc-500 shrink-0" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-zinc-500 shrink-0" />
+                )}
+                <span className="text-sm font-medium text-zinc-200 flex-1">
+                  {group.report.report_number} — {auditDate}
                 </span>
-              )}
-              {fixedCount > 0 && (
-                <span className="text-xs bg-green-900/60 text-green-300 px-1.5 py-0.5 rounded">
-                  {fixedCount} resolved
+                <span className="text-xs text-zinc-400">
+                  {group.snags.length} findings
                 </span>
-              )}
-            </button>
+                {openCount > 0 && (
+                  <span className="text-xs bg-red-900/60 text-red-300 px-1.5 py-0.5 rounded">
+                    {openCount} open
+                  </span>
+                )}
+                {fixedCount > 0 && (
+                  <span className="text-xs bg-green-900/60 text-green-300 px-1.5 py-0.5 rounded">
+                    {fixedCount} resolved
+                  </span>
+                )}
+              </button>
+
+              {/* Delete report button */}
+              <button
+                type="button"
+                onClick={(e) => { void handleDeleteReport(e, group.report.id); }}
+                disabled={isDeleting}
+                title="Delete this report and all its snags"
+                className="p-2 text-zinc-600 hover:text-red-400 disabled:opacity-40 transition-colors shrink-0"
+                aria-label="Delete report"
+              >
+                {isDeleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </button>
+            </div>
 
             {/* Snag cards grid */}
             {!isCollapsed && (
@@ -154,6 +192,7 @@ export function SnagGrid({
                           onClose={() => setExpandedSnagId(null)}
                           onUpdated={handleSnagUpdated}
                           onPhotoAdded={(photo) => handlePhotoAdded(snag.id, photo)}
+                          onPhotoDeleted={(photoId) => handlePhotoDeleted(snag.id, photoId)}
                         />
                       )}
                     </div>

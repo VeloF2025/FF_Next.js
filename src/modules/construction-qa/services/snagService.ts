@@ -147,6 +147,46 @@ export async function uploadSnagPhoto(data: CreateSnagPhotoRequest): Promise<Sna
   return json.data;
 }
 
+/**
+ * Upload a photo file to VF Storage and create a snag_photo record.
+ * POSTs multipart form to /api/snags/upload-photo.
+ */
+export async function uploadSnagPhotoFile(file: File, snagId: string, phase: string): Promise<SnagPhoto> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('snag_id', snagId);
+  formData.append('phase', phase);
+  const res = await fetch('/api/snags/upload-photo', { method: 'POST', body: formData });
+  if (!res.ok) {
+    const err = await res.json() as { error?: { message?: string } };
+    throw new Error(err.error?.message ?? 'Upload failed');
+  }
+  const json = await res.json() as { data: SnagPhoto };
+  return json.data;
+}
+
+/** Delete a single snag photo record. */
+export async function deleteSnagPhoto(photoId: string): Promise<void> {
+  const res = await fetch(`/api/snags/photos?id=${encodeURIComponent(photoId)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const err = await res.json() as { error?: { message?: string } };
+    throw new Error(err.error?.message ?? 'Failed to delete photo');
+  }
+}
+
+/** Delete a TQR snag report (cascades to snags + photos via FK). */
+export async function deleteSnagReport(reportId: string): Promise<void> {
+  const res = await fetch(`/api/snags/reports?id=${encodeURIComponent(reportId)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const err = await res.json() as { error?: { message?: string } };
+    throw new Error(err.error?.message ?? 'Failed to delete report');
+  }
+}
+
 // ============================================================
 // Projects (for import dialog)
 // ============================================================

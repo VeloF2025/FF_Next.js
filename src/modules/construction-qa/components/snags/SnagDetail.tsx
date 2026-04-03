@@ -22,6 +22,7 @@ interface SnagDetailProps {
   onClose: () => void;
   onUpdated: (updated: Snag) => void;
   onPhotoAdded: (photo: SnagPhoto) => void;
+  onPhotoDeleted: (photoId: string) => void;
 }
 
 const STATUS_OPTIONS: { value: SnagStatus; label: string }[] = [
@@ -35,7 +36,7 @@ const STATUS_OPTIONS: { value: SnagStatus; label: string }[] = [
 ];
 
 /** 🟢 WORKING: Expanded inline snag detail */
-export function SnagDetail({ snag, photos, onClose, onUpdated, onPhotoAdded }: SnagDetailProps) {
+export function SnagDetail({ snag, photos, onClose, onUpdated, onPhotoAdded, onPhotoDeleted }: SnagDetailProps) {
   const [saving, setSaving] = useState(false);
 
   const handleStatusChange = async (status: SnagStatus) => {
@@ -98,6 +99,7 @@ export function SnagDetail({ snag, photos, onClose, onUpdated, onPhotoAdded }: S
             photos={photos}
             snagId={snag.id}
             onPhotoAdded={onPhotoAdded}
+            onPhotoDeleted={onPhotoDeleted}
           />
         ))}
       </div>
