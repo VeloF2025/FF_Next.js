@@ -95,6 +95,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
              COALESCE(pole.latitude, dr.longitude) AS resolved_lon,
              COALESCE(pole.zone_no, dr.zone_no) AS resolved_zone,
              COALESCE(pole.pon_no, dr.pon_no) AS resolved_pon,
+             pole.id AS resolved_pole_uuid,
              pole.pole_number AS resolved_pole_number,
              dr.drop_number AS resolved_dr_number
       FROM snags s
@@ -108,6 +109,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       resolved_lon: string | null;
       resolved_zone: number | null;
       resolved_pon: number | null;
+      resolved_pole_uuid: string | null;
       resolved_pole_number: string | null;
       resolved_dr_number: string | null;
     }>;
@@ -131,7 +133,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const poleRefs = (snag.pole_references ?? []).join(', ');
     const gpsStr = snag.resolved_lat && snag.resolved_lon
-      ? `${snag.resolved_lat}, ${snag.resolved_lon}` : null;
+      ? `${snag.resolved_lat},${snag.resolved_lon}` : null;
 
     const descParts = [
       snag.description,
@@ -158,7 +160,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       created_by: user?.id ?? undefined,
       dr_number: snag.resolved_dr_number ?? undefined,
       zone_id: snag.resolved_zone != null ? String(snag.resolved_zone) : undefined,
-      pole_number: snag.resolved_pole_number ?? undefined,
+      pole_number: snag.resolved_pole_uuid ?? undefined,
       pon_number: snag.resolved_pon != null ? String(snag.resolved_pon) : undefined,
       address: gpsStr ?? undefined,
       external_id: JSON.stringify({ snag_id: snag.id, tags: ['snag', snag.category] }),
