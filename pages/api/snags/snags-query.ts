@@ -38,7 +38,7 @@ export async function querySnagsByReport(
       WHERE s.report_id = ${reportId} AND s.status = ${status}
         AND s.category = ${category} AND s.severity = ${severity}
         AND s.description ILIKE ${searchTerm}
-      ORDER BY s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
+      ORDER BY s.grid_index ASC, s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
     ` as Snag[];
     const countRows = await sql`
       SELECT COUNT(*) AS total FROM snags WHERE report_id = ${reportId}
@@ -57,7 +57,7 @@ export async function querySnagsByReport(
       LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
       WHERE s.report_id = ${reportId} AND s.status = ${status}
         AND s.category = ${category} AND s.severity = ${severity}
-      ORDER BY s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
+      ORDER BY s.grid_index ASC, s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
     ` as Snag[];
     const countRows = await sql`
       SELECT COUNT(*) AS total FROM snags WHERE report_id = ${reportId}
@@ -74,7 +74,7 @@ export async function querySnagsByReport(
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
       LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
       WHERE s.report_id = ${reportId} AND s.status = ${status} AND s.category = ${category}
-      ORDER BY s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
+      ORDER BY s.grid_index ASC, s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
     ` as Snag[];
     const countRows = await sql`
       SELECT COUNT(*) AS total FROM snags WHERE report_id = ${reportId}
@@ -91,7 +91,7 @@ export async function querySnagsByReport(
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
       LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
       WHERE s.report_id = ${reportId} AND s.status = ${status}
-      ORDER BY s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
+      ORDER BY s.grid_index ASC, s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
     ` as Snag[];
     const countRows = await sql`
       SELECT COUNT(*) AS total FROM snags WHERE report_id = ${reportId} AND status = ${status}
@@ -105,7 +105,7 @@ export async function querySnagsByReport(
     LEFT JOIN users u ON u.id = s.assigned_to
     LEFT JOIN snag_reports sr ON sr.id = s.report_id
     WHERE s.report_id = ${reportId}
-    ORDER BY s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
+    ORDER BY s.grid_index ASC, s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
   ` as Snag[];
   const countRows = await sql`
     SELECT COUNT(*) AS total FROM snags WHERE report_id = ${reportId}
@@ -136,7 +136,7 @@ export async function querySnagsByProject(
       LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
       WHERE s.project_id = ${projectId} AND s.status = ${status}
         AND s.category = ${category} AND s.severity = ${severity}
-      ORDER BY sr.audit_date DESC, s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
+      ORDER BY sr.audit_date DESC, s.grid_index ASC, s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
     ` as Snag[];
     const countRows = await sql`
       SELECT COUNT(*) AS total FROM snags WHERE project_id = ${projectId}
@@ -153,7 +153,7 @@ export async function querySnagsByProject(
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
       LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
       WHERE s.project_id = ${projectId} AND s.status = ${status} AND s.category = ${category}
-      ORDER BY sr.audit_date DESC, s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
+      ORDER BY sr.audit_date DESC, s.grid_index ASC, s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
     ` as Snag[];
     const countRows = await sql`
       SELECT COUNT(*) AS total FROM snags WHERE project_id = ${projectId}
@@ -170,7 +170,7 @@ export async function querySnagsByProject(
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
       LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
       WHERE s.project_id = ${projectId} AND s.status = ${status}
-      ORDER BY sr.audit_date DESC, s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
+      ORDER BY sr.audit_date DESC, s.grid_index ASC, s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
     ` as Snag[];
     const countRows = await sql`
       SELECT COUNT(*) AS total FROM snags WHERE project_id = ${projectId} AND status = ${status}
@@ -184,7 +184,7 @@ export async function querySnagsByProject(
     LEFT JOIN users u ON u.id = s.assigned_to
     LEFT JOIN snag_reports sr ON sr.id = s.report_id
     WHERE s.project_id = ${projectId}
-    ORDER BY sr.audit_date DESC, s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
+    ORDER BY sr.audit_date DESC, s.grid_index ASC, s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
   ` as Snag[];
   const countRows = await sql`
     SELECT COUNT(*) AS total FROM snags WHERE project_id = ${projectId}

@@ -97,7 +97,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     LEFT JOIN users u ON u.id = s.assigned_to
     LEFT JOIN snag_reports sr ON sr.id = s.report_id
     LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
-    ORDER BY s.created_at DESC
+    ORDER BY s.grid_index ASC, s.snag_number ASC
     LIMIT ${pageSizeNum} OFFSET ${offset}
   ` as Snag[];
 

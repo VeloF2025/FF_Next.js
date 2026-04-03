@@ -72,13 +72,14 @@ export async function createSnagsPerPhoto(
 
     const snagRows = await sql`
       INSERT INTO snags (
-        report_id, project_id, snag_number,
+        report_id, project_id, snag_number, grid_index,
         category, severity, description,
         pole_references, status
       ) VALUES (
         ${reportId},
         ${projectId},
         ${slot.snagNumber},
+        ${i},
         ${finding.category},
         'major',
         ${finding.description},
