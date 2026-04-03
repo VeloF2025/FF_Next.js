@@ -120,24 +120,45 @@ export function SnagDetail({ snag: initialSnag, photos, onClose, onUpdated, onPh
               </a>
             )}
           </p>
-          {/* GPS from first photo that has coordinates */}
+          {/* GPS from photo + distance to pole */}
           {(() => {
             const gpsPhoto = photos.find((p) => p.latitude != null && p.longitude != null);
             if (!gpsPhoto) return null;
-            const lat = Number(gpsPhoto.latitude);
-            const lon = Number(gpsPhoto.longitude);
-            if (isNaN(lat) || isNaN(lon)) return null;
-            const mapsUrl = `https://www.google.com/maps?q=${lat},${lon}`;
+            const photoLat = Number(gpsPhoto.latitude);
+            const photoLon = Number(gpsPhoto.longitude);
+            if (isNaN(photoLat) || isNaN(photoLon)) return null;
+            const mapsUrl = `https://www.google.com/maps?q=${photoLat},${photoLon}`;
+
+            // Calculate distance to pole if we have pole GPS
+            const poleLat = snag.pole_latitude ? Number(snag.pole_latitude) : null;
+            const poleLon = snag.pole_longitude ? Number(snag.pole_longitude) : null;
+            let distanceM: number | null = null;
+            if (poleLat != null && poleLon != null && !isNaN(poleLat) && !isNaN(poleLon)) {
+              // Haversine formula
+              const R = 6371000;
+              const dLat = (poleLat - photoLat) * Math.PI / 180;
+              const dLon = (poleLon - photoLon) * Math.PI / 180;
+              const a = Math.sin(dLat / 2) ** 2 + Math.cos(photoLat * Math.PI / 180) * Math.cos(poleLat * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+              distanceM = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            }
+
             return (
-              <a
-                href={mapsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 mt-0.5"
-              >
-                <MapPin className="h-3 w-3" />
-                {lat.toFixed(6)}, {lon.toFixed(6)}
-              </a>
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                <a
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
+                >
+                  <MapPin className="h-3 w-3" />
+                  {photoLat.toFixed(6)}, {photoLon.toFixed(6)}
+                </a>
+                {distanceM != null && (
+                  <span className={`text-xs ${distanceM < 50 ? 'text-green-400' : distanceM < 200 ? 'text-yellow-400' : 'text-red-400'}`}>
+                    {distanceM < 1000 ? `${Math.round(distanceM)}m from pole` : `${(distanceM / 1000).toFixed(1)}km from pole`}
+                  </span>
+                )}
+              </div>
             );
           })()}
         </div>

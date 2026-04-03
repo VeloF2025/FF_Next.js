@@ -126,6 +126,10 @@ export interface Snag {
   report_number?: string;
   audit_date?: string;
   noc_ticket_uid?: string | null;
+  pole_latitude?: string | null;
+  pole_longitude?: string | null;
+  pole_zone_no?: number | null;
+  pole_pon_no?: number | null;
   photos?: SnagPhoto[];
 }
 

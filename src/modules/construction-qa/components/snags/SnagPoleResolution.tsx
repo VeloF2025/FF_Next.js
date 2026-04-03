@@ -73,7 +73,12 @@ export function SnagPoleResolution({ snag, onLinked }: SnagPoleResolutionProps) 
         <p className="flex items-center gap-1.5 text-xs text-green-400">
           <CheckCircle className="h-3.5 w-3.5 shrink-0" />
           <span className="font-mono">{poleRefs}</span>
-          <span className="text-zinc-500">linked</span>
+          {snag.pole_zone_no != null && (
+            <span className="text-zinc-400">Zone {snag.pole_zone_no}</span>
+          )}
+          {snag.pole_pon_no != null && (
+            <span className="text-zinc-400">PON {snag.pole_pon_no}</span>
+          )}
         </p>
       </div>
     );
