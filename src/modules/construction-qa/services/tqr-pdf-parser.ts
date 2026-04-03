@@ -266,13 +266,13 @@ export function parseGridMapping(text: string): TqrGridMapping {
   for (let li = 0; li < lines.length; li++) {
     const line = lines[li] ?? '';
 
-    // Start parsing after page 2 heading
-    if (/Page\s+2\s+of\s+10/i.test(line)) {
+    // Start parsing after page 2 heading (any page count)
+    if (/Page\s+2\s+of\s+\d+/i.test(line)) {
       inGridSection = true;
       continue;
     }
-    // Stop before the recommendations section
-    if (/Risk\s+Identification\s*\/\s*Recommendation/i.test(line)) {
+    // Stop before the recommendations section or quality audit results
+    if (/Risk\s+Identification|Recommendation|Quality\s+Audit\s+Results/i.test(line)) {
       break;
     }
     if (!inGridSection) continue;
@@ -283,29 +283,38 @@ export function parseGridMapping(text: string): TqrGridMapping {
       continue;
     }
 
-    // Detect GPS coordinate lines and emit slots
-    gpsGroupPattern.lastIndex = 0;
-    const gpsMatches: Array<{ snagNumber: number; latitude: number; longitude: number }> = [];
+    // Detect grid data lines: either GPS coords or pole references
+    // Format A (2026): "1  -26.119  28.481   1  -26.119  28.481   1  -26.119  28.481"
+    // Format B (2025): "1  P.I031   1  P.H884   1  P.H888"
+    // Format C (2025): "1  -26.123,28.489   1  P.I031   1  P.I036" (mixed)
+    const gridLinePattern = /(\d{1,2})\s+((?:-?\d+\.\d+[,\s]\s*\d+\.\d+)|(?:P\.[A-Z]\d{3,4}[A-Z]?))/g;
+    gridLinePattern.lastIndex = 0;
+    const gridMatches: Array<{ snagNumber: number; latitude: number | null; longitude: number | null; poleRef: string | null }> = [];
     let m: RegExpExecArray | null;
-    while ((m = gpsGroupPattern.exec(line)) !== null) {
-      if (m[1] && m[2] && m[3]) {
-        gpsMatches.push({
-          snagNumber: parseInt(m[1], 10),
-          latitude:   parseFloat(m[2]),
-          longitude:  parseFloat(m[3]),
-        });
+    while ((m = gridLinePattern.exec(line)) !== null) {
+      if (!m[1] || !m[2]) continue;
+      const snagNum = parseInt(m[1], 10);
+      if (snagNum > 30) continue; // Skip page numbers etc.
+      const val = m[2].trim();
+      // Check if it's a GPS coordinate (contains negative sign or comma separator)
+      const gpsMatch = val.match(/(-?\d+\.\d+)[,\s]\s*(\d+\.\d+)/);
+      if (gpsMatch && gpsMatch[1] && gpsMatch[2]) {
+        gridMatches.push({ snagNumber: snagNum, latitude: parseFloat(gpsMatch[1]), longitude: parseFloat(gpsMatch[2]), poleRef: null });
+      } else {
+        // It's a pole reference (P.I031, P.H884)
+        gridMatches.push({ snagNumber: snagNum, latitude: null, longitude: null, poleRef: val });
       }
     }
 
-    if (gpsMatches.length > 0) {
-      for (let col = 0; col < gpsMatches.length; col++) {
-        const gps = gpsMatches[col];
-        if (!gps) continue;
+    if (gridMatches.length > 0) {
+      for (let col = 0; col < gridMatches.length; col++) {
+        const gm = gridMatches[col];
+        if (!gm) continue;
         slots.push({
-          snagNumber:    gps.snagNumber,
-          latitude:      gps.latitude,
-          longitude:     gps.longitude,
-          poleReference: pendingPoleRefs[col] ?? null,
+          snagNumber:    gm.snagNumber,
+          latitude:      gm.latitude,
+          longitude:     gm.longitude,
+          poleReference: gm.poleRef ?? pendingPoleRefs[col] ?? null,
         });
       }
       // Reset pending pole refs after consuming
