@@ -153,10 +153,13 @@ export function SnagDetail({ snag: initialSnag, photos, onClose, onUpdated, onPh
                   <MapPin className="h-3 w-3" />
                   {photoLat.toFixed(6)}, {photoLon.toFixed(6)}
                 </a>
-                {distanceM != null && (
+                {distanceM != null && distanceM > 1 && (
                   <span className={`text-xs ${distanceM < 50 ? 'text-green-400' : distanceM < 200 ? 'text-yellow-400' : 'text-red-400'}`}>
                     {distanceM < 1000 ? `${Math.round(distanceM)}m from pole` : `${(distanceM / 1000).toFixed(1)}km from pole`}
                   </span>
+                )}
+                {distanceM != null && distanceM <= 1 && (
+                  <span className="text-xs text-green-400">at pole</span>
                 )}
               </div>
             );

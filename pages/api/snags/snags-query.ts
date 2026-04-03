@@ -30,7 +30,7 @@ export async function querySnagsByReport(
 ) {
   if (status && category && severity && searchTerm) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, pole.latitude AS pole_latitude, pole.longitude AS pole_longitude, pole.zone_no AS pole_zone_no, pole.pon_no AS pole_pon_no
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, pole.longitude AS pole_latitude, pole.latitude AS pole_longitude, pole.zone_no AS pole_zone_no, pole.pon_no AS pole_pon_no
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
@@ -51,7 +51,7 @@ export async function querySnagsByReport(
 
   if (status && category && severity) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, pole.latitude AS pole_latitude, pole.longitude AS pole_longitude, pole.zone_no AS pole_zone_no, pole.pon_no AS pole_pon_no
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, pole.longitude AS pole_latitude, pole.latitude AS pole_longitude, pole.zone_no AS pole_zone_no, pole.pon_no AS pole_pon_no
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
@@ -70,7 +70,7 @@ export async function querySnagsByReport(
 
   if (status && category) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, pole.latitude AS pole_latitude, pole.longitude AS pole_longitude, pole.zone_no AS pole_zone_no, pole.pon_no AS pole_pon_no
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, pole.longitude AS pole_latitude, pole.latitude AS pole_longitude, pole.zone_no AS pole_zone_no, pole.pon_no AS pole_pon_no
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
@@ -88,7 +88,7 @@ export async function querySnagsByReport(
 
   if (status) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, pole.latitude AS pole_latitude, pole.longitude AS pole_longitude, pole.zone_no AS pole_zone_no, pole.pon_no AS pole_pon_no
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, pole.longitude AS pole_latitude, pole.latitude AS pole_longitude, pole.zone_no AS pole_zone_no, pole.pon_no AS pole_pon_no
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
@@ -133,7 +133,7 @@ export async function querySnagsByProject(
 ) {
   if (status && category && severity) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, pole.latitude AS pole_latitude, pole.longitude AS pole_longitude, pole.zone_no AS pole_zone_no, pole.pon_no AS pole_pon_no
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, pole.longitude AS pole_latitude, pole.latitude AS pole_longitude, pole.zone_no AS pole_zone_no, pole.pon_no AS pole_pon_no
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
@@ -152,7 +152,7 @@ export async function querySnagsByProject(
 
   if (status && category) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, pole.latitude AS pole_latitude, pole.longitude AS pole_longitude, pole.zone_no AS pole_zone_no, pole.pon_no AS pole_pon_no
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, pole.longitude AS pole_latitude, pole.latitude AS pole_longitude, pole.zone_no AS pole_zone_no, pole.pon_no AS pole_pon_no
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
@@ -170,7 +170,7 @@ export async function querySnagsByProject(
 
   if (status) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, pole.latitude AS pole_latitude, pole.longitude AS pole_longitude, pole.zone_no AS pole_zone_no, pole.pon_no AS pole_pon_no
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, pole.longitude AS pole_latitude, pole.latitude AS pole_longitude, pole.zone_no AS pole_zone_no, pole.pon_no AS pole_pon_no
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
