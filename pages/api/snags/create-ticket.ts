@@ -16,7 +16,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, getAuthUser } from '@/lib/auth';
 import { createTicket } from '@/modules/noc/services/ticketService';
 import {
   TicketSource,
@@ -77,6 +77,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.methodNotAllowed(res, req.method ?? 'Unknown', ['POST']);
   }
 
+  const user = getAuthUser(req);
+
   try {
     const { snag_id } = req.body as { snag_id?: string };
 
@@ -131,7 +133,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       priority: mapSeverityToPriority(snag.severity),
       project_id: snag.project_id,
       uid_prefix: 'SNG',
-      // Tags stored as external_id JSON since CreateTicketPayload has no tags field
+      created_by: user?.id ?? undefined,
       external_id: JSON.stringify({ snag_id: snag.id, tags: ['snag', snag.category] }),
     });
 
