@@ -285,7 +285,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       createdSnags,
       uploadedPhotos,
       gridMapping.snagNumbers,
-      user?.id ?? null
+      user?.id ?? null,
+      gridMapping.slots
     );
 
     log.info('TqrPdfImport: complete', {

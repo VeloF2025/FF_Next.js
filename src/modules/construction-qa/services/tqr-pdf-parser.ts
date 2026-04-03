@@ -42,9 +42,23 @@ export interface TqrAuditScores {
   trafficNc: number;
 }
 
+/** GPS and pole metadata for a single photo slot in the TQR grid */
+export interface TqrGridSlot {
+  /** Snag number for this photo slot */
+  snagNumber: number;
+  /** GPS latitude from the PDF grid text, or null if not found */
+  latitude: number | null;
+  /** GPS longitude from the PDF grid text, or null if not found */
+  longitude: number | null;
+  /** Pole reference label above this photo slot (e.g. "CO4", "PH258B"), or null */
+  poleReference: string | null;
+}
+
 /** Ordered list of snag numbers per photo slot, derived from grid text */
 export interface TqrGridMapping {
-  /** snagNumbers[i] is the snag number for the i-th snag photo (0-indexed) */
+  /** Full slot data including GPS and pole reference per photo (0-indexed) */
+  slots: TqrGridSlot[];
+  /** snagNumbers[i] is the snag number for the i-th snag photo — kept for backward compatibility */
   snagNumbers: number[];
   /** Total photo slots parsed from grid text */
   totalSlots: number;
@@ -198,26 +212,60 @@ export function parseFindings(text: string, category: TqrFinding['category']): T
 // ============================================================
 
 /**
- * Parse the photo-grid text to get an ordered sequence of snag numbers.
+ * Returns true if a line contains only pole reference labels (e.g. "CO4", "PH258B").
+ * Pole refs are 1–3 groups of uppercase letters followed by digits and optional letters,
+ * separated by whitespace. Lines with 1–3 such tokens and nothing else.
  *
- * Each grid slot has a line like:
- *   "1               -26.119823 28.48195"
- * The leading number is the snag number for that photo.
+ * Examples that match: "CO4", "PH258B  PH256  PH257", "PH258B"
+ * Examples that don't: "Finding: ...", "-26.1  28.4", plain numbers
+ */
+function isPoleReferenceLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  // Must consist solely of tokens like CO4, PH258B, PH256A — at least one
+  return /^[A-Z]{1,4}\d+[A-Z]?(?:\s{2,}[A-Z]{1,4}\d+[A-Z]?){0,2}$/.test(trimmed);
+}
+
+/**
+ * Split a pole-reference line into up to 3 column values.
+ * Uses 2+ spaces as the column delimiter (same layout convention as GPS lines).
+ */
+function splitPoleReferenceLine(line: string): (string | null)[] {
+  const parts = line.trim().split(/\s{2,}/);
+  return [
+    parts[0] ?? null,
+    parts[1] ?? null,
+    parts[2] ?? null,
+  ];
+}
+
+/**
+ * Parse the photo-grid text to extract an ordered sequence of snag numbers,
+ * GPS coordinates (latitude/longitude), and pole reference labels per slot.
+ *
+ * Grid layout (3 photos per row):
+ *   PoleRef          PoleRef          PoleRef       ← pole reference line
+ *   N  -lat  lon     N  -lat  lon     N  -lat  lon  ← GPS line
  *
  * Grid pages are pages 3-7 in the PDF. In the text file, these are
- * identified by sections between "Page 2 of 10" and "Page 8 of 10".
+ * identified by sections between "Page 2 of 10" and the recommendations section.
  */
 export function parseGridMapping(text: string): TqrGridMapping {
-  const snagNumbers: number[] = [];
-
-  // Multi-column GPS pattern: "N  -lat  lon" groups (global, multiple per line)
-  // Example line: "1   -26.119823 28.48195   1   -26.119711 28.481402   1  ..."
-  const groupPattern = /(\d+)\s+-\d+\.\d+\s+\d+\.\d+/g;
+  // GPS line pattern: up to 3 groups of "snagNum  -lat  lon" on one line
+  // Example: "1   -26.119823 28.48195   1   -26.119711 28.481402   1  -26.119648 28.480923"
+  const gpsGroupPattern = /(\d+)\s+(-\d+\.\d+)\s+(\d+\.\d+)/g;
 
   const lines = text.split('\n');
   let inGridSection = false;
 
-  for (const line of lines) {
+  // We collect rows: each GPS line has up to 3 slots; the line immediately before
+  // it (if it looks like a pole-ref line) gives us the pole references.
+  const slots: TqrGridSlot[] = [];
+  let pendingPoleRefs: (string | null)[] = [null, null, null];
+
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li] ?? '';
+
     // Start parsing after page 2 heading
     if (/Page\s+2\s+of\s+10/i.test(line)) {
       inGridSection = true;
@@ -229,17 +277,44 @@ export function parseGridMapping(text: string): TqrGridMapping {
     }
     if (!inGridSection) continue;
 
-    // Extract all (snagNum, lat, lon) groups from this line
-    groupPattern.lastIndex = 0;
+    // Detect pole reference lines and buffer them
+    if (isPoleReferenceLine(line)) {
+      pendingPoleRefs = splitPoleReferenceLine(line);
+      continue;
+    }
+
+    // Detect GPS coordinate lines and emit slots
+    gpsGroupPattern.lastIndex = 0;
+    const gpsMatches: Array<{ snagNumber: number; latitude: number; longitude: number }> = [];
     let m: RegExpExecArray | null;
-    while ((m = groupPattern.exec(line)) !== null) {
-      if (m[1]) {
-        snagNumbers.push(parseInt(m[1], 10));
+    while ((m = gpsGroupPattern.exec(line)) !== null) {
+      if (m[1] && m[2] && m[3]) {
+        gpsMatches.push({
+          snagNumber: parseInt(m[1], 10),
+          latitude:   parseFloat(m[2]),
+          longitude:  parseFloat(m[3]),
+        });
       }
+    }
+
+    if (gpsMatches.length > 0) {
+      for (let col = 0; col < gpsMatches.length; col++) {
+        const gps = gpsMatches[col];
+        if (!gps) continue;
+        slots.push({
+          snagNumber:    gps.snagNumber,
+          latitude:      gps.latitude,
+          longitude:     gps.longitude,
+          poleReference: pendingPoleRefs[col] ?? null,
+        });
+      }
+      // Reset pending pole refs after consuming
+      pendingPoleRefs = [null, null, null];
     }
   }
 
-  return { snagNumbers, totalSlots: snagNumbers.length };
+  const snagNumbers = slots.map((s) => s.snagNumber);
+  return { slots, snagNumbers, totalSlots: slots.length };
 }
 
 // ============================================================

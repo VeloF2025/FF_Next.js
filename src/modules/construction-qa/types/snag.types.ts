@@ -137,6 +137,12 @@ export interface SnagPhoto {
   photo_url: string;
   thumbnail_url: string | null;
   pole_reference: string | null;
+  /** GPS latitude extracted from TQR PDF grid text */
+  latitude: number | null;
+  /** GPS longitude extracted from TQR PDF grid text */
+  longitude: number | null;
+  /** Raw timestamp string from TQR PDF, if available */
+  photo_timestamp: string | null;
   caption: string | null;
   source: SnagPhotoSource;
   vlm_assessment: Record<string, unknown> | null;

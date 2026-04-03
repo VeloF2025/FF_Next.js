@@ -8,7 +8,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Upload, ExternalLink, X, Link as LinkIcon, Loader2 } from 'lucide-react';
+import { Upload, ExternalLink, X, Link as LinkIcon, Loader2, MapPin } from 'lucide-react';
 import type { SnagPhoto } from '../../types/snag.types';
 import { uploadSnagPhoto, uploadSnagPhotoFile, deleteSnagPhoto } from '../../services/snagService';
 import { log } from '@/lib/logger';
@@ -97,38 +97,65 @@ function PhotoThumbnail({
     }
   };
 
-  return (
-    <div className="relative group rounded overflow-hidden bg-zinc-800">
-      <a
-        href={photo.photo_url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block hover:opacity-90 transition-opacity"
-      >
-        <img
-          src={photo.thumbnail_url ?? photo.photo_url}
-          alt={`${phaseLabel} photo`}
-          className="w-full h-32 object-cover"
-        />
-        <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-zinc-300 text-xs px-2 py-1 flex items-center justify-between">
-          <span>{photo.source.replace('_', ' ')}</span>
-          <ExternalLink className="h-3 w-3" />
-        </div>
-      </a>
+  const hasGps = photo.latitude != null && photo.longitude != null;
+  const mapsUrl = hasGps
+    ? `https://www.google.com/maps?q=${photo.latitude},${photo.longitude}`
+    : null;
 
-      {/* Delete button — visible on hover */}
-      <button
-        type="button"
-        onClick={(e) => { void handleDelete(e); }}
-        disabled={deleting}
-        aria-label="Delete photo"
-        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 hover:bg-red-800 disabled:opacity-50 rounded p-0.5"
-      >
-        {deleting
-          ? <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
-          : <X className="h-3.5 w-3.5 text-white" />
-        }
-      </button>
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="relative group rounded overflow-hidden bg-zinc-800">
+        <a
+          href={photo.photo_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block hover:opacity-90 transition-opacity"
+        >
+          <img
+            src={photo.thumbnail_url ?? photo.photo_url}
+            alt={`${phaseLabel} photo`}
+            className="w-full h-32 object-cover"
+          />
+          <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-zinc-300 text-xs px-2 py-1 flex items-center justify-between">
+            <span>{photo.source.replace('_', ' ')}</span>
+            <ExternalLink className="h-3 w-3" />
+          </div>
+        </a>
+
+        {/* Delete button — visible on hover */}
+        <button
+          type="button"
+          onClick={(e) => { void handleDelete(e); }}
+          disabled={deleting}
+          aria-label="Delete photo"
+          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 hover:bg-red-800 disabled:opacity-50 rounded p-0.5"
+        >
+          {deleting
+            ? <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
+            : <X className="h-3.5 w-3.5 text-white" />
+          }
+        </button>
+      </div>
+
+      {/* Pole reference and GPS metadata */}
+      {(photo.pole_reference ?? mapsUrl) && (
+        <div className="flex flex-col gap-0.5 px-0.5">
+          {photo.pole_reference && (
+            <span className="text-xs text-zinc-400 truncate">{photo.pole_reference}</span>
+          )}
+          {mapsUrl && (
+            <a
+              href={mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-400 truncate"
+            >
+              <MapPin className="h-3 w-3 shrink-0" />
+              {photo.latitude?.toFixed(5)}, {photo.longitude?.toFixed(5)}
+            </a>
+          )}
+        </div>
+      )}
     </div>
   );
 }

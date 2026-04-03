@@ -74,7 +74,11 @@ export function SnagCard({ snag, photos, isExpanded, onClick }: SnagCardProps) {
   const statusClass   = STATUS_PILL[snag.status]        ?? 'bg-zinc-700 text-zinc-300';
   const bgClass       = STATUS_CARD_BG[snag.status]     ?? 'bg-zinc-900';
 
-  const poleRef = snag.pole_references?.join(', ') ?? '—';
+  // Use snag-level pole references first; fall back to the first photo that has one
+  const poleRef =
+    (snag.pole_references?.length ?? 0) > 0
+      ? (snag.pole_references?.join(', ') ?? '—')
+      : (photos.find((p) => p.pole_reference)?.pole_reference ?? '—');
 
   return (
     <button

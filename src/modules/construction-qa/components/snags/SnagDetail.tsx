@@ -10,7 +10,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { X, ExternalLink, Ticket } from 'lucide-react';
+import { X, ExternalLink, Ticket, MapPin } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Snag, SnagPhoto, SnagStatus } from '../../types/snag.types';
 import { updateSnag, createNocTicket } from '../../services/snagService';
@@ -97,6 +97,17 @@ export function SnagDetail({ snag: initialSnag, photos, onClose, onUpdated, onPh
           </h3>
           <p className="text-xs text-zinc-400 mt-0.5">
             {snag.category} | {snag.severity}
+            {(() => {
+              // Collect all unique pole refs from snag + photos
+              const snagRefs = snag.pole_references ?? [];
+              const photoRefs = photos
+                .map((p) => p.pole_reference)
+                .filter((r): r is string => Boolean(r));
+              const allRefs = [...new Set([...snagRefs, ...photoRefs])];
+              return allRefs.length > 0 ? (
+                <span className="ml-2 text-zinc-300">Poles: {allRefs.join(', ')}</span>
+              ) : null;
+            })()}
             {snag.noc_ticket_uid && (
               <a
                 href={`/noc/tickets/${snag.noc_ticket_id ?? ''}`}
@@ -108,6 +119,25 @@ export function SnagDetail({ snag: initialSnag, photos, onClose, onUpdated, onPh
               </a>
             )}
           </p>
+          {/* GPS from first photo that has coordinates */}
+          {(() => {
+            const gpsPhoto = photos.find((p) => p.latitude != null && p.longitude != null);
+            if (!gpsPhoto) return null;
+            const lat = gpsPhoto.latitude!;
+            const lon = gpsPhoto.longitude!;
+            const mapsUrl = `https://www.google.com/maps?q=${lat},${lon}`;
+            return (
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 mt-0.5"
+              >
+                <MapPin className="h-3 w-3" />
+                {lat.toFixed(6)}, {lon.toFixed(6)}
+              </a>
+            );
+          })()}
         </div>
         <button
           type="button"
