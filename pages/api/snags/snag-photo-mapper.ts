@@ -34,9 +34,14 @@ export async function insertSnagPhotos(
 
   const photoRecords: SnagPhoto[] = [];
 
-  if (gridSnagNumbers.length === photos.length) {
+  // Use grid mapping if grid has data. When photo count > grid count,
+  // only map the first gridSnagNumbers.length photos (extras are compliance photos).
+  const gridCount = gridSnagNumbers.length;
+  const useGridMapping = gridCount > 0 && gridCount <= photos.length;
+
+  if (useGridMapping) {
     // ── Grid-mapped assignment (with GPS metadata when available) ──────
-    for (let i = 0; i < photos.length; i++) {
+    for (let i = 0; i < gridCount; i++) {
       const snagNum = gridSnagNumbers[i];
       if (snagNum === undefined) continue;
       const snag = snagByNumber.get(snagNum);
