@@ -16,6 +16,8 @@ export interface TqrMetadata {
   reportNumber: string | null;
   auditDate: string | null;
   siteName: string | null;
+  /** Address field from cover page (e.g. "Etwatwa") — used for project auto-detection */
+  address: string | null;
   client: string | null;
   contractor: string | null;
   auditor: string | null;
@@ -120,6 +122,9 @@ export function parseMetadata(text: string): TqrMetadata {
   const client     = extract(/Client[:\s]+(.+)/i);
   const contractor = extract(/Contractor[:\s]+(.+)/i);
 
+  // Address: "Address:      Etwatwa" from cover page
+  const address = extract(/Address[:\s]+(.+)/i);
+
   // Auditor: "report was prepared by <name>"
   const auditor = extract(/prepared\s+by\s+(.+?)(?:\s*\/\s*.+)?$/im);
 
@@ -127,6 +132,7 @@ export function parseMetadata(text: string): TqrMetadata {
     reportNumber: reportNumber ? reportNumber.replace(/\s+/, ' ') : null,
     auditDate,
     siteName,
+    address,
     client,
     contractor,
     auditor,

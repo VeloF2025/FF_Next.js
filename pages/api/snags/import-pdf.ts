@@ -63,26 +63,57 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const form = formidable({ maxFileSize: 100 * 1024 * 1024, keepExtensions: true });
     const [fields, files] = await form.parse(req);
 
-    const projectId = Array.isArray(fields.project_id)
+    let projectId = Array.isArray(fields.project_id)
       ? fields.project_id[0]
       : fields.project_id;
-
-    if (!projectId) {
-      return apiResponse.badRequest(res, 'project_id is required');
-    }
 
     const uploadedFile = Array.isArray(files.file) ? files.file[0] : files.file;
     if (!uploadedFile) {
       return apiResponse.badRequest(res, 'No PDF file uploaded (field name: file)');
     }
 
-    // ── 2. Validate project exists ───────────────────────────
-    const projectRows = await sql`
-      SELECT id, project_name FROM projects WHERE id = ${projectId}
-    ` as Array<{ id: string; project_name: string }>;
+    // ── 2. Validate or auto-detect project ──────────────────
+    if (projectId) {
+      const projectRows = await sql`
+        SELECT id, project_name FROM projects WHERE id = ${projectId}
+      ` as Array<{ id: string; project_name: string }>;
 
-    if (projectRows.length === 0) {
-      return apiResponse.notFound(res, 'Project', projectId);
+      if (projectRows.length === 0) {
+        return apiResponse.notFound(res, 'Project', projectId);
+      }
+    } else {
+      // Auto-detect: extract text first, then search by address/siteName
+      const autoTextPath = path.join(tempDir, 'auto-detect.txt');
+      execSync(`/usr/bin/pdftotext -layout "${uploadedFile.filepath}" "${autoTextPath}"`, {
+        timeout: 30_000,
+      });
+      const autoText = fs.readFileSync(autoTextPath, 'utf-8');
+      const { metadata: autoMeta } = parseTqrText(autoText);
+
+      const searchTerms = [
+        autoMeta.address,
+        autoMeta.siteName ? autoMeta.siteName.split('.')[0] : null,
+      ].filter((t): t is string => Boolean(t));
+
+      for (const term of searchTerms) {
+        const matches = await sql`
+          SELECT id, project_name FROM projects WHERE project_name ILIKE ${'%' + term + '%'}
+        ` as Array<{ id: string; project_name: string }>;
+
+        if (matches.length === 1 && matches[0]) {
+          projectId = matches[0].id;
+          log.info('TqrPdfImport: auto-detected project', { term, projectId, name: matches[0].project_name });
+          break;
+        }
+      }
+
+      if (!projectId) {
+        return apiResponse.error(
+          res,
+          ErrorCode.BAD_REQUEST,
+          'Could not auto-detect project. Please provide project_id.'
+        );
+      }
     }
 
     const pdfPath      = uploadedFile.filepath;

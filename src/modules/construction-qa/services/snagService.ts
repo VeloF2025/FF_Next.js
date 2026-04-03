@@ -194,6 +194,78 @@ export async function uploadSnagPhotoFile(
 }
 
 // ============================================================
+// PDF Zero-Touch Import
+// ============================================================
+
+/** Preview result from /api/snags/preview-pdf — no DB writes */
+export interface PdfPreviewResult {
+  metadata: {
+    reportNumber: string;
+    auditDate: string;
+    siteName: string | null;
+    address: string | null;
+    category: string;
+    auditor: string | null;
+    client: string | null;
+    contractor: string | null;
+  };
+  project: { id: string; name: string } | null;
+  projectCandidates: Array<{ id: string; name: string }>;
+  findings: Array<{ number: number; description: string; category: string }>;
+  photoCount: number;
+  auditScores: {
+    qualityAssurance: number;
+    qualityNc: number;
+    healthAssurance: number;
+    healthNc: number;
+    safetyAssurance: number;
+    safetyNc: number;
+    environmentAssurance: number;
+    environmentNc: number;
+    trafficAssurance: number;
+    trafficNc: number;
+  };
+  isDuplicate: boolean;
+  duplicateReportId: string | null;
+}
+
+/** POST a PDF to preview endpoint — no DB writes. */
+export async function previewPdf(file: File): Promise<PdfPreviewResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch('/api/snags/preview-pdf', { method: 'POST', body: formData });
+  if (!res.ok) {
+    const err = await res.json() as { error?: { message?: string } };
+    throw new Error(err.error?.message ?? 'PDF preview failed');
+  }
+  const json = await res.json() as { data: PdfPreviewResult };
+  return json.data;
+}
+
+/** POST a PDF + project_id to import endpoint — writes to DB. */
+export async function importPdf(
+  file: File,
+  projectId: string
+): Promise<{ reportId: string; snagCount: number; photoCount: number }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('project_id', projectId);
+  const res = await fetch('/api/snags/import-pdf', { method: 'POST', body: formData });
+  if (!res.ok) {
+    const err = await res.json() as { error?: { message?: string } };
+    throw new Error(err.error?.message ?? 'PDF import failed');
+  }
+  const json = await res.json() as {
+    data: { report: { id: string }; snags: unknown[]; photoCount: number };
+  };
+  return {
+    reportId: json.data.report.id,
+    snagCount: json.data.snags.length,
+    photoCount: json.data.photoCount,
+  };
+}
+
+// ============================================================
 // NOC Ticket Integration
 // ============================================================
 

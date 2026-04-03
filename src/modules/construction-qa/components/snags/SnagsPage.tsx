@@ -120,7 +120,6 @@ export function SnagsPage() {
       {/* Import dialog */}
       {showImport && (
         <SnagImportDialog
-          projects={projects}
           onClose={() => setShowImport(false)}
           onImported={onImported}
         />
