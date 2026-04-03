@@ -131,7 +131,8 @@ function PhotoThumbnail({
             <img
               src={photo.photo_url}
               alt={`${phaseLabel} photo`}
-              className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
+              className="w-[90vw] h-[90vh] object-contain"
+              onClick={(e) => e.stopPropagation()}
             />
             <button
               type="button"
