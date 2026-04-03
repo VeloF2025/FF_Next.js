@@ -92,34 +92,64 @@ export async function createSnagsPerPhoto(
     const snag = snagRows[0];
     if (!snag) continue;
 
-    // Auto-resolve pole: match P.H890 → ETW.P.H890 in poles table
+    // Auto-resolve: pole or drop reference
     if (poleRef) {
-      const poleRows = await sql`
-        SELECT id, pole_number, zone_no, pon_no, latitude, longitude
-        FROM poles
-        WHERE project_id = ${projectId}
-          AND pole_number ILIKE '%' || ${poleRef}
-        LIMIT 1
-      ` as Array<{ id: string; pole_number: string; zone_no: number | null; pon_no: number | null; latitude: string | null; longitude: string | null }>;
+      const isDrRef = /^DR\d/i.test(poleRef);
 
-      if (poleRows[0]) {
-        const pole = poleRows[0];
-        await sql`
-          UPDATE snags
-          SET pole_ids = ARRAY[${pole.id}]::uuid[],
-              zone_id = (SELECT zone_id FROM poles WHERE id = ${pole.id}),
-              pon_id = (SELECT pon_id FROM poles WHERE id = ${pole.id}),
-              pole_references = ARRAY[${pole.pole_number}]
-          WHERE id = ${snag.id}
-        `;
-        snag.pole_ids = [pole.id];
-        snag.pole_references = [pole.pole_number];
+      if (isDrRef) {
+        // Match DR1751584 in drops table
+        const dropRows = await sql`
+          SELECT id, drop_number, zone_no, pon_no, latitude, longitude
+          FROM drops
+          WHERE drop_number = ${poleRef}
+          LIMIT 1
+        ` as Array<{ id: string; drop_number: string; zone_no: number | null; pon_no: number | null; latitude: string | null; longitude: string | null }>;
 
-        // Use pole GPS when photo grid doesn't have GPS
-        // Note: poles table has lat/lon swapped (latitude col = longitude value)
-        if (!slot.latitude && pole.longitude) {
-          slot.latitude = parseFloat(pole.longitude);
-          slot.longitude = pole.latitude ? parseFloat(pole.latitude) : null;
+        if (dropRows[0]) {
+          const drop = dropRows[0];
+          await sql`
+            UPDATE snags
+            SET drop_id = ${drop.id},
+                pole_references = ARRAY[${drop.drop_number}]
+            WHERE id = ${snag.id}
+          `;
+          snag.pole_references = [drop.drop_number];
+
+          // Use drop GPS when photo grid doesn't have GPS
+          if (!slot.latitude && drop.latitude) {
+            slot.latitude = parseFloat(drop.latitude);
+            slot.longitude = drop.longitude ? parseFloat(drop.longitude) : null;
+          }
+        }
+      } else {
+        // Match P.H890 → ETW.P.H890 in poles table
+        const poleRows = await sql`
+          SELECT id, pole_number, zone_no, pon_no, latitude, longitude
+          FROM poles
+          WHERE project_id = ${projectId}
+            AND pole_number ILIKE '%' || ${poleRef}
+          LIMIT 1
+        ` as Array<{ id: string; pole_number: string; zone_no: number | null; pon_no: number | null; latitude: string | null; longitude: string | null }>;
+
+        if (poleRows[0]) {
+          const pole = poleRows[0];
+          await sql`
+            UPDATE snags
+            SET pole_ids = ARRAY[${pole.id}]::uuid[],
+                zone_id = (SELECT zone_id FROM poles WHERE id = ${pole.id}),
+                pon_id = (SELECT pon_id FROM poles WHERE id = ${pole.id}),
+                pole_references = ARRAY[${pole.pole_number}]
+            WHERE id = ${snag.id}
+          `;
+          snag.pole_ids = [pole.id];
+          snag.pole_references = [pole.pole_number];
+
+          // Use pole GPS when photo grid doesn't have GPS
+          // Note: poles table has lat/lon swapped (latitude col = longitude value)
+          if (!slot.latitude && pole.longitude) {
+            slot.latitude = parseFloat(pole.longitude);
+            slot.longitude = pole.latitude ? parseFloat(pole.latitude) : null;
+          }
         }
       }
     }

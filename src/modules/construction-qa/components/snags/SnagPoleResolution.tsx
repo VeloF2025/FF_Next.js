@@ -28,7 +28,7 @@ export function SnagPoleResolution({ snag, onLinked }: SnagPoleResolutionProps) 
   const [searching, setSearching] = useState(false);
   const [linking, setLinking] = useState(false);
 
-  const isResolved = (snag.pole_ids?.length ?? 0) > 0;
+  const isResolved = (snag.pole_ids?.length ?? 0) > 0 || snag.drop_id != null;
   const poleRefs = snag.pole_references?.join(', ') ?? '—';
 
   const handleSearch = useCallback(async (value: string) => {
