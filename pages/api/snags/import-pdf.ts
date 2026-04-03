@@ -29,9 +29,8 @@ import {
   uploadSnagPhotos,
   uploadSourcePdf,
 } from '@/modules/construction-qa/services/tqr-image-extractor';
-import type { SnagReport, Snag } from '@/modules/construction-qa/types/snag.types';
-import { processSnagPostInsert } from '@/modules/construction-qa/services/snag-import-helpers';
-import { insertSnagPhotos } from './snag-photo-mapper';
+import type { SnagReport } from '@/modules/construction-qa/types/snag.types';
+import { createSnagsPerPhoto } from './snag-photo-mapper';
 
 // ============================================================
 // Next.js Config — disable body parser for multipart
@@ -229,69 +228,29 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Failed to create snag report');
     }
 
-    // ── 9. Insert snags, auto-resolve poles, detect repeats ──
-    const createdSnags: Snag[] = [];
-    let autoResolved = 0;
-    let repeatsDetected = 0;
-
-    for (const finding of findings) {
-      // Extract pole_references from the finding if available (parser may add this later)
-      const poleRefs = 'poleReferences' in finding
-        ? (finding.poleReferences as string[] | undefined) ?? null
-        : null;
-
-      const snagRows = await sql`
-        INSERT INTO snags (
-          report_id, project_id, snag_number,
-          category, severity, description,
-          pole_references, status
-        ) VALUES (
-          ${report.id},
-          ${projectId},
-          ${finding.snagNumber},
-          ${finding.category},
-          'major',
-          ${finding.description},
-          ${poleRefs},
-          'open'
-        )
-        RETURNING *
-      ` as Snag[];
-
-      const snag = snagRows[0];
-      if (!snag) continue;
-
-      const result = await processSnagPostInsert({
-        snag,
-        projectId,
-        reportId: report.id,
-        poleRefs,
-        sql,
-      });
-
-      createdSnags.push(result.snag);
-      if (result.autoResolved) autoResolved++;
-      if (result.isRepeat) repeatsDetected++;
-    }
-
-    log.info('TqrPdfImport: pole resolution + repeat detection complete', {
-      reportId: report.id,
-      autoResolved,
-      repeatsDetected,
-    });
-
-    // ── 10. Map photos to snags and insert snag_photos ────────
-    const photoRecords = await insertSnagPhotos(
-      createdSnags,
+    // ── 9. Create one snag per photo/pole instance ─────────────
+    // Each photo in the TQR grid is a unique issue at a specific pole.
+    // Finding #1 with 14 photos at different poles → 14 individual snags.
+    const { snags: createdSnags, photos: photoRecords } = await createSnagsPerPhoto(
+      report.id,
+      projectId,
+      findings,
+      gridMapping.slots,
       uploadedPhotos,
-      gridMapping.snagNumbers,
-      user?.id ?? null,
-      gridMapping.slots
+      user?.id ?? null
     );
+
+    // Update total_findings to reflect actual snag count
+    await sql`
+      UPDATE snag_reports
+      SET total_findings = ${createdSnags.length}, updated_at = NOW()
+      WHERE id = ${report.id}
+    `;
 
     log.info('TqrPdfImport: complete', {
       reportId: report.id,
       reportNumber: report.report_number,
+      findingTypes: findings.length,
       snags: createdSnags.length,
       photos: photoRecords.length,
     });
@@ -300,10 +259,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       report,
       snags: createdSnags,
       photoCount: photoRecords.length,
-      unmappedPhotos: uploadedPhotos.length - photoRecords.length,
-      autoResolved,
-      repeatsDetected,
-    }, `Imported ${createdSnags.length} findings with ${photoRecords.length} photos`);
+      findingTypes: findings.length,
+    }, `Imported ${createdSnags.length} snags (${findings.length} finding types) with ${photoRecords.length} photos`);
 
   } catch (error) {
     log.error('TqrPdfImport: import failed', { error });

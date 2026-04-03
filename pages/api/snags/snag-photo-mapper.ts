@@ -1,99 +1,129 @@
 /**
- * Snag Photo Mapper — maps uploaded TQR images to snag records.
- * Extracted from import-pdf.ts to keep files under 300 lines.
+ * Snag-Per-Photo Import — creates one snag record per photo/pole instance.
  *
- * WORKING: Grid-mapped (with GPS + pole_reference) and round-robin fallback.
+ * Each photo in the TQR grid is a unique issue at a specific pole.
+ * The finding description is shared across all instances of the same finding number.
+ *
+ * WORKING: Grid-mapped with GPS + pole_reference per snag.
  */
 
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import type { Snag, SnagPhoto } from '@/modules/construction-qa/types/snag.types';
-import type { TqrGridSlot } from '@/modules/construction-qa/services/tqr-pdf-parser';
+import type { TqrFinding, TqrGridSlot } from '@/modules/construction-qa/services/tqr-pdf-parser';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+interface UploadedPhoto {
+  gridIndex: number;
+  url: string;
+  filename: string;
+}
+
+interface SnagPerPhotoResult {
+  snags: Snag[];
+  photos: SnagPhoto[];
+}
+
 /**
- * Map uploaded photos to snags using the grid slot sequence.
- * Each slot carries snagNumber, latitude, longitude, and poleReference from the PDF.
- * Falls back to round-robin if grid parsing produced no slot data.
+ * Create one snag per photo/pole instance from the TQR grid.
+ *
+ * Each grid slot maps to: finding description + pole ref + GPS + one before photo.
+ * This means a finding with 14 photos at different poles becomes 14 separate snags.
  */
-export async function insertSnagPhotos(
-  snags: Snag[],
-  photos: Array<{ gridIndex: number; url: string; filename: string }>,
-  gridSnagNumbers: number[],
-  uploadedBy: string | null,
-  gridSlots?: TqrGridSlot[]
-): Promise<SnagPhoto[]> {
-  if (snags.length === 0 || photos.length === 0) return [];
-
-  // Build a map: snagNumber → snag record
-  const snagByNumber = new Map<number, Snag>();
-  for (const s of snags) {
-    snagByNumber.set(s.snag_number, s);
+export async function createSnagsPerPhoto(
+  reportId: string,
+  projectId: string,
+  findings: TqrFinding[],
+  gridSlots: TqrGridSlot[],
+  uploadedPhotos: UploadedPhoto[],
+  uploadedBy: string | null
+): Promise<SnagPerPhotoResult> {
+  if (gridSlots.length === 0 && uploadedPhotos.length === 0) {
+    return { snags: [], photos: [] };
   }
 
-  const photoRecords: SnagPhoto[] = [];
+  // Build a lookup: finding number → description + category
+  const findingMap = new Map<number, TqrFinding>();
+  for (const f of findings) {
+    findingMap.set(f.snagNumber, f);
+  }
 
-  // Use grid mapping if grid has data. When photo count > grid count,
-  // only map the first gridSnagNumbers.length photos (extras are compliance photos).
-  const gridCount = gridSnagNumbers.length;
-  const useGridMapping = gridCount > 0 && gridCount <= photos.length;
+  const createdSnags: Snag[] = [];
+  const createdPhotos: SnagPhoto[] = [];
 
-  if (useGridMapping) {
-    // ── Grid-mapped assignment (with GPS metadata when available) ──────
-    for (let i = 0; i < gridCount; i++) {
-      const snagNum = gridSnagNumbers[i];
-      if (snagNum === undefined) continue;
-      const snag = snagByNumber.get(snagNum);
-      if (!snag) continue;
+  // Process each grid slot as an individual snag
+  const slotCount = Math.min(gridSlots.length, uploadedPhotos.length);
 
-      const photoUrl = photos[i]?.url;
-      if (!photoUrl) continue;
+  for (let i = 0; i < slotCount; i++) {
+    const slot = gridSlots[i];
+    const photo = uploadedPhotos[i];
+    if (!slot || !photo) continue;
 
-      // Pull GPS + pole ref from slots if available
-      const slot = gridSlots?.[i];
-      const latitude      = slot?.latitude      ?? null;
-      const longitude     = slot?.longitude     ?? null;
-      const poleReference = slot?.poleReference ?? null;
-
-      const rows = await sql`
-        INSERT INTO snag_photos (
-          snag_id, phase, photo_url, pole_reference,
-          latitude, longitude, source, uploaded_by
-        )
-        VALUES (
-          ${snag.id}, 'before', ${photoUrl}, ${poleReference},
-          ${latitude}, ${longitude}, 'tqr_import', ${uploadedBy}
-        )
-        ON CONFLICT (snag_id, phase, photo_url) DO NOTHING
-        RETURNING *
-      ` as SnagPhoto[];
-
-      if (rows[0]) photoRecords.push(rows[0]);
+    const finding = findingMap.get(slot.snagNumber);
+    if (!finding) {
+      log.warn('SnagPerPhoto: no finding for slot', { index: i, snagNumber: slot.snagNumber });
+      continue;
     }
-  } else {
-    // ── Round-robin fallback ───────────────────────────────────────────
-    log.warn('SnagPhotoMapper: grid count mismatch, using round-robin', {
-      gridNumbers: gridSnagNumbers.length,
-      photoCount:  photos.length,
+
+    // Create snag with pole + GPS from this specific photo
+    const poleRef = slot.poleReference ?? null;
+    const poleRefs = poleRef ? [poleRef] : null;
+
+    const snagRows = await sql`
+      INSERT INTO snags (
+        report_id, project_id, snag_number,
+        category, severity, description,
+        pole_references, status
+      ) VALUES (
+        ${reportId},
+        ${projectId},
+        ${slot.snagNumber},
+        ${finding.category},
+        'major',
+        ${finding.description},
+        ${poleRefs},
+        'open'
+      )
+      RETURNING *
+    ` as Snag[];
+
+    const snag = snagRows[0];
+    if (!snag) continue;
+    createdSnags.push(snag);
+
+    // Create the before photo linked to this specific snag
+    const photoRows = await sql`
+      INSERT INTO snag_photos (
+        snag_id, phase, photo_url, pole_reference,
+        latitude, longitude, source, uploaded_by
+      )
+      VALUES (
+        ${snag.id}, 'before', ${photo.url}, ${poleRef},
+        ${slot.latitude ?? null}, ${slot.longitude ?? null},
+        'tqr_import', ${uploadedBy}
+      )
+      ON CONFLICT (snag_id, phase, photo_url) DO NOTHING
+      RETURNING *
+    ` as SnagPhoto[];
+
+    if (photoRows[0]) createdPhotos.push(photoRows[0]);
+  }
+
+  // Handle extra photos beyond grid slots (compliance photos etc.)
+  // These get no snag — they're just report-level documentation
+  if (uploadedPhotos.length > slotCount) {
+    log.info('SnagPerPhoto: extra photos beyond grid', {
+      gridSlots: slotCount,
+      totalPhotos: uploadedPhotos.length,
+      extras: uploadedPhotos.length - slotCount,
     });
-
-    for (let i = 0; i < photos.length; i++) {
-      const snag = snags[i % snags.length];
-      if (!snag) continue;
-      const photoUrl = photos[i]?.url;
-      if (!photoUrl) continue;
-
-      const rows = await sql`
-        INSERT INTO snag_photos (snag_id, phase, photo_url, source, uploaded_by)
-        VALUES (${snag.id}, 'before', ${photoUrl}, 'tqr_import', ${uploadedBy})
-        ON CONFLICT (snag_id, phase, photo_url) DO NOTHING
-        RETURNING *
-      ` as SnagPhoto[];
-
-      if (rows[0]) photoRecords.push(rows[0]);
-    }
   }
 
-  return photoRecords;
+  log.info('SnagPerPhoto: created', {
+    snags: createdSnags.length,
+    photos: createdPhotos.length,
+  });
+
+  return { snags: createdSnags, photos: createdPhotos };
 }
