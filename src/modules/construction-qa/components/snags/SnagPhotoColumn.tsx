@@ -97,6 +97,7 @@ function PhotoThumbnail({
     }
   };
 
+  const [zoomed, setZoomed] = useState(false);
   const hasGps = photo.latitude != null && photo.longitude != null;
   const mapsUrl = hasGps
     ? `https://www.google.com/maps?q=${photo.latitude},${photo.longitude}`
@@ -105,11 +106,10 @@ function PhotoThumbnail({
   return (
     <div className="flex flex-col gap-0.5">
       <div className="relative group rounded overflow-hidden bg-zinc-800">
-        <a
-          href={photo.photo_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block hover:opacity-90 transition-opacity"
+        <button
+          type="button"
+          onClick={() => setZoomed(true)}
+          className="block w-full text-left cursor-zoom-in hover:opacity-90 transition-opacity"
         >
           <img
             src={photo.thumbnail_url ?? photo.photo_url}
@@ -120,7 +120,29 @@ function PhotoThumbnail({
             <span>{photo.source.replace('_', ' ')}</span>
             <ExternalLink className="h-3 w-3" />
           </div>
-        </a>
+        </button>
+
+        {/* Lightbox zoom overlay */}
+        {zoomed && (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm cursor-zoom-out"
+            onClick={() => setZoomed(false)}
+          >
+            <img
+              src={photo.photo_url}
+              alt={`${phaseLabel} photo`}
+              className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
+            />
+            <button
+              type="button"
+              onClick={() => setZoomed(false)}
+              className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/50 rounded-full p-2"
+              aria-label="Close"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+        )}
 
         {/* Delete button — visible on hover */}
         <button
