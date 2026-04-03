@@ -183,15 +183,11 @@ async function uploadToVfStorage(
 ): Promise<VfUploadResult> {
   const VF_STORAGE_BASE = process.env.VF_STORAGE_URL ?? 'http://100.96.203.105:8091';
 
-  // Sanitise report number for use in URL path (e.g. "TQR 0012/2026" → "TQR-0012-2026")
-  const safeReport = reportNumber.replace(/[\s/\\]+/g, '-');
-  const category   = `${projectId}/${safeReport}`;
-
   const formData = new FormData();
   formData.append('file', new Blob([buffer as unknown as BlobPart], { type: 'image/jpeg' }), filename);
 
-  // VF Storage API route: /upload/:type/:category
-  const uploadUrl = `${VF_STORAGE_BASE}/upload/snags/${category}`;
+  // VF Storage only supports /:type/:category/:filename (2 levels)
+  const uploadUrl = `${VF_STORAGE_BASE}/upload/snags/tqr-photos`;
 
   const response = await fetch(uploadUrl, {
     method: 'POST',
@@ -213,9 +209,8 @@ async function uploadToVfStorage(
   };
 
   const actualFilename = result.filename ?? filename;
-  const storagePath = result.path ?? `snags/${category}/${actualFilename}`;
+  const storagePath = result.path ?? `snags/tqr-photos/${actualFilename}`;
 
-  // Use https://vf.fibreflow.app/storage/ prefix for nginx proxy routing
   return {
     url: `https://vf.fibreflow.app/storage/${storagePath}`,
     filename: actualFilename,
@@ -233,12 +228,10 @@ async function uploadToVfStorage(
 export async function uploadSourcePdf(
   buffer: Buffer,
   filename: string,
-  projectId: string,
-  reportNumber: string
+  _projectId: string,
+  _reportNumber: string
 ): Promise<string> {
   const VF_STORAGE_BASE = process.env.VF_STORAGE_URL ?? 'http://100.96.203.105:8091';
-  const safeReport      = reportNumber.replace(/[\s/\\]+/g, '-');
-  const category        = `${projectId}/${safeReport}`;
 
   const formData = new FormData();
   formData.append(
@@ -247,7 +240,7 @@ export async function uploadSourcePdf(
     filename
   );
 
-  const uploadUrl = `${VF_STORAGE_BASE}/upload/snags/${category}`;
+  const uploadUrl = `${VF_STORAGE_BASE}/upload/snags/tqr-pdfs`;
 
   try {
     const response = await fetch(uploadUrl, { method: 'POST', body: formData });
@@ -256,7 +249,7 @@ export async function uploadSourcePdf(
       return '';
     }
     const result = (await response.json()) as { path?: string; filename?: string };
-    const storagePath = result.path ?? `snags/${category}/${result.filename ?? filename}`;
+    const storagePath = result.path ?? `snags/tqr-pdfs/${result.filename ?? filename}`;
     return `https://vf.fibreflow.app/storage/${storagePath}`;
   } catch (err) {
     log.warn('TqrImageExtractor: source PDF upload failed', { error: err });
