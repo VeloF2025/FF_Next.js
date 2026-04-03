@@ -114,19 +114,26 @@ export async function createSnagsPerPhoto(
         `;
         snag.pole_ids = [pole.id];
         snag.pole_references = [pole.pole_number];
+
+        // Use pole GPS when photo grid doesn't have GPS
+        // Note: poles table has lat/lon swapped (latitude col = longitude value)
+        if (!slot.latitude && pole.longitude) {
+          slot.latitude = parseFloat(pole.longitude);
+          slot.longitude = pole.latitude ? parseFloat(pole.latitude) : null;
+        }
       }
     }
 
     createdSnags.push(snag);
 
-    // Create the before photo linked to this specific snag
+    // Create the before photo with GPS (from grid text or pole location)
     const photoRows = await sql`
       INSERT INTO snag_photos (
         snag_id, phase, photo_url, pole_reference,
         latitude, longitude, source, uploaded_by
       )
       VALUES (
-        ${snag.id}, 'before', ${photo.url}, ${poleRef},
+        ${snag.id}, 'before', ${photo.url}, ${snag.pole_references?.[0] ?? poleRef},
         ${slot.latitude ?? null}, ${slot.longitude ?? null},
         'tqr_import', ${uploadedBy}
       )
