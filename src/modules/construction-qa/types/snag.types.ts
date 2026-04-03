@@ -162,6 +162,18 @@ export interface SnagProjectStats {
 }
 
 // ============================================================
+// Pole Resolution
+// ============================================================
+
+/** Candidate pole returned by the resolver search */
+export interface PoleCandidate {
+  id: string;
+  pole_number: string;
+  zone_no: number | null;
+  pon_no: number | null;
+}
+
+// ============================================================
 // Sort
 // ============================================================
 

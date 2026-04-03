@@ -29,7 +29,9 @@ import {
   uploadSnagPhotos,
   uploadSourcePdf,
 } from '@/modules/construction-qa/services/tqr-image-extractor';
-import type { SnagReport, Snag, SnagPhoto } from '@/modules/construction-qa/types/snag.types';
+import type { SnagReport, Snag } from '@/modules/construction-qa/types/snag.types';
+import { processSnagPostInsert } from '@/modules/construction-qa/services/snag-import-helpers';
+import { insertSnagPhotos } from './snag-photo-mapper';
 
 // ============================================================
 // Next.js Config — disable body parser for multipart
@@ -196,14 +198,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Failed to create snag report');
     }
 
-    // ── 9. Insert snags ───────────────────────────────────────
+    // ── 9. Insert snags, auto-resolve poles, detect repeats ──
     const createdSnags: Snag[] = [];
+    let autoResolved = 0;
+    let repeatsDetected = 0;
 
     for (const finding of findings) {
+      // Extract pole_references from the finding if available (parser may add this later)
+      const poleRefs = 'poleReferences' in finding
+        ? (finding.poleReferences as string[] | undefined) ?? null
+        : null;
+
       const snagRows = await sql`
         INSERT INTO snags (
           report_id, project_id, snag_number,
-          category, severity, description, status
+          category, severity, description,
+          pole_references, status
         ) VALUES (
           ${report.id},
           ${projectId},
@@ -211,15 +221,33 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           ${finding.category},
           'major',
           ${finding.description},
+          ${poleRefs},
           'open'
         )
         RETURNING *
       ` as Snag[];
 
-      if (snagRows[0]) {
-        createdSnags.push(snagRows[0]);
-      }
+      const snag = snagRows[0];
+      if (!snag) continue;
+
+      const result = await processSnagPostInsert({
+        snag,
+        projectId,
+        reportId: report.id,
+        poleRefs,
+        sql,
+      });
+
+      createdSnags.push(result.snag);
+      if (result.autoResolved) autoResolved++;
+      if (result.isRepeat) repeatsDetected++;
     }
+
+    log.info('TqrPdfImport: pole resolution + repeat detection complete', {
+      reportId: report.id,
+      autoResolved,
+      repeatsDetected,
+    });
 
     // ── 10. Map photos to snags and insert snag_photos ────────
     const photoRecords = await insertSnagPhotos(
@@ -241,6 +269,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       snags: createdSnags,
       photoCount: photoRecords.length,
       unmappedPhotos: uploadedPhotos.length - photoRecords.length,
+      autoResolved,
+      repeatsDetected,
     }, `Imported ${createdSnags.length} findings with ${photoRecords.length} photos`);
 
   } catch (error) {
@@ -254,75 +284,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       log.warn('TqrPdfImport: temp cleanup failed', { tempDir, error: cleanupErr });
     }
   }
-}
-
-// ============================================================
-// Photo-to-Snag Mapping
-// ============================================================
-
-/**
- * Map uploaded photos to snags using the grid number sequence.
- * Falls back to round-robin if grid parsing produced no data.
- */
-async function insertSnagPhotos(
-  snags: Snag[],
-  photos: Array<{ gridIndex: number; url: string; filename: string }>,
-  gridSnagNumbers: number[],
-  uploadedBy: string | null
-): Promise<SnagPhoto[]> {
-  if (snags.length === 0 || photos.length === 0) return [];
-
-  // Build a map: snagNumber → snag record
-  const snagByNumber = new Map<number, Snag>();
-  for (const s of snags) {
-    snagByNumber.set(s.snag_number, s);
-  }
-
-  const photoRecords: SnagPhoto[] = [];
-
-  if (gridSnagNumbers.length === photos.length) {
-    // ── Grid-mapped assignment ─────────────────────────────
-    for (let i = 0; i < photos.length; i++) {
-      const snagNum = gridSnagNumbers[i];
-      if (snagNum === undefined) continue;
-      const snag    = snagByNumber.get(snagNum);
-      if (!snag) continue;
-
-      const photoUrl = photos[i]?.url;
-      if (!photoUrl) continue;
-      const rows = await sql`
-        INSERT INTO snag_photos (snag_id, phase, photo_url, source, uploaded_by)
-        VALUES (${snag.id}, 'before', ${photoUrl}, 'tqr_import', ${uploadedBy})
-        ON CONFLICT (snag_id, phase, photo_url) DO NOTHING
-        RETURNING *
-      ` as SnagPhoto[];
-
-      if (rows[0]) photoRecords.push(rows[0]);
-    }
-  } else {
-    // ── Round-robin fallback ───────────────────────────────
-    log.warn('TqrPdfImport: grid count mismatch, using round-robin', {
-      gridNumbers: gridSnagNumbers.length,
-      photoCount: photos.length,
-    });
-
-    for (let i = 0; i < photos.length; i++) {
-      const snag = snags[i % snags.length];
-      if (!snag) continue;
-      const photoUrl = photos[i]?.url;
-      if (!photoUrl) continue;
-      const rows = await sql`
-        INSERT INTO snag_photos (snag_id, phase, photo_url, source, uploaded_by)
-        VALUES (${snag.id}, 'before', ${photoUrl}, 'tqr_import', ${uploadedBy})
-        ON CONFLICT (snag_id, phase, photo_url) DO NOTHING
-        RETURNING *
-      ` as SnagPhoto[];
-
-      if (rows[0]) photoRecords.push(rows[0]);
-    }
-  }
-
-  return photoRecords;
 }
 
 export default withAuth(handler);

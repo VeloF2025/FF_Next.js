@@ -2,19 +2,21 @@
  * SnagDetail — Expanded inline snag detail (accordion).
  * 3-column photo comparison: Before | During | After.
  * Status changes, assignment, verification actions.
+ * Pole resolution widget delegated to SnagPoleResolution.
  *
  * Photo column logic lives in SnagPhotoColumn.tsx.
  */
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { X } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Snag, SnagPhoto, SnagStatus } from '../../types/snag.types';
 import { updateSnag } from '../../services/snagService';
 import { log } from '@/lib/logger';
 import { PhotoColumn } from './SnagPhotoColumn';
+import { SnagPoleResolution } from './SnagPoleResolution';
 
 interface SnagDetailProps {
   snag: Snag;
@@ -35,14 +37,16 @@ const STATUS_OPTIONS: { value: SnagStatus; label: string }[] = [
   { value: 'wont_fix', label: "Won't Fix" },
 ];
 
-/** 🟢 WORKING: Expanded inline snag detail */
-export function SnagDetail({ snag, photos, onClose, onUpdated, onPhotoAdded, onPhotoDeleted }: SnagDetailProps) {
+/** WORKING: Expanded inline snag detail with pole resolution */
+export function SnagDetail({ snag: initialSnag, photos, onClose, onUpdated, onPhotoAdded, onPhotoDeleted }: SnagDetailProps) {
+  const [snag, setSnag] = useState<Snag>(initialSnag);
   const [saving, setSaving] = useState(false);
 
   const handleStatusChange = async (status: SnagStatus) => {
     setSaving(true);
     try {
       const updated = await updateSnag(snag.id, { status });
+      setSnag(updated);
       onUpdated(updated);
     } catch (err) {
       log.error('Failed to update snag status', { err, snagId: snag.id });
@@ -55,6 +59,7 @@ export function SnagDetail({ snag, photos, onClose, onUpdated, onPhotoAdded, onP
     setSaving(true);
     try {
       const updated = await updateSnag(snag.id, { status: 'verified' });
+      setSnag(updated);
       onUpdated(updated);
     } catch (err) {
       log.error('Failed to verify snag', { err, snagId: snag.id });
@@ -63,18 +68,21 @@ export function SnagDetail({ snag, photos, onClose, onUpdated, onPhotoAdded, onP
     }
   };
 
-  const poleRefs = snag.pole_references?.join(', ') ?? '—';
+  const handlePoleLinked = useCallback((updated: Snag) => {
+    setSnag(updated);
+    onUpdated(updated);
+  }, [onUpdated]);
 
   return (
     <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-4 mt-1">
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between mb-3">
         <div>
           <h3 className="text-sm font-semibold text-zinc-100">
             Snag #{snag.snag_number} — {snag.description}
           </h3>
-          <p className="text-xs text-zinc-400 mt-1">
-            {snag.category} | {snag.severity} | Poles: {poleRefs}
+          <p className="text-xs text-zinc-400 mt-0.5">
+            {snag.category} | {snag.severity}
             {snag.noc_ticket_id && (
               <span className="ml-2 text-blue-400">NOC #{snag.noc_ticket_id}</span>
             )}
@@ -89,6 +97,11 @@ export function SnagDetail({ snag, photos, onClose, onUpdated, onPhotoAdded, onP
           <X className="h-4 w-4" />
         </button>
       </div>
+
+      {/* Pole Resolution */}
+      {(snag.pole_references?.length ?? 0) > 0 && (
+        <SnagPoleResolution snag={snag} onLinked={handlePoleLinked} />
+      )}
 
       {/* 3-column photo comparison */}
       <div className="grid grid-cols-3 gap-4 mb-4">
@@ -144,7 +157,7 @@ export function SnagDetail({ snag, photos, onClose, onUpdated, onPhotoAdded, onP
         </button>
       </div>
 
-      {/* Timeline (simplified) */}
+      {/* Timeline */}
       <div className="mt-3 border-t border-zinc-800 pt-3">
         <p className="text-xs text-zinc-500">
           Created {new Date(snag.created_at).toLocaleDateString('en-ZA')}

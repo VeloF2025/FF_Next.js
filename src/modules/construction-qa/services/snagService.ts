@@ -8,6 +8,7 @@ import type {
   SnagReport,
   Snag,
   SnagPhoto,
+  PoleCandidate,
   CreateSnagReportRequest,
   CreateSnagRequest,
   UpdateSnagRequest,
@@ -189,6 +190,43 @@ export async function uploadSnagPhotoFile(
     throw new Error(err.error?.message ?? 'Failed to upload photo');
   }
   const json = await res.json() as { data: SnagPhoto };
+  return json.data;
+}
+
+// ============================================================
+// Pole Resolution
+// ============================================================
+
+/**
+ * Search for pole candidates matching a TQR pole reference.
+ * Uses numeric suffix matching on the server.
+ */
+export async function searchPoles(
+  projectId: string,
+  poleRef: string
+): Promise<PoleCandidate[]> {
+  const params = new URLSearchParams({ projectId, poleRef });
+  const res = await fetch(`/api/snags/resolve-poles?${params.toString()}`);
+  if (!res.ok) throw new Error(`Failed to search poles: ${res.status}`);
+  const json = await res.json() as { data: PoleCandidate[] };
+  return json.data ?? [];
+}
+
+/**
+ * Manually link a snag to a specific pole.
+ * Updates snag.pole_ids, zone_id, pon_id server-side.
+ */
+export async function linkSnagToPole(snagId: string, poleId: string): Promise<Snag> {
+  const res = await fetch('/api/snags/resolve-poles', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ snag_id: snagId, pole_id: poleId }),
+  });
+  if (!res.ok) {
+    const err = await res.json() as { error?: { message?: string } };
+    throw new Error(err.error?.message ?? 'Failed to link snag to pole');
+  }
+  const json = await res.json() as { data: Snag };
   return json.data;
 }
 
