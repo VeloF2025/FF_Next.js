@@ -195,8 +195,8 @@ export function SnagDetail({ snag: initialSnag, photos, onClose, onUpdated, onPh
       <div className="mt-3 border-t border-zinc-800 pt-3">
         <p className="text-xs text-zinc-500">
           Created {new Date(snag.created_at).toLocaleDateString('en-ZA')}
-          {snag.report && (
-            <span className="ml-1">— from {snag.report.report_number}</span>
+          {snag.report_number && (
+            <span className="ml-1">— from {snag.report_number}</span>
           )}
         </p>
         {snag.assigned_at && (
