@@ -228,35 +228,42 @@ export function SnagGrid({
               </button>
             </div>
 
-            {/* Snag cards grid */}
+            {/* Snag cards grid + full-width detail below expanded card */}
             {!isCollapsed && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-                {group.snags.map((snag) => {
-                  const photos = photosBySnag[snag.id] ?? [];
-                  const isExpanded = expandedSnagId === snag.id;
+              <div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+                  {group.snags.map((snag) => {
+                    const photos = photosBySnag[snag.id] ?? [];
+                    const isExpanded = expandedSnagId === snag.id;
 
-                  return (
-                    <div key={snag.id} className="flex flex-col">
+                    return (
                       <SnagCard
+                        key={snag.id}
                         snag={snag}
                         photos={photos}
                         isExpanded={isExpanded}
                         onClick={() => handleCardClick(snag.id)}
                       />
+                    );
+                  })}
+                </div>
 
-                      {isExpanded && (
-                        <SnagDetail
-                          snag={snag}
-                          photos={photos}
-                          onClose={() => setExpandedSnagId(null)}
-                          onUpdated={handleSnagUpdated}
-                          onPhotoAdded={(photo) => handlePhotoAdded(snag.id, photo)}
-                          onPhotoDeleted={(photoId) => onPhotoDeleted(snag.id, photoId)}
-                        />
-                      )}
-                    </div>
+                {/* Detail panel — full width below the grid */}
+                {expandedSnagId && (() => {
+                  const snag = group.snags.find((s) => s.id === expandedSnagId);
+                  if (!snag) return null;
+                  const photos = photosBySnag[snag.id] ?? [];
+                  return (
+                    <SnagDetail
+                      snag={snag}
+                      photos={photos}
+                      onClose={() => setExpandedSnagId(null)}
+                      onUpdated={handleSnagUpdated}
+                      onPhotoAdded={(photo) => handlePhotoAdded(snag.id, photo)}
+                      onPhotoDeleted={(photoId) => onPhotoDeleted(snag.id, photoId)}
+                    />
                   );
-                })}
+                })()}
               </div>
             )}
           </div>
