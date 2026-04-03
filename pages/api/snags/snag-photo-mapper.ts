@@ -91,6 +91,32 @@ export async function createSnagsPerPhoto(
 
     const snag = snagRows[0];
     if (!snag) continue;
+
+    // Auto-resolve pole: match P.H890 → ETW.P.H890 in poles table
+    if (poleRef) {
+      const poleRows = await sql`
+        SELECT id, pole_number, zone_no, pon_no, latitude, longitude
+        FROM poles
+        WHERE project_id = ${projectId}
+          AND pole_number ILIKE '%' || ${poleRef}
+        LIMIT 1
+      ` as Array<{ id: string; pole_number: string; zone_no: number | null; pon_no: number | null; latitude: string | null; longitude: string | null }>;
+
+      if (poleRows[0]) {
+        const pole = poleRows[0];
+        await sql`
+          UPDATE snags
+          SET pole_ids = ARRAY[${pole.id}]::uuid[],
+              zone_id = (SELECT zone_id FROM poles WHERE id = ${pole.id}),
+              pon_id = (SELECT pon_id FROM poles WHERE id = ${pole.id}),
+              pole_references = ARRAY[${pole.pole_number}]
+          WHERE id = ${snag.id}
+        `;
+        snag.pole_ids = [pole.id];
+        snag.pole_references = [pole.pole_number];
+      }
+    }
+
     createdSnags.push(snag);
 
     // Create the before photo linked to this specific snag
