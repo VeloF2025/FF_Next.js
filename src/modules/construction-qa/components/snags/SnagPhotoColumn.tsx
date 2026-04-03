@@ -151,7 +151,7 @@ function PhotoThumbnail({
               className="inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-400 truncate"
             >
               <MapPin className="h-3 w-3 shrink-0" />
-              {photo.latitude?.toFixed(5)}, {photo.longitude?.toFixed(5)}
+              {Number(photo.latitude).toFixed(5)}, {Number(photo.longitude).toFixed(5)}
             </a>
           )}
         </div>

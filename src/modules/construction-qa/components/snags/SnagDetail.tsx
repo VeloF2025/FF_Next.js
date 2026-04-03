@@ -123,8 +123,9 @@ export function SnagDetail({ snag: initialSnag, photos, onClose, onUpdated, onPh
           {(() => {
             const gpsPhoto = photos.find((p) => p.latitude != null && p.longitude != null);
             if (!gpsPhoto) return null;
-            const lat = gpsPhoto.latitude!;
-            const lon = gpsPhoto.longitude!;
+            const lat = Number(gpsPhoto.latitude);
+            const lon = Number(gpsPhoto.longitude);
+            if (isNaN(lat) || isNaN(lon)) return null;
             const mapsUrl = `https://www.google.com/maps?q=${lat},${lon}`;
             return (
               <a
