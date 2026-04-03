@@ -7,8 +7,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  LayoutGrid, Table2, Square, Loader2, Palette, Type,
-  MousePointerClick, Bell, Search, RefreshCw, AlertTriangle,
+  Table2, Square, Loader2, Palette, Type,
+  MousePointerClick, Bell, RefreshCw, AlertTriangle,
   CheckCircle2, XCircle, Minus, BarChart3, Layers
 } from 'lucide-react';
 import { log } from '@/lib/logger';

@@ -3,7 +3,6 @@
  * Live inventory of all UI components and design patterns
  */
 
-import React from 'react';
 import Head from 'next/head';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
