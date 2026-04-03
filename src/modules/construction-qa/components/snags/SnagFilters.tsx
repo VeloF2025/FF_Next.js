@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { SnagFilters } from '../../types/snag.types';
 
 interface Project {
-  id: number;
+  id: string;
   name: string;
 }
 

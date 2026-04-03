@@ -6,7 +6,7 @@
 import type { SnagCategory, SnagSeverity } from '../../types/snag.types';
 
 export interface Project {
-  id: number;
+  id: string;
   name: string;
 }
 
