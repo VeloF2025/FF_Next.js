@@ -149,7 +149,7 @@ log "Commit: $CURRENT_COMMIT -> $NEW_COMMIT"
 # --- Step 3: Install deps if needed ---
 if sudo -u velo bash -c "cd $DIR && git diff --name-only $CURRENT_COMMIT HEAD 2>/dev/null" | grep -q 'package.json'; then
   log "package.json changed, running npm install..."
-  sudo -u velo bash -c "cd $DIR && npm install"
+  sudo -u velo bash -c "cd $DIR && npm install --legacy-peer-deps"
 fi
 
 # --- Step 3b: Run lint gates (Zero Tolerance) ---
