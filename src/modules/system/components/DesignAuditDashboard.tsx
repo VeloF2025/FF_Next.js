@@ -7,9 +7,11 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Table2, Square, Loader2, Palette, Type,
+  Table2, Square, Loader2, Palette, Type, Eye,
   MousePointerClick, Bell, RefreshCw, AlertTriangle,
-  CheckCircle2, XCircle, Minus, BarChart3, Layers
+  CheckCircle2, XCircle, Minus, BarChart3, Layers,
+  Plus, Download, Trash2, Edit3, Save, Search as SearchIcon,
+  ChevronDown, Settings, ArrowRight, Filter, Upload
 } from 'lucide-react';
 import { log } from '@/lib/logger';
 
@@ -447,6 +449,216 @@ export default function DesignAuditDashboard() {
               <div className="col-span-5 text-[var(--ff-text-tertiary)]">{item.description}</div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════
+           COMPONENT GALLERY — Visual samples of every variant
+           ═══════════════════════════════════════════════════════════ */}
+      <div className="rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] p-6">
+        <div className="flex items-center gap-2 mb-6">
+          <Eye className="w-5 h-5 text-[var(--ff-text-secondary)]" />
+          <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Component Gallery</h2>
+          <span className="text-xs text-[var(--ff-text-tertiary)] ml-2">Live samples of every pattern found in the codebase</span>
+        </div>
+
+        {/* ── BUTTONS ─────────────────────────────────────────── */}
+        <div className="mb-8">
+          <h3 className="text-sm font-semibold text-[var(--ff-text-secondary)] uppercase tracking-wider mb-4 border-b border-[var(--ff-border-light)] pb-2">
+            Buttons — 4 Systems Coexisting
+          </h3>
+
+          <div className="mb-5">
+            <p className="text-xs font-semibold text-red-400 mb-2">Pattern 1: Raw &lt;button&gt; with inline Tailwind (199 instances, ~90 unique styles)</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">bg-blue-600</button>
+              <button type="button" className="px-3 py-1.5 rounded text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-white transition-colors">bg-slate-700 sm</button>
+              <button type="button" className="px-3 py-1.5 rounded text-xs font-semibold bg-green-700 hover:bg-green-600 text-white">bg-green-700</button>
+              <button type="button" className="px-3 py-1.5 rounded text-xs font-semibold bg-red-700 hover:bg-red-600 text-white">bg-red-700</button>
+              <button type="button" className="px-3 py-1.5 rounded text-xs font-semibold bg-amber-700 hover:bg-amber-600 text-white">bg-amber-700</button>
+              <button type="button" className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">shadow-sm variant</button>
+              <button type="button" className="inline-flex items-center px-3 py-2 border border-gray-600 rounded-md text-sm font-medium text-gray-300 bg-transparent hover:bg-gray-700">bordered ghost</button>
+              <button type="button" className="p-2 text-gray-400 hover:text-white rounded-md hover:bg-gray-700"><Settings className="w-4 h-4" /></button>
+              <button type="button" className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white"><Trash2 className="w-4 h-4" /></button>
+              <button type="button" className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300">text link style</button>
+            </div>
+          </div>
+
+          <div className="mb-5">
+            <p className="text-xs font-semibold text-blue-400 mb-2">Pattern 2: ff-button CSS classes (13 instances)</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="ff-button ff-button--primary">ff-button primary</button>
+              <button type="button" className="ff-button ff-button--secondary">ff-button secondary</button>
+            </div>
+          </div>
+
+          <div className="mb-5">
+            <p className="text-xs font-semibold text-green-400 mb-2">Pattern 3: CSS var themed (var(--ff-*) inline)</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="flex items-center justify-center px-4 py-2 bg-[var(--ff-primary-600)] text-white rounded-lg hover:bg-[var(--ff-primary-700)] transition-colors text-sm"><Plus className="w-4 h-4 mr-1.5" /> Primary action</button>
+              <button type="button" className="flex items-center justify-center px-4 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)] border border-[var(--ff-border-light)] text-sm"><Download className="w-4 h-4 mr-1.5" /> Secondary</button>
+              <button type="button" className="flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"><Trash2 className="w-4 h-4 mr-1.5" /> Danger</button>
+              <button type="button" className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] p-2 rounded hover:bg-[var(--ff-bg-hover)]"><Edit3 className="w-4 h-4" /></button>
+            </div>
+          </div>
+
+          <div className="mt-4 p-4 rounded-lg border-2 border-dashed border-green-500/30 bg-green-500/5">
+            <p className="text-xs font-semibold text-green-400 mb-3">TARGET: Unified Button component with consistent variants</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-[var(--ff-primary-600)] text-white hover:bg-[var(--ff-primary-700)]"><Plus className="w-4 h-4" /> Primary</button>
+              <button type="button" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)]"><Download className="w-4 h-4" /> Secondary</button>
+              <button type="button" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-red-600/10 text-red-400 border border-red-500/30 hover:bg-red-600/20"><Trash2 className="w-4 h-4" /> Danger</button>
+              <button type="button" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)]"><Settings className="w-4 h-4" /> Ghost</button>
+              <button type="button" className="inline-flex items-center justify-center w-9 h-9 rounded-lg transition-colors text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)]"><Edit3 className="w-4 h-4" /></button>
+              <button type="button" className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors bg-[var(--ff-primary-600)] text-white hover:bg-[var(--ff-primary-700)]">Small</button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── TABLES ──────────────────────────────────────────── */}
+        <div className="mb-8">
+          <h3 className="text-sm font-semibold text-[var(--ff-text-secondary)] uppercase tracking-wider mb-4 border-b border-[var(--ff-border-light)] pb-2">
+            Tables — 4 Systems
+          </h3>
+          <div className="mb-5">
+            <p className="text-xs font-semibold text-red-400 mb-2">Pattern 1: Raw &lt;table&gt; with inline Tailwind (165 instances)</p>
+            <div className="overflow-x-auto rounded border border-gray-700">
+              <table className="min-w-full text-sm"><thead><tr className="bg-gray-800 text-gray-300 text-left text-xs uppercase"><th className="px-4 py-2">Name</th><th className="px-4 py-2">Status</th><th className="px-4 py-2">Value</th></tr></thead>
+              <tbody className="divide-y divide-gray-700"><tr className="text-gray-300 hover:bg-gray-800"><td className="px-4 py-2">Item A</td><td className="px-4 py-2"><span className="text-green-400">Active</span></td><td className="px-4 py-2">R 1,200</td></tr><tr className="text-gray-300 hover:bg-gray-800"><td className="px-4 py-2">Item B</td><td className="px-4 py-2"><span className="text-yellow-400">Pending</span></td><td className="px-4 py-2">R 850</td></tr></tbody></table>
+            </div>
+          </div>
+          <div className="mb-5">
+            <p className="text-xs font-semibold text-blue-400 mb-2">Pattern 2: ff-table CSS classes (37 instances)</p>
+            <div className="ff-table-container"><table className="ff-table"><thead><tr className="ff-table-header"><th className="ff-table-th">Name</th><th className="ff-table-th">Status</th><th className="ff-table-th">Value</th></tr></thead>
+            <tbody><tr className="ff-table-row"><td className="ff-table-td ff-table-primary">Item A</td><td className="ff-table-td"><span className="text-green-400">Active</span></td><td className="ff-table-td">R 1,200</td></tr><tr className="ff-table-row"><td className="ff-table-td ff-table-primary">Item B</td><td className="ff-table-td"><span className="text-yellow-400">Pending</span></td><td className="ff-table-td">R 850</td></tr></tbody></table></div>
+          </div>
+          <div className="p-4 rounded-lg border-2 border-dashed border-green-500/30 bg-green-500/5">
+            <p className="text-xs font-semibold text-green-400 mb-2">TARGET: Unified DataTable</p>
+            <p className="text-xs text-[var(--ff-text-tertiary)] font-mono">{'<DataTable columns={cols} data={rows} searchable sortable paginated exportable />'}</p>
+          </div>
+        </div>
+
+        {/* ── LOADING STATES ──────────────────────────────────── */}
+        <div className="mb-8">
+          <h3 className="text-sm font-semibold text-[var(--ff-text-secondary)] uppercase tracking-wider mb-4 border-b border-[var(--ff-border-light)] pb-2">Loading States</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 rounded-lg border border-red-500/30 bg-red-500/5">
+              <p className="text-xs font-semibold text-red-400 mb-3">DIY animate-spin (319 files)</p>
+              <div className="flex items-center justify-center h-16"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" /></div>
+            </div>
+            <div className="p-4 rounded-lg border border-yellow-500/30 bg-yellow-500/5">
+              <p className="text-xs font-semibold text-yellow-400 mb-3">DIY animate-pulse (65 files)</p>
+              <div className="space-y-2 h-16 flex flex-col justify-center"><div className="h-3 bg-gray-700 rounded animate-pulse w-3/4" /><div className="h-3 bg-gray-700 rounded animate-pulse w-1/2" /><div className="h-3 bg-gray-700 rounded animate-pulse w-5/6" /></div>
+            </div>
+            <div className="p-4 rounded-lg border-2 border-dashed border-green-500/30 bg-green-500/5">
+              <p className="text-xs font-semibold text-green-400 mb-3">TARGET</p>
+              <div className="space-y-2 h-16 flex flex-col justify-center text-xs text-[var(--ff-text-tertiary)]"><p>{'<LoadingSpinner size="sm|md|lg" />'}</p><p>{'<SkeletonTable rows={5} cols={3} />'}</p></div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── MODALS ──────────────────────────────────────────── */}
+        <div className="mb-8">
+          <h3 className="text-sm font-semibold text-[var(--ff-text-secondary)] uppercase tracking-wider mb-4 border-b border-[var(--ff-border-light)] pb-2">Modals</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 rounded-lg border border-red-500/30 bg-red-500/5">
+              <p className="text-xs font-semibold text-red-400 mb-3">DIY fixed inset-0 (107)</p>
+              <div className="relative h-28 rounded bg-[var(--ff-bg-tertiary)] overflow-hidden"><div className="absolute inset-0 bg-black/50 flex items-center justify-center"><div className="bg-gray-800 rounded-lg p-3 w-3/4 shadow-xl border border-gray-700"><p className="text-xs text-white mb-2">Custom modal</p><div className="flex gap-1 justify-end"><button type="button" className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded">Cancel</button><button type="button" className="px-2 py-1 text-xs bg-blue-600 text-white rounded">Save</button></div></div></div></div>
+            </div>
+            <div className="p-4 rounded-lg border border-orange-500/30 bg-orange-500/5">
+              <p className="text-xs font-semibold text-orange-400 mb-3">window.confirm() (24)</p>
+              <div className="h-28 flex items-center justify-center"><div className="bg-white rounded p-3 text-black text-xs shadow-lg border w-3/4"><p className="font-semibold mb-1">localhost says</p><p className="mb-2">Delete this item?</p><div className="flex gap-2 justify-end"><button type="button" className="px-2 py-1 text-xs bg-gray-200 rounded">Cancel</button><button type="button" className="px-2 py-1 text-xs bg-blue-500 text-white rounded">OK</button></div></div></div>
+            </div>
+            <div className="p-4 rounded-lg border-2 border-dashed border-green-500/30 bg-green-500/5">
+              <p className="text-xs font-semibold text-green-400 mb-3">TARGET: ConfirmDialog</p>
+              <div className="relative h-28 rounded bg-[var(--ff-bg-tertiary)] overflow-hidden"><div className="absolute inset-0 bg-black/50 flex items-center justify-center"><div className="bg-[var(--ff-bg-secondary)] rounded-lg p-3 w-3/4 shadow-xl border border-[var(--ff-border-light)]"><p className="text-xs text-[var(--ff-text-primary)] font-semibold mb-1">Delete Item?</p><p className="text-xs text-[var(--ff-text-tertiary)] mb-2">This cannot be undone.</p><div className="flex gap-1 justify-end"><button type="button" className="px-2 py-1 text-xs bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] rounded border border-[var(--ff-border-light)]">Cancel</button><button type="button" className="px-2 py-1 text-xs bg-red-600 text-white rounded">Delete</button></div></div></div></div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── BADGES ──────────────────────────────────────────── */}
+        <div className="mb-8">
+          <h3 className="text-sm font-semibold text-[var(--ff-text-secondary)] uppercase tracking-wider mb-4 border-b border-[var(--ff-border-light)] pb-2">Status Badges</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs font-semibold text-red-400 mb-2">Current: ~20 different styles</p>
+              <div className="flex flex-wrap gap-2">
+                <span className="px-2 py-0.5 text-xs rounded-full bg-green-500/20 text-green-400">Active</span>
+                <span className="px-2 py-0.5 text-xs rounded bg-green-900 text-green-300">Active v2</span>
+                <span className="px-2 py-1 text-xs font-semibold bg-green-600 text-white rounded-md">ACTIVE</span>
+                <span className="inline-block w-3 h-3 rounded-full bg-green-500" />
+                <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-500/20 text-yellow-400">Pending</span>
+                <span className="px-2 py-0.5 text-xs rounded bg-red-900 text-red-300">Rejected</span>
+                <span className="px-3 py-1 text-xs bg-blue-600 text-white rounded-full">In Progress</span>
+                <span className="px-2 py-0.5 text-xs rounded bg-gray-700 text-gray-400">Draft</span>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-green-400 mb-2">TARGET: Unified StatusBadge</p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: 'Active', color: 'green' },
+                  { label: 'Pending', color: 'yellow' },
+                  { label: 'Failed', color: 'red' },
+                  { label: 'In Progress', color: 'blue' },
+                  { label: 'Draft', color: 'gray' },
+                ].map((b) => (
+                  <span key={b.label} className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium rounded-full bg-${b.color}-500/15 text-${b.color}-400 border border-${b.color}-500/30`}>
+                    <span className={`w-1.5 h-1.5 rounded-full bg-${b.color}-400`} /> {b.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── CARDS ────────────────────────────────────────────── */}
+        <div className="mb-8">
+          <h3 className="text-sm font-semibold text-[var(--ff-text-secondary)] uppercase tracking-wider mb-4 border-b border-[var(--ff-border-light)] pb-2">Cards</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div><p className="text-xs font-semibold text-red-400 mb-2">Hardcoded Tailwind</p><div className="bg-gray-800 rounded-lg border border-gray-700 p-4"><h4 className="text-white font-semibold text-sm">Project Alpha</h4><p className="text-gray-400 text-xs mt-1">Drops: 450</p><div className="mt-2 flex justify-between text-xs"><span className="text-gray-500">Active</span><span className="text-green-400">87%</span></div></div></div>
+            <div><p className="text-xs font-semibold text-blue-400 mb-2">ff-card CSS</p><div className="ff-card"><div className="ff-card-header"><h4 className="ff-card-title">Project Alpha</h4><p className="ff-card-subtitle">Drops: 450</p></div><div className="ff-card-content"><div className="flex justify-between text-xs"><span className="text-[var(--ff-text-tertiary)]">Active</span><span className="text-green-400">87%</span></div></div></div></div>
+            <div><p className="text-xs font-semibold text-green-400 mb-2">CSS var themed (target)</p><div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4"><h4 className="text-[var(--ff-text-primary)] font-semibold text-sm">Project Alpha</h4><p className="text-[var(--ff-text-tertiary)] text-xs mt-1">Drops: 450</p><div className="mt-2 flex justify-between text-xs"><span className="text-[var(--ff-text-tertiary)]">Active</span><span className="text-green-400">87%</span></div></div></div>
+          </div>
+        </div>
+
+        {/* ── INPUTS ──────────────────────────────────────────── */}
+        <div className="mb-8">
+          <h3 className="text-sm font-semibold text-[var(--ff-text-secondary)] uppercase tracking-wider mb-4 border-b border-[var(--ff-border-light)] pb-2">Form Inputs</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div><p className="text-xs font-semibold text-red-400 mb-2">Raw (hardcoded)</p><input type="text" placeholder="bg-gray-800 border-gray-600..." className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-sm text-white placeholder-gray-500" readOnly /></div>
+            <div><p className="text-xs font-semibold text-blue-400 mb-2">ff-input CSS</p><input type="text" placeholder="ff-input class..." className="ff-input w-full" readOnly /></div>
+            <div><p className="text-xs font-semibold text-green-400 mb-2">CSS var (target)</p><input type="text" placeholder="Search..." className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary-500)]" readOnly /></div>
+          </div>
+        </div>
+
+        {/* ── COLORS ──────────────────────────────────────────── */}
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--ff-text-secondary)] uppercase tracking-wider mb-4 border-b border-[var(--ff-border-light)] pb-2">Color System</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs font-semibold text-red-400 mb-2">Hardcoded Tailwind (6,971 uses)</p>
+              <div className="flex gap-1 flex-wrap">
+                {['bg-blue-500', 'bg-blue-600', 'bg-red-500', 'bg-green-500', 'bg-gray-700', 'bg-gray-800', 'bg-slate-800', 'bg-amber-500'].map((c) => (
+                  <div key={c} className={`${c} w-10 h-10 rounded flex items-center justify-center`}><span className="text-[6px] text-white/80 font-mono">{c.replace('bg-', '')}</span></div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-green-400 mb-2">CSS Variables (9,037 uses)</p>
+              <div className="flex gap-1 flex-wrap">
+                {[
+                  { n: 'primary', c: 'bg-[var(--ff-primary-500)]' },
+                  { n: 'bg-pri', c: 'bg-[var(--ff-bg-primary)]' },
+                  { n: 'bg-sec', c: 'bg-[var(--ff-bg-secondary)]' },
+                  { n: 'bg-ter', c: 'bg-[var(--ff-bg-tertiary)]' },
+                  { n: 'hover', c: 'bg-[var(--ff-bg-hover)]' },
+                ].map((v) => (
+                  <div key={v.n} className={`${v.c} w-10 h-10 rounded border border-[var(--ff-border-light)] flex items-center justify-center`}><span className="text-[6px] text-white/80 font-mono">{v.n}</span></div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
