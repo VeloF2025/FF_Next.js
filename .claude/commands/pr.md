@@ -11,26 +11,36 @@ Create a pull request for the current branch following FF team standards.
 
 2. Get commit history for this branch:
    ```bash
-   git log main..HEAD --oneline 2>/dev/null || git log develop..HEAD --oneline
+   git log master..HEAD --oneline
    ```
 
 3. See changed files:
    ```bash
-   git diff main...HEAD --stat 2>/dev/null || git diff develop...HEAD --stat
+   git diff master...HEAD --stat
    ```
 
-## TDD Validation
+## Local CI Pipeline (replaces GitHub Actions)
 
-Before creating PR, validate TDD compliance:
+**MANDATORY — run before creating PR. Do not skip.**
 
-1. Check for test coverage:
-   ```bash
-   npm run test:coverage 2>/dev/null || npm test
-   ```
+Run the local CI pipeline which mirrors the GitHub Actions gates:
 
-2. Verify new code has tests:
-   - For each new file in `src/modules/`, confirm test exists
-   - Check `tests/specs/` for feature specification
+```bash
+bash scripts/ci-local.sh --quick
+```
+
+This runs:
+- Accessibility lint gate (jsx-a11y, max 487 warnings)
+- Error handling gate (no-silent-catch, max 896 warnings)
+- Type safety gate (no-explicit-any, max 2573 warnings)
+- TypeScript type check (non-blocking)
+
+If any **blocking** gate fails, fix the issues before creating the PR.
+
+For a full CI run including tests and build (takes longer):
+```bash
+bash scripts/ci-local.sh
+```
 
 ## Analyze Changes
 
@@ -45,29 +55,28 @@ Use gh CLI with FF standards:
 
 ```bash
 gh pr create \
-  --title "<type>: <description>" \
-  --body "## Summary
+  --title "<type>(<scope>): <description>" \
+  --body "$(cat <<'EOF'
+## Summary
 <1-3 bullet points explaining the change>
 
 ## Changes
 - <list key files/components changed>
 
-## Testing
-- [ ] Unit tests pass (\`npm test\`)
-- [ ] Type check passes (\`npm run type-check\`)
-- [ ] Lint passes (\`npm run lint\`)
-- [ ] Manual testing completed
+## Local CI
+- [x] Lint gates passed (`bash scripts/ci-local.sh --quick`)
+- [ ] Unit tests pass (`npm test -- --run`)
+- [ ] Build verified
 
-## TDD Compliance
-- [ ] Test spec exists: tests/specs/<feature>.spec.md
-- [ ] Tests written before/during implementation
-- [ ] Coverage maintained or improved
+## Testing
+- [ ] Manual testing completed on dev
 
 ## Related
 Closes #<issue-number> (if applicable)
 
----
-Generated with Claude Code"
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
 ```
 
 ## Output

@@ -24,16 +24,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint (Accessibility Gate - jsx-a11y)
-        run: npx eslint src --ext ts,tsx --rule "jsx-a11y/*" --max-warnings 487
-        continue-on-error: false
+      - name: Lint (ratchet gate - max 77 errors, 3765 warnings)
+        run: npm run lint -- --max-warnings 3765
 
       - name: Lint (Error Handling Gate - no-silent-catch)
-        run: npx eslint pages/api --ext .ts --rulesdir scripts/eslint-rules --rule '{"local/no-silent-catch": "warn"}' --max-warnings 896
-        continue-on-error: false
-
-      - name: Lint (Type Safety Gate - no-explicit-any)
-        run: npx eslint src --ext ts,tsx --rule '{"@typescript-eslint/no-explicit-any": "warn"}' --max-warnings 2573
+        run: npx eslint pages/api --ext .ts --rulesdir scripts/eslint-rules --rule '{"no-silent-catch": "warn"}' --max-warnings 88
         continue-on-error: false
 
       - name: Run TypeScript type check

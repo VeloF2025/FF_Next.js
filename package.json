@@ -27,6 +27,8 @@
     "lint:strict": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint src --ext ts,tsx --fix",
     "type-check": "tsc --noEmit",
+    "ci": "bash scripts/ci-local.sh",
+    "ci:quick": "bash scripts/ci-local.sh --quick",
     "db:migrate": "tsx scripts/migrations/run.ts",
     "db:seed": "tsx scripts/setupNeonDatabase.ts seed",
     "db:validate": "tsx scripts/setupNeonDatabase.ts validate",

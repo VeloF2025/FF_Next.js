@@ -152,6 +152,36 @@ if sudo -u velo bash -c "cd $DIR && git diff --name-only $CURRENT_COMMIT HEAD 2>
   sudo -u velo bash -c "cd $DIR && npm install"
 fi
 
+# --- Step 3b: Run lint gates (Zero Tolerance) ---
+if [[ "$FORCE" != true ]]; then
+  log "Running lint gates..."
+  LINT_FAILED=false
+  MAX_LINT_WARNINGS=3765
+  MAX_LINT_ERRORS=77
+
+  LINT_OUTPUT=$(sudo -u velo bash -c "cd $DIR && npm run lint" 2>&1 || true)
+  LINT_SUMMARY=$(echo "$LINT_OUTPUT" | grep -P '\d+ problems? \(' || echo "0 problems (0 errors, 0 warnings)")
+  LINT_ERRORS=$(echo "$LINT_SUMMARY" | grep -oP '\d+ error' | grep -oP '\d+' || echo "0")
+  LINT_WARNINGS=$(echo "$LINT_SUMMARY" | grep -oP '\d+ warning' | grep -oP '\d+' || echo "0")
+
+  if [[ "$LINT_WARNINGS" -gt "$MAX_LINT_WARNINGS" ]]; then
+    warn "New lint warnings: ${LINT_WARNINGS} (max ${MAX_LINT_WARNINGS})"
+    LINT_FAILED=true
+  fi
+  if [[ "$LINT_ERRORS" -gt "$MAX_LINT_ERRORS" ]]; then
+    warn "New lint errors: ${LINT_ERRORS} (max ${MAX_LINT_ERRORS})"
+    echo "$LINT_OUTPUT" | grep "  error  " | tail -5 | sed 's/^/    /'
+    LINT_FAILED=true
+  fi
+
+  if [[ "$LINT_FAILED" == true ]]; then
+    error "Lint gates failed. Fix issues or use --force to bypass."
+  fi
+  log "Lint gates passed: ${LINT_ERRORS} errors (≤${MAX_LINT_ERRORS}), ${LINT_WARNINGS} warnings (≤${MAX_LINT_WARNINGS}) ✓"
+else
+  warn "Skipping lint gates (--force)"
+fi
+
 # --- Step 4: Stop service to free resources ---
 log "Stopping $SVC..."
 sudo /usr/bin/systemctl stop "$SVC" 2>/dev/null || true
