@@ -22,7 +22,11 @@ import type {
 } from '../../types/snag.types';
 
 export interface ReportGroup {
-  report: Pick<SnagReport, 'id' | 'report_number' | 'audit_date'>;
+  report: {
+    id: string;
+    report_number: string;
+    audit_date: string;
+  };
   snags: Snag[];
 }
 
@@ -135,8 +139,8 @@ export function useSnagsPage() {
           groupMap.set(key, {
             report: {
               id: snag.report_id,
-              report_number: snag.report?.report_number ?? snag.report_id,
-              audit_date: snag.report?.audit_date ?? new Date().toISOString(),
+              report_number: snag.report_number ?? snag.report_id,
+              audit_date: snag.audit_date ?? new Date().toISOString(),
             },
             snags: [],
           });

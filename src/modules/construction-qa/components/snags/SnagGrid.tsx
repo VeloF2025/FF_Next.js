@@ -141,6 +141,11 @@ export function SnagGrid({
         const openWithoutTicket = group.snags.filter(
           (s) => s.status === 'open' && !s.noc_ticket_id
         ).length;
+        const withTicket = group.snags.filter((s) => s.noc_ticket_id).length;
+        const totalPhotos = group.snags.reduce(
+          (sum, s) => sum + (photosBySnag[s.id]?.length ?? 0), 0
+        );
+        const repeatCount = group.snags.filter((s) => s.is_repeat).length;
 
         return (
           <div key={group.report.id} className="space-y-2">
@@ -149,29 +154,43 @@ export function SnagGrid({
               <button
                 type="button"
                 onClick={() => toggleReport(group.report.id)}
-                className="flex-1 flex items-center gap-2 text-left bg-zinc-800 hover:bg-zinc-750 border border-zinc-700 rounded-md px-3 py-2 transition-colors"
+                className="flex-1 flex items-center gap-2 text-left bg-zinc-800 hover:bg-zinc-750 border border-zinc-700 rounded-md px-3 py-2.5 transition-colors"
               >
                 {isCollapsed ? (
                   <ChevronRight className="h-4 w-4 text-zinc-500 shrink-0" />
                 ) : (
                   <ChevronDown className="h-4 w-4 text-zinc-500 shrink-0" />
                 )}
-                <span className="text-sm font-medium text-zinc-200 flex-1">
-                  {group.report.report_number} — {auditDate}
-                </span>
-                <span className="text-xs text-zinc-400">
-                  {group.snags.length} findings
-                </span>
-                {openCount > 0 && (
-                  <span className="text-xs bg-red-900/60 text-red-300 px-1.5 py-0.5 rounded">
-                    {openCount} open
-                  </span>
-                )}
-                {fixedCount > 0 && (
-                  <span className="text-xs bg-green-900/60 text-green-300 px-1.5 py-0.5 rounded">
-                    {fixedCount} resolved
-                  </span>
-                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-zinc-100">
+                      {group.report.report_number}
+                    </span>
+                    <span className="text-xs text-zinc-500">{auditDate}</span>
+                    {repeatCount > 0 && (
+                      <span className="text-xs bg-orange-900/60 text-orange-300 px-1.5 py-0.5 rounded">
+                        {repeatCount} repeat{repeatCount > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 mt-0.5 text-xs text-zinc-500">
+                    <span>{group.snags.length} findings</span>
+                    <span>{totalPhotos} photos</span>
+                    {withTicket > 0 && <span>{withTicket} tickets</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {openCount > 0 && (
+                    <span className="text-xs bg-red-900/60 text-red-300 px-1.5 py-0.5 rounded">
+                      {openCount} open
+                    </span>
+                  )}
+                  {fixedCount > 0 && (
+                    <span className="text-xs bg-green-900/60 text-green-300 px-1.5 py-0.5 rounded">
+                      {fixedCount} resolved
+                    </span>
+                  )}
+                </div>
               </button>
 
               {/* Bulk create NOC tickets (only when there are open snags without tickets) */}

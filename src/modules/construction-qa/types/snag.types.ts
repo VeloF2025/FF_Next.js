@@ -122,9 +122,11 @@ export interface Snag {
   created_at: string;
   updated_at: string;
 
-  // Joined data
+  // Joined data (flat from SQL JOIN)
+  report_number?: string;
+  audit_date?: string;
+  noc_ticket_uid?: string | null;
   photos?: SnagPhoto[];
-  report?: Pick<SnagReport, 'report_number' | 'audit_date'>;
 }
 
 /** Maps to snag_photos table */
