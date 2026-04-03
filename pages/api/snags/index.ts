@@ -13,11 +13,24 @@ import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import { querySnagsByReport, querySnagsByProject } from './snags-query';
+import { updateTicket } from '@/modules/noc/services/ticketService';
+import { TicketStatus } from '@/modules/noc/types/ticket';
 import type {
   Snag,
+  SnagStatus,
   CreateSnagRequest,
   UpdateSnagRequest,
 } from '@/modules/construction-qa/types/snag.types';
+
+/** Map snag status → NOC ticket status for sync (returns undefined if no sync needed) */
+function mapSnagStatusToTicketStatus(snagStatus: SnagStatus): TicketStatus | undefined {
+  switch (snagStatus) {
+    case 'fixed':    return TicketStatus.RESOLVED;
+    case 'verified': return TicketStatus.RESOLVED;
+    case 'closed':   return TicketStatus.CLOSED;
+    default:         return undefined;
+  }
+}
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -79,10 +92,11 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
   // No filter — all snags paginated
   const rows = await sql`
-    SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date
+    SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid
     FROM snags s
     LEFT JOIN users u ON u.id = s.assigned_to
     LEFT JOIN snag_reports sr ON sr.id = s.report_id
+    LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
     ORDER BY s.created_at DESC
     LIMIT ${pageSizeNum} OFFSET ${offset}
   ` as Snag[];
@@ -191,8 +205,32 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Failed to update snag');
   }
 
+  const updatedSnag = rows[0];
+
+  // Sync status to linked NOC ticket if applicable
+  if (body.status && updatedSnag.noc_ticket_id) {
+    const ticketStatus = mapSnagStatusToTicketStatus(body.status);
+    if (ticketStatus) {
+      try {
+        await updateTicket(updatedSnag.noc_ticket_id, { status: ticketStatus });
+        log.info('NOC ticket status synced', {
+          snagId: body.id,
+          ticketId: updatedSnag.noc_ticket_id,
+          ticketStatus,
+        });
+      } catch (syncErr) {
+        // Non-fatal: log but don't fail the snag update
+        log.error('Failed to sync NOC ticket status', {
+          snagId: body.id,
+          ticketId: updatedSnag.noc_ticket_id,
+          syncErr,
+        });
+      }
+    }
+  }
+
   log.info('Snag updated', { snagId: body.id, status: body.status });
-  return apiResponse.success(res, rows[0]);
+  return apiResponse.success(res, updatedSnag);
 }
 
 export default withAuth(handler);

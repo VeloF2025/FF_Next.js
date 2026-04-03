@@ -100,6 +100,8 @@ export interface Snag {
   // Lifecycle
   status: SnagStatus;
   noc_ticket_id: string | null;
+  /** Human-readable NOC ticket UID (e.g. SNG-20260402-001), joined from maintenance_tickets */
+  noc_ticket_uid?: string | null;
   assigned_to: string | null;
   assigned_to_name?: string | null;
   assigned_at: string | null;

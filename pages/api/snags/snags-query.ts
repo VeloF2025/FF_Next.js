@@ -2,6 +2,8 @@
  * Snag Query Helpers — Explicit SQL query branches for snag list queries.
  * Avoids conditional SQL fragments (Neon constraint).
  * Used by pages/api/snags/index.ts.
+ *
+ * All queries JOIN maintenance_tickets to surface noc_ticket_uid for the UI.
  */
 
 import type { NextApiResponse } from 'next';
@@ -28,10 +30,11 @@ export async function querySnagsByReport(
 ) {
   if (status && category && severity && searchTerm) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
+      LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
       WHERE s.report_id = ${reportId} AND s.status = ${status}
         AND s.category = ${category} AND s.severity = ${severity}
         AND s.description ILIKE ${searchTerm}
@@ -47,10 +50,11 @@ export async function querySnagsByReport(
 
   if (status && category && severity) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
+      LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
       WHERE s.report_id = ${reportId} AND s.status = ${status}
         AND s.category = ${category} AND s.severity = ${severity}
       ORDER BY s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
@@ -64,10 +68,11 @@ export async function querySnagsByReport(
 
   if (status && category) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
+      LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
       WHERE s.report_id = ${reportId} AND s.status = ${status} AND s.category = ${category}
       ORDER BY s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
     ` as Snag[];
@@ -80,10 +85,11 @@ export async function querySnagsByReport(
 
   if (status) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
+      LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
       WHERE s.report_id = ${reportId} AND s.status = ${status}
       ORDER BY s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
     ` as Snag[];
@@ -123,10 +129,11 @@ export async function querySnagsByProject(
 ) {
   if (status && category && severity) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
+      LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
       WHERE s.project_id = ${projectId} AND s.status = ${status}
         AND s.category = ${category} AND s.severity = ${severity}
       ORDER BY sr.audit_date DESC, s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
@@ -140,10 +147,11 @@ export async function querySnagsByProject(
 
   if (status && category) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
+      LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
       WHERE s.project_id = ${projectId} AND s.status = ${status} AND s.category = ${category}
       ORDER BY sr.audit_date DESC, s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
     ` as Snag[];
@@ -156,10 +164,11 @@ export async function querySnagsByProject(
 
   if (status) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
+      LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
       WHERE s.project_id = ${projectId} AND s.status = ${status}
       ORDER BY sr.audit_date DESC, s.snag_number ASC LIMIT ${pageSizeNum} OFFSET ${offset}
     ` as Snag[];

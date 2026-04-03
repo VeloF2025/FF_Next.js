@@ -194,6 +194,50 @@ export async function uploadSnagPhotoFile(
 }
 
 // ============================================================
+// NOC Ticket Integration
+// ============================================================
+
+/**
+ * Create a NOC ticket for a single snag.
+ * Returns the created ticket and the updated snag (with noc_ticket_uid).
+ */
+export async function createNocTicket(
+  snagId: string
+): Promise<{ ticket: Record<string, unknown>; snag: Snag }> {
+  const res = await fetch('/api/snags/create-ticket', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ snag_id: snagId }),
+  });
+  if (!res.ok) {
+    const err = await res.json() as { error?: { message?: string } };
+    throw new Error(err.error?.message ?? 'Failed to create NOC ticket');
+  }
+  const json = await res.json() as { data: { ticket: Record<string, unknown>; snag: Snag } };
+  return json.data;
+}
+
+/**
+ * Create NOC tickets for all open snags in a report.
+ * Returns count of tickets created.
+ */
+export async function createNocTicketsBulk(
+  reportId: string
+): Promise<{ created: number; skipped: number; errors: number }> {
+  const res = await fetch('/api/snags/create-tickets-bulk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ report_id: reportId }),
+  });
+  if (!res.ok) {
+    const err = await res.json() as { error?: { message?: string } };
+    throw new Error(err.error?.message ?? 'Failed to bulk-create NOC tickets');
+  }
+  const json = await res.json() as { data: { created: number; skipped: number; errors: number } };
+  return json.data;
+}
+
+// ============================================================
 // Pole Resolution
 // ============================================================
 

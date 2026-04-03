@@ -10,10 +10,10 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { X } from 'lucide-react';
+import { X, ExternalLink, Ticket } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Snag, SnagPhoto, SnagStatus } from '../../types/snag.types';
-import { updateSnag } from '../../services/snagService';
+import { updateSnag, createNocTicket } from '../../services/snagService';
 import { log } from '@/lib/logger';
 import { PhotoColumn } from './SnagPhotoColumn';
 import { SnagPoleResolution } from './SnagPoleResolution';
@@ -41,6 +41,7 @@ const STATUS_OPTIONS: { value: SnagStatus; label: string }[] = [
 export function SnagDetail({ snag: initialSnag, photos, onClose, onUpdated, onPhotoAdded, onPhotoDeleted }: SnagDetailProps) {
   const [snag, setSnag] = useState<Snag>(initialSnag);
   const [saving, setSaving] = useState(false);
+  const [creatingTicket, setCreatingTicket] = useState(false);
 
   const handleStatusChange = async (status: SnagStatus) => {
     setSaving(true);
@@ -73,6 +74,19 @@ export function SnagDetail({ snag: initialSnag, photos, onClose, onUpdated, onPh
     onUpdated(updated);
   }, [onUpdated]);
 
+  const handleCreateNocTicket = async () => {
+    setCreatingTicket(true);
+    try {
+      const { snag: updatedSnag } = await createNocTicket(snag.id);
+      setSnag(updatedSnag);
+      onUpdated(updatedSnag);
+    } catch (err) {
+      log.error('Failed to create NOC ticket', { err, snagId: snag.id });
+    } finally {
+      setCreatingTicket(false);
+    }
+  };
+
   return (
     <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-4 mt-1">
       {/* Header */}
@@ -83,8 +97,15 @@ export function SnagDetail({ snag: initialSnag, photos, onClose, onUpdated, onPh
           </h3>
           <p className="text-xs text-zinc-400 mt-0.5">
             {snag.category} | {snag.severity}
-            {snag.noc_ticket_id && (
-              <span className="ml-2 text-blue-400">NOC #{snag.noc_ticket_id}</span>
+            {snag.noc_ticket_uid && (
+              <a
+                href={`/noc/tickets/${snag.noc_ticket_id ?? ''}`}
+                className="ml-2 text-blue-400 hover:text-blue-300 underline"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {snag.noc_ticket_uid}
+              </a>
             )}
           </p>
         </div>
@@ -147,14 +168,27 @@ export function SnagDetail({ snag: initialSnag, photos, onClose, onUpdated, onPh
           </button>
         )}
 
-        <button
-          type="button"
-          disabled
-          className="text-xs bg-zinc-800 text-zinc-500 border border-zinc-700 px-3 py-1.5 rounded cursor-not-allowed"
-          title="NOC ticket creation available in Phase 2"
-        >
-          Create NOC Ticket (Phase 2)
-        </button>
+        {snag.noc_ticket_id ? (
+          <a
+            href={`/noc/tickets/${snag.noc_ticket_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-xs bg-blue-900/60 hover:bg-blue-800/60 text-blue-300 border border-blue-700 px-3 py-1.5 rounded font-medium transition-colors"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            NOC {snag.noc_ticket_uid ?? 'Ticket'}
+          </a>
+        ) : (
+          <button
+            type="button"
+            onClick={() => { void handleCreateNocTicket(); }}
+            disabled={saving || creatingTicket}
+            className="flex items-center gap-1.5 text-xs bg-blue-900/60 hover:bg-blue-800/60 disabled:opacity-50 text-blue-300 border border-blue-700 px-3 py-1.5 rounded font-medium transition-colors"
+          >
+            <Ticket className="h-3.5 w-3.5" />
+            {creatingTicket ? 'Creating...' : 'Create NOC Ticket'}
+          </button>
+        )}
       </div>
 
       {/* Timeline */}
