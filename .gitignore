@@ -121,6 +121,10 @@ nul
 
 # Local credentials (never commit)
 .claude/credentials.local.md
+QFIELD_CREDENTIALS.md
+JAUN_PROJECT_ACCESS.md
+*_CREDENTIALS.md
+*_ACCESS.md
 
 # Browser automation / session artifacts
 snapshot.txt
