@@ -117,7 +117,7 @@ export function SnagGrid({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-16">
       {/* Back button */}
       <button
         type="button"
