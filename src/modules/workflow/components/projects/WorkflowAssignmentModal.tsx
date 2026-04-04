@@ -8,8 +8,8 @@ import {
   FileText,
   CheckCircle2,
   AlertTriangle,
-  Loader2
 } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 import type {
   WorkflowTemplate,
@@ -459,7 +459,7 @@ export function WorkflowAssignmentModal({
                     <div className="max-h-40 overflow-y-auto border border-border rounded-lg p-2 space-y-2">
                       {loadingStaff ? (
                         <div className="flex items-center justify-center py-4">
-                          <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                          <InlineSpinner size="sm" />
                           <span className="ml-2 text-sm text-muted-foreground">Loading staff...</span>
                         </div>
                       ) : staffMembers.length === 0 ? (

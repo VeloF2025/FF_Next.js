@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Search, Filter, ChevronDown, Loader2, List, Columns } from 'lucide-react';
+import { Search, Filter, ChevronDown, List, Columns } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { MancoActionItem, MancoActionItemStats } from '@/types/manco-action-items.types';
 import { log } from '@/lib/logger';
 import { MancoDetailPane } from '../components/MancoDetailPane';
@@ -126,7 +127,7 @@ export function MancoStrategicGrid() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-primary)]" />
+        <LoadingSpinner size="lg" label="" />
       </div>
     );
   }

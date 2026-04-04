@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode, Suspense } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ChartWrapperProps {
   children: ReactNode;
@@ -12,7 +12,7 @@ interface ChartWrapperProps {
 export function ChartWrapper({ children, fallback, className = '' }: ChartWrapperProps) {
   const defaultFallback = (
     <div className={`flex items-center justify-center h-64 ${className}`}>
-      <RefreshCw className="w-8 h-8 text-[var(--ff-text-tertiary)] animate-spin" />
+      <LoadingSpinner size="lg" label="" />
     </div>
   );
 

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useOnlineStatus } from './useOnlineStatus';
 import { useOfflineSync } from './useOfflineSync';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface OfflineBannerProps {
   className?: string;
@@ -93,7 +94,7 @@ export function OfflineBanner({ className = '' }: OfflineBannerProps) {
       >
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
-            <RefreshCw className="w-5 h-5 animate-spin flex-shrink-0" />
+            <InlineSpinner size="sm" className="flex-shrink-0" />
             <div>
               <p className="font-medium text-sm">
                 Syncing... {progress.completed}/{progress.total}
@@ -230,7 +231,7 @@ export function OfflineIndicator({ className = '' }: { className?: string }) {
         </>
       ) : isSyncing ? (
         <>
-          <RefreshCw className="w-3 h-3 animate-spin" />
+          <InlineSpinner size="sm" />
           <span>Syncing</span>
         </>
       ) : (

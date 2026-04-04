@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
 import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -330,7 +331,7 @@ export function OtdrTestingPage({ projectId }: OtdrTestingPageProps = {}) {
               {loading ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-gray-500">
-                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" />
+                    <LoadingSpinner size="sm" label="" className="mb-2" />
                     Loading...
                   </td>
                 </tr>

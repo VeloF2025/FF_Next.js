@@ -12,7 +12,8 @@ import {
   ResponsiveContainer, Cell, Legend, LabelList,
 } from '@/components/ui/DynamicChart';
 import { useProjectRevenueData } from './useProjectRevenueData';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { ReportTabLayout } from '../ReportTabLayout';
 import type { ProjectProfitabilityRow } from './useProjectRevenueData';
 
@@ -184,7 +185,7 @@ export default function ProjectRevenue() {
 
   if (isLoading) return (
     <div className="flex items-center justify-center h-64 text-gray-400">
-      <Loader2 className="w-6 h-6 animate-spin mr-2" />Loading…
+      <InlineSpinner size="md" className="mr-2" />Loading…
     </div>
   );
 

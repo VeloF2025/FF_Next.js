@@ -12,7 +12,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, LabelList,
 } from '@/components/ui/DynamicChart';
-import { ChevronDown, ChevronRight, Loader2, AlertCircle, ChevronLeft } from 'lucide-react';
+import { ChevronDown, ChevronRight, AlertCircle, ChevronLeft } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { ReportTabLayout } from '../ReportTabLayout';
 import { useActivationsData } from './useActivationsData';
@@ -489,7 +490,7 @@ export default function ActivationsReport() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-400">
-        <Loader2 className="w-6 h-6 animate-spin mr-2" />
+        <InlineSpinner size="md" className="mr-2" />
         Loading activations&hellip;
       </div>
     );

@@ -1,6 +1,7 @@
 'use client';
 
-import { Calendar, Loader2 } from 'lucide-react';
+import { Calendar } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { MancoMeetingContext as MeetingContextData } from '@/types/manco-action-items.types';
 import { formatDate } from './manco-grid-helpers';
 
@@ -25,7 +26,7 @@ export function MancoMeetingContext({ context, loading }: MancoMeetingContextPro
 
       {loading ? (
         <div className="flex items-center justify-center py-4">
-          <Loader2 className="w-4 h-4 animate-spin text-[var(--ff-text-secondary)]" />
+          <InlineSpinner size="sm" />
         </div>
       ) : context?.meeting ? (
         <div className="space-y-3 p-3 bg-[var(--ff-bg-secondary)] rounded text-xs">

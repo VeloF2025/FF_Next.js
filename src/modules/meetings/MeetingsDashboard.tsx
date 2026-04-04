@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { Plus, RefreshCw, Video, Calendar, Film } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import Link from 'next/link';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { notificationService } from '@/services/core/NotificationService';
@@ -353,7 +354,7 @@ export function MeetingsDashboard() {
                 className="flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] transition-colors disabled:opacity-50"
               >
                 {isLoadingMore ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <InlineSpinner size="sm" />
                 ) : null}
                 {isLoadingMore ? 'Loading...' : `Load More (${meetings.length} of ${totalMeetings})`}
               </button>

@@ -7,9 +7,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Send, Sparkles, RefreshCw, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Send, Sparkles, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
 import type { DropRecord, EvaluationResult } from '../types';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 
 interface EvaluationPanelProps {
@@ -125,7 +126,7 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
         >
           {isEvaluating ? (
             <>
-              <RefreshCw className="w-4 h-4 animate-spin" />
+              <InlineSpinner size="sm" />
               Evaluating...
             </>
           ) : (
@@ -265,7 +266,7 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
           >
             {sending ? (
               <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
+                <InlineSpinner size="sm" />
                 Sending...
               </>
             ) : (

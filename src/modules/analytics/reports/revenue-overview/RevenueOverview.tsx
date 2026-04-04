@@ -8,7 +8,8 @@
 
 import { useRevenueData } from './useRevenueData';
 import type { CashflowRow } from './useRevenueData';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { ReportTabLayout } from '../ReportTabLayout';
 
 function fZAR(value: number): { text: string; negative: boolean } {
@@ -93,7 +94,7 @@ export default function RevenueOverview() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64 text-[var(--ff-text-muted)]">
-        <Loader2 className="w-6 h-6 animate-spin mr-2" />
+        <InlineSpinner size="md" className="mr-2" />
         Loading cashflow data&hellip;
       </div>
     );

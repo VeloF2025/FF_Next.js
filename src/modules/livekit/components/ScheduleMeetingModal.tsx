@@ -12,11 +12,11 @@ import {
     Mail,
     Plus,
     Trash2,
-    Loader2,
     CheckCircle,
     AlertCircle,
 } from 'lucide-react';
 import { AccessibleModal } from '@/components/accessible';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface Attendee {
     email: string;
@@ -391,7 +391,7 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
                         >
                             {loading ? (
                                 <>
-                                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                                    <InlineSpinner size="sm" />
                                     Scheduling…
                                 </>
                             ) : (

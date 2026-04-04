@@ -7,7 +7,6 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   X,
   Search,
-  Loader2,
   Link2,
   MapPin,
   Building,
@@ -16,6 +15,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 
 /** Project option shape for pipeline linking modal */
@@ -213,7 +213,7 @@ export function LinkToProjectModal({
             <div className="max-h-64 overflow-y-auto border border-[var(--ff-border-light)] rounded-lg divide-y divide-[var(--ff-border-light)]">
               {isLoading ? (
                 <div className="flex items-center justify-center p-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                  <LoadingSpinner size="md" />
                 </div>
               ) : projects.length === 0 ? (
                 <div className="p-8 text-center text-[var(--ff-text-secondary)]">
@@ -329,7 +329,7 @@ export function LinkToProjectModal({
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <InlineSpinner size="sm" />
                   Linking...
                 </>
               ) : (

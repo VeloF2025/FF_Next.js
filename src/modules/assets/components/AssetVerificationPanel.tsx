@@ -15,12 +15,12 @@ import {
   AlertTriangle,
   Clock,
   Camera,
-  RefreshCw,
   ShieldCheck,
   ShieldAlert,
   ShieldQuestion,
 } from 'lucide-react';
 import { LabelScanner, type VerificationResult } from './LabelScanner';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import { formatDisplayDateTime } from '@/utils/dateFormat';
 
@@ -177,7 +177,7 @@ export function AssetVerificationPanel({
         >
           {isVerifying ? (
             <>
-              <RefreshCw className="w-4 h-4 animate-spin" />
+              <InlineSpinner size="sm" />
               Saving...
             </>
           ) : (

@@ -1,4 +1,5 @@
-import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { wizardSteps } from './constants';
 
 interface WizardNavigationProps {
@@ -43,7 +44,7 @@ export function WizardNavigation({
         >
           {isSubmitting ? (
             <>
-              <Loader2 size={16} className="mr-2 animate-spin" />
+              <InlineSpinner size="sm" className="mr-2" />
               Creating Project...
             </>
           ) : (

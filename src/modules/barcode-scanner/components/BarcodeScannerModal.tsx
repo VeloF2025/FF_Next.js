@@ -7,7 +7,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Camera, CameraOff, Flashlight, FlashlightOff, RefreshCw, AlertCircle } from 'lucide-react';
+import { X, Camera, CameraOff, Flashlight, FlashlightOff, AlertCircle } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { modalVariants, overlayVariants } from '@/lib/animations/modal-variants';
 import { useBarcodeScanner, lookupAssetByCode } from '../hooks/useBarcodeScanner';
 import type { BarcodeScannerModalProps, ScanResult, AssetLookupResult } from '../types/scanner';
@@ -180,7 +181,7 @@ export function BarcodeScannerModal({
               {scannerState === 'initializing' && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                   <div className="text-center">
-                    <RefreshCw className="w-8 h-8 text-blue-400 animate-spin mx-auto mb-2" />
+                    <LoadingSpinner size="lg" label="" className="mb-2" />
                     <p className="text-white">Starting camera...</p>
                   </div>
                 </div>
@@ -204,7 +205,7 @@ export function BarcodeScannerModal({
               {lookupState === 'loading' && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                   <div className="text-center">
-                    <RefreshCw className="w-8 h-8 text-blue-400 animate-spin mx-auto mb-2" />
+                    <LoadingSpinner size="lg" label="" className="mb-2" />
                     <p className="text-white">Looking up asset...</p>
                   </div>
                 </div>

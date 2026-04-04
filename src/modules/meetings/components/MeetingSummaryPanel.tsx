@@ -5,7 +5,8 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { Calendar, Clock, Video, MapPin, User, Users, Save, Loader2 } from 'lucide-react';
+import { Calendar, Clock, Video, MapPin, User, Users, Save } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import type { Meeting } from '../types/meeting.types';
 
@@ -211,7 +212,7 @@ export function MeetingSummaryPanel({ meeting }: MeetingSummaryPanelProps) {
               disabled={isSaving || notes === notesRef.current}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+              {isSaving ? <InlineSpinner size="sm" /> : <Save className="w-3 h-3" />}
               Save
             </button>
           </div>

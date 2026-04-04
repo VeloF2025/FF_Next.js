@@ -17,6 +17,7 @@ import { PerformanceTab } from './components/tabs/PerformanceTab';
 import { DocumentsTab } from './components/tabs/DocumentsTab';
 import { MessagesTab } from './components/tabs/MessagesTab';
 import { log } from '@/lib/logger';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // Error boundary component
 interface ErrorBoundaryState {
@@ -228,7 +229,7 @@ function SuppliersPortalLayout() {
         {/* Loading State */}
         {isLoading && (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <LoadingSpinner size="md" />
             <span className="ml-3 text-[var(--ff-text-secondary)]">Loading...</span>
           </div>
         )}

@@ -15,11 +15,11 @@ import {
   AlertTriangle,
   Eye,
   Shield,
-  Loader2,
   Filter,
   ExternalLink,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { DriverLicenseUploadModal } from '../DriverLicenseUploadModal';
 import { DocumentVerificationModal } from '@/components/shared/DocumentVerificationModal';
 import { log } from '@/lib/logger';
@@ -223,7 +223,7 @@ export function DriversDocumentsTab({ onRefresh }: DriversDocumentsTabProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-8 h-8 text-[var(--ff-text-tertiary)] animate-spin" />
+        <LoadingSpinner size="lg" label="" />
       </div>
     );
   }

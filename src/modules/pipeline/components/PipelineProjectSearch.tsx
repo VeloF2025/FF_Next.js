@@ -5,8 +5,9 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { Search, Loader2 } from 'lucide-react';
+import { Search } from 'lucide-react';
 import type { PipelineProjectSummary, PipelineStatus } from '../types';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 const STATUS_LABELS: Record<PipelineStatus, string> = {
   new: 'New',
@@ -120,7 +121,7 @@ export function PipelineProjectSearch({ currentProjectId }: Props) {
           className="w-full pl-9 pr-8 py-2 text-sm rounded-lg bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500/40"
         />
         {loading && (
-          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-[var(--ff-text-secondary)]" />
+          <InlineSpinner size="sm" className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--ff-text-secondary)]" />
         )}
       </div>
 

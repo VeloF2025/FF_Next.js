@@ -24,6 +24,7 @@ import { ExecutionLogs } from './ExecutionLogs';
 import type { ProjectWorkflow } from '../../types/workflow.types';
 import { formatDate } from '../../../../utils/dateHelpers';
 import { log } from '@/lib/logger';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ProjectWorkflowDetailProps {
   workflowId: string;
@@ -169,7 +170,7 @@ export function ProjectWorkflowDetail({
     return (
       <div className="flex items-center justify-center h-96">
         <div className="flex items-center space-x-2">
-          <Clock className="w-5 h-5 animate-spin text-green-600" />
+          <InlineSpinner size="sm" className="text-green-600" />
           <span className="text-muted-foreground">Loading workflow details...</span>
         </div>
       </div>

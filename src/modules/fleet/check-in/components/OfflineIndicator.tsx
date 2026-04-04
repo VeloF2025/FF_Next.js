@@ -4,7 +4,8 @@
  */
 
 import React from 'react';
-import { Wifi, WifiOff, Cloud, CloudOff, RefreshCw, Loader2 } from 'lucide-react';
+import { Wifi, WifiOff, Cloud, CloudOff, RefreshCw } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useOfflineSync } from '../hooks/useOfflineSync';
 
 interface OfflineIndicatorProps {
@@ -65,7 +66,7 @@ export function OfflineIndicator({ showDetails = false }: OfflineIndicatorProps)
                 title="Sync now"
               >
                 {isSyncing ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                  <InlineSpinner size="sm" />
                 ) : (
                   <RefreshCw className="w-4 h-4 text-muted-foreground" />
                 )}

@@ -18,6 +18,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import type { OverallStatus, ServiceHealth, ActivityEvent } from '../types/self-healing.types';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface DashboardData {
   health: {
@@ -63,7 +64,7 @@ export default function OverviewDashboard() {
   if (loading) {
     return (
       <div data-testid="loading-skeleton" className="flex items-center justify-center py-12">
-        <RefreshCw className="w-8 h-8 text-blue-400 animate-spin" />
+        <LoadingSpinner size="lg" />
       </div>
     );
   }

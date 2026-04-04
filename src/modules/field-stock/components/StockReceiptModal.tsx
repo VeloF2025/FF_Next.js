@@ -21,12 +21,12 @@ import {
   Trash2,
   AlertCircle,
   CheckCircle,
-  RefreshCw,
   FileText,
   Plus,
   Keyboard,
 } from 'lucide-react';
 import { modalVariants, overlayVariants } from '@/lib/animations/modal-variants';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { BarcodeScannerModal } from '@/modules/barcode-scanner/components/BarcodeScannerModal';
 
 // ==================== TYPES ====================
@@ -503,7 +503,7 @@ export function StockReceiptModal({
               >
                 {isSubmitting ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <InlineSpinner size="sm" />
                     Processing...
                   </>
                 ) : (

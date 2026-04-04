@@ -28,7 +28,7 @@ import {
   User,
   ExternalLink,
 } from 'lucide-react';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface MaintenanceMessage {
   id: string;
@@ -259,7 +259,7 @@ export function MaintenanceTab({ dropNumber, onCreateTicket }: MaintenanceTabPro
               >
                 {isCreatingTicket ? (
                   <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <InlineSpinner size="sm" />
                     Creating...
                   </>
                 ) : (

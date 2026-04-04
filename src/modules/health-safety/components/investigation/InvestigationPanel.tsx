@@ -12,11 +12,11 @@ import {
   FileText,
   CheckSquare,
   ChevronRight,
-  Loader2,
   Plus,
   Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import { FiveWhysForm, type WhyEntry } from './FiveWhysForm';
 import { CAPA_SEVERITY_CONFIG, type CAPASeverity } from '@/modules/health-safety/types/capa.types';
@@ -291,7 +291,7 @@ export function InvestigationPanel({ ticketId, onComplete }: InvestigationPanelP
 
           <div className="flex gap-2">
             <Button variant="primary" onClick={() => { handleSaveFindings(); setStep(2); }} disabled={saving}>
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save & Continue'}
+              {saving ? <InlineSpinner size="sm" /> : 'Save & Continue'}
             </Button>
           </div>
         </div>
@@ -324,7 +324,7 @@ export function InvestigationPanel({ ticketId, onComplete }: InvestigationPanelP
             />
           </div>
           <Button variant="primary" onClick={() => { handleSaveFindings(); setStep(3); }} disabled={saving}>
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save & Continue'}
+            {saving ? <InlineSpinner size="sm" /> : 'Save & Continue'}
           </Button>
         </div>
       )}
@@ -385,7 +385,7 @@ export function InvestigationPanel({ ticketId, onComplete }: InvestigationPanelP
               onClick={() => handleSaveFindings(true)}
               disabled={saving}
             >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Complete Investigation'}
+              {saving ? <InlineSpinner size="sm" /> : 'Complete Investigation'}
             </Button>
             <Button
               variant="ghost"

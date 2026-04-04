@@ -14,6 +14,7 @@ import {
   ChevronDown, Settings, ArrowRight, Filter, Upload
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ── Types ──────────────────────────────────────────────────────
 interface AuditData {
@@ -175,7 +176,7 @@ export default function DesignAuditDashboard() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-3" />
+          <LoadingSpinner size="lg" className="mx-auto mb-3" />
           <p className="text-[var(--ff-text-secondary)]">Scanning codebase...</p>
           <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">This may take 10-15 seconds</p>
         </div>

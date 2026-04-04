@@ -34,9 +34,9 @@ import {
   Upload,
   ExternalLink,
   Save,
-  Loader2,
   Shield,
 } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type {
   PipelineProjectWithRelations,
   PipelineProjectApprovalWithType,
@@ -920,7 +920,7 @@ export function PipelineProjectDetail() {
                     className="flex items-center gap-1"
                   >
                     {savingLegalDocs ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <InlineSpinner size="sm" />
                     ) : (
                       <Save className="w-3 h-3" />
                     )}
@@ -997,7 +997,7 @@ export function PipelineProjectDetail() {
                         aria-label="Upload lease file"
                       >
                         {uploadingField === 'lease' ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <InlineSpinner size="sm" />
                         ) : (
                           <Upload className="w-4 h-4" />
                         )}
@@ -1071,7 +1071,7 @@ export function PipelineProjectDetail() {
                         aria-label="Upload cession file"
                       >
                         {uploadingField === 'cession' ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <InlineSpinner size="sm" />
                         ) : (
                           <Upload className="w-4 h-4" />
                         )}
@@ -1209,7 +1209,7 @@ export function PipelineProjectDetail() {
                     className="w-full flex items-center justify-center gap-2"
                   >
                     {transitioning ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <InlineSpinner size="sm" />
                     ) : (
                       <CheckCircle className="w-4 h-4" />
                     )}
@@ -1223,7 +1223,7 @@ export function PipelineProjectDetail() {
                   className="w-full flex items-center justify-center gap-2"
                 >
                   {deleting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <InlineSpinner size="sm" />
                   ) : (
                     <Trash2 className="w-4 h-4" />
                   )}

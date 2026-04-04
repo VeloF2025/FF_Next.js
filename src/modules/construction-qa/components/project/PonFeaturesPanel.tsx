@@ -10,7 +10,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { RefreshCw, ChevronLeft, ChevronRight, Bot, User } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Bot, User } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { log } from '@/lib/logger';
 import type { PonFeatureRow } from '../../types/dashboard.types';
@@ -144,7 +145,7 @@ export function PonFeaturesPanel({ projectId, zoneNo, ponNo, highlightId, dateFr
           {loading && features.length === 0 ? (
             <tr>
               <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" />
+                <LoadingSpinner size="sm" label="" className="mb-2" />
                 Loading...
               </td>
             </tr>

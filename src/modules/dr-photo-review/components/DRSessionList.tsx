@@ -6,6 +6,7 @@
 'use client';
 
 import { Search, Camera, AlertTriangle, RefreshCw } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useState, useMemo } from 'react';
 import type { DRSession } from '../types';
 
@@ -91,8 +92,7 @@ export function DRSessionList({
             <div className="flex-1 overflow-y-auto">
                 {isLoading ? (
                     <div className="p-8 text-center">
-                        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                        <p className="text-[var(--ff-text-tertiary)]">Loading sessions...</p>
+                        <LoadingSpinner size="lg" label="Loading sessions..." />
                     </div>
                 ) : error ? (
                     <div className="p-8 text-center">

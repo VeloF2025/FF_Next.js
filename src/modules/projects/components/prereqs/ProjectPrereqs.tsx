@@ -25,6 +25,7 @@ import {
   PREREQ_THRESHOLDS,
   type AccordionItemConfig,
 } from '@/components/accessible';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ProjectPrereqsProps {
   projectId: string;
@@ -438,11 +439,7 @@ export function ProjectPrereqs({ projectId }: ProjectPrereqsProps) {
     return (
       <div className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)] p-8">
         <div className="flex items-center justify-center gap-3">
-          <div
-            className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-500"
-            role="status"
-            aria-label="Loading pre-requisites"
-          />
+          <LoadingSpinner size="sm" aria-label="Loading pre-requisites" />
           <span className="text-[var(--ff-text-secondary)]">Loading pre-requisites...</span>
         </div>
       </div>

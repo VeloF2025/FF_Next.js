@@ -11,6 +11,7 @@ import {
   DISCIPLINARY_OUTCOME_COLORS,
   DISCIPLINARY_SEVERITY,
 } from '@/types/staff/disciplinary.types';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface DisciplinaryTabProps {
   staffId: string;
@@ -57,7 +58,7 @@ export function DisciplinaryTab({ staffId, onAddIncident, onEditIncident }: Disc
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <LoadingSpinner size="md" />
       </div>
     );
   }

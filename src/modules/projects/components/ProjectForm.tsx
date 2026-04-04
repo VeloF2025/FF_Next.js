@@ -8,7 +8,6 @@ import { useForm, Controller } from 'react-hook-form';
 import {
   Save,
   X,
-  Loader2,
   Calendar,
   MapPin,
   DollarSign,
@@ -18,6 +17,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useActiveClients } from '@/hooks/useClients';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useProjectManagers } from '@/hooks/useStaff';
 import { notificationService } from '@/services/core/NotificationService';
 
@@ -417,7 +417,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ project, onSubmit, onC
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <InlineSpinner size="sm" />
                   Saving...
                 </>
               ) : (

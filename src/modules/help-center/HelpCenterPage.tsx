@@ -9,6 +9,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Menu, X, Download, ExternalLink, ChevronLeft, ChevronRight, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useHelpCenter } from './hooks/useHelpCenter';
 import { TableOfContents } from './components/TableOfContents';
 import { SearchBar } from './components/SearchBar';
@@ -239,8 +240,7 @@ export const HelpCenterPage: React.FC = () => {
               // Loading state
               <div className="flex items-center justify-center py-16">
                 <div className="text-center">
-                  <div className="w-12 h-12 border-4 border-[var(--ff-primary)]/20 border-t-[var(--ff-primary)] rounded-full animate-spin mx-auto mb-4" />
-                  <p className="text-[var(--ff-text-secondary)]">Loading help content...</p>
+                  <LoadingSpinner size="xl" label="Loading help content..." />
                 </div>
               </div>
             ) : !currentSection ? (

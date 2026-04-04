@@ -7,13 +7,13 @@ import { useState, useEffect } from 'react';
 import {
   X,
   Plus,
-  Loader2,
   Building2,
   User,
   Calendar,
   AlertCircle,
 } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import { useClientSelection } from '@/hooks/useClients';
 import { useProjectManagerSelection } from '@/hooks/staff';
@@ -282,7 +282,7 @@ export function CreateAndLinkProjectModal({
           >
             {isSubmitting ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <InlineSpinner size="sm" />
                 Creating...
               </>
             ) : (

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { GitBranch } from 'lucide-react';
 import { log } from '@/lib/logger';
 import { formatLabel } from '@/lib/utils';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface StaffMember {
   id: string;
@@ -95,7 +96,7 @@ export function HierarchyTab() {
       {loading ? (
         <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-12">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <LoadingSpinner size="xl" className="mx-auto mb-4" />
             <p className="text-[var(--ff-text-secondary)]">Loading organizational hierarchy...</p>
           </div>
         </div>

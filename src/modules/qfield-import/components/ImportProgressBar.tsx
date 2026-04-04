@@ -1,5 +1,6 @@
-import { CheckCircle, Loader2 } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
 import type { ImportResult, LayerType } from '../types';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ImportProgressBarProps {
   result: ImportResult | null;
@@ -20,7 +21,7 @@ export function ImportProgressBar({ result, importing }: ImportProgressBarProps)
   if (importing) {
     return (
       <div className="flex flex-col items-center justify-center py-8">
-        <Loader2 className="w-10 h-10 animate-spin text-blue-400 mb-3" />
+        <LoadingSpinner size="lg" className="mb-3" />
         <p className="text-sm font-medium text-[var(--ff-text-primary)]">Importing layers...</p>
         <p className="text-xs text-[var(--ff-text-secondary)] mt-1">
           This may take a minute for large datasets

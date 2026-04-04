@@ -15,9 +15,9 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  Loader2,
   RefreshCw,
 } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { log } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
@@ -466,7 +466,7 @@ export function BillingUploadTab() {
       {/* Loading Indicator */}
       {isLoading && (
         <div className="flex items-center justify-center gap-3 py-4">
-          <Loader2 className="w-5 h-5 animate-spin text-[var(--ff-accent)]" />
+          <InlineSpinner size="sm" />
           <span className="text-[var(--ff-text-secondary)]">
             {uploadState === 'previewing' && 'Parsing PDF…'}
             {uploadState === 'importing' && 'Importing…'}

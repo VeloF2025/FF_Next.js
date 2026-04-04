@@ -9,7 +9,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Upload, Loader2, FileText, Network } from 'lucide-react';
+import { Upload, FileText, Network } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { SnagProjectCard } from './SnagProjectCard';
 import { SnagGrid } from './SnagGrid';
 import { SnagGridByPon } from './SnagGridByPon';
@@ -117,7 +118,7 @@ export function SnagsPage() {
         <>
           {statsLoading ? (
             <div className="flex items-center justify-center h-48">
-              <Loader2 className="h-6 w-6 text-zinc-400 animate-spin" />
+              <LoadingSpinner size="md" label="" />
             </div>
           ) : stats.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-zinc-500">

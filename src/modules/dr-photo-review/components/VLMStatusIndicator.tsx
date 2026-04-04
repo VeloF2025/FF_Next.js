@@ -5,7 +5,8 @@
 
 'use client';
 
-import { Cpu, Check, X, Loader2 } from 'lucide-react';
+import { Cpu, Check, X } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { VLMStatus } from '../types';
 
 interface VLMStatusIndicatorProps {
@@ -17,7 +18,7 @@ export function VLMStatusIndicator({ status, isLoading }: VLMStatusIndicatorProp
     if (isLoading) {
         return (
             <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--ff-bg-tertiary)] rounded-full">
-                <Loader2 className="w-4 h-4 text-[var(--ff-text-tertiary)] animate-spin" />
+                <InlineSpinner size="sm" />
                 <span className="text-sm text-[var(--ff-text-tertiary)]">Checking AI...</span>
             </div>
         );

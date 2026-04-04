@@ -7,12 +7,12 @@ import { useState, useEffect } from 'react';
 import {
   X,
   Plus,
-  Loader2,
   CheckCircle,
   Building2,
   FileText,
 } from 'lucide-react';
 import type { ServiceAuthority } from '../types';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { AuthorityPicker } from './AuthorityPicker';
 
 interface ApprovalType {
@@ -167,7 +167,7 @@ export function AddApprovalModal({
 
           {loadingTypes ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-text-secondary)]" />
+              <LoadingSpinner size="md" label="" />
             </div>
           ) : (
             <div className="space-y-6">
@@ -309,7 +309,7 @@ export function AddApprovalModal({
           >
             {submitting ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <InlineSpinner size="sm" />
                 Adding...
               </>
             ) : (

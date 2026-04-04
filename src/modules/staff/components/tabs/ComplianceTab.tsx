@@ -33,6 +33,7 @@ import {
   SAContractType,
 } from '@/types/staff/compliance.types';
 import { log } from '@/lib/logger';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface DocumentStatus {
   type: string;
@@ -379,7 +380,7 @@ export function ComplianceTab({ staff, onUploadDocument }: ComplianceTabProps) {
 
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+            <LoadingSpinner size="md" />
           </div>
         ) : complianceStatus ? (
           <div className="space-y-3">

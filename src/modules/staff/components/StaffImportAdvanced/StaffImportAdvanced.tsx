@@ -8,6 +8,7 @@ import { useStaffImportAdvanced } from './hooks/useStaffImportAdvanced';
 import { FileUploadArea } from './components/FileUploadArea';
 import { ImportProgress } from './components/ImportProgress';
 import { ImportResults } from './components/ImportResults';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 export function StaffImportAdvanced() {
   const {
@@ -75,7 +76,7 @@ export function StaffImportAdvanced() {
         >
           {importing ? (
             <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+              <InlineSpinner size="sm" className="mr-2" />
               Importing...
             </>
           ) : (

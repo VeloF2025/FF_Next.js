@@ -13,6 +13,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import type { PonProgressResponse, ProgressCategory } from '@/types/pon-stages.types';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ProgressSummaryCards } from './ProgressSummaryCards';
 import { DailyLogPanel } from './DailyLogPanel';
 import { ZoneSection } from './ProgressTableRows';
@@ -66,7 +67,7 @@ export function PonProgressTracker({ projectId }: PonProgressTrackerProps) {
     return (
       <div className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)] p-8">
         <div className="flex items-center justify-center gap-3">
-          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-500" />
+          <LoadingSpinner size="sm" />
           <span className="text-[var(--ff-text-secondary)]">Loading progress...</span>
         </div>
       </div>

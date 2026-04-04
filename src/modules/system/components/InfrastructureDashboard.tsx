@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import type { ServiceDefinition, ServiceHealth, ServiceCategory } from '../types/self-healing.types';
 import { log } from '@/lib/logger';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ServiceWithHealth extends ServiceDefinition {
   health?: ServiceHealth;
@@ -108,7 +109,7 @@ export default function InfrastructureDashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <RefreshCw className="w-8 h-8 text-blue-400 animate-spin" />
+        <LoadingSpinner size="lg" />
       </div>
     );
   }

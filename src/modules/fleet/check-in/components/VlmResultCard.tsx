@@ -5,7 +5,8 @@
  */
 
 import React, { useState } from 'react';
-import { Loader2, CheckCircle2, AlertCircle, Edit3, AlertTriangle, XCircle, Camera } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Edit3, AlertTriangle, XCircle, Camera } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { VlmAnalysisType, CheckPhotoType } from '../../types/check-in.types';
 
 interface VlmValidation {
@@ -80,7 +81,7 @@ export function VlmResultCard({
           <div className="flex-1">
             <p className="text-sm font-medium text-blue-700 dark:text-blue-300">{title}</p>
             <div className="flex items-center gap-2 mt-1">
-              <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+              <InlineSpinner size="sm" />
               <span className="text-sm text-blue-600 dark:text-blue-400">
                 Analyzing photo...
               </span>

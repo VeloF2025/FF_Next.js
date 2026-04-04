@@ -18,6 +18,7 @@ import { EditorToolbar } from './EditorToolbar';
 import { WorkflowEditorForms } from './forms';
 import { ValidationPanel } from './ValidationPanel';
 import { EditorMinimap } from './EditorMinimap';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface WorkflowEditorProps {
   templateId?: string;
@@ -138,7 +139,7 @@ export function WorkflowEditor({ templateId, className = '' }: WorkflowEditorPro
   if (!mounted) {
     return (
       <div className="h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <LoadingSpinner size="md" />
       </div>
     );
   }
@@ -275,7 +276,7 @@ export function WorkflowEditor({ templateId, className = '' }: WorkflowEditorPro
           {state.isLoading && (
             <div className="absolute inset-0 bg-[var(--ff-bg-secondary)]/50 backdrop-blur-sm z-50 flex items-center justify-center">
               <div className="flex items-center space-x-3">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <InlineSpinner size="sm" />
                 <span className="text-sm font-medium text-[var(--ff-text-secondary)]">
                   {templateId ? 'Loading template...' : 'Saving...'}
                 </span>

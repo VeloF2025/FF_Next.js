@@ -7,6 +7,7 @@ import { WorkflowTabs } from './components/WorkflowTabs';
 import { useWorkflowPortal } from './hooks/useWorkflowPortal';
 import { TemplatesTab, EditorTab, ProjectsTab, AnalyticsTab } from './components/tabs';
 import type { WorkflowTabId } from './types/portal.types';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface WorkflowPortalPageProps {
   children?: React.ReactNode;
@@ -152,7 +153,7 @@ function WorkflowPortalLayout({ children }: WorkflowPortalPageProps) {
         {isLoading && !children ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4" />
+              <LoadingSpinner size="xl" className="mx-auto mb-4" />
               <p className="text-[var(--ff-text-secondary)]">Loading workflow data...</p>
             </div>
           </div>

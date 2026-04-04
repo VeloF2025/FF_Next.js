@@ -5,7 +5,8 @@
  */
 
 import { useState } from 'react';
-import { X, Loader2, AlertCircle, Clock, MapPin, User } from 'lucide-react';
+import { X, AlertCircle, Clock, MapPin, User } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { ConditionPhotoCapture, type CapturedPhoto } from '@/modules/assets/components/ConditionPhotoCapture';
 
@@ -167,7 +168,7 @@ export function CheckinModal({ checkout, itemName, onClose, onSuccess }: Checkin
               type="submit"
               disabled={isSubmitting || conditionPhotos.some(p => p.uploading)}
             >
-              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isSubmitting && <InlineSpinner size="sm" />}
               Check In
             </Button>
           </div>

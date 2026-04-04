@@ -9,7 +9,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { X, Upload, Loader2, Search, User, FileText, AlertCircle } from 'lucide-react';
+import { X, Upload, Search, User, FileText, AlertCircle } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { DocumentUploadWizard } from '@/components/shared/DocumentUploadWizard';
 import { log } from '@/lib/logger';
 import { formatDisplayDate } from '@/utils/dateFormat';
@@ -158,7 +159,7 @@ export function DriverLicenseUploadModal({
 
               {loadingStaff ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 text-[var(--ff-text-tertiary)] animate-spin" />
+                  <LoadingSpinner size="lg" label="" />
                 </div>
               ) : filteredStaff.length === 0 ? (
                 <div className="text-center py-12">

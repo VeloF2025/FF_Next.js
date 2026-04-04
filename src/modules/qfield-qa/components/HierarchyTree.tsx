@@ -6,8 +6,9 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { ChevronRight, ChevronDown, Loader2, MapPin, Cable, Zap } from 'lucide-react';
+import { ChevronRight, ChevronDown, MapPin, Cable, Zap } from 'lucide-react';
 import type { QAHierarchy, QAHierarchyZone, QAHierarchyPon, QAHierarchyFeature } from '../types';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface HierarchyTreeProps {
   hierarchy: QAHierarchy | null;
@@ -48,7 +49,7 @@ export function HierarchyTree({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-5 h-5 animate-spin text-[var(--ff-text-tertiary)]" />
+        <LoadingSpinner size="sm" />
       </div>
     );
   }

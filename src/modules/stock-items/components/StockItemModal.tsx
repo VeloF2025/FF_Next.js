@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { X, Package, Trash2, AlertCircle, ExternalLink, Loader2, ChevronDown, Search } from 'lucide-react';
+import { X, Package, Trash2, AlertCircle, ExternalLink, ChevronDown, Search } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useStockItemMutations } from '../hooks/useStockItems';
 import { SerialsPanel } from './SerialsPanel';
 import type { StockItem, CreateStockItemInput } from '@/types/stockItem.types';
@@ -620,7 +621,7 @@ export function StockItemModal({ item, onClose, onSave }: StockItemModalProps) {
                 disabled={isSubmitting}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
               >
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting && <InlineSpinner size="sm" />}
                 {isEditing ? 'Save Changes' : 'Create Item'}
               </button>
             </div>

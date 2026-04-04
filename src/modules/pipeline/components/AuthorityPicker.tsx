@@ -17,9 +17,9 @@ import {
   Check,
   MapPin,
   ChevronDown,
-  Loader2,
 } from 'lucide-react';
 import type { ServiceAuthoritySearchResult, ServiceAuthority } from '../types';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface AuthorityPickerProps {
   /** The approval type ID to filter authorities */
@@ -272,7 +272,7 @@ export function AuthorityPicker({
                 className="w-full pl-10 pr-4 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)] text-sm"
               />
               {loading && (
-                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)] animate-spin" />
+                <InlineSpinner size="sm" className="absolute right-3 top-1/2 -translate-y-1/2" />
               )}
             </div>
           </div>

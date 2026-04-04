@@ -7,7 +7,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { ChevronLeft, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronRight } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { SnagCard } from './SnagCard';
 import { SnagDetail } from './SnagDetail';
 import type { Snag, SnagPhoto, ZonePonGroup } from '../../types/snag.types';
@@ -169,7 +170,7 @@ export function SnagGridByPon({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48">
-        <Loader2 className="h-6 w-6 text-zinc-400 animate-spin" />
+        <LoadingSpinner size="md" label="" />
       </div>
     );
   }

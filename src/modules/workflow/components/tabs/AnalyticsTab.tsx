@@ -13,6 +13,7 @@ import {
   FileText
 } from 'lucide-react';
 import { Card, CardContent } from '@/shared/components/ui/Card';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/shared/components/ui/Button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/Select';
 // Badge import removed - not used in current implementation
@@ -113,7 +114,7 @@ export function AnalyticsTab() {
       <div className="p-6">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
-            <RefreshCw className="w-8 h-8 text-purple-600 dark:text-purple-400 animate-spin mx-auto mb-4" />
+            <LoadingSpinner size="lg" className="mx-auto mb-4" />
             <h3 className="text-lg font-medium text-foreground mb-2">
               Loading Analytics
             </h3>

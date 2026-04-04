@@ -28,6 +28,7 @@ import { log } from '@/lib/logger';
 import { notificationService } from '@/services/core/NotificationService';
 import type { StaffMember } from '@/types/staff';
 import { formatLabel } from '@/lib/utils';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface StaffNote {
   id: string;
@@ -323,7 +324,7 @@ export function NotesTab({ staff, staffId }: NotesTabProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <LoadingSpinner size="md" />
       </div>
     );
   }
@@ -340,7 +341,7 @@ export function NotesTab({ staff, staffId }: NotesTabProps) {
             className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-400 bg-blue-500/10 border border-blue-500/30 rounded-lg hover:bg-blue-500/20 disabled:opacity-50"
           >
             {isGenerating ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
+              <InlineSpinner size="sm" />
             ) : (
               <Sparkles className="w-4 h-4" />
             )}

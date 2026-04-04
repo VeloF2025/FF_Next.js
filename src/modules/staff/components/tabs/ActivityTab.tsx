@@ -27,6 +27,7 @@ import { formatDisplayDateTime, formatDisplayDateShort } from '@/utils/dateForma
 import { safeToDate } from '@/utils/dateHelpers';
 import { log } from '@/lib/logger';
 import { formatLabel } from '@/lib/utils';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface AuditEntry {
   id: string;
@@ -133,7 +134,7 @@ export function ActivityTab({ staffId }: ActivityTabProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <LoadingSpinner size="md" />
       </div>
     );
   }

@@ -8,7 +8,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { BarChart3, Clock, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
+import { BarChart3, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { FtWeeklyBilling } from '@/modules/data-sync/types';
 
 type Project = 'All' | 'Lawley' | 'Mohadin' | 'Mamelodi';
@@ -113,7 +114,7 @@ export function WeeklySummaryTab() {
           </div>
           <p className="text-3xl font-bold text-[var(--ff-text-primary)]">
             {loading ? (
-              <Loader2 className="w-6 h-6 animate-spin inline text-[var(--ff-text-tertiary)]" />
+              <InlineSpinner size="md" />
             ) : (
               (metrics?.currentlyExcluded ?? '—')
             )}
@@ -132,7 +133,7 @@ export function WeeklySummaryTab() {
           </div>
           <p className="text-3xl font-bold text-[var(--ff-text-primary)]">
             {loading ? (
-              <Loader2 className="w-6 h-6 animate-spin inline text-[var(--ff-text-tertiary)]" />
+              <InlineSpinner size="md" />
             ) : (
               (metrics?.ppOutstanding ?? '—')
             )}
@@ -149,7 +150,7 @@ export function WeeklySummaryTab() {
           </div>
           <p className="text-3xl font-bold text-[var(--ff-text-primary)]">
             {loading ? (
-              <Loader2 className="w-6 h-6 animate-spin inline text-[var(--ff-text-tertiary)]" />
+              <InlineSpinner size="md" />
             ) : (
               (metrics?.recoveredThisMonth ?? '—')
             )}
@@ -184,7 +185,7 @@ export function WeeklySummaryTab() {
       {/* Table */}
       {loading ? (
         <div className="flex items-center justify-center py-12 gap-3">
-          <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-accent)]" />
+          <InlineSpinner size="md" />
           <span className="text-[var(--ff-text-secondary)]">Loading…</span>
         </div>
       ) : rows.length === 0 ? (

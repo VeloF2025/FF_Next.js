@@ -6,8 +6,9 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Trash2, Loader2, BookMarked } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, BookMarked } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { ConduitBaseline } from '../types';
 import type { ConduitProjectInputs } from '../types';
 import { calcConduit } from '../hooks/useConduitCalc';
@@ -113,7 +114,7 @@ function BaselineCard({ baseline, onDelete }: {
             <>
               <span className="text-xs text-red-400">Sure?</span>
               <Button variant="danger" size="sm" onClick={handleDelete} disabled={deleting}>
-                {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Yes'}
+                {deleting ? <InlineSpinner size="sm" /> : 'Yes'}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>No</Button>
             </>

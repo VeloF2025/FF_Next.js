@@ -13,6 +13,7 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { DevQueueItem, MvpBuildStatus } from '../types/devQueue';
 
 interface DevQueuePipelineProps {
@@ -240,9 +241,10 @@ function BuildCard({
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <StatusIcon
-              className={`h-4 w-4 ${config.color} ${status === 'building' ? 'animate-spin' : ''}`}
-            />
+            {status === 'building'
+              ? <InlineSpinner size="sm" className={config.color} />
+              : <StatusIcon className={`h-4 w-4 ${config.color}`} />
+            }
             <h4 className="font-medium text-[var(--ff-text-primary)]">{item.title}</h4>
           </div>
 

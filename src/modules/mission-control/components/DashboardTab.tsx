@@ -1,5 +1,6 @@
 import React from 'react';
-import { Users, MessageSquare, ListTodo, Loader, Wifi, WifiOff, Clock } from 'lucide-react';
+import { Users, MessageSquare, ListTodo, Wifi, WifiOff, Clock } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import type { MCDashboard } from '../types';
 import { SystemHealthPanel } from './SystemHealthPanel';
@@ -45,7 +46,7 @@ export function DashboardTab({ data }: DashboardTabProps) {
   if (!data) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader className="w-6 h-6 animate-spin" style={{ color: 'var(--ff-primary)' }} />
+        <LoadingSpinner size="md" label="" />
       </div>
     );
   }

@@ -4,7 +4,8 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface HealthHistoryEntry {
   totalServices: number;
@@ -57,7 +58,7 @@ export function HealthTrendChart({ hours = 24, limit = 48 }: HealthTrendChartPro
     return (
       <div className="bg-card/5 rounded-xl border border-white/10 p-6">
         <div className="flex items-center gap-2 mb-4">
-          <RefreshCw className="w-5 h-5 text-velocity-accent animate-spin" />
+          <InlineSpinner size="sm" className="text-velocity-accent" />
           <span className="text-white/60">Loading health history...</span>
         </div>
         <div className="h-32 bg-card/5 rounded animate-pulse" />

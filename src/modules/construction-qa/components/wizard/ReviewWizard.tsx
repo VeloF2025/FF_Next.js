@@ -21,7 +21,6 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
-  Loader2,
   Camera,
   ClipboardCheck,
   Database,
@@ -33,6 +32,7 @@ import {
 } from 'lucide-react';
 import { log } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { getChecklist } from '../../types/construction.types';
 import type {
   Discipline,
@@ -349,7 +349,7 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <LoadingSpinner size="lg" label="" />
       </div>
     );
   }
@@ -548,7 +548,7 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
         </button>
 
         <div className="flex items-center gap-3">
-          {saving && <Loader2 className="w-4 h-4 animate-spin text-blue-400" />}
+          {saving && <InlineSpinner size="sm" />}
 
           {phase === 'final_decision' && decision ? (
             <button

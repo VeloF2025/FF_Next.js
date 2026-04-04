@@ -15,13 +15,13 @@ import {
   ExternalLink,
   Calendar,
   AlertTriangle,
-  Loader2,
   X,
   FolderOpen,
   Search,
   Shield,
   Star,
 } from 'lucide-react';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface Document {
   id: string;
@@ -322,7 +322,7 @@ export function ProjectDocumentManager({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
@@ -596,7 +596,7 @@ export function ProjectDocumentManager({
                     className="flex items-center gap-1.5 px-3 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] disabled:opacity-50 text-sm whitespace-nowrap"
                     title="Upload file"
                   >
-                    {uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    {uploadingFile ? <InlineSpinner size="sm" /> : <Upload className="w-4 h-4" />}
                     {uploadingFile ? 'Uploading...' : 'Upload'}
                   </button>
                   <input
@@ -678,7 +678,7 @@ export function ProjectDocumentManager({
                 disabled={uploading || !uploadData.document_name || !uploadData.file_name}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
-                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                {uploading ? <InlineSpinner size="sm" /> : <Upload className="w-4 h-4" />}
                 {uploading ? 'Adding...' : 'Add Document'}
               </button>
               <button
@@ -775,7 +775,7 @@ function DocumentRow({
             title={doc.is_required ? 'Remove from required' : 'Mark as required'}
           >
             {togglingRequired === doc.id ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <InlineSpinner size="sm" />
             ) : (
               <Star className={`w-4 h-4 ${doc.is_required ? 'fill-current' : ''}`} />
             )}
@@ -788,7 +788,7 @@ function DocumentRow({
             className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500"
             title="Delete"
           >
-            {deleting === doc.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            {deleting === doc.id ? <InlineSpinner size="sm" /> : <Trash2 className="w-4 h-4" />}
           </button>
         )}
       </div>

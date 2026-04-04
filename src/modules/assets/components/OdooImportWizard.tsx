@@ -22,11 +22,11 @@ import {
   Play,
   CheckCircle2,
   AlertTriangle,
-  Loader2,
   ChevronRight,
   ChevronLeft,
   X,
 } from 'lucide-react';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 // ============================================================================
 // Types
@@ -439,7 +439,7 @@ export function OdooImportWizard({ isOpen, onClose, onComplete }: OdooImportWiza
             <div className="space-y-4">
               {loading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+                  <InlineSpinner size="lg" />
                   <span className="ml-3 text-slate-400">Generating preview...</span>
                 </div>
               ) : previewResult ? (
@@ -520,7 +520,7 @@ export function OdooImportWizard({ isOpen, onClose, onComplete }: OdooImportWiza
             <div className="space-y-4">
               {loading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+                  <InlineSpinner size="lg" />
                   <span className="ml-3 text-slate-400">Importing assets...</span>
                 </div>
               ) : importResult ? (
@@ -613,7 +613,7 @@ export function OdooImportWizard({ isOpen, onClose, onComplete }: OdooImportWiza
                 disabled={!canGoNext() || loading}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-lg font-medium flex items-center gap-2"
               >
-                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                {loading && <InlineSpinner size="sm" />}
                 {currentStep === 2 ? 'Preview' : currentStep === 3 ? 'Import Now' : 'Next'}
                 {!loading && currentStep < 3 && <ChevronRight className="w-4 h-4" />}
               </button>

@@ -10,7 +10,8 @@
  */
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Calendar, Search, RefreshCw } from 'lucide-react';
+import { Calendar, Search } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import type { Meeting } from '@/modules/meetings/types/meeting.types';
 import { MeetingsList } from '@/modules/meetings/components/MeetingsList';
@@ -267,7 +268,7 @@ export function CommunicationsMeetingsTab({
             disabled={isLoadingMore}
             className="flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] transition-colors disabled:opacity-50"
           >
-            {isLoadingMore && <RefreshCw className="w-4 h-4 animate-spin" />}
+            {isLoadingMore && <InlineSpinner size="sm" />}
             {isLoadingMore ? 'Loading...' : `Load More (${meetings.length} of ${totalMeetings ?? '?'})`}
           </button>
         </div>

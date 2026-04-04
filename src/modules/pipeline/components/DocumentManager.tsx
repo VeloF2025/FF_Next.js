@@ -13,7 +13,6 @@ import {
   ExternalLink,
   Calendar,
   AlertTriangle,
-  Loader2,
   X,
 } from 'lucide-react';
 import type {
@@ -21,6 +20,7 @@ import type {
   ApprovalDocumentType,
   UploadApprovalDocumentInput,
 } from '../types';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface UploadedFile {
   id: string;
@@ -284,7 +284,7 @@ export function DocumentManager({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-text-secondary)]" />
+        <LoadingSpinner size="md" label="" />
       </div>
     );
   }
@@ -360,7 +360,7 @@ export function DocumentManager({
                     title="Delete document"
                   >
                     {deleting === doc.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <InlineSpinner size="sm" />
                     ) : (
                       <Trash2 className="w-4 h-4" />
                     )}
@@ -428,7 +428,7 @@ export function DocumentManager({
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-[var(--ff-border-light)] rounded-lg hover:border-[var(--ff-accent)] hover:text-[var(--ff-accent)] transition-colors disabled:opacity-50 text-sm"
               >
                 {uploadingFiles ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Uploading files...</>
+                  <><InlineSpinner size="sm" /> Uploading files...</>
                 ) : (
                   <><Upload className="w-4 h-4" /> Select files (multiple allowed)</>
                 )}
@@ -443,7 +443,7 @@ export function DocumentManager({
                       className="flex items-center gap-2 p-2 bg-[var(--ff-bg-primary)] rounded-lg"
                     >
                       {file.uploading ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-[var(--ff-accent)] flex-shrink-0" />
+                        <InlineSpinner size="sm" className="flex-shrink-0" />
                       ) : file.error ? (
                         <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
                       ) : (
@@ -593,7 +593,7 @@ export function DocumentManager({
             >
               {uploading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <InlineSpinner size="sm" />
                   Saving...
                 </>
               ) : (

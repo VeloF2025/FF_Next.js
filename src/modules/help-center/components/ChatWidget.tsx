@@ -6,9 +6,10 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { MessageCircle, X, Send, Sparkles, ChevronDown, ChevronLeft, Loader2, Bot, User,
+import { MessageCircle, X, Send, Sparkles, ChevronDown, ChevronLeft, Bot, User,
   LayoutDashboard, FolderKanban, CheckCircle, MapPin, Wrench, ShoppingCart, Package, Truck, Users, BarChart3, MessageSquare, Settings, HelpCircle, HardHat } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { log } from '@/lib/logger';
 
@@ -443,7 +444,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
                     disabled={!input.trim() || isLoading}
                     className="flex-shrink-0 rounded-xl"
                   >
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    {isLoading ? <InlineSpinner size="sm" /> : <Send className="w-4 h-4" />}
                   </Button>
                 </div>
                 <p className="text-[10px] text-[var(--ff-text-tertiary)] mt-1.5 text-center">

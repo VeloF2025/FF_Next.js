@@ -7,7 +7,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Trash2, Plus, Loader2 } from 'lucide-react';
+import { Trash2, Plus } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -90,7 +91,7 @@ function SingleList({
           disabled={adding || !newValue.trim()}
           className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold bg-teal-700 hover:bg-teal-600 text-white disabled:opacity-40 transition-colors"
         >
-          {adding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+          {adding ? <InlineSpinner size="sm" /> : <Plus className="w-3 h-3" />}
           Add
         </button>
       </div>
@@ -153,7 +154,7 @@ export function SelectListAdmin() {
   if (loading) {
     return (
       <div className="flex items-center gap-2 py-8 text-gray-500 text-sm justify-center">
-        <Loader2 className="w-4 h-4 animate-spin" />
+        <InlineSpinner size="sm" />
         Loading…
       </div>
     );

@@ -20,10 +20,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
-  Loader2,
   AlertCircle,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type {
   ServiceAuthorityWithType,
   CreateServiceAuthorityInput,
@@ -350,7 +350,7 @@ export function AuthorityManager({ currentUserId }: AuthorityManagerProps) {
       {/* Results */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-accent)]" />
+          <LoadingSpinner size="lg" label="" />
         </div>
       ) : authorities.length === 0 ? (
         <div className="text-center py-12 bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
@@ -758,7 +758,7 @@ export function AuthorityManager({ currentUserId }: AuthorityManagerProps) {
                 disabled={saving}
                 className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-accent)] text-white rounded-lg hover:bg-[var(--ff-accent-hover)] disabled:opacity-50"
               >
-                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {saving && <InlineSpinner size="sm" />}
                 {editingAuthority ? 'Update' : 'Create'}
               </button>
             </div>

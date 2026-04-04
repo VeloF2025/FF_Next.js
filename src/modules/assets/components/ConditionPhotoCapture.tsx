@@ -18,7 +18,8 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Loader2, ImagePlus, ZoomIn } from 'lucide-react';
+import { X, ImagePlus, ZoomIn } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 
 export interface CapturedPhoto {
@@ -248,7 +249,7 @@ export function ConditionPhotoCapture({
                 className="absolute inset-0 bg-black/50 flex items-center justify-center"
                 aria-hidden="true"
               >
-                <Loader2 className="h-5 w-5 text-white animate-spin" />
+                <InlineSpinner size="sm" className="text-white" />
               </div>
             )}
 

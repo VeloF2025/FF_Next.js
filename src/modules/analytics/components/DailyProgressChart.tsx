@@ -1,6 +1,7 @@
 'use client';
 
-import { BarChart3, RefreshCw } from 'lucide-react';
+import { BarChart3 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { DailyProgress } from '../types/analytics.types';
 
 interface DailyProgressChartProps {
@@ -18,7 +19,7 @@ export function DailyProgressChart({ dailyProgress, isLoading }: DailyProgressCh
         </div>
         {isLoading ? (
           <div className="h-64 flex items-center justify-center">
-            <RefreshCw className="w-8 h-8 text-[var(--ff-text-tertiary)] animate-spin" />
+            <LoadingSpinner size="lg" label="" />
           </div>
         ) : (
           <div className="space-y-4">

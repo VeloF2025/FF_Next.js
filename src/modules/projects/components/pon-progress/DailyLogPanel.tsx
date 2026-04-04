@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { PonDailyLogEntry, ProgressCategory, DelayReason } from '@/types/pon-stages.types';
 import { DELAY_REASON_LABELS } from '@/types/pon-stages.types';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface DailyLogPanelProps {
   projectId: string;
@@ -239,7 +240,7 @@ export function DailyLogPanel({ projectId, ponStageId, ponLabel, onClose }: Dail
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500" />
+              <LoadingSpinner size="sm" />
             </div>
           ) : grouped.size === 0 ? (
             <div className="text-center py-12">

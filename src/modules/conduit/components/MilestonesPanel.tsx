@@ -9,7 +9,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Loader2, ChevronDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -354,7 +355,7 @@ export function MilestonesPanel({ projectId, readOnly = false }: Props) {
   if (loading) {
     return (
       <div className="flex items-center gap-2 py-6 text-gray-500 text-sm">
-        <Loader2 className="w-4 h-4 animate-spin" />
+        <InlineSpinner size="sm" />
         Loading milestones…
       </div>
     );

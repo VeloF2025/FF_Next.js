@@ -1,5 +1,6 @@
-import { MapPin, Loader2 } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import type { GpsState } from '../types/basicInfo.types';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface GpsCoordinatesInputProps {
   register: any;
@@ -33,7 +34,7 @@ export function GpsCoordinatesInput({
           className="inline-flex items-center px-3 py-1 text-xs font-medium text-blue-600 bg-blue-500/20 border border-blue-500/30 rounded-md hover:bg-blue-500/30 disabled:opacity-50"
         >
           {isGeocoding ? (
-            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+            <InlineSpinner size="sm" className="mr-1" />
           ) : (
             <MapPin className="w-3 h-3 mr-1" />
           )}
@@ -114,7 +115,7 @@ export function GpsCoordinatesInput({
       
       {isGeocoding && (
         <div className="mt-2 flex items-center text-sm text-blue-600">
-          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          <InlineSpinner size="sm" className="mr-2" />
           Looking up location information...
         </div>
       )}

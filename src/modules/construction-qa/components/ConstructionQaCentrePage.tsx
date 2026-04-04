@@ -20,6 +20,7 @@ import {
   CircleDot,
   Search,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
 import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -382,7 +383,7 @@ export function ConstructionQaCentrePage() {
             {loading && features.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
-                  <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
+                  <LoadingSpinner size="md" label="" className="mb-2" />
                   Loading features...
                 </td>
               </tr>

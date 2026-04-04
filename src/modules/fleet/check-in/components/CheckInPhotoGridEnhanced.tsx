@@ -5,7 +5,8 @@
 
 import React, { useRef } from 'react';
 import toast from 'react-hot-toast';
-import { Camera, X, Check, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Camera, X, Check, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { CheckPhotoType, VlmAnalysisType } from '../../types/check-in.types';
 
 interface PhotoData {
@@ -101,7 +102,7 @@ export function CheckInPhotoGridEnhanced({
     if (vlmResult.isProcessing) {
       return (
         <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 bg-blue-500 text-white text-xs rounded-full">
-          <Loader2 className="w-3 h-3 animate-spin" />
+          <InlineSpinner size="sm" />
           <span>Processing</span>
         </div>
       );

@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, CheckCircle, XCircle, AlertTriangle, Clock, Settings, ChevronDown, ChevronUp, FileDown, Database, ArrowUpDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { log } from '@/lib/logger';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface SyncResult {
   success: boolean;
@@ -382,7 +383,7 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
       case 'partial':
         return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
       case 'running':
-        return <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />;
+        return <InlineSpinner size="sm" className="text-blue-500" />;
       default:
         return <Clock className="w-4 h-4 text-gray-400" />;
     }

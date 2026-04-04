@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Loader2, Database, CloudCog, CheckCircle, FileSpreadsheet } from 'lucide-react';
+import { Database, CloudCog, CheckCircle, FileSpreadsheet } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 export type ImportPhase = 'parsing' | 'uploading' | 'processing' | 'syncing' | 'complete';
@@ -27,7 +27,7 @@ const phaseConfig: Record<ImportPhase, {
   },
   uploading: {
     message: 'Uploading data...',
-    icon: <Loader2 className="w-8 h-8 animate-spin" />,
+    icon: <InlineSpinner size="lg" />,
     color: 'text-blue-500',
   },
   processing: {

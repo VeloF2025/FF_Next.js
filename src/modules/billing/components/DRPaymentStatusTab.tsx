@@ -11,7 +11,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { CreditCard, Loader2, Search, CheckCircle, XCircle } from 'lucide-react';
+import { CreditCard, Search, CheckCircle, XCircle } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 type Project = 'All' | 'Lawley' | 'Mohadin' | 'Mamelodi';
 type StatusFilter = 'all' | 'excluded' | 'recovered';
@@ -201,7 +202,7 @@ export function DRPaymentStatusTab() {
       {/* Loading / Error */}
       {loading && (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-accent)]" />
+          <InlineSpinner size="md" />
         </div>
       )}
 

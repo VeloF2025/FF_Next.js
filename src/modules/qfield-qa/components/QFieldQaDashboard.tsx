@@ -33,6 +33,7 @@ import { PhotoListTab } from './PhotoListTab';
 import { PhotoDetailModal } from './PhotoDetailModal';
 import type { PhotoValidation } from '../types';
 import { log } from '@/lib/logger';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 export function QFieldQaDashboard() {
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoValidation | null>(null);
@@ -292,7 +293,7 @@ export function QFieldQaDashboard() {
       {/* Validation Status Banner */}
       {validationMessage && (
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 flex items-center gap-3">
-          <RefreshCw className="h-5 w-5 text-blue-400 animate-spin" />
+          <InlineSpinner size="sm" className="text-blue-400" />
           <p className="text-sm text-blue-400">{validationMessage}</p>
           <button
             onClick={() => setValidationMessage(null)}

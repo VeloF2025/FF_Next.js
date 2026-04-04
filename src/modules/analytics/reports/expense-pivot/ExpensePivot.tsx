@@ -7,7 +7,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useExpensePivotData, type PivotType } from './useExpensePivotData';
 import { ReportTabLayout } from '../ReportTabLayout';
 import { ExpensePivotTable } from '../tables/ExpensePivotTable';
@@ -31,7 +32,7 @@ export default function ExpensePivot() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-400">
-        <Loader2 className="w-6 h-6 animate-spin mr-2" />
+        <InlineSpinner size="md" className="mr-2" />
         Loading expense data&hellip;
       </div>
     );

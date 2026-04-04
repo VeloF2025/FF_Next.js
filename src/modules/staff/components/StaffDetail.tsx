@@ -37,6 +37,7 @@ import { DisciplinaryIncidentForm } from './DisciplinaryIncidentForm';
 import { VehicleAssignmentForm } from './VehicleAssignmentForm';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import type { DisciplinaryIncident, VehicleAssignment } from '@/types/staff';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 type TabType = 'overview' | 'performance' | 'employment' | 'compliance' | 'vehicles' | 'disciplinary' | 'documents' | 'projects' | 'notes' | 'activity';
 
@@ -361,7 +362,7 @@ export function StaffDetail() {
   if (isLoading || accessLoading || permissionsLoading || featuresLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <LoadingSpinner size="xl" />
       </div>
     );
   }

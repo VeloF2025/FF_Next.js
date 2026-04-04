@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useWorkflowEditor } from '../../context/WorkflowEditorContext';
 import type { WorkflowValidationError, WorkflowValidationWarning } from '../../types/workflow.types';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ValidationItemProps {
   item: WorkflowValidationError | WorkflowValidationWarning;
@@ -175,7 +176,7 @@ export function ValidationPanel() {
         {state.isValidating ? (
           <div className="flex items-center justify-center py-8">
             <div className="flex items-center space-x-3">
-              <RefreshCw className="w-5 h-5 animate-spin text-blue-600 dark:text-blue-400" />
+              <InlineSpinner size="sm" className="text-blue-600 dark:text-blue-400" />
               <span className="text-sm text-muted-foreground">
                 Validating workflow...
               </span>

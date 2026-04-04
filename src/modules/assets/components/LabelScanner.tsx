@@ -16,13 +16,13 @@ import {
   X,
   Camera,
   Upload,
-  RefreshCw,
   CheckCircle2,
   AlertTriangle,
   XCircle,
   Image as ImageIcon,
 } from 'lucide-react';
 import { modalVariants, overlayVariants } from '@/lib/animations/modal-variants';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { AssetLabelExtraction } from '../services/assetVlmService';
 import { log } from '@/lib/logger';
 
@@ -364,7 +364,7 @@ export function LabelScanner({
                     </div>
                   )}
                   <div className="flex flex-col items-center py-6">
-                    <RefreshCw className="w-10 h-10 text-blue-400 animate-spin mb-3" />
+                    <LoadingSpinner size="xl" label="" className="mb-3" />
                     <p className="text-white font-medium">
                       {mode === 'extract' ? 'Extracting information...' : 'Verifying label...'}
                     </p>

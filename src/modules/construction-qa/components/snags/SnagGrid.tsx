@@ -7,7 +7,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { ChevronLeft, ChevronDown, ChevronRight, Loader2, Trash2, Ticket } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronRight, Trash2, Ticket } from 'lucide-react';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { SnagCard } from './SnagCard';
 import { SnagDetail } from './SnagDetail';
 import { deleteSnagReport, createNocTicketsBulk } from '../../services/snagService';
@@ -102,7 +103,7 @@ export function SnagGrid({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48">
-        <Loader2 className="h-6 w-6 text-zinc-400 animate-spin" />
+        <LoadingSpinner size="md" label="" />
       </div>
     );
   }
@@ -204,7 +205,7 @@ export function SnagGrid({
                   className="flex items-center gap-1.5 px-2 py-2 text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50 transition-colors border border-zinc-700 rounded-md bg-zinc-800"
                 >
                   {bulkCreatingReportId === group.report.id
-                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    ? <InlineSpinner size="sm" />
                     : <Ticket className="h-4 w-4" />
                   }
                   <span className="hidden sm:inline">
@@ -222,7 +223,7 @@ export function SnagGrid({
                 className="p-2 text-zinc-500 hover:text-red-400 disabled:opacity-50 transition-colors border border-zinc-700 rounded-md bg-zinc-800 hover:bg-zinc-750"
               >
                 {deletingReportId === group.report.id
-                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  ? <InlineSpinner size="sm" />
                   : <Trash2 className="h-4 w-4" />
                 }
               </button>

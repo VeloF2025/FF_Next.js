@@ -20,6 +20,7 @@ import {
 import { workflowManagementService } from '../../services/WorkflowManagementService';
 import { workflowTemplateService } from '../../services/WorkflowTemplateService';
 import { log } from '@/lib/logger';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { 
   WorkflowTemplate,
   WorkflowTemplateQuery,
@@ -423,7 +424,7 @@ export function TemplateList({
       {/* Templates Grid */}
       {state.isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <LoadingSpinner size="md" />
           <span className="ml-3 text-[var(--ff-text-secondary)]">Loading templates...</span>
         </div>
       ) : state.templates.length === 0 ? (

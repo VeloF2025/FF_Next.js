@@ -1,6 +1,7 @@
 // Workflow editor forms for creating and editing phases, steps, and tasks
 import React, { useState, useEffect } from 'react';
 import { X, Save, AlertCircle } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useWorkflowEditor } from '../../../context/WorkflowEditorContext';
 import { workflowManagementService } from '../../../services/WorkflowManagementService';
 import type { StepType, TaskPriority } from '../../../types/workflow.types';
@@ -484,7 +485,7 @@ export function WorkflowEditorForms() {
             >
               {loading ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  <InlineSpinner size="sm" className="mr-2" />
                   Saving...
                 </>
               ) : (

@@ -29,6 +29,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { FullSyncRequest, FullSyncResult } from '../../types/qcontact';
 import { SyncDirection } from '../../types/qcontact';
 
@@ -380,7 +381,7 @@ export function SyncTrigger({ onTriggerSync, disabled = false, compact = false }
         >
           {isSyncing ? (
             <>
-              <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
+              <InlineSpinner size="sm" className="mr-2" />
               Syncing...
             </>
           ) : (

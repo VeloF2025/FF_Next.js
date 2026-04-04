@@ -4,12 +4,12 @@ import {
   FileSpreadsheet,
   CheckCircle,
   AlertCircle,
-  Loader2,
   Download,
   Trash2
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { SOWFile, FileTypeConfig } from '../types/sowUpload.types';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface FileUploadCardProps {
   fileType: FileTypeConfig;
@@ -91,7 +91,7 @@ function FileUploadStatus({ uploadedFile }: { uploadedFile: SOWFile }) {
 
       {uploadedFile.status === 'processing' && (
         <div className="flex items-center gap-2">
-          <Loader2 className="w-4 h-4 animate-spin text-primary-500" />
+          <InlineSpinner size="sm" className="text-primary-500" />
           <span className="text-sm text-[var(--ff-text-secondary)]">Processing...</span>
         </div>
       )}

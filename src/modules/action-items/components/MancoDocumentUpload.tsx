@@ -1,7 +1,8 @@
 'use client';
 
 import { useRef } from 'react';
-import { FileText, Upload, Loader2 } from 'lucide-react';
+import { FileText, Upload } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { toast } from 'react-hot-toast';
 import { log } from '@/lib/logger';
 import { MancoActionItem } from '@/types/manco-action-items.types';
@@ -115,7 +116,7 @@ export function MancoDocumentUpload({
           aria-label="Choose document to upload"
         >
           {uploading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-[var(--ff-text-secondary)]" />
+            <InlineSpinner size="sm" />
           ) : (
             <Upload className="w-4 h-4 text-[var(--ff-text-secondary)]" />
           )}

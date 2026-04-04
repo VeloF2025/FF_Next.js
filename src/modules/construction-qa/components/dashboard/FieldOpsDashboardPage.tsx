@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, LayoutGrid, Table2 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import type { ProjectDashboardRow } from '../../types/dashboard.types';
 import { ProjectQaCard } from './ProjectQaCard';
@@ -110,7 +111,7 @@ export function FieldOpsDashboardPage() {
       {/* Project cards grid */}
       {loading && projects.length === 0 ? (
         <div className="flex items-center justify-center py-16 text-gray-500">
-          <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+          <LoadingSpinner size="md" label="" className="mr-2" />
           Loading projects...
         </div>
       ) : projects.length === 0 ? (

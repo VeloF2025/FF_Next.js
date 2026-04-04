@@ -8,7 +8,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { X, Loader2, AlertCircle, Calendar, MapPin, ScanLine } from 'lucide-react';
+import { X, AlertCircle, Calendar, MapPin, ScanLine } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { BarcodeScannerModal } from '@/modules/barcode-scanner';
 import { ConditionPhotoCapture, type CapturedPhoto } from '@/modules/assets/components/ConditionPhotoCapture';
@@ -292,7 +293,7 @@ export function CheckoutModal({ stockItemId, stockItemName, serials, onClose, on
                 type="submit"
                 disabled={isSubmitting || availableSerials.length === 0 || conditionPhotos.some(p => p.uploading)}
               >
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting && <InlineSpinner size="sm" />}
                 Check Out
               </Button>
             </div>

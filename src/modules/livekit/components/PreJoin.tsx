@@ -11,8 +11,8 @@ import {
     Mic,
     MicOff,
     PhoneCall,
-    Loader2,
 } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface PreJoinProps {
     roomName: string;
@@ -166,7 +166,7 @@ export function PreJoin({ roomName, onJoin }: PreJoinProps) {
                 >
                     {isLoading ? (
                         <>
-                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <InlineSpinner size="sm" />
                             Joining...
                         </>
                     ) : (

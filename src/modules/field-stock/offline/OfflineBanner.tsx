@@ -11,7 +11,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { WifiOff, RefreshCw, Loader2 } from 'lucide-react';
+import { WifiOff, RefreshCw } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useOnlineStatus } from './useOnlineStatus';
 import { offlineStorage } from './offlineStorage';
 
@@ -85,7 +86,7 @@ export function OfflineBanner({ className = '' }: OfflineBannerProps) {
           className="flex items-center gap-1 rounded px-2 py-1 hover:bg-blue-100 disabled:opacity-50 dark:hover:bg-blue-800/30"
         >
           {syncing ? (
-            <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+            <InlineSpinner size="sm" />
           ) : (
             <RefreshCw className="h-3 w-3" aria-hidden />
           )}

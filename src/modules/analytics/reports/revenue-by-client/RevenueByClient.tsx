@@ -7,7 +7,8 @@
 // 🟢 WORKING: Revenue by Client report component
 'use client';
 
-import { Loader2, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { ReportTabLayout } from '../ReportTabLayout';
 import { useRevenueByClientData } from './useRevenueByClientData';
 
@@ -24,7 +25,7 @@ export default function RevenueByClient() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64 text-[var(--ff-text-muted)]">
-        <Loader2 className="w-6 h-6 animate-spin mr-2" />
+        <InlineSpinner size="md" className="mr-2" />
         Loading revenue by client&hellip;
       </div>
     );

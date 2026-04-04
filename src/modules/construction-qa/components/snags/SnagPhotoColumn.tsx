@@ -8,7 +8,8 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Upload, ExternalLink, X, Link as LinkIcon, Loader2, MapPin } from 'lucide-react';
+import { Upload, ExternalLink, X, Link as LinkIcon, MapPin } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { SnagPhoto } from '../../types/snag.types';
 import { uploadSnagPhoto, uploadSnagPhotoFile, deleteSnagPhoto } from '../../services/snagService';
 import { log } from '@/lib/logger';
@@ -52,7 +53,7 @@ function PhotoUrlInput({
           disabled={uploading || !url.trim()}
           className="flex items-center gap-1 text-xs bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-200 px-2 py-1 rounded whitespace-nowrap"
         >
-          {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+          {uploading ? <InlineSpinner size="sm" /> : <Upload className="h-3 w-3" />}
           {uploading ? 'Adding...' : 'Add'}
         </button>
       </div>
@@ -154,7 +155,7 @@ function PhotoThumbnail({
           className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 hover:bg-red-800 disabled:opacity-50 rounded p-0.5"
         >
           {deleting
-            ? <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
+            ? <InlineSpinner size="sm" className="text-white" />
             : <X className="h-3.5 w-3.5 text-white" />
           }
         </button>
@@ -293,7 +294,7 @@ export function PhotoColumn({
               className="flex items-center justify-center gap-1.5 text-xs bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-200 px-2 py-1.5 rounded w-full"
             >
               {uploading
-                ? <Loader2 className="h-3 w-3 animate-spin" />
+                ? <InlineSpinner size="sm" />
                 : <Upload className="h-3 w-3" />
               }
               {uploading ? 'Uploading...' : 'Upload photo'}

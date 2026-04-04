@@ -6,7 +6,8 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { Upload, Loader2 } from 'lucide-react';
+import { Upload } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ============================================================
 // UploadZone
@@ -56,7 +57,7 @@ export function UploadZone({ onFile, loading }: UploadZoneProps) {
       />
       {loading ? (
         <>
-          <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+          <LoadingSpinner size="lg" label="" />
           <p className="text-sm text-zinc-300">Analysing PDF...</p>
         </>
       ) : (

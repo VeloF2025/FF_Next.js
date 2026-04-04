@@ -6,12 +6,12 @@ import {
   Upload,
   Trash2,
   Download,
-  Loader2,
   AlertCircle,
   X,
   Link2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useAccountingDocuments } from './useAccountingDocuments';
 import {
   ACCOUNTING_DOCUMENT_TYPE_LABELS,
@@ -203,7 +203,7 @@ export function AccountingDocumentPanel({
       <div className="divide-y divide-[var(--ff-border-light)]">
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-5 w-5 animate-spin text-blue-400" />
+            <InlineSpinner size="sm" />
           </div>
         ) : documents.length === 0 ? (
           <div className="text-center py-8">

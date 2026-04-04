@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Database, Loader2, AlertCircle, RefreshCw, ChevronDown } from 'lucide-react';
+import { Database, AlertCircle, RefreshCw, ChevronDown } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import { useQFieldImport } from '../hooks/useQFieldImport';
 import { LayerPreviewCard } from './LayerPreviewCard';
@@ -104,7 +105,7 @@ export function QFieldImportPanel({ projectId }: QFieldImportPanelProps) {
             <div className="flex-1">
               {loadingLinked ? (
                 <div className="flex items-center gap-2 text-sm text-[var(--ff-text-secondary)]">
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <InlineSpinner size="sm" />
                   Loading linked projects...
                 </div>
               ) : linkedProjects.length > 1 ? (
@@ -153,7 +154,7 @@ export function QFieldImportPanel({ projectId }: QFieldImportPanelProps) {
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
             >
               {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <InlineSpinner size="sm" />
               ) : (
                 <Database className="w-4 h-4" />
               )}
@@ -232,7 +233,7 @@ export function QFieldImportPanel({ projectId }: QFieldImportPanelProps) {
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
             >
               {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <InlineSpinner size="sm" />
               ) : (
                 <Database className="w-4 h-4" />
               )}

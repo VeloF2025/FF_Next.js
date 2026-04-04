@@ -6,8 +6,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle, RefreshCw } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { getAllContractorsRagStatus } from '../services/ragApiService';
 import type { ContractorRagStatus, RagSummaryStats, RagStatus } from '../types/rag.types';
 import { RagSummaryCards } from './RagSummaryCards';
@@ -43,7 +44,7 @@ export function RagDashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        <InlineSpinner size="md" className="text-blue-600" />
         <span className="ml-3 text-[var(--ff-text-secondary)]">Loading RAG status...</span>
       </div>
     );

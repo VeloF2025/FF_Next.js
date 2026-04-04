@@ -4,7 +4,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Loader2, ArrowRightLeft, ArrowDownLeft, AlertCircle } from 'lucide-react';
+import { Plus, ArrowRightLeft, ArrowDownLeft, AlertCircle } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { CheckoutModal } from './CheckoutModal';
 import { CheckinModal } from './CheckinModal';
@@ -127,7 +128,7 @@ export function SerialsPanel({ stockItemId, stockItemName, category }: SerialsPa
             onClick={handleAddSerial}
             disabled={isAdding || !newSerial.trim()}
           >
-            {isAdding ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
+            {isAdding ? <InlineSpinner size="sm" /> : 'Save'}
           </Button>
           <Button
             type="button"
@@ -154,7 +155,7 @@ export function SerialsPanel({ stockItemId, stockItemName, category }: SerialsPa
       {/* Loading */}
       {isLoading && (
         <div className="flex items-center justify-center py-4">
-          <Loader2 className="h-5 w-5 animate-spin text-[var(--ff-text-tertiary)]" />
+          <InlineSpinner size="sm" />
         </div>
       )}
 

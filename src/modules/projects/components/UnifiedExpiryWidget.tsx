@@ -14,13 +14,13 @@ import {
   XCircle,
   Bell,
   CheckCircle,
-  Loader2,
   FileText,
   Building2,
   User,
   FolderKanban,
   FileCheck,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 type ExpiryUrgency = 'expired' | 'critical' | 'warning' | 'upcoming' | 'ok';
 type DocumentSource = 'pipeline_approval' | 'contractor_document' | 'agreement' | 'project_requirement' | 'staff_document';
@@ -165,7 +165,7 @@ export function UnifiedExpiryWidget({ projectId, compact = false, className = ''
   if (loading) {
     return (
       <div className={`flex items-center justify-center py-12 ${className}`}>
-        <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-text-secondary)]" />
+        <LoadingSpinner size="md" />
       </div>
     );
   }

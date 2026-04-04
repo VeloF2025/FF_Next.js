@@ -8,7 +8,6 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  Loader2,
   Phone,
   Clock,
   RotateCcw,
@@ -343,7 +342,7 @@ const ServicesTab: React.FC = () => {
       case 'disconnected':
         return <XCircle className="w-5 h-5 text-red-500" />;
       case 'connecting':
-        return <Loader2 className="w-5 h-5 text-yellow-500 animate-spin" />;
+        return <InlineSpinner size="sm" className="text-yellow-500" />;
       case 'error':
         return <AlertCircle className="w-5 h-5 text-red-500" />;
       default:

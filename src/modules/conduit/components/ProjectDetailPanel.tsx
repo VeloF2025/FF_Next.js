@@ -16,7 +16,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Loader2, Save, CheckCircle2, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { Save, CheckCircle2, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import type { ConduitProject, ConduitProjectInputs, MonthlyPlanEntry, ConduitActual } from '../types';
 import { calcConduit } from '../hooks/useConduitCalc';
@@ -548,7 +549,7 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-teal-600 hover:bg-teal-500 text-white disabled:opacity-50 transition-colors"
         >
           {saving ? (
-            <><Loader2 className="w-4 h-4 animate-spin" />Saving…</>
+            <><InlineSpinner size="sm" />Saving…</>
           ) : saved ? (
             <><CheckCircle2 className="w-4 h-4 text-emerald-300" />Saved</>
           ) : (

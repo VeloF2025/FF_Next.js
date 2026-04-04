@@ -14,8 +14,8 @@ import {
   XCircle,
   Bell,
   CheckCircle,
-  Loader2,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { ExpiringApproval, DueFollowup, ExpiryUrgency, FollowupStatus } from '../types';
 
 interface AlertsDashboardProps {
@@ -151,7 +151,7 @@ export function AlertsDashboard({ className = '', compact = false }: AlertsDashb
   if (loading) {
     return (
       <div className={`flex items-center justify-center py-12 ${className}`}>
-        <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-text-secondary)]" />
+        <LoadingSpinner size="md" label="" />
       </div>
     );
   }

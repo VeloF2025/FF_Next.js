@@ -14,14 +14,13 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  Loader2,
   Plus,
   Filter,
   RefreshCw,
   Truck,
   RotateCcw
 } from 'lucide-react';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { usePickings } from '../../hooks/usePickings';
 import type { StockPicking, PickingType, PickingStatus } from '../../types';
 
@@ -67,7 +66,7 @@ const STATUS_CONFIG: Record<PickingStatus, { label: string; color: string; icon:
   processing: {
     label: 'Processing',
     color: 'yellow',
-    icon: <Loader2 className="h-4 w-4 animate-spin" />
+    icon: <InlineSpinner size="sm" />
   },
   done: {
     label: 'Done',

@@ -9,6 +9,7 @@ import { SOWStats } from './components/SOWStats';
 import { useSOWDocuments } from './hooks/useSOWDocuments';
 import { useSOWFilters } from './hooks/useSOWFilters';
 import { SOWListItem } from './types/sow.types';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 export function SOWListPage() {
   const router = useRouter();
@@ -45,7 +46,7 @@ export function SOWListPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <LoadingSpinner size="xl" />
       </div>
     );
   }

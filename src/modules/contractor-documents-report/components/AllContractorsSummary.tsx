@@ -8,6 +8,7 @@
 
 import React, { useState } from 'react';
 import { FileText, Search, Download, AlertCircle } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import Link from 'next/link';
 import { log } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
@@ -23,8 +24,7 @@ export default function AllContractorsSummary() {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading contractors summary...</p>
+          <LoadingSpinner size="xl" label="Loading contractors summary..." />
         </div>
       </div>
     );

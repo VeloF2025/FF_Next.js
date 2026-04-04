@@ -7,6 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, X, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { SearchResult } from '../data/manual-content';
 
 interface SearchBarProps {
@@ -119,7 +120,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           {isSearching ? (
             <div className="p-4 text-center">
               <div className="flex items-center justify-center gap-2 text-[var(--ff-text-tertiary)]">
-                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                <InlineSpinner size="sm" />
                 <span className="text-sm">Searching...</span>
               </div>
             </div>

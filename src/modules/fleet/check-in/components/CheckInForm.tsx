@@ -7,7 +7,6 @@ import React, { useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle,
-  Loader2,
   Car,
   Gauge,
   Calendar,
@@ -15,6 +14,7 @@ import {
   Fuel,
 } from 'lucide-react';
 import { CheckInItemRow } from './CheckInItemRow';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { CheckInPhotoGridEnhanced } from './CheckInPhotoGridEnhanced';
 import { OfflineIndicator } from './OfflineIndicator';
 import { VlmResultCard } from './VlmResultCard';
@@ -156,7 +156,7 @@ export function CheckInForm({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <LoadingSpinner size="lg" label="" />
         <span className="ml-3 text-muted-foreground">Loading checklist...</span>
       </div>
     );
@@ -513,9 +513,9 @@ export function CheckInForm({
           }`}
         >
           {isSubmitting ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
+            <InlineSpinner size="sm" />
           ) : isProcessingVlm ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
+            <InlineSpinner size="sm" />
           ) : (
             <CheckCircle className="w-5 h-5" />
           )}

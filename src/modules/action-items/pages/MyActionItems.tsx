@@ -6,6 +6,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { ArrowLeft, Inbox, RefreshCw } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useRouter } from 'next/router';
 import { ActionItem, ActionItemSourceType } from '@/types/action-items.types';
 import { actionItemsService } from '@/services/action-items/actionItemsService';
@@ -126,7 +127,7 @@ export function MyActionItems() {
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <RefreshCw className="w-6 h-6 animate-spin text-[var(--ff-text-tertiary)]" />
+          <InlineSpinner size="md" />
           <span className="ml-2 text-[var(--ff-text-secondary)]">Loading your action items...</span>
         </div>
       ) : items.length === 0 ? (

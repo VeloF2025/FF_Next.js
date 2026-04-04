@@ -10,7 +10,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { Search, X, Loader2 } from 'lucide-react';
+import { Search, X } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import type { SearchResult } from '../../types/dashboard.types';
 import { Button } from '@/components/ui/button';
@@ -99,7 +100,7 @@ export function GlobalSearchBar() {
           onFocus={() => results.length > 0 && setOpen(true)}
           className="w-full pl-9 pr-8 py-2 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg text-sm text-gray-300 placeholder-gray-500"
         />
-        {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 animate-spin" />}
+        {loading && <InlineSpinner size="sm" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500" />}
         {!loading && query && (
           <Button variant="ghost" size="icon" onClick={handleClear} className="absolute right-1 top-1/2 -translate-y-1/2" aria-label="Clear search">
             <X className="w-4 h-4" />

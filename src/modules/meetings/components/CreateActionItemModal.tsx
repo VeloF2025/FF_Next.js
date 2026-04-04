@@ -4,7 +4,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { log } from '@/lib/logger';
 import { actionItemsService } from '@/services/action-items/actionItemsService';
@@ -165,7 +166,7 @@ export function CreateActionItemModal({ isOpen, onClose, onCreated }: CreateActi
             disabled={!description.trim() || !meetingId || isSubmitting}
             className="flex items-center gap-2"
           >
-            {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+            {isSubmitting && <InlineSpinner size="sm" />}
             Create
           </Button>
         </div>

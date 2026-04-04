@@ -18,6 +18,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { StaffFilter, StaffMember, StaffSummary } from '@/types/staff.types';
 import { log } from '@/lib/logger';
 import { formatLabel } from '@/lib/utils';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 export function StaffList() {
   const router = useRouter();
@@ -136,7 +137,7 @@ export function StaffList() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <LoadingSpinner size="xl" />
       </div>
     );
   }

@@ -18,6 +18,7 @@ import {
   Users
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 type DataType = 'poles' | 'drops';
 type ViewType = 'summary' | 'comparison' | 'details';
@@ -207,7 +208,7 @@ export function FieldInstallationsViewer() {
     return (
       <div className="bg-card rounded-lg shadow p-8">
         <div className="flex flex-col items-center justify-center">
-          <Activity className="h-8 w-8 animate-spin text-blue-600 mb-4" />
+          <LoadingSpinner size="lg" className="mb-4" />
           <p className="text-muted-foreground">Loading {dataType} data...</p>
         </div>
       </div>

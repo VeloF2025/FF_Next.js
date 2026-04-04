@@ -11,6 +11,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { ArrowLeft, RefreshCw, Download, CheckCircle, XCircle } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import type { DateFilter } from '@/modules/data-sync/types';
 import { getDateRange } from '@/modules/data-sync/types';
@@ -277,7 +278,7 @@ export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageP
       {/* Zone accordion */}
       {loading && zones.length === 0 ? (
         <div className="flex items-center justify-center py-12 text-gray-500">
-          <RefreshCw className="w-5 h-5 animate-spin mr-2" />
+          <LoadingSpinner size="sm" label="" className="mr-2" />
           Loading zones...
         </div>
       ) : zones.length === 0 ? (

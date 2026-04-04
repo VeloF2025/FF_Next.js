@@ -4,8 +4,9 @@
  */
 
 import React from 'react';
-import { RefreshCw, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, CheckCircle, AlertCircle } from 'lucide-react';
 import { SyncJob } from '../types/qfield-sync.types';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface SyncJobCardProps {
   job: SyncJob;
@@ -29,7 +30,7 @@ export function SyncJobCard({ job, onCancel }: SyncJobCardProps) {
   const getStatusIcon = () => {
     switch (job.status) {
       case 'syncing':
-        return <RefreshCw className="h-5 w-5 animate-spin" />;
+        return <InlineSpinner size="sm" />;
       case 'completed':
         return <CheckCircle className="h-5 w-5" />;
       case 'error':

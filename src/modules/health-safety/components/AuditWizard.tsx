@@ -17,11 +17,11 @@ import {
   ChevronRight,
   Save,
   Send,
-  Loader2,
   MessageSquare,
   Info,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import type { ResponseValue, RAGStatus } from '../types/audit.types';
 import { CHECKLIST_CATEGORIES } from '../types/checklist.types';
@@ -219,7 +219,7 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
   if (!auditData) {
     return (
       <div className="p-8 text-center">
-        <Loader2 className="w-12 h-12 mx-auto mb-4 text-orange-500 animate-spin" />
+        <LoadingSpinner size="xl" label="" className="mb-4" />
         <p className="text-muted-foreground">Loading audit...</p>
       </div>
     );
@@ -254,7 +254,7 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
               disabled={isSaving || Object.keys(responses).length === 0}
               className="flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary dark:hover:bg-gray-600 text-foreground rounded-lg disabled:opacity-50 transition-colors"
             >
-              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {isSaving ? <InlineSpinner size="sm" /> : <Save className="w-4 h-4" />}
               Save
             </button>
           </div>
@@ -342,7 +342,7 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
               className="flex items-center gap-2 px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg disabled:opacity-50 transition-colors"
             >
               {isSubmitting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <InlineSpinner size="sm" />
               ) : (
                 <Send className="w-4 h-4" />
               )}

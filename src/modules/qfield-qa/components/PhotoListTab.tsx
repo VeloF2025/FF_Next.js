@@ -19,12 +19,12 @@ import {
   Camera,
   ChevronLeft,
   ChevronRight,
-  Loader2,
   Zap,
   UserPlus,
   Calendar,
 } from 'lucide-react';
 import { qfieldQaApiService } from '../services/qfieldQaApiService';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { PhotoValidation, QAProject, QAFilters, Priority, WorkflowStatus } from '../types';
 
 interface PhotoListTabProps {
@@ -292,7 +292,7 @@ export function PhotoListTab({
               className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {bulkActionLoading === 'approve' ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <InlineSpinner size="sm" />
               ) : (
                 <CheckCircle className="w-4 h-4" />
               )}
@@ -304,7 +304,7 @@ export function PhotoListTab({
               className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {bulkActionLoading === 'reject' ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <InlineSpinner size="sm" />
               ) : (
                 <XCircle className="w-4 h-4" />
               )}
@@ -316,7 +316,7 @@ export function PhotoListTab({
               className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {bulkActionLoading === 'revalidate' ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <InlineSpinner size="sm" />
               ) : (
                 <Zap className="w-4 h-4" />
               )}
@@ -328,7 +328,7 @@ export function PhotoListTab({
               className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {bulkActionLoading === 'assign' ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <InlineSpinner size="sm" />
               ) : (
                 <UserPlus className="w-4 h-4" />
               )}
@@ -383,7 +383,7 @@ export function PhotoListTab({
               >
                 {bulkActionLoading ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <InlineSpinner size="sm" />
                     Processing...
                   </>
                 ) : (
@@ -503,7 +503,7 @@ export function PhotoListTab({
               >
                 {bulkActionLoading === 'assign' ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <InlineSpinner size="sm" />
                     Assigning...
                   </>
                 ) : (

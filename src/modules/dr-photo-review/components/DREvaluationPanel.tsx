@@ -5,7 +5,8 @@
 
 'use client';
 
-import { Play, Loader2, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Play, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { DREvaluationResult } from '../types';
 
 interface DREvaluationPanelProps {
@@ -48,7 +49,7 @@ export function DREvaluationPanel({
                 >
                     {isEvaluating ? (
                         <>
-                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <InlineSpinner size="sm" />
                             Evaluating...
                         </>
                     ) : (

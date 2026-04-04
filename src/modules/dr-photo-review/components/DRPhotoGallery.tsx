@@ -7,6 +7,7 @@
 
 import { useState } from 'react';
 import { X, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, XCircle, Camera } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { DRStepPhoto } from '../types';
 
 interface DRPhotoGalleryProps {
@@ -43,8 +44,7 @@ export function DRPhotoGallery({ steps, drNumber, isLoading }: DRPhotoGalleryPro
         return (
             <div className="flex items-center justify-center h-64 bg-[var(--ff-bg-tertiary)] rounded-lg">
                 <div className="text-center">
-                    <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                    <p className="text-[var(--ff-text-tertiary)]">Loading photos...</p>
+                    <LoadingSpinner size="lg" label="Loading photos..." />
                 </div>
             </div>
         );

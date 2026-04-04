@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Trash2, Plus, Loader2 } from 'lucide-react';
+import { Trash2, Plus } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface SelectListEntry {
   id: string;
@@ -94,7 +95,7 @@ function SingleList({
           disabled={adding || !newValue.trim()}
           className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-40 transition-colors"
         >
-          {adding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+          {adding ? <InlineSpinner size="sm" /> : <Plus className="w-3 h-3" />}
           Add
         </button>
       </div>

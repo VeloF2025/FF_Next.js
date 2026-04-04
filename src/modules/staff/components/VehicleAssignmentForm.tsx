@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Calendar, Car, Fuel, AlertTriangle, Search, Loader2 } from 'lucide-react';
+import { X, Calendar, Car, Fuel, AlertTriangle, Search } from 'lucide-react';
 import { formatDateISO } from '@/utils/dateFormat';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { VehicleAssignment, VehicleAssignmentCreate } from '@/types/staff';
 import { COMMON_VEHICLE_MAKES } from '@/types/staff/vehicle.types';
 import Link from 'next/link';
@@ -292,7 +293,7 @@ export function VehicleAssignmentForm({
                   {/* Fleet vehicle list */}
                   {loadingFleet ? (
                     <div className="flex items-center justify-center py-6">
-                      <Loader2 className="w-6 h-6 text-[var(--ff-text-tertiary)] animate-spin" />
+                      <LoadingSpinner size="md" />
                     </div>
                   ) : filteredFleetVehicles.length === 0 ? (
                     <div className="text-center py-6 text-[var(--ff-text-secondary)]">

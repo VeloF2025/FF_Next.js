@@ -1,4 +1,5 @@
-import { Calendar, Clock, Video, MapPin, Users, ChevronRight, CheckCircle, Link, Edit, Trash2, Loader2, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, Video, MapPin, Users, ChevronRight, CheckCircle, Link, Edit, Trash2, AlertCircle } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { Meeting } from '../types/meeting.types';
 import { getMeetingTypeColor, getStatusColor, getSourceColor, getSourceLabel } from '../utils/meetingUtils';
 
@@ -47,7 +48,7 @@ export function MeetingsList({ meetings, onEditMeeting, onDeleteMeeting }: Meeti
                       {meeting.processingStatus === 'failed' ? (
                         <AlertCircle className="w-3 h-3" />
                       ) : (
-                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <InlineSpinner size="sm" />
                       )}
                       {meeting.processingStatus}
                     </span>

@@ -17,7 +17,6 @@
 import { useState, useCallback } from 'react';
 import {
   X,
-  Loader2,
   Upload,
   Calendar,
   Car,
@@ -32,6 +31,7 @@ import {
   RefreshCw,
   Info,
 } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import type { LicenseDisc, CreateLicenseDiscRequest } from '@/modules/fleet/types';
 import type { LicenseDiskExtractionResult } from '@/modules/fleet/types/check-in.types';
@@ -920,7 +920,7 @@ export function LicenseDiscModal({
               >
                 {extracting ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <InlineSpinner size="sm" />
                     Extracting...
                   </>
                 ) : (
@@ -950,7 +950,7 @@ export function LicenseDiscModal({
               >
                 {submitting ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <InlineSpinner size="sm" />
                     Saving...
                   </>
                 ) : (

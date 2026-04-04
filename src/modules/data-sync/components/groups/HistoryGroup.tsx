@@ -26,7 +26,7 @@ import {
 import type { SyncHistoryEntry, SyncOperationType } from '../../types';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import { usePermission } from '@/hooks/usePermission';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 // Filter options
 const FILTER_OPTIONS: { value: string; label: string; icon: React.ElementType; color: string }[] = [
@@ -276,7 +276,10 @@ export function HistoryGroup({ activeTab, onTabChange }: HistoryGroupProps) {
                         {typeConf.label}
                       </span>
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full border ${statusClassName}`}>
-                        <StatusIcon className={`w-3 h-3 ${entry.status === 'running' ? 'animate-spin' : ''}`} />
+                        {entry.status === 'running'
+                          ? <InlineSpinner size="sm" />
+                          : <StatusIcon className="w-3 h-3" />
+                        }
                         {statusLabel}
                       </span>
                     </div>

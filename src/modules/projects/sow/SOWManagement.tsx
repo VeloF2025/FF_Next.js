@@ -1,5 +1,6 @@
 import { SOWHeader, SOWStats, SOWFilters, SOWTable } from './components';
 import { useSOWData } from './hooks/useSOWData';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 export function SOWManagement() {
   const { sows, filteredSOWs, filter, setFilter, loading, error } = useSOWData();
@@ -8,7 +9,7 @@ export function SOWManagement() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <LoadingSpinner size="xl" />
           <p className="mt-4 text-muted-foreground">Loading SOW data from database...</p>
         </div>
       </div>

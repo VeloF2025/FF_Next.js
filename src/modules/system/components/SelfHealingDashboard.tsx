@@ -34,6 +34,7 @@ import type {
   RiskLevel,
 } from '../types/self-healing.types';
 import { log } from '@/lib/logger';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface DashboardData {
   daemon: DaemonStatus;
@@ -116,7 +117,7 @@ export default function SelfHealingDashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <RefreshCw className="w-8 h-8 text-blue-400 animate-spin" />
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
@@ -540,7 +541,7 @@ function RecoveryHistory() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-4">
-        <RefreshCw className="w-5 h-5 text-gray-400 animate-spin" />
+        <LoadingSpinner size="sm" />
       </div>
     );
   }

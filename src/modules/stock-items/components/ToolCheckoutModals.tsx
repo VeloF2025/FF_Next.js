@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { X, AlertCircle, Loader2, LogOut, LogIn } from 'lucide-react';
+import { X, AlertCircle, LogOut, LogIn } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useToolCheckoutMutations } from '../hooks/useToolCheckouts';
 import type { StockItem, ToolCheckout } from '@/types/stockItem.types';
 
@@ -121,7 +122,7 @@ export function CheckOutModal({ item, onClose, onSuccess }: CheckOutModalProps) 
               disabled={isSubmitting}
               className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg disabled:opacity-50"
             >
-              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isSubmitting && <InlineSpinner size="sm" />}
               Check Out
             </button>
           </div>
@@ -232,7 +233,7 @@ export function CheckInModal({ checkout, itemName, onClose, onSuccess }: CheckIn
               disabled={isSubmitting}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50"
             >
-              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isSubmitting && <InlineSpinner size="sm" />}
               Check In
             </button>
           </div>

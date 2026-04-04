@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, MessageSquare, Loader2, ExternalLink } from 'lucide-react';
+import { Search, MessageSquare, ExternalLink } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 
 interface TranscriptUtterance {
@@ -95,7 +96,7 @@ export function TranscriptView({ meetingId, transcriptUrl }: TranscriptViewProps
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
+        <InlineSpinner size="md" />
         <span className="ml-2 text-[var(--ff-text-secondary)]">Loading transcript...</span>
       </div>
     );

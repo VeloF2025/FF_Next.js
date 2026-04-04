@@ -5,7 +5,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { CheckCircle, Circle, Plus, Loader2, Zap, Calendar, User, Trash2 } from 'lucide-react';
+import { CheckCircle, Circle, Plus, Zap, Calendar, User, Trash2 } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { log } from '@/lib/logger';
@@ -119,7 +120,7 @@ export function MeetingActionItemsPanel({ meeting }: MeetingActionItemsPanelProp
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-5 h-5 animate-spin text-[var(--ff-text-tertiary)]" />
+        <InlineSpinner size="sm" />
         <span className="ml-2 text-sm text-[var(--ff-text-secondary)]">Loading action items...</span>
       </div>
     );
@@ -144,7 +145,7 @@ export function MeetingActionItemsPanel({ meeting }: MeetingActionItemsPanelProp
           className="inline-flex items-center gap-2"
         >
           {isExtracting ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <InlineSpinner size="sm" />
           ) : (
             <Zap className="w-4 h-4" />
           )}
@@ -233,7 +234,7 @@ export function MeetingActionItemsPanel({ meeting }: MeetingActionItemsPanelProp
               disabled={!newDescription.trim() || isAdding}
               className="flex items-center gap-1.5"
             >
-              {isAdding && <Loader2 className="w-3 h-3 animate-spin" />}
+              {isAdding && <InlineSpinner size="sm" />}
               Add
             </Button>
           </div>

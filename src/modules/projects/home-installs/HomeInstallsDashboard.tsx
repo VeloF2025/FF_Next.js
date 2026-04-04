@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { log } from '@/lib/logger';
-import { 
-  Home, 
-  Calendar, 
-  Users, 
-  CheckCircle, 
+import {
+  Home,
+  Calendar,
+  Users,
+  CheckCircle,
   AlertTriangle,
   Clock,
   MapPin,
@@ -17,6 +17,7 @@ import {
   Camera,
   Wifi
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface InstallStats {
   totalScheduled: number;
@@ -167,7 +168,7 @@ export function HomeInstallsDashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <LoadingSpinner size="xl" />
       </div>
     );
   }

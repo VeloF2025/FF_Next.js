@@ -12,13 +12,13 @@ import {
   Send,
   CheckSquare,
   Square,
-  Loader2,
   CheckCircle,
   AlertCircle,
   Mail,
   Users,
 } from 'lucide-react';
 import type { Meeting, MeetingAttendee } from '../types/meeting.types';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 
 interface MeetingMinutesPreviewModalProps {
@@ -221,7 +221,7 @@ export function MeetingMinutesPreviewModal({
               />
             ) : (
               <div className="flex items-center justify-center h-full text-[var(--ff-text-tertiary)]">
-                <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                <InlineSpinner size="md" className="mr-2" />
                 Loading preview...
               </div>
             )}
@@ -333,7 +333,7 @@ export function MeetingMinutesPreviewModal({
                 >
                   {distributeStatus === 'sending' ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <InlineSpinner size="sm" />
                       Sending to {selectedEmails.size} recipient{selectedEmails.size !== 1 ? 's' : ''}...
                     </>
                   ) : (

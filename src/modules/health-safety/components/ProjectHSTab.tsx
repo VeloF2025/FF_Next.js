@@ -11,7 +11,6 @@ import {
   Shield,
   AlertTriangle,
   CheckCircle,
-  Clock,
   FileText,
   Plus,
   Settings,
@@ -22,6 +21,7 @@ import {
   Building,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import { getRAGStatus, AUDIT_STATUS_CONFIG } from '../types/audit.types';
 import type { HSProjectConfig, HSProjectAudit } from '../types/audit.types';
@@ -428,7 +428,7 @@ function NotConfiguredState({
         >
           {saving ? (
             <>
-              <Clock className="w-4 h-4 animate-spin" />
+              <InlineSpinner size="sm" />
               Saving...
             </>
           ) : (

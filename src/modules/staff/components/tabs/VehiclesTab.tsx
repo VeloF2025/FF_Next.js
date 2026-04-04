@@ -7,6 +7,7 @@ import { formatDisplayDate } from '@/utils/dateFormat';
 import type { VehicleAssignment } from '@/types/staff';
 import { checkVehicleNeedsAttention, formatVehicleDisplayName } from '@/types/staff/vehicle.types';
 import { log } from '@/lib/logger';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 // Date format helpers (dd/mm/yyyy <-> yyyy-mm-dd)
 const isoToDisplay = (isoDate: string | null): string => {
@@ -147,7 +148,7 @@ export function VehiclesTab({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <LoadingSpinner size="md" />
       </div>
     );
   }
@@ -467,7 +468,7 @@ export function VehiclesTab({
               >
                 {saving ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <InlineSpinner size="sm" />
                     Saving...
                   </>
                 ) : (

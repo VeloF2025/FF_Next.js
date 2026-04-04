@@ -25,6 +25,7 @@ import type {
 } from '@/types/pon-stages.types';
 import { BUILD_STAGES, BUILD_STAGE_META } from '@/types/pon-stages.types';
 import { ProgressBar, STAGE_THRESHOLDS } from '@/components/accessible';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface PonStageTrackerProps {
   projectId: string;
@@ -272,11 +273,7 @@ export function PonStageTracker({ projectId }: PonStageTrackerProps) {
     return (
       <div className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)] p-8">
         <div className="flex items-center justify-center gap-3">
-          <div
-            className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-500"
-            role="status"
-            aria-label="Loading PON stages"
-          />
+          <LoadingSpinner size="sm" aria-label="Loading PON stages" />
           <span className="text-[var(--ff-text-secondary)]">Loading PON stages...</span>
         </div>
       </div>

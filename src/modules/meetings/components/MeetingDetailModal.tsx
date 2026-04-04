@@ -5,7 +5,8 @@
  */
 
 import { useState } from 'react';
-import { X, FileText, MessageSquare, Film, CheckCircle, Loader2, AlertCircle, Download, FileDown, Link2, Check } from 'lucide-react';
+import { X, FileText, MessageSquare, Film, CheckCircle, AlertCircle, Download, FileDown, Link2, Check } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { toast } from 'react-hot-toast';
 import type { Meeting } from '../types/meeting.types';
 import { getSourceColor, getSourceLabel, getProcessingStatusLabel } from '../utils/meetingUtils';
@@ -109,7 +110,7 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
               {meeting.processingStatus === 'failed' ? (
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
               ) : (
-                <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+                <InlineSpinner size="sm" className="flex-shrink-0" />
               )}
               {getProcessingStatusLabel(meeting.processingStatus)}
             </div>
@@ -178,7 +179,7 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[var(--ff-primary)] hover:bg-[var(--ff-primary-hover)] rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isGeneratingMinutes ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <InlineSpinner size="sm" />
                 ) : (
                   <FileDown className="w-3.5 h-3.5" />
                 )}

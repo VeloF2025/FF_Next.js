@@ -16,6 +16,7 @@ import {
   Settings,
   Download,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ConnectionStatus } from './ConnectionStatus';
 import { SyncJobCard } from './SyncJobCard';
 import { SyncStatsCard } from './SyncStatsCard';
@@ -65,7 +66,7 @@ export function QFieldSyncDashboard() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <LoadingSpinner size="lg" className="mx-auto mb-4" />
           <p className="text-[var(--ff-text-secondary)]">Loading QField Sync Dashboard...</p>
         </div>
       </div>

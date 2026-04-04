@@ -14,7 +14,6 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  Loader2,
   AlertCircle,
   Truck,
   RotateCcw,
@@ -22,7 +21,7 @@ import {
   Play,
   Ban,
 } from 'lucide-react';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { usePickings } from '../../hooks/usePickings';
 import { SignatureCapture } from './SignatureCapture';
 import type { PickingType, PickingStatus } from '../../types';
@@ -78,7 +77,7 @@ const TYPE_CONFIG: Record<PickingType, { label: string; icon: React.ReactNode; c
 const STATUS_CONFIG: Record<PickingStatus, { label: string; color: string; icon: React.ReactNode }> = {
   draft: { label: 'Draft', color: 'gray', icon: <Clock className="h-4 w-4" /> },
   confirmed: { label: 'Confirmed', color: 'blue', icon: <CheckCircle2 className="h-4 w-4" /> },
-  processing: { label: 'Processing', color: 'yellow', icon: <Loader2 className="h-4 w-4 animate-spin" /> },
+  processing: { label: 'Processing', color: 'yellow', icon: <InlineSpinner size="sm" /> },
   done: { label: 'Done', color: 'green', icon: <CheckCircle2 className="h-4 w-4" /> },
   cancelled: { label: 'Cancelled', color: 'red', icon: <XCircle className="h-4 w-4" /> },
 };

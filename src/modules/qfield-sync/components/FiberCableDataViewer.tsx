@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Cable, MapPin, Activity, CheckCircle, Clock, AlertCircle, RefreshCw, Download } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 
 interface FiberCable {
@@ -199,7 +200,7 @@ export function FiberCableDataViewer() {
     return (
       <div className="bg-card rounded-lg shadow p-8">
         <div className="flex flex-col items-center justify-center">
-          <Activity className="h-8 w-8 animate-spin text-blue-600 mb-4" />
+          <LoadingSpinner size="lg" className="mb-4" />
           <p className="text-muted-foreground">Loading fiber cable data...</p>
         </div>
       </div>

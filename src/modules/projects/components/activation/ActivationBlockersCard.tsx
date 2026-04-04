@@ -13,11 +13,11 @@ import {
   Shield,
   Users,
   AlertTriangle,
-  Loader2,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
 import type { ActivationCheck } from '../../services/activationService';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ActivationBlockersCardProps {
   projectId: string;
@@ -194,7 +194,7 @@ export function ActivationBlockersCard({
     return (
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
         <div className="flex items-center gap-3">
-          <Loader2 className="w-5 h-5 animate-spin text-[var(--ff-text-secondary)]" />
+          <InlineSpinner size="sm" />
           <span className="text-[var(--ff-text-secondary)]">Checking activation requirements...</span>
         </div>
       </div>
@@ -314,7 +314,7 @@ export function ActivationBlockersCard({
           >
             {seeding ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <InlineSpinner size="sm" />
                 Seeding...
               </>
             ) : (
@@ -340,7 +340,7 @@ export function ActivationBlockersCard({
         >
           {activating ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <InlineSpinner size="sm" />
               Activating...
             </>
           ) : canActivate ? (

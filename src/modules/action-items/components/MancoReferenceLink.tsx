@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Link2, Loader2, ExternalLink, Plus, X, Users } from 'lucide-react';
+import { Link2, ExternalLink, Plus, X, Users } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { toast } from 'react-hot-toast';
 import { log } from '@/lib/logger';
@@ -176,7 +177,7 @@ export function MancoReferenceLink({ item, onUpdated }: MancoReferenceLinkProps)
         </div>
 
         {loadingMeetings ? (
-          <Loader2 className="w-4 h-4 animate-spin text-[var(--ff-text-secondary)]" />
+          <InlineSpinner size="sm" />
         ) : linkedMeetings.length === 0 ? (
           <p className="text-xs text-[var(--ff-text-secondary)]">No meetings linked</p>
         ) : (
