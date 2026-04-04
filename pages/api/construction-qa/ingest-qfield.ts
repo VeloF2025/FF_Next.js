@@ -20,18 +20,19 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { ingestQFieldPhotos, ingestAllQFieldPhotos } from '@/modules/construction-qa/services/qfieldIngestionService';
 
-const CRON_SECRET = process.env.CRON_SECRET || '';
-
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'unknown', ['POST']);
   }
 
-  // Auth: CRON_SECRET only — this is a server-to-server endpoint.
-  // The cookie fallback was removed because any authenticated browser session
-  // would bypass the secret check, exposing mass-ingest to web users.
+  // Auth: CRON_SECRET only — this is a server-to-server endpoint (mandatory, fail-closed).
   const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
-  if (cronSecret !== CRON_SECRET) {
+  const expectedSecret = process.env.CRON_SECRET;
+  if (!expectedSecret) {
+    log.error('CRON_SECRET not configured — rejecting cron request');
+    return apiResponse.error(res, 'Cron endpoint misconfigured', 503);
+  }
+  if (cronSecret !== expectedSecret) {
     return apiResponse.unauthorized(res, 'Invalid cron secret');
   }
 

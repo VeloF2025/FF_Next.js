@@ -24,7 +24,9 @@ const sql = neon(process.env.DATABASE_URL!);
  */
 function hasCronSecret(req: NextApiRequest): boolean {
   const cronSecret = req.headers['x-cron-secret'];
-  return !!process.env.CRON_SECRET && cronSecret === process.env.CRON_SECRET;
+  const expectedSecret = process.env.CRON_SECRET;
+  if (!expectedSecret) return false;
+  return cronSecret === expectedSecret;
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {

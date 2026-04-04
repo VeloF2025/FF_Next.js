@@ -300,9 +300,14 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Verify cron secret (optional security)
+  // Verify cron secret (mandatory — fail closed if not configured)
   const cronSecret = req.headers['x-cron-secret'];
-  if (process.env.CRON_SECRET && cronSecret !== process.env.CRON_SECRET) {
+  const expectedSecret = process.env.CRON_SECRET;
+  if (!expectedSecret) {
+    log.error('CRON_SECRET not configured — rejecting cron request');
+    return apiResponse.error(res, 'Cron endpoint misconfigured', 503);
+  }
+  if (cronSecret !== expectedSecret) {
     return apiResponse.unauthorized(res, 'Invalid cron secret');
   }
 

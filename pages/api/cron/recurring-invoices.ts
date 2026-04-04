@@ -13,7 +13,6 @@ import { log } from '@/lib/logger';
 import { sql } from '@/lib/neon';
 import { generateInvoiceFromRecurring } from '@/modules/accounting/services/recurringInvoiceService';
 
-const CRON_SECRET = process.env.CRON_SECRET || '';
 const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -21,9 +20,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
-  // Auth: cron secret or session cookie
+  // Auth: cron secret (mandatory) or session cookie
   const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
-  if (cronSecret !== CRON_SECRET && !req.headers.cookie) {
+  const expectedSecret = process.env.CRON_SECRET;
+  if (!expectedSecret) {
+    log.error('CRON_SECRET not configured — rejecting cron request');
+    return apiResponse.error(res, 'Cron endpoint misconfigured', 503);
+  }
+  if (cronSecret !== expectedSecret && !req.headers.cookie) {
     return apiResponse.unauthorized(res, 'Invalid cron secret');
   }
 

@@ -71,8 +71,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 // Allow cron secret OR localhost (VLM server) OR session auth
 function authWrapper(req: NextApiRequest, res: NextApiResponse) {
   const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
-  const CRON_SECRET = process.env.CRON_SECRET || '';
-  if (cronSecret === CRON_SECRET && CRON_SECRET) {
+  const expectedSecret = process.env.CRON_SECRET;
+  if (expectedSecret && cronSecret === expectedSecret) {
     return handler(req, res);
   }
 

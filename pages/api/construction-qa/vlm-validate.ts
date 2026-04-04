@@ -14,7 +14,7 @@ import { validateReviewPhotos } from '@/modules/construction-qa/services/vlmCons
 import type { Discipline } from '@/modules/construction-qa/types';
 import { withAuth, withPermission } from '@/lib/auth/middleware';
 
-const CRON_SECRET = process.env.CRON_SECRET || '';
+
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -53,7 +53,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 // Allow cron secret OR session auth
 function authWrapper(req: NextApiRequest, res: NextApiResponse) {
   const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
-  if (cronSecret === CRON_SECRET && CRON_SECRET) {
+  const expectedSecret = process.env.CRON_SECRET;
+  if (expectedSecret && cronSecret === expectedSecret) {
     return handler(req, res);
   }
   return withAuth(withPermission('construction-qa.qa-centre')(handler))(req, res);

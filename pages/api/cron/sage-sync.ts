@@ -29,10 +29,14 @@ export default async function handler(
     return apiResponse.methodNotAllowed(res, ['POST']);
   }
 
-  // Verify cron secret
+  // Verify cron secret (mandatory — fail closed if not configured)
   const cronSecret = req.headers['x-cron-secret'] || req.headers['authorization']?.replace('Bearer ', '');
-
-  if (process.env.CRON_SECRET && cronSecret !== process.env.CRON_SECRET) {
+  const expectedSecret = process.env.CRON_SECRET;
+  if (!expectedSecret) {
+    logger.error('CRON_SECRET not configured — rejecting cron request');
+    return res.status(503).json({ error: 'Cron endpoint misconfigured' });
+  }
+  if (cronSecret !== expectedSecret) {
     logger.warn('Unauthorized cron request attempt');
     return res.status(401).json({ error: 'Unauthorized' });
   }
