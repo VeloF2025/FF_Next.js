@@ -176,6 +176,27 @@ export interface SnagProjectStats {
 }
 
 // ============================================================
+// Zone / PON Grouping
+// ============================================================
+
+/** A group of snags sharing the same PON number within a zone */
+export interface PonGroup {
+  ponNo: number | null;
+  snags: Snag[];
+}
+
+/** A group of PON groups sharing the same zone number */
+export interface ZonePonGroup {
+  zoneNo: number | null;
+  /** Display label — "Zone 29" or "Unassigned" */
+  label: string;
+  pons: PonGroup[];
+  totalSnags: number;
+  openCount: number;
+  fixedCount: number;
+}
+
+// ============================================================
 // Pole Resolution
 // ============================================================
 

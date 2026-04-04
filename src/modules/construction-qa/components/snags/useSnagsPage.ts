@@ -4,7 +4,7 @@
  * Extracted to keep SnagsPage.tsx under 200 lines.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   fetchSnagStats,
   fetchSnags,
@@ -17,9 +17,11 @@ import type {
   SnagPhoto,
   SnagFilters,
   SnagSortBy,
-  SnagReport,
   Snag,
 } from '../../types/snag.types';
+import { groupByZonePon } from './snagGroupUtils';
+
+export type ViewMode = 'report' | 'pon';
 
 export interface ReportGroup {
   report: {
@@ -98,6 +100,7 @@ export function useSnagsPage() {
   const [photosBySnag, setPhotosBySnag] = useState<Record<string, SnagPhoto[]>>({});
   const [filters, setFilters] = useState<SnagFilters>(DEFAULT_FILTERS);
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>('report');
 
   // -------------------------------------------------------
   // Stats + Projects
@@ -250,6 +253,20 @@ export function useSnagsPage() {
     log.info('Import complete', { reportId });
   }, [loadStats, selectedProjectId, loadSnags, filters]);
 
+  // -------------------------------------------------------
+  // PON view — computed from the already-loaded flat snag list
+  // -------------------------------------------------------
+
+  const allSnags = useMemo(
+    () => snagGroups.flatMap((g) => g.snags),
+    [snagGroups]
+  );
+
+  const zonePonGroups = useMemo(
+    () => groupByZonePon(allSnags),
+    [allSnags]
+  );
+
   return {
     stats,
     statsLoading,
@@ -257,9 +274,12 @@ export function useSnagsPage() {
     selectedProjectId,
     selectedProjectName,
     snagGroups,
+    zonePonGroups,
     snagLoading,
     photosBySnag,
     filters,
+    viewMode,
+    setViewMode,
     selectProject,
     handleBack,
     handleFilterChange,
