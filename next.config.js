@@ -13,7 +13,7 @@ const BUILD_TIMESTAMP = new Date().toISOString();
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: false,
+  reactStrictMode: true,
 
   // Build-time version info — available in server-side code via process.env
   env: {
@@ -74,6 +74,8 @@ const nextConfig = {
       '@heroicons/react',
       '@mui/material',
       '@mui/icons-material',
+      'recharts',
+      'reactflow',
     ],
   },
 
