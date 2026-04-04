@@ -3,8 +3,9 @@ import fs from 'fs';
 import path from 'path';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth/middleware';
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+export default withAuth(function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const manualPath = path.join(process.cwd(), 'docs/user-manuals/source/fibreflow-complete.md');
     const content = fs.readFileSync(manualPath, 'utf-8');
@@ -14,4 +15,4 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     log.error('help-center-manual GET', { error: error instanceof Error ? error.message : String(error) });
     apiResponse.internalError(res, new Error('Failed to load manual'));
   }
-}
+});

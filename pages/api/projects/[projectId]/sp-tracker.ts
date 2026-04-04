@@ -9,10 +9,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth/middleware';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
-export default async function handler(
+export default withAuth(async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
@@ -60,4 +61,4 @@ export default async function handler(
     log.error('Failed to fetch SP tracker data', { err, projectId }, 'api/projects/sp-tracker');
     return apiResponse.internalError(res, 'Failed to fetch tracker data');
   }
-}
+});
