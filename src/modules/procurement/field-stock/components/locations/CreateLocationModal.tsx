@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Loader2, MapPin } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
 import type { CreateLocationInput, LocationType } from '../../types';
 
 interface CreateLocationModalProps {
@@ -96,9 +97,9 @@ export function CreateLocationModal({ isOpen, onClose, onCreated }: CreateLocati
             <MapPin className="h-5 w-5 text-blue-400" />
             <h2 className="text-base font-semibold text-[var(--ff-text-primary)]">Add Location</h2>
           </div>
-          <button type="button" onClick={onClose} className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]">
+          <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close">
             <X className="h-5 w-5" />
-          </button>
+          </Button>
         </div>
 
         {error && (
@@ -190,21 +191,20 @@ export function CreateLocationModal({ isOpen, onClose, onCreated }: CreateLocati
           )}
 
           <div className="flex justify-end gap-3 pt-1">
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={onClose}
-              className="px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={!name.trim() || !code.trim() || isSubmitting}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
             >
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
               Add Location
-            </button>
+            </Button>
           </div>
         </form>
       </div>

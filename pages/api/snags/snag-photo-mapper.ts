@@ -122,12 +122,18 @@ export async function createSnagsPerPhoto(
           }
         }
       } else {
+        // Normalize ref: PH258B → P.H258B, P.H 417 → P.H417
+        let normalizedRef = poleRef.replace(/\s/g, ''); // remove spaces
+        if (/^P[A-Z]\d/.test(normalizedRef)) {
+          normalizedRef = normalizedRef.replace(/^P([A-Z])/, 'P.$1'); // PH → P.H
+        }
+
         // Match P.H890 → ETW.P.H890 in poles table
         const poleRows = await sql`
           SELECT id, pole_number, zone_no, pon_no, latitude, longitude
           FROM poles
           WHERE project_id = ${projectId}
-            AND pole_number ILIKE '%' || ${poleRef}
+            AND pole_number ILIKE '%' || ${normalizedRef}
           LIMIT 1
         ` as Array<{ id: string; pole_number: string; zone_no: number | null; pon_no: number | null; latitude: string | null; longitude: string | null }>;
 

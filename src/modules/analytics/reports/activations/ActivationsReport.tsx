@@ -13,6 +13,7 @@ import {
   Tooltip, ResponsiveContainer, LabelList,
 } from '@/components/ui/DynamicChart';
 import { ChevronDown, ChevronRight, Loader2, AlertCircle, ChevronLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { ReportTabLayout } from '../ReportTabLayout';
 import { useActivationsData } from './useActivationsData';
 import type { ActivationYear, ActivationMonth, ActivationWeek } from './useActivationsData';
@@ -46,21 +47,23 @@ function ProjectLegend({ projects, colors, selected, onToggle }: ProjectLegendPr
       {projects.map((proj, idx) => {
         const isActive = !anySelected || selected.has(proj);
         return (
-          <button
+          <Button
             key={proj}
+            variant="ghost"
+            size="sm"
             onClick={() => onToggle(proj)}
             className="flex items-center gap-1.5 text-xs transition-opacity"
             style={{ opacity: isActive ? 1 : 0.3 }}
           >
             <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: colors[idx % colors.length] }} />
             <span className={`${selected.has(proj) ? 'font-bold text-white' : 'text-gray-400'}`}>{proj}</span>
-          </button>
+          </Button>
         );
       })}
       {anySelected && (
-        <button onClick={() => onToggle('__clear__')} className="text-xs text-blue-400 hover:text-blue-300 underline ml-1">
+        <Button variant="link" size="sm" onClick={() => onToggle('__clear__')} className="ml-1">
           Clear filter
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -383,22 +386,26 @@ function ActivationsChart({ years, allProjects }: { years: ActivationYear[]; all
     <div className="space-y-3">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm">
-        <button
-          className={`font-medium transition-colors ${drillMonth ? 'text-blue-400 hover:text-blue-300 underline cursor-pointer' : 'text-white'}`}
+        <Button
+          variant={drillMonth ? 'link' : 'ghost'}
+          size="sm"
+          className="font-medium"
           onClick={() => drillMonth && setDrillMonth(null)}
         >
           All Months
-        </button>
+        </Button>
         {drillMonth && drilledMonth && (
           <>
             <span className="text-gray-500">›</span>
             <span className="text-white font-medium">{drilledMonth.monthLabel}</span>
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setDrillMonth(null)}
-              className="ml-2 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-200 border border-gray-600 rounded px-2 py-0.5"
+              className="ml-2"
             >
               <ChevronLeft className="w-3 h-3" /> Back
-            </button>
+            </Button>
           </>
         )}
       </div>

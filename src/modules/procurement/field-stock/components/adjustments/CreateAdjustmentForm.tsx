@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import { X, Loader2, Plus, Minus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useLocations, useStockItems } from '../../hooks';
 import type { AdjustmentReason } from '@/types/procurement/stockTake.types';
 import { notificationService } from '@/services/core/NotificationService';
@@ -110,9 +111,9 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
       <div className="relative bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl w-full max-w-lg p-6 border border-[var(--ff-border-light)] max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">New Stock Adjustment</h2>
-          <button onClick={onClose} className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]">
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
             <X className="h-5 w-5" />
-          </button>
+          </Button>
         </div>
 
         <div className="space-y-4">
@@ -256,20 +257,16 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
         </div>
 
         <div className="flex justify-end gap-3 mt-6">
-          <button
+          <Button
+            variant="ghost"
             onClick={onClose}
-            className="px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleSubmit}
             disabled={submitting}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-colors disabled:opacity-50 ${
-              formData.adjustment_type === 'decrease'
-                ? 'bg-red-600 hover:bg-red-700'
-                : 'bg-green-600 hover:bg-green-700'
-            }`}
+            variant={formData.adjustment_type === 'decrease' ? 'danger' : 'primary'}
           >
             {submitting ? (
               <>

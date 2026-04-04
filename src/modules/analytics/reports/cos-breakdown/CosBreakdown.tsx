@@ -8,6 +8,7 @@
 
 import { useState } from 'react';
 import { Loader2, AlertCircle, ChevronRight, ChevronDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { ReportTabLayout } from '../ReportTabLayout';
 import { useCosBreakdownData } from './useCosBreakdownData';
 import type { CosBreakdownCategory } from './useCosBreakdownData';
@@ -55,10 +56,9 @@ const FilterBar = ({
       </select>
     </div>
     {(selectedBU || selectedProj) && (
-      <button onClick={() => { onBU(''); onProj(''); }}
-        className="text-xs text-blue-400 hover:text-blue-300 px-2 py-1 rounded border border-gray-600">
+      <Button variant="ghost" size="sm" onClick={() => { onBU(''); onProj(''); }}>
         Clear filters
-      </button>
+      </Button>
     )}
   </div>
 );
@@ -95,10 +95,10 @@ const PivotTable = ({
                 <tr key={cat.category} className={ci % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'}>
                   <td className="px-3 py-2 sticky left-0 bg-inherit">
                     {cat.rows.length > 1 ? (
-                      <button onClick={() => toggle(cat.category)} className="flex items-center gap-1 text-white font-semibold hover:text-blue-400">
+                      <Button variant="ghost" size="sm" onClick={() => toggle(cat.category)} className="flex items-center gap-1 font-semibold">
                         {isExp ? <ChevronDown className="w-4 h-4 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 flex-shrink-0" />}
                         {cat.category}
-                      </button>
+                      </Button>
                     ) : (
                       <span className="text-white font-semibold pl-5">{cat.category}</span>
                     )}

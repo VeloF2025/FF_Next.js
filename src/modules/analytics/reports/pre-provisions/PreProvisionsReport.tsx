@@ -12,6 +12,7 @@ import {
   Legend, ResponsiveContainer, LabelList,
 } from '@/components/ui/DynamicChart';
 import { ChevronRight, ChevronDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { ReportTabLayout } from '../ReportTabLayout';
 import { usePreProvisionsData } from './usePreProvisionsData';
 import type { PreProvisionYear, PreProvisionMonth } from './usePreProvisionsData';
@@ -60,10 +61,10 @@ const PreProvisionsTable = ({
               <>
                 <tr key={year.year} className={yi % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'}>
                   <td className="px-3 py-2">
-                    <button onClick={() => toggleYear(year.year)} className="flex items-center gap-1 text-white font-semibold hover:text-blue-400">
+                    <Button variant="ghost" size="sm" onClick={() => toggleYear(year.year)} className="flex items-center gap-1 font-semibold">
                       {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                       {year.year}
-                    </button>
+                    </Button>
                   </td>
                   {allProjects.map(p => (
                     <td key={p} className="px-2 py-2 text-right text-gray-300">{getPC(year.byProject, p, 'logged') || '—'}</td>
@@ -189,10 +190,10 @@ const ByProjectTable = ({
               <>
                 <tr key={year.year} className={yi % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'}>
                   <td className="px-3 py-2 sticky left-0 bg-inherit">
-                    <button onClick={() => toggleYear(year.year)} className="flex items-center gap-1 text-white font-semibold hover:text-blue-400">
+                    <Button variant="ghost" size="sm" onClick={() => toggleYear(year.year)} className="flex items-center gap-1 font-semibold">
                       {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                       {year.year}
-                    </button>
+                    </Button>
                   </td>
                   {allProjects.map(p => (
                     <>

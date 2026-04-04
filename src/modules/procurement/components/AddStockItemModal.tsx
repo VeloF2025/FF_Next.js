@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { X, Loader2, PackagePlus } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { log } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
 
 const UOM_OPTIONS = [
   { value: 'units', label: 'Units' },
@@ -86,9 +87,9 @@ export function AddStockItemModal({ initialName, onClose, onCreated }: AddStockI
             <PackagePlus className="h-5 w-5 text-purple-400" />
             <h2 className="text-base font-semibold text-[var(--ff-text-primary)]">Add to Stock Catalog</h2>
           </div>
-          <button type="button" onClick={onClose} className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]">
+          <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close">
             <X className="h-5 w-5" />
-          </button>
+          </Button>
         </div>
 
         <p className="text-sm text-[var(--ff-text-secondary)] mb-4">
@@ -151,17 +152,16 @@ export function AddStockItemModal({ initialName, onClose, onCreated }: AddStockI
           </div>
 
           <div className="flex justify-end gap-3 pt-1">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors">
+            <Button type="button" variant="ghost" onClick={onClose}>
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={!name.trim() || isSubmitting}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
             >
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <PackagePlus className="h-4 w-4" />}
               Add to Catalog
-            </button>
+            </Button>
           </div>
         </form>
       </div>

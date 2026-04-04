@@ -7,6 +7,7 @@
 
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Trash2, Loader2, BookMarked } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { ConduitBaseline } from '../types';
 import type { ConduitProjectInputs } from '../types';
 import { calcConduit } from '../hooks/useConduitCalc';
@@ -71,9 +72,9 @@ function BaselineCard({ baseline, onDelete }: {
       {/* Header row */}
       <div className="flex items-center gap-3 px-4 py-3">
         {/* Expand toggle */}
-        <button onClick={() => setExpanded(v => !v)} className="text-gray-500 hover:text-white transition-colors">
+        <Button variant="ghost" size="icon" onClick={() => setExpanded(v => !v)}>
           {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-        </button>
+        </Button>
 
         {/* Project + label */}
         <div className="flex-1 min-w-0">
@@ -111,17 +112,15 @@ function BaselineCard({ baseline, onDelete }: {
           {confirmDelete ? (
             <>
               <span className="text-xs text-red-400">Sure?</span>
-              <button onClick={handleDelete} disabled={deleting}
-                className="px-2 py-1 rounded text-xs bg-red-700 hover:bg-red-600 text-white disabled:opacity-40 transition-colors">
+              <Button variant="danger" size="sm" onClick={handleDelete} disabled={deleting}>
                 {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Yes'}
-              </button>
-              <button onClick={() => setConfirmDelete(false)} className="px-2 py-1 text-xs text-gray-500 hover:text-white transition-colors">No</button>
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>No</Button>
             </>
           ) : (
-            <button onClick={() => setConfirmDelete(true)} title="Delete baseline"
-              className="p-1 text-gray-600 hover:text-red-400 hover:bg-red-900/20 rounded transition-colors">
+            <Button variant="ghost" size="icon" onClick={() => setConfirmDelete(true)} aria-label="Delete baseline">
               <Trash2 className="w-3.5 h-3.5" />
-            </button>
+            </Button>
           )}
         </div>
       </div>

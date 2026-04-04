@@ -1,6 +1,7 @@
 // import React from 'react'; // Not used in this component
 import Link from 'next/link';
 import { Plus, Upload, FileText, Search, Filter } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { ProcurementErrorBoundary } from '../../components/error/ProcurementErrorBoundary';
 
 /**
@@ -137,10 +138,10 @@ export function BOQDashboard({ projectId: _projectId, searchTerm: _searchTerm, o
                     className="pl-10 pr-4 py-2 border border-[var(--ff-border-light)] rounded-md focus:ring-blue-500 focus:border-blue-500 bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
                   />
                 </div>
-                <button className="inline-flex items-center px-3 py-2 border border-[var(--ff-border-light)] rounded-md text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-hover)]">
+                <Button variant="secondary" size="sm">
                   <Filter className="h-4 w-4 mr-2" />
                   Filter
-                </button>
+                </Button>
               </div>
             </div>
           </div>

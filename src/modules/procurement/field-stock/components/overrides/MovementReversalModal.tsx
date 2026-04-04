@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { AlertTriangle, RotateCcw, Loader2, X } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
 
 interface MovementSummary {
   id: string;
@@ -72,9 +73,9 @@ export function MovementReversalModal({ movement, onClose, onSuccess }: Movement
               Reverse Movement
             </h2>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
             <X className="h-5 w-5" />
-          </button>
+          </Button>
         </div>
 
         <div className="px-6 py-4 space-y-4">
@@ -139,21 +140,21 @@ export function MovementReversalModal({ movement, onClose, onSuccess }: Movement
 
         {/* Footer */}
         <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-gray-700">
-          <button
+          <Button
+            variant="secondary"
             onClick={onClose}
             disabled={loading}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="danger"
             onClick={handleReverse}
             disabled={!canSubmit}
-            className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
             Confirm Reversal
-          </button>
+          </Button>
         </div>
       </div>
     </div>
