@@ -3,6 +3,15 @@
  * Daily Audit Runner
  * Main orchestrator for the FibreFlow audit framework
  *
+ * Loads .env.local for DATABASE_URL and other env vars
+ */
+
+// Load environment from .env.local before anything else
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
+
+/*
  * Usage:
  *   tsx scripts/daily-audit/runner.ts              # Full audit
  *   tsx scripts/daily-audit/runner.ts --quick      # P0 only
@@ -17,6 +26,9 @@ import {
   runExternalServicesSuite,
   runNavigationSuite,
   runCrossModuleSuite,
+  runDataIntegritySuite,
+  runSecuritySuite,
+  runPerformanceSuite,
   type SuiteName,
 } from './suites';
 import {
@@ -83,11 +95,14 @@ Options:
   --help, -h            Show this help message
 
 Available suites:
-  api-health            API endpoint health checks
   database-health       Database connectivity and health
   external-services     External service integrations
+  data-integrity        Orphan detection, business rules, data freshness
+  api-health            API endpoint health checks
   navigation            Navigation and route health
   cross-module          Cross-module integration tests
+  security              Static analysis, RBAC enforcement, code quality
+  performance           Response baselines, DB benchmarks, resource health
 
 Examples:
   tsx scripts/daily-audit/runner.ts              # Full audit
@@ -106,6 +121,9 @@ function getSuiteRunner(name: SuiteName): ((options: { quick?: boolean }) => Pro
     'external-services': runExternalServicesSuite,
     'navigation': runNavigationSuite,
     'cross-module': runCrossModuleSuite,
+    'data-integrity': runDataIntegritySuite,
+    'security': runSecuritySuite,
+    'performance': runPerformanceSuite,
   };
 
   return runners[name] || null;
@@ -117,13 +135,16 @@ function getSuiteRunner(name: SuiteName): ((options: { quick?: boolean }) => Pro
 async function runAllSuites(options: RunnerOptions): Promise<SuiteResult[]> {
   const results: SuiteResult[] = [];
 
-  // Define suite execution order
+  // Define suite execution order (layers 1-6)
   const suiteOrder: SuiteName[] = [
-    'database-health',     // Run first - other suites may depend on DB
-    'external-services',   // Check external dependencies early
-    'api-health',          // API endpoints
-    'navigation',          // Navigation routes
-    'cross-module',        // Integration tests last
+    'database-health',     // L1: Infrastructure - DB (run first, others depend on it)
+    'external-services',   // L1: Infrastructure - services
+    'data-integrity',      // L2: Data integrity, orphans, business rules
+    'api-health',          // L3: Functional - API endpoints
+    'navigation',          // L4: UI/UX - route health
+    'cross-module',        // L3: Functional - integration workflows
+    'security',            // L5: Security analysis
+    'performance',         // L6: Performance baselines (run last)
   ];
 
   // Filter suites for quick mode

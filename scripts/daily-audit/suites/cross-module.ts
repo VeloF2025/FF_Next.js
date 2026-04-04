@@ -145,7 +145,7 @@ async function testQaToWhatsApp(): Promise<TestResult> {
 
   try {
     // Check if WhatsApp sender service is reachable
-    const result = await httpClient.healthCheck(`${config.services.waSender.url}${config.services.waSender.healthPath}`);
+    const result = await httpClient.healthCheck(`${config.services.waBridge.url}${config.services.waBridge.healthPath}`);
     const duration = result.responseTime;
 
     if (result.success) {

@@ -7,6 +7,9 @@ export { runDatabaseHealthSuite } from './database-health';
 export { runExternalServicesSuite } from './external-services';
 export { runNavigationSuite } from './navigation';
 export { runCrossModuleSuite } from './cross-module';
+export { runDataIntegritySuite } from './data-integrity';
+export { runSecuritySuite } from './security';
+export { runPerformanceSuite } from './performance';
 
 // Suite registry for dynamic loading
 export const suiteRegistry = {
@@ -15,6 +18,9 @@ export const suiteRegistry = {
   'external-services': () => import('./external-services').then((m) => m.runExternalServicesSuite),
   'navigation': () => import('./navigation').then((m) => m.runNavigationSuite),
   'cross-module': () => import('./cross-module').then((m) => m.runCrossModuleSuite),
+  'data-integrity': () => import('./data-integrity').then((m) => m.runDataIntegritySuite),
+  'security': () => import('./security').then((m) => m.runSecuritySuite),
+  'performance': () => import('./performance').then((m) => m.runPerformanceSuite),
 } as const;
 
 export type SuiteName = keyof typeof suiteRegistry;

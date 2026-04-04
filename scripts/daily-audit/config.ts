@@ -152,16 +152,18 @@ export const config: AuditConfig = {
 
   priorities: {
     P0: [
-      'api-health',
       'database-health',
       'external-services',
+      'data-integrity',
+      'api-health',
     ],
     P1: [
       'navigation',
       'cross-module',
+      'security',
     ],
     P2: [
-      'button-actions',
+      'performance',
     ],
   },
 
@@ -224,6 +226,7 @@ export const excludedApiPatterns = [
   '/api/internal/',       // Internal-only endpoints
   '/_next/',              // Next.js internal
   '/api/cron/',           // Cron jobs
+  '/api/__tests__/',      // Test files accidentally in pages/api/
 ];
 
 // Modules for cross-module testing

@@ -71,6 +71,7 @@ class HttpClient {
     let lastError: Error | null = null;
     let attempt = 0;
 
+
     while (attempt <= this.retryConfig.maxRetries) {
       try {
         const response = await this.client.request<T>(config);
@@ -102,18 +103,16 @@ class HttpClient {
         lastError = error as Error;
         const axiosError = error as AxiosError;
 
-        // Network errors or timeouts
-        if (axiosError.code === 'ECONNABORTED' || axiosError.code === 'ETIMEDOUT') {
-          auditLogger.warn(`Request timeout to ${config.url}`, { attempt: attempt + 1 });
-        } else if (axiosError.code === 'ECONNREFUSED') {
-          auditLogger.warn(`Connection refused to ${config.url}`, { attempt: attempt + 1 });
+        // Final attempt — log and break out
+        if (attempt >= this.retryConfig.maxRetries) {
+          const errCode = axiosError.code || 'UNKNOWN';
+          auditLogger.warn(`${errCode}: ${config.url} (after ${attempt + 1} attempts)`);
+          break;
         }
 
-        if (attempt < this.retryConfig.maxRetries) {
-          attempt++;
-          await this.sleep(this.retryConfig.retryDelay * attempt);
-          continue;
-        }
+        // Retry with backoff
+        attempt++;
+        await this.sleep(this.retryConfig.retryDelay * attempt);
       }
     }
 
