@@ -11,6 +11,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
 import type { PonProgressResponse, ProgressCategory } from '@/types/pon-stages.types';
 import { ProgressSummaryCards } from './ProgressSummaryCards';
 import { DailyLogPanel } from './DailyLogPanel';
@@ -76,9 +77,9 @@ export function PonProgressTracker({ projectId }: PonProgressTrackerProps) {
     return (
       <div className="bg-[var(--ff-card-bg)] rounded-lg border border-red-500/30 p-6">
         <p className="text-red-400">{error}</p>
-        <button type="button" onClick={fetchData} className="mt-3 px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+        <Button type="button" variant="primary" size="sm" onClick={fetchData} className="mt-3">
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -98,12 +99,12 @@ export function PonProgressTracker({ projectId }: PonProgressTrackerProps) {
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">PON Progress</h3>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={expandAll} className="px-3 py-1.5 text-xs bg-[var(--ff-bg-secondary)] text-[var(--ff-text-secondary)] rounded hover:bg-[var(--ff-bg-tertiary)]">
+          <Button type="button" variant="ghost" size="sm" onClick={expandAll}>
             Expand All
-          </button>
-          <button type="button" onClick={collapseAll} className="px-3 py-1.5 text-xs bg-[var(--ff-bg-secondary)] text-[var(--ff-text-secondary)] rounded hover:bg-[var(--ff-bg-tertiary)]">
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={collapseAll}>
             Collapse All
-          </button>
+          </Button>
         </div>
       </div>
 

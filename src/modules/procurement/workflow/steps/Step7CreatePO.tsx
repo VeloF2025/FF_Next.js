@@ -8,6 +8,7 @@ import { useRouter } from 'next/router';
 import {
   ShoppingCart, CheckCircle, ExternalLink, ArrowLeft, ArrowRight, Loader2, AlertCircle,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { log } from '@/lib/logger';
 import type { WorkflowState } from '../useWorkflowState';
 import { ProcurementDocumentPanel } from '@/modules/procurement/documents/components/ProcurementDocumentPanel';
@@ -89,12 +90,13 @@ export const Step7CreatePO: React.FC<Step7Props> = ({ state, onComplete, onBack 
           <CheckCircle style={{ width: 40, height: 40, color: '#16a34a', margin: '0 auto 12px' }} />
           <p style={{ fontWeight: 600, fontSize: 16, color: 'var(--ff-text-primary)', marginBottom: 4 }}>Purchase Order Created</p>
           <p style={{ color: 'var(--ff-text-secondary)', marginBottom: 16 }}>{createdPoNumber}</p>
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => router.push(`/procurement/purchase-orders/${createdPoId}`)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: 'rgba(37,99,235,0.08)', border: '1px solid #2563eb', borderRadius: 8, cursor: 'pointer', color: '#2563eb', fontWeight: 500 }}
           >
             <ExternalLink style={{ width: 14, height: 14 }} /> View Purchase Order
-          </button>
+          </Button>
         </div>
 
         {createdPoId && (
@@ -111,9 +113,9 @@ export const Step7CreatePO: React.FC<Step7Props> = ({ state, onComplete, onBack 
         )}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button onClick={handleNext} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+          <Button variant="primary" onClick={handleNext} style={{ background: '#16a34a' }}>
             Next: Track Delivery <ArrowRight style={{ width: 16, height: 16 }} />
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -173,20 +175,20 @@ export const Step7CreatePO: React.FC<Step7Props> = ({ state, onComplete, onBack 
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', border: '1px solid var(--ff-border-light)', borderRadius: 8, cursor: 'pointer', background: 'transparent', color: 'var(--ff-text-secondary)' }}>
+        <Button variant="secondary" onClick={onBack}>
           <ArrowLeft style={{ width: 16, height: 16 }} /> Back
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => void handleCreatePO()}
           disabled={!canSubmit}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: canSubmit ? '#2563eb' : 'var(--ff-bg-tertiary)', color: canSubmit ? '#fff' : 'var(--ff-text-tertiary)', border: 'none', borderRadius: 8, cursor: canSubmit ? 'pointer' : 'not-allowed', fontWeight: 600 }}
+          style={{ background: canSubmit ? '#2563eb' : undefined }}
         >
           {phase === 'submitting' ? (
             <><Loader2 style={{ width: 16, height: 16, animation: 'spin 1s linear infinite' }} /> Creating…</>
           ) : (
             <><ShoppingCart style={{ width: 16, height: 16 }} /> Create Purchase Order</>
           )}
-        </button>
+        </Button>
       </div>
     </div>
   );

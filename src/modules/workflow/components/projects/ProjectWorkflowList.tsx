@@ -1,5 +1,6 @@
 // 🟢 WORKING: ProjectWorkflowList component - displays and manages active project workflows
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import {
   Play,
   Pause,
@@ -102,12 +103,9 @@ export function ProjectWorkflowList({
           Start managing your project workflows by assigning templates to projects. 
           Track progress, manage teams, and monitor execution.
         </p>
-        <button
-          onClick={() => onAssignWorkflow('')}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
-        >
+        <Button variant="primary" onClick={() => onAssignWorkflow('')}>
           Assign First Workflow
-        </button>
+        </Button>
       </div>
     );
   }
@@ -246,31 +244,37 @@ export function ProjectWorkflowList({
 
                     {/* Actions Menu */}
                     <div className="flex items-center space-x-2 ml-4">
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleActionClick('view', workflow.id)}
-                        className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-accent transition-colors"
                         title="View Details"
+                        aria-label="View details"
                       >
                         <Eye className="w-4 h-4" />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleActionClick('edit', workflow.id)}
-                        className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-accent transition-colors"
                         title="Edit Workflow"
+                        aria-label="Edit workflow"
                       >
                         <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleActionClick('timeline', workflow.id)}
-                        className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-accent transition-colors"
                         title="Toggle Timeline"
+                        aria-label="Toggle timeline"
                       >
                         <Calendar className="w-4 h-4" />
-                      </button>
+                      </Button>
                       <div className="relative">
-                        <button className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-accent transition-colors">
+                        <Button variant="ghost" size="icon" aria-label="More actions">
                           <MoreVertical className="w-4 h-4" />
-                        </button>
+                        </Button>
                         {/* TODO: Add dropdown menu for more actions */}
                       </div>
                     </div>

@@ -13,6 +13,7 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { log } from '@/lib/logger';
 import type { WorkflowState } from '../useWorkflowState';
 import { ProcurementDocumentPanel } from '@/modules/procurement/documents/components/ProcurementDocumentPanel';
@@ -233,20 +234,20 @@ export const Step7PaymentRequest: React.FC<Step7PaymentRequestProps> = ({ state,
 
       {/* Navigation */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button onClick={onBack} style={backBtnStyle}>
+        <Button variant="secondary" onClick={onBack}>
           <ArrowLeft style={{ width: 16, height: 16 }} /> Back
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => void handleSubmit()}
           disabled={submitting}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: submitting ? 'var(--ff-bg-tertiary)' : '#059669', color: submitting ? 'var(--ff-text-tertiary)' : '#fff', border: 'none', borderRadius: 8, cursor: submitting ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: 14 }}
+          style={{ background: submitting ? undefined : '#059669' }}
         >
           {submitting ? (
             <><Loader2 style={{ width: 16, height: 16, animation: 'spin 1s linear infinite' }} /> Submitting…</>
           ) : (
             <>Submit Payment Request <ArrowRight style={{ width: 16, height: 16 }} /></>
           )}
-        </button>
+        </Button>
       </div>
     </div>
   );

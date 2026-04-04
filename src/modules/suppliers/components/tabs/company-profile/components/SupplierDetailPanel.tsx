@@ -3,6 +3,7 @@
 
 import React from 'react';
 import { Building2, Mail, Phone, Globe, MapPin, Star, CheckCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { ExtendedSupplier } from '../types/company-profile.types';
 import { getStatusConfig } from '../data/statusConfig';
 
@@ -150,15 +151,9 @@ export const SupplierDetailPanel: React.FC<SupplierDetailPanelProps> = ({ suppli
 
       {/* Actions */}
       <div className="bg-background px-6 py-4 flex space-x-3">
-        <button className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-          Select Supplier
-        </button>
-        <button className="px-4 py-2 border border-border text-muted-foreground rounded-lg hover:bg-background transition-colors">
-          Edit Profile
-        </button>
-        <button className="px-4 py-2 border border-border text-muted-foreground rounded-lg hover:bg-background transition-colors">
-          Send Message
-        </button>
+        <Button className="flex-1">Select Supplier</Button>
+        <Button variant="secondary">Edit Profile</Button>
+        <Button variant="secondary">Send Message</Button>
       </div>
     </div>
   );

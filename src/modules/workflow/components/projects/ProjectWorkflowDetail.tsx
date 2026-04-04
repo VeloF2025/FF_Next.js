@@ -1,5 +1,6 @@
 // 🟢 WORKING: ProjectWorkflowDetail component - detailed view of individual project workflow
 import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
 import {
   ArrowLeft,
   Calendar,
@@ -185,12 +186,9 @@ export function ProjectWorkflowDetail({
         <p className="text-muted-foreground mb-4">
           The requested workflow could not be loaded.
         </p>
-        <button
-          onClick={onBack}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
-        >
+        <Button variant="primary" onClick={onBack}>
           Go Back
-        </button>
+        </Button>
       </div>
     );
   }
@@ -231,12 +229,9 @@ export function ProjectWorkflowDetail({
       <div className="bg-background border-b border-gray-200 dark:border-gray-800 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <button
-              onClick={onBack}
-              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-accent transition-colors"
-            >
+            <Button variant="ghost" size="icon" onClick={onBack} aria-label="Go back">
               <ArrowLeft className="w-5 h-5" />
-            </button>
+            </Button>
             
             <div>
               <div className="flex items-center space-x-3">
@@ -257,38 +252,41 @@ export function ProjectWorkflowDetail({
           <div className="flex items-center space-x-3">
             {/* Quick Actions */}
             {workflow.status === 'active' && (
-              <button
+              <Button
+                variant="secondary"
                 onClick={() => handleStatusAction('pause')}
-                className="flex items-center space-x-2 px-3 py-2 text-yellow-700 bg-yellow-100 hover:bg-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:hover:bg-yellow-800/30 rounded-lg transition-colors"
+                className="flex items-center space-x-2"
               >
                 <Pause className="w-4 h-4" />
                 <span>Pause</span>
-              </button>
+              </Button>
             )}
-            
+
             {workflow.status === 'paused' && (
-              <button
+              <Button
+                variant="primary"
                 onClick={() => handleStatusAction('play')}
-                className="flex items-center space-x-2 px-3 py-2 text-green-700 bg-green-100 hover:bg-green-200 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-800/30 rounded-lg transition-colors"
+                className="flex items-center space-x-2"
               >
                 <Play className="w-4 h-4" />
                 <span>Resume</span>
-              </button>
+              </Button>
             )}
-            
+
             {onEdit && (
-              <button
+              <Button
+                variant="secondary"
                 onClick={() => onEdit(workflow.id)}
-                className="flex items-center space-x-2 px-3 py-2 text-muted-foreground bg-secondary hover:bg-secondary dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="flex items-center space-x-2"
               >
                 <Edit2 className="w-4 h-4" />
                 <span>Edit</span>
-              </button>
+              </Button>
             )}
-            
-            <button className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-accent transition-colors">
+
+            <Button variant="ghost" size="icon" aria-label="Settings">
               <Settings className="w-5 h-5" />
-            </button>
+            </Button>
           </div>
         </div>
         

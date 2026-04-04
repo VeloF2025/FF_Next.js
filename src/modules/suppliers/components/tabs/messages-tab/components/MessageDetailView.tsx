@@ -13,6 +13,7 @@ import {
   Send
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import type { MessageThread } from '../types/messages.types';
 import { priorityConfig } from '../data/priorityConfig';
 import { categoryConfig } from '../data/categoryConfig';
@@ -52,15 +53,9 @@ export const MessageDetailView: React.FC<MessageDetailViewProps> = ({ thread }) 
           </div>
 
           <div className="flex items-center space-x-2">
-            <button className="p-2 text-gray-400 hover:text-muted-foreground rounded-md hover:bg-secondary">
-              <Star className="w-4 h-4" />
-            </button>
-            <button className="p-2 text-gray-400 hover:text-muted-foreground rounded-md hover:bg-secondary">
-              <Archive className="w-4 h-4" />
-            </button>
-            <button className="p-2 text-gray-400 hover:text-muted-foreground rounded-md hover:bg-secondary">
-              <MoreVertical className="w-4 h-4" />
-            </button>
+            <Button variant="ghost" size="icon" aria-label="Star"><Star className="w-4 h-4" /></Button>
+            <Button variant="ghost" size="icon" aria-label="Archive"><Archive className="w-4 h-4" /></Button>
+            <Button variant="ghost" size="icon" aria-label="More options"><MoreVertical className="w-4 h-4" /></Button>
           </div>
         </div>
       </div>
@@ -89,7 +84,7 @@ export const MessageDetailView: React.FC<MessageDetailViewProps> = ({ thread }) 
                   <div className="flex items-center space-x-2">
                     <Paperclip className="w-4 h-4 text-gray-400" />
                     <span className="text-sm text-muted-foreground">{thread.lastMessage.attachments} attachment(s)</span>
-                    <button className="text-sm text-blue-600 hover:text-blue-700">Download</button>
+                    <Button variant="ghost" size="sm">Download</Button>
                   </div>
                 </div>
               )}
@@ -128,22 +123,12 @@ export const MessageDetailView: React.FC<MessageDetailViewProps> = ({ thread }) 
 
             <div className="flex items-center justify-between px-3 py-2 bg-background border-t border-border">
               <div className="flex items-center space-x-2">
-                <button className="p-2 text-gray-400 hover:text-muted-foreground rounded-md hover:bg-secondary">
-                  <Paperclip className="w-4 h-4" />
-                </button>
+                <Button variant="ghost" size="icon" aria-label="Attach file"><Paperclip className="w-4 h-4" /></Button>
               </div>
 
               <div className="flex items-center space-x-2">
-                <button className="px-4 py-2 text-muted-foreground hover:text-foreground text-sm">
-                  Save Draft
-                </button>
-                <button
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm flex items-center space-x-2"
-                  disabled={!newMessage.trim()}
-                >
-                  <Send className="w-4 h-4" />
-                  <span>Send</span>
-                </button>
+                <Button variant="ghost" size="sm">Save Draft</Button>
+                <Button disabled={!newMessage.trim()} className="flex items-center space-x-2"><Send className="w-4 h-4" /><span>Send</span></Button>
               </div>
             </div>
           </div>

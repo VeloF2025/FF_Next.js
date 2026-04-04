@@ -1,5 +1,6 @@
 // 🟢 WORKING: Template list component for workflow template management
 import { useState, useEffect, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
 import { 
   Search, 
   Filter, 
@@ -124,16 +125,17 @@ function TemplateCard({
 
           {/* Actions Menu */}
           <div className="relative">
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowMenu(!showMenu);
               }}
-              className="p-1 rounded-full hover:bg-[var(--ff-bg-hover)] transition-colors"
               aria-label="Template actions"
             >
-              <MoreVertical className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
-            </button>
+              <MoreVertical className="w-4 h-4" />
+            </Button>
 
             {showMenu && (
               <>
@@ -142,51 +144,59 @@ function TemplateCard({
                   onClick={() => setShowMenu(false)}
                 />
                 <div className="absolute right-0 top-8 z-20 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-md shadow-lg py-1 w-32">
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
                       onEdit?.(template.id);
                       setShowMenu(false);
                     }}
-                    className="w-full px-3 py-1.5 text-left text-xs text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] flex items-center space-x-2"
+                    className="w-full justify-start text-xs"
                   >
-                    <Edit3 className="w-3 h-3" />
-                    <span>Edit</span>
-                  </button>
-                  <button
+                    <Edit3 className="w-3 h-3 mr-2" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
                       onDuplicate?.(template.id);
                       setShowMenu(false);
                     }}
-                    className="w-full px-3 py-1.5 text-left text-xs text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] flex items-center space-x-2"
+                    className="w-full justify-start text-xs"
                   >
-                    <Copy className="w-3 h-3" />
-                    <span>Duplicate</span>
-                  </button>
-                  <button
+                    <Copy className="w-3 h-3 mr-2" />
+                    Duplicate
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
                       onExport?.(template.id);
                       setShowMenu(false);
                     }}
-                    className="w-full px-3 py-1.5 text-left text-xs text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] flex items-center space-x-2"
+                    className="w-full justify-start text-xs"
                   >
-                    <Download className="w-3 h-3" />
-                    <span>Export</span>
-                  </button>
+                    <Download className="w-3 h-3 mr-2" />
+                    Export
+                  </Button>
                   {!template.isSystem && (
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
                         onDelete?.(template.id);
                         setShowMenu(false);
                       }}
-                      className="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:bg-red-500/20 flex items-center space-x-2"
+                      className="w-full justify-start text-xs text-red-400 hover:bg-red-500/20"
                     >
-                      <Trash2 className="w-3 h-3" />
-                      <span>Delete</span>
-                    </button>
+                      <Trash2 className="w-3 h-3 mr-2" />
+                      Delete
+                    </Button>
                   )}
                 </div>
               </>
@@ -365,14 +375,14 @@ export function TemplateList({
         </div>
 
         <div className="flex items-center space-x-3">
-          <button className="inline-flex items-center px-3 py-2 border border-[var(--ff-border-light)] rounded-md shadow-sm text-sm font-medium text-[var(--ff-text-primary)] bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-hover)] transition-colors">
+          <Button variant="secondary" className="inline-flex items-center">
             <Upload className="w-4 h-4 mr-2" />
             Import
-          </button>
-          <button className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors">
+          </Button>
+          <Button variant="primary" className="inline-flex items-center">
             <Plus className="w-4 h-4 mr-2" />
             New Template
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -427,10 +437,10 @@ export function TemplateList({
               ? 'Try adjusting your search or filters'
               : 'Get started by creating your first workflow template'}
           </p>
-          <button className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors">
+          <Button variant="primary" className="inline-flex items-center">
             <Plus className="w-4 h-4 mr-2" />
             Create Template
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

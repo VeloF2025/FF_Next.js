@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Bell, TrendingUp, FileText, User, Award, Upload, MessageSquare } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { VelocityButton } from '@/components/ui/VelocityButton';
+import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { RFQInvitation, SupplierPortalTab } from './types/portal.types';
 import { QuoteSubmissionModal } from './components/quote-modal';
@@ -136,12 +137,7 @@ const SupplierPortalPage: React.FC<SupplierPortalProps> = () => {
               >
                 {loading ? 'Verifying...' : 'Verify & Login'}
               </VelocityButton>
-              <button
-                onClick={() => setAuthStep('email')}
-                className="w-full text-sm text-blue-600 hover:text-blue-800"
-              >
-                ← Back to email
-              </button>
+              <Button variant="ghost" className="w-full" onClick={() => setAuthStep('email')}>← Back to email</Button>
             </div>
           )}
 
@@ -171,14 +167,14 @@ const SupplierPortalPage: React.FC<SupplierPortalProps> = () => {
               <p className="text-muted-foreground">Welcome, {supplierSession.supplierName}</p>
             </div>
             <div className="flex items-center space-x-4">
-              <button className="relative p-2 text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
                 <Bell className="h-5 w-5" />
                 {stats?.activeRFQs && stats.activeRFQs > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
                     {stats.activeRFQs}
                   </span>
                 )}
-              </button>
+              </Button>
               <div className="flex items-center space-x-2">
                 <User className="h-5 w-5 text-gray-400" />
                 <span className="text-sm text-muted-foreground">{supplierSession.supplierEmail}</span>

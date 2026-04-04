@@ -18,7 +18,7 @@ import {
   AlertTriangle,
   CheckCircle,
 } from 'lucide-react';
-import { Button } from '@/shared/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import type {
   QuoteExtractionResult,
   ExtractedLineItem,
@@ -502,12 +502,8 @@ function EditableField({
               if (e.key === 'Escape') onCancel();
             }}
           />
-          <button onClick={onSave} className="p-1 text-green-500 hover:bg-green-100 rounded">
-            <Check className="h-4 w-4" />
-          </button>
-          <button onClick={onCancel} className="p-1 text-red-500 hover:bg-red-100 rounded">
-            <X className="h-4 w-4" />
-          </button>
+          <Button variant="ghost" size="icon" onClick={onSave} aria-label="Save"><Check className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={onCancel} aria-label="Cancel"><X className="h-4 w-4" /></Button>
         </div>
       ) : (
         <div className="flex items-center gap-1 mt-1 group">
@@ -515,12 +511,7 @@ function EditableField({
             {value || <span className="text-gray-400 italic">Not extracted</span>}
           </p>
           {!readOnly && (
-            <button
-              onClick={() => onEdit(field, value ?? null)}
-              className="p-1 text-gray-400 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <Edit2 className="h-3 w-3" />
-            </button>
+            <Button variant="ghost" size="icon" onClick={() => onEdit(field, value ?? null)} aria-label="Edit" className="opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 className="h-3 w-3" /></Button>
           )}
         </div>
       )}
@@ -573,12 +564,8 @@ function EditableCell({
             if (e.key === 'Escape') onCancel();
           }}
         />
-        <button onClick={onSave} className="p-0.5 text-green-500">
-          <Check className="h-3 w-3" />
-        </button>
-        <button onClick={onCancel} className="p-0.5 text-red-500">
-          <X className="h-3 w-3" />
-        </button>
+        <Button variant="ghost" size="icon" onClick={onSave} aria-label="Save"><Check className="h-3 w-3" /></Button>
+        <Button variant="ghost" size="icon" onClick={onCancel} aria-label="Cancel"><X className="h-3 w-3" /></Button>
       </div>
     );
   }

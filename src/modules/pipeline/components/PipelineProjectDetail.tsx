@@ -45,6 +45,7 @@ import type {
   LeaseStatus,
   CessionStatus,
 } from '../types';
+import { Button } from '@/components/ui/button';
 import { ApprovalDetailDrawer } from './ApprovalDetailDrawer';
 import { ProjectDocumentManager } from './ProjectDocumentManager';
 import { AddApprovalModal } from './AddApprovalModal';
@@ -591,10 +592,11 @@ export function PipelineProjectDetail() {
             {/* Bulk Internal Approve button - shown when approvals are externally approved but internally pending */}
             {pendingInternalCount > 0 && (drawerUserRole === 'admin' || drawerUserRole === 'ops') && (
               <div className="mt-4 flex items-center gap-3">
-                <button
+                <Button
+                  variant="primary"
                   onClick={handleBulkInternalApprove}
                   disabled={bulkApproving}
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center gap-2"
                 >
                   {bulkApproving ? (
                     <>
@@ -607,7 +609,7 @@ export function PipelineProjectDetail() {
                       Approve All Internally ({pendingInternalCount})
                     </>
                   )}
-                </button>
+                </Button>
                 <span className="text-xs text-[var(--ff-text-secondary)]">
                   {pendingInternalCount} approval{pendingInternalCount !== 1 ? 's' : ''} externally approved but pending internal review
                 </span>
@@ -623,13 +625,15 @@ export function PipelineProjectDetail() {
             {approvals.length === 0 ? (
               <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-8 border border-[var(--ff-border-light)] text-center">
                 <p className="text-[var(--ff-text-secondary)]">No approvals configured yet</p>
-                <button
+                <Button
+                  variant="link"
+                  size="sm"
                   onClick={handleAddApproval}
-                  className="mt-4 flex items-center gap-1 mx-auto text-sm text-[var(--ff-accent)] hover:text-[var(--ff-accent-hover)]"
+                  className="mt-4 flex items-center gap-1 mx-auto"
                 >
                   <Plus className="w-4 h-4" />
                   Add Approval
-                </button>
+                </Button>
               </div>
             ) : (
               <>
@@ -747,13 +751,15 @@ export function PipelineProjectDetail() {
                       <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
                         Other Approvals ({otherApprovals.length})
                       </h2>
-                      <button
+                      <Button
+                        variant="link"
+                        size="sm"
                         onClick={handleAddApproval}
-                        className="flex items-center gap-1 text-sm text-[var(--ff-accent)] hover:text-[var(--ff-accent-hover)]"
+                        className="flex items-center gap-1"
                       >
                         <Plus className="w-4 h-4" />
                         Add
-                      </button>
+                      </Button>
                     </div>
                     <div className="space-y-3">
                       {otherApprovals.map((approval) => {
@@ -906,10 +912,12 @@ export function PipelineProjectDetail() {
                   Legal Documents
                 </h3>
                 {legalDocsChanged && (
-                  <button
+                  <Button
+                    variant="primary"
+                    size="sm"
                     onClick={saveLegalDocs}
                     disabled={savingLegalDocs}
-                    className="flex items-center gap-1 px-2 py-1 text-xs bg-[var(--ff-accent)] text-white rounded hover:bg-[var(--ff-accent-hover)] disabled:opacity-50"
+                    className="flex items-center gap-1"
                   >
                     {savingLegalDocs ? (
                       <Loader2 className="w-3 h-3 animate-spin" />
@@ -917,7 +925,7 @@ export function PipelineProjectDetail() {
                       <Save className="w-3 h-3" />
                     )}
                     Save
-                  </button>
+                  </Button>
                 )}
               </div>
 
@@ -979,19 +987,21 @@ export function PipelineProjectDetail() {
                           e.target.value = '';
                         }}
                       />
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={() => leaseFileRef.current?.click()}
                         disabled={uploadingField === 'lease'}
-                        className="px-2 py-1.5 border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-tertiary)] disabled:opacity-50"
                         title="Upload file"
+                        aria-label="Upload lease file"
                       >
                         {uploadingField === 'lease' ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
                           <Upload className="w-4 h-4" />
                         )}
-                      </button>
+                      </Button>
                       <input
                         type="url"
                         value={legalDocs.lease_agreement_document_url}
@@ -1051,19 +1061,21 @@ export function PipelineProjectDetail() {
                           e.target.value = '';
                         }}
                       />
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={() => cessionFileRef.current?.click()}
                         disabled={uploadingField === 'cession'}
-                        className="px-2 py-1.5 border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-tertiary)] disabled:opacity-50"
                         title="Upload file"
+                        aria-label="Upload cession file"
                       >
                         {uploadingField === 'cession' ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
                           <Upload className="w-4 h-4" />
                         )}
-                      </button>
+                      </Button>
                       <input
                         type="url"
                         value={legalDocs.cession_document_url}
@@ -1163,35 +1175,38 @@ export function PipelineProjectDetail() {
             <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
               <h3 className="font-semibold text-[var(--ff-text-primary)] mb-4">Actions</h3>
               <div className="space-y-2">
-                <button className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors text-sm">
+                <Button variant="secondary" className="w-full flex items-center justify-center gap-2">
                   <Edit className="w-4 h-4" />
                   Edit Project
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="secondary"
                   onClick={() => setLinkToProjectModalOpen(true)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-blue-500 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-sm"
+                  className="w-full flex items-center justify-center gap-2"
                 >
                   <ExternalLink className="w-4 h-4" />
                   Link to Existing Project
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="secondary"
                   onClick={() => setCreateAndLinkModalOpen(true)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-green-500 text-green-600 dark:text-green-400 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors text-sm"
+                  className="w-full flex items-center justify-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   Create &amp; Link New Project
-                </button>
+                </Button>
                 {!project.po_number && approvalStatus?.complete && (
-                  <button className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[var(--ff-accent)] text-white rounded-lg hover:bg-[var(--ff-accent-hover)] transition-colors text-sm">
+                  <Button variant="primary" className="w-full flex items-center justify-center gap-2">
                     <FileText className="w-4 h-4" />
                     Receive PO
-                  </button>
+                  </Button>
                 )}
                 {project.pipeline_status === 'ready_to_plan' && (
-                  <button
+                  <Button
+                    variant="primary"
                     onClick={handleTransitionToPlanned}
                     disabled={transitioning}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full flex items-center justify-center gap-2"
                   >
                     {transitioning ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -1199,12 +1214,13 @@ export function PipelineProjectDetail() {
                       <CheckCircle className="w-4 h-4" />
                     )}
                     {transitioning ? 'Transitioning...' : 'Transition to Planned'}
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button
+                  variant="danger"
                   onClick={handleDeleteProject}
                   disabled={deleting}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-2"
                 >
                   {deleting ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -1212,7 +1228,7 @@ export function PipelineProjectDetail() {
                     <Trash2 className="w-4 h-4" />
                   )}
                   {deleting ? 'Deleting...' : 'Delete Project'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useSuppliersPortal } from '../../context/SuppliersPortalContext';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 // RFQ types
 interface RFQInvite {
@@ -155,12 +156,7 @@ function RFQCard({ rfq, onView }: RFQCardProps) {
           )}
         </div>
         <div className="flex items-center space-x-2">
-          <button
-            onClick={() => onView(rfq)}
-            className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
-          >
-            View Details
-          </button>
+          <Button size="sm" onClick={() => onView(rfq)}>View Details</Button>
         </div>
       </div>
 
@@ -191,12 +187,7 @@ function RFQDetailModal({ rfq, onClose }: RFQDetailModalProps) {
         <div className="p-6 border-b">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-foreground">{rfq.title}</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-muted-foreground"
-            >
-              <XCircle className="w-6 h-6" />
-            </button>
+            <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close"><XCircle className="w-6 h-6" /></Button>
           </div>
         </div>
         <div className="p-6">
@@ -252,15 +243,8 @@ function RFQDetailModal({ rfq, onClose }: RFQDetailModalProps) {
           </div>
         </div>
         <div className="p-6 border-t bg-background flex justify-end space-x-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-border rounded-md text-muted-foreground hover:bg-background"
-          >
-            Close
-          </button>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-            Send Follow-up
-          </button>
+          <Button variant="secondary" onClick={onClose}>Close</Button>
+          <Button>Send Follow-up</Button>
         </div>
       </div>
     </div>
@@ -325,10 +309,7 @@ export function RFQInvitesTab() {
             Manage RFQ invitations and track responses for {selectedSupplier.name}
           </p>
         </div>
-        <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-          <Plus className="w-4 h-4" />
-          <span>Create RFQ</span>
-        </button>
+        <Button className="flex items-center space-x-2"><Plus className="w-4 h-4" /><span>Create RFQ</span></Button>
       </div>
 
       {/* Filters and Search */}

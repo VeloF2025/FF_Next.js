@@ -17,6 +17,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
 import {
   BarChart3,
   Users,
@@ -305,14 +306,15 @@ export function EnhancedKPIDashboard() {
           )}
 
           {/* Refresh Button */}
-          <button
+          <Button
+            variant="secondary"
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg transition-colors disabled:opacity-50"
+            className="flex items-center gap-2"
           >
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             Refresh
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -575,9 +577,9 @@ export function EnhancedKPIDashboard() {
 
           {teamData.leaderboard.length > 10 && (
             <div className="mt-4 text-center">
-              <button className="text-sm text-blue-500 hover:text-blue-600">
+              <Button variant="link" size="sm">
                 View all {teamData.leaderboard.length} technicians →
-              </button>
+              </Button>
             </div>
           )}
         </div>

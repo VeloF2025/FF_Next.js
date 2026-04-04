@@ -2,6 +2,7 @@ import React from 'react';
 import { FileText, CheckCircle, Award, TrendingUp, AlertTriangle, Clock } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { VelocityButton } from '@/components/ui/VelocityButton';
+import { Button } from '@/components/ui/button';
 import type { SupplierStats, RFQInvitation } from '../../types/portal.types';
 
 export interface DashboardTabProps {
@@ -115,9 +116,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ stats, rfqInvitation
           </div>
           {rfqInvitations.length > 3 && (
             <div className="mt-4 text-center">
-              <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                View all RFQs →
-              </button>
+              <Button variant="ghost" size="sm">View all RFQs →</Button>
             </div>
           )}
         </GlassCard>

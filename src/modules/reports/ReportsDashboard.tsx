@@ -3,6 +3,7 @@
 import { FileText, Download, Filter, PieChart, BarChart3, TrendingUp, Clock, Plus, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { StatsGrid } from '../../components/dashboard/EnhancedStatCard';
 import { DashboardHeader } from '../../components/dashboard/DashboardHeader';
 import { useReportsDashboardData } from '../../hooks/useDashboardData';
@@ -196,9 +197,9 @@ export default function ReportsDashboard() {
                       <p className="text-sm text-[var(--ff-text-secondary)]">{report.type} • {report.date}</p>
                     </div>
                   </div>
-                  <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                  <Button variant="link" size="sm">
                     Download
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>

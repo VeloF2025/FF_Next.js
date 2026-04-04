@@ -9,6 +9,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
 import {
   Play,
   Pause,
@@ -203,9 +204,11 @@ export default function SelfHealingDashboard() {
       <RecoveryStats stats={data.stats} />
 
       {/* History Toggle */}
-      <button
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={() => setShowHistory(!showHistory)}
-        className="flex items-center gap-2 text-gray-400 hover:text-gray-300 transition-colors"
+        className="flex items-center gap-2"
       >
         <History className="w-4 h-4" />
         <span className="text-sm">{showHistory ? 'Hide' : 'Show'} Recovery History</span>
@@ -214,7 +217,7 @@ export default function SelfHealingDashboard() {
         ) : (
           <ChevronRight className="w-4 h-4" />
         )}
-      </button>
+      </Button>
 
       {showHistory && <RecoveryHistory />}
     </div>
@@ -267,37 +270,37 @@ function DaemonControlPanel({
         <div className="flex items-center gap-2">
           {isRunning ? (
             <>
-              <button
+              <Button
+                variant="primary"
                 onClick={() => onAction('trigger-check')}
                 disabled={actionLoading === 'trigger-check'}
-                className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700
-                           text-white rounded-lg transition-colors disabled:opacity-50"
+                className="flex items-center gap-2"
               >
                 <RefreshCw
                   className={`w-4 h-4 ${actionLoading === 'trigger-check' ? 'animate-spin' : ''}`}
                 />
                 Check Now
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="danger"
                 onClick={() => onAction('stop-daemon')}
                 disabled={actionLoading === 'stop-daemon'}
-                className="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700
-                           text-white rounded-lg transition-colors disabled:opacity-50"
+                className="flex items-center gap-2"
               >
                 <Pause className="w-4 h-4" />
                 Stop
-              </button>
+              </Button>
             </>
           ) : (
-            <button
+            <Button
+              variant="primary"
               onClick={() => onAction('start-daemon')}
               disabled={actionLoading === 'start-daemon'}
-              className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700
-                         text-white rounded-lg transition-colors disabled:opacity-50"
+              className="flex items-center gap-2"
             >
               <Play className="w-4 h-4" />
               Start Daemon
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -393,26 +396,24 @@ function ApprovalCard({
           )}
 
           <div className="flex gap-2">
-            <button
+            <Button
+              variant="primary"
               onClick={onApprove}
               disabled={isLoading}
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2
-                         bg-green-600 hover:bg-green-700 text-white rounded-lg
-                         transition-colors disabled:opacity-50"
+              className="flex-1 flex items-center justify-center gap-2"
             >
               <ThumbsUp className="w-4 h-4" />
               Approve
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="danger"
               onClick={onReject}
               disabled={isLoading}
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2
-                         bg-red-600 hover:bg-red-700 text-white rounded-lg
-                         transition-colors disabled:opacity-50"
+              className="flex-1 flex items-center justify-center gap-2"
             >
               <ThumbsDown className="w-4 h-4" />
               Reject
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -432,24 +433,26 @@ function SuggestionCard({ suggestion }: { suggestion: ClassificationSuggestion }
             Suggest: {suggestion.currentRiskLevel} → {suggestion.suggestedRiskLevel}
           </p>
         </div>
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => setExpanded(!expanded)}
-          className="text-gray-400 hover:text-gray-300"
+          aria-label={expanded ? 'Collapse suggestion' : 'Expand suggestion'}
         >
           {expanded ? (
             <ChevronDown className="w-4 h-4" />
           ) : (
             <ChevronRight className="w-4 h-4" />
           )}
-        </button>
+        </Button>
       </div>
 
       {expanded && (
         <div className="mt-2 pt-2 border-t border-gray-600">
           <p className="text-xs text-gray-400">{suggestion.rationale}</p>
           <div className="flex gap-2 mt-2">
-            <button className="text-xs text-green-400 hover:text-green-300">Apply</button>
-            <button className="text-xs text-gray-400 hover:text-gray-300">Dismiss</button>
+            <Button variant="link" size="sm">Apply</Button>
+            <Button variant="ghost" size="sm">Dismiss</Button>
           </div>
         </div>
       )}

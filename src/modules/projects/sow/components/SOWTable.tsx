@@ -1,5 +1,6 @@
 import { Calendar, Eye, Edit, Download, Send } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { Button } from '@/components/ui/button';
 import { SOW, SOWMilestone } from '../types/sow.types';
 
 interface SOWTableProps {
@@ -124,19 +125,19 @@ export function SOWTable({ sows }: SOWTableProps) {
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-2">
-                    <button className="p-1 hover:bg-[var(--ff-bg-hover)] rounded">
-                      <Eye className="h-4 w-4 text-[var(--ff-text-secondary)]" />
-                    </button>
-                    <button className="p-1 hover:bg-[var(--ff-bg-hover)] rounded">
-                      <Edit className="h-4 w-4 text-[var(--ff-text-secondary)]" />
-                    </button>
-                    <button className="p-1 hover:bg-[var(--ff-bg-hover)] rounded">
-                      <Download className="h-4 w-4 text-[var(--ff-text-secondary)]" />
-                    </button>
+                    <Button variant="ghost" size="icon" aria-label="View SOW">
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" aria-label="Edit SOW">
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" aria-label="Download SOW">
+                      <Download className="h-4 w-4" />
+                    </Button>
                     {sow.status === 'draft' && (
-                      <button className="p-1 hover:bg-[var(--ff-bg-hover)] rounded">
-                        <Send className="h-4 w-4 text-primary-600" />
-                      </button>
+                      <Button variant="ghost" size="icon" aria-label="Send SOW">
+                        <Send className="h-4 w-4" />
+                      </Button>
                     )}
                   </div>
                 </td>

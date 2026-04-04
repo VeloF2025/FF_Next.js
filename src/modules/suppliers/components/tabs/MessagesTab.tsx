@@ -3,6 +3,7 @@
 
 import { useState, useMemo } from 'react';
 import { MessageSquare, Send, Search } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useSuppliersPortal } from '../../context/SuppliersPortalContext';
 import { useMessageFilters } from './messages-tab/hooks/useMessageFilters';
 import { messagesToThreads } from './messages-tab/utils/messageHelpers';
@@ -49,10 +50,7 @@ export function MessagesTab() {
           <div className="p-4 border-b border-border">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-foreground">Messages</h2>
-              <button className="px-3 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">
-                <Send className="w-4 h-4 inline mr-1" />
-                New
-              </button>
+              <Button size="sm"><Send className="w-4 h-4 inline mr-1" />New</Button>
             </div>
 
             {/* Search */}

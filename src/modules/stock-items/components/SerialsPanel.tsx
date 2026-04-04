@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Loader2, ArrowRightLeft, ArrowDownLeft, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { CheckoutModal } from './CheckoutModal';
 import { CheckinModal } from './CheckinModal';
 import { log } from '@/lib/logger';
@@ -99,13 +100,13 @@ export function SerialsPanel({ stockItemId, stockItemName, category }: SerialsPa
         <h4 className="text-sm font-medium text-[var(--ff-text-primary)]">
           Units / Checkout
         </h4>
-        <button
+        <Button
           type="button"
+          size="sm"
           onClick={() => setShowAddForm(true)}
-          className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded"
         >
           <Plus className="h-3 w-3" /> Add Serial
-        </button>
+        </Button>
       </div>
 
       {/* Add serial inline form */}
@@ -120,21 +121,22 @@ export function SerialsPanel({ stockItemId, stockItemName, category }: SerialsPa
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSerial(); } }}
             className="flex-1 px-3 py-1.5 text-sm border border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] rounded text-[var(--ff-text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
-          <button
+          <Button
             type="button"
+            size="sm"
             onClick={handleAddSerial}
             disabled={isAdding || !newSerial.trim()}
-            className="px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded disabled:opacity-50"
           >
             {isAdding ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => { setShowAddForm(false); setNewSerial(''); }}
-            className="px-2 py-1.5 text-xs text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]"
           >
             Cancel
-          </button>
+          </Button>
         </div>
       )}
 
@@ -143,9 +145,9 @@ export function SerialsPanel({ stockItemId, stockItemName, category }: SerialsPa
         <div className="p-2 bg-red-500/10 border border-red-500/30 rounded flex items-center gap-2">
           <AlertCircle className="h-3.5 w-3.5 text-red-400" />
           <p className="text-xs text-red-400">{error}</p>
-          <button onClick={() => setError(null)} className="ml-auto text-xs text-red-400 hover:text-red-300">
+          <Button variant="ghost" size="sm" onClick={() => setError(null)} className="ml-auto">
             Dismiss
-          </button>
+          </Button>
         </div>
       )}
 
@@ -222,22 +224,24 @@ export function SerialsPanel({ stockItemId, stockItemName, category }: SerialsPa
                     </td>
                     <td className="py-2 px-2 text-right">
                       {serial.status === 'available' && (
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => setShowCheckout(true)}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-green-600/20 text-green-400 hover:bg-green-600/30 rounded"
                         >
                           <ArrowRightLeft className="h-3 w-3" /> Check Out
-                        </button>
+                        </Button>
                       )}
                       {serial.status === 'checked_out' && (
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => setCheckinCheckout(serial)}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 rounded"
                         >
                           <ArrowDownLeft className="h-3 w-3" /> Check In
-                        </button>
+                        </Button>
                       )}
                     </td>
                   </tr>

@@ -16,6 +16,7 @@ import {
   Loader2,
   Link as LinkIcon,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { log } from '@/lib/logger';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import type { WorkflowState } from '../useWorkflowState';
@@ -182,9 +183,9 @@ export const Step8PaymentApproval: React.FC<Step8PaymentApprovalProps> = ({ stat
           )}
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button onClick={() => onComplete({ paymentApprovalStatus: 'approved' })} style={primaryBtn('#16a34a')}>
+          <Button variant="primary" onClick={() => onComplete({ paymentApprovalStatus: 'approved' })} style={{ background: '#16a34a' }}>
             Complete Journey <ArrowRight style={{ width: 16, height: 16 }} />
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -199,12 +200,12 @@ export const Step8PaymentApproval: React.FC<Step8PaymentApprovalProps> = ({ stat
           <p style={{ fontSize: 14, color: 'var(--ff-text-secondary)' }}>The payment request was not approved.</p>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <button onClick={onBack} style={backBtn}>
+          <Button variant="secondary" onClick={onBack}>
             <ArrowLeft style={{ width: 16, height: 16 }} /> Back
-          </button>
-          <button onClick={() => onComplete({ paymentApprovalStatus: 'rejected' })} style={primaryBtn('#dc2626')}>
+          </Button>
+          <Button variant="danger" onClick={() => onComplete({ paymentApprovalStatus: 'rejected' })}>
             Start Over
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -247,34 +248,34 @@ export const Step8PaymentApproval: React.FC<Step8PaymentApprovalProps> = ({ stat
 
       {/* Navigation row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-        <button onClick={onBack} style={backBtn}>
+        <Button variant="secondary" onClick={onBack}>
           <ArrowLeft style={{ width: 16, height: 16 }} /> Back
-        </button>
+        </Button>
 
         <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={() => void fetchStatus()} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', border: '1px solid var(--ff-border-light)', borderRadius: 8, cursor: 'pointer', background: 'transparent', color: 'var(--ff-text-secondary)', fontSize: 14 }}>
+          <Button variant="secondary" size="sm" onClick={() => void fetchStatus()}>
             <RefreshCw style={{ width: 14, height: 14 }} /> Refresh Status
-          </button>
+          </Button>
 
           {view === 'pending_can_approve' && (
             <>
-              <button
+              <Button
+                variant="danger"
                 onClick={() => setRejectModalOpen(true)}
                 disabled={actionLoading}
-                style={{ padding: '9px 16px', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 8, cursor: actionLoading ? 'not-allowed' : 'pointer', color: '#dc2626', fontWeight: 600, fontSize: 14 }}
               >
                 Reject
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => void handleApprove()}
                 disabled={actionLoading}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', background: actionLoading ? 'var(--ff-bg-tertiary)' : '#059669', color: actionLoading ? 'var(--ff-text-tertiary)' : '#fff', border: 'none', borderRadius: 8, cursor: actionLoading ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: 14 }}
+                style={{ background: actionLoading ? undefined : '#059669' }}
               >
                 {actionLoading
                   ? <><Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> Processing…</>
                   : <><CheckCircle style={{ width: 14, height: 14 }} /> Approve Payment</>
                 }
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -294,16 +295,16 @@ export const Step8PaymentApproval: React.FC<Step8PaymentApprovalProps> = ({ stat
               style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--ff-border-light)', borderRadius: 8, background: 'var(--ff-bg-primary)', color: 'var(--ff-text-primary)', fontSize: 14, resize: 'vertical', boxSizing: 'border-box' }}
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-              <button onClick={() => { setRejectModalOpen(false); setRejectReason(''); }} style={{ padding: '8px 16px', border: '1px solid var(--ff-border-light)', borderRadius: 8, cursor: 'pointer', background: 'transparent', color: 'var(--ff-text-secondary)', fontSize: 14 }}>
+              <Button variant="secondary" onClick={() => { setRejectModalOpen(false); setRejectReason(''); }}>
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="danger"
                 onClick={() => void handleReject()}
                 disabled={!rejectReason.trim() || actionLoading}
-                style={{ padding: '8px 16px', background: !rejectReason.trim() || actionLoading ? 'var(--ff-bg-tertiary)' : '#dc2626', color: !rejectReason.trim() || actionLoading ? 'var(--ff-text-tertiary)' : '#fff', border: 'none', borderRadius: 8, cursor: rejectReason.trim() && !actionLoading ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: 14 }}
               >
                 {actionLoading ? 'Rejecting…' : 'Confirm Rejection'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -342,9 +343,9 @@ const ErrorView: React.FC<{ message: string; onRetry: () => void; onBack: () => 
     <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 10, padding: 20, textAlign: 'center' }}>
       <AlertCircle style={{ width: 32, height: 32, color: '#ef4444', margin: '0 auto 10px' }} />
       <p style={{ color: '#ef4444', fontSize: 14 }}>{message}</p>
-      <button onClick={onRetry} style={{ marginTop: 10, padding: '8px 16px', border: '1px solid var(--ff-border-light)', borderRadius: 6, cursor: 'pointer', fontSize: 14 }}>Retry</button>
+      <Button variant="secondary" size="sm" onClick={onRetry} className="mt-3">Retry</Button>
     </div>
-    <button onClick={onBack} style={backBtn}><ArrowLeft style={{ width: 16, height: 16 }} /> Back</button>
+    <Button variant="secondary" onClick={onBack}><ArrowLeft style={{ width: 16, height: 16 }} /> Back</Button>
   </div>
 );
 

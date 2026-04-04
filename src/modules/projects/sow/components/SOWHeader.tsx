@@ -2,6 +2,7 @@
 
 import { Upload, FileText } from 'lucide-react';
 import { useRouter } from 'next/router';
+import { Button } from '@/components/ui/button';
 
 export function SOWHeader() {
   const router = useRouter();
@@ -23,17 +24,18 @@ export function SOWHeader() {
           <p className="text-[var(--ff-text-secondary)] mt-1">Manage Statements of Work and project contracts</p>
         </div>
         <div className="flex gap-3">
-          <button
+          <Button
+            variant="secondary"
             onClick={handleImportClick}
-            className="px-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)] flex items-center gap-2"
+            className="flex items-center gap-2"
           >
             <Upload className="h-4 w-4" />
             Import SOW
-          </button>
-          <button className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2">
+          </Button>
+          <Button variant="primary" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             New SOW
-          </button>
+          </Button>
         </div>
       </div>
     </div>

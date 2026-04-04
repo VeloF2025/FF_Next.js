@@ -6,6 +6,7 @@
  */
 
 import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/router';
 import { useQuery } from '@tanstack/react-query';
 import { staffService } from '@/services/staffService';
@@ -117,12 +118,12 @@ export function StaffList() {
       <div>
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Import Staff</h1>
-          <button
+          <Button
+            variant="secondary"
             onClick={() => setShowImport(false)}
-            className="px-4 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md hover:bg-[var(--ff-bg-hover)]"
           >
             Back to List
-          </button>
+          </Button>
         </div>
         <StaffImport onComplete={async () => {
           setShowImport(false);
@@ -144,12 +145,13 @@ export function StaffList() {
     return (
       <div className="text-center py-12">
         <p className="text-red-600">Failed to load staff data</p>
-        <button 
+        <Button
+          variant="primary"
           onClick={() => refetch()}
-          className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          className="mt-2"
         >
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -189,12 +191,13 @@ export function StaffList() {
       {staff.length === 0 && (
         <div className="text-center py-12">
           <p className="text-[var(--ff-text-secondary)] text-lg">No staff members found</p>
-          <button
+          <Button
+            variant="primary"
             onClick={() => router.push('/staff/new')}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="mt-4"
           >
             Add First Staff Member
-          </button>
+          </Button>
         </div>
       )}
 

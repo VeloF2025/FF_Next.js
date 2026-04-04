@@ -7,6 +7,7 @@
 
 import { useState, useCallback } from 'react';
 import { Search, X, Filter } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { QAFilters, WorkflowStatus, Priority } from '../types';
 
 interface SearchFilterBarProps {
@@ -57,12 +58,15 @@ export function SearchFilterBar({
             className="w-full pl-10 pr-8 py-2 text-sm bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
           />
           {searchTerm && (
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={handleClearSearch}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]"
+              aria-label="Clear search"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2"
             >
               <X className="w-3.5 h-3.5" />
-            </button>
+            </Button>
           )}
         </div>
 
@@ -95,13 +99,15 @@ export function SearchFilterBar({
 
         {/* Clear All */}
         {activeFilterCount > 0 && (
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={onClearFilters}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+            className="flex items-center gap-1.5"
           >
             <X className="w-3.5 h-3.5" />
             Clear
-          </button>
+          </Button>
         )}
       </div>
 
@@ -142,9 +148,9 @@ function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }
   return (
     <span className="flex items-center gap-1 px-2 py-1 text-xs bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] rounded-md">
       {label}
-      <button onClick={onRemove} className="hover:text-[var(--ff-text-primary)]">
+      <Button variant="ghost" size="icon" onClick={onRemove} aria-label={`Remove filter: ${label}`}>
         <X className="w-3 h-3" />
-      </button>
+      </Button>
     </span>
   );
 }

@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { X, Loader2, AlertCircle, Calendar, MapPin, ScanLine } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { BarcodeScannerModal } from '@/modules/barcode-scanner';
 import { ConditionPhotoCapture, type CapturedPhoto } from '@/modules/assets/components/ConditionPhotoCapture';
 import type { Asset } from '@/modules/assets/types/asset';
@@ -156,9 +157,9 @@ export function CheckoutModal({ stockItemId, stockItemName, serials, onClose, on
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--ff-border-light)]">
             <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Check Out Tool</h3>
-            <button onClick={onClose} className="p-1 hover:bg-[var(--ff-bg-hover)] rounded">
-              <X className="h-5 w-5 text-[var(--ff-text-tertiary)]" />
-            </button>
+            <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+              <X className="h-5 w-5" />
+            </Button>
           </div>
 
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
@@ -193,14 +194,15 @@ export function CheckoutModal({ stockItemId, stockItemName, serials, onClose, on
                       <option key={s.id} value={s.id}>{s.serial_number}</option>
                     ))}
                   </select>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setScannerOpen(true)}
-                    className="px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded-lg hover:bg-purple-500/20 transition-colors"
                     title="Scan barcode to select serial"
                   >
                     <ScanLine className="h-4 w-4 text-purple-400" />
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -285,21 +287,14 @@ export function CheckoutModal({ stockItemId, stockItemName, serials, onClose, on
 
             {/* Footer */}
             <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
-              >
-                Cancel
-              </button>
-              <button
+              <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+              <Button
                 type="submit"
                 disabled={isSubmitting || availableSerials.length === 0 || conditionPhotos.some(p => p.uploading)}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50"
               >
                 {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
                 Check Out
-              </button>
+              </Button>
             </div>
           </form>
         </div>

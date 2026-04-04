@@ -12,6 +12,7 @@ import {
   Activity
 } from 'lucide-react';
 import { useSuppliersPortal } from '../../context/SuppliersPortalContext';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 // Stats card component
@@ -164,9 +165,7 @@ function RecentActivity() {
           );
         })}
       </div>
-      <button className="w-full mt-4 px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
-        View All Activity
-      </button>
+      <Button variant="ghost" className="w-full mt-4">View All Activity</Button>
     </div>
   );
 }
@@ -211,9 +210,7 @@ function TopSuppliers() {
           </div>
         ))}
       </div>
-      <button className="w-full mt-4 px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
-        View All Suppliers
-      </button>
+      <Button variant="ghost" className="w-full mt-4">View All Suppliers</Button>
     </div>
   );
 }

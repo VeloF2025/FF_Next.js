@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
+import { Button } from '@/components/ui/button';
 import { MasterTrackerTable, MASTER_COLS } from './MasterTrackerTable';
 import { emptyMasterRow } from '../types/master-tracker.types';
 import type { MasterRow } from '../types/master-tracker.types';
@@ -129,33 +130,33 @@ export function MasterTrackerPage({ projectId }: Props) {
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap">
         {!editMode ? (
-          <button onClick={() => setEditMode(true)} className="px-3 py-1.5 rounded text-xs font-semibold bg-blue-700 hover:bg-blue-600 text-white transition-colors">
+          <Button variant="primary" size="sm" onClick={() => setEditMode(true)}>
             Edit
-          </button>
+          </Button>
         ) : (
           <>
-            <button onClick={() => void handleSave()} disabled={saving} className="px-3 py-1.5 rounded text-xs font-semibold bg-green-700 hover:bg-green-600 text-white disabled:opacity-50 transition-colors">
+            <Button variant="primary" size="sm" onClick={() => void handleSave()} disabled={saving}>
               {saving ? 'Saving…' : 'Save'}
-            </button>
-            <button onClick={handleCancel} className="px-3 py-1.5 rounded text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-white transition-colors">
+            </Button>
+            <Button variant="secondary" size="sm" onClick={handleCancel}>
               Cancel
-            </button>
+            </Button>
           </>
         )}
-        <button onClick={handleAddRow} className="px-3 py-1.5 rounded text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-white transition-colors">
+        <Button variant="secondary" size="sm" onClick={handleAddRow}>
           + Add Row
-        </button>
-        <button onClick={exportCsv} className="px-3 py-1.5 rounded text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-white transition-colors">
+        </Button>
+        <Button variant="secondary" size="sm" onClick={exportCsv}>
           Export Excel
-        </button>
-        <button onClick={() => importRef.current?.click()} className="px-3 py-1.5 rounded text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-white transition-colors">
+        </Button>
+        <Button variant="secondary" size="sm" onClick={() => importRef.current?.click()}>
           Import Excel
-        </button>
+        </Button>
         <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImport} />
         {Object.values(filters).some((s) => s.size > 0) && (
-          <button onClick={() => setFilters({})} className="px-3 py-1.5 rounded text-xs font-semibold bg-amber-700 hover:bg-amber-600 text-white transition-colors">
+          <Button variant="secondary" size="sm" onClick={() => setFilters({})}>
             Clear Filters
-          </button>
+          </Button>
         )}
         {lastSaved && <span className="text-xs text-slate-500 ml-2">Saved {new Date(lastSaved).toLocaleTimeString()}</span>}
         {error && <span className="text-xs text-red-400 ml-2">{error}</span>}

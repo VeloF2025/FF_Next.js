@@ -1,5 +1,6 @@
 import React from 'react';
 import { MapPin, Home, Cable, Camera, CheckCircle, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { formatDisplayDateTime } from '@/utils/dateFormat';
 import { TrackerItem } from '../types/tracker.types';
 
@@ -117,16 +118,18 @@ export function TrackerTable({ data, isLoading, expandedRows, toggleRowExpansion
                       {item.lastUpdated ? formatDisplayDateTime(item.lastUpdated) : 'N/A'}
                     </td>
                     <td className="px-4 py-3">
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => toggleRowExpansion(item.id)}
-                        className="p-1 hover:bg-[var(--ff-bg-hover)] rounded"
+                        aria-label={expandedRows.has(item.id) ? 'Collapse row' : 'Expand row'}
                       >
                         {expandedRows.has(item.id) ? (
-                          <ChevronUp className="w-4 h-4 text-[var(--ff-text-secondary)]" />
+                          <ChevronUp className="w-4 h-4" />
                         ) : (
-                          <ChevronDown className="w-4 h-4 text-[var(--ff-text-secondary)]" />
+                          <ChevronDown className="w-4 h-4" />
                         )}
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                   {expandedRows.has(item.id) && (

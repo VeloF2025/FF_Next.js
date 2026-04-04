@@ -3,6 +3,7 @@
 
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { SupplierDocument } from '../types/documents.types';
 
 interface ComplianceAlertProps {
@@ -27,9 +28,7 @@ export const ComplianceAlert: React.FC<ComplianceAlertProps> = ({ documents }) =
             {expiredCount} expired documents and {expiringSoonCount} documents expiring soon require attention.
           </p>
           <div className="mt-3">
-            <button className="text-sm bg-amber-100 hover:bg-amber-200 text-amber-900 px-3 py-1 rounded-md transition-colors">
-              Review Compliance
-            </button>
+            <Button variant="secondary" size="sm">Review Compliance</Button>
           </div>
         </div>
       </div>

@@ -6,6 +6,7 @@
 
 import { useState } from 'react';
 import { X, Loader2, AlertCircle, Clock, MapPin, User } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { ConditionPhotoCapture, type CapturedPhoto } from '@/modules/assets/components/ConditionPhotoCapture';
 
 interface CheckoutInfo {
@@ -79,9 +80,9 @@ export function CheckinModal({ checkout, itemName, onClose, onSuccess }: Checkin
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--ff-border-light)]">
           <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Check In Tool</h3>
-          <button onClick={onClose} className="p-1 hover:bg-[var(--ff-bg-hover)] rounded">
-            <X className="h-5 w-5 text-[var(--ff-text-tertiary)]" />
-          </button>
+          <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+            <X className="h-5 w-5" />
+          </Button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
@@ -161,21 +162,14 @@ export function CheckinModal({ checkout, itemName, onClose, onSuccess }: Checkin
 
           {/* Footer */}
           <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
-            >
-              Cancel
-            </button>
-            <button
+            <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button
               type="submit"
               disabled={isSubmitting || conditionPhotos.some(p => p.uploading)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
             >
               {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
               Check In
-            </button>
+            </Button>
           </div>
         </form>
       </div>

@@ -1,5 +1,6 @@
 // 🟢 WORKING: WorkflowProgress component - displays workflow execution progress
 import { useMemo } from 'react';
+import { Button } from '@/components/ui/button';
 import {
   CheckCircle2,
   Clock,
@@ -198,20 +199,24 @@ export function WorkflowProgress({ workflow, compact = false, showPhases = true 
                 {/* Phase Actions */}
                 <div className="flex items-center space-x-1">
                   {phase.status === 'active' && (
-                    <button 
-                      className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       title="Pause Phase"
+                      aria-label="Pause phase"
                     >
                       <Pause className="w-4 h-4" />
-                    </button>
+                    </Button>
                   )}
                   {phase.status === 'paused' && (
-                    <button 
-                      className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       title="Resume Phase"
+                      aria-label="Resume phase"
                     >
                       <Play className="w-4 h-4" />
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>

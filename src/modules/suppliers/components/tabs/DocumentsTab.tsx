@@ -2,6 +2,7 @@
 // Supplier document management with filtering and compliance tracking
 
 import { Upload } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useSuppliersPortal } from '../../context/SuppliersPortalContext';
 import { log } from '@/lib/logger';
 import { useDocumentFilters } from './documents-tab/hooks/useDocumentFilters';
@@ -68,10 +69,7 @@ export function DocumentsTab() {
           </p>
         </div>
 
-        <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-          <Upload className="w-4 h-4" />
-          <span>Upload Document</span>
-        </button>
+        <Button className="flex items-center space-x-2"><Upload className="w-4 h-4" /><span>Upload Document</span></Button>
       </div>
 
       {/* Document Summary */}

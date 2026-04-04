@@ -1,4 +1,5 @@
 import { User, MapPin, Wifi, Router, MoreVertical } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Installation } from '../types/installation.types';
 import { getStatusColor, getSpeedQuality } from '../utils/installationUtils';
 
@@ -109,9 +110,9 @@ export function InstallationsTable({ installations }: InstallationsTableProps) {
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button className="text-gray-400 hover:text-muted-foreground">
+                  <Button variant="ghost" size="icon" aria-label="More actions">
                     <MoreVertical className="w-5 h-5" />
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}

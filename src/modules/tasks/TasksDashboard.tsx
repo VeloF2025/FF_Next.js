@@ -1,6 +1,7 @@
 import { Clock, Users, Calendar, Plus, TrendingUp, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 
 export function TasksDashboard() {
   const router = useRouter();
@@ -123,9 +124,9 @@ export function TasksDashboard() {
       <div className="mt-8">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Recent Tasks</h2>
-          <button className="text-sm text-blue-600 hover:text-blue-700">
+          <Button variant="link" size="sm">
             View all →
-          </button>
+          </Button>
         </div>
         <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)]">
           <div className="p-6">

@@ -4,6 +4,7 @@
  */
 
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import type {
   ZoneProgressNode,
   PonProgressRow,
@@ -66,15 +67,17 @@ function CategoryCell({
             className="w-28 px-1 py-0.5 text-[10px] bg-[var(--ff-bg-secondary)] border border-blue-500 rounded text-[var(--ff-text-primary)]"
           />
         ) : (
-          <button type="button"
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => { setDateValue(data.target_date || ''); setEditing(true); }}
-            className="text-[10px] text-[var(--ff-text-secondary)] hover:text-blue-400 cursor-pointer"
             title="Click to set target date"
           >
             {data.target_date
               ? new Date(data.target_date + 'T00:00:00').toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })
               : '+ target'}
-          </button>
+          </Button>
         )}
       </div>
     </td>
