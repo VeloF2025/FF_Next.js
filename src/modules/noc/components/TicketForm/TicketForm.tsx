@@ -16,7 +16,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
-import { AlertCircle, Loader2, Save, X, RotateCcw } from 'lucide-react';
+import { AlertCircle, Save, X, RotateCcw } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useTicketForm, type TicketFormData } from '../../hooks/useTicketForm';
 import {
   SourceSection,
@@ -237,7 +238,7 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
           >
             {form.isSubmitting ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <InlineSpinner size="sm" />
                 Creating...
               </>
             ) : (

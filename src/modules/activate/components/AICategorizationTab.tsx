@@ -19,6 +19,7 @@ import {
   STEP_LABELS,
   VlmCategorizationStatus,
 } from '../types/unified.types';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface AICategorizationTabProps {
   dropNumber: string;
@@ -309,10 +310,7 @@ export function AICategorizationTab({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400"></div>
-        <span className="ml-3 text-muted-foreground">Loading categorization...</span>
-      </div>
+      <LoadingSpinner className="py-12" size="lg" label="Loading categorization..." />
     );
   }
 
@@ -348,7 +346,7 @@ export function AICategorizationTab({
   if (state.status === 'processing') {
     return (
       <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 dark:border-purple-400 mx-auto mb-4"></div>
+        <LoadingSpinner className="mb-4" size="xl" label="" />
         <h3 className="text-lg font-semibold text-foreground mb-2">
           Categorizing Photos...
         </h3>
@@ -387,7 +385,7 @@ export function AICategorizationTab({
           >
             {isProcessing ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <InlineSpinner size="sm" />
                 <span>Processing...</span>
               </>
             ) : (
@@ -573,7 +571,7 @@ export function AICategorizationTab({
                         </button>
                       )}
                       {isEditing && isSavingEdit && (
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 dark:border-blue-400 flex-shrink-0"></div>
+                        <InlineSpinner size="sm" />
                       )}
                     </div>
                   </div>

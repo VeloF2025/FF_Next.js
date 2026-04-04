@@ -11,10 +11,11 @@
 
 import React from 'react';
 import {
-  Camera, Upload, Loader2, CheckCircle, AlertCircle, X,
+  Camera, Upload, CheckCircle, AlertCircle, X,
   Maximize2, Monitor, Video, Mic, FileVideo, FileAudio,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import { useScreenshotUploader } from './useScreenshotUploader';
 import { ACCEPTED_TYPES, ANALYSING_MESSAGES } from './screenshotUtils';
@@ -77,7 +78,7 @@ export function ScreenshotUploader({ onFieldsExtracted, disabled }: ScreenshotUp
       >
         {isAnalysing ? (
           <div className="flex flex-col items-center gap-2 py-2">
-            <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+            <InlineSpinner size="lg" className="text-purple-400" />
             <p className="text-sm font-medium text-purple-300">{analysingMsg.title}</p>
             <p className="text-xs text-[var(--ff-text-muted)]">{analysingMsg.subtitle}</p>
           </div>

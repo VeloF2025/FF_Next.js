@@ -5,7 +5,8 @@
  */
 
 import React, { useState } from 'react';
-import { ScanLine, Flashlight, FlashlightOff, Loader2, AlertCircle } from 'lucide-react';
+import { ScanLine, Flashlight, FlashlightOff, AlertCircle } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useBarcodeScanner } from '@/modules/barcode-scanner';
 import type { ScanResult } from '@/modules/barcode-scanner';
 
@@ -86,7 +87,7 @@ export function ScannerView({
         {state === 'initializing' && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/70">
             <div className="text-center text-white">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+              <InlineSpinner size="lg" className="mx-auto mb-2" />
               <p className="text-sm">Starting camera…</p>
             </div>
           </div>

@@ -6,7 +6,8 @@
 
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Loader2, MapPin } from 'lucide-react';
+import { X, MapPin } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
 import type { CreateLocationInput, LocationType } from '../../types';
@@ -202,7 +203,7 @@ export function CreateLocationModal({ isOpen, onClose, onCreated }: CreateLocati
               type="submit"
               disabled={!name.trim() || !code.trim() || isSubmitting}
             >
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+              {isSubmitting ? <InlineSpinner size="sm" /> : <MapPin className="h-4 w-4" />}
               Add Location
             </Button>
           </div>

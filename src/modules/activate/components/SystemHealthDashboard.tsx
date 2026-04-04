@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ServiceStatus {
   status: 'healthy' | 'degraded' | 'down' | 'unknown';
@@ -162,7 +163,7 @@ export function SystemHealthDashboard({
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 text-muted-foreground">
-        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+        <InlineSpinner size="sm" />
         <span>Checking system health...</span>
       </div>
     );

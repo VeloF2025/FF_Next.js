@@ -14,6 +14,7 @@
 
 import { useState, useEffect } from 'react';
 import { STEP_LABELS } from '../types/unified.types';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // ============================================================================
 // ACTIVITY TIMELINE TYPES
@@ -216,10 +217,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400"></div>
-        <span className="ml-3 text-muted-foreground">Loading activity...</span>
-      </div>
+      <LoadingSpinner className="py-12" size="lg" label="Loading activity..." />
     );
   }
 

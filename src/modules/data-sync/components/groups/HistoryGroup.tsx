@@ -13,7 +13,6 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
-  Loader2,
   FileSpreadsheet,
   WifiOff,
   Users,
@@ -22,10 +21,12 @@ import {
   ChevronDown,
   ChevronRight,
   Lock,
+  Loader2,
 } from 'lucide-react';
 import type { SyncHistoryEntry, SyncOperationType } from '../../types';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import { usePermission } from '@/hooks/usePermission';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // Filter options
 const FILTER_OPTIONS: { value: string; label: string; icon: React.ElementType; color: string }[] = [
@@ -143,10 +144,7 @@ export function HistoryGroup({ activeTab, onTabChange }: HistoryGroupProps) {
   // Show loading state
   if (permissionsLoading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-accent)]" />
-        <span className="ml-3 text-[var(--ff-text-secondary)]">Loading...</span>
-      </div>
+      <LoadingSpinner className="py-16" size="lg" label="Loading..." />
     );
   }
 
@@ -227,10 +225,7 @@ export function HistoryGroup({ activeTab, onTabChange }: HistoryGroupProps) {
 
       {/* Timeline */}
       {loading && entries.length === 0 ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-accent)]" />
-          <span className="ml-3 text-[var(--ff-text-secondary)]">Loading history...</span>
-        </div>
+        <LoadingSpinner className="py-12" size="md" label="Loading history..." />
       ) : entries.length === 0 ? (
         <div className="text-center py-12">
           <Clock className="w-12 h-12 mx-auto text-[var(--ff-text-tertiary)] mb-3" />

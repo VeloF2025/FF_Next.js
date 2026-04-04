@@ -18,13 +18,13 @@
 import React, { useState } from 'react';
 import {
   FileText,
-  Loader2,
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useTickets } from '../../hooks/useTickets';
 import { TicketFilters } from './TicketFilters';
 import { TicketListItem } from './TicketListItem';
@@ -79,14 +79,7 @@ export function TicketList({
 
   // 🟢 WORKING: Loading state
   if (isLoading && tickets.length === 0) {
-    return (
-      <div className="flex items-center justify-center p-12">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 text-[var(--ff-text-secondary)] animate-spin mx-auto mb-3" />
-          <p className="text-[var(--ff-text-secondary)]">Loading tickets...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner className="p-12" size="lg" label="Loading tickets..." />;
   }
 
   // 🟢 WORKING: Error state

@@ -5,7 +5,8 @@
 
 'use client';
 
-import { MapPin, Search, CheckCircle, AlertTriangle, X, Loader2 } from 'lucide-react';
+import { MapPin, Search, CheckCircle, AlertTriangle, X } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { TicketFormData, TicketFormErrors } from '../../../hooks/useTicketForm';
 import type { DRLookupData } from '../../../types/ticket';
 
@@ -79,7 +80,7 @@ export function LocationSection({
               } disabled:opacity-50`}
             />
             {drLookup.isLoading && (
-              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 animate-spin" />
+              <InlineSpinner size="sm" className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400" />
             )}
             {drLookup.isFound && !drLookup.isLoading && (
               <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-400" />
@@ -105,7 +106,7 @@ export function LocationSection({
               className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {drLookup.isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <InlineSpinner size="sm" />
               ) : (
                 <Search className="w-4 h-4" />
               )}

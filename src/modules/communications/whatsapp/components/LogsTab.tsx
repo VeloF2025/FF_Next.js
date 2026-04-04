@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
-  Loader2,
   ArrowUpRight,
   ArrowDownLeft,
   CheckCircle,
@@ -21,6 +20,7 @@ import {
 } from 'lucide-react';
 import { waAdminApi } from '../services/waAdminApiService';
 import type { WaMessageLog, WaMessageLogFilters } from '../types/wa-admin.types';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 const LogsTab: React.FC = () => {
   const [logs, setLogs] = useState<WaMessageLog[]>([]);
@@ -248,7 +248,7 @@ const LogsTab: React.FC = () => {
               {loading ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center" role="status" aria-label="Loading message logs">
-                    <Loader2 className="w-6 h-6 animate-spin text-gray-400 mx-auto" aria-hidden="true" />
+                    <InlineSpinner size="md" className="mx-auto" />
                     <span className="sr-only">Loading message logs...</span>
                   </td>
                 </tr>

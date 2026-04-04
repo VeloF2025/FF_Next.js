@@ -4,7 +4,8 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { Loader2, TrendingUp, AlertTriangle, ChevronRight, ChevronDown } from 'lucide-react';
+import { TrendingUp, AlertTriangle, ChevronRight, ChevronDown } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import { POTransactionDetail } from './POTransactionDetail';
 import { BOQSpendKPICards } from './BOQSpendKPICards';
@@ -160,12 +161,7 @@ export function BOQSpendSummary() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-40">
-        <Loader2 className="h-5 w-5 animate-spin text-purple-500" />
-        <span className="ml-2 text-sm text-[var(--ff-text-secondary)]">Loading BOQ spend...</span>
-      </div>
-    );
+    return <LoadingSpinner className="h-40" size="sm" label="Loading BOQ spend..." />;
   }
 
   if (error) {

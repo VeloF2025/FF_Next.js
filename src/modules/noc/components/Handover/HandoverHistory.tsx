@@ -26,6 +26,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useHandoverHistory } from '../../hooks/useHandover';
 import { HandoverSnapshot as HandoverSnapshotDisplay } from './HandoverSnapshot';
 import type { HandoverSnapshot } from '../../types/handover';
@@ -231,15 +232,7 @@ export function HandoverHistory({
   // Loading state
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
-        <div className="flex items-center gap-3 text-[var(--ff-text-secondary)]">
-          <div
-            role="status"
-            className="w-5 h-5 border-2 border-[var(--ff-border-light)] border-t-[var(--ff-text-secondary)] rounded-full animate-spin"
-          />
-          <span>Loading handover history...</span>
-        </div>
-      </div>
+      <LoadingSpinner className="p-8" size="md" label="Loading handover history..." />
     );
   }
 

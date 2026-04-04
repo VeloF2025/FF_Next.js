@@ -24,10 +24,10 @@ import {
   ChevronRight,
   TrendingUp,
   AlertCircle,
-  Loader2,
   MousePointerClick,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import {
   ResponsiveContainer,
   LineChart,
@@ -290,7 +290,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
     return (
       <div className="flex items-center justify-center p-16">
         <div className="text-center space-y-3">
-          <Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" />
+          <LoadingSpinner className="mb-2" size="xl" label="" />
           <p className="text-sm text-muted-foreground">Loading penetration curve...</p>
         </div>
       </div>

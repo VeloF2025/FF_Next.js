@@ -4,7 +4,7 @@
 
 'use client';
 
-import { Loader2 } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { AutoDetectStatus } from '../../../types';
 
 interface OltAutoDetectBannerProps {
@@ -20,7 +20,7 @@ export function OltAutoDetectBanner({ autoDetectStatus }: OltAutoDetectBannerPro
     <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg px-4 py-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
+          <InlineSpinner size="sm" />
           <span className="text-sm font-medium text-purple-300">
             OLT Mismatch Check Running
           </span>

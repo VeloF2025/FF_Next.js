@@ -11,10 +11,10 @@ import {
   ChevronRight,
   AlertTriangle,
   CheckCircle2,
-  Loader2,
   RefreshCw,
   FileText,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useTickets } from '../../hooks/useTickets';
@@ -267,10 +267,7 @@ export function TicketGridView({ initialFilters = {}, onTicketClick }: TicketGri
   }, [page, isLoading]);
 
   if (isLoading && tickets.length === 0) return (
-    <div className="flex items-center justify-center p-12" role="status" aria-live="polite">
-      <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-text-secondary)]" aria-hidden="true" />
-      <span className="ml-3 text-[var(--ff-text-secondary)]">Loading tickets…</span>
-    </div>
+    <LoadingSpinner className="p-12" label="Loading tickets..." />
   );
   if (isError && tickets.length === 0) return (
     <div className="p-8" role="alert">

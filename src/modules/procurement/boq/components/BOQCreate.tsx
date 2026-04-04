@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Save, X } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { ProcurementErrorBoundary } from '../../components/error/ProcurementErrorBoundary';
 import { BOQLineItemsTable, type BOQLineItemRow } from './BOQLineItemsTable';
 import { BOQMetadataFields, BOQFileUpload, type BOQFormState } from './BOQFormFields';
@@ -83,7 +84,7 @@ export function BOQCreate({ projectId, onSave, onCancel, isLoading }: BOQCreateP
                   text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
                 {isLoading ? (
-                  <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <InlineSpinner size="sm" />
                 ) : (
                   <Save className="h-4 w-4" />
                 )}

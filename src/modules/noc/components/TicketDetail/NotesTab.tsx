@@ -22,6 +22,7 @@ import {
   TicketNote,
   CreateNotePayload,
 } from '../../hooks/useTicketNotesWithMutations';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface NotesTabProps {
   ticketId: string;
@@ -84,10 +85,7 @@ export function NotesTab({ ticketId }: NotesTabProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--ff-accent-primary)]"></div>
-        <span className="ml-2 text-[var(--ff-text-secondary)]">Loading notes...</span>
-      </div>
+      <LoadingSpinner className="py-8" size="lg" label="Loading notes..." />
     );
   }
 
@@ -248,7 +246,7 @@ export function NotesTab({ ticketId }: NotesTabProps) {
                 >
                   {isCreating ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <InlineSpinner size="sm" />
                       Saving...
                     </>
                   ) : (

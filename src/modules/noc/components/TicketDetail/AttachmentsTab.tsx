@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Upload, Image, FileText, Film, Paperclip, X, Trash2 } from 'lucide-react';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface Attachment {
@@ -176,7 +177,7 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
         />
         {uploading ? (
           <div className="flex items-center justify-center gap-2">
-            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-500" />
+            <InlineSpinner size="sm" />
             <span className="text-sm text-blue-400">Uploading...</span>
           </div>
         ) : (
@@ -208,9 +209,7 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
 
       {/* Attachments Grid */}
       {loading ? (
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-500" />
-        </div>
+        <LoadingSpinner className="py-8" size="sm" label="" />
       ) : attachments.length === 0 ? (
         <div className="text-center py-8">
           <Paperclip className="w-10 h-10 mx-auto mb-3 text-[var(--ff-text-secondary)] opacity-40" />

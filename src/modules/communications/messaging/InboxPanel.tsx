@@ -19,6 +19,7 @@ import {
   CheckSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useInternalMessages } from '../hooks/useInternalMessages';
 import { MessageListItem } from './MessageListItem';
 import { MessageThread } from './MessageThread';
@@ -304,10 +305,7 @@ export function InboxPanel() {
 
           {/* Message list */}
           {isLoading && messages.length === 0 ? (
-            <div className="flex items-center justify-center py-12">
-              <RefreshCw className="w-5 h-5 animate-spin text-[var(--ff-text-tertiary)]" />
-              <span className="ml-2 text-sm text-[var(--ff-text-secondary)]">Loading messages...</span>
-            </div>
+            <LoadingSpinner className="py-12" size="sm" label="Loading messages..." />
           ) : messages.length === 0 ? (
             <div className="text-center py-12">
               <Mail className="w-10 h-10 mx-auto text-[var(--ff-text-tertiary)] mb-3" />

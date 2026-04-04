@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import type { Project } from '@/types/project.types';
 import { ProjectType, ProjectStatus, Priority } from '@/types/project.types';
 import { AlertCircle } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ProcurementTabs } from './components/ProcurementTabs';
 import { ProjectFilter } from './components/ProjectFilter';
 import { ProcurementPortalProvider } from './context/ProcurementPortalProvider';
@@ -356,12 +357,7 @@ export function ProcurementPortalPage({ children }: ProcurementPortalPageProps) 
         {/* Content Area */}
         <div className="flex-1 overflow-hidden">
           {isLoading && !children ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4" />
-                <p className="text-[var(--ff-text-secondary)]">Loading procurement data...</p>
-              </div>
-            </div>
+            <LoadingSpinner className="h-full" label="Loading procurement data..." />
           ) : (
             <div className="h-full overflow-auto">
               {children}

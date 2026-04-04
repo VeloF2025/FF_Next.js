@@ -14,7 +14,6 @@ import {
   Clock,
   CheckCircle,
   ArrowRight,
-  Loader2,
   RefreshCw,
   FileSpreadsheet,
   Upload,
@@ -23,6 +22,7 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import type { TabGroupId, DataSyncStats } from '../types';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface OverviewDashboardProps {
   onGroupSelect: (groupId: TabGroupId) => void;
@@ -381,7 +381,7 @@ export function OverviewDashboard({ onGroupSelect, accessibleGroups }: OverviewD
                 {/* Card Stats */}
                 {loading ? (
                   <div className="flex items-center gap-2 text-[var(--ff-text-tertiary)]">
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <InlineSpinner size="sm" />
                     <span className="text-sm">Loading stats...</span>
                   </div>
                 ) : (

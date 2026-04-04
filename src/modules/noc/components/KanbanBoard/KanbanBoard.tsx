@@ -19,6 +19,7 @@ import { useTickets } from '../../hooks/useTickets';
 import { useTicketSummary } from '../../hooks/useTicketSummary';
 import { useUpdateTicket } from '../../hooks/useTicket';
 import { KanbanColumn } from './KanbanColumn';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface KanbanBoardProps {
   filters?: TicketFilters;
@@ -192,14 +193,7 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
   }, [tickets, optimisticMoves, moveTicket]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full"></div>
-          <span className="text-[var(--ff-text-secondary)]">Loading tickets...</span>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner className="h-96" size="lg" label="Loading tickets..." />;
   }
 
   if (isError) {
@@ -263,7 +257,7 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
         </span>
         {updateTicket.isPending && (
           <span className="flex items-center gap-2 text-blue-400">
-            <div className="animate-spin w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full"></div>
+            <InlineSpinner size="sm" />
             Updating...
           </span>
         )}

@@ -6,7 +6,8 @@
 'use client';
 
 import React, { useEffect, useMemo } from 'react';
-import { Upload, BarChart3, CreditCard, Lock, Loader2 } from 'lucide-react';
+import { Upload, BarChart3, CreditCard, Lock } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { BillingTabId } from '../../types';
 import { usePermission } from '@/hooks/usePermission';
 
@@ -56,10 +57,7 @@ export function BillingGroup({ activeTab, onTabChange }: BillingGroupProps) {
   // Show loading state
   if (permissionsLoading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-accent)]" />
-        <span className="ml-3 text-[var(--ff-text-secondary)]">Loading...</span>
-      </div>
+      <LoadingSpinner className="py-16" size="lg" label="Loading..." />
     );
   }
 

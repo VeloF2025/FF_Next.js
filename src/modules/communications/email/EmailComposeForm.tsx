@@ -4,7 +4,8 @@
  */
 
 import { useState } from 'react';
-import { Send, Loader2 } from 'lucide-react';
+import { Send } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import { log } from '@/lib/logger';
 
@@ -149,7 +150,7 @@ export function EmailComposeForm({ onSent }: EmailComposeFormProps) {
           )}
         >
           {isSending ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <InlineSpinner size="sm" />
           ) : (
             <Send className="w-4 h-4" />
           )}

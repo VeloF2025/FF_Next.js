@@ -6,7 +6,8 @@
 'use client';
 
 import { useState, useCallback, useId, useEffect } from 'react';
-import { ScanLine, Check, X, Loader2, AlertCircle, Camera } from 'lucide-react';
+import { ScanLine, Check, X, AlertCircle, Camera } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useBarcodeScanner } from '@/modules/barcode-scanner/hooks/useBarcodeScanner';
 import { useSerials } from '../../hooks';
 import type { StockSerial } from '../../types';
@@ -154,7 +155,7 @@ export function SerialScanner({
         >
           {searching ? (
             <span className="flex items-center justify-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <InlineSpinner size="sm" />
               Searching...
             </span>
           ) : (

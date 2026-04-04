@@ -7,7 +7,6 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Loader2,
   AlertCircle,
   TrendingUp,
   TrendingDown,
@@ -16,6 +15,7 @@ import {
   BarChart3,
   Download,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useProjectFinancials } from '../hooks/useProjectFinancials';
 import { formatDisplayMonthYear } from '@/utils/dateFormat';
 
@@ -95,12 +95,7 @@ export function ProjectFinancialSummary({ projectId }: Props) {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-accent)]" />
-        <span className="ml-2 text-[var(--ff-text-secondary)]">Loading financials...</span>
-      </div>
-    );
+    return <LoadingSpinner className="py-12" label="Loading financials..." />;
   }
 
   if (error) {

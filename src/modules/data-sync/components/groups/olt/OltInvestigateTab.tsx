@@ -12,7 +12,6 @@ import {
   ChevronRight,
   Search,
   ExternalLink,
-  Loader2,
   Wrench,
   XCircle,
   CheckCircle,
@@ -20,6 +19,7 @@ import {
   Ticket,
 } from 'lucide-react';
 import type { OltRecord, OltStats, InvestigationContext, SwapLookupResult } from '../../../types';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { OltRecordTable } from './OltRecordTable';
 import { OltResolveModal } from './OltResolveModal';
 import { OltEscalateModal } from './OltEscalateModal';
@@ -312,7 +312,7 @@ export function OltInvestigateTab({
                         disabled={swapLoading.has(record.id)}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 disabled:opacity-50"
                       >
-                        {swapLoading.has(record.id) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+                        {swapLoading.has(record.id) ? <InlineSpinner size="sm" /> : <Search className="w-3 h-3" />}
                         Check Other DR
                       </button>
                       {swapErrors[record.id] && <span className="text-[10px] text-red-400">{swapErrors[record.id]}</span>}
@@ -385,7 +385,7 @@ export function OltInvestigateTab({
                                 disabled={isFixing}
                                 className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:opacity-50"
                               >
-                                {isFixing ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArrowLeftRight className="w-3 h-3" />}
+                                {isFixing ? <InlineSpinner size="sm" /> : <ArrowLeftRight className="w-3 h-3" />}
                                 Swap Both DRs
                               </button>
                             )}
@@ -394,7 +394,7 @@ export function OltInvestigateTab({
                               disabled={isFixing}
                               className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs rounded disabled:opacity-50 ${lookup.upsTransfer?.needed ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'}`}
                             >
-                              {isFixing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
+                              {isFixing ? <InlineSpinner size="sm" /> : <Wrench className="w-3 h-3" />}
                               {lookup.upsTransfer?.needed ? 'Fix A + Transfer UPS' : 'Fix DR A Only'}
                             </button>
                           </div>
@@ -470,7 +470,7 @@ export function OltInvestigateTab({
                            disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
               >
                 {selectingAll ? (
-                  <><Loader2 className="w-3 h-3 animate-spin" /> Loading...</>
+                  <><InlineSpinner size="sm" /> Loading...</>
                 ) : (
                   <><Ticket className="w-3 h-3" /> Ticket All ({stats.needs_investigation})</>
                 )}

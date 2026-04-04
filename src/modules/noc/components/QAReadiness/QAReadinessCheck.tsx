@@ -15,7 +15,8 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, Loader2, PlayCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle, PlayCircle, RefreshCw } from 'lucide-react';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useAuth } from '@/contexts/AuthContext';
 import { ReadinessResults } from './ReadinessResults';
 import { cn } from '@/lib/utils';
@@ -114,10 +115,7 @@ export function QAReadinessCheck({
   // 🟢 WORKING: Loading state
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
-        <Loader2 className="w-6 h-6 text-[var(--ff-text-secondary)] animate-spin" />
-        <span className="ml-2 text-[var(--ff-text-secondary)]">Loading QA readiness status...</span>
-      </div>
+      <LoadingSpinner className="p-8" label="Loading QA readiness status..." />
     );
   }
 
@@ -165,8 +163,8 @@ export function QAReadinessCheck({
           >
             {runCheckMutation.isPending ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Running Check...
+                <InlineSpinner size="sm" />
+                <span className="ml-2">Running Check...</span>
               </>
             ) : status.last_check ? (
               <>

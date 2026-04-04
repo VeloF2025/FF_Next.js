@@ -13,6 +13,7 @@ import {
   CheckSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useUnifiedFeed } from '../hooks/useUnifiedFeed';
 import { FeedItemRow } from './FeedItemRow';
 import type { FeedItem } from '../types/hub.types';
@@ -135,12 +136,7 @@ export function UnifiedFeedList({ onOpenThread }: UnifiedFeedListProps) {
 
       {/* Feed items */}
       {isLoading && items.length === 0 ? (
-        <div className="flex items-center justify-center py-12">
-          <RefreshCw className="w-5 h-5 animate-spin text-[var(--ff-text-tertiary)]" />
-          <span className="ml-2 text-sm text-[var(--ff-text-secondary)]">
-            Loading feed...
-          </span>
-        </div>
+        <LoadingSpinner className="py-12" size="sm" label="Loading feed..." />
       ) : items.length === 0 ? (
         <div className="text-center py-12">
           <Rss className="w-10 h-10 mx-auto text-[var(--ff-text-tertiary)] mb-3" />

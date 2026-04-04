@@ -12,13 +12,13 @@ import {
   FileText,
   Upload,
   X,
-  Loader2,
   CheckCircle,
   AlertTriangle,
   FileImage,
   Trash2,
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type {
   QuoteExtractionResult,
   QuoteMatchingResult,
@@ -515,7 +515,7 @@ export function QuoteScannerModal({
 
           {step === 'processing' && (
             <div className="text-center py-12">
-              <Loader2 className="h-16 w-16 mx-auto text-blue-500 animate-spin mb-6" />
+              <LoadingSpinner size="xl" label="" className="mb-6" />
               <h3 className="text-lg font-medium text-foreground mb-2">
                 Analyzing Document
               </h3>
@@ -916,7 +916,7 @@ export function QuoteScannerModal({
             >
               {isProcessing ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <InlineSpinner size="sm" className="mr-2" />
                   Processing...
                 </>
               ) : (
@@ -936,7 +936,7 @@ export function QuoteScannerModal({
               >
                 {isCreatingQuote ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <InlineSpinner size="sm" className="mr-2" />
                     Creating...
                   </>
                 ) : (
@@ -950,7 +950,7 @@ export function QuoteScannerModal({
             <Button onClick={handleCreateQuote} disabled={isCreatingQuote}>
               {isCreatingQuote ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <InlineSpinner size="sm" className="mr-2" />
                   Creating...
                 </>
               ) : (

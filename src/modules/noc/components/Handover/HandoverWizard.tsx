@@ -21,12 +21,12 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  Loader2,
   ArrowRight,
   Lock,
   AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useHandoverWizard } from '../../hooks/useHandover';
 import type {
   HandoverType,
@@ -163,10 +163,7 @@ export function HandoverWizard({
   if (isValidating) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="flex items-center gap-3 text-[var(--ff-text-secondary)]">
-          <Loader2 className="w-5 h-5 animate-spin" />
-          <span>Validating handover gates...</span>
-        </div>
+        <LoadingSpinner size="sm" label="Validating handover gates..." />
       </div>
     );
   }
@@ -333,7 +330,7 @@ export function HandoverWizard({
         >
           {isCreating ? (
             <span className="flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <InlineSpinner size="sm" />
               <span>Creating Handover...</span>
             </span>
           ) : (

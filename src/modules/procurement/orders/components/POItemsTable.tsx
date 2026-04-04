@@ -4,8 +4,9 @@
  */
 
 import { useState, useCallback } from 'react';
-import { Edit, Save, X, Loader2 } from 'lucide-react';
+import { Edit, Save, X } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface POLineItem {
   id: string;
@@ -133,7 +134,7 @@ export function POItemsTable({ poId, items, canEdit = false, onItemsUpdated }: P
                 disabled={saving}
                 className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50"
               >
-                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                {saving ? <InlineSpinner size="sm" /> : <Save className="h-3.5 w-3.5" />}
                 Save Changes
               </button>
             </>

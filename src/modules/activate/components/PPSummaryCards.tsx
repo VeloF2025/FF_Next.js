@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import { type PPCardCategory, type PPStats, type LookupStatus } from './ppDataShared';
 import { Button } from '@/components/ui/button';
@@ -42,7 +43,7 @@ export function LookupProgressBanner({ status }: { status: LookupStatus }) {
   return (
     <div className="bg-purple-900/20 border border-purple-800 rounded-lg p-4 space-y-3">
       <div className="flex items-center gap-2">
-        <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />
+        <InlineSpinner size="sm" />
         <span className="text-sm font-medium text-purple-300">1Map Serial Search in Progress</span>
         <span className="text-xs text-purple-400 ml-auto">{status.elapsed_seconds ? `${status.elapsed_seconds}s elapsed` : ''}</span>
       </div>

@@ -9,7 +9,6 @@ import {
   Edit2,
   Save,
   X,
-  Loader2,
   CheckCircle,
   XCircle,
   RotateCcw,
@@ -19,6 +18,7 @@ import {
 import { notificationService } from '@/services/core/NotificationService';
 import { waAdminApi } from '../services/waAdminApiService';
 import type { WaMessageTemplate } from '../types/wa-admin.types';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 const TemplatesTab: React.FC = () => {
   const [templates, setTemplates] = useState<WaMessageTemplate[]>([]);
@@ -121,10 +121,7 @@ const TemplatesTab: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12" role="status" aria-label="Loading templates">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" aria-hidden="true" />
-        <span className="sr-only">Loading templates...</span>
-      </div>
+      <LoadingSpinner className="py-12" size="lg" label="Loading templates..." />
     );
   }
 
@@ -255,7 +252,7 @@ const TemplatesTab: React.FC = () => {
                         className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-500 text-white rounded hover:bg-green-600 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-500"
                       >
                         {saving ? (
-                          <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                          <InlineSpinner size="sm" />
                         ) : (
                           <Save className="w-4 h-4" aria-hidden="true" />
                         )}

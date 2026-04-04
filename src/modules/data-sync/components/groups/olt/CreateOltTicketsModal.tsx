@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { TeamSelector } from '@/modules/noc/components/Assignment/TeamSelector';
 
 interface CreateOltTicketsModalProps {
@@ -129,7 +130,7 @@ export function CreateOltTicketsModal({
                        disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {loading ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Creating...</>
+              <><InlineSpinner size="sm" /> Creating...</>
             ) : (
               `Create ${selectedCount} Ticket${selectedCount !== 1 ? 's' : ''}`
             )}

@@ -10,11 +10,11 @@ import {
   Building2,
   MapPin,
   Download,
-  Loader2,
   AlertCircle,
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { usePnLReport, PnLViewMode } from '../hooks/usePnLReport';
 
 const SECTION_ORDER = ['Revenue', 'Cost of Sales', 'Other Income', 'Expenses', 'Other Expenses', 'Other'];
@@ -148,12 +148,7 @@ export function PnLReport() {
       )}
 
       {/* Loading / Error */}
-      {loading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-accent)]" />
-          <span className="ml-2 text-[var(--ff-text-secondary)]">Loading report...</span>
-        </div>
-      )}
+      {loading && <LoadingSpinner className="py-12" label="Loading report..." />}
 
       {error && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex items-center">

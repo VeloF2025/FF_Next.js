@@ -5,7 +5,8 @@
 
 import { useState, useId, useCallback } from 'react';
 import toast from 'react-hot-toast';
-import { Loader2, Trash2, ArrowLeft, Check } from 'lucide-react';
+import { Trash2, ArrowLeft, Check } from 'lucide-react';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
 import type { StockLocation, SerialCondition } from '../../types';
@@ -135,7 +136,7 @@ export function ReturnFlow({ technicians, techLoading, onBack, onDone }: ReturnF
           </p>
           {techLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-orange-600" />
+              <LoadingSpinner size="md" label="" className="text-orange-600" />
             </div>
           ) : (
             <div className="space-y-2">
@@ -245,7 +246,7 @@ export function ReturnFlow({ technicians, techLoading, onBack, onDone }: ReturnF
           >
             {submitting ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <InlineSpinner size="md" />
                 Processing…
               </>
             ) : (

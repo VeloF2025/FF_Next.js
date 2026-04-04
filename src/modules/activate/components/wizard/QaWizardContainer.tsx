@@ -8,6 +8,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { log } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { QaWizardPhase, QaWizardState, QaDecision, Photo } from '../../types/unified.types';
 import { PrerequisitesPhase } from './PrerequisitesPhase';
 import { PhotoReviewPhase } from './PhotoReviewPhase';
@@ -530,7 +531,7 @@ export function QaWizardContainer({
   if (loading) {
     return (
       <div className="p-6 text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
+        <LoadingSpinner className="mb-4" size="lg" label="" />
         <p className="text-muted-foreground">
           {dataStatus || 'Loading QA Wizard...'}
         </p>

@@ -9,6 +9,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { 
   AggregateProjectMetrics, 
   ProjectSummary 
@@ -29,9 +30,7 @@ export function AllProjectsOverview({
   if (!aggregateMetrics || !projectSummaries) {
     return (
       <div className="p-6 max-w-6xl mx-auto">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500" />
-        </div>
+        <LoadingSpinner className="h-64" />
       </div>
     );
   }

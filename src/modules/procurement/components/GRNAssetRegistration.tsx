@@ -19,10 +19,10 @@ import {
   AlertTriangle,
   Plus,
   Trash2,
-  Loader2,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { LabelScanner } from '@/modules/assets/components/LabelScanner';
 
 // ============================================================================
@@ -290,8 +290,7 @@ export function GRNAssetRegistration({ grnId, onComplete }: GRNAssetRegistration
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-        <span className="ml-2 text-slate-400">Loading registration data...</span>
+        <LoadingSpinner size="md" label="Loading registration data..." />
       </div>
     );
   }
@@ -338,7 +337,7 @@ export function GRNAssetRegistration({ grnId, onComplete }: GRNAssetRegistration
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white rounded-lg font-medium flex items-center gap-2"
           >
             {submitting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <InlineSpinner size="sm" />
             ) : (
               <CheckCircle2 className="w-4 h-4" />
             )}

@@ -5,8 +5,9 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Loader2, AlertCircle, Calendar, Building2, ChevronDown } from 'lucide-react';
+import { AlertCircle, Calendar, Building2, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { RequisitionUrgency } from '@/types/procurement/requisition.types';
 import type { WorkflowState } from '../useWorkflowState';
 import { RequisitionItemsTable, type FormItem } from './RequisitionItemsTable';
@@ -548,7 +549,7 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <InlineSpinner size="sm" />
               Creating...
             </>
           ) : (

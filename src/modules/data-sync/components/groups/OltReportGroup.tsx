@@ -6,7 +6,8 @@
 'use client';
 
 import React from 'react';
-import { Loader2, Lock } from 'lucide-react';
+import { Lock } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useOltState, OLT_TABS } from '../../hooks/useOltState';
 import { OltAutoDetectBanner } from './olt/OltAutoDetectBanner';
 import { OltImportTab } from './olt/OltImportTab';
@@ -27,10 +28,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
   // Loading state while permissions resolve
   if (state.permissionsLoading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-accent)]" />
-        <span className="ml-3 text-[var(--ff-text-secondary)]">Loading...</span>
-      </div>
+      <LoadingSpinner className="py-16" size="lg" label="Loading..." />
     );
   }
 

@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Cpu, BatteryCharging, Loader2, Package, CheckCircle, AlertTriangle, Zap, Download } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 
 interface ReconStats {
@@ -209,9 +210,7 @@ export function BootstockReportsPage() {
 
       {/* Loading */}
       {loading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-accent)]" />
-        </div>
+        <LoadingSpinner className="py-12" size="lg" label="" />
       )}
 
       {/* Per-Project Breakdown */}
@@ -366,7 +365,7 @@ function ProjectBreakdown({ type }: { type: 'ont' | 'ups' }) {
     })();
   }, [type]);
 
-  if (loading) return <div className="p-4"><Loader2 className="w-5 h-5 animate-spin text-[var(--ff-accent)]" /></div>;
+  if (loading) return <LoadingSpinner className="p-4 min-h-[80px]" size="sm" label="" />;
 
   return (
     <table className="w-full text-sm">

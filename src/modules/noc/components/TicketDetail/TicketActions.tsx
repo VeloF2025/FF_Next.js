@@ -20,8 +20,8 @@ import {
   CheckCircle2,
   Clock,
   ArrowRight,
-  Loader2,
 } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import { useUpdateTicket, useDeleteTicket } from '../../hooks/useTicket';
 import type { EnrichedTicket, TicketStatus } from '../../types/ticket';
@@ -144,7 +144,7 @@ export function TicketActions({ ticket, compact = false, onActionComplete }: Tic
                 )}
               >
                 {isLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <InlineSpinner size="sm" />
                 ) : (
                   <Icon className="w-4 h-4" />
                 )}
@@ -179,7 +179,7 @@ export function TicketActions({ ticket, compact = false, onActionComplete }: Tic
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <InlineSpinner size="sm" />
               ) : (
                 <Trash2 className="w-4 h-4" />
               )}

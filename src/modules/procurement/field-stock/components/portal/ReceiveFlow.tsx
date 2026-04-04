@@ -5,7 +5,8 @@
 
 import { useState, useId, useCallback } from 'react';
 import toast from 'react-hot-toast';
-import { Loader2, Trash2, ArrowLeft } from 'lucide-react';
+import { Trash2, ArrowLeft } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import type { ScannedSerial } from './types';
 import { ScannerView } from './ScannerView';
@@ -196,7 +197,7 @@ export function ReceiveFlow({ onBack, onDone }: ReceiveFlowProps) {
           >
             {submitting ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <InlineSpinner size="md" />
                 Receiving…
               </>
             ) : (

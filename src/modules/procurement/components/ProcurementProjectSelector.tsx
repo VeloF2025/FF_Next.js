@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Search, Building2, X, Globe, Loader2 } from 'lucide-react';
+import { ChevronDown, Search, Building2, X, Globe } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { ProjectQueryService } from '@/services/projects/core/projectQueryService';
 import type { ProcurementViewMode } from '@/types/procurement/portal.types';
 import type { Project } from '@/types/project.types';
@@ -198,7 +199,7 @@ export function ProcurementProjectSelector({
             {isLoadingProjects ? (
               <div className="px-4 py-6 text-center text-muted-foreground text-sm">
                 <div className="flex items-center justify-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <InlineSpinner size="sm" />
                   Loading projects...
                 </div>
               </div>

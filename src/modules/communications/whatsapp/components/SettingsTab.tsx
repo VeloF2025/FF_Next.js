@@ -5,7 +5,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Save,
-  Loader2,
   AlertCircle,
   CheckCircle,
   RefreshCw,
@@ -17,6 +16,7 @@ import {
 import { notificationService } from '@/services/core/NotificationService';
 import { waAdminApi } from '../services/waAdminApiService';
 import type { WaServiceConfig } from '../types/wa-admin.types';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   service: Server,
@@ -106,10 +106,7 @@ const SettingsTab: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12" role="status" aria-label="Loading configuration">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" aria-hidden="true" />
-        <span className="sr-only">Loading configuration...</span>
-      </div>
+      <LoadingSpinner className="py-12" size="lg" label="Loading configuration..." />
     );
   }
 
@@ -327,7 +324,7 @@ const ConfigRow: React.FC<ConfigRowProps> = ({
                   aria-label={`Save ${formatLabel(config.config_key)}`}
                 >
                   {isSaving ? (
-                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                    <InlineSpinner size="sm" />
                   ) : isSuccess ? (
                     <CheckCircle className="w-4 h-4" aria-hidden="true" />
                   ) : (

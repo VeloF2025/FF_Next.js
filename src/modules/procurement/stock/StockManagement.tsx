@@ -28,6 +28,7 @@ import {
   XCircle
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import { formatDisplayDate } from '@/utils/dateFormat';
 
@@ -445,11 +446,7 @@ export default function StockManagement({ projectId, projectName }: StockManagem
       </div>
 
       {/* Loading State */}
-      {isLoading && (
-        <div className="flex items-center justify-center py-12">
-          <RefreshCw className="h-8 w-8 animate-spin text-[var(--ff-primary-500)]" />
-        </div>
-      )}
+      {isLoading && <LoadingSpinner className="py-12" size="lg" label="" />}
 
       {/* Error State */}
       {error && !isLoading && (

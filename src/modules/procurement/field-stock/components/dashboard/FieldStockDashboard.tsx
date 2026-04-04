@@ -6,7 +6,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, MapPin, Package, ScanLine, ArrowRightLeft, AlertTriangle, RefreshCw } from 'lucide-react';
+import { MapPin, Package, ScanLine, ArrowRightLeft, AlertTriangle, RefreshCw } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { useFieldStockDashboard } from '../../hooks';
 
@@ -85,11 +86,7 @@ export function FieldStockDashboard({ onNavigate }: FieldStockDashboardProps) {
   };
 
   if (loading && !summary) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-      </div>
-    );
+    return <LoadingSpinner className="h-64" size="lg" label="" />;
   }
 
   if (error) {

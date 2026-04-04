@@ -7,7 +7,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Search, RefreshCw, Check } from 'lucide-react';
+import { X, Search, Check } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { QFieldProject, QFieldCloudProject } from '../../../types';
 
 interface QFieldProjectModalProps {
@@ -204,8 +205,8 @@ export function QFieldProjectModal({ project, onClose, onSave }: QFieldProjectMo
             <div className="bg-[var(--ff-bg-tertiary)] rounded-lg border border-[var(--ff-border-light)] max-h-48 overflow-y-auto">
               {discoverLoading ? (
                 <div className="p-4 text-center text-sm text-[var(--ff-text-secondary)]">
-                  <RefreshCw className="w-4 h-4 animate-spin mx-auto mb-1" />
-                  Fetching from QFieldCloud...
+                  <InlineSpinner size="sm" />
+                  <span className="ml-1">Fetching from QFieldCloud...</span>
                 </div>
               ) : discoveredProjects.length === 0 ? (
                 <div className="p-4 text-center text-sm text-[var(--ff-text-secondary)]">

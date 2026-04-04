@@ -4,7 +4,8 @@
  */
 
 import { useState } from 'react';
-import { AlertTriangle, RotateCcw, Loader2, X } from 'lucide-react';
+import { AlertTriangle, RotateCcw, X } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
 
@@ -152,7 +153,7 @@ export function MovementReversalModal({ movement, onClose, onSuccess }: Movement
             onClick={handleReverse}
             disabled={!canSubmit}
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+            {loading ? <InlineSpinner size="sm" /> : <RotateCcw className="h-4 w-4" />}
             Confirm Reversal
           </Button>
         </div>

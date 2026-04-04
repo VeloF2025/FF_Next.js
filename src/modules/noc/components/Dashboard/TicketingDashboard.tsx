@@ -22,11 +22,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
-  Loader2,
   RefreshCw,
   TrendingUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
 import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';
 import { SLAComplianceCard } from './SLAComplianceCard';
@@ -131,14 +131,7 @@ export function TicketingDashboard({
 
   // 🟢 WORKING: Loading state
   if (isLoading && !summaryData) {
-    return (
-      <div className="flex items-center justify-center p-12">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 text-[var(--ff-text-secondary)] animate-spin mx-auto mb-3" />
-          <p className="text-[var(--ff-text-secondary)]">Loading dashboard...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner className="p-12" size="lg" label="Loading dashboard..." />;
   }
 
   // 🟢 WORKING: Error state

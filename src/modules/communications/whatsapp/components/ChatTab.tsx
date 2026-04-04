@@ -5,7 +5,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Send,
-  Loader2,
   RefreshCw,
   Users,
   MessageCircle,
@@ -18,6 +17,7 @@ import { notificationService } from '@/services/core/NotificationService';
 import { waAdminApi } from '../services/waAdminApiService';
 import type { WaMonitoredGroup } from '../types/wa-admin.types';
 import { log } from '@/lib/logger';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ChatMessage {
   id: string;
@@ -180,9 +180,7 @@ const ChatTab: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-      </div>
+      <LoadingSpinner className="py-12" size="lg" label="" />
     );
   }
 
@@ -248,9 +246,7 @@ const ChatTab: React.FC = () => {
             <p>Select a group to view messages</p>
           </div>
         ) : loadingMessages && messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-          </div>
+          <LoadingSpinner className="h-full" size="lg" label="" />
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-[var(--ff-text-secondary)]">
             <MessageCircle className="w-12 h-12 mb-4 opacity-50" />
@@ -294,7 +290,7 @@ const ChatTab: React.FC = () => {
             className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {sending ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <InlineSpinner size="sm" />
             ) : (
               <Send className="w-5 h-5" />
             )}

@@ -19,6 +19,7 @@ import {
   Link2,
 } from 'lucide-react';
 import type { QFieldProject } from '../../../types';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { QFieldProjectModal } from './QFieldProjectModal';
 import { formatDisplayDateTime } from '@/utils/dateFormat';
 
@@ -105,8 +106,7 @@ export function QFieldProjectsTab() {
   if (loading) {
     return (
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-8 text-center">
-        <RefreshCw className="w-6 h-6 animate-spin mx-auto text-[var(--ff-accent)]" />
-        <p className="mt-2 text-[var(--ff-text-secondary)]">Loading QField projects...</p>
+        <LoadingSpinner size="md" label="Loading QField projects..." />
       </div>
     );
   }

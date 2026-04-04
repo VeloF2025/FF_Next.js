@@ -3,7 +3,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Send, Loader2, RefreshCw, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, Send, RefreshCw, Link as LinkIcon } from 'lucide-react';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import { log } from '@/lib/logger';
 import type { ThreadMessage, MessageRecipient } from '../types/messaging.types';
@@ -95,10 +96,7 @@ export function MessageThread({ threadId, onBack }: MessageThreadProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <RefreshCw className="w-5 h-5 animate-spin text-[var(--ff-text-tertiary)]" />
-        <span className="ml-2 text-sm text-[var(--ff-text-secondary)]">Loading thread...</span>
-      </div>
+      <LoadingSpinner className="py-12" size="sm" label="Loading thread..." />
     );
   }
 
@@ -197,7 +195,7 @@ export function MessageThread({ threadId, onBack }: MessageThreadProps) {
           )}
         >
           {isSending ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <InlineSpinner size="sm" />
           ) : (
             <Send className="w-4 h-4" />
           )}

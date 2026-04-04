@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Plus, FileText, Clock, CheckCircle, Package } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useBOQs } from '../hooks/useBOQ';
 import { BOQStatus } from '@/types/procurement.types';
 import { BOQCard } from '../components/BOQCard';
@@ -205,8 +206,8 @@ export function BOQListPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
           {isLoading && (
-            <div className="col-span-full text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <div className="col-span-full">
+              <LoadingSpinner className="py-8" label="" />
             </div>
           )}
           

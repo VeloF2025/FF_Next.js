@@ -4,7 +4,8 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Search, Loader2 } from 'lucide-react';
+import { X, Search } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import type { UserOption } from '../types/messaging.types';
 
@@ -125,7 +126,7 @@ export function RecipientPicker({ selected, onChange }: RecipientPickerProps) {
           className="w-full pl-9 pr-8 py-2 text-sm rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]/50 focus:border-[var(--ff-primary)]"
         />
         {isSearching && (
-          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-[var(--ff-text-tertiary)]" />
+          <InlineSpinner size="sm" className="absolute right-3 top-1/2 -translate-y-1/2" />
         )}
       </div>
 

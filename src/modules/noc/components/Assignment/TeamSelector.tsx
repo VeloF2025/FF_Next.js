@@ -14,7 +14,8 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Users, Search, X, ChevronDown, Loader2, Building2, Wrench } from 'lucide-react';
+import { Users, Search, X, ChevronDown, Building2, Wrench } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import { useTeamsForAssignment } from '../../hooks/useAssignment';
 import type { TeamDropdownOption } from '../../types/team';
@@ -229,7 +230,7 @@ export function TeamSelector({
         </div>
 
         <div className="flex items-center gap-1">
-          {isLoading && <Loader2 className="w-4 h-4 animate-spin text-[var(--ff-text-tertiary)]" />}
+          {isLoading && <InlineSpinner size="sm" />}
           {showClear && selectedTeam && !disabled && (
             <button
               type="button"
@@ -301,7 +302,7 @@ export function TeamSelector({
           <div className="max-h-80 overflow-y-auto">
             {isLoading ? (
               <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-5 h-5 animate-spin text-[var(--ff-text-tertiary)]" />
+                <InlineSpinner size="sm" />
               </div>
             ) : isError ? (
               <div className="px-3 py-4 text-sm text-red-400 text-center">

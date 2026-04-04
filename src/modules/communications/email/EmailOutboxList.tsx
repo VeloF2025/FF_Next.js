@@ -3,6 +3,7 @@
  */
 
 import { RefreshCw, Mail, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import type { EmailOutboxItem, EmailStatus } from '../types/email.types';
 import { useEmailOutbox } from '../hooks/useEmailOutbox';
@@ -45,10 +46,7 @@ export function EmailOutboxList() {
 
       {/* Table */}
       {isLoading && emails.length === 0 ? (
-        <div className="flex items-center justify-center py-12">
-          <RefreshCw className="w-5 h-5 animate-spin text-[var(--ff-text-tertiary)]" />
-          <span className="ml-2 text-sm text-[var(--ff-text-secondary)]">Loading...</span>
-        </div>
+        <LoadingSpinner className="py-12" size="sm" label="Loading..." />
       ) : emails.length === 0 ? (
         <div className="text-center py-12">
           <Mail className="w-10 h-10 mx-auto text-[var(--ff-text-tertiary)] mb-3" />

@@ -8,7 +8,6 @@
 import { useState, useEffect } from 'react';
 import {
   Package,
-  Loader2,
   Plus,
   Trash2,
   AlertCircle,
@@ -16,6 +15,7 @@ import {
   ScanLine,
   ArrowRight
 } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { usePickings } from '../../hooks/usePickings';
 import { useLocations } from '../../hooks/useLocations';
 import { useStockItems } from '../../hooks/useStockItems';
@@ -428,7 +428,7 @@ export function CreatePickingForm({
         >
           {submitting ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <InlineSpinner size="sm" />
               Creating...
             </>
           ) : (

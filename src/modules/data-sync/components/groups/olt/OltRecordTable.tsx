@@ -9,12 +9,12 @@ import {
   ExternalLink,
   Wrench,
   CheckCircle,
-  Loader2,
   CheckSquare,
   Square,
   Info,
 } from 'lucide-react';
 import type { OltRecord, InvestigationContext, DisplacedInfo } from '../../../types';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 type TabMode = 'pending' | 'investigate' | 'escalations';
 
@@ -90,10 +90,7 @@ export function OltRecordTable({
   const showCheckboxes = mode === 'pending' || (mode === 'investigate' && !!onToggleSelect);
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-accent)]" />
-        <span className="ml-2 text-[var(--ff-text-secondary)]">Loading records...</span>
-      </div>
+      <LoadingSpinner className="py-12" size="md" label="Loading records..." />
     );
   }
 
@@ -252,7 +249,7 @@ export function OltRecordTable({
                             className="flex items-center gap-1 px-3 py-1.5 bg-[var(--ff-accent)] text-white text-xs rounded hover:bg-[var(--ff-accent)]/80 disabled:opacity-50"
                           >
                             {fixing === record.id ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
+                              <InlineSpinner size="sm" />
                             ) : (
                               <Wrench className="w-3 h-3" />
                             )}

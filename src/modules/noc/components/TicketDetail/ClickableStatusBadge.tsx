@@ -20,13 +20,13 @@ import {
   XCircle,
   Ban,
   ChevronDown,
-  Loader2,
   ClipboardCheck,
   UserCheck,
   AlertTriangle,
   CheckCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ClickableStatusBadgeProps {
   /** Current ticket status code */
@@ -185,7 +185,7 @@ export function ClickableStatusBadge({
         aria-haspopup="listbox"
       >
         {isUpdating ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <InlineSpinner size="sm" />
         ) : (
           showIcon && <Icon className="w-3.5 h-3.5 flex-shrink-0" />
         )}
@@ -202,7 +202,7 @@ export function ClickableStatusBadge({
         >
           {isLoadingStatuses ? (
             <div className="flex items-center justify-center py-4">
-              <Loader2 className="w-5 h-5 animate-spin text-[var(--ff-text-secondary)]" />
+              <InlineSpinner size="sm" />
             </div>
           ) : availableStatuses.length === 0 ? (
             <div className="px-3 py-2 text-sm text-[var(--ff-text-secondary)]">

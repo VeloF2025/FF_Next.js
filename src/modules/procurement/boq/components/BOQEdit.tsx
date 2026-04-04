@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Save, X, Loader2 } from 'lucide-react';
+import { Save, X } from 'lucide-react';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { ProcurementErrorBoundary } from '../../components/error/ProcurementErrorBoundary';
 import { BOQLineItemsTable, type BOQLineItemRow } from './BOQLineItemsTable';
 import { BOQMetadataFields, BOQFileUpload, type BOQFormState } from './BOQFormFields';
@@ -114,10 +115,7 @@ export function BOQEdit({ boqId, projectId, onSave, onCancel, isLoading }: BOQEd
   if (fetching) {
     return (
       <ProcurementErrorBoundary level="component">
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-          <span className="ml-3 text-sm text-[var(--ff-text-secondary)]">Loading BOQ...</span>
-        </div>
+        <LoadingSpinner className="py-20" size="lg" label="Loading BOQ..." />
       </ProcurementErrorBoundary>
     );
   }
@@ -152,7 +150,7 @@ export function BOQEdit({ boqId, projectId, onSave, onCancel, isLoading }: BOQEd
                   text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
                 {isLoading ? (
-                  <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <InlineSpinner size="sm" />
                 ) : (
                   <Save className="h-4 w-4" />
                 )}

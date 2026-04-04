@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface ImportError {
@@ -77,10 +78,7 @@ export function WeeklyImportHistory() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <RefreshCw className="w-6 h-6 animate-spin text-[var(--ff-accent)]" />
-        <span className="ml-2 text-[var(--ff-text-secondary)]">Loading history...</span>
-      </div>
+      <LoadingSpinner className="py-8" size="md" label="Loading history..." />
     );
   }
 

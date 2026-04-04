@@ -22,7 +22,6 @@ import {
   Upload,
   FileSpreadsheet,
   AlertCircle,
-  Loader2,
   ArrowLeft,
   CheckCircle,
   XCircle,
@@ -30,6 +29,7 @@ import {
   Database,
   FileCheck,
 } from 'lucide-react';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import { ImportPreview } from './ImportPreview';
 import { ImportResults } from './ImportResults';
@@ -556,7 +556,7 @@ function FileUploadStep({
           )}
         >
           {isParsing ? (
-            <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+            <InlineSpinner size="lg" />
           ) : (
             <Upload className="w-8 h-8 text-[var(--ff-text-tertiary)]" />
           )}
@@ -631,7 +631,7 @@ function PreviewStep({
         >
           {isImporting ? (
             <span className="flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <InlineSpinner size="sm" />
               <span>Starting Import...</span>
             </span>
           ) : (
@@ -650,7 +650,7 @@ function ImportingStep({ progress }: { progress: ImportProgressUpdate | null }) 
   return (
     <div className="flex flex-col items-center justify-center py-12 space-y-6">
       <div className="w-24 h-24 rounded-full bg-blue-500/10 flex items-center justify-center">
-        <Loader2 className="w-12 h-12 text-blue-400 animate-spin" />
+        <LoadingSpinner size="xl" label="" />
       </div>
 
       <div className="text-center space-y-2">

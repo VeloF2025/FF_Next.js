@@ -25,6 +25,7 @@ import { STEP_LABELS, PHOTO_REJECTION_REASONS } from '../../utils/stepMapper';
 import { WizardProgressOverlay, type CategorizationPhase } from './WizardProgressOverlay';
 import { PhotoLightbox, type LightboxPhoto } from '@/components/PhotoLightbox';
 import { Button } from '@/components/ui/button';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface PhotoReviewPhaseProps {
   dropNumber: string;
@@ -362,8 +363,7 @@ export function PhotoReviewPhase({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-        <span className="ml-3 text-muted-foreground">Loading categorization...</span>
+        <LoadingSpinner size="lg" label="Loading categorization..." />
       </div>
     );
   }
@@ -425,7 +425,7 @@ export function PhotoReviewPhase({
   if (state.status === 'processing') {
     return (
       <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4" />
+        <LoadingSpinner className="mb-4" size="xl" label="" />
         <h3 className="text-lg font-semibold text-foreground mb-2">
           Categorizing Photos...
         </h3>

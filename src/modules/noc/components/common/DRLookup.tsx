@@ -14,7 +14,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Loader2, CheckCircle2, AlertTriangle, MapPin } from 'lucide-react';
+import { Search, CheckCircle2, AlertTriangle, MapPin } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import type { DRLookupData } from '../../types/ticket';
 
@@ -125,7 +126,7 @@ export function DRLookup({
           className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <InlineSpinner size="sm" />
           ) : (
             <Search className="w-4 h-4" />
           )}

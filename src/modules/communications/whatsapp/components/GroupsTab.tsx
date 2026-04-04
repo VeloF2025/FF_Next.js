@@ -9,7 +9,6 @@ import {
   Edit2,
   Trash2,
   Send,
-  Loader2,
   CheckCircle,
   XCircle,
   AlertCircle,
@@ -18,6 +17,7 @@ import {
 import { notificationService } from '@/services/core/NotificationService';
 import { waAdminApi } from '../services/waAdminApiService';
 import type { WaMonitoredGroup, WaMonitoredGroupInput, WaGroupType } from '../types/wa-admin.types';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 const GROUP_TYPE_OPTIONS: { value: WaGroupType; label: string; description: string }[] = [
   { value: 'dr_submission', label: 'DR Submission', description: 'DR photo submissions - processed and acknowledged' },
@@ -108,10 +108,7 @@ const GroupsTab: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12" role="status" aria-label="Loading groups">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" aria-hidden="true" />
-        <span className="sr-only">Loading groups...</span>
-      </div>
+      <LoadingSpinner className="py-12" size="lg" label="Loading groups..." />
     );
   }
 
@@ -212,7 +209,7 @@ const GroupsTab: React.FC = () => {
                         title="Send test message"
                       >
                         {testingGroupId === group.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                          <InlineSpinner size="sm" />
                         ) : (
                           <Send className="w-4 h-4" aria-hidden="true" />
                         )}

@@ -4,7 +4,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Filter, RefreshCw, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Filter, RefreshCw } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useAuditLogs } from '../hooks/useAuditLogs';
 import type { AuditLogFilter, AuditLogListItem, AuditEntityTypeValue, AuditActionValue } from '@/types/procurement/audit.types';
 
@@ -125,9 +126,7 @@ export function AuditLogTable() {
 
       {/* Table */}
       {loading && logs.length === 0 ? (
-        <div className="flex h-40 items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
-        </div>
+        <LoadingSpinner className="h-40" label="" />
       ) : (
         <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">

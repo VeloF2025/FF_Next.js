@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import { useCommunications } from '@/hooks/useCommunications';
 import type { CommsTab } from './types/hub.types';
@@ -314,10 +315,7 @@ export default function CommunicationsHub() {
           >
             {activeTab === 'meetings' && (
               isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <RefreshCw className="w-6 h-6 animate-spin text-[var(--ff-text-tertiary)]" />
-                  <span className="ml-2 text-[var(--ff-text-secondary)]">Loading meetings...</span>
-                </div>
+                <LoadingSpinner className="py-12" size="md" label="Loading meetings..." />
               ) : (
                 <CommunicationsMeetingsTab
                   meetings={data.meetings}

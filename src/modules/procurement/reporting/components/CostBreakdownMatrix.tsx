@@ -6,7 +6,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Loader2, AlertCircle, Download } from 'lucide-react';
+import { AlertCircle, Download } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useCostBreakdown } from '../hooks/useCostBreakdown';
 
 function formatCurrency(amount: number): string {
@@ -100,12 +101,7 @@ export function CostBreakdownMatrix() {
         </button>
       </div>
 
-      {loading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-accent)]" />
-          <span className="ml-2 text-[var(--ff-text-secondary)]">Loading...</span>
-        </div>
-      )}
+      {loading && <LoadingSpinner className="py-12" label="Loading..." />}
 
       {error && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex items-center">

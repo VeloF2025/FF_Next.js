@@ -6,7 +6,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, ChevronDown, ChevronRight, Trash2, Image } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, Image } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import type { EodInstallSheet } from '../../../types';
 
@@ -53,9 +54,7 @@ export function EodHistoryTab() {
 
   if (loading && sheets.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-accent)]" />
-      </div>
+      <LoadingSpinner className="py-12" size="lg" label="" />
     );
   }
 

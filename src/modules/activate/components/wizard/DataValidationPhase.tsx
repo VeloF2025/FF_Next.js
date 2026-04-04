@@ -7,6 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { log } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { QaWizardState, PowerMeterStatus, SerialValidationStatus } from '../../types/unified.types';
 
 interface DataValidationPhaseProps {
@@ -155,7 +156,7 @@ export function DataValidationPhase({
       {/* Loading state */}
       {loading && (
         <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
+          <LoadingSpinner className="mb-4" size="xl" label="" />
           <p className="text-muted-foreground">
             Extracting data from photos using VLM...
           </p>

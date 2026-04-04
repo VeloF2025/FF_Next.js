@@ -32,6 +32,7 @@ import { QaWizardContainer } from './wizard/QaWizardContainer';
 import { DrSummaryPage } from './DrSummaryPage';
 import { MaintenanceTab } from '@/modules/noc/components/MaintenanceTab';
 import { ChevronDown, ChevronRight, RefreshCw, MapPin, MessageCircle, Wrench } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
 
@@ -69,8 +70,7 @@ export const UnifiedReviewCard = React.memo(function UnifiedReviewCard({ dropNum
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400 mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading review...</p>
+          <LoadingSpinner className="mb-4" size="xl" label="Loading review..." />
         </div>
       </div>
     );
@@ -694,7 +694,7 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
                     <>
                       {waPhotosLoading ? (
                         <div className="flex items-center justify-center py-8">
-                          <RefreshCw className="h-6 w-6 text-blue-500 animate-spin" />
+                          <LoadingSpinner size="md" label="" />
                         </div>
                       ) : (
                         <WAPhotosGallery
@@ -710,7 +710,7 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
                     <>
                       {maintenanceLoading ? (
                         <div className="flex items-center justify-center py-8">
-                          <RefreshCw className="h-6 w-6 text-orange-500 animate-spin" />
+                          <LoadingSpinner size="md" label="" />
                         </div>
                       ) : maintenancePhotos.length === 0 ? (
                         <div className="text-center py-8 bg-background/50 rounded-lg">

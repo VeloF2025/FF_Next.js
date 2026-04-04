@@ -11,6 +11,7 @@ import { Draggable } from '@hello-pangea/dnd';
 import type { Ticket } from '../../types/ticket';
 import type { DatabaseStatus } from './KanbanBoard';
 import { KanbanCard } from './KanbanCard';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface KanbanColumnProps {
   status: DatabaseStatus;
@@ -79,9 +80,7 @@ export function KanbanColumn({ status, tickets, totalCount, isDraggingOver, isUp
           </span>
         </div>
 
-        {isUpdating && (
-          <div className="animate-spin w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full"></div>
-        )}
+        {isUpdating && <InlineSpinner size="sm" />}
       </div>
 
       {/* Cards Container */}

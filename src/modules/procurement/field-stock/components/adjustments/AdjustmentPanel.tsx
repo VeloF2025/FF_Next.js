@@ -8,11 +8,11 @@ import {
   Settings,
   Plus,
   Search,
-  Loader2,
   ArrowDown,
   ArrowUp,
   Calendar,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useAdjustments, useLocations } from '../../hooks';
 import { CreateAdjustmentForm } from './CreateAdjustmentForm';
 import { formatDisplayDate } from '@/utils/dateFormat';
@@ -170,10 +170,7 @@ export function AdjustmentPanel() {
 
       {/* Adjustment History Table */}
       {loading ? (
-        <div className="flex items-center justify-center h-48">
-          <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-          <span className="ml-2 text-[var(--ff-text-secondary)]">Loading adjustments...</span>
-        </div>
+        <LoadingSpinner className="h-48" size="lg" label="Loading adjustments..." />
       ) : adjustments.length === 0 ? (
         <div className="text-center py-12 text-[var(--ff-text-secondary)]">
           <Settings className="h-12 w-12 mx-auto mb-3 text-[var(--ff-text-tertiary)]" />

@@ -6,7 +6,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, CheckCircle, XCircle, AlertTriangle, Calendar } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, Calendar } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { EodReconciliationRow, EodReconciliationSummary } from '../../../types';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -78,11 +79,7 @@ export function EodReconciliationTab() {
       )}
 
       {/* Loading / Error */}
-      {loading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-accent)]" />
-        </div>
-      )}
+      {loading && <LoadingSpinner className="py-12" size="lg" label="" />}
 
       {error && (
         <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-400">

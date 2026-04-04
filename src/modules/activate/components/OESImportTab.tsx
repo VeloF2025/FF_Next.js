@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { Upload, FileSpreadsheet, CheckCircle, XCircle, AlertCircle, Loader2, Database, CloudCog } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle, XCircle, AlertCircle, Database, CloudCog } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { ImportProgressOverlay, type ImportPhase } from './ImportProgressOverlay';
 
@@ -388,7 +389,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
       {/* Parsing Indicator */}
       {isParsing && (
         <div className="flex items-center justify-center gap-2 py-4">
-          <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+          <InlineSpinner size="sm" />
           <span className="text-muted-foreground">Parsing file...</span>
         </div>
       )}
@@ -502,7 +503,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
           >
             {isLoading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <InlineSpinner size="sm" />
                 Importing...
               </>
             ) : (
@@ -588,7 +589,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
                 >
                   {isSyncingToQField ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <InlineSpinner size="sm" />
                       Syncing to QFieldCloud...
                     </>
                   ) : (

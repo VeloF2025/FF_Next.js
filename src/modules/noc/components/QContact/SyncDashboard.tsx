@@ -20,7 +20,6 @@ import React from 'react';
 import {
   AlertCircle,
   CheckCircle2,
-  Loader2,
   RefreshCw,
   ArrowUpCircle,
   ArrowDownCircle,
@@ -28,6 +27,7 @@ import {
   TrendingUp,
   AlertTriangle,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useQContactSyncStatus } from '../../hooks/useQContactSync';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -58,10 +58,7 @@ export function SyncDashboard({
   // 🟢 WORKING: Loading state
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="w-6 h-6 text-[var(--ff-text-secondary)] animate-spin" />
-        <span className="ml-2 text-[var(--ff-text-secondary)]">Loading sync status...</span>
-      </div>
+      <LoadingSpinner className="p-8" label="Loading sync status..." />
     );
   }
 

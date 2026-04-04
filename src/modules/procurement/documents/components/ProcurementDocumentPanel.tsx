@@ -6,10 +6,10 @@ import {
   Upload,
   Trash2,
   Download,
-  Loader2,
   AlertCircle,
   X,
 } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useProcurementDocuments } from '../hooks/useProcurementDocuments';
 import {
   DOCUMENT_TYPE_LABELS,
@@ -205,7 +205,7 @@ export function ProcurementDocumentPanel({
               >
                 {uploading ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <InlineSpinner size="sm" />
                     Uploading...
                   </>
                 ) : (
@@ -247,7 +247,7 @@ export function ProcurementDocumentPanel({
       <div className="divide-y divide-[var(--ff-border-light)]">
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-5 w-5 animate-spin text-blue-400" />
+            <InlineSpinner size="md" className="text-blue-400" />
           </div>
         ) : documents.length === 0 ? (
           <div className="text-center py-8">

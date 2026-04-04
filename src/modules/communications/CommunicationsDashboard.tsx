@@ -16,6 +16,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { Plus, RefreshCw, Film } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { log } from '@/lib/logger';
@@ -263,10 +264,7 @@ const CommunicationsDashboard: React.FC = () => {
 
         <div className="p-6">
           {isLoading ? (
-            <div className="flex items-center justify-center py-12" role="status" aria-label="Loading communications">
-              <RefreshCw className="w-6 h-6 animate-spin text-[var(--ff-text-tertiary)]" aria-hidden="true" />
-              <span className="ml-2 text-[var(--ff-text-secondary)]">Loading...</span>
-            </div>
+            <LoadingSpinner className="py-12" size="md" label="Loading..." />
           ) : (
             <>
               {/* WCAG: role=tabpanel + id (matches aria-controls) + aria-labelledby (matches tab id) */}

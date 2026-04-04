@@ -3,7 +3,8 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { RotateCcw, Loader2, Filter } from 'lucide-react';
+import { RotateCcw, Filter } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import type { AuditLogListItem } from '@/types/procurement/audit.types';
 
@@ -52,11 +53,7 @@ export function OverrideHistoryPanel() {
   }, [fetchOverrides]);
 
   if (loading) {
-    return (
-      <div className="flex h-32 items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-      </div>
-    );
+    return <LoadingSpinner className="h-32" size="sm" label="" />;
   }
 
   if (error) {

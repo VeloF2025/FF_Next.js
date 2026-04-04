@@ -17,7 +17,6 @@ import {
   Edit,
   UserPlus,
   Activity,
-  Loader2,
   AlertTriangle,
   RefreshCw,
   StickyNote,
@@ -25,6 +24,7 @@ import {
   Pin,
   ChevronRight,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { formatDistanceToNow } from 'date-fns';
 import { formatDisplayDateTime } from '@/utils/dateFormat';
 import { cn } from '@/lib/utils';
@@ -250,10 +250,7 @@ export function ActivityTab({ ticketId }: ActivityTabProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="w-6 h-6 text-[var(--ff-text-secondary)] animate-spin" />
-        <span className="ml-2 text-[var(--ff-text-secondary)]">Loading activities...</span>
-      </div>
+      <LoadingSpinner className="p-8" label="Loading activities..." />
     );
   }
 

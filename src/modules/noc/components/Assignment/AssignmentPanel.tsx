@@ -13,7 +13,8 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { User, Users, UserPlus, Save, Loader2, X } from 'lucide-react';
+import { User, Users, UserPlus, Save, X } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserSelector } from './UserSelector';
@@ -231,7 +232,7 @@ export function AssignmentPanel({
             )}
           >
             {isLoading && assignTicket.variables?.assigned_to === user?.uid ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <InlineSpinner size="sm" />
             ) : (
               <UserPlus className="w-3.5 h-3.5" />
             )}
@@ -253,7 +254,7 @@ export function AssignmentPanel({
               )}
             >
               {isLoading && assignTicket.variables?.assigned_to !== user?.uid ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <InlineSpinner size="sm" />
               ) : (
                 <Save className="w-3.5 h-3.5" />
               )}

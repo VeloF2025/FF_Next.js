@@ -6,7 +6,8 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Upload, Loader2, CheckCircle, Camera, XCircle, AlertTriangle } from 'lucide-react';
+import { Upload, CheckCircle, Camera, XCircle, AlertTriangle } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import type { EodVlmExtraction, EodVlmEntry } from '../../../types';
 import { EodEntryTable } from './EodEntryTable';
@@ -227,7 +228,7 @@ export function EodUploadTab() {
         >
           {extracting ? (
             <>
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <InlineSpinner size="sm" />
               Extracting with VLM...
             </>
           ) : (

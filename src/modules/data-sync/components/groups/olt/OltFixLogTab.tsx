@@ -5,7 +5,7 @@
 
 'use client';
 
-import { Loader2 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { OltRecord, OltStats, ImportRecord, DateFilter } from '../../../types';
 import { OltDateFilterBar } from './OltDateFilterBar';
 import { OltStatsBar } from './OltStatsBar';
@@ -149,9 +149,7 @@ export function OltFixLogTab({
           <h3 className="text-sm font-semibold text-[var(--ff-text-primary)]">Import History</h3>
         </div>
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-accent)]" />
-          </div>
+          <LoadingSpinner className="py-12" size="md" label="" />
         ) : imports.length === 0 ? (
           <div className="text-center py-8 text-[var(--ff-text-tertiary)] text-sm">No imports yet</div>
         ) : (

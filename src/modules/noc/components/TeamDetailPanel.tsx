@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { X, UserPlus, Trash2, Crown, Loader2, Search } from 'lucide-react';
+import { X, UserPlus, Trash2, Crown, Search } from 'lucide-react';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import {
   useTeam,
   useTeamMembers,
@@ -86,7 +87,7 @@ export function TeamDetailPanel({ teamId, onClose }: TeamDetailPanelProps) {
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div className="absolute inset-0 bg-black/50" onClick={onClose} />
         <div className="relative bg-[var(--ff-bg-card)] border border-[var(--ff-border)] rounded-xl shadow-2xl max-w-lg w-full mx-4 p-8">
-          <Loader2 className="w-6 h-6 animate-spin mx-auto text-[var(--ff-text-secondary)]" />
+          <LoadingSpinner label="" />
         </div>
       </div>
     );
@@ -204,7 +205,7 @@ export function TeamDetailPanel({ teamId, onClose }: TeamDetailPanelProps) {
                       disabled={addMember.isPending}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                     >
-                      {addMember.isPending && <Loader2 className="w-3 h-3 animate-spin" />}
+                      {addMember.isPending && <InlineSpinner size="sm" />}
                       Add
                     </button>
                   </div>
@@ -215,9 +216,7 @@ export function TeamDetailPanel({ teamId, onClose }: TeamDetailPanelProps) {
 
           {/* Members List */}
           {membersLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-5 h-5 animate-spin text-[var(--ff-text-secondary)]" />
-            </div>
+            <LoadingSpinner className="py-8" size="sm" label="" />
           ) : members.length === 0 ? (
             <p className="text-center py-8 text-sm text-[var(--ff-text-tertiary)]">
               No members yet. Add staff to this team.

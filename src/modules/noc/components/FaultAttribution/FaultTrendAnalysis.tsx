@@ -17,7 +17,8 @@
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { Download, Filter, TrendingUp, AlertTriangle, Loader2, FileBarChart } from 'lucide-react';
+import { Download, Filter, TrendingUp, AlertTriangle, FileBarChart } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { FaultCause } from '../../types/ticket';
 import {
   getFaultCauseMetadata,
@@ -148,10 +149,7 @@ export function FaultTrendAnalysis({
   // 🟢 WORKING: Loading state
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
-        <Loader2 className="w-6 h-6 text-[var(--ff-text-secondary)] animate-spin" />
-        <span className="ml-2 text-[var(--ff-text-secondary)]">Loading fault trend data...</span>
-      </div>
+      <LoadingSpinner className="p-8" label="Loading fault trend data..." />
     );
   }
 

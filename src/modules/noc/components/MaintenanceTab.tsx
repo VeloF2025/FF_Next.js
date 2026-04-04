@@ -28,6 +28,7 @@ import {
   User,
   ExternalLink,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface MaintenanceMessage {
   id: string;
@@ -152,14 +153,7 @@ export function MaintenanceTab({ dropNumber, onCreateTicket }: MaintenanceTabPro
   }, [dropNumber]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[300px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-600 mx-auto mb-3"></div>
-          <p className="text-muted-foreground">Loading maintenance data...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner className="min-h-[300px]" size="lg" label="Loading maintenance data..." />;
   }
 
   if (error) {

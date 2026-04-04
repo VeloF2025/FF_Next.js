@@ -24,6 +24,7 @@ import {
   getYesterdaySAST,
 } from '../context';
 import { log } from '@/lib/logger';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 
 type TabType = 'dashboard' | 'reports';
@@ -658,7 +659,7 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-[var(--ff-text-primary)]">
                                   <div className="flex items-center gap-2">
                                     {isLoadingZones ? (
-                                      <div className="animate-spin h-4 w-4 border-2 border-[var(--ff-primary-500)] border-t-transparent rounded-full" />
+                                      <InlineSpinner size="sm" />
                                     ) : isExpanded ? (
                                       <ChevronDown className="h-4 w-4 text-[var(--ff-text-secondary)]" />
                                     ) : (

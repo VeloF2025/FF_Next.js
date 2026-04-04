@@ -15,7 +15,6 @@
 
 import React, { useState } from 'react';
 import {
-  Loader2,
   AlertTriangle,
   RefreshCw,
   FileText,
@@ -25,6 +24,7 @@ import {
   MessageSquare,
   Paperclip,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import { useTicket } from '../../hooks/useTicket';
 import { useTicketActivities } from '../../hooks/useTicketActivities';
@@ -122,12 +122,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
   // Loading state
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-12">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 text-[var(--ff-text-secondary)] animate-spin mx-auto mb-3" />
-          <p className="text-[var(--ff-text-secondary)]">Loading ticket...</p>
-        </div>
-      </div>
+      <LoadingSpinner className="p-12" size="lg" label="Loading ticket..." />
     );
   }
 

@@ -16,7 +16,6 @@ import React, { useState } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
-  Loader2,
   RefreshCw,
   Download,
   Play,
@@ -25,6 +24,7 @@ import {
   XCircle,
   Eye,
 } from 'lucide-react';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 
@@ -194,10 +194,7 @@ export function AlignmentReport({ compact = false }: AlignmentReportProps) {
   // Loading state
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="w-6 h-6 text-[var(--ff-text-secondary)] animate-spin" />
-        <span className="ml-2 text-[var(--ff-text-secondary)]">Generating alignment report...</span>
-      </div>
+      <LoadingSpinner className="p-8" label="Generating alignment report..." />
     );
   }
 
@@ -353,7 +350,7 @@ export function AlignmentReport({ compact = false }: AlignmentReportProps) {
               className="flex items-center gap-2 px-3 py-1.5 text-sm text-white bg-[var(--ff-accent)] rounded-lg hover:opacity-90 transition-colors disabled:opacity-50"
             >
               {applyMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <InlineSpinner size="sm" />
               ) : (
                 <Play className="w-4 h-4" />
               )}

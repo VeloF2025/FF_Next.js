@@ -21,7 +21,6 @@ import {
   Gauge,
   BarChart3,
   Download,
-  Loader2,
   CheckCircle2,
   Circle,
   Filter,
@@ -29,6 +28,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { formatDisplayDate } from '@/utils/dateFormat';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type {
   MaturityTrackingResponse,
   ProjectMaturityNode,
@@ -212,10 +212,7 @@ export function MaturityTrackingReport({ projectId, projectName }: MaturityTrack
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-        <span className="ml-3 text-[var(--ff-text-secondary)]">Loading maturity data...</span>
-      </div>
+      <LoadingSpinner className="py-12" size="lg" label="Loading maturity data..." />
     );
   }
 

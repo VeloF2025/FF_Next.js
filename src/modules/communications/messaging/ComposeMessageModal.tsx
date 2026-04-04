@@ -4,7 +4,8 @@
  */
 
 import { useState } from 'react';
-import { X, Send, Loader2 } from 'lucide-react';
+import { X, Send } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import { log } from '@/lib/logger';
 import { RecipientPicker } from './RecipientPicker';
@@ -198,7 +199,7 @@ export function ComposeMessageModal({
               )}
             >
               {isSending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <InlineSpinner size="sm" />
               ) : (
                 <Send className="w-4 h-4" />
               )}

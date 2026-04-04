@@ -9,7 +9,8 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { RefreshCw, Link2, Loader2, AlertCircle } from 'lucide-react';
+import { RefreshCw, Link2, AlertCircle } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import { useRelatedTickets } from '../../hooks/useRelatedTickets';
 import { TicketStatusBadge } from '../TicketList/TicketStatusBadge';
@@ -102,7 +103,7 @@ export function RelatedTickets({
       {/* Loading State */}
       {isLoading && (
         <div className="flex items-center justify-center py-4">
-          <Loader2 className="w-5 h-5 animate-spin text-[var(--ff-text-tertiary)]" />
+          <InlineSpinner size="sm" />
         </div>
       )}
 

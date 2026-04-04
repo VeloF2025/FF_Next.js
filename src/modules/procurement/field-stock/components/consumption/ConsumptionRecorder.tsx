@@ -6,7 +6,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Package, Check, X, Loader2, AlertCircle, Plus, Trash2 } from 'lucide-react';
+import { Package, Check, X, AlertCircle, Plus, Trash2 } from 'lucide-react';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useConsumptions, useStockItems } from '../../hooks';
 import { SerialScanner } from '../serials/SerialScanner';
 import type { StockSerial, StockItem, RecordConsumptionInput } from '../../types';
@@ -192,9 +193,7 @@ export function ConsumptionRecorder({
             </div>
 
             {loadingItems ? (
-              <div className="flex h-32 items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
-              </div>
+              <LoadingSpinner className="h-32" label="" />
             ) : (
               <div className="space-y-4">
                 <select
@@ -314,7 +313,7 @@ export function ConsumptionRecorder({
         >
           {submitting ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <InlineSpinner size="sm" />
               Recording...
             </>
           ) : (

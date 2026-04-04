@@ -12,7 +12,8 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { User, Search, X, ChevronDown, Loader2 } from 'lucide-react';
+import { User, Search, X, ChevronDown } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import { useUsersForAssignment } from '../../hooks/useAssignment';
 import type { UserDropdownOption } from '../../types/team';
@@ -126,7 +127,7 @@ export function UserSelector({
         </div>
 
         <div className="flex items-center gap-1">
-          {isLoading && <Loader2 className="w-4 h-4 animate-spin text-[var(--ff-text-tertiary)]" />}
+          {isLoading && <InlineSpinner size="sm" />}
           {showClear && selectedUser && !disabled && (
             <button
               type="button"
@@ -176,7 +177,7 @@ export function UserSelector({
           <div className="max-h-60 overflow-y-auto">
             {isLoading ? (
               <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-5 h-5 animate-spin text-[var(--ff-text-tertiary)]" />
+                <InlineSpinner size="sm" />
               </div>
             ) : isError ? (
               <div className="px-3 py-4 text-sm text-red-400 text-center">

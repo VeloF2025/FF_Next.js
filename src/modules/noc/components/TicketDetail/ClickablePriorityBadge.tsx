@@ -13,7 +13,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   ChevronDown,
-  Loader2,
   CheckCircle2,
   AlertTriangle,
   AlertCircle,
@@ -21,6 +20,7 @@ import {
   Flame,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ClickablePriorityBadgeProps {
   /** Current ticket priority */
@@ -200,7 +200,7 @@ export function ClickablePriorityBadge({
         aria-haspopup="listbox"
       >
         {isUpdating ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <InlineSpinner size="sm" />
         ) : (
           showIcon && <Icon className="w-3.5 h-3.5 flex-shrink-0" />
         )}

@@ -29,8 +29,8 @@ import {
   ChevronDown,
   ChevronUp,
   X,
-  Loader2,
 } from 'lucide-react';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface MaintenanceFlag {
   id: string;
@@ -268,14 +268,7 @@ export function WATrackingDashboard() {
       )}
 
       {/* Loading State */}
-      {isLoading && (
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-600 mx-auto mb-3"></div>
-            <p className="text-[var(--ff-text-secondary)]">Loading...</p>
-          </div>
-        </div>
-      )}
+      {isLoading && <LoadingSpinner className="py-12" size="lg" label="Loading..." />}
 
       {/* Empty State */}
       {!isLoading && !error && flags.length === 0 && (
@@ -412,7 +405,7 @@ export function WATrackingDashboard() {
                           </h4>
                           {photosLoading ? (
                             <div className="flex items-center gap-2 text-sm text-[var(--ff-text-secondary)]">
-                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <InlineSpinner size="sm" />
                               Loading photos...
                             </div>
                           ) : photos.length === 0 ? (

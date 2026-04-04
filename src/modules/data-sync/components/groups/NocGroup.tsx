@@ -12,9 +12,9 @@ import {
   FileSpreadsheet,
   FileUp,
   MessageSquare,
-  Loader2,
   Lock,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { NocTabId } from '../../types';
 import { usePermission } from '@/hooks/usePermission';
 
@@ -74,10 +74,7 @@ export function NocGroup({ activeTab, onTabChange }: NocGroupProps) {
   // Show loading state
   if (permissionsLoading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-accent)]" />
-        <span className="ml-3 text-[var(--ff-text-secondary)]">Loading...</span>
-      </div>
+      <LoadingSpinner className="py-16" size="lg" label="Loading..." />
     );
   }
 

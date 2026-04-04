@@ -6,7 +6,8 @@
 'use client';
 
 import React, { useEffect, useMemo } from 'react';
-import { MapPin, Loader2, Lock } from 'lucide-react';
+import { MapPin, Lock } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { QFieldTabId } from '../../types';
 import { QFieldProjectsTab } from './qfield/QFieldProjectsTab';
 import { usePermission } from '@/hooks/usePermission';
@@ -47,10 +48,7 @@ export function QFieldGroup({ activeTab, onTabChange }: QFieldGroupProps) {
   // Show loading state
   if (permissionsLoading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-accent)]" />
-        <span className="ml-3 text-[var(--ff-text-secondary)]">Loading...</span>
-      </div>
+      <LoadingSpinner className="py-16" size="lg" label="Loading..." />
     );
   }
 

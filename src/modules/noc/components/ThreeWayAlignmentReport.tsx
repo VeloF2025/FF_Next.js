@@ -16,7 +16,6 @@ import React, { useState, useCallback } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
-  Loader2,
   Upload,
   AlertTriangle,
   ArrowRight,
@@ -28,6 +27,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 
 // xlsx is loaded dynamically inside the mutationFn to avoid bundle cost at page load
@@ -297,7 +297,7 @@ export function ThreeWayAlignmentReport() {
             className="flex items-center gap-2 px-4 py-2 text-white bg-[var(--ff-accent)] rounded-lg hover:opacity-90 transition-colors disabled:opacity-50"
           >
             {generateMutation.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <InlineSpinner size="sm" />
             ) : (
               <FileSpreadsheet className="w-4 h-4" />
             )}
@@ -492,7 +492,7 @@ export function ThreeWayAlignmentReport() {
                   className="flex items-center gap-2 px-3 py-1.5 text-sm text-white bg-[var(--ff-accent)] rounded-lg hover:opacity-90 transition-colors disabled:opacity-50"
                 >
                   {applyMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <InlineSpinner size="sm" />
                   ) : (
                     <Play className="w-4 h-4" />
                   )}

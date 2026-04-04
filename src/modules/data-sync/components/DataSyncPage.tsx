@@ -28,7 +28,6 @@ import {
   MapPin,
   Clock,
   Lock,
-  Loader2,
   CreditCard,
   ClipboardList,
 } from 'lucide-react';
@@ -43,6 +42,7 @@ import { HistoryGroup } from './groups/HistoryGroup';
 import { BillingGroup } from './groups/BillingGroup';
 import { usePermission } from '@/hooks/usePermission';
 import { useSystemFeatures } from '../hooks/useSystemFeatures';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 
 // Permission keys for each group
@@ -188,10 +188,7 @@ export function DataSyncPage({ groupFilter }: DataSyncPageProps) {
   if (isLoading) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-accent)]" />
-          <p className="text-[var(--ff-text-secondary)]">Loading permissions...</p>
-        </div>
+        <LoadingSpinner size="lg" label="Loading permissions..." />
       </div>
     );
   }

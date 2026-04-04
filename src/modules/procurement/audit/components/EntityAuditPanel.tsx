@@ -5,8 +5,9 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Plus, Edit, Trash2, CheckCircle, XCircle, Shield, RotateCcw, Loader2,
+  Plus, Edit, Trash2, CheckCircle, XCircle, Shield, RotateCcw,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useAuditLogs } from '../hooks/useAuditLogs';
 import type { AuditLogListItem, AuditEntityTypeValue, AuditActionValue } from '@/types/procurement/audit.types';
 import { formatDisplayDateShort } from '@/utils/dateFormat';
@@ -69,11 +70,7 @@ export function EntityAuditPanel({ entityType, entityId }: EntityAuditPanelProps
   }, [entityType, entityId, fetchEntityHistory]);
 
   if (loading) {
-    return (
-      <div className="flex h-24 items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-      </div>
-    );
+    return <LoadingSpinner className="h-24" size="sm" label="" />;
   }
 
   if (history.length === 0) {

@@ -18,6 +18,7 @@ import {
   CheckCheck,
 } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { waAdminApi } from '../services/waAdminApiService';
 import type { WaServicesStatusResponse, WaServiceStatus, ServiceStatus, WaPhoneNumber } from '../types/wa-admin.types';
 
@@ -158,7 +159,7 @@ const PairingModal: React.FC<PairingModalProps> = ({
 
         {status === 'generating' && (
           <div className="text-center py-8">
-            <Loader2 className="w-12 h-12 animate-spin text-green-500 mx-auto mb-4" />
+            <InlineSpinner size="xl" className="mx-auto mb-4 text-green-500" />
             <p className="text-muted-foreground">Generating pairing code...</p>
           </div>
         )}
@@ -200,7 +201,7 @@ const PairingModal: React.FC<PairingModalProps> = ({
             </div>
 
             <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <InlineSpinner size="sm" />
               Waiting for phone to connect...
             </div>
 
@@ -390,10 +391,7 @@ const ServicesTab: React.FC = () => {
 
   if (loading && !status) {
     return (
-      <div className="flex items-center justify-center py-12" role="status" aria-label="Loading service status">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" aria-hidden="true" />
-        <span className="sr-only">Loading service status...</span>
-      </div>
+      <LoadingSpinner className="py-12" size="lg" label="Loading service status..." />
     );
   }
 
@@ -598,7 +596,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
             className="flex items-center justify-center gap-1 px-3 py-1.5 text-sm bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-border-light)] text-[var(--ff-text-primary)] rounded transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
           >
             {isRestarting ? (
-              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+              <InlineSpinner size="sm" />
             ) : (
               <RotateCcw className="w-4 h-4" aria-hidden="true" />
             )}

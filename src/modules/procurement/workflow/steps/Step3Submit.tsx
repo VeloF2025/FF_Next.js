@@ -7,7 +7,6 @@
 import { useState, useEffect } from 'react';
 import {
   ArrowLeft,
-  Loader2,
   AlertCircle,
   CheckCircle,
   Clock,
@@ -15,6 +14,7 @@ import {
   Send,
   ShoppingCart,
 } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { WorkflowState } from '../useWorkflowState';
 import { log } from '@/lib/logger';
 import { calcVat } from './requisitionUtils';
@@ -185,7 +185,7 @@ export function Step3Submit({ state, onComplete, onBack }: Step3SubmitProps) {
   if (isCheckingStatus) {
     return (
       <div className="flex items-center justify-center py-12 gap-3">
-        <Loader2 className="h-5 w-5 animate-spin text-purple-400" />
+        <InlineSpinner size="sm" className="text-purple-400" />
         <span className="text-sm text-[var(--ff-text-secondary)]">Checking requisition status...</span>
       </div>
     );
@@ -312,7 +312,7 @@ export function Step3Submit({ state, onComplete, onBack }: Step3SubmitProps) {
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <InlineSpinner size="sm" />
               Submitting...
             </>
           ) : (

@@ -22,6 +22,7 @@ import {
   Play,
   Ban,
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { usePickings } from '../../hooks/usePickings';
 import { SignatureCapture } from './SignatureCapture';
 import type { PickingType, PickingStatus } from '../../types';
@@ -162,11 +163,7 @@ export function PickingDetail({ pickingId }: PickingDetailProps) {
   };
 
   if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-      </div>
-    );
+    return <LoadingSpinner className="h-64" size="lg" label="" />;
   }
 
   if (error || !picking) {

@@ -7,13 +7,13 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  Loader2,
   AlertTriangle,
   WifiOff,
   Clock,
 } from 'lucide-react';
 import { ImportProgressOverlay, type ImportPhase } from './ImportProgressOverlay';
 import { Button } from '@/components/ui/button';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface OfflineRow {
   drop_number: string;
@@ -285,7 +285,7 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
       {/* Parsing Indicator */}
       {isParsing && (
         <div className="flex items-center justify-center gap-2 py-4">
-          <Loader2 className="w-5 h-5 animate-spin text-orange-600" />
+          <InlineSpinner size="sm" />
           <span className="text-muted-foreground">Parsing file...</span>
         </div>
       )}

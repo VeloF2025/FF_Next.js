@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Bell, CheckCheck, RefreshCw, Filter } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import { log } from '@/lib/logger';
 import type { UserNotification } from '@/modules/notifications/types';
@@ -184,10 +185,7 @@ export function NotificationsTab() {
 
       {/* Notification list */}
       {isLoading && notifications.length === 0 ? (
-        <div className="flex items-center justify-center py-12">
-          <RefreshCw className="w-5 h-5 animate-spin text-[var(--ff-text-tertiary)]" />
-          <span className="ml-2 text-sm text-[var(--ff-text-secondary)]">Loading notifications...</span>
-        </div>
+        <LoadingSpinner className="py-12" size="sm" label="Loading notifications..." />
       ) : filteredNotifications.length === 0 ? (
         <div className="text-center py-12">
           <Bell className="w-10 h-10 mx-auto text-[var(--ff-text-tertiary)] mb-3" />

@@ -16,6 +16,7 @@ import { log } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
 import type { DRSummary, DRState } from '../types/summary.types';
 import type { SerialVerificationResult } from '../services/serialVerificationService';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface DrSummaryPageProps {
   dropNumber: string;
@@ -103,12 +104,7 @@ export function DrSummaryPage({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading DR Summary...</p>
-        </div>
-      </div>
+      <LoadingSpinner className="min-h-[400px]" size="xl" label="Loading DR Summary..." />
     );
   }
 

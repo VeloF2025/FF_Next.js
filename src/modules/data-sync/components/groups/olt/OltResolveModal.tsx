@@ -5,7 +5,8 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle, Loader2 } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface OltResolveModalProps {
   recordId: string;
@@ -97,7 +98,7 @@ export function OltResolveModal({ recordId, onClose, onResolved, setError }: Olt
               disabled={!resolutionType || resolving}
               className="flex items-center gap-2 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
             >
-              {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+              {resolving ? <InlineSpinner size="sm" /> : <CheckCircle className="w-4 h-4" />}
               Resolve
             </button>
           </div>

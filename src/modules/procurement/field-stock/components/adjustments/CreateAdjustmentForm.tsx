@@ -4,7 +4,8 @@
  */
 
 import { useState } from 'react';
-import { X, Loader2, Plus, Minus } from 'lucide-react';
+import { X, Plus, Minus } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { useLocations, useStockItems } from '../../hooks';
 import type { AdjustmentReason } from '@/types/procurement/stockTake.types';
@@ -270,7 +271,7 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
           >
             {submitting ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <InlineSpinner size="sm" />
                 Creating...
               </>
             ) : (

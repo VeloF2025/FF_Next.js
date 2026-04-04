@@ -33,6 +33,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type {
   RepeatFaultEscalation,
   EscalationScopeType,
@@ -305,14 +306,7 @@ export function EscalationList({
 
   // 🟢 WORKING: Loading state
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--ff-text-secondary)] mx-auto mb-4" />
-          <p className="text-[var(--ff-text-secondary)]">Loading escalations...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner className="py-12" size="xl" label="Loading escalations..." />;
   }
 
   // 🟢 WORKING: Error state

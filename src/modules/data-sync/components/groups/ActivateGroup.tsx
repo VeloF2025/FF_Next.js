@@ -6,7 +6,8 @@
 'use client';
 
 import React, { useEffect, useMemo } from 'react';
-import { FileSpreadsheet, WifiOff, PlusCircle, FileSearch, Loader2, Lock } from 'lucide-react';
+import { FileSpreadsheet, WifiOff, PlusCircle, FileSearch, Lock } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { ActivateTabId } from '../../types';
 import { usePermission } from '@/hooks/usePermission';
 
@@ -63,10 +64,7 @@ export function ActivateGroup({ activeTab, onTabChange }: ActivateGroupProps) {
   // Show loading state
   if (permissionsLoading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-accent)]" />
-        <span className="ml-3 text-[var(--ff-text-secondary)]">Loading...</span>
-      </div>
+      <LoadingSpinner className="py-16" size="lg" label="Loading..." />
     );
   }
 

@@ -32,6 +32,7 @@ import {
   Save,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { Input } from '@/shared/components/ui/Input';
 import { Badge } from '@/shared/components/ui/Badge';
 import { formatDisplayDate } from '@/utils/dateFormat';
@@ -261,8 +262,7 @@ export function TechnicianDirectory({ onViewTechnician }: TechnicianDirectoryPro
         <div className="ff-card overflow-hidden">
           {isLoading ? (
             <div className="p-8 text-center">
-              <RefreshCw className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
-              <p className="text-[var(--ff-text-secondary)]">Loading technicians...</p>
+              <LoadingSpinner size="lg" label="Loading technicians..." />
             </div>
           ) : technicians.length === 0 ? (
             <div className="p-8 text-center">
@@ -637,7 +637,7 @@ function EditTechnicianModal({ technician, onClose, onSave }: EditTechnicianModa
           <Button onClick={handleSave} disabled={isSaving}>
             {isSaving ? (
               <>
-                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                <InlineSpinner size="sm" className="mr-2" />
                 Saving...
               </>
             ) : (
@@ -689,8 +689,7 @@ function DiscoverSection({ discovered, isLoading, onRefresh, onImport }: Discove
   if (isLoading) {
     return (
       <div className="ff-card p-8 text-center">
-        <RefreshCw className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
-        <p className="text-[var(--ff-text-secondary)]">Discovering technicians from WhatsApp and OneMap...</p>
+        <LoadingSpinner size="lg" label="Discovering technicians from WhatsApp and OneMap..." />
       </div>
     );
   }

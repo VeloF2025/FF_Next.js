@@ -5,8 +5,9 @@
 import { useRouter } from 'next/router';
 import {
   FileText, ShoppingCart, Package, ChevronRight,
-  Check, X, Loader2, Clock, CheckCircle, XCircle, AlertTriangle,
+  Check, X, Clock, CheckCircle, XCircle, AlertTriangle,
 } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { WorkflowType } from '@/types/procurement/approval.types';
 
 export interface ApprovalItem {
@@ -147,7 +148,7 @@ export function ApprovalCard({ item, onApprove, onReject, actioningId }: Props) 
                 disabled={actioningId === item.id}
                 className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 text-sm"
               >
-                {actioningId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                {actioningId === item.id ? <InlineSpinner size="sm" /> : <Check className="h-4 w-4" />}
                 Approve
               </button>
             )}

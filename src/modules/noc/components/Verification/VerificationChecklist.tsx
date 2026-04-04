@@ -17,7 +17,8 @@
 'use client';
 
 import React, { useCallback } from 'react';
-import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useAuth } from '@/contexts/AuthContext';
 import { VerificationStep } from './VerificationStep';
 import { useVerification, useUpdateVerificationStep } from '../../hooks/useVerification';
@@ -111,10 +112,7 @@ export function VerificationChecklist({
   // 🟢 WORKING: Loading state
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="w-6 h-6 text-[var(--ff-text-secondary)] animate-spin" />
-        <span className="ml-2 text-[var(--ff-text-secondary)]">Loading verification steps...</span>
-      </div>
+      <LoadingSpinner className="p-8" label="Loading verification steps..." />
     );
   }
 

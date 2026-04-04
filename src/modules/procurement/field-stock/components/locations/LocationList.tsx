@@ -6,7 +6,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, MapPin, Plus, Search, Filter, Building2, Truck, User, Package } from 'lucide-react';
+import { MapPin, Plus, Search, Filter, Building2, Truck, User, Package } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useLocations } from '../../hooks';
 import type { StockLocation, LocationType } from '../../types';
 
@@ -165,11 +166,7 @@ export function LocationList({
       )}
 
       {/* Loading State */}
-      {loading && (
-        <div className="flex h-32 items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
-        </div>
-      )}
+      {loading && <LoadingSpinner className="h-32" label="" />}
 
       {/* Location List */}
       {!loading && locations.length === 0 && (

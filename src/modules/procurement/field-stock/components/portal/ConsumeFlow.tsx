@@ -6,7 +6,8 @@
 
 import { useState, useId, useCallback } from 'react';
 import toast from 'react-hot-toast';
-import { Loader2, ArrowLeft, Check, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Check, AlertCircle } from 'lucide-react';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import type { SerialLookupResult } from './types';
 import { ScannerView } from './ScannerView';
@@ -174,8 +175,7 @@ export function ConsumeFlow({ initialDrNumber, initialSerial, onBack, onDone }: 
           {lookupLoading ? (
             <div className="flex items-center justify-center py-12 bg-white dark:bg-gray-800 rounded-xl">
               <div className="text-center">
-                <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">Looking up serial…</p>
+                <LoadingSpinner size="lg" label="Looking up serial…" />
               </div>
             </div>
           ) : (
@@ -246,7 +246,7 @@ export function ConsumeFlow({ initialDrNumber, initialSerial, onBack, onDone }: 
           >
             {submitting ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <InlineSpinner size="md" />
                 Recording…
               </>
             ) : (

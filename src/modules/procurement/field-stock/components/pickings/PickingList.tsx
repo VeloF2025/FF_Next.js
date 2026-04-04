@@ -21,6 +21,7 @@ import {
   Truck,
   RotateCcw
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { usePickings } from '../../hooks/usePickings';
 import type { StockPicking, PickingType, PickingStatus } from '../../types';
 
@@ -135,11 +136,7 @@ export function PickingList({ onCreateNew, onSelectPicking }: PickingListProps) 
   };
 
   if (loading && pickings.length === 0) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-      </div>
-    );
+    return <LoadingSpinner className="h-64" size="lg" label="" />;
   }
 
   if (error) {

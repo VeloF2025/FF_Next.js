@@ -8,7 +8,6 @@ import {
   Plus,
   Edit2,
   Trash2,
-  Loader2,
   CheckCircle,
   XCircle,
   AlertCircle,
@@ -19,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { notificationService } from '@/services/core/NotificationService';
 import { waAdminApi } from '../services/waAdminApiService';
 import type { WaMonitoredGroup, WaMonitoredGroupInput, WaGroupType } from '../types/wa-admin.types';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { MonitoredGroupFormModal } from './MonitoredGroupFormModal';
 import { ConfirmDeactivateModal } from './ConfirmDeactivateModal';
 import { GROUP_TYPE_CONFIG } from './groupTypeConfig';
@@ -149,9 +149,7 @@ const MonitoredGroupsTab: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12" role="status">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-      </div>
+      <LoadingSpinner className="py-12" size="lg" label="" />
     );
   }
 

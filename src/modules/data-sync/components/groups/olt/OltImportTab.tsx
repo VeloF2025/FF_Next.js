@@ -11,11 +11,11 @@ import {
   FileSpreadsheet,
   XCircle,
   CheckCircle,
-  Loader2,
   Zap,
   Database,
 } from 'lucide-react';
 import type { AutoDetectStatus, UploadResult } from '../../../types';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface OltImportTabProps {
   autoDetectStatus: AutoDetectStatus | null;
@@ -208,7 +208,7 @@ export function OltImportTab({ autoDetectStatus, fetchStats }: OltImportTabProps
         >
           {isUploading ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <InlineSpinner size="sm" />
               Importing &middot; This may take a minute...
             </>
           ) : (
@@ -270,9 +270,9 @@ export function OltImportTab({ autoDetectStatus, fetchStats }: OltImportTabProps
                   : 'bg-red-500/20 text-red-400'
               }`}>
                 {autoDetectStatus.run.status === 'processing_queue' ? (
-                  <span className="flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />Processing Queue</span>
+                  <span className="flex items-center gap-1"><InlineSpinner size="sm" />Processing Queue</span>
                 ) : autoDetectStatus.run.status === 'running' ? (
-                  <span className="flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />Running</span>
+                  <span className="flex items-center gap-1"><InlineSpinner size="sm" />Running</span>
                 ) : (
                   autoDetectStatus.run.status
                 )}
@@ -330,7 +330,7 @@ export function OltImportTab({ autoDetectStatus, fetchStats }: OltImportTabProps
                     )}
                     {autoDetectStatus.queue.pending > 0 ? (
                       <span className="flex items-center gap-1 text-blue-400">
-                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <InlineSpinner size="sm" />
                         {autoDetectStatus.queue.pending} remaining
                       </span>
                     ) : (

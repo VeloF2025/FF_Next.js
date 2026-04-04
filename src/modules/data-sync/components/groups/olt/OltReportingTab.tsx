@@ -5,7 +5,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Download, Loader2 } from 'lucide-react';
+import { Download } from 'lucide-react';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import type { ReportPeriod, ReportData, DisplacedReport, OltRecord } from '../../../types';
 import { formatDisplayDate } from '@/utils/dateFormat';
@@ -128,15 +129,13 @@ export function OltReportingTab({ setError }: OltReportingTabProps) {
           className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
           title={`Export ${reportView === 'displaced' ? 'displaced ONTs' : reportView === 'imports' ? 'imports' : reportStatusFilter === 'all' ? 'all records' : reportStatusFilter.replace(/_/g, ' ')} to CSV`}
         >
-          {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          {exporting ? <InlineSpinner size="sm" /> : <Download className="w-4 h-4" />}
           Export {reportView === 'displaced' ? 'Displaced' : reportView === 'imports' ? 'Imports' : reportStatusFilter === 'all' ? 'All' : reportStatusFilter.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} CSV
         </button>
       </div>
 
       {reportLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-accent)]" />
-        </div>
+        <LoadingSpinner className="py-12" size="md" label="" />
       ) : reportData ? (
         <>
           {/* Summary Stats */}
@@ -290,9 +289,7 @@ export function OltReportingTab({ setError }: OltReportingTabProps) {
                 )}
               </div>
               {displacedReportLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-5 h-5 animate-spin text-[var(--ff-accent)]" />
-                </div>
+                <LoadingSpinner className="py-8" size="sm" label="" />
               ) : displacedReport && displacedReport.records.length > 0 ? (
                 <div className="overflow-y-auto max-h-[500px]">
                   <table className="w-full text-sm table-fixed">

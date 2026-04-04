@@ -7,11 +7,11 @@ import {
   Clock,
   Check,
   X,
-  Loader2,
   Link as LinkIcon,
   AlertCircle,
   RefreshCw,
 } from 'lucide-react';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { WorkflowState } from '../useWorkflowState';
 import { log } from '@/lib/logger';
 import { calcVat } from './requisitionUtils';
@@ -203,7 +203,7 @@ export function Step4Approval({ state, onComplete, onBack }: Step4ApprovalProps)
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
+        <LoadingSpinner size="lg" label="" className="text-amber-500" />
       </div>
     );
   }
@@ -251,7 +251,7 @@ export function Step4Approval({ state, onComplete, onBack }: Step4ApprovalProps)
                   disabled={isActioning}
                   className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
                 >
-                  {isActioning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                  {isActioning ? <InlineSpinner size="sm" /> : <Check className="h-4 w-4" />}
                   Approve
                 </button>
                 <button
@@ -346,7 +346,7 @@ export function Step4Approval({ state, onComplete, onBack }: Step4ApprovalProps)
                 disabled={!rejectReason.trim() || isActioning}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
               >
-                {isActioning ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                {isActioning ? <InlineSpinner size="sm" /> : <X className="h-4 w-4" />}
                 Reject
               </button>
             </div>

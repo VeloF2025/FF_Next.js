@@ -3,7 +3,7 @@
  */
 
 import Link from 'next/link';
-import { Loader2 } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 export interface POTransaction {
   id: string;
@@ -33,7 +33,7 @@ export function POTransactionDetail({ transactions, loading }: Props) {
   if (loading) {
     return (
       <div className="flex items-center gap-2 py-2 text-xs text-[var(--ff-text-tertiary)]">
-        <Loader2 className="h-3 w-3 animate-spin" /> Loading transactions...
+        <InlineSpinner size="sm" /> Loading transactions...
       </div>
     );
   }

@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Loader2, MapPin, Camera, Brain, CheckCircle, Database, Sparkles } from 'lucide-react';
+import { MapPin, Camera, Brain, CheckCircle, Database, Sparkles } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 export type WizardOperationType = 'sync_1map' | 'categorization';
 
@@ -186,7 +187,7 @@ function ProgressStep({ label, isActive, isComplete }: ProgressStepProps) {
         {isComplete ? (
           <CheckCircle className="w-4 h-4" />
         ) : isActive ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
+          <InlineSpinner size="sm" />
         ) : (
           <div className="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500" />
         )}

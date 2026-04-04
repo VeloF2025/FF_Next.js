@@ -5,7 +5,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 
 interface OltEscalateModalProps {
@@ -116,7 +117,7 @@ export function OltEscalateModal({ recordId, onClose, onEscalated, setError }: O
               disabled={!escalateTo || escalating}
               className="flex items-center gap-2 px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
             >
-              {escalating ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
+              {escalating ? <InlineSpinner size="sm" /> : <AlertTriangle className="w-4 h-4" />}
               Escalate
             </button>
           </div>

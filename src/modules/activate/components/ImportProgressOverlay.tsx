@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Loader2, Database, CloudCog, CheckCircle, FileSpreadsheet } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 export type ImportPhase = 'parsing' | 'uploading' | 'processing' | 'syncing' | 'complete';
 
@@ -163,7 +164,7 @@ function ProgressStep({ label, icon, isActive, isComplete }: ProgressStepProps) 
         {isComplete ? (
           <CheckCircle className="w-4 h-4" />
         ) : isActive ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
+          <InlineSpinner size="sm" />
         ) : (
           <div className="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500" />
         )}

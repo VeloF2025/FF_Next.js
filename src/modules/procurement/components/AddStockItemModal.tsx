@@ -4,7 +4,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import { X, Loader2, PackagePlus } from 'lucide-react';
+import { X, PackagePlus } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { createPortal } from 'react-dom';
 import { log } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
@@ -159,7 +160,7 @@ export function AddStockItemModal({ initialName, onClose, onCreated }: AddStockI
               type="submit"
               disabled={!name.trim() || isSubmitting}
             >
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <PackagePlus className="h-4 w-4" />}
+              {isSubmitting ? <InlineSpinner size="sm" /> : <PackagePlus className="h-4 w-4" />}
               Add to Catalog
             </Button>
           </div>

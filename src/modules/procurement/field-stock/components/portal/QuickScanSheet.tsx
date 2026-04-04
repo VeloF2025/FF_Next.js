@@ -5,7 +5,8 @@
  * If serial not found, offers to navigate to registration.
  */
 
-import { X, Package, ScanLine, AlertCircle, Loader2 } from 'lucide-react';
+import { X, Package, ScanLine, AlertCircle } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { SerialLookupResult } from './types';
 
 interface QuickScanSheetProps {
@@ -73,7 +74,7 @@ export function QuickScanSheet({
           {/* Loading */}
           {loading && (
             <div className="flex items-center gap-2 py-4">
-              <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+              <InlineSpinner size="md" className="text-blue-600" />
               <span className="text-sm text-gray-500">Looking up serial…</span>
             </div>
           )}

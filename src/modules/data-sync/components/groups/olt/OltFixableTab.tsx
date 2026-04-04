@@ -8,11 +8,11 @@ import React, { useState, useEffect } from 'react';
 import { log } from '@/lib/logger';
 import {
   Wrench,
-  Loader2,
   CheckSquare,
   Square,
 } from 'lucide-react';
 import type { OltRecord, OltStats, InvestigationContext, DisplacedInfo, BulkFixResult } from '../../../types';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { OltRecordTable } from './OltRecordTable';
 
 interface OltFixableTabProps {
@@ -220,7 +220,7 @@ export function OltFixableTab({
               className="flex items-center gap-2 px-4 py-1.5 bg-[var(--ff-accent)] text-white text-sm rounded hover:bg-[var(--ff-accent)]/80 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {bulkFixing ? (
-                <><Loader2 className="w-4 h-4 animate-spin" />Fixing {selectedIds.size}...</>
+                <><InlineSpinner size="sm" />Fixing {selectedIds.size}...</>
               ) : (
                 <><Wrench className="w-4 h-4" />Fix Selected ({selectedIds.size})</>
               )}

@@ -5,7 +5,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Send,
-  Loader2,
   CheckCircle,
   AlertCircle,
   Users,
@@ -16,6 +15,7 @@ import {
 import { notificationService } from '@/services/core/NotificationService';
 import { waAdminApi } from '../services/waAdminApiService';
 import type { WaMonitoredGroup, WaMessageLog } from '../types/wa-admin.types';
+import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface SendMessageInput {
   group_id: string;
@@ -135,10 +135,7 @@ const SendTab: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12" role="status">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-        <span className="sr-only">Loading...</span>
-      </div>
+      <LoadingSpinner className="py-12" size="lg" label="" />
     );
   }
 
@@ -245,7 +242,7 @@ You can use *bold*, _italic_, ~strikethrough~, and ```code``` formatting."
             >
               {sending ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <InlineSpinner size="sm" />
                   Sending...
                 </>
               ) : (

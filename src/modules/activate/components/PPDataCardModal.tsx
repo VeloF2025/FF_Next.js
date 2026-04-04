@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { X, Loader2, Search, XCircle, Wrench } from 'lucide-react';
+import { X, Search, XCircle, Wrench } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import { CreatePPTicketsModal } from './CreatePPTicketsModal';
 import { type PPRecord, type PPCardCategory, isSelectable } from './ppDataShared';
@@ -160,9 +161,7 @@ export function PPDataCardModal({ category, count, onClose }: PPDataCardModalPro
       {/* Table */}
       <div className="flex-1 overflow-auto">
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-text-tertiary)]" />
-          </div>
+          <LoadingSpinner className="h-64" size="lg" label="" />
         ) : (
           <table className="w-full text-sm">
             <PPDataTableHead showSelectAll={selectableOnPage.length > 0} allChecked={allSelectableChecked} onToggleAll={toggleSelectAll} />
