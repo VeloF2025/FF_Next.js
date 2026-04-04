@@ -5,6 +5,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { log } from '@/lib/logger';
 import {
   Wrench,
   Loader2,
@@ -127,7 +128,7 @@ export function OltFixableTab({
           const result = d.data || d;
           if (result.success) totalSuccess++;
           else { totalFail++; allErrors[rec.id] = result.error || 'Status fix failed'; }
-        } catch { totalFail++; allErrors[rec.id] = 'Network error'; }
+        } catch (error) { totalFail++; allErrors[rec.id] = 'Network error'; log.warn('OltFixableTab', { action: 'fixStatusFailed', recordId: rec.id, error }); }
       }
 
       // Fix serial mismatches in bulk batches
@@ -171,8 +172,8 @@ export function OltFixableTab({
       setSelectedIds(new Set());
       fetchRecords('pending');
       fetchStats();
-    } catch {
-      // Error handled via bulk result
+    } catch (error) {
+      log.warn('OltFixableTab', { action: 'bulkFixFailed', error });
     } finally {
       setBulkFixing(false);
     }

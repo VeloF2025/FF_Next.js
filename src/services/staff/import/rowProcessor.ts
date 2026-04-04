@@ -109,7 +109,7 @@ export async function processImportRows(
 
           }
         } catch (error) {
-
+          log.warn('rowProcessor', { action: 'managerLookupFailed', managerName, error });
         }
       } else {
 

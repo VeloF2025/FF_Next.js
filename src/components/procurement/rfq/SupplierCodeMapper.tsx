@@ -10,6 +10,7 @@ import {
   ArrowRight, AlertCircle,
 } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
+import { log } from '@/lib/logger';
 
 interface RFQItem {
   id: string;
@@ -54,8 +55,8 @@ export default function SupplierCodeMapper({
       if (data.data?.items) {
         setSearchResults(data.data.items);
       }
-    } catch {
-      // Fail silently for search
+    } catch (error) {
+      log.warn('SupplierCodeMapper', { action: 'stockItemsSearchFailed', error });
     } finally {
       setIsSearching(false);
     }

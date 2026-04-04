@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
+import { log } from '@/lib/logger';
 import { useProject, useProjectHierarchy, useDeleteProject } from '@/hooks/useProjects';
 import { EnhancedSOWDisplay } from '@/components/sow/EnhancedSOWDisplay';
 import { ProjectHSTab } from '@/modules/health-safety/components';
@@ -125,8 +126,8 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
         }
 
         setTabBadges(badges);
-      } catch {
-        // Silently fail - badges are optional
+      } catch (error) {
+        log.warn('ProjectDetail', { action: 'fetchBadgesFailed', projectId: id, error });
       }
     }
 

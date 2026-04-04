@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import { log } from '@/lib/logger';
 import { 
   Select, 
   SelectContent, 
@@ -277,7 +278,7 @@ export function ServiceSelect({
             return;
           }
         } catch (apiError) {
-          // TODO: Replace with proper logging - Service templates API not available, using fallback
+          log.warn('ContractorFormFields', { action: 'serviceTemplatesFetchFailed', error: apiError });
         }
         
         // Fallback to comprehensive default services

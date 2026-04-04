@@ -5,6 +5,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { log } from '@/lib/logger';
 import {
   Upload,
   FileSpreadsheet,
@@ -38,8 +39,8 @@ export function OltImportTab({ autoDetectStatus, fetchStats }: OltImportTabProps
           const data = await res.json();
           setProjects(data.data?.projects || data.projects || []);
         }
-      } catch {
-        // Silently fail
+      } catch (error) {
+        log.warn('OltImportTab', { action: 'fetchProjectsFailed', error });
       }
     };
     fetchProjects();

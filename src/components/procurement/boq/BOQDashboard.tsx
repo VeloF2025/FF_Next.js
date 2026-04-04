@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { FileText, AlertTriangle, Clock, Loader2 } from 'lucide-react';
+import { log } from '@/lib/logger';
 import { BOQ, BOQStats } from '@/types/procurement/boq.types';
 import { ImportJob, ImportStats } from '@/services/procurement/boqImportService';
 import { useProcurementContext } from '@/hooks/procurement/useProcurementContext';
@@ -53,7 +54,7 @@ export default function BOQDashboard({ className }: BOQDashboardProps) {
       setRecentActivity(data.recentActivity);
       setActiveJobs(data.activeJobs);
     } catch (error) {
-      // log.error('Failed to load dashboard data:', { data: error }, 'BOQDashboard');
+      log.error('Failed to load dashboard data:', { data: error }, 'BOQDashboard');
       notificationService.operationError('load', error as Error, 'dashboard data');
     } finally {
       setIsLoading(false);

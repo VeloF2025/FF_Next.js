@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Download, Loader2 } from 'lucide-react';
+import { log } from '@/lib/logger';
 import type { ReportPeriod, ReportData, DisplacedReport, OltRecord } from '../../../types';
 import { formatDisplayDate } from '@/utils/dateFormat';
 
@@ -32,8 +33,8 @@ export function OltReportingTab({ setError }: OltReportingTabProps) {
         const data = await res.json();
         setReportData(data.data || data);
       }
-    } catch {
-      // Silently fail
+    } catch (error) {
+      log.warn('OltReportingTab', { action: 'fetchReportDataFailed', error });
     } finally {
       setReportLoading(false);
     }
@@ -47,8 +48,8 @@ export function OltReportingTab({ setError }: OltReportingTabProps) {
         const data = await res.json();
         setDisplacedReport(data.data || data);
       }
-    } catch {
-      // Silently fail
+    } catch (error) {
+      log.warn('OltReportingTab', { action: 'fetchDisplacedReportFailed', error });
     } finally {
       setDisplacedReportLoading(false);
     }

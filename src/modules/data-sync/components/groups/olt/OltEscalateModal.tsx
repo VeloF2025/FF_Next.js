@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { AlertTriangle, Loader2 } from 'lucide-react';
+import { log } from '@/lib/logger';
 
 interface OltEscalateModalProps {
   recordId: string;
@@ -29,8 +30,8 @@ export function OltEscalateModal({ recordId, onClose, onEscalated, setError }: O
           const data = await res.json();
           setAdminUsers(data.data || data || []);
         }
-      } catch {
-        // Silently fail
+      } catch (error) {
+        log.warn('OltEscalateModal', { action: 'fetchAdminUsersFailed', error });
       }
     };
     fetchAdminUsers();

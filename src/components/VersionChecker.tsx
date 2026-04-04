@@ -30,7 +30,7 @@ export function VersionChecker() {
           clearInterval(interval); // Stop checking once update detected
         }
       } catch {
-        // Silently fail - don't interrupt user experience
+        // intentional: version check failures must not interrupt user experience
       }
     }, 5 * 60 * 1000); // 5 minutes
 

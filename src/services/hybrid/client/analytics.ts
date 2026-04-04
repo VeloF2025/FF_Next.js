@@ -40,6 +40,6 @@ export async function syncClientToAnalytics(_clientId: string, _clientData: any)
     // TODO: Implement actual client analytics sync
     
   } catch (error) {
-    // Silent fail for analytics sync
+    // intentional: analytics sync failures must not break main operations
   }
 }

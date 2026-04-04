@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import { CheckCircle2, Circle, Loader2, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
+import { log } from '@/lib/logger';
 import { useProjectRequirements, completeRequirement, ProjectRequirement } from '@/hooks/useProjectOverview';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatDisplayDate } from '@/utils/dateFormat';
@@ -63,7 +64,7 @@ export function ProjectWorkflowChecklist({ projectId, projectStatus }: ProjectWo
       // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['project-requirements', projectId] });
     } catch (err) {
-      // Error handling - could show toast here
+      log.warn('ProjectWorkflowChecklist', { action: 'completeRequirementFailed', requirementId: requirement.id, error: err });
     } finally {
       setCompletingId(null);
     }

@@ -257,10 +257,10 @@ async function sendErrorEvent(event: ErrorEvent): Promise<void> {
       body: JSON.stringify(event),
       keepalive: true,
     }).catch(() => {
-      // Silently fail - don't impact user experience
+      // intentional: fetch failure must not impact user experience
     });
   } catch (error) {
-    // Don't log to avoid infinite loop
+    // intentional: avoid infinite loop — logging here would call captureException recursively
   }
 }
 

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-ignore — firebase not in project dependencies
 import { collection, query, where, orderBy, getDocs, doc, addDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import { log } from '@/lib/logger';
 // @ts-ignore — firebase config not available
 import { db } from '@/config/firebase';
 import { 
@@ -43,7 +44,7 @@ export const clientQueryService = {
           category: client.category,
         }));
     } catch (error) {
-      // Error: 'Error getting active clients:', error);
+      log.error('clientQueryService', { action: 'getActiveClientsFailed', error });
       throw new Error('Failed to fetch active clients');
     }
   },
@@ -100,7 +101,7 @@ export const clientQueryService = {
       
       return summary;
     } catch (error) {
-      // Error: 'Error getting client summary:', error);
+      log.error('clientQueryService', { action: 'getClientSummaryFailed', error });
       throw new Error('Failed to fetch client summary');
     }
   },
@@ -136,7 +137,7 @@ export const clientQueryService = {
         updatedAt: Timestamp.now(),
       });
     } catch (error) {
-      // Error: 'Error updating client metrics:', error);
+      log.error('clientQueryService', { action: 'updateClientMetricsFailed', error });
       throw new Error('Failed to update client metrics');
     }
   },
@@ -162,7 +163,7 @@ export const clientQueryService = {
       
       return docRef.id;
     } catch (error) {
-      // Error: 'Error adding contact history:', error);
+      log.error('clientQueryService', { action: 'addContactHistoryFailed', error });
       throw new Error('Failed to add contact history');
     }
   },
@@ -184,7 +185,7 @@ export const clientQueryService = {
         ...doc.data()
       } as ContactHistory));
     } catch (error) {
-      // Error: 'Error getting contact history:', error);
+      log.error('clientQueryService', { action: 'getContactHistoryFailed', error });
       throw new Error('Failed to fetch contact history');
     }
   },

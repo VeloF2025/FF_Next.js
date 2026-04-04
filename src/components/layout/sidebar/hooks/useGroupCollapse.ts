@@ -45,7 +45,7 @@ export function useGroupCollapse({ items, sectionId }: UseGroupCollapseOptions):
           }
         }
       } catch {
-        // Ignore
+        // intentional: localStorage may be unavailable (private browsing, quota exceeded)
       }
     }
     // Default: expand all groups
@@ -76,7 +76,7 @@ export function useGroupCollapse({ items, sectionId }: UseGroupCollapseOptions):
         allGroups.push(...Array.from(expandedGroups));
         localStorage.setItem(STORAGE_KEY, JSON.stringify(allGroups));
       } catch {
-        // Ignore localStorage errors
+        // intentional: localStorage may be unavailable (private browsing, quota exceeded)
       }
     }, 100);
 

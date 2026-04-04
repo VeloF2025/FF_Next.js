@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { log } from '@/lib/logger';
 import { analyticsService } from '@/services/analytics';
 import { FirebaseToNeonSync } from '@/services/sync';
 import { transformKPIDashboardItemsToMetrics } from '@/types/analytics';
@@ -58,7 +59,7 @@ export function AnalyticsDashboard() {
         projectTrends
       });
     } catch (error) {
-      // log.error('Failed to load dashboard data:', { data: error }, 'AnalyticsDashboard');
+      log.error('Failed to load dashboard data:', { data: error }, 'AnalyticsDashboard');
     } finally {
       setLoading(false);
     }
@@ -72,7 +73,7 @@ export function AnalyticsDashboard() {
       setLastSyncTime(new Date());
       await loadDashboardData();
     } catch (error) {
-      // log.error('Sync failed:', { data: error }, 'AnalyticsDashboard');
+      log.error('Sync failed:', { data: error }, 'AnalyticsDashboard');
     } finally {
       setSyncing(false);
     }

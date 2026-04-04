@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { log } from '@/lib/logger';
 
 export interface ImageLoadOptions {
   src: string;
@@ -291,7 +292,7 @@ export class ImageCompressor {
         });
         results[`${size}w`] = compressed;
       } catch (error) {
-        // log.warn(`Failed to generate ${size}w version:`, { data: error }, 'imageOptimization');
+        log.warn(`Failed to generate ${size}w version:`, { data: error }, 'imageOptimization');
       }
     }
 

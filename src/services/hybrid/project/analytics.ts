@@ -66,7 +66,7 @@ export async function syncProjectToAnalytics(_projectId: string, _projectData: a
     // TODO: Implement actual analytics sync
     
   } catch (error) {
-    // Don't throw - sync failures shouldn't break main operations
+    // intentional: analytics sync failures must not break main operations
   }
 }
 

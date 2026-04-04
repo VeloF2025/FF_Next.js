@@ -49,7 +49,7 @@ export function useSectionCollapse({ sections }: UseSectionCollapseOptions): Use
         setExpandedSections(new Set(parsed));
       }
     } catch {
-      // Ignore localStorage errors
+      // intentional: localStorage may be unavailable (private browsing, quota exceeded)
     }
   }, []);
 
@@ -58,7 +58,7 @@ export function useSectionCollapse({ sections }: UseSectionCollapseOptions): Use
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify([...expandedSections]));
     } catch {
-      // Ignore localStorage errors
+      // intentional: localStorage may be unavailable (private browsing, quota exceeded)
     }
   }, [expandedSections]);
 

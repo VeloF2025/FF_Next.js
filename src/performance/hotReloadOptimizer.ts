@@ -173,10 +173,10 @@ class HotReloadOptimizer {
         // Dynamic import to preload (won't execute, just cache)
         /* @vite-ignore */
         import(modulePath).catch(() => {
-          // Ignore errors for modules that don't exist
+          // intentional: modules that don't exist are expected during HMR warmup
         });
       } catch {
-        // Ignore import errors
+        // intentional: dynamic import errors during HMR prefetch are non-critical
       }
     });
   }
