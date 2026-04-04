@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, MessageCircle, Send, Loader2, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { toast } from 'react-hot-toast';
 import { MancoActionItem, MancoActionItemComment, MancoMeetingContext } from '@/types/manco-action-items.types';
 import { log } from '@/lib/logger';
@@ -229,12 +230,9 @@ export function MancoDetailPane({
               {statusLabel}
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5 text-[var(--ff-text-secondary)]" />
-          </button>
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+            <X className="w-5 h-5" />
+          </Button>
         </div>
 
         <div className="p-6 space-y-6">
@@ -282,14 +280,16 @@ export function MancoDetailPane({
                 <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
               </select>
-              <button
-                onClick={handleStatusUpdate}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => { void handleStatusUpdate(); }}
                 disabled={loading || status === item.status}
-                className="px-4 py-2 bg-[var(--ff-primary)] text-white rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
+                loading={loading}
                 aria-label="Save status update"
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update'}
-              </button>
+                Update
+              </Button>
             </div>
           </div>
 
@@ -360,18 +360,17 @@ export function MancoDetailPane({
                 className="flex-1 px-3 py-2 text-sm border border-[var(--ff-border-light)] rounded bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-secondary)] resize-none"
                 rows={2}
               />
-              <button
-                onClick={handleAddComment}
+              <Button
+                variant="primary"
+                size="icon"
+                onClick={() => { void handleAddComment(); }}
                 disabled={commentsLoading || !newComment.trim()}
-                className="px-3 py-2 bg-[var(--ff-primary)] text-white rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 self-end"
+                loading={commentsLoading}
                 aria-label="Post comment"
+                className="self-end"
               >
-                {commentsLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
-              </button>
+                <Send className="w-4 h-4" />
+              </Button>
             </div>
           </div>
         </div>

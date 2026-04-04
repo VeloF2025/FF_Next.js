@@ -27,6 +27,7 @@ import {
   type DrValidationData,
   type TechnicianIssue,
 } from '../../services/qaAutoFailService';
+import { Button } from '@/components/ui/button';
 
 interface InitialDecisionData {
   decision: QaDecision | null;
@@ -632,18 +633,19 @@ export function FinalDecisionPhase({
               The photo quality prevented accurate extraction. Consider:
             </p>
             <div className="flex gap-2">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="sm"
                 onClick={() => setIssueClassification((prev) => ({
                   ...prev,
                   createTicket: true,
                   ticketType: 'qa',
                   ticketDescription: `Re-photo needed for ${dropNumber} - photo quality issue`,
                 }))}
-                className="px-3 py-1.5 text-sm bg-yellow-100 dark:bg-yellow-800/50 rounded hover:bg-yellow-200"
               >
                 Request Re-photo
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -813,31 +815,22 @@ export function FinalDecisionPhase({
 
       {/* Actions */}
       <div className="flex justify-between pt-4">
-        <button
+        <Button
+          variant="ghost"
           onClick={handleBack}
           disabled={savingDraft}
-          className="px-4 py-2 text-muted-foreground hover:text-foreground disabled:opacity-50"
+          loading={savingDraft}
         >
-          {savingDraft ? (
-            <span className="flex items-center gap-2">
-              <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400" />
-              Saving draft...
-            </span>
-          ) : (
-            '← Back'
-          )}
-        </button>
-        <button
-          onClick={handleSubmit}
+          Back
+        </Button>
+        <Button
+          variant="primary"
+          onClick={() => { void handleSubmit(); }}
           disabled={!decision || loading || savingDraft || (isOverriding && !overrideReason)}
-          className={`px-6 py-2 rounded-lg font-medium ${
-            !decision || loading || savingDraft || (isOverriding && !overrideReason)
-              ? 'bg-muted text-muted-foreground cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
-          }`}
+          loading={loading}
         >
-          {loading ? 'Saving...' : 'Confirm & Send Feedback →'}
-        </button>
+          {loading ? 'Saving...' : 'Confirm & Send Feedback'}
+        </Button>
       </div>
     </div>
   );

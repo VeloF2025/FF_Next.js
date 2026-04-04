@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { log } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
 import type { QaWizardPhase, QaWizardState, QaDecision, Photo } from '../../types/unified.types';
 import { PrerequisitesPhase } from './PrerequisitesPhase';
 import { PhotoReviewPhase } from './PhotoReviewPhase';
@@ -542,12 +543,12 @@ export function QaWizardContainer({
     return (
       <div className="p-6 text-center">
         <div className="text-red-500 mb-4">Error: {error}</div>
-        <button
-          onClick={loadWizardState}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        <Button
+          variant="primary"
+          onClick={() => { void loadWizardState(); }}
         >
           Retry
-        </button>
+        </Button>
       </div>
     );
   }

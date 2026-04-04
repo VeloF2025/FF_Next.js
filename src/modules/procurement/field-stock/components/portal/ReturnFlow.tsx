@@ -7,6 +7,7 @@ import { useState, useId, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { Loader2, Trash2, ArrowLeft, Check } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
 import type { StockLocation, SerialCondition } from '../../types';
 import type { ReturnItem } from './types';
 import { ScannerView } from './ScannerView';
@@ -112,12 +113,14 @@ export function ReturnFlow({ technicians, techLoading, onBack, onDone }: ReturnF
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={stepIndex === 0 ? onBack : () => setStep(['technician', 'scan', 'review'][stepIndex - 1] as ReturnStep)}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          aria-label="Back"
         >
-          <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-        </button>
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
         <div>
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Process Return</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">Step {stepIndex + 1} of 3</p>
@@ -164,13 +167,13 @@ export function ReturnFlow({ technicians, techLoading, onBack, onDone }: ReturnF
               ))}
             </div>
           )}
-          <button
+          <Button
             onClick={() => setStep('scan')}
             disabled={!selectedTechId}
-            className="w-full min-h-[56px] bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors"
+            className="w-full min-h-[56px]"
           >
             Next: Scan Items
-          </button>
+          </Button>
         </div>
       )}
 
@@ -200,13 +203,13 @@ export function ReturnFlow({ technicians, techLoading, onBack, onDone }: ReturnF
             </div>
           )}
 
-          <button
+          <Button
             onClick={() => setStep('review')}
             disabled={returnItems.length === 0}
-            className="w-full min-h-[56px] bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors"
+            className="w-full min-h-[56px]"
           >
             Review ({returnItems.length} items)
-          </button>
+          </Button>
         </div>
       )}
 
@@ -228,17 +231,17 @@ export function ReturnFlow({ technicians, techLoading, onBack, onDone }: ReturnF
                   <option value="fair">Fair</option>
                   <option value="damaged">Damaged</option>
                 </select>
-                <button onClick={() => removeItem(item.serial)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg">
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <Button variant="ghost" size="icon" onClick={() => removeItem(item.serial)} aria-label="Remove item">
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                </Button>
               </div>
             ))}
           </div>
 
-          <button
+          <Button
             onClick={handleSubmit}
             disabled={submitting}
-            className="w-full min-h-[56px] bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors"
+            className="w-full min-h-[56px]"
           >
             {submitting ? (
               <>
@@ -248,7 +251,7 @@ export function ReturnFlow({ technicians, techLoading, onBack, onDone }: ReturnF
             ) : (
               `Confirm Return (${returnItems.length} items)`
             )}
-          </button>
+          </Button>
         </div>
       )}
     </div>

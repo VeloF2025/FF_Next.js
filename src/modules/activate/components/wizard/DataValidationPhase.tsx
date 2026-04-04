@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { log } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
 import type { QaWizardState, PowerMeterStatus, SerialValidationStatus } from '../../types/unified.types';
 
 interface DataValidationPhaseProps {
@@ -142,12 +143,12 @@ export function DataValidationPhase({
           <p className="text-muted-foreground mb-6">
             Extract and validate power meter reading and serial numbers from photos.
           </p>
-          <button
-            onClick={runExtraction}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+          <Button
+            variant="primary"
+            onClick={() => { void runExtraction(); }}
           >
             Start Extraction
-          </button>
+          </Button>
         </div>
       )}
 
@@ -168,12 +169,13 @@ export function DataValidationPhase({
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 mb-4">
           <p className="text-red-700 dark:text-red-300">{error}</p>
-          <button
-            onClick={runExtraction}
-            className="mt-2 text-sm text-red-600 dark:text-red-400 underline"
+          <Button
+            variant="link"
+            onClick={() => { void runExtraction(); }}
+            className="mt-2 text-sm text-red-600 dark:text-red-400"
           >
             Try Again
-          </button>
+          </Button>
         </div>
       )}
 
@@ -281,18 +283,18 @@ export function DataValidationPhase({
 
           {/* Actions */}
           <div className="flex justify-between pt-4">
-            <button
+            <Button
+              variant="ghost"
               onClick={onBack}
-              className="px-4 py-2 text-muted-foreground hover:text-foreground"
             >
               ← Back
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="primary"
               onClick={handleContinue}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
             >
               Continue to Decision →
-            </button>
+            </Button>
           </div>
         </>
       )}

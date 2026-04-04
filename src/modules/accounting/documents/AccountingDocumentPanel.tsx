@@ -11,6 +11,7 @@ import {
   X,
   Link2,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useAccountingDocuments } from './useAccountingDocuments';
 import {
   ACCOUNTING_DOCUMENT_TYPE_LABELS,
@@ -114,13 +115,10 @@ export function AccountingDocumentPanel({
           </h3>
         </div>
         {!readOnly && (
-          <button
-            onClick={() => setShowUpload(!showUpload)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
+          <Button variant="primary" size="sm" onClick={() => setShowUpload(!showUpload)}>
             <Upload className="h-4 w-4" />
             Upload
-          </button>
+          </Button>
         )}
       </div>
 
@@ -171,23 +169,23 @@ export function AccountingDocumentPanel({
             </div>
 
             <div className="flex items-center gap-2 pt-1">
-              <button
-                onClick={handleUpload}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => { void handleUpload(); }}
                 disabled={!selectedFile || uploading}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                loading={uploading}
               >
-                {uploading ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" /> Uploading...</>
-                ) : (
-                  <><Upload className="h-4 w-4" /> Upload Document</>
-                )}
-              </button>
-              <button
+                <Upload className="h-4 w-4" />
+                {uploading ? 'Uploading...' : 'Upload Document'}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => { setShowUpload(false); setSelectedFile(null); setNotes(''); }}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
               >
                 <X className="h-4 w-4" /> Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -261,13 +259,14 @@ export function AccountingDocumentPanel({
                     <Download className="h-4 w-4 text-[var(--ff-text-secondary)]" />
                   </a>
                   {!readOnly && !isLinked && (
-                    <button
-                      onClick={() => handleDelete(doc.id, doc.documentName)}
-                      className="p-1.5 hover:bg-red-500/10 rounded-lg transition-colors"
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => { void handleDelete(doc.id, doc.documentName); }}
                       title="Delete"
                     >
                       <Trash2 className="h-4 w-4 text-red-400" />
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>

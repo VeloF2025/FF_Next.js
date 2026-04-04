@@ -17,6 +17,7 @@
 
 import { useState, useMemo } from 'react';
 import Image from 'next/image';
+import { Button } from '@/components/ui/button';
 import type { Photo, PhotoSource } from '../types/unified.types';
 import { STEP_LABELS } from '../types/unified.types';
 import { PhotoLightbox as SharedLightbox, type LightboxPhoto } from '@/components/PhotoLightbox';
@@ -145,15 +146,16 @@ function StepGroupedGallery({ photos, source, onPhotoClick }: StepGroupedGallery
             {photos.length} photo{photos.length !== 1 ? 's' : ''}
           </span>
         </div>
-        <button
+        <Button
+          variant="link"
+          size="sm"
           onClick={() => {
             const allSteps = new Set(Object.keys(photosByStep).map(Number));
             setExpandedSteps(expandedSteps.size === allSteps.size ? new Set() : allSteps);
           }}
-          className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
         >
           {expandedSteps.size === Object.keys(photosByStep).length ? 'Collapse All' : 'Expand All'}
-        </button>
+        </Button>
       </div>
 
       {/* Step Sections */}

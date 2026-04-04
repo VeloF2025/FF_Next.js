@@ -20,6 +20,7 @@ import {
   type TechnicianIssue,
 } from '../../services/qaAutoFailService';
 import { STEP_LABELS } from '../../utils/stepMapper';
+import { Button } from '@/components/ui/button';
 
 interface FeedbackPhaseProps {
   dropNumber: string;
@@ -335,12 +336,9 @@ export function FeedbackPhase({
           </div>
         </div>
 
-        <button
-          onClick={onComplete}
-          className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-        >
+        <Button variant="primary" onClick={onComplete}>
           Finish Review
-        </button>
+        </Button>
       </div>
     );
   }
@@ -551,13 +549,9 @@ export function FeedbackPhase({
             <span className="text-green-500">💬</span>
             WhatsApp Feedback
           </h4>
-          <button
-            type="button"
-            onClick={generateTemplate}
-            className="text-sm text-blue-600 hover:text-blue-700"
-          >
+          <Button type="button" variant="link" size="sm" onClick={generateTemplate}>
             Reset to Template
-          </button>
+          </Button>
         </div>
 
         <textarea
@@ -722,41 +716,21 @@ export function FeedbackPhase({
 
       {/* Actions */}
       <div className="flex justify-between pt-4 border-t border-border">
-        <button
-          onClick={onBack}
-          className="px-4 py-2 text-muted-foreground hover:text-foreground"
-        >
-          ← Back
-        </button>
+        <Button variant="ghost" onClick={onBack}>
+          Back
+        </Button>
         <div className="flex gap-3">
-          <button
-            onClick={onComplete}
-            className="px-4 py-2 border border-border text-muted-foreground rounded-lg hover:bg-accent"
-          >
+          <Button variant="secondary" onClick={onComplete}>
             Skip Feedback
-          </button>
-          <button
-            onClick={handleSendFeedback}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => { void handleSendFeedback(); }}
             disabled={isSending || !feedback.customMessage.trim() || (feedbackAlreadySent && !confirmResend)}
-            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            loading={isSending}
           >
-            {isSending ? (
-              <>
-                <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                Sending...
-              </>
-            ) : feedbackAlreadySent ? (
-              <>
-                <span>🔄</span>
-                Resend Feedback
-              </>
-            ) : (
-              <>
-                <span>📤</span>
-                Send Feedback
-              </>
-            )}
-          </button>
+            {isSending ? 'Sending...' : feedbackAlreadySent ? 'Resend Feedback' : 'Send Feedback'}
+          </Button>
         </div>
       </div>
     </div>

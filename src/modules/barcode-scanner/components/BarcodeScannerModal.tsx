@@ -13,6 +13,7 @@ import { useBarcodeScanner, lookupAssetByCode } from '../hooks/useBarcodeScanner
 import type { BarcodeScannerModalProps, ScanResult, AssetLookupResult } from '../types/scanner';
 import type { Asset } from '@/modules/assets/types/asset';
 import { log } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
 
 const SCANNER_ELEMENT_ID = 'barcode-scanner-reader';
 
@@ -161,12 +162,9 @@ export function BarcodeScannerModal({
                 <Camera className="w-5 h-5 text-blue-400" />
                 <h2 className="text-lg font-semibold text-white">{title}</h2>
               </div>
-              <button
-                onClick={handleClose}
-                className="p-2 rounded-lg hover:bg-slate-800 transition-colors"
-              >
+              <Button variant="ghost" size="icon" onClick={handleClose}>
                 <X className="w-5 h-5 text-slate-400" />
-              </button>
+              </Button>
             </div>
 
             {/* Scanner Area */}
@@ -196,12 +194,9 @@ export function BarcodeScannerModal({
                     <p className="text-slate-400 text-sm mb-4">
                       {scannerError || 'Please allow camera access to scan barcodes'}
                     </p>
-                    <button
-                      onClick={handleTryAgain}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                    >
+                    <Button variant="primary" onClick={handleTryAgain}>
                       Try Again
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -235,16 +230,18 @@ export function BarcodeScannerModal({
 
               {/* Torch button */}
               {scannerState === 'scanning' && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={toggleTorch}
-                  className="absolute top-4 right-4 p-3 bg-slate-800/80 hover:bg-slate-700 rounded-full transition-colors"
+                  className="absolute top-4 right-4"
                 >
                   {isTorchOn ? (
                     <FlashlightOff className="w-5 h-5 text-yellow-400" />
                   ) : (
                     <Flashlight className="w-5 h-5 text-slate-300" />
                   )}
-                </button>
+                </Button>
               )}
             </div>
 
@@ -274,18 +271,12 @@ export function BarcodeScannerModal({
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      onClick={handleTryAgain}
-                      className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-                    >
+                    <Button variant="secondary" onClick={handleTryAgain} className="flex-1">
                       Scan Another
-                    </button>
-                    <button
-                      onClick={handleSelectAsset}
-                      className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
-                    >
+                    </Button>
+                    <Button variant="primary" onClick={handleSelectAsset} className="flex-1">
                       Select Asset
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -306,12 +297,9 @@ export function BarcodeScannerModal({
                       )}
                     </div>
                   </div>
-                  <button
-                    onClick={handleTryAgain}
-                    className="w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-                  >
+                  <Button variant="secondary" onClick={handleTryAgain} className="w-full">
                     Try Again
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>

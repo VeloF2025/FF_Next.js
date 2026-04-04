@@ -37,6 +37,7 @@ import type {
   MilestoneData,
   ProjectionData,
 } from '../../types/reporting.types';
+import { Button } from '@/components/ui/button';
 
 interface MaturityTrackingReportProps {
   projectId?: string;
@@ -351,13 +352,14 @@ export function MaturityTrackingReport({ projectId, projectName }: MaturityTrack
             {hideZero ? 'Hiding Zero' : 'Hide Zero'}
           </button>
         </div>
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={exportCsv}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors"
         >
           <Download className="w-4 h-4" />
           Export CSV
-        </button>
+        </Button>
       </div>
 
       {/* Project Cards */}

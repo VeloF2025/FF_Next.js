@@ -15,6 +15,7 @@ import {
   RefreshCw,
   MessageSquare,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { notificationService } from '@/services/core/NotificationService';
 import { waAdminApi } from '../services/waAdminApiService';
 import type { WaMonitoredGroup, WaMonitoredGroupInput, WaGroupType } from '../types/wa-admin.types';
@@ -59,12 +60,12 @@ const GroupTableRow: React.FC<GroupTableRowProps> = ({ group, onEdit, onDelete, 
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center justify-end gap-2">
-          <button onClick={() => onEdit(group)} className="p-1.5 text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)] rounded" aria-label={`Edit ${group.group_name}`}>
+          <Button variant="ghost" size="icon" onClick={() => onEdit(group)} aria-label={`Edit ${group.group_name}`}>
             <Edit2 className="w-4 h-4" />
-          </button>
-          <button onClick={() => onDelete(group)} className="p-1.5 text-red-600 hover:bg-red-500/10 rounded" aria-label={`Delete ${group.group_name}`}>
+          </Button>
+          <Button variant="danger" size="icon" onClick={() => onDelete(group)} aria-label={`Delete ${group.group_name}`}>
             <Trash2 className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
       </td>
     </tr>
@@ -159,13 +160,10 @@ const MonitoredGroupsTab: React.FC = () => {
       <div className="text-center py-12" role="alert">
         <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
         <p className="text-red-600 mb-4">{error}</p>
-        <button
-          onClick={fetchGroups}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
+        <Button variant="primary" onClick={fetchGroups}>
           <RefreshCw className="w-4 h-4" />
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -180,13 +178,10 @@ const MonitoredGroupsTab: React.FC = () => {
             Groups the WhatsApp Bridge monitors for incoming messages
           </p>
         </div>
-        <button
-          onClick={() => setIsCreating(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
-        >
+        <Button variant="primary" onClick={() => setIsCreating(true)}>
           <Plus className="w-4 h-4" />
           Add Group
-        </button>
+        </Button>
       </div>
 
       {/* Type Filter Cards */}

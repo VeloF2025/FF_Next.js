@@ -11,6 +11,7 @@ import { ActionItem, ActionItemSourceType } from '@/types/action-items.types';
 import { actionItemsService } from '@/services/action-items/actionItemsService';
 import { ActionItemsList } from '../components/ActionItemsList';
 import { SourceBadge } from '../components/SourceBadge';
+import { Button } from '@/components/ui/button';
 import { log } from '@/lib/logger';
 
 type GroupFilter = 'all' | ActionItemSourceType;
@@ -54,14 +55,15 @@ export function MyActionItems() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             aria-label="Back to action items"
-            onClick={() => router.push('/action-items')}
-            className="p-2 hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors"
+            onClick={() => { void router.push('/action-items'); }}
           >
-            <ArrowLeft className="w-5 h-5 text-[var(--ff-text-secondary)]" />
-          </button>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
           <div>
             <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">My Actions</h1>
             <p className="text-sm text-[var(--ff-text-secondary)]">
@@ -71,15 +73,16 @@ export function MyActionItems() {
             </p>
           </div>
         </div>
-        <button
+        <Button
           type="button"
+          variant="secondary"
+          size="icon"
           aria-label="Refresh action items"
           onClick={fetchItems}
           disabled={loading}
-          className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg transition-colors"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
+        </Button>
       </div>
 
       {/*

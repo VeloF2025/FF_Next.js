@@ -8,6 +8,7 @@
 
 import { Plus, Trash2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import {
   CATEGORY_OPTIONS,
   SEVERITY_OPTIONS,
@@ -149,9 +150,9 @@ export function StepThree({ entries, onAdd, onRemove, onUpdate }: StepThreeProps
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-zinc-300">Finding #{entry.snag_number}</span>
             {entries.length > 1 && (
-              <button type="button" onClick={() => onRemove(i)} className="text-zinc-600 hover:text-red-400">
+              <Button type="button" variant="ghost" size="icon" onClick={() => onRemove(i)} aria-label="Remove finding">
                 <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              </Button>
             )}
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -208,14 +209,10 @@ export function StepThree({ entries, onAdd, onRemove, onUpdate }: StepThreeProps
           </div>
         </div>
       ))}
-      <button
-        type="button"
-        onClick={onAdd}
-        className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300"
-      >
+      <Button type="button" variant="link" size="sm" onClick={onAdd}>
         <Plus className="h-3.5 w-3.5" />
         Add Finding
-      </button>
+      </Button>
     </div>
   );
 }

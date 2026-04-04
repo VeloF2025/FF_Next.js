@@ -31,7 +31,7 @@ import {
   X,
   Save,
 } from 'lucide-react';
-import { Button } from '@/shared/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/shared/components/ui/Input';
 import { Badge } from '@/shared/components/ui/Badge';
 import { formatDisplayDate } from '@/utils/dateFormat';
@@ -544,12 +544,9 @@ function EditTechnicianModal({ technician, onClose, onSave }: EditTechnicianModa
           <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
             Edit Technician
           </h3>
-          <button
-            onClick={onClose}
-            className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]"
-          >
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
             <X className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
 
         {/* Body */}

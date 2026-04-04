@@ -1,5 +1,6 @@
 import { User, MoreVertical } from 'lucide-react';
 import { ActionItem, Meeting, Status, Priority } from '@/types/communications.types';
+import { Button } from '@/components/ui/button';
 
 interface CommunicationsActionTabProps {
   actionItems: ActionItem[];
@@ -74,9 +75,9 @@ export function CommunicationsActionTab({
                 </span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <button className="text-gray-400 hover:text-muted-foreground">
+                <Button variant="ghost" size="icon" aria-label="More options">
                   <MoreVertical className="w-5 h-5" />
-                </button>
+                </Button>
               </td>
             </tr>
           ))}

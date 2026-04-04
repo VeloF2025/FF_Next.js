@@ -10,6 +10,7 @@ import React, { useState } from 'react';
 import { FileText, Download, Printer, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { log } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
 import { notificationService } from '@/services/core/NotificationService';
 import { useContractorDocumentReport } from '../hooks/useDocumentReport';
 import {
@@ -129,27 +130,18 @@ export default function SingleContractorReport({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleExportCSV}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:bg-background"
-          >
+          <Button variant="secondary" onClick={handleExportCSV}>
             <Download size={16} />
             <span className="hidden sm:inline">CSV</span>
-          </button>
-          <button
-            onClick={handleExportPDF}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:bg-background"
-          >
+          </Button>
+          <Button variant="secondary" onClick={handleExportPDF}>
             <Download size={16} />
             <span className="hidden sm:inline">PDF</span>
-          </button>
-          <button
-            onClick={handlePrint}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:bg-background"
-          >
+          </Button>
+          <Button variant="secondary" onClick={handlePrint}>
             <Printer size={16} />
             <span className="hidden sm:inline">Print</span>
-          </button>
+          </Button>
         </div>
       </div>
 

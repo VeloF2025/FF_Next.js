@@ -26,6 +26,7 @@ import type {
 } from '../services/activateDataService';
 import { log } from '@/lib/logger';
 import toast from 'react-hot-toast';
+import { Button } from '@/components/ui/button';
 
 // ============================================================================
 // BADGE COLOR REFERENCE
@@ -477,12 +478,9 @@ function QaCentrePageContent() {
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
             <h3 className="text-red-800 dark:text-red-200 font-semibold mb-2">Error Loading DRs</h3>
             <p className="text-red-600 dark:text-red-400">{error}</p>
-            <button
-              onClick={refresh}
-              className="mt-4 px-4 py-2 bg-red-600 dark:bg-red-500 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600 transition-colors"
-            >
+            <Button variant="danger" size="sm" onClick={refresh} className="mt-4">
               Retry
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -505,14 +503,10 @@ function QaCentrePageContent() {
                   Last updated: {lastRefreshAt.toLocaleTimeString()}
                 </div>
               )}
-              <button
-                onClick={refresh}
-                className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
-                title="Refresh data"
-              >
-                <RefreshCw className={`h-4 w-4 text-[var(--ff-text-secondary)] ${isLoading ? 'animate-spin' : ''}`} />
-                <span className="text-sm text-[var(--ff-text-secondary)]">Refresh</span>
-              </button>
+              <Button variant="secondary" size="sm" onClick={refresh} title="Refresh data">
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
             </div>
           </div>
         </div>
@@ -567,15 +561,16 @@ function QaCentrePageContent() {
               </button>
 
               {/* Export Button */}
-              <button
-                onClick={handleExportExcel}
+              <Button
+                variant="primary"
+                onClick={() => { void handleExportExcel(); }}
                 disabled={isExporting}
-                className="px-4 py-3 rounded-lg font-medium transition-colors bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                loading={isExporting}
                 title={`Export ${filters.statusFilter !== 'all' ? 'filtered' : 'all'} data to Excel`}
               >
                 <Download className={`h-5 w-5 ${isExporting ? 'animate-bounce' : ''}`} />
                 {isExporting ? 'Exporting...' : `Export ${filters.statusFilter !== 'all' ? filters.statusFilter.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : 'All'} Excel`}
-              </button>
+              </Button>
             </div>
 
             {/* Filter Options */}
@@ -717,13 +712,10 @@ function QaCentrePageContent() {
                 {/* Clear Filters Button */}
                 {hasActiveFilters && (
                   <div className="md:col-span-6 flex justify-end">
-                    <button
-                      onClick={handleClearFilters}
-                      className="px-4 py-2 bg-secondary text-muted-foreground rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
-                    >
+                    <Button variant="secondary" size="sm" onClick={handleClearFilters}>
                       <X className="h-4 w-4" />
                       Clear All Filters
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -960,28 +952,22 @@ function QaCentrePageContent() {
                   Page {currentPage} of {pagination.totalPages} • Showing {filteredDrops.length} drops per page
                 </div>
                 <div className="flex gap-2">
-                  <button
+                  <Button
+                    variant="primary"
+                    size="sm"
                     onClick={goToPreviousPage}
                     disabled={!pagination.hasPreviousPage}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                      pagination.hasPreviousPage
-                        ? 'bg-[var(--ff-primary-500)] text-white hover:opacity-90'
-                        : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)] cursor-not-allowed'
-                    }`}
                   >
-                    ← Previous
-                  </button>
-                  <button
+                    Previous
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
                     onClick={goToNextPage}
                     disabled={!pagination.hasNextPage}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                      pagination.hasNextPage
-                        ? 'bg-[var(--ff-primary-500)] text-white hover:opacity-90'
-                        : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)] cursor-not-allowed'
-                    }`}
                   >
-                    Next →
-                  </button>
+                    Next
+                  </Button>
                 </div>
               </div>
             </div>

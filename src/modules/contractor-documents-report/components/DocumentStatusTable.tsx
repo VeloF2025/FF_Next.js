@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { FileText, Eye, Upload, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { DocumentInfo, TeamMemberDocuments } from '../types/documentReport.types';
 import DocumentStatusBadge from './DocumentStatusBadge';
 import { formatExpiryDate, getActionButtonText } from '../utils/documentStatusRules';
@@ -117,12 +118,13 @@ export default function DocumentStatusTable({
                         onUpload={onUploadDocument}
                       />
                     ) : (
-                      <button
+                      <Button
+                        variant="link"
+                        size="sm"
                         onClick={() => onUploadDocument?.('ID Document')}
-                        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                       >
                         Upload
-                      </button>
+                      </Button>
                     )}
                   </td>
                 </tr>
@@ -152,35 +154,26 @@ function ActionButton({
 
   if (isViewable && doc.fileUrl) {
     return (
-      <button
-        onClick={() => onView?.(doc)}
-        className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
-      >
+      <Button variant="link" size="sm" onClick={() => onView?.(doc)}>
         <Eye size={14} />
         {actionText}
-      </button>
+      </Button>
     );
   }
 
   if (doc.displayStatus === 'rejected') {
     return (
-      <button
-        onClick={() => onUpload?.(doc.type)}
-        className="inline-flex items-center gap-1 text-sm text-purple-600 hover:text-purple-800 font-medium"
-      >
+      <Button variant="link" size="sm" onClick={() => onUpload?.(doc.type)}>
         <RefreshCw size={14} />
         {actionText}
-      </button>
+      </Button>
     );
   }
 
   return (
-    <button
-      onClick={() => onUpload?.(doc.type)}
-      className="inline-flex items-center gap-1 text-sm text-orange-600 hover:text-orange-800 font-medium"
-    >
+    <Button variant="link" size="sm" onClick={() => onUpload?.(doc.type)}>
       <Upload size={14} />
       {actionText}
-    </button>
+    </Button>
   );
 }

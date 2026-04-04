@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import type { ReportFilters } from '../../types/reporting.types';
 import { ReportCard, ReportCardGrid } from './shared';
+import { Button } from '@/components/ui/button';
 
 interface InstallationGapItem {
   drop_number: string;
@@ -128,12 +129,13 @@ export function InstallationGapsReports({ filters, refreshKey }: InstallationGap
         <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-6 text-center">
           <AlertTriangle className="h-8 w-8 text-red-500 mx-auto mb-2" />
           <p className="text-red-700 dark:text-red-300">{error}</p>
-          <button
-            onClick={fetchData}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          <Button
+            variant="danger"
+            onClick={() => { void fetchData(); }}
+            className="mt-4"
           >
             Retry
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -347,20 +349,22 @@ export function InstallationGapsReports({ filters, refreshKey }: InstallationGap
             Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
           </div>
           <div className="flex gap-2">
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="p-2 rounded-lg bg-secondary hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
               disabled={page >= pagination.totalPages}
-              className="p-2 rounded-lg bg-secondary hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronRight className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         </div>
       )}

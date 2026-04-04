@@ -13,6 +13,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, RotateCcw, ImageOff } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface LightboxPhoto {
   id: string;
@@ -150,23 +151,23 @@ export function PhotoLightbox({ photos, initialIndex, onClose }: Props) {
 
         <div className="flex items-center gap-2">
           {/* Zoom controls */}
-          <button onClick={zoomOut} disabled={zoom <= MIN_ZOOM} className="p-2 text-gray-400 hover:text-white disabled:opacity-30 transition-colors" title="Zoom out (-)">
+          <Button variant="ghost" size="icon" onClick={zoomOut} disabled={zoom <= MIN_ZOOM} title="Zoom out (-)">
             <ZoomOut className="w-5 h-5" />
-          </button>
+          </Button>
           <span className="text-xs text-gray-400 w-12 text-center font-mono">{Math.round(zoom * 100)}%</span>
-          <button onClick={zoomIn} disabled={zoom >= MAX_ZOOM} className="p-2 text-gray-400 hover:text-white disabled:opacity-30 transition-colors" title="Zoom in (+)">
+          <Button variant="ghost" size="icon" onClick={zoomIn} disabled={zoom >= MAX_ZOOM} title="Zoom in (+)">
             <ZoomIn className="w-5 h-5" />
-          </button>
-          <button onClick={resetView} className="p-2 text-gray-400 hover:text-white transition-colors" title="Reset zoom (0)">
+          </Button>
+          <Button variant="ghost" size="icon" onClick={resetView} title="Reset zoom (0)">
             <RotateCcw className="w-4 h-4" />
-          </button>
+          </Button>
 
           <div className="w-px h-6 bg-gray-700 mx-1" />
 
           {/* Close */}
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-white transition-colors" title="Close (Esc)">
+          <Button variant="ghost" size="icon" onClick={onClose} title="Close (Esc)" aria-label="Close">
             <X className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -203,22 +204,28 @@ export function PhotoLightbox({ photos, initialIndex, onClose }: Props) {
 
         {/* Prev arrow */}
         {currentIndex > 0 && (
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={goPrev}
-            className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/60 rounded-full text-white hover:bg-black/80 transition-colors"
+            className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/60 rounded-full text-white hover:bg-black/80"
+            aria-label="Previous photo"
           >
             <ChevronLeft className="w-6 h-6" />
-          </button>
+          </Button>
         )}
 
         {/* Next arrow */}
         {currentIndex < photos.length - 1 && (
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={goNext}
-            className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/60 rounded-full text-white hover:bg-black/80 transition-colors"
+            className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/60 rounded-full text-white hover:bg-black/80"
+            aria-label="Next photo"
           >
             <ChevronRight className="w-6 h-6" />
-          </button>
+          </Button>
         )}
       </div>
 

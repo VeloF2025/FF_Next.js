@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Loader2, ChevronDown, ChevronRight, Trash2, Image } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { EodInstallSheet } from '../../../types';
 
 export function EodHistoryTab() {
@@ -149,23 +150,25 @@ export function EodHistoryTab() {
             {total} sheets total
           </span>
           <div className="flex gap-2">
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-3 py-1 text-sm bg-[var(--ff-bg-tertiary)] rounded disabled:opacity-50 text-[var(--ff-text-secondary)]"
             >
               Prev
-            </button>
+            </Button>
             <span className="px-3 py-1 text-sm text-[var(--ff-text-secondary)]">
               {page} / {totalPages}
             </span>
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="px-3 py-1 text-sm bg-[var(--ff-bg-tertiary)] rounded disabled:opacity-50 text-[var(--ff-text-secondary)]"
             >
               Next
-            </button>
+            </Button>
           </div>
         </div>
       )}

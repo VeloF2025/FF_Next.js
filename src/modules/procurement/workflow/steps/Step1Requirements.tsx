@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { Loader2, AlertCircle, Calendar, Building2, ChevronDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { RequisitionUrgency } from '@/types/procurement/requisition.types';
 import type { WorkflowState } from '../useWorkflowState';
 import { RequisitionItemsTable, type FormItem } from './RequisitionItemsTable';
@@ -541,10 +542,9 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
 
       {/* Submit */}
       <div className="flex justify-end">
-        <button
+        <Button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex items-center gap-2 px-6 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSubmitting ? (
             <>
@@ -554,7 +554,7 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
           ) : (
             'Next: Choose Strategy'
           )}
-        </button>
+        </Button>
       </div>
     </form>
   );

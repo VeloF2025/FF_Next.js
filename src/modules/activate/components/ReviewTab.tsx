@@ -17,6 +17,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { STEP_LABELS } from '../utils/stepMapper';
 import { log } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
 
 // ============================================================================
 // TYPES
@@ -227,12 +228,9 @@ export function ReviewTab({
           </div>
         </div>
         {reviewedCount === totalSteps && onReviewComplete && (
-          <button
-            onClick={onReviewComplete}
-            className="px-4 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 transition-colors"
-          >
+          <Button variant="primary" size="sm" onClick={onReviewComplete}>
             Complete Review
-          </button>
+          </Button>
         )}
       </div>
 
@@ -377,20 +375,23 @@ export function ReviewTab({
               {/* Action Buttons */}
               {!isLocked && !selectedPhoto.humanOverride && (
                 <div className="flex gap-3 pt-4 border-t border-border">
-                  <button
-                    onClick={() => handleApprove(selectedPhoto.step)}
+                  <Button
+                    variant="primary"
+                    onClick={() => { void handleApprove(selectedPhoto.step); }}
                     disabled={isProcessing}
-                    className="flex-1 px-4 py-3 bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                    loading={isProcessing}
+                    className="flex-1"
                   >
-                    ✓ Approve (A)
-                  </button>
-                  <button
+                    Approve (A)
+                  </Button>
+                  <Button
+                    variant="danger"
                     onClick={() => setShowRejectModal(true)}
                     disabled={isProcessing}
-                    className="flex-1 px-4 py-3 bg-red-600 dark:bg-red-500 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                    className="flex-1"
                   >
-                    ✗ Reject (R)
-                  </button>
+                    Reject (R)
+                  </Button>
                 </div>
               )}
             </div>
@@ -414,22 +415,22 @@ export function ReviewTab({
               autoFocus
             />
             <div className="flex gap-3 mt-4">
-              <button
-                onClick={() => {
-                  setShowRejectModal(false);
-                  setRejectReason('');
-                }}
-                className="flex-1 px-4 py-2 border border-border text-muted-foreground rounded-lg hover:bg-accent transition-colors"
+              <Button
+                variant="secondary"
+                onClick={() => { setShowRejectModal(false); setRejectReason(''); }}
+                className="flex-1"
               >
                 Cancel (Esc)
-              </button>
-              <button
-                onClick={handleReject}
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => { void handleReject(); }}
                 disabled={isProcessing}
-                className="flex-1 px-4 py-2 bg-red-600 dark:bg-red-500 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                loading={isProcessing}
+                className="flex-1"
               >
-                {isProcessing ? 'Rejecting...' : 'Reject'}
-              </button>
+                Reject
+              </Button>
             </div>
           </div>
         </div>
@@ -520,26 +521,22 @@ function PhotoCard({
       {/* Hover Actions */}
       {!isLocked && !photo.humanOverride && (
         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onApprove();
-            }}
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={(e) => { e.stopPropagation(); onApprove(); }}
             disabled={isProcessing}
-            className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
           >
-            ✓
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onReject();
-            }}
+            Approve
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={(e) => { e.stopPropagation(); onReject(); }}
             disabled={isProcessing}
-            className="px-3 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
           >
-            ✗
-          </button>
+            Reject
+          </Button>
         </div>
       )}
     </div>

@@ -17,6 +17,7 @@ import {
   X, Loader2, ScanLine, ScanLine, PenLine,
   PackagePlus, Camera,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { LabelScanner } from './LabelScanner';
 import { ConditionPhotoCapture, type CapturedPhoto } from './ConditionPhotoCapture';
 import { BarcodeScannerModal } from '@/modules/barcode-scanner';
@@ -184,9 +185,9 @@ export function AddAssetModal({ isOpen, onClose, onCreated }: AddAssetModalProps
                 {mode === 'choose' ? 'Add Asset' : vlmData ? 'Add Asset (Scanned)' : 'Add Asset'}
               </h2>
             </div>
-            <button type="button" onClick={onClose} className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]">
+            <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close">
               <X className="h-5 w-5" />
-            </button>
+            </Button>
           </div>
 
           {/* Content */}
@@ -279,13 +280,14 @@ export function AddAssetModal({ isOpen, onClose, onCreated }: AddAssetModalProps
                     <span className="text-green-400">
                       Scanned — {Math.round(vlmData.confidence * 100)}% confidence. Review and edit below.
                     </span>
-                    <button
+                    <Button
                       type="button"
+                      variant="link"
+                      className="ml-auto"
                       onClick={() => setLabelScannerOpen(true)}
-                      className="ml-auto text-blue-400 hover:text-blue-300"
                     >
                       Re-scan
-                    </button>
+                    </Button>
                   </div>
                 )}
 
@@ -435,22 +437,23 @@ export function AddAssetModal({ isOpen, onClose, onCreated }: AddAssetModalProps
           {/* Footer */}
           {mode === 'manual' && (
             <div className="flex justify-end gap-3 p-5 border-t border-[var(--ff-border-light)]">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => vlmData ? setMode('choose') : onClose()}
-                className="px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
               >
                 {vlmData ? 'Back' : 'Cancel'}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
                 form="add-asset-form"
+                variant="primary"
                 disabled={!name.trim() || !categoryId || createAsset.isPending || conditionPhotos.some(p => p.uploading)}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                loading={createAsset.isPending}
               >
-                {createAsset.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <PackagePlus className="h-4 w-4" />}
+                <PackagePlus className="h-4 w-4" />
                 Add Asset
-              </button>
+              </Button>
             </div>
           )}
         </div>

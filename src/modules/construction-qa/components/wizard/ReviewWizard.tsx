@@ -32,6 +32,7 @@ import {
   X,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
 import { getChecklist } from '../../types/construction.types';
 import type {
   Discipline,
@@ -403,23 +404,24 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
                   className="px-2 py-1 bg-gray-800 border border-blue-500 rounded text-white text-lg font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   autoFocus
                 />
-                <button onClick={saveFeatureId} disabled={saving} className="p-1 text-green-400 hover:text-green-300" title="Save">
+                <Button variant="ghost" size="icon" onClick={saveFeatureId} disabled={saving} title="Save">
                   <Check className="w-5 h-5" />
-                </button>
-                <button onClick={() => setIsEditingFeatureId(false)} className="p-1 text-gray-400 hover:text-gray-300" title="Cancel">
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => setIsEditingFeatureId(false)} title="Cancel">
                   <X className="w-5 h-5" />
-                </button>
+                </Button>
               </div>
             ) : (
               <>
                 <h1 className="text-xl font-bold text-white">{review.feature_id}</h1>
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => { setEditFeatureId(review.feature_id); setIsEditingFeatureId(true); }}
-                  className="p-1 text-gray-500 hover:text-gray-300 transition-colors"
                   title="Rename or reassign to another pole"
                 >
                   <Pencil className="w-4 h-4" />
-                </button>
+                </Button>
               </>
             )}
           </div>
@@ -481,9 +483,9 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
         <div className="flex items-center gap-3 px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
           <span className="flex-1">{error}</span>
-          <button onClick={() => setError(null)} className="text-red-400/60 hover:text-red-300">
+          <Button variant="ghost" size="icon" onClick={() => setError(null)} aria-label="Dismiss error">
             <X className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
       )}
 

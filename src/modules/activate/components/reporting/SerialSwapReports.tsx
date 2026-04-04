@@ -33,6 +33,7 @@ import type {
   SwapStatus,
 } from '../../types/reporting.types';
 import { ReportCard, ReportCardGrid } from './shared';
+import { Button } from '@/components/ui/button';
 
 interface SerialSwapReportsProps {
   filters: ReportFilters;
@@ -166,12 +167,13 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
       <div className="p-6 text-center">
         <AlertTriangle className="h-8 w-8 text-red-500 mx-auto mb-2" />
         <p className="text-red-600 dark:text-red-400">{error}</p>
-        <button
-          onClick={fetchData}
-          className="mt-2 text-blue-600 hover:underline"
+        <Button
+          variant="link"
+          onClick={() => { void fetchData(); }}
+          className="mt-2"
         >
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -230,14 +232,16 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
           </select>
         </div>
 
-        <button
+        <Button
+          variant="primary"
+          size="sm"
           onClick={handleExport}
-          className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700"
           title={`Export ${selectedStatus ? selectedStatus.replace(/_/g, ' ') : 'all'} records to CSV`}
+          className="ml-auto"
         >
           <Download className="h-4 w-4" />
           Export {selectedStatus ? selectedStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'All'} CSV
-        </button>
+        </Button>
       </div>
 
       {/* Info Banner */}
@@ -349,20 +353,23 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
                   <td className="px-4 py-3">
                     {record.swap_status === 'pending_correction' && (
                       <div className="flex gap-2">
-                        <button
-                          onClick={() => handleStatusUpdate(record.drop_number, 'corrected_in_1map')}
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => { void handleStatusUpdate(record.drop_number, 'corrected_in_1map'); }}
                           disabled={actionLoading === record.drop_number}
-                          className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                          loading={actionLoading === record.drop_number}
                         >
-                          {actionLoading === record.drop_number ? '...' : 'Mark Corrected'}
-                        </button>
-                        <button
-                          onClick={() => handleStatusUpdate(record.drop_number, 'false_positive')}
+                          Mark Corrected
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => { void handleStatusUpdate(record.drop_number, 'false_positive'); }}
                           disabled={actionLoading === record.drop_number}
-                          className="px-2 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 disabled:opacity-50"
                         >
                           False +
-                        </button>
+                        </Button>
                       </div>
                     )}
                     {record.swap_status === 'corrected_in_1map' && record.corrected_at && (
@@ -386,20 +393,22 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
             {Math.min(page * pageSize, data.total_count)} of {data.total_count} results
           </p>
           <div className="flex gap-2">
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-3 py-1.5 border border-border rounded text-sm disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700"
             >
               <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setPage((p) => p + 1)}
               disabled={page * pageSize >= data.total_count}
-              className="px-3 py-1.5 border border-border rounded text-sm disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700"
             >
               <ChevronRight className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         </div>
       )}

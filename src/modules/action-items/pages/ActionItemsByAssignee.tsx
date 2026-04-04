@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 import { ActionItem } from '@/types/action-items.types';
 import { actionItemsService } from '@/services/action-items/actionItemsService';
 import { ActionItemsList } from '../components/ActionItemsList';
+import { Button } from '@/components/ui/button';
 
 export function ActionItemsByAssignee() {
   const router = useRouter();
@@ -47,13 +48,10 @@ export function ActionItemsByAssignee() {
     <div className="p-6">
       {/* Header */}
       <div className="mb-6">
-        <button
-          onClick={() => router.push('/action-items')}
-          className="flex items-center gap-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] mb-4"
-        >
+        <Button variant="link" onClick={() => { void router.push('/action-items'); }} className="mb-4 pl-0">
           <ArrowLeft className="w-4 h-4" />
           Back to Dashboard
-        </button>
+        </Button>
 
         <div className="flex items-center gap-3">
           <Users className="w-8 h-8 text-purple-500" />

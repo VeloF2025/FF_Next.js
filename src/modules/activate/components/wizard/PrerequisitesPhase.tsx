@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+import { Button } from '@/components/ui/button';
 import type { QaWizardState } from '../../types/unified.types';
 
 interface PrerequisitesPhaseProps {
@@ -92,23 +93,19 @@ export function PrerequisitesPhase({
 
       {/* Actions */}
       <div className="flex justify-between pt-4">
-        <button
+        <Button
+          variant="ghost"
           onClick={onRefresh}
-          className="px-4 py-2 text-muted-foreground hover:text-foreground"
         >
           Refresh
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="primary"
           onClick={() => onComplete(allPassed)}
           disabled={!allPassed}
-          className={`px-6 py-2 rounded-lg font-medium ${
-            allPassed
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'bg-muted text-muted-foreground cursor-not-allowed'
-          }`}
         >
           Continue to Photo Review
-        </button>
+        </Button>
       </div>
     </div>
   );

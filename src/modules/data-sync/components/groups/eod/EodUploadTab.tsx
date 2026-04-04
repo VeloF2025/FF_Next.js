@@ -7,6 +7,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Upload, Loader2, CheckCircle, Camera, XCircle, AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { EodVlmExtraction, EodVlmEntry } from '../../../types';
 import { EodEntryTable } from './EodEntryTable';
 
@@ -146,12 +147,9 @@ export function EodUploadTab() {
         <p className="text-[var(--ff-text-secondary)] mb-6">
           {entries.length} entries saved for {sheetDate}. Check Reconciliation tab to compare with WA DRs and OES.
         </p>
-        <button
-          onClick={reset}
-          className="px-4 py-2 bg-[var(--ff-accent)] text-white rounded-lg hover:opacity-90 transition-opacity"
-        >
+        <Button variant="primary" onClick={reset}>
           Upload Another Sheet
-        </button>
+        </Button>
       </div>
     );
   }
@@ -292,20 +290,22 @@ export function EodUploadTab() {
 
           {/* Save */}
           <div className="flex gap-3">
-            <button
-              onClick={handleSave}
+            <Button
+              variant="primary"
+              onClick={() => { void handleSave(); }}
               disabled={saving || !sheetDate}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+              loading={saving}
+              className="flex-1"
             >
-              {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
+              <CheckCircle className="w-5 h-5" />
               Save Sheet ({entries.length} entries)
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
               onClick={reset}
-              className="px-4 py-3 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] rounded-lg hover:bg-[var(--ff-bg-secondary)] transition-colors border border-[var(--ff-border-light)]"
             >
               Start Over
-            </button>
+            </Button>
           </div>
         </div>
       )}

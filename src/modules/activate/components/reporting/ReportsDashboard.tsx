@@ -45,6 +45,7 @@ import { InstallationGapsReports } from './InstallationGapsReports';
 import { ActivationProgressReport } from './ActivationProgressReport';
 import { MaturityTrackingReport } from './MaturityTrackingReport';
 import { PenetrationCurveReport } from './PenetrationCurveReport';
+import { Button } from '@/components/ui/button';
 
 interface CategoryTab {
   id: ReportCategory;
@@ -444,22 +445,26 @@ export function ReportsDashboard() {
 
           {/* Action Buttons */}
           <div className="flex gap-2 ml-auto">
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={handleRefresh}
               disabled={isLoading}
-              className="flex items-center gap-2 px-3 py-1.5 bg-secondary text-muted-foreground rounded text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+              loading={isLoading}
             >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className="h-4 w-4" />
               Refresh
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
               onClick={handleExport}
               disabled={isExporting}
-              className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              loading={isExporting}
             >
-              <Download className={`h-4 w-4 ${isExporting ? 'animate-bounce' : ''}`} />
+              <Download className="h-4 w-4" />
               {isExporting ? 'Exporting...' : 'Export'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

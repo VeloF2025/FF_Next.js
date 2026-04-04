@@ -4,6 +4,7 @@
  */
 
 import { Clock, ArrowRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface ActivityHeaderProps {
   showAll: boolean;
@@ -22,13 +23,10 @@ export function ActivityHeader({ showAll, hasMore, onViewAll }: ActivityHeaderPr
       </div>
       
       {!showAll && hasMore && onViewAll && (
-        <button 
-          onClick={onViewAll}
-          className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center space-x-1"
-        >
+        <Button variant="link" onClick={onViewAll} className="text-sm flex items-center space-x-1">
           <span>View All</span>
           <ArrowRight className="w-3 h-3" />
-        </button>
+        </Button>
       )}
     </div>
   );

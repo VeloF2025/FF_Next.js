@@ -24,6 +24,7 @@ import type {
 import { STEP_LABELS, PHOTO_REJECTION_REASONS } from '../../utils/stepMapper';
 import { WizardProgressOverlay, type CategorizationPhase } from './WizardProgressOverlay';
 import { PhotoLightbox, type LightboxPhoto } from '@/components/PhotoLightbox';
+import { Button } from '@/components/ui/button';
 
 interface PhotoReviewPhaseProps {
   dropNumber: string;
@@ -401,26 +402,20 @@ export function PhotoReviewPhase({
         )}
 
         <div className="flex justify-center gap-3">
-          <button
+          <Button
+            variant="secondary"
             onClick={onBack}
-            className="px-4 py-2 border border-border text-muted-foreground rounded-lg hover:bg-accent"
           >
             ← Back
-          </button>
-          <button
-            onClick={runCategorization}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => { void runCategorization(); }}
             disabled={isProcessing || photoCount === 0}
-            className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            loading={isProcessing}
           >
-            {isProcessing ? (
-              <span className="flex items-center gap-2">
-                <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                Categorizing...
-              </span>
-            ) : (
-              'Run AI Categorization'
-            )}
-          </button>
+            Run AI Categorization
+          </Button>
         </div>
       </div>
     );
@@ -567,12 +562,13 @@ export function PhotoReviewPhase({
                   Change individual photo step assignments below. Click Save when done.
                 </p>
               </div>
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => setIsEditing(false)}
-                className="px-3 py-1 text-sm border border-blue-600 text-blue-600 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -611,22 +607,23 @@ export function PhotoReviewPhase({
 
           {/* Navigation */}
           <div className="flex justify-between pt-4 border-t border-border">
-            <button
+            <Button
+              variant="ghost"
               onClick={() => setIsEditing(false)}
-              className="px-4 py-2 text-muted-foreground hover:text-foreground"
             >
               ← Cancel
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="primary"
               onClick={async () => {
                 await submitApprovals();
                 setIsEditing(false);
               }}
               disabled={isProcessing}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              loading={isProcessing}
             >
-              {isProcessing ? 'Saving...' : 'Save Changes'}
-            </button>
+              Save Changes
+            </Button>
           </div>
         </div>
       );
@@ -659,26 +656,22 @@ export function PhotoReviewPhase({
               </div>
             </div>
             <div className="flex gap-2">
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => setIsEditing(true)}
-                className="px-3 py-1 text-sm border border-blue-600 text-blue-600 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30"
               >
                 ✏️ Edit
-              </button>
-              <button
-                onClick={runCategorization}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => { void runCategorization(); }}
                 disabled={isProcessing}
-                className="px-3 py-1 text-sm border border-green-600 text-green-600 rounded hover:bg-green-100 dark:hover:bg-green-900/30 disabled:opacity-50"
+                loading={isProcessing}
               >
-                {isProcessing ? (
-                  <span className="flex items-center gap-2">
-                    <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600" />
-                    Re-categorizing...
-                  </span>
-                ) : (
-                  'Re-categorize'
-                )}
-              </button>
+                Re-categorize
+              </Button>
             </div>
           </div>
         </div>
@@ -738,28 +731,28 @@ export function PhotoReviewPhase({
 
         {/* Navigation */}
         <div className="flex justify-between pt-4 border-t border-border">
-          <button
+          <Button
+            variant="ghost"
             onClick={onBack}
-            className="px-4 py-2 text-muted-foreground hover:text-foreground"
           >
             ← Back
-          </button>
+          </Button>
           <div className="flex gap-2">
             {onSkipToDecision && (
-              <button
+              <Button
+                variant="secondary"
                 onClick={onSkipToDecision}
-                className="px-4 py-2 border border-orange-500 text-orange-600 dark:text-orange-400 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20"
                 title="Skip data validation and go directly to final decision"
               >
                 Skip to Decision ⏭️
-              </button>
+              </Button>
             )}
-            <button
+            <Button
+              variant="primary"
               onClick={handleProceed}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               Continue to Data Validation →
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -801,20 +794,23 @@ export function PhotoReviewPhase({
             </p>
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={runCategorization}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => { void runCategorization(); }}
               disabled={isProcessing}
-              className="px-3 py-1 text-sm border border-blue-600 text-blue-600 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 disabled:opacity-50"
             >
               Re-run
-            </button>
-            <button
-              onClick={approveAll}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => { void approveAll(); }}
               disabled={isProcessing}
-              className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+              loading={isProcessing}
             >
               Approve All
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -1000,19 +996,20 @@ export function PhotoReviewPhase({
 
       {/* Navigation */}
       <div className="flex justify-between pt-4 border-t border-border">
-        <button
+        <Button
+          variant="ghost"
           onClick={onBack}
-          className="px-4 py-2 text-muted-foreground hover:text-foreground"
         >
           ← Back
-        </button>
-        <button
-          onClick={submitApprovals}
+        </Button>
+        <Button
+          variant="primary"
+          onClick={() => { void submitApprovals(); }}
           disabled={isProcessing}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          loading={isProcessing}
         >
-          {isProcessing ? 'Saving...' : state.autoApprovalSummary ? 'Confirm & Continue →' : 'Save & Continue →'}
-        </button>
+          {state.autoApprovalSummary ? 'Confirm & Continue →' : 'Save & Continue →'}
+        </Button>
       </div>
     </div>
   );

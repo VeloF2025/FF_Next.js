@@ -21,6 +21,7 @@ import type {
   ProjectProgress,
 } from '../../types/reporting.types';
 import { ReportCard, ReportCardGrid, TrendChart } from './shared';
+import { Button } from '@/components/ui/button';
 
 interface TimeToActivationResponse {
   summary: {
@@ -229,12 +230,14 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
             className="w-24 px-3 py-1.5 border border-border rounded text-sm bg-card text-foreground focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
           {dailyTarget > 0 && (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setDailyTarget(0)}
-              className="text-xs text-muted-foreground hover:text-red-500"
+              className="text-xs"
             >
               Clear
-            </button>
+            </Button>
           )}
         </div>
 

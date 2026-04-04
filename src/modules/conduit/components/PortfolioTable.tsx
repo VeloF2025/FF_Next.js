@@ -12,6 +12,7 @@
 
 import { useState, useCallback } from 'react';
 import { ChevronRight, ChevronDown, Save, Loader2, CheckCircle2, AlertCircle, Plus, X, ArrowRight, Trash2, BookMarked, Copy } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { ConduitProject } from '../types';
 import { calcConduit } from '../hooks/useConduitCalc';
 import { ProjectDetailPanel } from './ProjectDetailPanel';
@@ -340,21 +341,18 @@ export function ProjectsGrid({
 
       {/* Add Project button + inline form */}
       {showAddButton && !showAddForm && (
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-gray-800 hover:bg-gray-700 border border-gray-600 hover:border-gray-500 text-muted-foreground hover:text-foreground transition-colors focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
-        >
+        <Button variant="secondary" onClick={() => setShowAddForm(true)}>
           <Plus className="w-4 h-4" />
           Add Project
-        </button>
+        </Button>
       )}
       {showAddButton && showAddForm && (
         <div className="rounded-lg border border-gray-600 bg-card p-4 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-foreground">New Project</h3>
-            <button onClick={() => { setShowAddForm(false); setAddError(null); }} className="text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-teal-500 rounded">
+            <Button variant="ghost" size="icon" onClick={() => { setShowAddForm(false); setAddError(null); }} aria-label="Close">
               <X className="w-4 h-4" />
-            </button>
+            </Button>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -419,20 +417,21 @@ export function ProjectsGrid({
           )}
 
           <div className="flex items-center gap-3">
-            <button
+            <Button
+              variant="primary"
               onClick={submitAdd}
               disabled={adding}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-teal-600 hover:bg-teal-500 text-white disabled:opacity-50 transition-colors focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800"
+              loading={adding}
             >
-              {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              <Plus className="w-4 h-4" />
               {adding ? 'Adding…' : 'Add Project'}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
               onClick={() => { setShowAddForm(false); setAddError(null); }}
-              className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors focus-visible:ring-2 focus-visible:ring-teal-500 rounded"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -497,85 +496,98 @@ export function ProjectsGrid({
                   <td className="px-2 py-2 text-center border border-gray-700 bg-gray-900">
                     <div className="flex items-center gap-1 justify-center whitespace-nowrap">
                       {showBaselineButton && (
-                        <button
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           onClick={() => saveBaseline(project)}
                           disabled={baselining[project.id]}
+                          loading={baselining[project.id]}
                           title="Save to Baseline"
-                          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-indigo-800 hover:bg-indigo-700 text-indigo-200 disabled:opacity-40 transition-colors whitespace-nowrap focus-visible:ring-2 focus-visible:ring-indigo-500 outline-none"
                         >
-                          {baselining[project.id]
-                            ? <Loader2 className="w-3 h-3 animate-spin" />
-                            : baselined[project.id]
+                          {!baselining[project.id] && (baselined[project.id]
                             ? <CheckCircle2 className="w-3 h-3 text-emerald-300" />
-                            : <BookMarked className="w-3 h-3" />}
+                            : <BookMarked className="w-3 h-3" />)}
                           {baselining[project.id] ? 'Saving…' : baselined[project.id] ? 'Saved!' : 'Baseline'}
-                        </button>
+                        </Button>
                       )}
-                      <button onClick={() => saveProject(project)} disabled={isSaving || project.is_baseline_locked} className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-teal-600 hover:bg-teal-500 text-white disabled:opacity-40 transition-colors focus-visible:ring-2 focus-visible:ring-teal-500 outline-none">
-                        {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : justSaved ? <CheckCircle2 className="w-3 h-3 text-emerald-300" /> : <Save className="w-3 h-3" />}
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => saveProject(project)}
+                        disabled={isSaving || project.is_baseline_locked}
+                        loading={isSaving}
+                      >
+                        {!isSaving && (justSaved ? <CheckCircle2 className="w-3 h-3 text-emerald-300" /> : <Save className="w-3 h-3" />)}
                         {isSaving ? 'Saving' : justSaved ? 'Saved' : 'Save'}
-                      </button>
+                      </Button>
                       {demoteToStatus && demoteLabel && (
-                        <button
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           onClick={() => demoteProject(project)}
                           disabled={promoting[project.id]}
+                          loading={promoting[project.id]}
                           title={demoteLabel}
-                          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors whitespace-nowrap focus-visible:ring-2 focus-visible:ring-gray-500 outline-none"
                         >
-                          {promoting[project.id]
-                            ? <Loader2 className="w-3 h-3 animate-spin" />
-                            : <ArrowRight className="w-3 h-3 rotate-180" />}
+                          {!promoting[project.id] && <ArrowRight className="w-3 h-3 rotate-180" />}
                           {promoting[project.id] ? '…' : demoteLabel}
-                        </button>
+                        </Button>
                       )}
                       {promoteToStatus && promoteLabel && (
-                        <button
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           onClick={() => promoteProject(project)}
                           disabled={promoting[project.id]}
+                          loading={promoting[project.id]}
                           title={promoteLabel}
-                          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-gray-700 hover:bg-indigo-700 text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors whitespace-nowrap focus-visible:ring-2 focus-visible:ring-indigo-500 outline-none"
                         >
-                          {promoting[project.id]
-                            ? <Loader2 className="w-3 h-3 animate-spin" />
-                            : <ArrowRight className="w-3 h-3" />}
+                          {!promoting[project.id] && <ArrowRight className="w-3 h-3" />}
                           {promoting[project.id] ? '…' : promoteLabel}
-                        </button>
+                        </Button>
                       )}
                       {showCopyToScopingButton && (
-                        <button
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           onClick={() => copyToScoping(project)}
                           disabled={copying[project.id]}
+                          loading={copying[project.id]}
                           title="Copy to Scoping"
-                          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-cyan-800 hover:bg-cyan-700 text-cyan-200 disabled:opacity-40 transition-colors whitespace-nowrap"
                         >
-                          {copying[project.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />}
+                          {!copying[project.id] && <Copy className="w-3 h-3" />}
                           {copying[project.id] ? '…' : '→ Scoping'}
-                        </button>
+                        </Button>
                       )}
                       {showDeleteButton && (
                         confirmDelete === project.id ? (
                           <span className="flex items-center gap-1">
                             <span className="text-xs text-red-400 whitespace-nowrap">Sure?</span>
-                            <button
+                            <Button
+                              variant="danger"
+                              size="sm"
                               onClick={() => deleteProject(project)}
                               disabled={deleting[project.id]}
-                              className="px-2 py-1 rounded text-xs font-medium bg-red-700 hover:bg-red-600 text-white disabled:opacity-40 transition-colors focus-visible:ring-2 focus-visible:ring-red-500 outline-none"
+                              loading={deleting[project.id]}
                             >
-                              {deleting[project.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Yes'}
-                            </button>
-                            <button
+                              {deleting[project.id] ? '' : 'Yes'}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => setConfirmDelete(null)}
-                              className="px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground transition-colors focus-visible:ring-2 focus-visible:ring-gray-500 outline-none"
-                            >No</button>
+                            >No</Button>
                           </span>
                         ) : (
-                          <button
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => setConfirmDelete(project.id)}
                             title="Delete project"
-                            className="p-1 rounded text-gray-600 hover:text-red-400 hover:bg-red-900/20 transition-colors focus-visible:ring-2 focus-visible:ring-red-500 outline-none"
+                            aria-label="Delete project"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          </Button>
                         )
                       )}
                     </div>

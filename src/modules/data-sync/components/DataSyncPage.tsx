@@ -43,6 +43,7 @@ import { HistoryGroup } from './groups/HistoryGroup';
 import { BillingGroup } from './groups/BillingGroup';
 import { usePermission } from '@/hooks/usePermission';
 import { useSystemFeatures } from '../hooks/useSystemFeatures';
+import { Button } from '@/components/ui/button';
 
 // Permission keys for each group
 const GROUP_PERMISSION_KEYS: Record<TabGroupId, string> = {
@@ -200,13 +201,14 @@ export function DataSyncPage({ groupFilter }: DataSyncPageProps) {
     return (
       <div className="p-6 space-y-6">
         <div className="flex items-center gap-4">
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => handleGroupChange(null)}
-            className="p-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors"
             title="Back to overview"
           >
             <ArrowLeft className="w-5 h-5" />
-          </button>
+          </Button>
           <div>
             <h1 className="text-2xl font-semibold text-[var(--ff-text-primary)] flex items-center gap-3">
               <Database className="w-7 h-7 text-[var(--ff-accent)]" />
@@ -226,12 +228,13 @@ export function DataSyncPage({ groupFilter }: DataSyncPageProps) {
             You don&apos;t have permission to access the {currentGroup?.label || activeGroup} section,
             or this feature has been disabled by an administrator.
           </p>
-          <button
+          <Button
+            variant="secondary"
             onClick={() => handleGroupChange(null)}
-            className="mt-6 px-4 py-2 bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg transition-colors border border-[var(--ff-border-light)]"
+            className="mt-6"
           >
             Return to Overview
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -243,13 +246,14 @@ export function DataSyncPage({ groupFilter }: DataSyncPageProps) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-4">
           {activeGroup && (
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => handleGroupChange(null)}
-              className="p-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors"
               title="Back to overview"
             >
               <ArrowLeft className="w-5 h-5" />
-            </button>
+            </Button>
           )}
           <div>
             <h1 className="text-2xl font-semibold text-[var(--ff-text-primary)] flex items-center gap-3">
@@ -268,14 +272,15 @@ export function DataSyncPage({ groupFilter }: DataSyncPageProps) {
           <span className="text-sm text-[var(--ff-text-tertiary)]">
             Updated {lastRefresh.toLocaleTimeString()}
           </span>
-          <button
-            onClick={handleRefresh}
+          <Button
+            variant="secondary"
+            onClick={() => { void handleRefresh(); }}
             disabled={isRefreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg transition-colors disabled:opacity-50 border border-[var(--ff-border-light)]"
+            loading={isRefreshing}
           >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className="w-4 h-4" />
             Refresh
-          </button>
+          </Button>
         </div>
       </div>
 

@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { log } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
 
 interface ManualDREntryProps {
   onDRsAdded?: (count: number) => void;
@@ -270,22 +271,17 @@ export function ManualDREntry({ onDRsAdded }: ManualDREntryProps) {
       )}
 
       {/* Submit Button */}
-      <button
-        onClick={handleSubmit}
+      <Button
+        variant="primary"
+        onClick={() => { void handleSubmit(); }}
         disabled={isProcessing || drNumbers.length === 0 || !project}
-        className="w-full px-4 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+        loading={isProcessing}
+        className="w-full"
       >
-        {isProcessing ? (
-          <>
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-            <span>Processing {results.length}/{drNumbers.length}...</span>
-          </>
-        ) : (
-          <>
-            <span>Process {drNumbers.length} DR{drNumbers.length !== 1 ? 's' : ''}</span>
-          </>
-        )}
-      </button>
+        {isProcessing
+          ? `Processing ${results.length}/${drNumbers.length}...`
+          : `Process ${drNumbers.length} DR${drNumbers.length !== 1 ? 's' : ''}`}
+      </Button>
 
       {/* Results */}
       {results.length > 0 && (

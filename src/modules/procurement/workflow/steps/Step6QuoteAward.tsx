@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import {
   FileText, CheckCircle, ArrowLeft, ArrowRight, Loader2, AlertCircle, Award, Upload,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { log } from '@/lib/logger';
 import type { WorkflowState } from '../useWorkflowState';
 import { ProcurementDocumentPanel } from '@/modules/procurement/documents/components/ProcurementDocumentPanel';
@@ -135,12 +136,12 @@ export const Step6QuoteAward: React.FC<Step6Props> = ({ state, onComplete, onBac
         />
 
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <button onClick={() => setAwarded(false)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', border: '1px solid var(--ff-border-light)', borderRadius: 8, cursor: 'pointer', background: 'transparent', color: 'var(--ff-text-secondary)' }}>
+          <Button variant="secondary" onClick={() => setAwarded(false)}>
             <ArrowLeft style={{ width: 16, height: 16 }} /> Edit
-          </button>
-          <button onClick={handleNext} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+          </Button>
+          <Button onClick={handleNext}>
             Next: Create PO <ArrowRight style={{ width: 16, height: 16 }} />
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -202,12 +203,12 @@ export const Step6QuoteAward: React.FC<Step6Props> = ({ state, onComplete, onBac
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', border: '1px solid var(--ff-border-light)', borderRadius: 8, cursor: 'pointer', background: 'transparent', color: 'var(--ff-text-secondary)' }}>
+          <Button variant="secondary" onClick={onBack}>
             <ArrowLeft style={{ width: 16, height: 16 }} /> Back
-          </button>
-          <button onClick={handleAwardRfq} disabled={!canAward} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: canAward ? '#16a34a' : 'var(--ff-bg-tertiary)', color: canAward ? '#fff' : 'var(--ff-text-tertiary)', border: 'none', borderRadius: 8, cursor: canAward ? 'pointer' : 'not-allowed', fontWeight: 600 }}>
+          </Button>
+          <Button onClick={handleAwardRfq} disabled={!canAward}>
             <Award style={{ width: 16, height: 16 }} /> Award Supplier
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -245,12 +246,12 @@ export const Step6QuoteAward: React.FC<Step6Props> = ({ state, onComplete, onBac
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', border: '1px solid var(--ff-border-light)', borderRadius: 8, cursor: 'pointer', background: 'transparent', color: 'var(--ff-text-secondary)' }}>
+        <Button variant="secondary" onClick={onBack}>
           <ArrowLeft style={{ width: 16, height: 16 }} /> Back
-        </button>
-        <button onClick={handleConfirmDirect} disabled={!directValid} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: directValid ? '#2563eb' : 'var(--ff-bg-tertiary)', color: directValid ? '#fff' : 'var(--ff-text-tertiary)', border: 'none', borderRadius: 8, cursor: directValid ? 'pointer' : 'not-allowed', fontWeight: 600 }}>
+        </Button>
+        <Button onClick={handleConfirmDirect} disabled={!directValid}>
           <CheckCircle style={{ width: 16, height: 16 }} /> Confirm Quote
-        </button>
+        </Button>
       </div>
     </div>
   );

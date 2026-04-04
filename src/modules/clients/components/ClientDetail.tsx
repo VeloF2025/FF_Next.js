@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { Edit, Trash2, Building, Activity, FileText } from 'lucide-react';
 import { useClient, useDeleteClient } from '@/hooks/useClients';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { Button } from '@/components/ui/button';
 import {
   ClientInfoSection,
   ContactDetailsSection,
@@ -54,12 +55,9 @@ export function ClientDetail() {
         <div className="bg-red-500/20 border border-red-500/40 rounded-lg p-6 text-center">
           <Building className="w-12 h-12 text-red-400 mx-auto mb-3" />
           <h3 className="text-lg font-medium text-red-400 mb-2">Client not found</h3>
-          <button
-            onClick={() => router.push('/clients')}
-            className="text-blue-400 hover:text-blue-300 font-medium"
-          >
+          <Button variant="link" onClick={() => router.push('/clients')}>
             Back to Client List
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -79,21 +77,23 @@ export function ClientDetail() {
 
             {hasPermission(Permission.CLIENTS_UPDATE) && (
               <div className="flex items-center gap-2">
-                <button
+                <Button
+                  variant="primary"
                   onClick={() => router.push(`/clients/${id}/edit`)}
-                  className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
                 >
-                  <Edit className="w-4 h-4 mr-2" />
+                  <Edit className="w-4 h-4" />
                   Edit
-                </button>
-                
+                </Button>
+
                 {hasPermission(Permission.CLIENTS_DELETE) && (
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                    aria-label="Delete client"
                   >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+                    <Trash2 className="w-5 h-5 text-red-600" />
+                  </Button>
                 )}
               </div>
             )}
@@ -169,9 +169,9 @@ export function ClientDetail() {
         <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Contact History</h3>
-            <button className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+            <Button variant="primary">
               Add Contact
-            </button>
+            </Button>
           </div>
           <p className="text-[var(--ff-text-tertiary)]">Contact history feature coming soon.</p>
         </div>
@@ -186,19 +186,20 @@ export function ClientDetail() {
               Are you sure you want to delete "{client.name}"? This action cannot be undone and will remove all associated data.
             </p>
             <div className="flex justify-end gap-3">
-              <button
+              <Button
+                variant="secondary"
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)]"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="danger"
                 onClick={handleDelete}
                 disabled={deleteMutation.isPending}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+                loading={deleteMutation.isPending}
               >
                 {deleteMutation.isPending ? 'Deleting...' : 'Delete Client'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

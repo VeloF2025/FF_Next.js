@@ -13,6 +13,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { log } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
 import type { DRSummary, DRState } from '../types/summary.types';
 import type { SerialVerificationResult } from '../services/serialVerificationService';
 
@@ -117,12 +118,9 @@ export function DrSummaryPage({
         <div className="text-center">
           <div className="text-red-500 text-4xl mb-4">!</div>
           <p className="text-muted-foreground mb-4">{error || 'DR not found'}</p>
-          <button
-            onClick={onBackToList}
-            className="px-4 py-2 bg-secondary text-foreground rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
-          >
+          <Button variant="secondary" size="sm" onClick={onBackToList}>
             Back to List
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -327,12 +325,9 @@ export function DrSummaryPage({
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
               Photos
             </h3>
-            <button
-              onClick={onViewPhotos}
-              className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-            >
+            <Button variant="link" size="sm" onClick={onViewPhotos}>
               View All ({summary.qaStatus.stepsComplete})
-            </button>
+            </Button>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-2">
             {summary.photoPreview.map((photo, idx) => (
@@ -357,24 +352,15 @@ export function DrSummaryPage({
 
       {/* Action Buttons */}
       <div className="flex flex-wrap gap-3 justify-center pt-4 border-t border-border">
-        <button
-          onClick={onBackToList}
-          className="px-4 py-2 bg-secondary text-foreground rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-        >
-          ← Back to List
-        </button>
-        <button
-          onClick={onViewPhotos}
-          className="px-4 py-2 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
-        >
-          📸 View Photos
-        </button>
-        <button
-          onClick={onStartQA}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-        >
-          {summary.currentState === 'reviewed' ? '🔄 Re-Review' : '🧙 Start QA Review'}
-        </button>
+        <Button variant="secondary" onClick={onBackToList}>
+          Back to List
+        </Button>
+        <Button variant="secondary" onClick={onViewPhotos}>
+          View Photos
+        </Button>
+        <Button variant="primary" onClick={onStartQA}>
+          {summary.currentState === 'reviewed' ? 'Re-Review' : 'Start QA Review'}
+        </Button>
       </div>
     </div>
   );

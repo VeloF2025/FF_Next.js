@@ -13,6 +13,7 @@ import { useState, useEffect } from 'react';
 import { AlertTriangle, Clock, ExternalLink, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/utils/cn';
+import { Button } from '@/components/ui/button';
 interface StaleProject {
   id: string;
   project_name: string;
@@ -129,13 +130,14 @@ export function StaleProjectsWidget() {
             </span>
           )}
         </div>
-        <button
-          onClick={fetchStale}
-          className="p-1 rounded text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)] transition-colors"
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => { void fetchStale(); }}
           title="Refresh"
         >
           <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
-        </button>
+        </Button>
       </div>
 
       {/* Summary badges */}

@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 import { ActionItem, ActionItemFilters } from '@/types/action-items.types';
 import { actionItemsService } from '@/services/action-items/actionItemsService';
 import { ActionItemsList } from '../components/ActionItemsList';
+import { Button } from '@/components/ui/button';
 
 export function ActionItemsSearch() {
   const router = useRouter();
@@ -59,13 +60,10 @@ export function ActionItemsSearch() {
     <div className="p-6">
       {/* Header */}
       <div className="mb-6">
-        <button
-          onClick={() => router.push('/action-items')}
-          className="flex items-center gap-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] mb-4"
-        >
+        <Button variant="link" onClick={() => { void router.push('/action-items'); }} className="mb-4 pl-0">
           <ArrowLeft className="w-4 h-4" />
           Back to Dashboard
-        </button>
+        </Button>
 
         <div className="flex items-center gap-3">
           <Filter className="w-8 h-8 text-indigo-500" />
@@ -146,21 +144,13 @@ export function ActionItemsSearch() {
 
         {/* Buttons */}
         <div className="flex gap-3">
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-          >
+          <Button type="submit" variant="primary" size="sm" disabled={loading} loading={loading}>
             <Search className="w-4 h-4" />
             {loading ? 'Searching...' : 'Search'}
-          </button>
-          <button
-            type="button"
-            onClick={handleReset}
-            className="px-4 py-2 border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] rounded-md hover:bg-[var(--ff-bg-hover)]"
-          >
+          </Button>
+          <Button type="button" variant="secondary" size="sm" onClick={handleReset}>
             Reset
-          </button>
+          </Button>
         </div>
       </form>
 

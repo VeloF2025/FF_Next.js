@@ -21,6 +21,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { UploadZone, SummaryRow } from './SnagImportParts';
 import { previewPdf, importPdf, type PdfPreviewResult } from '../../services/snagService';
 import { log } from '@/lib/logger';
@@ -99,9 +100,9 @@ export function SnagImportDialog({ onClose, onImported }: SnagImportDialogProps)
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 shrink-0">
           <h2 className="text-sm font-semibold text-zinc-100">Import TQR Report</h2>
-          <button type="button" onClick={onClose} className="text-zinc-500 hover:text-zinc-300">
+          <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close">
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
 
         {/* Content */}
@@ -155,23 +156,25 @@ export function SnagImportDialog({ onClose, onImported }: SnagImportDialogProps)
         {/* Footer — only visible during review */}
         {(phase === 'preview' || phase === 'importing') && (
           <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-zinc-800 shrink-0">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={onClose}
               disabled={phase === 'importing'}
-              className="text-xs text-zinc-400 hover:text-zinc-200 disabled:opacity-40"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="primary"
+              size="sm"
               onClick={() => { void handleImport(); }}
               disabled={isImportDisabled}
-              className="flex items-center gap-2 text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-5 py-2 rounded-md font-medium"
+              loading={phase === 'importing'}
             >
-              {phase === 'importing' && <Loader2 className="h-4 w-4 animate-spin" />}
               {phase === 'importing' ? 'Importing...' : 'Import Now'}
-            </button>
+            </Button>
           </div>
         )}
       </div>

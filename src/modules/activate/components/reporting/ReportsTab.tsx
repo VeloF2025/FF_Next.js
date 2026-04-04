@@ -23,6 +23,7 @@ import {
   Calendar,
   RefreshCw,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type {
   ReportType,
   ReportFilters,
@@ -286,16 +287,16 @@ export function ReportsTab() {
           </div>
 
           {/* Refresh Button */}
-          <button
-            onClick={() => fetchReportData()}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => { void fetchReportData(); }}
             disabled={isLoading}
-            className="flex items-center gap-2 px-3 py-1.5 bg-secondary text-muted-foreground rounded text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+            loading={isLoading}
           >
-            <RefreshCw
-              className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`}
-            />
+            <RefreshCw className="h-4 w-4" />
             Refresh
-          </button>
+          </Button>
         </div>
       </div>
 

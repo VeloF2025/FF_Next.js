@@ -8,6 +8,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { Button } from '@/components/ui/button';
 
 interface ServiceStatus {
   status: 'healthy' | 'degraded' | 'down' | 'unknown';
@@ -175,12 +176,9 @@ export function SystemHealthDashboard({
             <span className="text-red-600 dark:text-red-400">⚠</span>
             <span className="text-red-700 dark:text-red-300">{error}</span>
           </div>
-          <button
-            onClick={fetchHealth}
-            className="text-sm text-red-600 dark:text-red-400 hover:underline"
-          >
+          <Button variant="link" size="sm" onClick={() => { void fetchHealth(); }}>
             Retry
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -278,12 +276,9 @@ export function SystemHealthDashboard({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={fetchHealth}
-              className="px-3 py-1 text-sm border border-border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            >
+            <Button variant="secondary" size="sm" onClick={() => { void fetchHealth(); }}>
               Refresh
-            </button>
+            </Button>
             <a
               href="/activate/monitoring"
               className="px-3 py-1 text-sm text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-700 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
@@ -373,23 +368,15 @@ export function SystemHealthDashboard({
               )}
             </div>
             {health.recentActivity.failedCategorization > 0 && (
-              <button
-                onClick={retryFailed}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => { void retryFailed(); }}
                 disabled={isRetrying}
-                className="px-3 py-1.5 text-sm bg-yellow-600 dark:bg-yellow-500 text-white rounded-lg hover:bg-yellow-700 dark:hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                loading={isRetrying}
               >
-                {isRetrying ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Retrying...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>🔄</span>
-                    <span>Retry Failed</span>
-                  </>
-                )}
-              </button>
+                {isRetrying ? 'Retrying...' : 'Retry Failed'}
+              </Button>
             )}
           </div>
         </div>

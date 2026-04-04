@@ -13,6 +13,7 @@ import { useRouter } from 'next/router';
 import { Search, X, Loader2 } from 'lucide-react';
 import { log } from '@/lib/logger';
 import type { SearchResult } from '../../types/dashboard.types';
+import { Button } from '@/components/ui/button';
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-yellow-500/20 text-yellow-400',
@@ -100,9 +101,9 @@ export function GlobalSearchBar() {
         />
         {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 animate-spin" />}
         {!loading && query && (
-          <button onClick={handleClear} className="absolute right-3 top-1/2 -translate-y-1/2">
-            <X className="w-4 h-4 text-gray-500 hover:text-gray-300" />
-          </button>
+          <Button variant="ghost" size="icon" onClick={handleClear} className="absolute right-1 top-1/2 -translate-y-1/2" aria-label="Clear search">
+            <X className="w-4 h-4" />
+          </Button>
         )}
       </div>
 

@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Cpu, BatteryCharging, Loader2, Package, CheckCircle, AlertTriangle, Zap, Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface ReconStats {
   total: number;
@@ -196,14 +197,14 @@ export function BootstockReportsPage() {
         <span className="text-xs text-[var(--ff-text-tertiary)]">
           {total.toLocaleString()} {type === 'ont' ? 'ONTs' : 'UPS devices'}
         </span>
-        <button
+        <Button
           onClick={handleExport}
           disabled={exporting}
-          className="ml-auto px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+          className="ml-auto"
         >
           <Download className={`w-4 h-4 ${exporting ? 'animate-bounce' : ''}`} />
           {exporting ? 'Exporting...' : 'Export Excel'}
-        </button>
+        </Button>
       </div>
 
       {/* Loading */}

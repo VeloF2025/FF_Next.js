@@ -10,6 +10,7 @@ import React, { useState } from 'react';
 import { FileText, Search, Download, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { log } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
 import { useAllContractorsSummary } from '../hooks/useDocumentReport';
 import { CompletionProgressBar } from './index';
 import { getComplianceLevel } from '../utils/completenessCalculator';
@@ -70,19 +71,13 @@ export default function AllContractorsSummary() {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleExportAll}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:bg-background"
-          >
+          <Button variant="secondary" onClick={() => { void handleExportAll(); }}>
             <Download size={16} />
             Export All CSV
-          </button>
-          <button
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:bg-background"
-          >
+          </Button>
+          <Button variant="secondary" onClick={() => window.print()}>
             Print
-          </button>
+          </Button>
         </div>
       </div>
 

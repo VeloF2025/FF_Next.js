@@ -17,6 +17,7 @@ import {
   Info,
   XCircle,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { log } from '@/lib/logger';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import type { WorkflowState } from '../useWorkflowState';
@@ -99,9 +100,9 @@ export const Step6Receive: React.FC<Step6ReceiveProps> = ({ state, onComplete, o
           </p>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <button onClick={onBack} style={backBtnStyle}>
+          <Button variant="secondary" onClick={onBack}>
             <ArrowLeft style={{ width: 16, height: 16 }} /> Back
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -145,9 +146,9 @@ export const Step6Receive: React.FC<Step6ReceiveProps> = ({ state, onComplete, o
             <Truck style={{ width: 20, height: 20, color: '#d97706', flexShrink: 0 }} />
             <p style={{ fontSize: 14, color: 'var(--ff-text-primary)', fontWeight: 500 }}>No delivery recorded yet</p>
           </div>
-          <button onClick={handleRecordDelivery} style={primaryBtnStyle('#d97706')}>
+          <Button onClick={handleRecordDelivery}>
             Record Delivery
-          </button>
+          </Button>
         </div>
       )}
 
@@ -206,16 +207,15 @@ export const Step6Receive: React.FC<Step6ReceiveProps> = ({ state, onComplete, o
 
       {/* Action row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button onClick={onBack} style={backBtnStyle}>
+        <Button variant="secondary" onClick={onBack}>
           <ArrowLeft style={{ width: 16, height: 16 }} /> Back
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={handleConfirm}
           disabled={!hasCompleteOrPartial}
-          style={primaryBtnStyle(hasCompleteOrPartial ? '#16a34a' : undefined)}
         >
           Mark as Received &amp; Continue <ArrowRight style={{ width: 16, height: 16 }} />
-        </button>
+        </Button>
       </div>
 
     </div>
@@ -237,9 +237,9 @@ const SectionHeader: React.FC<{ title: string; subtitle: string }> = ({ title, s
 const ErrorBanner: React.FC<{ message: string; onRetry: () => void }> = ({ message, onRetry }) => (
   <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
     <span style={{ fontSize: 14, color: '#dc2626' }}>{message}</span>
-    <button onClick={onRetry} style={{ fontSize: 12, color: '#dc2626', background: 'none', border: '1px solid #dc2626', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>
+    <Button variant="danger" size="sm" onClick={onRetry}>
       Retry
-    </button>
+    </Button>
   </div>
 );
 

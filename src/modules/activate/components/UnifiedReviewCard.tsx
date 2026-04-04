@@ -33,6 +33,7 @@ import { DrSummaryPage } from './DrSummaryPage';
 import { MaintenanceTab } from '@/modules/noc/components/MaintenanceTab';
 import { ChevronDown, ChevronRight, RefreshCw, MapPin, MessageCircle, Wrench } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
 
 interface UnifiedReviewCardProps {
   dropNumber: string;
@@ -80,12 +81,9 @@ export const UnifiedReviewCard = React.memo(function UnifiedReviewCard({ dropNum
       <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
         <h3 className="text-red-800 dark:text-red-200 font-semibold mb-2">Error Loading Review</h3>
         <p className="text-red-600 dark:text-red-400">{error.message}</p>
-        <button
-          onClick={refresh}
-          className="mt-4 px-4 py-2 bg-red-600 dark:bg-red-500 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600 transition-colors"
-        >
+        <Button variant="danger" size="sm" onClick={refresh} className="mt-4">
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -357,13 +355,14 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
       {/* Save Incorrect Button */}
       {incorrectSteps.size > 0 && (
         <div className="flex justify-end">
-          <button
-            onClick={handleSaveIncorrect}
+          <Button
+            variant="danger"
+            onClick={() => { void handleSaveIncorrect(); }}
             disabled={isUpdating}
-            className="px-6 py-2 bg-red-600 dark:bg-red-500 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            loading={isUpdating}
           >
             {isUpdating ? 'Saving...' : `Save ${incorrectSteps.size} Incorrect Step${incorrectSteps.size > 1 ? 's' : ''}`}
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -570,23 +569,16 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
                 {!hasOntSerial && !hasUpsSerial && 'No serial numbers synced. '}
                 Data may still be syncing from OneMap.
               </p>
-              <button
-                onClick={handleFetchPhotos}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => { void handleFetchPhotos(); }}
                 disabled={isFetching}
-                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium"
+                loading={isFetching}
               >
-                {isFetching ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    <span>Refreshing from OneMap...</span>
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="h-4 w-4" />
-                    <span>Refresh Data from OneMap</span>
-                  </>
-                )}
-              </button>
+                <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+                {isFetching ? 'Refreshing from OneMap...' : 'Refresh Data from OneMap'}
+              </Button>
             </div>
           </div>
         </div>
@@ -679,14 +671,16 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
                             ? `Source: ${review.photo_source || 'OneMap'}`
                             : 'No photos loaded yet'}
                         </div>
-                        <button
-                          onClick={handleFetchPhotos}
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => { void handleFetchPhotos(); }}
                           disabled={isFetching}
-                          className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center gap-2"
+                          loading={isFetching}
                         >
                           <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
                           Refresh
-                        </button>
+                        </Button>
                       </div>
                       <PhotoGalleryUnified
                         photos={installationPhotos}
@@ -824,13 +818,9 @@ function FeedbackTab({ review, generateFeedback, sendFeedback }: FeedbackTabProp
       {/* Generate Button */}
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-foreground">WhatsApp Feedback</h3>
-        <button
-          onClick={handleGenerateFeedback}
-          className="px-4 py-2 bg-purple-600 dark:bg-purple-500 text-white rounded-lg hover:bg-purple-700 dark:hover:bg-purple-600 transition-colors flex items-center gap-2"
-        >
-          <span>✨</span>
+        <Button variant="primary" size="sm" onClick={() => { void handleGenerateFeedback(); }}>
           Generate Auto-Feedback
-        </button>
+        </Button>
       </div>
 
       {/* Previously sent notice */}
@@ -873,28 +863,14 @@ function FeedbackTab({ review, generateFeedback, sendFeedback }: FeedbackTabProp
 
       {/* Send Button */}
       <div className="flex justify-end gap-3">
-        <button
-          onClick={handleSendFeedback}
+        <Button
+          variant="primary"
+          onClick={() => { void handleSendFeedback(); }}
           disabled={isSending || !message.trim()}
-          className="px-6 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+          loading={isSending}
         >
-          {isSending ? (
-            <>
-              <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-              Sending...
-            </>
-          ) : alreadySent ? (
-            <>
-              <span>🔄</span>
-              Resend Feedback
-            </>
-          ) : (
-            <>
-              <span>📤</span>
-              Send to WhatsApp
-            </>
-          )}
-        </button>
+          {isSending ? 'Sending...' : alreadySent ? 'Resend Feedback' : 'Send to WhatsApp'}
+        </Button>
       </div>
     </div>
   );

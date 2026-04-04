@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link2, Loader2, ExternalLink, Plus, X, Users } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { toast } from 'react-hot-toast';
 import { log } from '@/lib/logger';
 import { MancoActionItem } from '@/types/manco-action-items.types';
@@ -193,13 +194,15 @@ export function MancoReferenceLink({ item, onUpdated }: MancoReferenceLinkProps)
                 <span className="text-[var(--ff-text-tertiary)] whitespace-nowrap">
                   {new Date(m.meeting_date).toLocaleDateString()}
                 </span>
-                <button
-                  onClick={() => handleUnlinkMeeting(m.meeting_id)}
-                  className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-[var(--ff-bg-tertiary)] rounded transition-opacity"
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => { void handleUnlinkMeeting(m.meeting_id); }}
                   title="Unlink meeting"
+                  className="opacity-0 group-hover:opacity-100"
                 >
-                  <X className="w-3 h-3 text-[var(--ff-text-secondary)]" />
-                </button>
+                  <X className="w-3 h-3" />
+                </Button>
               </div>
             ))}
           </div>
@@ -223,13 +226,14 @@ export function MancoReferenceLink({ item, onUpdated }: MancoReferenceLinkProps)
               <ExternalLink className="w-3 h-3 flex-shrink-0" />
               {item.reference_link}
             </a>
-            <button
-              onClick={handleClearReferenceLink}
-              className="p-1 hover:bg-[var(--ff-bg-tertiary)] rounded"
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => { void handleClearReferenceLink(); }}
               title="Clear link"
             >
-              <X className="w-3 h-3 text-[var(--ff-text-secondary)]" />
-            </button>
+              <X className="w-3 h-3" />
+            </Button>
           </div>
         </div>
       )}
@@ -249,13 +253,15 @@ export function MancoReferenceLink({ item, onUpdated }: MancoReferenceLinkProps)
             placeholder="Paste meeting link or URL..."
             className="flex-1 px-3 py-2 text-sm border border-[var(--ff-border-light)] rounded bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-secondary)]"
           />
-          <button
-            onClick={handleAddLink}
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => { void handleAddLink(); }}
             disabled={saving || !linkInput.trim()}
-            className="px-4 py-2 bg-[var(--ff-primary)] text-white rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
+            loading={saving}
           >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add'}
-          </button>
+            Add
+          </Button>
         </div>
         <p className="text-[10px] text-[var(--ff-text-tertiary)] mt-1">
           Meeting links auto-detect and extract discussion. Other URLs saved as reference links.

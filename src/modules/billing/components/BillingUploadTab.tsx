@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { log } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
 
 type Project = 'Lawley' | 'Mohadin' | 'Mamelodi';
 
@@ -370,12 +371,14 @@ export function BillingUploadTab() {
               </div>
             </div>
             {uploadState === 'idle' && (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => { setPdfFile(null); setPreview(null); }}
-                className="text-sm text-red-400 hover:text-red-300"
+                className="text-sm text-red-400"
               >
                 Remove
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -388,24 +391,27 @@ export function BillingUploadTab() {
           <span className="text-[var(--ff-text-tertiary)]">(optional)</span>
         </label>
         <div className="flex items-center gap-3">
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={() => document.getElementById('billing-xlsx-input')?.click()}
             disabled={isLoading || isLocked}
-            className="flex items-center gap-2 px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-md text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors disabled:opacity-50"
           >
             <FileSpreadsheet className="w-4 h-4 text-green-400" />
             {xlsxFile ? xlsxFile.name : 'Choose file…'}
-          </button>
+          </Button>
           {xlsxFile && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => setXlsxFile(null)}
               disabled={isLoading}
-              className="text-sm text-red-400 hover:text-red-300"
+              className="text-sm text-red-400"
             >
               Remove
-            </button>
+            </Button>
           )}
         </div>
         <input
@@ -446,14 +452,14 @@ export function BillingUploadTab() {
       {/* Preview Button */}
       {pdfFile && uploadState === 'idle' && (
         <div className="flex justify-end">
-          <button
+          <Button
             type="button"
-            onClick={handlePreview}
-            className="flex items-center gap-2 px-5 py-2 bg-[var(--ff-accent)] text-white rounded-lg hover:opacity-90 transition-opacity"
+            variant="primary"
+            onClick={() => { void handlePreview(); }}
           >
             <Upload className="w-4 h-4" />
             Preview
-          </button>
+          </Button>
         </div>
       )}
 
@@ -542,21 +548,21 @@ export function BillingUploadTab() {
             {/* Import Button (only when still in previewed state) */}
             {uploadState === 'previewed' && (
               <div className="flex justify-end gap-3">
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={handleReset}
-                  className="px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  onClick={handleImport}
-                  className="flex items-center gap-2 px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                  variant="primary"
+                  onClick={() => { void handleImport(); }}
                 >
                   <Upload className="w-4 h-4" />
                   Import
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -580,32 +586,33 @@ export function BillingUploadTab() {
 
               {uploadState === 'imported' && (
                 <div className="mt-4 flex gap-3">
-                  <button
+                  <Button
                     type="button"
-                    onClick={handleReconcile}
-                    className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors text-sm"
+                    variant="primary"
+                    onClick={() => { void handleReconcile(); }}
                   >
                     <RefreshCw className="w-4 h-4" />
                     Run Reconciliation
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="ghost"
                     onClick={handleReset}
-                    className="px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
                   >
                     Upload Another
-                  </button>
+                  </Button>
                 </div>
               )}
 
               {uploadState === 'done' && (
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
                   onClick={handleReset}
-                  className="mt-4 px-4 py-2 text-sm bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]"
+                  className="mt-4"
                 >
                   Upload Another Week
-                </button>
+                </Button>
               )}
             </div>
           </div>

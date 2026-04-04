@@ -33,6 +33,7 @@ import type {
   OfflineMatchStatus,
 } from '../../types/reporting.types';
 import { ReportCard, ReportCardGrid } from './shared';
+import { Button } from '@/components/ui/button';
 
 interface OfflineDevicesReportsProps {
   filters: ReportFilters;
@@ -161,14 +162,15 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
           Offline Devices Report
         </h3>
         {data && data.total_count > 0 && (
-          <button
+          <Button
+            variant="primary"
+            size="sm"
             onClick={handleExport}
             title={`Export ${selectedZone || selectedBucket || selectedMatchStatus || serialMismatchOnly ? 'filtered' : 'all'} offline devices to CSV`}
-            className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 transition-colors"
           >
             <Download className="h-4 w-4" />
             Export {selectedMatchStatus ? selectedMatchStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : serialMismatchOnly ? 'Mismatches' : 'All'} CSV
-          </button>
+          </Button>
         )}
       </div>
 
@@ -316,7 +318,9 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
             </label>
 
             {(selectedZone || selectedBucket || selectedMatchStatus || selectedReason || serialMismatchOnly) && (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   setSelectedZone('');
                   setSelectedBucket('');
@@ -324,10 +328,9 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
                   setSelectedReason('');
                   setSerialMismatchOnly(false);
                 }}
-                className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground"
               >
                 Clear Filters
-              </button>
+              </Button>
             )}
           </div>
 
@@ -342,25 +345,27 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
                 {data.total_count} devices
               </p>
               <div className="flex gap-2">
-                <button
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="flex items-center gap-1 px-3 py-1.5 border border-border rounded text-sm disabled:opacity-50"
                 >
                   <ChevronLeft className="h-4 w-4" />
                   Previous
-                </button>
+                </Button>
                 <span className="px-3 py-1.5 text-sm text-muted-foreground">
                   Page {page} of {totalPages}
                 </span>
-                <button
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="flex items-center gap-1 px-3 py-1.5 border border-border rounded text-sm disabled:opacity-50"
                 >
                   Next
                   <ChevronRight className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
             </div>
           )}

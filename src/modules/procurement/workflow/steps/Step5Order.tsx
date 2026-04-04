@@ -16,6 +16,7 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { log } from '@/lib/logger';
 import type { WorkflowState } from '../useWorkflowState';
 import { calcVat } from './requisitionUtils';
@@ -137,7 +138,7 @@ export const Step5Order: React.FC<Step5OrderProps> = ({ state, onComplete, onBac
       <div style={{ padding: '24px', textAlign: 'center' }}>
         <AlertCircle style={{ width: 32, height: 32, color: '#ef4444', margin: '0 auto 8px' }} />
         <p style={{ color: '#ef4444', marginBottom: 12 }}>{supplierError}</p>
-        <button onClick={() => void fetchSuppliers()} style={{ padding: '8px 16px', border: '1px solid var(--ff-border-light)', borderRadius: 6, cursor: 'pointer' }}>Retry</button>
+        <Button variant="secondary" onClick={() => void fetchSuppliers()}>Retry</Button>
       </div>
     );
   }
@@ -157,9 +158,9 @@ export const Step5Order: React.FC<Step5OrderProps> = ({ state, onComplete, onBac
           <p style={{ color: 'var(--ff-text-secondary)' }}>{doneDetail}</p>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button onClick={handleNext} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+          <Button onClick={handleNext}>
             Next: Quote &amp; Award <ArrowRight style={{ width: 16, height: 16 }} />
-          </button>
+          </Button>
         </div>
       </div>
     );

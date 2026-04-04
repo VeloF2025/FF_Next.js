@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Search, XCircle, Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface PPDataFiltersProps {
   searchText: string;
@@ -44,12 +45,15 @@ export function PPDataFilters({
                      text-[var(--ff-text-primary)] text-sm w-56 placeholder:text-[var(--ff-text-tertiary)]"
         />
         {searchText && (
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => onSearchChange('')}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]"
+            className="absolute right-2 top-1/2 -translate-y-1/2"
+            aria-label="Clear search"
           >
             <XCircle className="w-3.5 h-3.5" />
-          </button>
+          </Button>
         )}
       </div>
       <select
@@ -121,24 +125,20 @@ export function PPDataFilters({
                      text-[var(--ff-text-primary)] text-sm"
         />
         {(filterDateFrom || filterDateTo) && (
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => { onDateFromChange(''); onDateToChange(''); }}
-            className="p-1 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]"
             title="Clear dates"
           >
             <XCircle className="w-4 h-4" />
-          </button>
+          </Button>
         )}
       </div>
       <div className="ml-auto">
-        <button
-          onClick={onExport}
-          className="px-3 py-1.5 text-sm rounded border border-[var(--ff-border-light)]
-                     text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]
-                     flex items-center gap-1.5"
-        >
+        <Button variant="secondary" size="sm" onClick={onExport}>
           <Download className="w-3.5 h-3.5" /> Export Excel
-        </button>
+        </Button>
       </div>
     </div>
   );
