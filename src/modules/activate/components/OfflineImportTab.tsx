@@ -13,6 +13,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { ImportProgressOverlay, type ImportPhase } from './ImportProgressOverlay';
+import { Button } from '@/components/ui/button';
 
 interface OfflineRow {
   drop_number: string;
@@ -274,9 +275,9 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
                 <p className="text-sm text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</p>
               </div>
             </div>
-            <button onClick={() => resetForm()} className="text-sm text-red-600 hover:text-red-700">
+            <Button variant="danger" size="sm" onClick={() => resetForm()}>
               Remove
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -448,30 +449,24 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
       {/* Import Button */}
       {previewData && !importResult && (
         <div className="flex justify-end gap-3">
-          <button
+          <Button
+            variant="ghost"
             onClick={() => resetForm()}
-            className="px-4 py-2 text-muted-foreground hover:text-gray-800 dark:hover:text-gray-200"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="primary"
             onClick={handleImport}
             disabled={isLoading}
-            className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700
-                       disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            loading={isLoading}
           >
             {isLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Importing...
-              </>
+              'Importing...'
             ) : (
-              <>
-                <Upload className="w-4 h-4" />
-                Import {previewData.totalRows.toLocaleString()} Records
-              </>
+              <><Upload className="w-4 h-4" /> Import {previewData.totalRows.toLocaleString()} Records</>
             )}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -555,12 +550,13 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
                 </div>
               )}
 
-              <button
+              <Button
+                variant="primary"
+                className="mt-4"
                 onClick={() => resetForm(true)}
-                className="mt-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
               >
                 Import Another File
-              </button>
+              </Button>
             </div>
           </div>
         </div>

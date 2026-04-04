@@ -27,6 +27,7 @@ import {
   Loader2,
   MousePointerClick,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   ResponsiveContainer,
   LineChart,
@@ -344,9 +345,9 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
           {groupBy === 'project' ? (
             <span className="font-semibold text-foreground">All Projects</span>
           ) : (
-            <button onClick={backToProjects} aria-label="Back to all projects" className="text-primary hover:text-primary/80 hover:underline font-medium">
+            <Button variant="link" onClick={backToProjects} aria-label="Back to all projects">
               All Projects
-            </button>
+            </Button>
           )}
           {(groupBy === 'zone' || groupBy === 'pon') && (
             <>
@@ -354,9 +355,9 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
               {groupBy === 'zone' ? (
                 <span className="font-semibold text-foreground">{drill.projectLabel ?? 'Project'}</span>
               ) : (
-                <button onClick={backToZones} aria-label={`Back to ${drill.projectLabel ?? 'Project'} zones`} className="text-primary hover:text-primary/80 hover:underline font-medium">
+                <Button variant="link" onClick={backToZones} aria-label={`Back to ${drill.projectLabel ?? 'Project'} zones`}>
                   {drill.projectLabel ?? 'Project'}
-                </button>
+                </Button>
               )}
             </>
           )}

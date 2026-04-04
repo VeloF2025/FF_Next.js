@@ -4,6 +4,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Search, RefreshCw, Loader2, AlertCircle, XCircle, Wrench } from 'lucide-react';
 import { log } from '@/lib/logger';
 import toast from 'react-hot-toast';
+import { Button } from '@/components/ui/button';
 import { SummaryCards, LookupProgressBanner, LookupCompleteBanner } from './PPSummaryCards';
 import { CreatePPTicketsModal } from './CreatePPTicketsModal';
 import { PPDataFilters } from './PPDataFilters';
@@ -242,23 +243,30 @@ export function PPDataTab() {
 
       {stats && stats.total > 0 && (
         <div className="flex flex-wrap gap-3">
-          <button onClick={handleResolveAll} disabled={isResolving || lookupStatus?.status === 'running'}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
-            {isResolving ? (<><Loader2 className="w-4 h-4 animate-spin" /> Resolving...</>)
-              : lookupStatus?.status === 'running' ? (<><Loader2 className="w-4 h-4 animate-spin" /> 1Map Searching...</>)
-              : (<><Search className="w-4 h-4" /> Resolve All</>)}
-          </button>
+          <Button
+            variant="primary"
+            onClick={handleResolveAll}
+            disabled={isResolving || lookupStatus?.status === 'running'}
+            loading={isResolving || lookupStatus?.status === 'running'}
+          >
+            {isResolving ? 'Resolving...'
+              : lookupStatus?.status === 'running' ? '1Map Searching...'
+              : <><Search className="w-4 h-4" /> Resolve All</>}
+          </Button>
           {stats.unticketed > 0 && (
-            <button onClick={handleSelectAllUnticketed} disabled={selectingAllUnticketed}
-              className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
-              {selectingAllUnticketed ? (<><Loader2 className="w-4 h-4 animate-spin" /> Loading...</>)
-                : (<><Wrench className="w-4 h-4" /> Ticket All Unticketed ({stats.unticketed})</>)}
-            </button>
+            <Button
+              variant="primary"
+              onClick={handleSelectAllUnticketed}
+              disabled={selectingAllUnticketed}
+              loading={selectingAllUnticketed}
+            >
+              {selectingAllUnticketed ? 'Loading...'
+                : <><Wrench className="w-4 h-4" /> Ticket All Unticketed ({stats.unticketed})</>}
+            </Button>
           )}
-          <button onClick={() => { fetchStats(); fetchRecords(); }}
-            className="px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg flex items-center gap-2">
+          <Button variant="secondary" onClick={() => { fetchStats(); fetchRecords(); }}>
             <RefreshCw className="w-4 h-4" /> Refresh
-          </button>
+          </Button>
         </div>
       )}
 
@@ -266,10 +274,10 @@ export function PPDataTab() {
         <div className="bg-blue-900/30 border border-blue-700 rounded-lg px-4 py-3 flex items-center justify-between">
           <span className="text-sm text-blue-300"><strong>{selectedIds.length}</strong> record{selectedIds.length !== 1 ? 's' : ''} selected</span>
           <div className="flex gap-3">
-            <button onClick={() => setSelectedIds([])} className="px-3 py-1.5 text-sm rounded border border-blue-700 text-blue-300 hover:text-blue-100">Clear</button>
-            <button onClick={() => setShowTicketModal(true)} className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1.5">
+            <Button variant="secondary" size="sm" onClick={() => setSelectedIds([])}>Clear</Button>
+            <Button variant="primary" size="sm" onClick={() => setShowTicketModal(true)}>
               <Wrench className="w-3.5 h-3.5" /> Create NOC Tickets
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -301,11 +309,9 @@ export function PPDataTab() {
           </div>
           {totalPages > 1 && (
             <div className="flex justify-between items-center px-4 py-3 border-t border-[var(--ff-border-light)]">
-              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                className="px-3 py-1 text-sm rounded border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] disabled:opacity-50">Previous</button>
+              <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</Button>
               <span className="text-sm text-[var(--ff-text-secondary)]">Page {page} of {totalPages}</span>
-              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                className="px-3 py-1 text-sm rounded border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] disabled:opacity-50">Next</button>
+              <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</Button>
             </div>
           )}
         </div>

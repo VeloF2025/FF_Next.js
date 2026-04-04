@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { Snag, SnagPhoto, SnagStatus } from '../../types/snag.types';
 import { updateSnag, createNocTicket } from '../../services/snagService';
 import { log } from '@/lib/logger';
+import toast from 'react-hot-toast';
 import { PhotoColumn } from './SnagPhotoColumn';
 import { SnagPoleResolution } from './SnagPoleResolution';
 
@@ -77,11 +78,29 @@ export function SnagDetail({ snag: initialSnag, photos, onClose, onUpdated, onPh
   const handleCreateNocTicket = async () => {
     setCreatingTicket(true);
     try {
-      const { snag: updatedSnag } = await createNocTicket(snag.id);
+      const { snag: updatedSnag, ticket } = await createNocTicket(snag.id);
       setSnag(updatedSnag);
       onUpdated(updatedSnag);
+      const uid = ticket?.ticket_uid ?? updatedSnag.noc_ticket_uid ?? 'Ticket';
+      const ticketId = ticket?.id ?? updatedSnag.noc_ticket_id ?? '';
+      toast.success(
+        (t) => (
+          <span>
+            NOC ticket created:{' '}
+            <a
+              href={`/noc/tickets/${ticketId}`}
+              className="font-semibold underline text-blue-600"
+              onClick={() => toast.dismiss(t.id)}
+            >
+              {uid}
+            </a>
+          </span>
+        ),
+        { duration: 6000 }
+      );
     } catch (err) {
       log.error('Failed to create NOC ticket', { err, snagId: snag.id });
+      toast.error('Failed to create NOC ticket');
     } finally {
       setCreatingTicket(false);
     }

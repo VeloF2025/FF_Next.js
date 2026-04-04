@@ -7,6 +7,7 @@ import { CreatePPTicketsModal } from './CreatePPTicketsModal';
 import { type PPRecord, type PPCardCategory, isSelectable } from './ppDataShared';
 import { PPDataRow, PPDataTableHead } from './PPDataRow';
 import toast from 'react-hot-toast';
+import { Button } from '@/components/ui/button';
 
 const CATEGORY_CONFIG: Record<PPCardCategory, { title: string; statusFilter: string; color: string }> = {
   total:     { title: 'Total Imported',  statusFilter: '',          color: 'text-[var(--ff-text-primary)]' },
@@ -132,14 +133,14 @@ export function PPDataCardModal({ category, count, onClose }: PPDataCardModalPro
                          text-[var(--ff-text-primary)] text-sm w-56 placeholder:text-[var(--ff-text-tertiary)]"
             />
             {searchText && (
-              <button onClick={() => setSearchText('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]">
+              <Button variant="ghost" size="icon" onClick={() => setSearchText('')} className="absolute right-2 top-1/2 -translate-y-1/2" aria-label="Clear search">
                 <XCircle className="w-3.5 h-3.5" />
-              </button>
+              </Button>
             )}
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-[var(--ff-bg-primary)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors">
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
             <X className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -148,10 +149,10 @@ export function PPDataCardModal({ category, count, onClose }: PPDataCardModalPro
         <div className="bg-blue-900/30 border-b border-blue-700 px-6 py-3 flex items-center justify-between">
           <span className="text-sm text-blue-300"><strong>{selectedIds.length}</strong> record{selectedIds.length !== 1 ? 's' : ''} selected</span>
           <div className="flex gap-3">
-            <button onClick={() => setSelectedIds([])} className="px-3 py-1.5 text-sm rounded border border-blue-700 text-blue-300 hover:text-blue-100">Clear</button>
-            <button onClick={() => setShowTicketModal(true)} className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1.5">
+            <Button variant="secondary" size="sm" onClick={() => setSelectedIds([])}>Clear</Button>
+            <Button variant="primary" size="sm" onClick={() => setShowTicketModal(true)}>
               <Wrench className="w-3.5 h-3.5" /> Create NOC Tickets
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -180,11 +181,9 @@ export function PPDataCardModal({ category, count, onClose }: PPDataCardModalPro
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-between items-center px-6 py-3 border-t border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-            className="px-3 py-1 text-sm rounded border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] disabled:opacity-50">Previous</button>
+          <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</Button>
           <span className="text-sm text-[var(--ff-text-secondary)]">Page {page} of {totalPages}</span>
-          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-            className="px-3 py-1 text-sm rounded border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] disabled:opacity-50">Next</button>
+          <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</Button>
         </div>
       )}
 

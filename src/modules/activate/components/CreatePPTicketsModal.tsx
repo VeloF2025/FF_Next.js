@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { TeamSelector } from '@/modules/noc/components/Assignment/TeamSelector';
+import { Button } from '@/components/ui/button';
 
 interface CreatePPTicketsModalProps {
   selectedCount: number;
@@ -56,9 +57,9 @@ export function CreatePPTicketsModal({
           <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
             Create NOC Tickets
           </h3>
-          <button onClick={onClose} className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]">
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
             <X className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
 
         <p className="text-sm text-[var(--ff-text-secondary)]">
@@ -126,26 +127,21 @@ export function CreatePPTicketsModal({
         </div>
 
         <div className="flex justify-end gap-3 pt-2">
-          <button
+          <Button
+            variant="secondary"
             onClick={onClose}
             disabled={loading}
-            className="px-4 py-2 text-sm rounded border border-[var(--ff-border-light)]
-                       text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="primary"
             onClick={() => onConfirm({ ticket_type: ticketType, priority, notes, assigned_team_id: assignedTeamId || undefined })}
             disabled={loading}
-            className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700
-                       disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            loading={loading}
           >
-            {loading ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Creating...</>
-            ) : (
-              `Create ${selectedCount} Ticket${selectedCount !== 1 ? 's' : ''}`
-            )}
-          </button>
+            {loading ? 'Creating...' : `Create ${selectedCount} Ticket${selectedCount !== 1 ? 's' : ''}`}
+          </Button>
         </div>
       </div>
     </div>

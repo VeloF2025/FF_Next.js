@@ -4,6 +4,7 @@ import React from 'react';
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import { type PPCardCategory, type PPStats, type LookupStatus } from './ppDataShared';
+import { Button } from '@/components/ui/button';
 
 export function SummaryCards({ stats, activeCard, onCardClick }: { stats: PPStats; activeCard: PPCardCategory | null; onCardClick: (cat: PPCardCategory) => void }) {
   const cards: { cat: PPCardCategory; value: number; label: string; color: string; hover: string; activeBorder: string }[] = [
@@ -69,9 +70,9 @@ export function LookupCompleteBanner({ status, onDismiss }: { status: LookupStat
         not found {status.not_found}
         {status.elapsed_seconds ? ` in ${status.elapsed_seconds}s` : ''}.
       </div>
-      <button onClick={onDismiss} className="ml-auto text-green-500 hover:text-green-300">
+      <Button variant="ghost" size="icon" onClick={onDismiss} className="ml-auto" aria-label="Dismiss">
         <XCircle className="w-4 h-4" />
-      </button>
+      </Button>
     </div>
   );
 }

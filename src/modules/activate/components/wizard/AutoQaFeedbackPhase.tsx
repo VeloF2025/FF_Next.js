@@ -14,6 +14,7 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { log } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
 import { STEP_LABELS } from '../../utils/stepMapper';
 import type { AutoQaResults, AutoQaPhotoResult } from '../../services/autoQaCommentGenerator';
 import { generateFeedbackMessage, generatePhotoComment } from '../../services/autoQaCommentGenerator';
@@ -318,9 +319,9 @@ export function AutoQaFeedbackPhase({
         <div className="text-6xl mb-4">{decision === 'PASS' ? '✅' : decision === 'FAIL' ? '❌' : '⚠️'}</div>
         <h3 className="text-2xl font-bold text-foreground">Review Complete</h3>
         <p className="text-muted-foreground">{dropNumber} feedback sent to technicians.</p>
-        <button onClick={onComplete} className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+        <Button variant="primary" size="lg" onClick={onComplete}>
           Finish Review
-        </button>
+        </Button>
       </div>
     );
   }
@@ -445,12 +446,9 @@ export function AutoQaFeedbackPhase({
             <span className="text-green-500">💬</span> WhatsApp Feedback
           </h4>
           {feedbackStale && (
-            <button
-              onClick={regenerateFeedback}
-              className="px-3 py-1 text-xs font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
-            >
+            <Button variant="primary" size="sm" onClick={regenerateFeedback}>
               Regenerate Message
-            </button>
+            </Button>
           )}
         </div>
         {feedbackStale && (
@@ -499,26 +497,17 @@ export function AutoQaFeedbackPhase({
 
       {/* Actions */}
       <div className="flex justify-between pt-4 border-t border-border">
-        <button
-          onClick={handleRejectAutoQa}
-          className="px-4 py-2 text-red-600 hover:text-red-700 border border-red-300 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
-        >
+        <Button variant="danger" onClick={handleRejectAutoQa}>
           Reject Auto-QA (Manual Review)
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="primary"
           onClick={handleSendFeedback}
           disabled={isSending || !feedbackMessage.trim()}
-          className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          loading={isSending}
         >
-          {isSending ? (
-            <>
-              <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-              Sending...
-            </>
-          ) : (
-            <>Send Feedback</>
-          )}
-        </button>
+          {isSending ? 'Sending...' : 'Send Feedback'}
+        </Button>
       </div>
     </div>
   );

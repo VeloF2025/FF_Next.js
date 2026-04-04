@@ -27,6 +27,7 @@ import {
   Users,
   Shield,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type {
   ReportFilters,
   SerialMismatchRecord,
@@ -249,9 +250,9 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
       <div className="p-6 text-center">
         <AlertTriangle className="h-8 w-8 text-red-500 mx-auto mb-2" />
         <p className="text-red-600 dark:text-red-400">{error}</p>
-        <button onClick={fetchData} className="mt-2 text-blue-600 hover:underline">
+        <Button variant="link" className="mt-2" onClick={fetchData}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -395,14 +396,16 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
           </div>
         )}
 
-        <button
+        <Button
+          variant="primary"
+          size="sm"
+          className="ml-auto"
           onClick={handleExport}
-          className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700"
           title={`Export ${selectedStatus ? selectedStatus.replace(/_/g, ' ') : 'all'} records${selectedTeam ? ` for ${selectedTeam}` : ''}${selectedZone ? ` in zone ${selectedZone}` : ''}`}
         >
           <Download className="h-4 w-4" />
           Export {selectedStatus ? selectedStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'All'} CSV
-        </button>
+        </Button>
       </div>
 
       {/* Data Table */}
@@ -530,15 +533,19 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
                     <td className="px-3 py-3">
                       {record.status === 'pending_investigation' && (
                         <div className="flex gap-1">
-                          <button
+                          <Button
+                            variant="danger"
+                            size="sm"
                             onClick={() => handleCreateTicket(record.id)}
                             disabled={actionLoading === record.id}
-                            className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                            loading={actionLoading === record.id}
                             title="Create investigation ticket"
                           >
-                            {actionLoading === record.id ? '...' : '🎫'}
-                          </button>
-                          <button
+                            {actionLoading === record.id ? '' : '🎫'}
+                          </Button>
+                          <Button
+                            variant="primary"
+                            size="sm"
                             onClick={() =>
                               setResolutionModal({
                                 record,
@@ -546,14 +553,15 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
                                 notes: '',
                               })
                             }
-                            className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
                           >
                             ✓
-                          </button>
+                          </Button>
                         </div>
                       )}
                       {record.status === 'ticket_created' && (
-                        <button
+                        <Button
+                          variant="primary"
+                          size="sm"
                           onClick={() =>
                             setResolutionModal({
                               record,
@@ -561,10 +569,9 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
                               notes: '',
                             })
                           }
-                          className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
                         >
                           ✓
-                        </button>
+                        </Button>
                       )}
                       {record.status === 'resolved' && record.resolved_at && (
                         <span className="text-xs text-muted-foreground">
@@ -588,20 +595,24 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
             {Math.min(page * pageSize, data.total_count)} of {data.total_count} results
           </p>
           <div className="flex gap-2">
-            <button
+            <Button
+              variant="secondary"
+              size="icon"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-3 py-1.5 border border-border rounded text-sm disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700"
+              aria-label="Previous page"
             >
               <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
+              size="icon"
               onClick={() => setPage((p) => p + 1)}
               disabled={page * pageSize >= data.total_count}
-              className="px-3 py-1.5 border border-border rounded text-sm disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700"
+              aria-label="Next page"
             >
               <ChevronRight className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -688,13 +699,14 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
             </div>
 
             <div className="flex justify-end gap-3 mt-6">
-              <button
+              <Button
+                variant="secondary"
                 onClick={() => setResolutionModal(null)}
-                className="px-4 py-2 text-sm border border-border rounded hover:bg-gray-100 dark:hover:bg-gray-700"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="primary"
                 onClick={() =>
                   handleStatusUpdate(
                     resolutionModal.record.id,
@@ -704,10 +716,10 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
                   )
                 }
                 disabled={actionLoading === resolutionModal.record.id}
-                className="px-4 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                loading={actionLoading === resolutionModal.record.id}
               >
                 {actionLoading === resolutionModal.record.id ? 'Saving...' : 'Resolve'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
