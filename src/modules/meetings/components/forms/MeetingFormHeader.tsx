@@ -4,6 +4,7 @@
  */
 
 import { X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface MeetingFormHeaderProps {
   isEditing: boolean;
@@ -16,9 +17,9 @@ export function MeetingFormHeader({ isEditing, onClose }: MeetingFormHeaderProps
       <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
         {isEditing ? 'Edit Meeting' : 'New Meeting'}
       </h2>
-      <button onClick={onClose} className="p-2 hover:bg-[var(--ff-bg-hover)] rounded-md">
+      <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
         <X className="w-5 h-5" />
-      </button>
+      </Button>
     </div>
   );
 }

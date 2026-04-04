@@ -283,7 +283,7 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
                 Create Adjustment
               </>
             )}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

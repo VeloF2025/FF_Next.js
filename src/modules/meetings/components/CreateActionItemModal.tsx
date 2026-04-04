@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { log } from '@/lib/logger';
 import { actionItemsService } from '@/services/action-items/actionItemsService';
 import type { ActionItemPriority } from '@/types/action-items.types';
@@ -77,9 +78,9 @@ export function CreateActionItemModal({ isOpen, onClose, onCreated }: CreateActi
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg max-w-lg w-full">
         <div className="p-4 border-b border-[var(--ff-border-light)] flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">New Action Item</h2>
-          <button onClick={onClose} className="p-2 hover:bg-[var(--ff-bg-hover)] rounded">
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close modal">
             <X className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
 
         <div className="p-4 space-y-4">
@@ -150,22 +151,23 @@ export function CreateActionItemModal({ isOpen, onClose, onCreated }: CreateActi
         </div>
 
         <div className="p-4 border-t border-[var(--ff-border-light)] flex justify-end gap-3">
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={onClose}
-            className="ff-button ff-button-secondary"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="primary"
             onClick={handleSubmit}
             disabled={!description.trim() || !meetingId || isSubmitting}
-            className="ff-button ff-button-primary flex items-center gap-2 disabled:opacity-50"
+            className="flex items-center gap-2"
           >
             {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
             Create
-          </button>
+          </Button>
         </div>
       </div>
     </div>

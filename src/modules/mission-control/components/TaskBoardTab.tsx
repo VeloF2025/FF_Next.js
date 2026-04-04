@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, X, ChevronRight, ChevronLeft, Check, RotateCcw, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { MCTask, MCAgent } from '../types';
 
@@ -37,12 +38,14 @@ function TaskCard({ task, onMove, onDelete }: {
     >
       <div className="flex items-start justify-between mb-2">
         <h4 className="text-sm font-medium flex-1" style={{ color: 'var(--ff-text-primary)' }}>{task.title}</h4>
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => onDelete(task.id)}
-          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-500/20"
+          className="opacity-0 group-hover:opacity-100 transition-opacity"
         >
           <Trash2 className="w-3 h-3 text-red-400" />
-        </button>
+        </Button>
       </div>
       {task.description && (
         <p className="text-xs mb-2 line-clamp-2" style={{ color: 'var(--ff-text-tertiary)' }}>{task.description}</p>
@@ -60,20 +63,24 @@ function TaskCard({ task, onMove, onDelete }: {
         </div>
         <div className="flex items-center gap-0.5">
           {task.status !== 'pending' && (
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => onMove(task.id, task.status === 'completed' ? 'pending' : 'pending')}
-              className="p-1 rounded hover:bg-[var(--ff-bg-secondary)]" title="Move back"
+              title="Move back"
             >
               {task.status === 'completed' ? <RotateCcw className="w-3 h-3" style={{ color: 'var(--ff-text-tertiary)' }} /> : <ChevronLeft className="w-3 h-3" style={{ color: 'var(--ff-text-tertiary)' }} />}
-            </button>
+            </Button>
           )}
           {task.status !== 'completed' && (
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => onMove(task.id, task.status === 'pending' ? 'in-progress' : 'completed')}
-              className="p-1 rounded hover:bg-[var(--ff-bg-secondary)]" title="Move forward"
+              title="Move forward"
             >
               {task.status === 'in-progress' ? <Check className="w-3 h-3 text-emerald-400" /> : <ChevronRight className="w-3 h-3" style={{ color: 'var(--ff-text-tertiary)' }} />}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -116,13 +123,13 @@ export function TaskBoardTab({ tasks, agents, onCreateTask, onUpdateTask, onDele
     <div>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold" style={{ color: 'var(--ff-text-primary)' }}>Agent Task Board</h3>
-        <button
+        <Button
+          variant="primary"
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
-          style={{ background: 'var(--ff-primary)', color: '#fff' }}
+          className="flex items-center gap-1.5"
         >
           <Plus className="w-4 h-4" /> New Task
-        </button>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4" style={{ minHeight: 'calc(100vh - 320px)' }}>
@@ -167,9 +174,9 @@ export function TaskBoardTab({ tasks, agents, onCreateTask, onUpdateTask, onDele
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold" style={{ color: 'var(--ff-text-primary)' }}>New Task</h3>
-              <button onClick={() => setShowModal(false)} className="p-1 rounded hover:bg-[var(--ff-bg-tertiary)]">
-                <X className="w-5 h-5" style={{ color: 'var(--ff-text-tertiary)' }} />
-              </button>
+              <Button variant="ghost" size="icon" onClick={() => setShowModal(false)} aria-label="Close modal">
+                <X className="w-5 h-5" />
+              </Button>
             </div>
             <div className="space-y-3">
               <input
@@ -211,21 +218,19 @@ export function TaskBoardTab({ tasks, agents, onCreateTask, onUpdateTask, onDele
               </select>
             </div>
             <div className="flex justify-end gap-2 mt-4">
-              <button
+              <Button
+                variant="secondary"
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 text-sm rounded-lg border"
-                style={{ borderColor: 'var(--ff-border-light)', color: 'var(--ff-text-secondary)' }}
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="primary"
                 onClick={handleCreate}
                 disabled={!newTitle.trim()}
-                className="px-4 py-2 text-sm font-medium rounded-lg text-white disabled:opacity-50"
-                style={{ background: 'var(--ff-primary)' }}
               >
                 Create
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { log } from '@/lib/logger';
 import {
   RISK_CATEGORIES,
@@ -160,13 +161,14 @@ export function RiskForm({ projectId, onSuccess, onCancel }: RiskFormProps) {
       >
         <div className="flex items-center justify-between p-4 border-b border-[var(--ff-border-light)]">
           <h2 id="risk-dialog-title" className="text-lg font-semibold text-[var(--ff-text-primary)]">New Risk Assessment</h2>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={onCancel}
             aria-label="Close dialog"
-            className="p-3 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] rounded-lg transition-colors min-w-[44px] min-h-[44px]"
           >
             <X className="w-5 h-5" aria-hidden="true" />
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
@@ -284,10 +286,10 @@ export function RiskForm({ projectId, onSuccess, onCancel }: RiskFormProps) {
           </div>
 
           <div className="flex items-center gap-3 pt-3 border-t border-[var(--ff-border-light)]">
-            <button type="submit" disabled={submitting} className="px-4 py-2 bg-[var(--ff-primary-500)] hover:bg-[var(--ff-primary-600)] disabled:opacity-50 text-white text-sm font-medium rounded-lg">
+            <Button type="submit" variant="primary" disabled={submitting}>
               {submitting ? 'Creating...' : 'Add to Register'}
-            </button>
-            <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-[var(--ff-text-secondary)]">Cancel</button>
+            </Button>
+            <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
           </div>
         </form>
       </div>

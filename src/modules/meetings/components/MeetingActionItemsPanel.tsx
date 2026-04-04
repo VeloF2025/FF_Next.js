@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { CheckCircle, Circle, Plus, Loader2, Zap, Calendar, User, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { log } from '@/lib/logger';
 import { actionItemsService } from '@/services/action-items/actionItemsService';
@@ -135,11 +136,12 @@ export function MeetingActionItemsPanel({ meeting }: MeetingActionItemsPanelProp
         <p className="text-xs text-[var(--ff-text-secondary)] mb-4 max-w-sm mx-auto">
           Extract action items from the meeting summary to track and assign them.
         </p>
-        <button
+        <Button
           type="button"
+          variant="primary"
           onClick={handleExtract}
           disabled={isExtracting}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-2"
         >
           {isExtracting ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -147,7 +149,7 @@ export function MeetingActionItemsPanel({ meeting }: MeetingActionItemsPanelProp
             <Zap className="w-4 h-4" />
           )}
           {isExtracting ? 'Extracting...' : 'Extract Action Items'}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -167,14 +169,16 @@ export function MeetingActionItemsPanel({ meeting }: MeetingActionItemsPanelProp
         <p className="text-xs text-[var(--ff-text-tertiary)]">
           {items.length} item{items.length !== 1 ? 's' : ''} ({completed.length} completed)
         </p>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => setShowAddForm(!showAddForm)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-400 hover:text-blue-300 border border-blue-500/30 rounded-lg hover:bg-blue-500/10 transition-colors"
+          className="flex items-center gap-1.5"
         >
           <Plus className="w-3.5 h-3.5" />
           Add Item
-        </button>
+        </Button>
       </div>
 
       {/* Add form */}
@@ -213,22 +217,25 @@ export function MeetingActionItemsPanel({ meeting }: MeetingActionItemsPanelProp
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => setShowAddForm(false)}
-              className="px-3 py-1.5 text-xs font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="primary"
+              size="sm"
               onClick={handleAdd}
               disabled={!newDescription.trim() || isAdding}
-              className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5"
             >
               {isAdding && <Loader2 className="w-3 h-3 animate-spin" />}
               Add
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -330,14 +337,16 @@ function ActionItemRow({
           )}
         </div>
       </div>
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon"
         onClick={onDelete}
-        className="p-1 opacity-0 group-hover:opacity-100 text-[var(--ff-text-tertiary)] hover:text-red-400 transition-all"
         title="Delete"
+        className="opacity-0 group-hover:opacity-100"
       >
         <Trash2 className="w-3.5 h-3.5" />
-      </button>
+      </Button>
     </div>
   );
 }

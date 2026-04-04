@@ -10,6 +10,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
 import { formatDisplayDateTime } from '@/utils/dateFormat';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -184,14 +185,15 @@ export function WATrackingDashboard() {
             Monitor DRs flagged from WhatsApp QA groups
           </p>
         </div>
-        <button
+        <Button
+          variant="secondary"
           onClick={fetchData}
           disabled={isLoading}
-          className="px-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors flex items-center gap-2 text-[var(--ff-text-primary)]"
+          className="flex items-center gap-2"
         >
           <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
           Refresh
-        </button>
+        </Button>
       </div>
 
       {/* Status Summary Cards */}
@@ -332,13 +334,13 @@ export function WATrackingDashboard() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {flag.wa_photo_count > 0 && (
-                          <button className="text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]">
+                          <Button variant="ghost" size="icon" aria-label={expandedDr === flag.drop_number ? 'Collapse photos' : 'Expand photos'}>
                             {expandedDr === flag.drop_number ? (
                               <ChevronUp className="h-4 w-4" />
                             ) : (
                               <ChevronDown className="h-4 w-4" />
                             )}
-                          </button>
+                          </Button>
                         )}
                         <div>
                           <Link
@@ -489,12 +491,15 @@ export function WATrackingDashboard() {
           onClick={() => setLightboxPhoto(null)}
         >
           <div className="relative max-w-4xl max-h-[90vh] bg-[var(--ff-bg-secondary)] rounded-lg overflow-hidden">
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setLightboxPhoto(null)}
-              className="absolute top-2 right-2 z-10 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors"
+              aria-label="Close lightbox"
+              className="absolute top-2 right-2 z-10 bg-black/50 hover:bg-black/70 rounded-full"
             >
-              <X className="h-5 w-5" />
-            </button>
+              <X className="h-5 w-5 text-white" />
+            </Button>
             <Image
               src={lightboxPhoto.url}
               alt={lightboxPhoto.filename}

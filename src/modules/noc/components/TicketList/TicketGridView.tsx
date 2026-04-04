@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 import {
   ChevronUp,
   ChevronDown,
@@ -278,7 +279,7 @@ export function TicketGridView({ initialFilters = {}, onTicketClick }: TicketGri
         <div>
           <p className="font-medium text-red-400">Error loading tickets</p>
           <p className="text-sm text-red-300 mt-1">{error?.message ?? 'Unknown error'}</p>
-          <button onClick={() => refetch()} className="mt-3 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">Retry</button>
+          <Button variant="danger" size="sm" onClick={() => refetch()} className="mt-3">Retry</Button>
         </div>
       </div>
     </div>
@@ -325,15 +326,17 @@ export function TicketGridView({ initialFilters = {}, onTicketClick }: TicketGri
               >{n}</button>
             ))}
           </div>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => { refetch(); announce('Refreshing tickets'); }}
             disabled={isLoading}
-            className="ml-1 p-2.5 rounded text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)] disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--ff-primary-500)] min-w-[44px] min-h-[44px] flex items-center justify-center"
+            className="ml-1"
             title="Refresh"
             aria-label="Refresh tickets"
           >
             <RefreshCw className={cn('w-3.5 h-3.5', isLoading && 'animate-spin')} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
       </div>
 

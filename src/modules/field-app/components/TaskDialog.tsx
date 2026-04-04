@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { 
-  X, Camera, MapPin, Clock, User, FileText, 
-  CheckCircle, AlertTriangle, Phone 
+import {
+  X, Camera, MapPin, Clock, User, FileText,
+  CheckCircle, AlertTriangle, Phone
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { Button } from '@/components/ui/button';
 import type { FieldTask } from '../types/field-app.types';
 
 interface TaskDialogProps {
@@ -28,37 +29,40 @@ export function TaskDialog({ task, isOpen, onClose, onStatusUpdate }: TaskDialog
     
     if (task.status === 'pending') {
       buttons.push(
-        <button
+        <Button
           key="start"
+          variant="primary"
           onClick={() => handleStatusUpdate('in_progress')}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          className="flex items-center"
         >
           <Clock className="w-4 h-4 mr-2" />
           Start Task
-        </button>
+        </Button>
       );
     }
     
     if (task.status === 'in_progress') {
       buttons.push(
-        <button
+        <Button
           key="complete"
+          variant="primary"
           onClick={() => handleStatusUpdate('completed')}
-          className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+          className="flex items-center"
         >
           <CheckCircle className="w-4 h-4 mr-2" />
           Mark Complete
-        </button>
+        </Button>
       );
       buttons.push(
-        <button
+        <Button
           key="fail"
+          variant="danger"
           onClick={() => handleStatusUpdate('failed')}
-          className="flex items-center px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+          className="flex items-center"
         >
           <AlertTriangle className="w-4 h-4 mr-2" />
           Mark Failed
-        </button>
+        </Button>
       );
     }
     
@@ -76,13 +80,14 @@ export function TaskDialog({ task, isOpen, onClose, onStatusUpdate }: TaskDialog
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] p-4 flex items-center justify-between">
           <h2 id="task-dialog-title" className="text-lg font-semibold text-[var(--ff-text-primary)]">Task Details</h2>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={onClose}
             aria-label="Close task details"
-            className="p-2 hover:bg-[var(--ff-bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] rounded-md"
           >
             <X className="w-5 h-5" aria-hidden="true" />
-          </button>
+          </Button>
         </div>
 
         <div className="p-6 space-y-6">
@@ -125,9 +130,9 @@ export function TaskDialog({ task, isOpen, onClose, onStatusUpdate }: TaskDialog
                 <span>
                   {task.coordinates.lat.toFixed(4)}, {task.coordinates.lng.toFixed(4)}
                 </span>
-                <button className="text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded">
+                <Button variant="link" size="sm">
                   View on Map
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -173,14 +178,14 @@ export function TaskDialog({ task, isOpen, onClose, onStatusUpdate }: TaskDialog
 
           {/* Quick Actions */}
           <div className="grid grid-cols-2 gap-4">
-            <button className="flex items-center justify-center px-4 py-3 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)]">
+            <Button variant="secondary" className="flex items-center justify-center">
               <Camera className="w-5 h-5 mr-2" aria-hidden="true" />
               Take Photo
-            </button>
-            <button className="flex items-center justify-center px-4 py-3 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)]">
+            </Button>
+            <Button variant="secondary" className="flex items-center justify-center">
               <Phone className="w-5 h-5 mr-2" aria-hidden="true" />
               Call Customer
-            </button>
+            </Button>
           </div>
 
           {/* Status Actions */}
@@ -188,12 +193,9 @@ export function TaskDialog({ task, isOpen, onClose, onStatusUpdate }: TaskDialog
             <div className="flex space-x-2">
               {getStatusButtons()}
             </div>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] rounded-md"
-            >
+            <Button variant="ghost" onClick={onClose}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       </div>

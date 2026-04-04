@@ -16,6 +16,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { log } from '@/lib/logger';
 import { FiveWhysForm, type WhyEntry } from './FiveWhysForm';
 import { CAPA_SEVERITY_CONFIG, type CAPASeverity } from '@/modules/health-safety/types/capa.types';
@@ -216,13 +217,9 @@ export function InvestigationPanel({ ticketId, onComplete }: InvestigationPanelP
               ))}
             </select>
           </div>
-          <button
-            onClick={handleAssign}
-            disabled={saving}
-            className="px-4 py-2 bg-[var(--ff-primary-500)] hover:bg-[var(--ff-primary-600)] disabled:opacity-50 text-white text-sm font-medium rounded-lg"
-          >
+          <Button variant="primary" onClick={handleAssign} disabled={saving}>
             {saving ? 'Assigning...' : 'Start Investigation'}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -268,9 +265,9 @@ export function InvestigationPanel({ ticketId, onComplete }: InvestigationPanelP
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className={labelClass}>Contributing Factors</label>
-              <button type="button" onClick={addFactor} className="text-xs text-[var(--ff-primary-500)]">
+              <Button type="button" variant="ghost" size="sm" onClick={addFactor}>
                 <Plus className="w-3 h-3 inline" /> Add
-              </button>
+              </Button>
             </div>
             {contributingFactors.map((f, idx) => (
               <div key={idx} className="flex gap-2 mb-1">
@@ -285,17 +282,17 @@ export function InvestigationPanel({ ticketId, onComplete }: InvestigationPanelP
                   placeholder={`Factor ${idx + 1}`}
                   className={`${inputClass} flex-1`}
                 />
-                <button type="button" onClick={() => setContributingFactors(contributingFactors.filter((_, i) => i !== idx))} className="text-red-400 p-1">
+                <Button type="button" variant="ghost" size="icon" onClick={() => setContributingFactors(contributingFactors.filter((_, i) => i !== idx))}>
                   <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                </Button>
               </div>
             ))}
           </div>
 
           <div className="flex gap-2">
-            <button onClick={() => { handleSaveFindings(); setStep(2); }} disabled={saving} className="px-4 py-2 bg-[var(--ff-primary-500)] text-white text-sm rounded-lg disabled:opacity-50">
+            <Button variant="primary" onClick={() => { handleSaveFindings(); setStep(2); }} disabled={saving}>
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save & Continue'}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -326,9 +323,9 @@ export function InvestigationPanel({ ticketId, onComplete }: InvestigationPanelP
               className={`${inputClass} resize-y`}
             />
           </div>
-          <button onClick={() => { handleSaveFindings(); setStep(3); }} disabled={saving} className="px-4 py-2 bg-[var(--ff-primary-500)] text-white text-sm rounded-lg disabled:opacity-50">
+          <Button variant="primary" onClick={() => { handleSaveFindings(); setStep(3); }} disabled={saving}>
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save & Continue'}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -339,9 +336,9 @@ export function InvestigationPanel({ ticketId, onComplete }: InvestigationPanelP
             <h3 className="text-sm font-semibold text-[var(--ff-text-primary)]">
               Corrective Actions
             </h3>
-            <button type="button" onClick={addCapaDraft} className="flex items-center gap-1 text-xs text-[var(--ff-primary-500)]">
+            <Button type="button" variant="ghost" size="sm" onClick={addCapaDraft} className="flex items-center gap-1">
               <Plus className="w-3.5 h-3.5" /> Add CAPA
-            </button>
+            </Button>
           </div>
 
           {/* Existing CAPAs */}
@@ -362,7 +359,7 @@ export function InvestigationPanel({ ticketId, onComplete }: InvestigationPanelP
             <div key={idx} className="p-3 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-[var(--ff-text-secondary)]">CAPA {idx + 1}</span>
-                <button type="button" onClick={() => removeCapaDraft(idx)} className="text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
+                <Button type="button" variant="ghost" size="icon" onClick={() => removeCapaDraft(idx)}><Trash2 className="w-3.5 h-3.5" /></Button>
               </div>
               <input type="text" value={draft.title} onChange={(e) => updateCapaDraft(idx, 'title', e.target.value)} placeholder="Action required..." className={inputClass} />
               <div className="grid grid-cols-2 gap-2">
@@ -383,20 +380,20 @@ export function InvestigationPanel({ ticketId, onComplete }: InvestigationPanelP
           )}
 
           <div className="flex gap-2 pt-2">
-            <button
+            <Button
+              variant="primary"
               onClick={() => handleSaveFindings(true)}
               disabled={saving}
-              className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg disabled:opacity-50"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Complete Investigation'}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
               onClick={() => handleSaveFindings(false)}
               disabled={saving}
-              className="px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
             >
               Save Draft
-            </button>
+            </Button>
           </div>
         </div>
       )}

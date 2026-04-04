@@ -14,6 +14,7 @@ import {
   Camera, Upload, Loader2, CheckCircle, AlertCircle, X,
   Maximize2, Monitor, Video, Mic, FileVideo, FileAudio,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useScreenshotUploader } from './useScreenshotUploader';
 import { ACCEPTED_TYPES, ANALYSING_MESSAGES } from './screenshotUtils';
@@ -110,9 +111,9 @@ export function ScreenshotUploader({ onFieldsExtracted, disabled }: ScreenshotUp
         <div className="flex items-center gap-2 p-2.5 bg-red-500/10 border border-red-500/30 rounded-lg">
           <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
           <span className="text-sm text-red-300">{error}</span>
-          <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-300">
+          <Button variant="ghost" size="icon" onClick={() => setError(null)} aria-label="Dismiss error" className="ml-auto">
             <X className="w-3.5 h-3.5" />
-          </button>
+          </Button>
         </div>
       )}
 
@@ -153,12 +154,15 @@ export function ScreenshotUploader({ onFieldsExtracted, disabled }: ScreenshotUp
                   <span className="text-[10px] text-[var(--ff-text-muted)] truncate max-w-[80px]">{p.name}</span>
                 </div>
               )}
-              <button
+              <Button
+                variant="danger"
+                size="icon"
                 onClick={(e) => { e.stopPropagation(); removePreview(i); }}
-                className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 rounded-full p-1 transition-colors z-10"
+                className="absolute -top-2 -right-2 rounded-full z-10"
+                aria-label="Remove preview"
               >
-                <X className="w-3 h-3 text-white" />
-              </button>
+                <X className="w-3 h-3" />
+              </Button>
             </div>
           ))}
         </div>
@@ -170,12 +174,15 @@ export function ScreenshotUploader({ onFieldsExtracted, disabled }: ScreenshotUp
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
           onClick={() => setShowLightbox(null)}
         >
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setShowLightbox(null)}
-            className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+            aria-label="Close lightbox"
+            className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 rounded-full"
           >
             <X className="w-6 h-6 text-white" />
-          </button>
+          </Button>
           <img
             src={showLightbox}
             alt="Media enlarged"

@@ -9,6 +9,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { MessageCircle, X, Send, Sparkles, ChevronDown, ChevronLeft, Loader2, Bot, User,
   LayoutDashboard, FolderKanban, CheckCircle, MapPin, Wrench, ShoppingCart, Package, Truck, Users, BarChart3, MessageSquare, Settings, HelpCircle, HardHat } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { log } from '@/lib/logger';
 
 interface ChatMessage {
@@ -242,12 +243,14 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
     <>
       {/* Restore pill — visible when widget is hidden */}
       {isHidden && (
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => setIsHidden(false)}
-          className="fixed bottom-2 left-1/2 -translate-x-1/2 z-[9999] px-3 py-1 rounded-full bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[10px] text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] transition-colors shadow-lg"
+          className="fixed bottom-2 left-1/2 -translate-x-1/2 z-[9999] rounded-full border border-[var(--ff-border-light)] text-[10px] shadow-lg"
         >
           Show Velo chat
-        </button>
+        </Button>
       )}
 
       {/* Floating Button — draggable, right-click to hide */}
@@ -288,9 +291,9 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
           <div className="flex-shrink-0 bg-gradient-to-r from-emerald-600 to-cyan-600 p-4">
             <div className="flex items-center gap-3">
               {selectedTopic && (
-                <button onClick={goBack} className="p-1 rounded-lg hover:bg-card/10 text-white/70 hover:text-white transition-colors">
+                <Button variant="ghost" size="icon" onClick={goBack} className="text-white/70 hover:text-white hover:bg-card/10">
                   <ChevronLeft className="w-5 h-5" />
-                </button>
+                </Button>
               )}
               <div className="w-10 h-10 rounded-full bg-card/20 flex items-center justify-center backdrop-blur-sm">
                 <Sparkles className="w-5 h-5 text-white" />
@@ -301,9 +304,9 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
                   {selectedTopic ? selectedTopic.label : 'Choose a topic to get started'}
                 </p>
               </div>
-              <button onClick={() => setIsOpen(false)} className="p-1.5 rounded-lg hover:bg-card/10 text-white/70 hover:text-white transition-colors">
+              <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="text-white/70 hover:text-white hover:bg-card/10">
                 <X className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -350,13 +353,15 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
                     </p>
                     <div className="space-y-2 w-full">
                       {getQuickQuestions(selectedTopic.id).map((q) => (
-                        <button
+                        <Button
                           key={q}
+                          variant="ghost"
+                          size="sm"
                           onClick={() => sendMessage(q)}
-                          className="w-full text-left text-xs px-3 py-2 rounded-lg bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+                          className="w-full text-left text-xs"
                         >
                           {q}
-                        </button>
+                        </Button>
                       ))}
                     </div>
                   </div>
@@ -403,12 +408,14 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
               </div>
 
               {showScrollDown && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })}
-                  className="absolute bottom-24 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] shadow-lg flex items-center justify-center hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+                  className="absolute bottom-24 left-1/2 -translate-x-1/2 rounded-full shadow-lg"
                 >
-                  <ChevronDown className="w-4 h-4 text-[var(--ff-text-secondary)]" />
-                </button>
+                  <ChevronDown className="w-4 h-4" />
+                </Button>
               )}
 
               {/* Input */}
@@ -429,18 +436,15 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
                       t.style.height = Math.min(t.scrollHeight, 96) + 'px';
                     }}
                   />
-                  <button
+                  <Button
+                    variant="primary"
+                    size="icon"
                     onClick={() => sendMessage()}
                     disabled={!input.trim() || isLoading}
-                    className={cn(
-                      'flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all',
-                      input.trim() && !isLoading
-                        ? 'bg-gradient-to-br from-emerald-500 to-cyan-500 text-white hover:from-emerald-400 hover:to-cyan-400 shadow-lg shadow-emerald-500/20'
-                        : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)]'
-                    )}
+                    className="flex-shrink-0 rounded-xl"
                   >
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  </button>
+                  </Button>
                 </div>
                 <p className="text-[10px] text-[var(--ff-text-tertiary)] mt-1.5 text-center">
                   AI-powered • May occasionally be inaccurate
