@@ -300,7 +300,18 @@ export function SnagSummaryPage() {
                                   : <ChevronRight className="w-3.5 h-3.5" />
                                 }
                               </button>
-                              <span className="text-zinc-300">{z.label}</span>
+                              {/* WORKING: zone deep-link — zone_no param parsed by useSnagListPage when supported */}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void router.push(
+                                    `/field-ops/snags/list?projectId=${p.project_id}${z.zoneNo !== null ? `&zone_no=${z.zoneNo}` : ''}`
+                                  )
+                                }
+                                className="text-blue-400 hover:text-blue-300 hover:underline text-left"
+                              >
+                                {z.label}
+                              </button>
                             </div>
                           </td>
 
@@ -330,7 +341,18 @@ export function SnagSummaryPage() {
                               <td className="px-3 py-2 text-xs whitespace-nowrap pl-12">
                                 <div className="flex items-center gap-1">
                                   <span className="w-3.5 inline-block flex-shrink-0" />
-                                  <span className="text-zinc-400">{pon.label}</span>
+                                  {/* WORKING: PON deep-link — zone_no+pon_no params parsed by useSnagListPage when supported */}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      void router.push(
+                                        `/field-ops/snags/list?projectId=${p.project_id}${z.zoneNo !== null ? `&zone_no=${z.zoneNo}` : ''}${pon.ponNo !== null ? `&pon_no=${pon.ponNo}` : ''}`
+                                      )
+                                    }
+                                    className="text-blue-400 hover:text-blue-300 hover:underline text-left"
+                                  >
+                                    {pon.label}
+                                  </button>
                                 </div>
                               </td>
 
