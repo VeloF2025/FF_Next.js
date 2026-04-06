@@ -10,6 +10,7 @@ import {
   fetchSnags,
   fetchSnagPhotos,
   fetchProjects,
+  fetchZonePonOptions,
 } from '../../services/snagService';
 import { log } from '@/lib/logger';
 import type {
@@ -103,6 +104,8 @@ export function useSnagsPage() {
   const [filters, setFilters] = useState<SnagFilters>(DEFAULT_FILTERS);
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('report');
+  const [zones, setZones] = useState<number[]>([]);
+  const [pons, setPons] = useState<Array<{ zone_no: number | null; pon_no: number | null }>>([]);
 
   // -------------------------------------------------------
   // Stats + Projects
@@ -191,8 +194,13 @@ export function useSnagsPage() {
   const selectProject = useCallback((s: SnagProjectStats) => {
     setSelectedProjectId(s.project_id);
     setSelectedProjectName(s.project_name);
-    setFilters(DEFAULT_FILTERS);
-    void loadSnags(s.project_id, DEFAULT_FILTERS);
+    const resetFilters = { ...DEFAULT_FILTERS, projectId: s.project_id };
+    setFilters(resetFilters);
+    void loadSnags(s.project_id, resetFilters);
+    // Fetch zone/PON options for cascading filters
+    fetchZonePonOptions(s.project_id)
+      .then(({ zones: z, pons: p }) => { setZones(z); setPons(p); })
+      .catch(() => { setZones([]); setPons([]); });
   }, [loadSnags]);
 
   const handleBack = useCallback(() => {
@@ -200,6 +208,9 @@ export function useSnagsPage() {
     setSelectedProjectName('');
     setSnagGroups([]);
     setPhotosBySnag({});
+    setZones([]);
+    setPons([]);
+    setFilters(DEFAULT_FILTERS);
   }, []);
 
   // -------------------------------------------------------
@@ -273,6 +284,8 @@ export function useSnagsPage() {
     stats,
     statsLoading,
     projects,
+    zones,
+    pons,
     selectedProjectId,
     selectedProjectName,
     snagGroups,

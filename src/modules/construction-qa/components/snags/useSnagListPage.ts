@@ -13,6 +13,7 @@ import {
   fetchSnagPhotos,
   fetchProjects,
   fetchSnagSummary,
+  fetchZonePonOptions,
 } from '../../services/snagService';
 import type { SnagSummary } from '../../services/snagService';
 import { log } from '@/lib/logger';
@@ -65,6 +66,9 @@ export function useSnagListPage() {
   const [photosBySnag, setPhotosBySnag] = useState<Record<string, SnagPhoto[]>>({});
   const [loadingPhotos, setLoadingPhotos] = useState<Set<string>>(new Set());
 
+  const [zones, setZones] = useState<number[]>([]);
+  const [pons, setPons] = useState<Array<{ zone_no: number | null; pon_no: number | null }>>([]);
+
   // -------------------------------------------------------
   // Projects on mount
   // -------------------------------------------------------
@@ -102,6 +106,21 @@ export function useSnagListPage() {
       page: 1,
     }));
   }, [router.isReady, router.query]);
+
+  // -------------------------------------------------------
+  // Zone/PON options — re-fetch when projectId changes
+  // -------------------------------------------------------
+
+  useEffect(() => {
+    if (filters.projectId) {
+      fetchZonePonOptions(filters.projectId)
+        .then(({ zones: z, pons: p }) => { setZones(z); setPons(p); })
+        .catch(() => { setZones([]); setPons([]); });
+    } else {
+      setZones([]);
+      setPons([]);
+    }
+  }, [filters.projectId]);
 
   // -------------------------------------------------------
   // Snag loading — re-runs when filters change
@@ -161,7 +180,19 @@ export function useSnagListPage() {
   // -------------------------------------------------------
 
   const handleFilterChange = useCallback((key: string, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value, page: 1 }));
+    setFilters((prev) => {
+      const next = { ...prev, [key]: value, page: 1 };
+      // Cascade: project change resets zone + PON
+      if (key === 'projectId') {
+        next.zone_no = '';
+        next.pon_no = '';
+      }
+      // Cascade: zone change resets PON
+      if (key === 'zone_no') {
+        next.pon_no = '';
+      }
+      return next;
+    });
   }, []);
 
   const handlePageChange = useCallback((page: number) => {
@@ -227,6 +258,8 @@ export function useSnagListPage() {
   return {
     projects,
     filters,
+    zones,
+    pons,
     snags,
     total,
     totalPages,

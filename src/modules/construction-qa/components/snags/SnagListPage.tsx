@@ -16,6 +16,8 @@ export function SnagListPage() {
   const {
     projects,
     filters,
+    zones,
+    pons,
     snags,
     total,
     totalPages,
@@ -47,6 +49,8 @@ export function SnagListPage() {
         <SnagListFilters
           filters={filters}
           projects={projects}
+          zones={zones}
+          pons={pons}
           onChange={handleFilterChange}
         />
       </div>
