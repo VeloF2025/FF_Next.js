@@ -176,6 +176,50 @@ export interface SnagProjectStats {
 }
 
 // ============================================================
+// Hierarchy Stats
+// ============================================================
+
+export interface HierarchyRow {
+  project_id: string;
+  project_name: string;
+  zone_no: number | null;
+  pon_no: number | null;
+  total: number;
+  open: number;
+  assigned: number;
+  in_progress: number;
+  fixed: number;
+  verified: number;
+  closed: number;
+  reopened: number;
+}
+
+export interface StatusCounts {
+  total: number; open: number; assigned: number; in_progress: number;
+  fixed: number; verified: number; closed: number; reopened: number;
+}
+
+export interface PonNode extends StatusCounts {
+  ponNo: number | null;
+  label: string;
+}
+
+export interface ZoneNode extends StatusCounts {
+  zoneNo: number | null;
+  label: string;
+  pons: PonNode[];
+}
+
+export interface ProjectNode extends StatusCounts {
+  project_id: string;
+  project_name: string;
+  zones: ZoneNode[];
+  latest_report_number: string | null;
+  latest_report_date: string | null;
+  latest_report_id: string | null;
+}
+
+// ============================================================
 // Zone / PON Grouping
 // ============================================================
 
