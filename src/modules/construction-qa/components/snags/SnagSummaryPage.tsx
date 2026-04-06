@@ -57,7 +57,7 @@ function SkeletonRow({ cols }: { cols: number }) {
   );
 }
 
-const COL_COUNT = 9;
+const COL_COUNT = 10;
 
 // ============================================================
 // Main component
@@ -116,13 +116,14 @@ export function SnagSummaryPage() {
     (acc, p) => ({
       total: acc.total + p.total,
       open: acc.open + p.open,
+      assigned: acc.assigned + p.assigned,
       in_progress: acc.in_progress + p.in_progress,
       fixed: acc.fixed + p.fixed,
       verified: acc.verified + p.verified,
       closed: acc.closed + p.closed,
       reopened: acc.reopened + p.reopened,
     }),
-    { total: 0, open: 0, in_progress: 0, fixed: 0, verified: 0, closed: 0, reopened: 0 }
+    { total: 0, open: 0, assigned: 0, in_progress: 0, fixed: 0, verified: 0, closed: 0, reopened: 0 }
   );
 
   function formatDate(iso: string | null): string {
@@ -162,6 +163,7 @@ export function SnagSummaryPage() {
                   'Project',
                   'Total',
                   'Open',
+                  'Assigned',
                   'In Progress',
                   'Fixed',
                   'Verified',
@@ -251,6 +253,7 @@ export function SnagSummaryPage() {
                       </td>
 
                       <CountCell value={p.open} colorClass="text-red-300" bgClass="bg-red-900/20" />
+                      <CountCell value={p.assigned} colorClass="text-amber-300" bgClass="bg-amber-900/20" />
                       <CountCell value={p.in_progress} colorClass="text-amber-300" bgClass="bg-amber-900/20" />
                       <CountCell value={p.fixed} colorClass="text-blue-300" bgClass="bg-blue-900/20" />
                       <CountCell value={p.verified} colorClass="text-green-300" bgClass="bg-green-900/20" />
@@ -306,6 +309,7 @@ export function SnagSummaryPage() {
                           </td>
 
                           <CountCell value={z.open} colorClass="text-red-300" bgClass="bg-red-900/20" />
+                          <CountCell value={z.assigned} colorClass="text-amber-300" bgClass="bg-amber-900/20" />
                           <CountCell value={z.in_progress} colorClass="text-amber-300" bgClass="bg-amber-900/20" />
                           <CountCell value={z.fixed} colorClass="text-blue-300" bgClass="bg-blue-900/20" />
                           <CountCell value={z.verified} colorClass="text-green-300" bgClass="bg-green-900/20" />
@@ -335,6 +339,7 @@ export function SnagSummaryPage() {
                               </td>
 
                               <CountCell value={pon.open} colorClass="text-red-300" bgClass="bg-red-900/20" />
+                              <CountCell value={pon.assigned} colorClass="text-amber-300" bgClass="bg-amber-900/20" />
                               <CountCell value={pon.in_progress} colorClass="text-amber-300" bgClass="bg-amber-900/20" />
                               <CountCell value={pon.fixed} colorClass="text-blue-300" bgClass="bg-blue-900/20" />
                               <CountCell value={pon.verified} colorClass="text-green-300" bgClass="bg-green-900/20" />
@@ -363,6 +368,9 @@ export function SnagSummaryPage() {
                   </td>
                   <td className="px-3 py-2 text-xs tabular-nums font-bold text-red-300 whitespace-nowrap text-right">
                     {totals.open}
+                  </td>
+                  <td className="px-3 py-2 text-xs tabular-nums font-bold text-amber-300 whitespace-nowrap text-right">
+                    {totals.assigned}
                   </td>
                   <td className="px-3 py-2 text-xs tabular-nums font-bold text-amber-300 whitespace-nowrap text-right">
                     {totals.in_progress}
