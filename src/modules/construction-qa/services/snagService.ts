@@ -56,8 +56,11 @@ export async function fetchSnagStats(): Promise<SnagProjectStats[]> {
 }
 
 /** Fetch project→zone→PON hierarchy snag counts. */
-export async function fetchSnagHierarchyStats(projectId?: string): Promise<HierarchyRow[]> {
-  const qs = projectId ? `?projectId=${projectId}` : '';
+export async function fetchSnagHierarchyStats(projectId?: string, search?: string): Promise<HierarchyRow[]> {
+  const params = new URLSearchParams();
+  if (projectId) params.set('projectId', projectId);
+  if (search) params.set('search', search);
+  const qs = params.toString() ? `?${params.toString()}` : '';
   const res = await fetch(`/api/snags/hierarchy-stats${qs}`);
   if (!res.ok) throw new Error(`hierarchy-stats: ${res.status}`);
   const json = await res.json() as { data: HierarchyRow[] };

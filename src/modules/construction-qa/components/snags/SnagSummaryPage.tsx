@@ -8,9 +8,9 @@
  */
 
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { Download } from 'lucide-react';
+import { Download, Search, X } from 'lucide-react';
 import type { ProjectNode, ZoneNode, PonNode } from '../../types/snag.types';
 import { fetchSnagStats, fetchSnagHierarchyStats } from '../../services/snagService';
 import { buildHierarchy } from './snagHierarchyUtils';
@@ -26,17 +26,37 @@ export function SnagSummaryPage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
+  const [searchInput, setSearchInput] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchInput(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setSearchTerm(value.trim()), 400);
+  }, []);
+
+  const clearSearch = useCallback(() => {
+    setSearchInput('');
+    setSearchTerm('');
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
 
-    Promise.all([fetchSnagStats(), fetchSnagHierarchyStats()])
+    Promise.all([fetchSnagStats(), fetchSnagHierarchyStats(undefined, searchTerm || undefined)])
       .then(([statsData, hierarchyRows]) => {
         if (!cancelled) {
           const statsById = new Map(statsData.map((s) => [s.project_id, s]));
           setProjects(buildHierarchy(hierarchyRows, statsById));
           setIsLoading(false);
+          // Auto-expand all projects when searching
+          if (searchTerm) {
+            const allIds = new Set(hierarchyRows.map((r) => r.project_id));
+            setExpandedProjects(allIds);
+          }
         }
       })
       .catch((err: unknown) => {
@@ -47,7 +67,7 @@ export function SnagSummaryPage() {
       });
 
     return () => { cancelled = true; };
-  }, []);
+  }, [searchTerm]);
 
   function toggleProject(id: string) {
     setExpandedProjects(prev => {
@@ -133,16 +153,37 @@ export function SnagSummaryPage() {
             Per-project snag count breakdown across all statuses.
           </p>
         </div>
-        {!isLoading && projects.length > 0 && (
-          <button
-            type="button"
-            onClick={exportCsv}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-200 transition-colors flex-shrink-0"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Export CSV
-          </button>
-        )}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Search DR, pole, description..."
+              className="w-56 pl-8 pr-7 py-1.5 text-xs rounded-md bg-zinc-800 border border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-500 transition-colors"
+            />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          {!isLoading && projects.length > 0 && (
+            <button
+              type="button"
+              onClick={exportCsv}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-200 transition-colors flex-shrink-0"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export CSV
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (

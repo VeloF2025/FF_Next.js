@@ -19,7 +19,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { projectId } = req.query;
+    const { projectId, search } = req.query;
+    const searchTerm = typeof search === 'string' ? search.trim() : '';
 
     type RawRow = {
       project_id: string;
@@ -38,12 +39,42 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     let rows: RawRow[];
 
-    if (projectId && typeof projectId === 'string') {
-      // Branch A — filtered by projectId
+    const searchPattern = searchTerm ? `%${searchTerm}%` : '';
+
+    if (projectId && typeof projectId === 'string' && searchTerm) {
+      // Branch A — projectId + search
       rows = await sql`
         SELECT
-          p.id AS project_id,
-          p.project_name AS project_name,
+          p.id AS project_id, p.project_name,
+          COALESCE(pole.zone_no, dr.zone_no) AS zone_no,
+          COALESCE(pole.pon_no, dr.pon_no) AS pon_no,
+          COUNT(s.id) AS total,
+          COUNT(s.id) FILTER (WHERE s.status = 'open') AS open,
+          COUNT(s.id) FILTER (WHERE s.status = 'assigned') AS assigned,
+          COUNT(s.id) FILTER (WHERE s.status = 'in_progress') AS in_progress,
+          COUNT(s.id) FILTER (WHERE s.status = 'fixed') AS fixed,
+          COUNT(s.id) FILTER (WHERE s.status = 'verified') AS verified,
+          COUNT(s.id) FILTER (WHERE s.status = 'closed') AS closed,
+          COUNT(s.id) FILTER (WHERE s.status = 'reopened') AS reopened
+        FROM projects p
+        INNER JOIN snags s ON s.project_id = p.id
+        LEFT JOIN poles pole ON pole.id = s.pole_ids[1]
+        LEFT JOIN drops dr ON dr.id = s.drop_id
+        WHERE p.id = ${projectId}
+          AND (
+            s.description ILIKE ${searchPattern}
+            OR EXISTS (SELECT 1 FROM unnest(s.pole_references) ref WHERE ref ILIKE ${searchPattern})
+            OR pole.pole_number ILIKE ${searchPattern}
+            OR dr.drop_number ILIKE ${searchPattern}
+          )
+        GROUP BY p.id, p.project_name, COALESCE(pole.zone_no, dr.zone_no), COALESCE(pole.pon_no, dr.pon_no)
+        ORDER BY p.project_name ASC, COALESCE(pole.zone_no, dr.zone_no) ASC NULLS LAST, COALESCE(pole.pon_no, dr.pon_no) ASC NULLS LAST
+      ` as RawRow[];
+    } else if (projectId && typeof projectId === 'string') {
+      // Branch B — projectId only
+      rows = await sql`
+        SELECT
+          p.id AS project_id, p.project_name,
           COALESCE(pole.zone_no, dr.zone_no) AS zone_no,
           COALESCE(pole.pon_no, dr.pon_no) AS pon_no,
           COUNT(s.id) AS total,
@@ -62,12 +93,39 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         GROUP BY p.id, p.project_name, COALESCE(pole.zone_no, dr.zone_no), COALESCE(pole.pon_no, dr.pon_no)
         ORDER BY p.project_name ASC, COALESCE(pole.zone_no, dr.zone_no) ASC NULLS LAST, COALESCE(pole.pon_no, dr.pon_no) ASC NULLS LAST
       ` as RawRow[];
-    } else {
-      // Branch B — all projects
+    } else if (searchTerm) {
+      // Branch C — search only (all projects)
       rows = await sql`
         SELECT
-          p.id AS project_id,
-          p.project_name AS project_name,
+          p.id AS project_id, p.project_name,
+          COALESCE(pole.zone_no, dr.zone_no) AS zone_no,
+          COALESCE(pole.pon_no, dr.pon_no) AS pon_no,
+          COUNT(s.id) AS total,
+          COUNT(s.id) FILTER (WHERE s.status = 'open') AS open,
+          COUNT(s.id) FILTER (WHERE s.status = 'assigned') AS assigned,
+          COUNT(s.id) FILTER (WHERE s.status = 'in_progress') AS in_progress,
+          COUNT(s.id) FILTER (WHERE s.status = 'fixed') AS fixed,
+          COUNT(s.id) FILTER (WHERE s.status = 'verified') AS verified,
+          COUNT(s.id) FILTER (WHERE s.status = 'closed') AS closed,
+          COUNT(s.id) FILTER (WHERE s.status = 'reopened') AS reopened
+        FROM projects p
+        INNER JOIN snags s ON s.project_id = p.id
+        LEFT JOIN poles pole ON pole.id = s.pole_ids[1]
+        LEFT JOIN drops dr ON dr.id = s.drop_id
+        WHERE (
+          s.description ILIKE ${searchPattern}
+          OR EXISTS (SELECT 1 FROM unnest(s.pole_references) ref WHERE ref ILIKE ${searchPattern})
+          OR pole.pole_number ILIKE ${searchPattern}
+          OR dr.drop_number ILIKE ${searchPattern}
+        )
+        GROUP BY p.id, p.project_name, COALESCE(pole.zone_no, dr.zone_no), COALESCE(pole.pon_no, dr.pon_no)
+        ORDER BY p.project_name ASC, COALESCE(pole.zone_no, dr.zone_no) ASC NULLS LAST, COALESCE(pole.pon_no, dr.pon_no) ASC NULLS LAST
+      ` as RawRow[];
+    } else {
+      // Branch D — no filters
+      rows = await sql`
+        SELECT
+          p.id AS project_id, p.project_name,
           COALESCE(pole.zone_no, dr.zone_no) AS zone_no,
           COALESCE(pole.pon_no, dr.pon_no) AS pon_no,
           COUNT(s.id) AS total,
