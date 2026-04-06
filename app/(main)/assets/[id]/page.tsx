@@ -9,7 +9,6 @@ import {
   ArrowLeft,
   Edit,
   Package,
-  Calendar,
   MapPin,
   User,
   Wrench,
