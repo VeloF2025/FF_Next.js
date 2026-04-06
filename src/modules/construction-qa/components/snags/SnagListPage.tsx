@@ -7,6 +7,7 @@
 
 import { SnagListFilters } from './SnagListFilters';
 import { SnagListTable } from './SnagListTable';
+import { SnagCountTiles } from './SnagCountTiles';
 import { Pagination } from '@/components/ui/StandardDataTable';
 import { useSnagListPage } from './useSnagListPage';
 
@@ -19,6 +20,8 @@ export function SnagListPage() {
     total,
     totalPages,
     isLoading,
+    summary,
+    isSummaryLoading,
     expandedSnagId,
     photosBySnag,
     handleFilterChange,
@@ -47,6 +50,9 @@ export function SnagListPage() {
           onChange={handleFilterChange}
         />
       </div>
+
+      {/* Count tiles */}
+      <SnagCountTiles summary={summary} isLoading={isSummaryLoading} />
 
       {/* Table */}
       <SnagListTable

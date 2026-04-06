@@ -8,7 +8,9 @@ import {
   fetchSnags,
   fetchSnagPhotos,
   fetchProjects,
+  fetchSnagSummary,
 } from '../../services/snagService';
+import type { SnagSummary } from '../../services/snagService';
 import { log } from '@/lib/logger';
 import type { Snag, SnagPhoto } from '../../types/snag.types';
 
@@ -17,6 +19,7 @@ export interface SnagListFilters {
   status: string;
   category: string;
   severity: string;
+  search?: string;
   page: number;
   pageSize: number;
 }
@@ -44,6 +47,9 @@ export function useSnagListPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [summary, setSummary] = useState<SnagSummary | null>(null);
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+
   const [expandedSnagId, setExpandedSnagId] = useState<string | null>(null);
   const [photosBySnag, setPhotosBySnag] = useState<Record<string, SnagPhoto[]>>({});
   const [loadingPhotos, setLoadingPhotos] = useState<Set<string>>(new Set());
@@ -65,6 +71,23 @@ export function useSnagListPage() {
   // Snag loading — re-runs when filters change
   // -------------------------------------------------------
 
+  const loadSummary = useCallback(async (activeFilters: SnagListFilters) => {
+    setIsSummaryLoading(true);
+    try {
+      const data = await fetchSnagSummary({
+        projectId: activeFilters.projectId || undefined,
+        category:  activeFilters.category  || undefined,
+        severity:  activeFilters.severity  || undefined,
+        search:    activeFilters.search    || undefined,
+      });
+      setSummary(data);
+    } catch (err) {
+      log.error('Failed to load snag summary', { err });
+    } finally {
+      setIsSummaryLoading(false);
+    }
+  }, []);
+
   const loadSnags = useCallback(async (activeFilters: SnagListFilters) => {
     setIsLoading(true);
     setError(null);
@@ -77,6 +100,7 @@ export function useSnagListPage() {
       if (activeFilters.status) params['status'] = activeFilters.status;
       if (activeFilters.category) params['category'] = activeFilters.category;
       if (activeFilters.severity) params['severity'] = activeFilters.severity;
+      if (activeFilters.search) params['search'] = activeFilters.search;
 
       const { snags: data, total: count } = await fetchSnags(params);
       setSnags(data);
@@ -91,7 +115,8 @@ export function useSnagListPage() {
 
   useEffect(() => {
     void loadSnags(filters);
-  }, [filters, loadSnags]);
+    void loadSummary(filters);
+  }, [filters, loadSnags, loadSummary]);
 
   // -------------------------------------------------------
   // Filter changes
@@ -169,6 +194,8 @@ export function useSnagListPage() {
     totalPages,
     isLoading,
     error,
+    summary,
+    isSummaryLoading,
     expandedSnagId,
     photosBySnag,
     loadingPhotos,

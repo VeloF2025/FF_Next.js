@@ -20,6 +20,32 @@ import type {
 // Stats
 // ============================================================
 
+export interface SnagSummary {
+  total: number;
+  open: number;
+  in_progress: number;
+  resolved: number;
+  critical: number;
+}
+
+/** Fetch filter-aware 4-bucket count (no status filter — always shows full breakdown). */
+export async function fetchSnagSummary(params: {
+  projectId?: string;
+  category?: string;
+  severity?: string;
+  search?: string;
+}): Promise<SnagSummary> {
+  const qs = new URLSearchParams();
+  if (params.projectId) qs.set('projectId', params.projectId);
+  if (params.category)  qs.set('category',  params.category);
+  if (params.severity)  qs.set('severity',  params.severity);
+  if (params.search)    qs.set('search',    params.search);
+  const res = await fetch(`/api/snags/count-summary?${qs.toString()}`);
+  if (!res.ok) throw new Error(`Failed to fetch snag summary: ${res.status}`);
+  const json = await res.json() as { data: SnagSummary };
+  return json.data;
+}
+
 /** Fetch per-project snag counts for the dashboard. */
 export async function fetchSnagStats(): Promise<SnagProjectStats[]> {
   const res = await fetch('/api/snags/stats');
