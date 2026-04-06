@@ -26,6 +26,7 @@
 
 import { Pool } from 'pg';
 import { log } from '@/lib/logger';
+import { dbCircuitBreaker } from '@/lib/dbCircuitBreaker';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -65,5 +66,19 @@ export function sql(strings: TemplateStringsArray, ...values: unknown[]): Promis
   for (let i = 0; i < values.length; i++) {
     query += `$${i + 1}${strings[i + 1]}`;
   }
-  return pool.query(query, values).then(r => r.rows);
+  return dbCircuitBreaker.execute(async (): Promise<Record<string, unknown>[]> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = await (pool as any).query(query, values);
+    return r.rows;
+  });
+}
+
+/** Get circuit breaker stats for health checks */
+export function getDbCircuitStats() {
+  return dbCircuitBreaker.getStats();
+}
+
+/** Force-reset the circuit breaker (manual recovery) */
+export function resetDbCircuit() {
+  dbCircuitBreaker.reset();
 }
