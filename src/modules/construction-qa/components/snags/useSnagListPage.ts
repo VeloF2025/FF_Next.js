@@ -100,6 +100,7 @@ export function useSnagListPage() {
       if (activeFilters.status) params['status'] = activeFilters.status;
       if (activeFilters.category) params['category'] = activeFilters.category;
       if (activeFilters.severity) params['severity'] = activeFilters.severity;
+      if (activeFilters.search) params['search'] = activeFilters.search;
 
       const { snags: data, total: count } = await fetchSnags(params);
       setSnags(data);
