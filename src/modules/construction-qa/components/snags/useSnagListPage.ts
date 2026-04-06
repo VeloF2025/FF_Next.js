@@ -134,6 +134,8 @@ export function useSnagListPage() {
         category:  activeFilters.category  || undefined,
         severity:  activeFilters.severity  || undefined,
         search:    activeFilters.search    || undefined,
+        zone_no:   activeFilters.zone_no   || undefined,
+        pon_no:    activeFilters.pon_no    || undefined,
       });
       setSummary(data);
     } catch (err) {

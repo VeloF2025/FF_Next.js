@@ -35,12 +35,16 @@ export async function fetchSnagSummary(params: {
   category?: string;
   severity?: string;
   search?: string;
+  zone_no?: string;
+  pon_no?: string;
 }): Promise<SnagSummary> {
   const qs = new URLSearchParams();
   if (params.projectId) qs.set('projectId', params.projectId);
   if (params.category)  qs.set('category',  params.category);
   if (params.severity)  qs.set('severity',  params.severity);
   if (params.search)    qs.set('search',    params.search);
+  if (params.zone_no)   qs.set('zone_no',   params.zone_no);
+  if (params.pon_no)    qs.set('pon_no',     params.pon_no);
   const res = await fetch(`/api/snags/count-summary?${qs.toString()}`);
   if (!res.ok) throw new Error(`Failed to fetch snag summary: ${res.status}`);
   const json = await res.json() as { data: SnagSummary };

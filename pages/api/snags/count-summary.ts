@@ -3,10 +3,11 @@
  * GET /api/snags/count-summary
  *
  * Returns 4 status-bucket counts for the current filter context.
- * Accepts: projectId, category, severity, search (NO status, NO pagination).
+ * Accepts: projectId, category, severity, search, zone_no, pon_no.
  * Status is intentionally excluded so tiles always show the full breakdown.
  *
- * Uses explicit SQL branches (Neon constraint — no conditional fragments).
+ * Uses a single query with nullable params (IS NULL OR column = param)
+ * to avoid combinatorial SQL branching.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -43,193 +44,32 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { projectId, category, severity, search } = req.query;
+    const { projectId, category, severity, search, zone_no, pon_no } = req.query;
 
-    const p = typeof projectId === 'string' && projectId ? projectId : null;
-    const c = typeof category  === 'string' && category  ? category  : null;
-    const sv = typeof severity === 'string' && severity  ? severity  : null;
-    const se = typeof search   === 'string' && search    ? `%${search}%` : null;
+    const p  = typeof projectId === 'string' && projectId ? projectId : null;
+    const c  = typeof category  === 'string' && category  ? category  : null;
+    const sv = typeof severity  === 'string' && severity  ? severity  : null;
+    const se = typeof search    === 'string' && search    ? `%${search}%` : null;
+    const zn = typeof zone_no   === 'string' && zone_no   ? parseInt(zone_no, 10) : null;
+    const pn = typeof pon_no    === 'string' && pon_no    ? parseInt(pon_no, 10) : null;
 
-    let rows: CountRow[];
-
-    // 16 explicit branches: {p, c, sv} × {se|no-se}, most-specific first
-    if (p && c && sv && se) {
-      rows = await sql`
-        SELECT
-          COUNT(*)                                                                    AS total,
-          COUNT(*) FILTER (WHERE status IN ('open','reopened'))                     AS open,
-          COUNT(*) FILTER (WHERE status IN ('assigned','in_progress'))              AS in_progress,
-          COUNT(*) FILTER (WHERE status IN ('fixed','verified','closed'))            AS resolved,
-          COUNT(*) FILTER (WHERE severity IN ('critical','major'))                  AS critical
-        FROM snags
-        WHERE project_id = ${p} AND category = ${c} AND severity = ${sv}
-          AND description ILIKE ${se}
-      ` as CountRow[];
-    } else if (p && c && sv) {
-      rows = await sql`
-        SELECT
-          COUNT(*)                                                                    AS total,
-          COUNT(*) FILTER (WHERE status IN ('open','reopened'))                     AS open,
-          COUNT(*) FILTER (WHERE status IN ('assigned','in_progress'))              AS in_progress,
-          COUNT(*) FILTER (WHERE status IN ('fixed','verified','closed'))            AS resolved,
-          COUNT(*) FILTER (WHERE severity IN ('critical','major'))                  AS critical
-        FROM snags
-        WHERE project_id = ${p} AND category = ${c} AND severity = ${sv}
-      ` as CountRow[];
-    } else if (p && c && se) {
-      rows = await sql`
-        SELECT
-          COUNT(*)                                                                    AS total,
-          COUNT(*) FILTER (WHERE status IN ('open','reopened'))                     AS open,
-          COUNT(*) FILTER (WHERE status IN ('assigned','in_progress'))              AS in_progress,
-          COUNT(*) FILTER (WHERE status IN ('fixed','verified','closed'))            AS resolved,
-          COUNT(*) FILTER (WHERE severity IN ('critical','major'))                  AS critical
-        FROM snags
-        WHERE project_id = ${p} AND category = ${c} AND description ILIKE ${se}
-      ` as CountRow[];
-    } else if (p && sv && se) {
-      rows = await sql`
-        SELECT
-          COUNT(*)                                                                    AS total,
-          COUNT(*) FILTER (WHERE status IN ('open','reopened'))                     AS open,
-          COUNT(*) FILTER (WHERE status IN ('assigned','in_progress'))              AS in_progress,
-          COUNT(*) FILTER (WHERE status IN ('fixed','verified','closed'))            AS resolved,
-          COUNT(*) FILTER (WHERE severity IN ('critical','major'))                  AS critical
-        FROM snags
-        WHERE project_id = ${p} AND severity = ${sv} AND description ILIKE ${se}
-      ` as CountRow[];
-    } else if (c && sv && se) {
-      rows = await sql`
-        SELECT
-          COUNT(*)                                                                    AS total,
-          COUNT(*) FILTER (WHERE status IN ('open','reopened'))                     AS open,
-          COUNT(*) FILTER (WHERE status IN ('assigned','in_progress'))              AS in_progress,
-          COUNT(*) FILTER (WHERE status IN ('fixed','verified','closed'))            AS resolved,
-          COUNT(*) FILTER (WHERE severity IN ('critical','major'))                  AS critical
-        FROM snags
-        WHERE category = ${c} AND severity = ${sv} AND description ILIKE ${se}
-      ` as CountRow[];
-    } else if (p && c) {
-      rows = await sql`
-        SELECT
-          COUNT(*)                                                                    AS total,
-          COUNT(*) FILTER (WHERE status IN ('open','reopened'))                     AS open,
-          COUNT(*) FILTER (WHERE status IN ('assigned','in_progress'))              AS in_progress,
-          COUNT(*) FILTER (WHERE status IN ('fixed','verified','closed'))            AS resolved,
-          COUNT(*) FILTER (WHERE severity IN ('critical','major'))                  AS critical
-        FROM snags
-        WHERE project_id = ${p} AND category = ${c}
-      ` as CountRow[];
-    } else if (p && sv) {
-      rows = await sql`
-        SELECT
-          COUNT(*)                                                                    AS total,
-          COUNT(*) FILTER (WHERE status IN ('open','reopened'))                     AS open,
-          COUNT(*) FILTER (WHERE status IN ('assigned','in_progress'))              AS in_progress,
-          COUNT(*) FILTER (WHERE status IN ('fixed','verified','closed'))            AS resolved,
-          COUNT(*) FILTER (WHERE severity IN ('critical','major'))                  AS critical
-        FROM snags
-        WHERE project_id = ${p} AND severity = ${sv}
-      ` as CountRow[];
-    } else if (p && se) {
-      rows = await sql`
-        SELECT
-          COUNT(*)                                                                    AS total,
-          COUNT(*) FILTER (WHERE status IN ('open','reopened'))                     AS open,
-          COUNT(*) FILTER (WHERE status IN ('assigned','in_progress'))              AS in_progress,
-          COUNT(*) FILTER (WHERE status IN ('fixed','verified','closed'))            AS resolved,
-          COUNT(*) FILTER (WHERE severity IN ('critical','major'))                  AS critical
-        FROM snags
-        WHERE project_id = ${p} AND description ILIKE ${se}
-      ` as CountRow[];
-    } else if (c && sv) {
-      rows = await sql`
-        SELECT
-          COUNT(*)                                                                    AS total,
-          COUNT(*) FILTER (WHERE status IN ('open','reopened'))                     AS open,
-          COUNT(*) FILTER (WHERE status IN ('assigned','in_progress'))              AS in_progress,
-          COUNT(*) FILTER (WHERE status IN ('fixed','verified','closed'))            AS resolved,
-          COUNT(*) FILTER (WHERE severity IN ('critical','major'))                  AS critical
-        FROM snags
-        WHERE category = ${c} AND severity = ${sv}
-      ` as CountRow[];
-    } else if (c && se) {
-      rows = await sql`
-        SELECT
-          COUNT(*)                                                                    AS total,
-          COUNT(*) FILTER (WHERE status IN ('open','reopened'))                     AS open,
-          COUNT(*) FILTER (WHERE status IN ('assigned','in_progress'))              AS in_progress,
-          COUNT(*) FILTER (WHERE status IN ('fixed','verified','closed'))            AS resolved,
-          COUNT(*) FILTER (WHERE severity IN ('critical','major'))                  AS critical
-        FROM snags
-        WHERE category = ${c} AND description ILIKE ${se}
-      ` as CountRow[];
-    } else if (sv && se) {
-      rows = await sql`
-        SELECT
-          COUNT(*)                                                                    AS total,
-          COUNT(*) FILTER (WHERE status IN ('open','reopened'))                     AS open,
-          COUNT(*) FILTER (WHERE status IN ('assigned','in_progress'))              AS in_progress,
-          COUNT(*) FILTER (WHERE status IN ('fixed','verified','closed'))            AS resolved,
-          COUNT(*) FILTER (WHERE severity IN ('critical','major'))                  AS critical
-        FROM snags
-        WHERE severity = ${sv} AND description ILIKE ${se}
-      ` as CountRow[];
-    } else if (p) {
-      rows = await sql`
-        SELECT
-          COUNT(*)                                                                    AS total,
-          COUNT(*) FILTER (WHERE status IN ('open','reopened'))                     AS open,
-          COUNT(*) FILTER (WHERE status IN ('assigned','in_progress'))              AS in_progress,
-          COUNT(*) FILTER (WHERE status IN ('fixed','verified','closed'))            AS resolved,
-          COUNT(*) FILTER (WHERE severity IN ('critical','major'))                  AS critical
-        FROM snags
-        WHERE project_id = ${p}
-      ` as CountRow[];
-    } else if (c) {
-      rows = await sql`
-        SELECT
-          COUNT(*)                                                                    AS total,
-          COUNT(*) FILTER (WHERE status IN ('open','reopened'))                     AS open,
-          COUNT(*) FILTER (WHERE status IN ('assigned','in_progress'))              AS in_progress,
-          COUNT(*) FILTER (WHERE status IN ('fixed','verified','closed'))            AS resolved,
-          COUNT(*) FILTER (WHERE severity IN ('critical','major'))                  AS critical
-        FROM snags
-        WHERE category = ${c}
-      ` as CountRow[];
-    } else if (sv) {
-      rows = await sql`
-        SELECT
-          COUNT(*)                                                                    AS total,
-          COUNT(*) FILTER (WHERE status IN ('open','reopened'))                     AS open,
-          COUNT(*) FILTER (WHERE status IN ('assigned','in_progress'))              AS in_progress,
-          COUNT(*) FILTER (WHERE status IN ('fixed','verified','closed'))            AS resolved,
-          COUNT(*) FILTER (WHERE severity IN ('critical','major'))                  AS critical
-        FROM snags
-        WHERE severity = ${sv}
-      ` as CountRow[];
-    } else if (se) {
-      rows = await sql`
-        SELECT
-          COUNT(*)                                                                    AS total,
-          COUNT(*) FILTER (WHERE status IN ('open','reopened'))                     AS open,
-          COUNT(*) FILTER (WHERE status IN ('assigned','in_progress'))              AS in_progress,
-          COUNT(*) FILTER (WHERE status IN ('fixed','verified','closed'))            AS resolved,
-          COUNT(*) FILTER (WHERE severity IN ('critical','major'))                  AS critical
-        FROM snags
-        WHERE description ILIKE ${se}
-      ` as CountRow[];
-    } else {
-      rows = await sql`
-        SELECT
-          COUNT(*)                                                                    AS total,
-          COUNT(*) FILTER (WHERE status IN ('open','reopened'))                     AS open,
-          COUNT(*) FILTER (WHERE status IN ('assigned','in_progress'))              AS in_progress,
-          COUNT(*) FILTER (WHERE status IN ('fixed','verified','closed'))            AS resolved,
-          COUNT(*) FILTER (WHERE severity IN ('critical','major'))                  AS critical
-        FROM snags
-      ` as CountRow[];
-    }
+    const rows = await sql`
+      SELECT
+        COUNT(*)                                                       AS total,
+        COUNT(*) FILTER (WHERE s.status IN ('open','reopened'))        AS open,
+        COUNT(*) FILTER (WHERE s.status IN ('assigned','in_progress')) AS in_progress,
+        COUNT(*) FILTER (WHERE s.status IN ('fixed','verified','closed')) AS resolved,
+        COUNT(*) FILTER (WHERE s.severity IN ('critical','major'))     AS critical
+      FROM snags s
+      LEFT JOIN poles pole ON pole.id = s.pole_ids[1]
+      LEFT JOIN drops dr ON dr.id = s.drop_id
+      WHERE (${p}::text  IS NULL OR s.project_id::text = ${p})
+        AND (${c}::text  IS NULL OR s.category = ${c})
+        AND (${sv}::text IS NULL OR s.severity = ${sv})
+        AND (${se}::text IS NULL OR s.description ILIKE ${se})
+        AND (${zn}::int  IS NULL OR COALESCE(pole.zone_no, dr.zone_no) = ${zn})
+        AND (${pn}::int  IS NULL OR COALESCE(pole.pon_no, dr.pon_no) = ${pn})
+    ` as CountRow[];
 
     return apiResponse.success(res, parseRow(rows[0] ?? { total: '0', open: '0', in_progress: '0', resolved: '0', critical: '0' }));
   } catch (error) {
