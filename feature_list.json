@@ -2305,5 +2305,23 @@
       "Verify page title is Snags List | Civil QA | FibreFlow"
     ],
     "passes": true
+  },
+  {
+    "id": "snags-sticky-headers",
+    "category": "ui",
+    "description": "Fix sticky column headers in SnagListTable \u2014 outer div uses overflow-y-auto with max-h, inner div handles overflow-x-auto so thead sticky top-0 works correctly",
+    "passes": true
+  },
+  {
+    "id": "snags-critical-tile",
+    "category": "ui",
+    "description": "Add Critical severity count tile \u2014 5th tile showing COUNT(*) FILTER (WHERE severity IN ('critical','major')), orange color scheme, grid updated to grid-cols-2 sm:grid-cols-3 lg:grid-cols-5",
+    "passes": true
+  },
+  {
+    "id": "snags-search-to-summary",
+    "category": "functional",
+    "description": "Wire search filter to tile summary loader \u2014 SnagListFilters gains optional search field, loadSummary passes it to fetchSnagSummary",
+    "passes": true
   }
 ]
