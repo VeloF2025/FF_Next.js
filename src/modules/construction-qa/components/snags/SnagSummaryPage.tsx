@@ -7,7 +7,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download } from 'lucide-react';
 import type { ProjectNode, ZoneNode, PonNode } from '../../types/snag.types';
 import { fetchSnagStats } from '../../services/snagService';
 import { fetchSnagHierarchyStats } from '../../services/snagService';
@@ -126,6 +126,77 @@ export function SnagSummaryPage() {
     { total: 0, open: 0, assigned: 0, in_progress: 0, fixed: 0, verified: 0, closed: 0, reopened: 0 }
   );
 
+  // WORKING: CSV export — generates from in-memory hierarchy, no API call needed
+  function exportCsv() {
+    const headers = [
+      'Tier',
+      'Label',
+      'Project',
+      'Total',
+      'Open',
+      'Assigned',
+      'In Progress',
+      'Fixed',
+      'Verified',
+      'Closed',
+      'Reopened',
+    ];
+
+    const csvRows: string[] = [headers.join(',')];
+
+    function esc(v: string | number): string {
+      const s = String(v);
+      return s.includes(',') || s.includes('"') || s.includes('\n')
+        ? `"${s.replace(/"/g, '""')}"`
+        : s;
+    }
+
+    for (const p of projects) {
+      csvRows.push(
+        [
+          'Project',
+          esc(p.project_name),
+          esc(p.project_name),
+          p.total, p.open, p.assigned, p.in_progress,
+          p.fixed, p.verified, p.closed, p.reopened,
+        ].join(',')
+      );
+
+      for (const z of p.zones) {
+        csvRows.push(
+          [
+            'Zone',
+            esc(z.label),
+            esc(p.project_name),
+            z.total, z.open, z.assigned, z.in_progress,
+            z.fixed, z.verified, z.closed, z.reopened,
+          ].join(',')
+        );
+
+        for (const pon of z.pons) {
+          csvRows.push(
+            [
+              'PON',
+              esc(pon.label),
+              esc(p.project_name),
+              pon.total, pon.open, pon.assigned, pon.in_progress,
+              pon.fixed, pon.verified, pon.closed, pon.reopened,
+            ].join(',')
+          );
+        }
+      }
+    }
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `snags-summary-${dateStr}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   function formatDate(iso: string | null): string {
     if (!iso) return '—';
     try {
@@ -141,11 +212,24 @@ export function SnagSummaryPage() {
 
   return (
     <div className="p-4">
-      <div className="mb-3">
-        <h2 className="text-sm font-semibold text-zinc-200">Snags by Project</h2>
-        <p className="text-xs text-[var(--ff-text-secondary)] mt-0.5">
-          Per-project snag count breakdown across all statuses.
-        </p>
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-zinc-200">Snags by Project</h2>
+          <p className="text-xs text-[var(--ff-text-secondary)] mt-0.5">
+            Per-project snag count breakdown across all statuses.
+          </p>
+        </div>
+        {/* WORKING: CSV export button — disabled until data loads */}
+        {!isLoading && projects.length > 0 && (
+          <button
+            type="button"
+            onClick={exportCsv}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-200 transition-colors flex-shrink-0"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Export CSV
+          </button>
+        )}
       </div>
 
       {error && (
