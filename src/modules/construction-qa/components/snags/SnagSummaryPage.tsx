@@ -10,7 +10,8 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { Download, Search, X } from 'lucide-react';
+import { FileSpreadsheet, Search, X } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import type { ProjectNode, ZoneNode, PonNode } from '../../types/snag.types';
 import { fetchSnagStats, fetchSnagHierarchyStats } from '../../services/snagService';
 import { buildHierarchy } from './snagHierarchyUtils';
@@ -114,34 +115,32 @@ export function SnagSummaryPage() {
     { total: 0, open: 0, assigned: 0, in_progress: 0, fixed: 0, verified: 0, closed: 0, reopened: 0 }
   );
 
-  // WORKING: CSV export — generates from in-memory hierarchy, no API call needed
-  function exportCsv() {
-    const headers = ['Tier', 'Label', 'Project', 'Total', 'Open', 'Assigned', 'In Progress', 'Fixed', 'Verified', 'Closed', 'Reopened'];
-    const csvRows: string[] = [headers.join(',')];
-
-    function esc(v: string | number): string {
-      const s = String(v);
-      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
-    }
+  function exportExcel() {
+    const rows: Record<string, string | number>[] = [];
 
     for (const p of projects) {
-      csvRows.push(['Project', esc(p.project_name), esc(p.project_name), p.total, p.open, p.assigned, p.in_progress, p.fixed, p.verified, p.closed, p.reopened].join(','));
+      rows.push({ Tier: 'Project', Label: p.project_name, Project: p.project_name, Total: p.total, Open: p.open, Assigned: p.assigned, 'In Progress': p.in_progress, Fixed: p.fixed, Verified: p.verified, Closed: p.closed, Reopened: p.reopened });
       for (const z of p.zones) {
-        csvRows.push(['Zone', esc(z.label), esc(p.project_name), z.total, z.open, z.assigned, z.in_progress, z.fixed, z.verified, z.closed, z.reopened].join(','));
+        rows.push({ Tier: 'Zone', Label: z.label, Project: p.project_name, Total: z.total, Open: z.open, Assigned: z.assigned, 'In Progress': z.in_progress, Fixed: z.fixed, Verified: z.verified, Closed: z.closed, Reopened: z.reopened });
         for (const pon of z.pons) {
-          csvRows.push(['PON', esc(pon.label), esc(p.project_name), pon.total, pon.open, pon.assigned, pon.in_progress, pon.fixed, pon.verified, pon.closed, pon.reopened].join(','));
+          rows.push({ Tier: 'PON', Label: pon.label, Project: p.project_name, Total: pon.total, Open: pon.open, Assigned: pon.assigned, 'In Progress': pon.in_progress, Fixed: pon.fixed, Verified: pon.verified, Closed: pon.closed, Reopened: pon.reopened });
         }
       }
     }
 
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Snag Summary');
+
+    // Auto-size columns
+    const colWidths = Object.keys(rows[0] ?? {}).map((key) => {
+      const maxLen = Math.max(key.length, ...rows.map((r) => String(r[key] ?? '').length));
+      return { wch: maxLen + 2 };
+    });
+    ws['!cols'] = colWidths;
+
     const dateStr = new Date().toISOString().slice(0, 10);
-    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `snags-summary-${dateStr}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    XLSX.writeFile(wb, `snags-summary-${dateStr}.xlsx`);
   }
 
   return (
@@ -176,11 +175,11 @@ export function SnagSummaryPage() {
           {!isLoading && projects.length > 0 && (
             <button
               type="button"
-              onClick={exportCsv}
+              onClick={exportExcel}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-200 transition-colors flex-shrink-0"
             >
-              <Download className="w-3.5 h-3.5" />
-              Export CSV
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              Export Excel
             </button>
           )}
         </div>
