@@ -23,6 +23,7 @@ export function MancoStrategicGrid() {
   const [items, setItems] = useState<MancoActionItem[]>([]);
   const [stats, setStats] = useState<MancoActionItemStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<TabType>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
@@ -50,16 +51,35 @@ export function MancoStrategicGrid() {
         fetch('/api/manco-action-items/stats'),
       ]);
 
-      if (itemsRes.ok && statsRes.ok) {
-        const itemsData = await itemsRes.json();
-        const statsData = await statsRes.json();
-        setItems(itemsData.data || itemsData);
-        setStats(statsData.data || statsData);
-        setDepartments(getUniqueDepartments(itemsData.data || itemsData));
-        setResponsiblePersons(getUniqueResponsiblePersons(itemsData.data || itemsData));
+      // Handle auth failures — redirect to login rather than silently showing 0
+      if (itemsRes.status === 401 || statsRes.status === 401) {
+        log.error('Manco action items: unauthenticated (401) — redirecting to login');
+        window.location.href = '/login';
+        return;
       }
+
+      if (!itemsRes.ok) {
+        log.error('Manco action items: items endpoint error', { status: itemsRes.status });
+        setFetchError(`Failed to load action items (HTTP ${itemsRes.status})`);
+        return;
+      }
+
+      if (!statsRes.ok) {
+        log.error('Manco action items: stats endpoint error', { status: statsRes.status });
+        setFetchError(`Failed to load stats (HTTP ${statsRes.status})`);
+        return;
+      }
+
+      setFetchError(null);
+      const itemsData = await itemsRes.json();
+      const statsData = await statsRes.json();
+      setItems(itemsData.data || itemsData);
+      setStats(statsData.data || statsData);
+      setDepartments(getUniqueDepartments(itemsData.data || itemsData));
+      setResponsiblePersons(getUniqueResponsiblePersons(itemsData.data || itemsData));
     } catch (error) {
       log.error('Error fetching manco data', { error });
+      setFetchError('An unexpected error occurred. Please refresh.');
     } finally {
       setLoading(false);
     }
@@ -128,6 +148,20 @@ export function MancoStrategicGrid() {
     return (
       <div className="flex items-center justify-center h-64">
         <LoadingSpinner size="lg" label="" />
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p className="text-[var(--ff-error)] font-medium">{fetchError}</p>
+        <button
+          onClick={() => fetchData()}
+          className="px-4 py-2 bg-[var(--ff-primary)] text-white rounded-md text-sm hover:opacity-90"
+        >
+          Retry
+        </button>
       </div>
     );
   }
