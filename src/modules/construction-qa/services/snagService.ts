@@ -67,6 +67,17 @@ export async function fetchSnagHierarchyStats(projectId?: string, search?: strin
   return json.data;
 }
 
+/** Fetch distinct zone/PON options for a project (cascading filters). */
+export async function fetchZonePonOptions(projectId: string): Promise<{
+  zones: number[];
+  pons: Array<{ zone_no: number | null; pon_no: number | null }>;
+}> {
+  const res = await fetch(`/api/snags/zone-pon-options?projectId=${projectId}`);
+  if (!res.ok) throw new Error(`zone-pon-options: ${res.status}`);
+  const json = await res.json() as { data: { zones: number[]; pons: Array<{ zone_no: number | null; pon_no: number | null }> } };
+  return json.data;
+}
+
 // ============================================================
 // Reports
 // ============================================================

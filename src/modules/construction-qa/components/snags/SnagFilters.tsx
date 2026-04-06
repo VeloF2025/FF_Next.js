@@ -17,6 +17,8 @@ interface Project {
 interface SnagFiltersProps {
   filters: SnagFilters;
   projects: Project[];
+  zones: number[];
+  pons: Array<{ zone_no: number | null; pon_no: number | null }>;
   onChange: (updated: Partial<SnagFilters>) => void;
 }
 
@@ -62,10 +64,59 @@ function toFilter(v: string): string { return v === ALL ? '' : v; }
 /** Convert empty string to ALL sentinel for Select */
 function fromFilter(v: string): string { return v === '' ? ALL : v; }
 
-/** 🟢 WORKING: Filter bar for snag grid with sort */
-export function SnagFiltersBar({ filters, projects, onChange }: SnagFiltersProps) {
+/** Filter bar for snag grid with sort */
+export function SnagFiltersBar({ filters, projects, zones, pons, onChange }: SnagFiltersProps) {
+  const hasProject = !!filters.projectId;
+  const selectedZone = filters.zone_no ?? '';
+
+  // PON options filtered by selected zone
+  const ponOptions = selectedZone
+    ? [...new Set(pons.filter((p) => p.zone_no === Number(selectedZone) && p.pon_no !== null).map((p) => p.pon_no!))].sort((a, b) => a - b)
+    : [...new Set(pons.filter((p) => p.pon_no !== null).map((p) => p.pon_no!))].sort((a, b) => a - b);
+
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {/* Zone filter — enabled when project selected */}
+      <Select
+        value={fromFilter(selectedZone)}
+        onValueChange={(v) => {
+          const zoneVal = toFilter(v);
+          onChange({ zone_no: zoneVal, pon_no: '', page: 1 });
+        }}
+        disabled={!hasProject || zones.length === 0}
+      >
+        <SelectTrigger className="w-36 bg-zinc-800 border-zinc-700 text-zinc-100 disabled:opacity-40">
+          <SelectValue placeholder="All Zones" />
+        </SelectTrigger>
+        <SelectContent className="bg-zinc-800 border-zinc-700">
+          <SelectItem value={ALL} className="text-zinc-100">All Zones</SelectItem>
+          {zones.map((z) => (
+            <SelectItem key={z} value={String(z)} className="text-zinc-100">
+              Zone {z}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* PON filter — enabled when project selected */}
+      <Select
+        value={fromFilter(filters.pon_no ?? '')}
+        onValueChange={(v) => onChange({ pon_no: toFilter(v), page: 1 })}
+        disabled={!hasProject || ponOptions.length === 0}
+      >
+        <SelectTrigger className="w-36 bg-zinc-800 border-zinc-700 text-zinc-100 disabled:opacity-40">
+          <SelectValue placeholder="All PONs" />
+        </SelectTrigger>
+        <SelectContent className="bg-zinc-800 border-zinc-700">
+          <SelectItem value={ALL} className="text-zinc-100">All PONs</SelectItem>
+          {ponOptions.map((p) => (
+            <SelectItem key={p} value={String(p)} className="text-zinc-100">
+              PON {p}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
       {/* Status filter */}
       <Select
         value={fromFilter(filters.status)}

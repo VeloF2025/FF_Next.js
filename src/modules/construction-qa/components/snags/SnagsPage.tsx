@@ -30,6 +30,8 @@ export function SnagsPage() {
     stats,
     statsLoading,
     projects,
+    zones,
+    pons,
     selectedProjectId,
     selectedProjectName,
     snagGroups,
@@ -66,6 +68,8 @@ export function SnagsPage() {
             <SnagFiltersBar
               filters={filters}
               projects={projects}
+              zones={zones}
+              pons={pons}
               onChange={handleFilterChange}
             />
           )}
