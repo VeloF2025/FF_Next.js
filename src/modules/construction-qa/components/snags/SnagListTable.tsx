@@ -71,7 +71,7 @@ function SkeletonRow({ cols }: { cols: number }) {
   );
 }
 
-const COL_COUNT = 11;
+const COL_COUNT = 13;
 
 /** 11-column snag list table with inline row expansion */
 export function SnagListTable({
@@ -97,6 +97,8 @@ export function SnagListTable({
                 '#',
                 'Project',
                 'Report',
+                'Zone',
+                'PON',
                 'Category',
                 'Severity',
                 'Description',
@@ -165,6 +167,14 @@ export function SnagListTable({
                     {/* Report */}
                     <td className="px-3 py-3 text-xs text-zinc-400 whitespace-nowrap">
                       {snag.report_number ?? '—'}
+                    </td>
+                    {/* Zone */}
+                    <td className="px-3 py-3 text-xs text-zinc-400 whitespace-nowrap">
+                      {snag.pole_zone_no != null ? snag.pole_zone_no : <span className="text-zinc-600">—</span>}
+                    </td>
+                    {/* PON */}
+                    <td className="px-3 py-3 text-xs text-zinc-400 whitespace-nowrap">
+                      {snag.pole_pon_no != null ? snag.pole_pon_no : <span className="text-zinc-600">—</span>}
                     </td>
                     {/* Category */}
                     <td className="px-3 py-3 whitespace-nowrap">
