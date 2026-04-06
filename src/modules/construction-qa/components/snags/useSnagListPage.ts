@@ -1,0 +1,182 @@
+/**
+ * useSnagListPage — Data-fetching hook for SnagListPage.
+ * Manages all-projects snag list, filters, pagination, and inline row expansion.
+ */
+
+import { useState, useEffect, useCallback } from 'react';
+import {
+  fetchSnags,
+  fetchSnagPhotos,
+  fetchProjects,
+} from '../../services/snagService';
+import { log } from '@/lib/logger';
+import type { Snag, SnagPhoto } from '../../types/snag.types';
+
+export interface SnagListFilters {
+  projectId: string;
+  status: string;
+  category: string;
+  severity: string;
+  page: number;
+  pageSize: number;
+}
+
+export interface ProjectOption {
+  id: string;
+  name: string;
+}
+
+const DEFAULT_FILTERS: SnagListFilters = {
+  projectId: '',
+  status: '',
+  category: '',
+  severity: '',
+  page: 1,
+  pageSize: 25,
+};
+
+export function useSnagListPage() {
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [filters, setFilters] = useState<SnagListFilters>(DEFAULT_FILTERS);
+
+  const [snags, setSnags] = useState<Snag[]>([]);
+  const [total, setTotal] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [expandedSnagId, setExpandedSnagId] = useState<string | null>(null);
+  const [photosBySnag, setPhotosBySnag] = useState<Record<string, SnagPhoto[]>>({});
+  const [loadingPhotos, setLoadingPhotos] = useState<Set<string>>(new Set());
+
+  // -------------------------------------------------------
+  // Projects on mount
+  // -------------------------------------------------------
+
+  useEffect(() => {
+    fetchProjects()
+      .then(setProjects)
+      .catch((err) => {
+        log.error('Failed to load projects for snag list', { err });
+        setProjects([]);
+      });
+  }, []);
+
+  // -------------------------------------------------------
+  // Snag loading — re-runs when filters change
+  // -------------------------------------------------------
+
+  const loadSnags = useCallback(async (activeFilters: SnagListFilters) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const params: Record<string, string> = {
+        page: String(activeFilters.page),
+        pageSize: String(activeFilters.pageSize),
+      };
+      if (activeFilters.projectId) params['projectId'] = activeFilters.projectId;
+      if (activeFilters.status) params['status'] = activeFilters.status;
+      if (activeFilters.category) params['category'] = activeFilters.category;
+      if (activeFilters.severity) params['severity'] = activeFilters.severity;
+
+      const { snags: data, total: count } = await fetchSnags(params);
+      setSnags(data);
+      setTotal(count);
+    } catch (err) {
+      log.error('Failed to load snag list', { err });
+      setError(err instanceof Error ? err.message : 'Failed to load snags');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadSnags(filters);
+  }, [filters, loadSnags]);
+
+  // -------------------------------------------------------
+  // Filter changes
+  // -------------------------------------------------------
+
+  const handleFilterChange = useCallback((key: string, value: string) => {
+    setFilters((prev) => ({ ...prev, [key]: value, page: 1 }));
+  }, []);
+
+  const handlePageChange = useCallback((page: number) => {
+    setFilters((prev) => ({ ...prev, page }));
+  }, []);
+
+  // -------------------------------------------------------
+  // Row expansion + lazy photo loading
+  // -------------------------------------------------------
+
+  const handleRowClick = useCallback((snag: Snag) => {
+    setExpandedSnagId((prev) => (prev === snag.id ? null : snag.id));
+
+    // Lazy-load photos if not already loaded
+    if (!photosBySnag[snag.id] && !loadingPhotos.has(snag.id)) {
+      setLoadingPhotos((prev) => new Set(prev).add(snag.id));
+      fetchSnagPhotos(snag.id)
+        .then((photos) => {
+          setPhotosBySnag((prev) => ({ ...prev, [snag.id]: photos }));
+        })
+        .catch((err) => {
+          log.error('Failed to load photos for snag', { snagId: snag.id, err });
+          setPhotosBySnag((prev) => ({ ...prev, [snag.id]: [] }));
+        })
+        .finally(() => {
+          setLoadingPhotos((prev) => {
+            const next = new Set(prev);
+            next.delete(snag.id);
+            return next;
+          });
+        });
+    }
+  }, [photosBySnag, loadingPhotos]);
+
+  // -------------------------------------------------------
+  // Mutations
+  // -------------------------------------------------------
+
+  const handleSnagUpdated = useCallback((updated: Snag) => {
+    setSnags((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+  }, []);
+
+  const handlePhotoAdded = useCallback((snagId: string, photo: SnagPhoto) => {
+    setPhotosBySnag((prev) => ({
+      ...prev,
+      [snagId]: [...(prev[snagId] ?? []), photo],
+    }));
+  }, []);
+
+  const handlePhotoDeleted = useCallback((snagId: string, photoId: string) => {
+    setPhotosBySnag((prev) => ({
+      ...prev,
+      [snagId]: (prev[snagId] ?? []).filter((p) => p.id !== photoId),
+    }));
+  }, []);
+
+  // -------------------------------------------------------
+  // Derived pagination
+  // -------------------------------------------------------
+
+  const totalPages = Math.max(1, Math.ceil(total / filters.pageSize));
+
+  return {
+    projects,
+    filters,
+    snags,
+    total,
+    totalPages,
+    isLoading,
+    error,
+    expandedSnagId,
+    photosBySnag,
+    loadingPhotos,
+    handleFilterChange,
+    handlePageChange,
+    handleRowClick,
+    handleSnagUpdated,
+    handlePhotoAdded,
+    handlePhotoDeleted,
+  };
+}

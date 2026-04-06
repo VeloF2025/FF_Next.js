@@ -6,7 +6,7 @@
  * - Reports: Construction-specific analytics and reporting
  */
 
-import { HardHat, ClipboardCheck, BarChart3, Radio, AlertTriangle } from 'lucide-react';
+import { HardHat, ClipboardCheck, BarChart3, Radio, AlertTriangle, LayoutGrid, List } from 'lucide-react';
 import type { ModuleNavigationConfig } from '../../types';
 
 export const constructionQaConfig: ModuleNavigationConfig = {
@@ -39,6 +39,10 @@ export const constructionQaConfig: ModuleNavigationConfig = {
       icon: AlertTriangle,
       path: '/field-ops/snags',
       rbacKey: 'construction-qa.snags',
+      subTabs: [
+        { id: 'cards', label: 'Cards', icon: LayoutGrid, path: '/field-ops/snags' },
+        { id: 'list', label: 'List', icon: List, path: '/field-ops/snags/list' },
+      ],
     },
     {
       id: 'reports',

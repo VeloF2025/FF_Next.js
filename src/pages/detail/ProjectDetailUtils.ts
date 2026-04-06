@@ -144,6 +144,7 @@ export const getGroupedTabConfig = (): TabGroup[] => [
       { id: 'procurement', label: 'Procurement' },
       { id: 'maintenance', label: 'Maintenance' },
       { id: 'hs', label: 'Health & Safety' },
+      { id: 'site-visits', label: 'Site Visits' },
     ],
   },
   {

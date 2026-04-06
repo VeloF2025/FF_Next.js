@@ -2,7 +2,7 @@
  * Contractors section configuration
  */
 
-import { Briefcase, Activity } from 'lucide-react';
+import { Briefcase, Activity, CalendarDays } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const contractorsSection: NavSection = {
@@ -23,6 +23,14 @@ export const contractorsSection: NavSection = {
       icon: Activity,
       label: 'RAG Dashboard',
       shortLabel: 'RAG',
+      permissions: [],
+      rbacKey: 'contractors',
+    },
+    {
+      to: '/site-visits',
+      icon: CalendarDays,
+      label: 'Site Visits',
+      shortLabel: 'Visits',
       permissions: [],
       rbacKey: 'contractors',
     },

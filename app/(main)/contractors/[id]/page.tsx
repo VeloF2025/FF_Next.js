@@ -13,6 +13,10 @@ import { Edit, ArrowLeft } from 'lucide-react';
 import type { Contractor } from '@/types/contractor.core.types';
 import { ContractorDocuments } from '@/components/contractors/ContractorDocuments';
 import { ContractorProjects } from '@/components/contractors/ContractorProjects';
+import { ContractorPayments } from '@/components/contractors/ContractorPayments';
+import { ProgressClaimsSection } from '@/components/contractors/ProgressClaimsSection';
+import { InvoiceSection } from '@/components/contractors/InvoiceSection';
+import { SiteVisitsSection } from '@/components/site-visits/SiteVisitsSection';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -266,6 +270,29 @@ export default async function ContractorDetailPage({
       {/* Project Assignments Section */}
       <div className="mt-8">
         <ContractorProjects contractorId={contractor.id} />
+      </div>
+
+      {/* Payment History Section */}
+      <div className="mt-8">
+        <ContractorPayments contractorId={contractor.id} />
+      </div>
+
+      {/* Progress Claims Section */}
+      <div className="mt-8">
+        <ProgressClaimsSection contractorId={contractor.id} />
+      </div>
+
+      {/* Invoices Section */}
+      <div className="mt-8">
+        <InvoiceSection contractorId={contractor.id} />
+      </div>
+
+      {/* Site Visits Section */}
+      <div className="mt-8">
+        <SiteVisitsSection
+          contractorId={contractor.id}
+          contractorName={contractor.companyName}
+        />
       </div>
     </div>
   );

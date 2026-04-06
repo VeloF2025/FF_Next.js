@@ -43,6 +43,8 @@ import { PonStageTracker } from '@/modules/projects/components/pon-stages/PonSta
 import { PonProgressTracker } from '@/modules/projects/components/pon-progress/PonProgressTracker';
 import { ProjectPrereqs } from '@/modules/projects/components/prereqs/ProjectPrereqs';
 import SpTrackerSandbox from '@/modules/projects/components/sp-tracker/SpTrackerSandbox';
+// Site Visits Tab
+import { SiteVisitsSection } from '@/components/site-visits/SiteVisitsSection';
 
 interface ProjectDetailProps {
   projectId: string;
@@ -327,6 +329,13 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
 
       {activeTab === 'sp-tracker' && (
         <SpTrackerSandbox projectId={id!} />
+      )}
+
+      {activeTab === 'site-visits' && (
+        <SiteVisitsSection
+          projectId={id!}
+          projectName={project.name}
+        />
       )}
     </div>
   );

@@ -626,9 +626,9 @@
       "Send feedback for FAIL evaluation",
       "Check WhatsApp message",
       "Verify 'FAIL' status is clearly shown",
-      "Verify emoji or icon is used (❌)",
+      "Verify emoji or icon is used (\u274c)",
       "Send feedback for PASS evaluation",
-      "Verify 'PASS' status shown with ✅"
+      "Verify 'PASS' status shown with \u2705"
     ],
     "passes": true
   },
@@ -2216,5 +2216,94 @@
       "Get approval to deploy"
     ],
     "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "F1: Snags page moved to snags/index.tsx for directory routing",
+    "steps": [
+      "Navigate to /field-ops/snags",
+      "Verify page loads correctly",
+      "Verify SnagsPage renders as before"
+    ],
+    "passes": true
+  },
+  {
+    "category": "functional",
+    "description": "F2: Snags nav has Cards and List sub-tabs",
+    "steps": [
+      "Navigate to /field-ops/snags",
+      "Verify Cards sub-tab appears in navigation",
+      "Verify List sub-tab appears in navigation",
+      "Click List sub-tab and verify routing to /field-ops/snags/list"
+    ],
+    "passes": true
+  },
+  {
+    "category": "functional",
+    "description": "F3: useSnagListPage hook fetches all-project snags with filter/pagination state",
+    "steps": [
+      "Verify hook exposes filters, snags, total, isLoading, error",
+      "Verify projectId filter omitted from API call when empty",
+      "Verify page resets to 1 on filter change"
+    ],
+    "passes": true
+  },
+  {
+    "category": "functional",
+    "description": "F4: SnagDetailPanel renders inline snag detail without modal overlay",
+    "steps": [
+      "Verify SnagDetailPanel renders status selector",
+      "Verify SnagDetailPanel renders photo columns",
+      "Verify SnagDetailPanel renders NOC ticket button",
+      "Verify no fixed inset-0 overlay wrapper"
+    ],
+    "passes": true
+  },
+  {
+    "category": "functional",
+    "description": "F5: SnagListFilters renders project, status, category, severity dropdowns",
+    "steps": [
+      "Navigate to /field-ops/snags/list",
+      "Verify Project dropdown lists all projects",
+      "Verify Status dropdown has all status options",
+      "Verify Category dropdown has all category options",
+      "Verify Severity dropdown has all severity options"
+    ],
+    "passes": true
+  },
+  {
+    "category": "functional",
+    "description": "F6: SnagListTable shows 11-column table with inline row expansion",
+    "steps": [
+      "Navigate to /field-ops/snags/list",
+      "Verify table has 11 columns: #, Project, Report, Category, Severity, Description, Poles, Status, NOC Ticket, Assigned To, Created",
+      "Click a row and verify SnagDetailPanel expands inline below",
+      "Click the same row again and verify it collapses",
+      "Verify loading skeleton shows while data is fetching"
+    ],
+    "passes": true
+  },
+  {
+    "category": "functional",
+    "description": "F7: SnagListPage orchestrates filters, table, and pagination",
+    "steps": [
+      "Navigate to /field-ops/snags/list",
+      "Verify All Snags title and total count badge",
+      "Verify SnagListFilters is rendered",
+      "Verify SnagListTable is rendered",
+      "Verify Pagination appears when total > 0"
+    ],
+    "passes": true
+  },
+  {
+    "category": "functional",
+    "description": "F8: /field-ops/snags/list page route renders SnagListPage",
+    "steps": [
+      "Navigate to /field-ops/snags/list",
+      "Verify page loads with AppLayout and ModulePage",
+      "Verify SnagListPage renders correctly",
+      "Verify page title is Snags List | Civil QA | FibreFlow"
+    ],
+    "passes": true
   }
 ]

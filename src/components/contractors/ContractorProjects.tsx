@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Plus, Briefcase, Calendar, DollarSign, TrendingUp, AlertCircle } from 'lucide-react';
 import { getContractorProjectsByContractor } from '@/services/contractor/contractorProjectsService';
 import type { ContractorProjectWithDetails } from '@/types/contractor-project.types';
@@ -13,33 +13,50 @@ import { ASSIGNMENT_STATUSES } from '@/types/contractor-project.types';
 import { AssignProjectForm } from './AssignProjectForm';
 import { log } from '@/lib/logger';
 
+interface PaymentTotals {
+  grandTotal: number;
+  byProject: Record<string, number>;
+}
+
+async function fetchPaymentTotals(contractorId: string): Promise<PaymentTotals> {
+  const res = await fetch(`/api/contractors/${contractorId}/payments/totals`);
+  if (!res.ok) return { grandTotal: 0, byProject: {} };
+  return res.json() as Promise<PaymentTotals>;
+}
+
 interface ContractorProjectsProps {
   contractorId: string;
 }
 
 export function ContractorProjects({ contractorId }: ContractorProjectsProps) {
   const [projects, setProjects] = useState<ContractorProjectWithDetails[]>([]);
+  const [paymentTotals, setPaymentTotals] = useState<PaymentTotals>({ grandTotal: 0, byProject: {} });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
 
-  useEffect(() => {
-    loadProjects();
-  }, [contractorId]);
-
-  async function loadProjects() {
+  const loadProjects = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await getContractorProjectsByContractor(contractorId);
+      const [data, totals] = await Promise.all([
+        getContractorProjectsByContractor(contractorId),
+        fetchPaymentTotals(contractorId),
+      ]);
       setProjects(data);
-    } catch (err: any) {
+      setPaymentTotals(totals);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to load projects';
       log.error('Error loading contractor projects', { error: err, contractorId }, 'ContractorProjects');
-      setError(err.message || 'Failed to load projects');
+      setError(message);
     } finally {
       setLoading(false);
     }
-  }
+  }, [contractorId]);
+
+  useEffect(() => {
+    loadProjects();
+  }, [loadProjects]);
 
   if (loading) {
     return (
@@ -113,7 +130,12 @@ export function ContractorProjects({ contractorId }: ContractorProjectsProps) {
       ) : (
         <div className="space-y-4">
           {projects.map((project) => (
-            <ProjectCard key={project.id} project={project} onUpdate={loadProjects} />
+            <ProjectCard
+              key={project.id}
+              project={project}
+              totalPaid={paymentTotals.byProject[String(project.id)] ?? 0}
+              onUpdate={loadProjects}
+            />
           ))}
         </div>
       )}
@@ -125,10 +147,11 @@ export function ContractorProjects({ contractorId }: ContractorProjectsProps) {
 
 interface ProjectCardProps {
   project: ContractorProjectWithDetails;
+  totalPaid: number;
   onUpdate: () => void;
 }
 
-function ProjectCard({ project, onUpdate }: ProjectCardProps) {
+function ProjectCard({ project, totalPaid, onUpdate }: ProjectCardProps) {
   const statusConfig = ASSIGNMENT_STATUSES.find(s => s.value === project.assignmentStatus);
   const statusColor = statusConfig?.color || 'gray';
 
@@ -193,22 +216,42 @@ function ProjectCard({ project, onUpdate }: ProjectCardProps) {
               </div>
             </div>
 
-            {/* Contract Value */}
-            {project.contractValue && (
-              <div className="flex items-center gap-2 text-[var(--ff-text-secondary)]">
-                <DollarSign className="h-4 w-4" />
-                <div>
-                  <div className="font-medium text-[var(--ff-text-primary)]">
-                    R {project.contractValue.toLocaleString()}
-                  </div>
-                  {project.paymentTerms && (
-                    <div className="text-xs text-[var(--ff-text-tertiary)]">
-                      {project.paymentTerms}
+            {/* Contract Value & Payment Progress */}
+            <div className="flex items-center gap-2 text-[var(--ff-text-secondary)]">
+              <DollarSign className="h-4 w-4" />
+              <div>
+                {project.contractValue ? (
+                  <>
+                    <div className="font-medium text-[var(--ff-text-primary)]">
+                      R {Number(project.contractValue).toLocaleString()}
                     </div>
-                  )}
-                </div>
+                    <div className="text-xs mt-0.5">
+                      <span className="text-green-400 font-medium">
+                        R {totalPaid.toLocaleString('en-ZA', { minimumFractionDigits: 2 })} paid
+                      </span>
+                      {' / '}
+                      <span className="text-[var(--ff-text-tertiary)]">
+                        R {Number(project.contractValue).toLocaleString()} contract
+                      </span>
+                    </div>
+                    {project.paymentTerms && (
+                      <div className="text-xs text-[var(--ff-text-tertiary)]">
+                        {project.paymentTerms}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="font-medium text-[var(--ff-text-primary)]">No contract value</div>
+                    {totalPaid > 0 && (
+                      <div className="text-xs text-green-400 font-medium mt-0.5">
+                        R {totalPaid.toLocaleString('en-ZA', { minimumFractionDigits: 2 })} paid
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
-            )}
+            </div>
           </div>
 
           {/* Performance Rating */}

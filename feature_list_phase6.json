@@ -1,0 +1,169 @@
+{
+  "project": "fibreflow-ims-phase-b",
+  "planned_at": "2026-04-06",
+  "description": "IMS Phase B — Contractor Payments, Performance Dashboards, Suspension Workflows, and Document Automation. Extends Phase A (profiles, onboarding, documents, RAG, project assignment).",
+  "features": [
+    {
+      "id": "contractor-payment-tracking",
+      "description": "Record and track payments made to contractors per project assignment. New contractor_payments table. Add payments tab to contractor detail page. Show total paid vs contract value on assignment cards.",
+      "priority": 1,
+      "complexity": "medium",
+      "success_criteria": [
+        "Can record a payment against a contractor_projects record via POST /api/contractors/[id]/payments",
+        "Payment history tab on contractor detail page renders with real data",
+        "Total paid vs contract value shown on contractor-project assignment card",
+        "Payments list filterable by status and date range",
+        "Payment list exportable as CSV"
+      ],
+      "passes": false
+    },
+    {
+      "id": "invoice-progress-claim-workflow",
+      "description": "Full invoice and progress claim workflow. Stages: submitted → under_review → approved → paid / rejected. Line items stored as JSONB. Approved invoices optionally create AP journal entries in the accounting module.",
+      "priority": 2,
+      "complexity": "high",
+      "success_criteria": [
+        "Can create an invoice with line items against a contractor-project assignment",
+        "Status transitions enforced at API level",
+        "Rejected invoices capture rejection reason",
+        "Invoice list page shows all invoices with status and contractor filters",
+        "Invoice detail view shows full line items and status change history"
+      ],
+      "passes": false
+    },
+    {
+      "id": "contractor-portal-full-tabs",
+      "description": "Complete the contractor detail page with a full 6-tab UI: Overview, Documents, Projects, Payments, Performance, Suspension History.",
+      "priority": 3,
+      "complexity": "high",
+      "success_criteria": [
+        "All 6 tabs render without error with real data",
+        "Documents tab embeds existing SingleContractorReport component inline",
+        "Projects tab shows contractor_projects assignment history",
+        "Payments tab shows payment records",
+        "Performance tab shows 4+ KPI stats",
+        "Suspension History tab shows contractor_suspension_history records"
+      ],
+      "passes": false
+    },
+    {
+      "id": "performance-dashboard",
+      "description": "Dedicated analytics page aggregating contractor performance KPIs. Filterable by date range and province. Sortable contractor league table. CSV export.",
+      "priority": 4,
+      "complexity": "medium",
+      "success_criteria": [
+        "Dashboard loads within 2 seconds with real aggregated data",
+        "Shows 6+ KPIs using EnhancedStatCard",
+        "Contractor league table sortable by any KPI column",
+        "Date range and province filters",
+        "CSV export of full performance dataset"
+      ],
+      "passes": false
+    },
+    {
+      "id": "suspension-reinstatement-workflow",
+      "description": "Formal suspension and reinstatement workflow with PDF suspension letter, compliance checklist, and full audit trail in contractor_suspension_history.",
+      "priority": 5,
+      "complexity": "medium",
+      "success_criteria": [
+        "Suspend modal requires reason (min 20 chars)",
+        "Suspension letter PDF generated and stored via VF Storage",
+        "H&S gate blocks suspended contractors from project assignment",
+        "Reinstatement flow shows compliance checklist",
+        "All events stored in contractor_suspension_history"
+      ],
+      "passes": false
+    },
+    {
+      "id": "appointment-letter-generation",
+      "description": "Generate branded PDF appointment letter on contractor-project assignment. Stored in VF Storage, versioned on re-generation.",
+      "priority": 6,
+      "complexity": "medium",
+      "success_criteria": [
+        "Generate button on assignment card triggers PDF creation",
+        "PDF contains contractor, project, contract value, and scope details",
+        "Stored via VF Storage; path saved to contractor_projects record",
+        "PDF viewable inline via document proxy",
+        "Re-generation preserves previous version path"
+      ],
+      "passes": false
+    },
+    {
+      "id": "bulk-statement-import",
+      "description": "Import bulk CSV payment statement, reconcile against open invoices, preview before commit, download discrepancy report.",
+      "priority": 7,
+      "complexity": "high",
+      "success_criteria": [
+        "Upload accepts CSV with amount, reference, date columns",
+        "Preview shows matched, unmatched, and ambiguous counts",
+        "Commit applies matched payments atomically",
+        "Discrepancy report downloadable as CSV",
+        "Import history stored"
+      ],
+      "passes": false
+    },
+    {
+      "id": "automated-document-expiry-alerts",
+      "description": "Scheduled alert job for documents expiring at 30/14/7-day thresholds. Dedup via contractor_alert_history. Counts on RAG dashboard.",
+      "priority": 8,
+      "complexity": "medium",
+      "success_criteria": [
+        "POST /api/contractors/send-expiry-alerts triggers check",
+        "One alert per contractor per document per threshold",
+        "Alert history stored in contractor_alert_history",
+        "RAG dashboard shows expiry alert count badge"
+      ],
+      "passes": false
+    },
+    {
+      "id": "contractor-scorecard-pdf",
+      "description": "Branded printable PDF scorecard per contractor with RAG status, 6 KPIs, document compliance summary, recent payments. Downloadable from Overview tab.",
+      "priority": 9,
+      "complexity": "medium",
+      "success_criteria": [
+        "Generated within 5 seconds",
+        "All sections present: company details, RAG, 6 KPIs, doc compliance, recent payments",
+        "FibreFlow branding applied",
+        "Server-side generation, downloadable from Overview tab"
+      ],
+      "passes": false
+    },
+    {
+      "id": "bulk-onboarding-status-import",
+      "description": "CSV import to batch-update contractor onboarding stage statuses after document review. Preview, validate, commit, log.",
+      "priority": 10,
+      "complexity": "low",
+      "success_criteria": [
+        "CSV template downloadable",
+        "Preview table shows old vs new status per row",
+        "Invalid rows excluded with error messages",
+        "Commit applies valid rows in single transaction",
+        "Result summary shown"
+      ],
+      "passes": false
+    }
+  ],
+  "new_db_tables_required": [
+    "contractor_invoices",
+    "contractor_payments",
+    "contractor_suspension_history",
+    "contractor_alert_history"
+  ],
+  "tech_stack": [
+    "Next.js 14 (Pages Router)",
+    "TypeScript",
+    "Neon PostgreSQL (tagged-template SQL — no ORM)",
+    "TailwindCSS with FF CSS variables",
+    "VF Storage API (port 8091)",
+    "PDF generation server-side (statementPdf.ts pattern)"
+  ],
+  "ims_phase_a_baseline_complete": {
+    "contractors_crud_rag": true,
+    "5_stage_onboarding": true,
+    "document_upload_verification_expiry": true,
+    "cipc_verification_directors": true,
+    "contractor_project_assignment_hs_gate": true,
+    "rag_dashboard": true,
+    "documents_compliance_report_csv": true
+  }
+}
