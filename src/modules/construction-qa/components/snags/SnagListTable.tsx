@@ -88,10 +88,10 @@ export function SnagListTable({
   const projectMap = new Map(projects.map((p) => [p.id, p.name]));
 
   return (
-    <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
+    <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-y-auto max-h-[calc(100vh-310px)]">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
-          <thead className="bg-[var(--ff-bg-tertiary)]">
+          <thead className="sticky top-0 z-10 bg-[var(--ff-bg-tertiary)]">
             <tr>
               {[
                 '#',
