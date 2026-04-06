@@ -1,0 +1,30 @@
+{
+  "project": "fibreflow-snags-summary-hierarchy",
+  "features": [
+    {
+      "id": "api-sql-verified",
+      "description": "hierarchy-stats API SQL verified correct — pole_ids is UUID[] so [1] subscript is valid Postgres 1-indexed array access",
+      "passes": true
+    },
+    {
+      "id": "typescript-compiles",
+      "description": "All 5 files compile with no TS errors — fixed duplicate noc_ticket_uid identifier in snag.types.ts",
+      "passes": true
+    },
+    {
+      "id": "expandable-ui",
+      "description": "3-tier expand/collapse UI working — Project → Zone → PON with chevron toggles",
+      "passes": true
+    },
+    {
+      "id": "pon-deep-link",
+      "description": "PON and Zone rows link to filtered snag list — zone_no+pon_no params in URL (note: useSnagListPage does not yet consume these params, marked with code comment)",
+      "passes": true
+    },
+    {
+      "id": "csv-export",
+      "description": "CSV export button downloads full hierarchy data — all tiers, client-side generation, snags-summary-YYYY-MM-DD.csv",
+      "passes": true
+    }
+  ]
+}

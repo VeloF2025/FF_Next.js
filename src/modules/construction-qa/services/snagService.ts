@@ -14,6 +14,7 @@ import type {
   UpdateSnagRequest,
   CreateSnagPhotoRequest,
   SnagFilters,
+  HierarchyRow,
 } from '../types/snag.types';
 
 // ============================================================
@@ -51,6 +52,15 @@ export async function fetchSnagStats(): Promise<SnagProjectStats[]> {
   const res = await fetch('/api/snags/stats');
   if (!res.ok) throw new Error(`Failed to fetch snag stats: ${res.status}`);
   const json = await res.json() as { data: SnagProjectStats[] };
+  return json.data;
+}
+
+/** Fetch project→zone→PON hierarchy snag counts. */
+export async function fetchSnagHierarchyStats(projectId?: string): Promise<HierarchyRow[]> {
+  const qs = projectId ? `?projectId=${projectId}` : '';
+  const res = await fetch(`/api/snags/hierarchy-stats${qs}`);
+  if (!res.ok) throw new Error(`hierarchy-stats: ${res.status}`);
+  const json = await res.json() as { data: HierarchyRow[] };
   return json.data;
 }
 
@@ -106,6 +116,8 @@ export async function fetchSnags(filters: Partial<SnagFilters>): Promise<{
   if (filters.category) params.set('category', filters.category);
   if (filters.severity) params.set('severity', filters.severity);
   if (filters.search) params.set('search', filters.search);
+  if (filters.zone_no) params.set('zone_no', String(filters.zone_no));
+  if (filters.pon_no) params.set('pon_no', String(filters.pon_no));
   if (filters.page) params.set('page', String(filters.page));
   if (filters.pageSize) params.set('pageSize', String(filters.pageSize));
 

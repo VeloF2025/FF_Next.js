@@ -1,9 +1,13 @@
 /**
  * useSnagListPage — Data-fetching hook for SnagListPage.
  * Manages all-projects snag list, filters, pagination, and inline row expansion.
+ *
+ * Supports seeding initial filters from URL query params:
+ *   ?projectId=<uuid>&zone_no=<int>&pon_no=<int>
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/router';
 import {
   fetchSnags,
   fetchSnagPhotos,
@@ -20,6 +24,10 @@ export interface SnagListFilters {
   category: string;
   severity: string;
   search?: string;
+  /** Zone number deep-link filter (from ?zone_no= URL param) */
+  zone_no?: string;
+  /** PON number deep-link filter (from ?pon_no= URL param) */
+  pon_no?: string;
   page: number;
   pageSize: number;
 }
@@ -34,11 +42,14 @@ const DEFAULT_FILTERS: SnagListFilters = {
   status: '',
   category: '',
   severity: '',
+  zone_no: '',
+  pon_no: '',
   page: 1,
   pageSize: 25,
 };
 
 export function useSnagListPage() {
+  const router = useRouter();
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [filters, setFilters] = useState<SnagListFilters>(DEFAULT_FILTERS);
 
@@ -66,6 +77,31 @@ export function useSnagListPage() {
         setProjects([]);
       });
   }, []);
+
+  // -------------------------------------------------------
+  // Seed filters from URL query params (deep-link support)
+  // Runs when router.query changes (covers initial load + back/forward nav)
+  // -------------------------------------------------------
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    const { projectId, zone_no, pon_no } = router.query;
+
+    const hasDeepLink =
+      (projectId && typeof projectId === 'string') ||
+      (zone_no && typeof zone_no === 'string') ||
+      (pon_no && typeof pon_no === 'string');
+
+    if (!hasDeepLink) return;
+
+    setFilters((prev) => ({
+      ...prev,
+      projectId: typeof projectId === 'string' ? projectId : prev.projectId,
+      zone_no:   typeof zone_no   === 'string' ? zone_no   : prev.zone_no,
+      pon_no:    typeof pon_no    === 'string' ? pon_no    : prev.pon_no,
+      page: 1,
+    }));
+  }, [router.isReady, router.query]);
 
   // -------------------------------------------------------
   // Snag loading — re-runs when filters change
@@ -101,6 +137,8 @@ export function useSnagListPage() {
       if (activeFilters.category) params['category'] = activeFilters.category;
       if (activeFilters.severity) params['severity'] = activeFilters.severity;
       if (activeFilters.search) params['search'] = activeFilters.search;
+      if (activeFilters.zone_no) params['zone_no'] = activeFilters.zone_no;
+      if (activeFilters.pon_no) params['pon_no'] = activeFilters.pon_no;
 
       const { snags: data, total: count } = await fetchSnags(params);
       setSnags(data);

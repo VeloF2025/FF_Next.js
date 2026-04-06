@@ -100,8 +100,6 @@ export interface Snag {
   // Lifecycle
   status: SnagStatus;
   noc_ticket_id: string | null;
-  /** Human-readable NOC ticket UID (e.g. SNG-20260402-001), joined from maintenance_tickets */
-  noc_ticket_uid?: string | null;
   assigned_to: string | null;
   assigned_to_name?: string | null;
   assigned_at: string | null;
@@ -176,6 +174,50 @@ export interface SnagProjectStats {
 }
 
 // ============================================================
+// Hierarchy Stats
+// ============================================================
+
+export interface HierarchyRow {
+  project_id: string;
+  project_name: string;
+  zone_no: number | null;
+  pon_no: number | null;
+  total: number;
+  open: number;
+  assigned: number;
+  in_progress: number;
+  fixed: number;
+  verified: number;
+  closed: number;
+  reopened: number;
+}
+
+export interface StatusCounts {
+  total: number; open: number; assigned: number; in_progress: number;
+  fixed: number; verified: number; closed: number; reopened: number;
+}
+
+export interface PonNode extends StatusCounts {
+  ponNo: number | null;
+  label: string;
+}
+
+export interface ZoneNode extends StatusCounts {
+  zoneNo: number | null;
+  label: string;
+  pons: PonNode[];
+}
+
+export interface ProjectNode extends StatusCounts {
+  project_id: string;
+  project_name: string;
+  zones: ZoneNode[];
+  latest_report_number: string | null;
+  latest_report_date: string | null;
+  latest_report_id: string | null;
+}
+
+// ============================================================
 // Zone / PON Grouping
 // ============================================================
 
@@ -231,6 +273,10 @@ export interface SnagFilters {
   severity: string;
   search: string;
   sortBy: SnagSortBy;
+  /** Zone number filter — matches snags whose associated pole/drop zone_no equals this value */
+  zone_no: string;
+  /** PON number filter — matches snags whose associated pole/drop pon_no equals this value */
+  pon_no: string;
   page: number;
   pageSize: number;
 }
