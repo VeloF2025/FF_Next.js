@@ -273,6 +273,10 @@ export interface SnagFilters {
   severity: string;
   search: string;
   sortBy: SnagSortBy;
+  /** Zone number filter — matches snags whose associated pole/drop zone_no equals this value */
+  zone_no: string;
+  /** PON number filter — matches snags whose associated pole/drop pon_no equals this value */
+  pon_no: string;
   page: number;
   pageSize: number;
 }

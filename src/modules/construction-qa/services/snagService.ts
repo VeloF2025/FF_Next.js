@@ -116,6 +116,8 @@ export async function fetchSnags(filters: Partial<SnagFilters>): Promise<{
   if (filters.category) params.set('category', filters.category);
   if (filters.severity) params.set('severity', filters.severity);
   if (filters.search) params.set('search', filters.search);
+  if (filters.zone_no) params.set('zone_no', String(filters.zone_no));
+  if (filters.pon_no) params.set('pon_no', String(filters.pon_no));
   if (filters.page) params.set('page', String(filters.page));
   if (filters.pageSize) params.set('pageSize', String(filters.pageSize));
 

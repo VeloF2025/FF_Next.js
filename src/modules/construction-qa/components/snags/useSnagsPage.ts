@@ -40,6 +40,8 @@ export const DEFAULT_FILTERS: SnagFilters = {
   severity: '',
   search: '',
   sortBy: 'newest',
+  zone_no: '',
+  pon_no: '',
   page: 1,
   pageSize: 200,
 };

@@ -12,7 +12,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
-import { querySnagsByReport, querySnagsByProject } from './snags-query';
+import { querySnagsByReport, querySnagsByProject, querySnagsByProjectAndZone } from './snags-query';
 import { updateTicket } from '@/modules/noc/services/ticketService';
 import { TicketStatus } from '@/modules/noc/types/ticket';
 import type {
@@ -60,6 +60,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     category,
     severity,
     search,
+    zone_no,
+    pon_no,
     page = '1',
     pageSize = '50',
   } = req.query;
@@ -68,6 +70,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   const pageSizeNum = Math.min(200, parseInt(pageSize as string, 10));
   const offset = (pageNum - 1) * pageSizeNum;
   const searchTerm = search && typeof search === 'string' ? `%${search}%` : null;
+  const zoneNoNum = zone_no && typeof zone_no === 'string' ? parseInt(zone_no, 10) : undefined;
+  const ponNoNum  = pon_no  && typeof pon_no  === 'string' ? parseInt(pon_no,  10) : undefined;
 
   if (reportId && typeof reportId === 'string') {
     return querySnagsByReport(
@@ -81,6 +85,16 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   }
 
   if (projectId && typeof projectId === 'string') {
+    // When zone_no/pon_no are present, use the hierarchy-aware query
+    if (zoneNoNum !== undefined || ponNoNum !== undefined) {
+      return querySnagsByProjectAndZone(
+        res, projectId,
+        zoneNoNum,
+        ponNoNum,
+        status as string | undefined,
+        pageNum, pageSizeNum, offset
+      );
+    }
     return querySnagsByProject(
       res, projectId,
       status as string | undefined,
