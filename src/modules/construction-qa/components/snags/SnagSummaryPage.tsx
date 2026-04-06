@@ -1,5 +1,5 @@
 /**
- * SnagSummaryPage — Per-project snag count breakdown table.
+ * SnagSummaryPage — Expandable project → zone → PON snag count breakdown.
  * Displays total, open, in_progress, fixed, verified, closed, reopened,
  * and latest TQR report number/date for each project.
  */
@@ -7,8 +7,11 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import type { SnagProjectStats } from '../../types/snag.types';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import type { ProjectNode, ZoneNode, PonNode } from '../../types/snag.types';
 import { fetchSnagStats } from '../../services/snagService';
+import { fetchSnagHierarchyStats } from '../../services/snagService';
+import { buildHierarchy } from './snagHierarchyUtils';
 
 // ============================================================
 // CountCell helper
@@ -62,17 +65,22 @@ const COL_COUNT = 9;
 
 export function SnagSummaryPage() {
   const router = useRouter();
-  const [stats, setStats] = useState<SnagProjectStats[]>([]);
+  const [projects, setProjects] = useState<ProjectNode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
-    fetchSnagStats()
-      .then((data) => {
+
+    Promise.all([fetchSnagStats(), fetchSnagHierarchyStats()])
+      .then(([statsData, hierarchyRows]) => {
         if (!cancelled) {
-          setStats(data);
+          const statsById = new Map(statsData.map((s) => [s.project_id, s]));
+          const built = buildHierarchy(hierarchyRows, statsById);
+          setProjects(built);
           setIsLoading(false);
         }
       })
@@ -82,19 +90,37 @@ export function SnagSummaryPage() {
           setIsLoading(false);
         }
       });
+
     return () => { cancelled = true; };
   }, []);
 
-  // Totals row
-  const totals = stats.reduce(
-    (acc, s) => ({
-      total: acc.total + s.total,
-      open: acc.open + s.open,
-      in_progress: acc.in_progress + s.in_progress,
-      fixed: acc.fixed + s.fixed,
-      verified: acc.verified + s.verified,
-      closed: acc.closed + s.closed,
-      reopened: acc.reopened + s.reopened,
+  function toggleProject(id: string) {
+    setExpandedProjects(prev => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  }
+
+  function toggleZone(pid: string, zoneNo: number | null) {
+    const key = `${pid}::${zoneNo ?? 'null'}`;
+    setExpandedZones(prev => {
+      const n = new Set(prev);
+      n.has(key) ? n.delete(key) : n.add(key);
+      return n;
+    });
+  }
+
+  // Totals computed from ProjectNode counts
+  const totals = projects.reduce(
+    (acc, p) => ({
+      total: acc.total + p.total,
+      open: acc.open + p.open,
+      in_progress: acc.in_progress + p.in_progress,
+      fixed: acc.fixed + p.fixed,
+      verified: acc.verified + p.verified,
+      closed: acc.closed + p.closed,
+      reopened: acc.reopened + p.reopened,
     }),
     { total: 0, open: 0, in_progress: 0, fixed: 0, verified: 0, closed: 0, reopened: 0 }
   );
@@ -160,8 +186,20 @@ export function SnagSummaryPage() {
                   <SkeletonRow key={i} cols={COL_COUNT} />
                 ))}
 
+              {/* Error state */}
+              {!isLoading && error && (
+                <tr>
+                  <td
+                    colSpan={COL_COUNT}
+                    className="px-4 py-12 text-center text-sm text-red-400"
+                  >
+                    {error}
+                  </td>
+                </tr>
+              )}
+
               {/* Empty state */}
-              {!isLoading && stats.length === 0 && !error && (
+              {!isLoading && projects.length === 0 && !error && (
                 <tr>
                   <td
                     colSpan={COL_COUNT}
@@ -172,62 +210,150 @@ export function SnagSummaryPage() {
                 </tr>
               )}
 
-              {/* Data rows */}
+              {/* Data rows — flat tbody via flatMap */}
               {!isLoading &&
-                stats.map((s) => (
-                  <tr key={s.project_id} className="hover:bg-[var(--ff-bg-hover)] transition-colors">
-                    {/* Project — clickable link */}
-                    <td className="px-3 py-2 text-xs whitespace-nowrap max-w-[200px] truncate">
-                      <button
-                        type="button"
-                        onClick={() => void router.push(`/field-ops/snags/list?projectId=${s.project_id}`)}
-                        className="text-blue-400 hover:text-blue-300 hover:underline text-left truncate max-w-[190px]"
-                      >
-                        {s.project_name}
-                      </button>
-                    </td>
+                projects.flatMap((p: ProjectNode) => {
+                  const isProjectExpanded = expandedProjects.has(p.project_id);
+                  const rows = [];
 
-                    {/* Total — always tinted zinc */}
-                    <td className="px-3 py-2 text-xs tabular-nums whitespace-nowrap text-right bg-zinc-100/5">
-                      <span className="font-medium text-zinc-200">{s.total}</span>
-                    </td>
+                  // Project row
+                  rows.push(
+                    <tr
+                      key={`project-${p.project_id}`}
+                      className="hover:bg-[var(--ff-bg-hover)] transition-colors"
+                    >
+                      <td className="px-3 py-2 text-xs whitespace-nowrap max-w-[200px]">
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => toggleProject(p.project_id)}
+                            className="flex-shrink-0 text-zinc-400 hover:text-zinc-200 transition-colors"
+                            aria-label={isProjectExpanded ? 'Collapse project' : 'Expand project'}
+                          >
+                            {isProjectExpanded
+                              ? <ChevronDown className="w-3.5 h-3.5" />
+                              : <ChevronRight className="w-3.5 h-3.5" />
+                            }
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void router.push(`/field-ops/snags/list?projectId=${p.project_id}`)}
+                            className="text-blue-400 hover:text-blue-300 hover:underline text-left truncate max-w-[170px]"
+                          >
+                            {p.project_name}
+                          </button>
+                        </div>
+                      </td>
 
-                    {/* Open */}
-                    <CountCell value={s.open} colorClass="text-red-300" bgClass="bg-red-900/20" />
+                      {/* Total */}
+                      <td className="px-3 py-2 text-xs tabular-nums whitespace-nowrap text-right bg-zinc-100/5">
+                        <span className="font-medium text-zinc-200">{p.total}</span>
+                      </td>
 
-                    {/* In Progress */}
-                    <CountCell value={s.in_progress} colorClass="text-amber-300" bgClass="bg-amber-900/20" />
+                      <CountCell value={p.open} colorClass="text-red-300" bgClass="bg-red-900/20" />
+                      <CountCell value={p.in_progress} colorClass="text-amber-300" bgClass="bg-amber-900/20" />
+                      <CountCell value={p.fixed} colorClass="text-blue-300" bgClass="bg-blue-900/20" />
+                      <CountCell value={p.verified} colorClass="text-green-300" bgClass="bg-green-900/20" />
+                      <CountCell value={p.closed} colorClass="text-green-300" bgClass="bg-green-900/20" />
+                      <CountCell value={p.reopened} colorClass="text-red-300" bgClass="bg-red-900/20" />
 
-                    {/* Fixed */}
-                    <CountCell value={s.fixed} colorClass="text-blue-300" bgClass="bg-blue-900/20" />
+                      {/* Latest TQR */}
+                      <td className="px-3 py-2 text-xs tabular-nums whitespace-nowrap">
+                        {p.latest_report_number ? (
+                          <span className="text-zinc-300 font-medium">{p.latest_report_number}</span>
+                        ) : (
+                          <span className="text-zinc-600">—</span>
+                        )}
+                        {p.latest_report_date && (
+                          <span className="text-zinc-400 ml-1.5">
+                            {formatDate(p.latest_report_date)}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
 
-                    {/* Verified */}
-                    <CountCell value={s.verified} colorClass="text-green-300" bgClass="bg-green-900/20" />
+                  if (isProjectExpanded) {
+                    p.zones.forEach((z: ZoneNode) => {
+                      const zoneKey = `${p.project_id}::${z.zoneNo ?? 'null'}`;
+                      const isZoneExpanded = expandedZones.has(zoneKey);
 
-                    {/* Closed */}
-                    <CountCell value={s.closed} colorClass="text-green-300" bgClass="bg-green-900/20" />
+                      // Zone row
+                      rows.push(
+                        <tr
+                          key={`zone-${zoneKey}`}
+                          className="bg-[var(--ff-bg-tertiary)]/30 hover:bg-[var(--ff-bg-hover)] transition-colors"
+                        >
+                          <td className="px-3 py-2 text-xs whitespace-nowrap pl-6">
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => toggleZone(p.project_id, z.zoneNo)}
+                                className="flex-shrink-0 text-zinc-500 hover:text-zinc-300 transition-colors"
+                                aria-label={isZoneExpanded ? 'Collapse zone' : 'Expand zone'}
+                              >
+                                {isZoneExpanded
+                                  ? <ChevronDown className="w-3.5 h-3.5" />
+                                  : <ChevronRight className="w-3.5 h-3.5" />
+                                }
+                              </button>
+                              <span className="text-zinc-300">{z.label}</span>
+                            </div>
+                          </td>
 
-                    {/* Reopened */}
-                    <CountCell value={s.reopened} colorClass="text-red-300" bgClass="bg-red-900/20" />
+                          <td className="px-3 py-2 text-xs tabular-nums whitespace-nowrap text-right bg-zinc-100/5">
+                            <span className="font-medium text-zinc-200">{z.total}</span>
+                          </td>
 
-                    {/* Latest TQR */}
-                    <td className="px-3 py-2 text-xs tabular-nums whitespace-nowrap">
-                      {s.latest_report_number ? (
-                        <span className="text-zinc-300 font-medium">{s.latest_report_number}</span>
-                      ) : (
-                        <span className="text-zinc-600">—</span>
-                      )}
-                      {s.latest_report_date && (
-                        <span className="text-zinc-400 ml-1.5">
-                          {formatDate(s.latest_report_date)}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                          <CountCell value={z.open} colorClass="text-red-300" bgClass="bg-red-900/20" />
+                          <CountCell value={z.in_progress} colorClass="text-amber-300" bgClass="bg-amber-900/20" />
+                          <CountCell value={z.fixed} colorClass="text-blue-300" bgClass="bg-blue-900/20" />
+                          <CountCell value={z.verified} colorClass="text-green-300" bgClass="bg-green-900/20" />
+                          <CountCell value={z.closed} colorClass="text-green-300" bgClass="bg-green-900/20" />
+                          <CountCell value={z.reopened} colorClass="text-red-300" bgClass="bg-red-900/20" />
+
+                          <td className="px-3 py-2 text-xs text-zinc-600 whitespace-nowrap">—</td>
+                        </tr>
+                      );
+
+                      if (isZoneExpanded) {
+                        z.pons.forEach((pon: PonNode) => {
+                          rows.push(
+                            <tr
+                              key={`pon-${p.project_id}-${z.zoneNo ?? 'null'}-${pon.ponNo ?? 'null'}`}
+                              className="bg-[var(--ff-bg-tertiary)]/15 hover:bg-[var(--ff-bg-hover)] transition-colors"
+                            >
+                              <td className="px-3 py-2 text-xs whitespace-nowrap pl-12">
+                                <div className="flex items-center gap-1">
+                                  <span className="w-3.5 inline-block flex-shrink-0" />
+                                  <span className="text-zinc-400">{pon.label}</span>
+                                </div>
+                              </td>
+
+                              <td className="px-3 py-2 text-xs tabular-nums whitespace-nowrap text-right bg-zinc-100/5">
+                                <span className="font-medium text-zinc-200">{pon.total}</span>
+                              </td>
+
+                              <CountCell value={pon.open} colorClass="text-red-300" bgClass="bg-red-900/20" />
+                              <CountCell value={pon.in_progress} colorClass="text-amber-300" bgClass="bg-amber-900/20" />
+                              <CountCell value={pon.fixed} colorClass="text-blue-300" bgClass="bg-blue-900/20" />
+                              <CountCell value={pon.verified} colorClass="text-green-300" bgClass="bg-green-900/20" />
+                              <CountCell value={pon.closed} colorClass="text-green-300" bgClass="bg-green-900/20" />
+                              <CountCell value={pon.reopened} colorClass="text-red-300" bgClass="bg-red-900/20" />
+
+                              <td className="px-3 py-2 text-xs text-zinc-600 whitespace-nowrap">—</td>
+                            </tr>
+                          );
+                        });
+                      }
+                    });
+                  }
+
+                  return rows;
+                })}
 
               {/* Totals row */}
-              {!isLoading && stats.length > 0 && (
+              {!isLoading && projects.length > 0 && (
                 <tr className="bg-[var(--ff-bg-tertiary)] border-t-2 border-[var(--ff-border-light)]">
                   <td className="px-3 py-2 text-xs font-bold text-zinc-200 whitespace-nowrap">
                     Totals
