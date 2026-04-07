@@ -18,6 +18,7 @@ import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, getAuthUser } from '@/lib/auth';
 import { createTicket } from '@/modules/noc/services/ticketService';
+import { notifySnagGroupOnCreate } from '@/modules/noc/services/snagGroupNotifications';
 import {
   TicketSource,
   TicketType,
@@ -214,6 +215,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       snag_id,
       ticket_id: ticket.id,
       ticket_uid: ticket.ticket_uid,
+    });
+
+    // 3b. Fire WhatsApp group notification (non-blocking)
+    notifySnagGroupOnCreate(ticket).catch(err => {
+      log.warn('Snag WA group notification failed', { ticketId: ticket.id, error: err });
     });
 
     // Attach noc_ticket_uid for immediate UI use
