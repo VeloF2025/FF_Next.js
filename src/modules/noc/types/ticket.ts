@@ -53,6 +53,7 @@ export enum TicketSource {
   PP_DATA = 'pp_data', // From PP Data investigation
   OLT_MISMATCH = 'olt_mismatch', // From OLT report serial mismatch
   DEV_OPS = 'dev_ops', // FibreFlow application issues
+  SNAGS = 'snags', // From TQR snag reports
 }
 
 /**
@@ -74,6 +75,8 @@ export enum TicketType {
   PRE_PROVISION = 'pre_provision', // PP Data ONT investigation
   // DevOps
   DEV_OPS = 'dev_ops', // FibreFlow application bug/error/feature
+  // Construction quality
+  SNAG = 'snag', // Construction quality snag from TQR audit
 }
 
 /**

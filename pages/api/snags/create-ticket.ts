@@ -22,6 +22,7 @@ import {
   TicketSource,
   TicketType,
   TicketPriority,
+  TicketStatus,
 } from '@/modules/noc/types/ticket';
 import type { Snag, SnagCategory, SnagSeverity } from '@/modules/construction-qa/types/snag.types';
 
@@ -32,21 +33,9 @@ const sql = neon(process.env.DATABASE_URL!);
 // ============================================================
 
 /** Map snag category → NOC ticket type */
-function mapCategoryToTicketType(category: SnagCategory): TicketType {
-  switch (category) {
-    case 'safety':
-      return TicketType.FAULT_REPAIR;
-    case 'quality':
-      return TicketType.FAULT_REPAIR;
-    case 'health':
-      return TicketType.FAULT_REPAIR;
-    case 'environment':
-      return TicketType.FAULT_REPAIR;
-    case 'traffic':
-      return TicketType.FAULT_REPAIR;
-    default:
-      return TicketType.FAULT_REPAIR;
-  }
+function mapCategoryToTicketType(_category: SnagCategory): TicketType {
+  // All snag categories map to the dedicated SNAG ticket type
+  return TicketType.SNAG;
 }
 
 /** Map snag severity → ticket priority */
@@ -127,6 +116,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       );
     }
 
+    // 1b. Resolve project site manager for auto-assignment
+    let siteManagerId: string | undefined;
+    if (snag.project_id) {
+      const managerRows = await sql`
+        SELECT person_id FROM v_project_team
+        WHERE project_id = ${snag.project_id}
+          AND is_primary = true
+          AND person_type = 'staff'
+        LIMIT 1
+      ` as Array<{ person_id: string }>;
+      siteManagerId = managerRows[0]?.person_id ?? undefined;
+    }
+
     // 2. Build ticket payload
     const rawTitle = `[SNAG] #${snag.snag_number} - ${snag.description}`;
     const title = rawTitle.length > 100 ? rawTitle.slice(0, 97) + '...' : rawTitle;
@@ -149,7 +151,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     ].filter(Boolean);
 
     const ticket = await createTicket({
-      source: TicketSource.CONSTRUCTION,
+      source: TicketSource.SNAGS,
       source_type: 'snag',
       title,
       description: descParts.join('\n'),
@@ -164,6 +166,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       pon_number: snag.resolved_pon != null ? String(snag.resolved_pon) : undefined,
       address: gpsStr ?? undefined,
       external_id: JSON.stringify({ snag_id: snag.id, tags: ['snag', snag.category] }),
+      // Auto-assign to project site manager if found
+      ...(siteManagerId && {
+        assigned_to: siteManagerId,
+        status: TicketStatus.ASSIGNED,
+      }),
     });
 
     // 2b. Set GPS coordinates on ticket (not available in CreateTicketPayload)

@@ -24,12 +24,14 @@ import type {
 export interface SnagSummary {
   total: number;
   open: number;
+  assigned: number;
   in_progress: number;
+  pending_qa: number;
   resolved: number;
   critical: number;
 }
 
-/** Fetch filter-aware 4-bucket count (no status filter — always shows full breakdown). */
+/** Fetch filter-aware count buckets aligned with NOC ticket stages. */
 export async function fetchSnagSummary(params: {
   projectId?: string;
   category?: string;

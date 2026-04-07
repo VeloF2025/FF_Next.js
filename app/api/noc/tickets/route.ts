@@ -27,6 +27,7 @@ import {
   triggerOnTicketAssignment,
   triggerOnTeamAssignment,
 } from '@/modules/noc/services/notificationTriggers';
+import { notifySnagGroupOnCreate } from '@/modules/noc/services/snagGroupNotifications';
 import {
   TicketSource,
   TicketType,
@@ -51,6 +52,7 @@ const VALID_SOURCES: TicketSource[] = [
   TicketSource.MANUAL,
   TicketSource.PP_DATA,
   TicketSource.DEV_OPS,
+  TicketSource.SNAGS,
 ];
 
 const VALID_TYPES: TicketType[] = [
@@ -65,6 +67,7 @@ const VALID_TYPES: TicketType[] = [
   TicketType.HSE_INCIDENT,
   TicketType.HSE_NEAR_MISS,
   TicketType.DEV_OPS,
+  TicketType.SNAG,
 ];
 
 const VALID_PRIORITIES: TicketPriority[] = [
@@ -277,6 +280,11 @@ export async function POST(req: NextRequest) {
         logger.error('Team assignment notification error on create', { ticketId: ticket.id, error: err.message });
       });
     }
+
+    // Snag tickets: notify project WhatsApp group (non-blocking)
+    notifySnagGroupOnCreate(ticket).catch(err => {
+      logger.error('Snag WA group notification error on create', { ticketId: ticket.id, error: err.message });
+    });
 
     return NextResponse.json(
       {
