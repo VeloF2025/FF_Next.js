@@ -17,6 +17,7 @@ import {
   TicketSource,
   TicketType,
   TicketPriority,
+  TicketStatus,
 } from '@/modules/noc/types/ticket';
 import type { Snag, SnagSeverity } from '@/modules/construction-qa/types/snag.types';
 
@@ -28,7 +29,8 @@ const sql = neon(process.env.DATABASE_URL!);
 // ============================================================
 
 function mapCategoryToTicketType(_category: string): TicketType {
-  return TicketType.FAULT_REPAIR;
+  // All snag categories map to the dedicated SNAG ticket type
+  return TicketType.SNAG;
 }
 
 function mapSeverityToPriority(severity: SnagSeverity): TicketPriority {
@@ -80,6 +82,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.success(res, { created: 0, skipped: 0, errors: 0 });
     }
 
+    // Resolve project site manager once per batch (all snags share the same project)
+    let siteManagerId: string | undefined;
+    const projectId = openSnags[0]?.project_id;
+    if (projectId) {
+      const managerRows = await sql`
+        SELECT person_id FROM v_project_team
+        WHERE project_id = ${projectId}
+          AND is_primary = true
+          AND person_type = 'staff'
+        LIMIT 1
+      ` as Array<{ person_id: string }>;
+      siteManagerId = managerRows[0]?.person_id ?? undefined;
+    }
+
     let created = 0;
     let errors = 0;
 
@@ -99,7 +115,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ].filter(Boolean);
 
         const ticket = await createTicket({
-          source: TicketSource.CONSTRUCTION,
+          source: TicketSource.SNAGS,
           source_type: 'snag',
           title,
           description: descParts.join('\n'),
@@ -109,6 +125,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           uid_prefix: 'SNG',
           created_by: user?.id ?? undefined,
           external_id: JSON.stringify({ snag_id: snag.id, tags: ['snag', snag.category] }),
+          // Auto-assign to project site manager if found
+          ...(siteManagerId && {
+            assigned_to: siteManagerId,
+            status: TicketStatus.ASSIGNED,
+          }),
         });
 
         await sql`

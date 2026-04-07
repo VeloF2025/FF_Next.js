@@ -34,10 +34,22 @@ const TILES: TileConfig[] = [
     value: 'text-red-300',
   },
   {
+    label: 'Assigned',
+    key: 'assigned',
+    container: 'bg-blue-900/20 border-blue-800/40',
+    value: 'text-blue-300',
+  },
+  {
     label: 'In Progress',
     key: 'in_progress',
     container: 'bg-amber-900/20 border-amber-800/40',
     value: 'text-amber-300',
+  },
+  {
+    label: 'Pending QA',
+    key: 'pending_qa',
+    container: 'bg-purple-900/20 border-purple-800/40',
+    value: 'text-purple-300',
   },
   {
     label: 'Resolved',
@@ -60,7 +72,7 @@ function SkeletonNumber() {
 /** 5 filter-aware count tiles */
 export function SnagCountTiles({ summary, isLoading }: SnagCountTilesProps) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
       {TILES.map((tile) => (
         <div
           key={tile.key}

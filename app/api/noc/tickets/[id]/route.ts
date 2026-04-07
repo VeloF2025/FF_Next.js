@@ -17,6 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { neon } from '@neondatabase/serverless';
 import { createLogger } from '@/lib/logger';
 import { verifyToken } from '@/lib/auth/jwt';
 import {
@@ -40,6 +41,7 @@ import type { UpdateTicketPayload } from '@/modules/noc/types/ticket';
 import { TicketStatus } from '@/modules/noc/types/ticket';
 
 const logger = createLogger('maintenance:api:tickets:id');
+const sql = neon(process.env.DATABASE_URL!);
 
 /**
  * UUID validation regex
@@ -311,6 +313,19 @@ export async function PUT(
         .catch(err => {
           logger.error('Data Sync resolution error', { ticketId, error: err.message });
         });
+    }
+
+    // Bi-directional sync: propagate NOC status back to linked snag
+    // resolved → snag.status = 'fixed'; closed → snag.status = 'closed'
+    if (body.status && ['resolved', 'closed'].includes(body.status) && updatedTicket.source === 'snags') {
+      const snagStatus = body.status === 'resolved' ? 'fixed' : 'closed';
+      sql`
+        UPDATE snags
+        SET status = ${snagStatus}, updated_at = NOW()
+        WHERE noc_ticket_id = ${ticketId}
+      `.catch(err => {
+        logger.error('Snag status sync error', { ticketId, snagStatus, error: err instanceof Error ? err.message : String(err) });
+      });
     }
 
     return NextResponse.json({

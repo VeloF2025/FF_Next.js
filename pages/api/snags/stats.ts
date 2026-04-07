@@ -19,23 +19,47 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
+    // Use NOC ticket status when a ticket is linked, otherwise fall back to snag status.
+    // This ensures counts reflect real NOC workflow progress.
     const rows = await sql`
       SELECT
         p.id                    AS project_id,
         p.project_name                  AS project_name,
         COUNT(s.id)             AS total,
-        COUNT(s.id) FILTER (WHERE s.status = 'open')        AS open,
-        COUNT(s.id) FILTER (WHERE s.status = 'assigned')    AS assigned,
-        COUNT(s.id) FILTER (WHERE s.status = 'in_progress') AS in_progress,
-        COUNT(s.id) FILTER (WHERE s.status = 'fixed')       AS fixed,
-        COUNT(s.id) FILTER (WHERE s.status = 'verified')    AS verified,
-        COUNT(s.id) FILTER (WHERE s.status = 'closed')      AS closed,
-        COUNT(s.id) FILTER (WHERE s.status = 'reopened')    AS reopened,
+        COUNT(s.id) FILTER (WHERE
+          CASE WHEN t.id IS NOT NULL THEN t.status = 'open'
+               ELSE s.status = 'open' END
+        ) AS open,
+        COUNT(s.id) FILTER (WHERE
+          CASE WHEN t.id IS NOT NULL THEN t.status = 'assigned'
+               ELSE s.status = 'assigned' END
+        ) AS assigned,
+        COUNT(s.id) FILTER (WHERE
+          CASE WHEN t.id IS NOT NULL THEN t.status = 'in_progress'
+               ELSE s.status = 'in_progress' END
+        ) AS in_progress,
+        COUNT(s.id) FILTER (WHERE
+          CASE WHEN t.id IS NOT NULL THEN t.status IN ('pending_qa','qa_in_progress','qa_rejected')
+               ELSE s.status = 'fixed' END
+        ) AS fixed,
+        COUNT(s.id) FILTER (WHERE
+          CASE WHEN t.id IS NOT NULL THEN t.status IN ('qa_approved','pending_handover','handed_to_ops')
+               ELSE s.status = 'verified' END
+        ) AS verified,
+        COUNT(s.id) FILTER (WHERE
+          CASE WHEN t.id IS NOT NULL THEN t.status IN ('resolved','closed')
+               ELSE s.status = 'closed' END
+        ) AS closed,
+        COUNT(s.id) FILTER (WHERE
+          CASE WHEN t.id IS NOT NULL THEN FALSE
+               ELSE s.status = 'reopened' END
+        ) AS reopened,
         lr.report_number        AS latest_report_number,
         lr.audit_date           AS latest_report_date,
         lr.id                   AS latest_report_id
       FROM projects p
       INNER JOIN snags s ON s.project_id = p.id
+      LEFT JOIN maintenance_tickets t ON t.id = s.noc_ticket_id
       LEFT JOIN LATERAL (
         SELECT id, report_number, audit_date
         FROM snag_reports sr

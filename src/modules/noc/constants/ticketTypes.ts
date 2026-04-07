@@ -59,6 +59,13 @@ export const TICKET_TYPE_DEFINITIONS: Record<TicketType, TicketTypeMetadata> = {
     icon: 'Warning',
     requiresDR: false,
   },
+  [TicketType.SNAG]: {
+    value: TicketType.SNAG,
+    label: 'Snag',
+    description: 'Construction quality snag from TQR audit',
+    icon: 'BugReport',
+    requiresDR: false,
+  },
 };
 
 /**
@@ -191,6 +198,13 @@ export const TICKET_SOURCE_DEFINITIONS: Record<TicketSource, TicketSourceMetadat
     description: 'Manually created via FibreFlow UI',
     icon: 'Person',
     automated: false,
+  },
+  [TicketSource.SNAGS]: {
+    value: TicketSource.SNAGS,
+    label: 'Snags',
+    description: 'From TQR snag reports',
+    icon: 'BugReport',
+    automated: true,
   },
 };
 

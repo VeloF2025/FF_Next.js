@@ -288,6 +288,7 @@ export default function TicketsListPageClient() {
               <option value="ont_swap">ONT Swap</option>
               <option value="pre_provision">Pre-Provision</option>
               <option value="serial_mismatch">Serial Mismatch</option>
+              <option value="snag">Snag</option>
             </select>
             <select
               value={filterSource}
@@ -308,6 +309,7 @@ export default function TicketsListPageClient() {
               <option value="qa_review">QA Review</option>
               <option value="qcontact">QContact</option>
               <option value="wa_maintenance">WhatsApp</option>
+              <option value="snags">Snags</option>
               <option value="weekly_report">Weekly Report</option>
             </select>
             <select
