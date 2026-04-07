@@ -637,12 +637,24 @@ export function resetDefaultNotificationTriggerService(): void {
 /**
  * Resolve a staff.id to the corresponding users.id by matching email.
  * Ticket assigned_to references staff.id, but notifications need users.id.
- * Delegates to the service singleton's lookupUserByStaffId to avoid duplicate SQL.
  */
-async function resolveUserIdFromStaff(staffId: string): Promise<string | null> {
-  const service = getDefaultNotificationTriggerService();
-  const user = await service['lookupUserByStaffId'](staffId);
-  return user?.id ?? null;
+async function resolveUserIdFromStaff(staffId: string): Promise<UserLookup | null> {
+  try {
+    return await queryOne<UserLookup>(
+      `SELECT u.id, u.first_name || ' ' || u.last_name AS name, u.phone_number AS phone
+       FROM staff s
+       JOIN users u ON LOWER(u.email) = LOWER(s.email)
+       WHERE s.id = $1 AND u.is_active = TRUE
+       LIMIT 1`,
+      [staffId]
+    );
+  } catch (error) {
+    logger.error('Failed to resolve user from staff', {
+      error: error instanceof Error ? error.message : 'Unknown',
+      staffId,
+    });
+    return null;
+  }
 }
 
 // ============================================================================
@@ -682,8 +694,8 @@ export async function triggerOnTicketAssignment(
 ): Promise<TriggerResult> {
   // ticket.assigned_to is staff.id — resolve to users.id for email/in-app
   if (ticket.assigned_to) {
-    const userId = await resolveUserIdFromStaff(ticket.assigned_to);
-    if (userId) {
+    const assignee = await resolveUserIdFromStaff(ticket.assigned_to);
+    if (assignee) {
       const emailPayload = {
         event_type: 'noc.ticket_assigned',
         title: `Ticket ${ticket.ticket_uid} assigned to you`,
@@ -691,11 +703,11 @@ export async function triggerOnTicketAssignment(
         action_url: `/noc/tickets/${ticket.id}`,
         source_module: 'maintenance',
         source_id: ticket.id,
-        recipient_user_ids: [userId],
+        recipient_user_ids: [assignee.id],
       };
 
       notify(emailPayload).catch(() => {});
-      deliverEmail(userId, emailPayload, null).catch((err) => {
+      deliverEmail(assignee.id, emailPayload, null).catch((err) => {
         logger.error('Failed to send assignment email', { error: err, ticket_id: ticket.id });
       });
     } else {
@@ -730,8 +742,8 @@ export async function triggerOnQARejection(
 ): Promise<TriggerResult> {
   // ticket.assigned_to is staff.id — resolve to users.id
   if (ticket.assigned_to) {
-    const userId = await resolveUserIdFromStaff(ticket.assigned_to);
-    if (userId) {
+    const assignee = await resolveUserIdFromStaff(ticket.assigned_to);
+    if (assignee) {
       notify({
         event_type: 'noc.qa_rejected',
         title: `Ticket ${ticket.ticket_uid} rejected by QA`,
@@ -739,7 +751,7 @@ export async function triggerOnQARejection(
         action_url: `/app/noc/tickets/${ticket.id}`,
         source_module: 'maintenance',
         source_id: ticket.id,
-        recipient_user_ids: [userId],
+        recipient_user_ids: [assignee.id],
       }).catch((err) => {
         logger.error('Failed to send QA rejection notification', { error: err, ticketId: ticket.id });
       });
@@ -772,15 +784,15 @@ export async function triggerOnQARejection(
 export async function triggerOnTicketClosure(ticket: Ticket): Promise<TriggerResult> {
   // ticket.assigned_to is staff.id — resolve to users.id
   if (ticket.assigned_to) {
-    const userId = await resolveUserIdFromStaff(ticket.assigned_to);
-    if (userId) {
+    const assignee = await resolveUserIdFromStaff(ticket.assigned_to);
+    if (assignee) {
       notify({
         event_type: 'noc.ticket_closed',
         title: `Ticket ${ticket.ticket_uid} closed`,
         action_url: `/app/noc/tickets/${ticket.id}`,
         source_module: 'maintenance',
         source_id: ticket.id,
-        recipient_user_ids: [userId],
+        recipient_user_ids: [assignee.id],
       }).catch((err) => {
         logger.error('Failed to send closure notification', { error: err, ticketId: ticket.id });
       });
@@ -812,8 +824,8 @@ export async function triggerOnTicketClosure(ticket: Ticket): Promise<TriggerRes
 export async function triggerOnSLAWarning(ticket: Ticket): Promise<TriggerResult> {
   // ticket.assigned_to is staff.id — resolve to users.id
   if (ticket.assigned_to) {
-    const userId = await resolveUserIdFromStaff(ticket.assigned_to);
-    if (userId) {
+    const assignee = await resolveUserIdFromStaff(ticket.assigned_to);
+    if (assignee) {
       notify({
         event_type: 'noc.sla_warning',
         title: `SLA Warning — Ticket ${ticket.ticket_uid}`,
@@ -823,7 +835,7 @@ export async function triggerOnSLAWarning(ticket: Ticket): Promise<TriggerResult
         action_url: `/app/noc/tickets/${ticket.id}`,
         source_module: 'maintenance',
         source_id: ticket.id,
-        recipient_user_ids: [userId],
+        recipient_user_ids: [assignee.id],
       }).catch(() => {});
     }
   }
@@ -1099,8 +1111,8 @@ export async function triggerOnReassignment(
 ): Promise<void> {
   // Notify old assignee they've been unassigned
   if (oldAssignedTo) {
-    const oldUserId = await resolveUserIdFromStaff(oldAssignedTo);
-    if (oldUserId) {
+    const oldAssignee = await resolveUserIdFromStaff(oldAssignedTo);
+    if (oldAssignee) {
       const unassignPayload = {
         event_type: 'noc.ticket_unassigned',
         title: `Ticket ${ticket.ticket_uid} — you have been unassigned`,
@@ -1108,7 +1120,7 @@ export async function triggerOnReassignment(
         action_url: `/noc/tickets/${ticket.id}`,
         source_module: 'maintenance',
         source_id: ticket.id,
-        recipient_user_ids: [oldUserId],
+        recipient_user_ids: [oldAssignee.id],
       };
 
       notify(unassignPayload).catch((err) => {
@@ -1117,7 +1129,7 @@ export async function triggerOnReassignment(
         });
       });
 
-      deliverEmail(oldUserId, unassignPayload, null).catch((err) => {
+      deliverEmail(oldAssignee.id, unassignPayload, null).catch((err) => {
         logger.error('Failed to send unassign email', {
           error: err, ticket_id: ticket.id,
         });
@@ -1126,7 +1138,7 @@ export async function triggerOnReassignment(
       logger.info('Old assignee unassign notification dispatched', {
         ticket_id: ticket.id,
         old_staff_id: oldAssignedTo,
-        old_user_id: oldUserId,
+        old_user_id: oldAssignee.id,
       });
     }
   }
@@ -1138,9 +1150,8 @@ export async function triggerOnReassignment(
       // Resolve new assignee name for the email
       let newAssigneeName = 'Unassigned';
       if (ticket.assigned_to) {
-        const service = getDefaultNotificationTriggerService();
-        const newUser = await service['lookupUserByStaffId'](ticket.assigned_to);
-        if (newUser) newAssigneeName = newUser.name;
+        const newAssignee = await resolveUserIdFromStaff(ticket.assigned_to);
+        if (newAssignee) newAssigneeName = newAssignee.name;
       }
 
       const reassignPayload = {

@@ -12,14 +12,14 @@
 
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { User, Users, UserPlus, Save, X } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserSelector } from './UserSelector';
 import { TeamSelector } from './TeamSelector';
-import { useAssignTicket } from '../../hooks/useAssignment';
+import { useAssignTicket, useUsersForAssignment } from '../../hooks/useAssignment';
 import type { UserDropdownOption, TeamDropdownOption } from '../../types/team';
 
 interface AssignmentPanelProps {
@@ -53,6 +53,7 @@ export function AssignmentPanel({
 }: AssignmentPanelProps) {
   const { user } = useAuth();
   const assignTicket = useAssignTicket();
+  const { users: staffList } = useUsersForAssignment();
 
   // Local state for selection (before saving)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(currentUserId);
@@ -78,26 +79,32 @@ export function AssignmentPanel({
     if (!isEditing) setIsEditing(true);
   }, [isEditing]);
 
+  // Resolve current user's staff.id from the staff dropdown list (matched by email)
+  const myStaffRecord = useMemo(
+    () => staffList.find((s) => s.email?.toLowerCase() === user?.email?.toLowerCase()),
+    [staffList, user?.email]
+  );
+
   // Handle "Assign to Me" quick action
   const handleAssignToMe = useCallback(() => {
-    if (!user?.uid) return;
+    if (!myStaffRecord?.id) return;
 
     assignTicket.mutate(
       {
         ticketId,
-        assigned_to: user.uid,
+        assigned_to: myStaffRecord.id,
         assigned_team_id: currentTeamId,
       },
       {
         onSuccess: () => {
-          setSelectedUserId(user.uid);
-          setSelectedUserName(user.displayName || user.email || 'Me');
+          setSelectedUserId(myStaffRecord.id);
+          setSelectedUserName(myStaffRecord.name || user?.displayName || 'Me');
           setIsEditing(false);
           onAssignmentSaved?.();
         },
       }
     );
-  }, [user, ticketId, currentTeamId, assignTicket, onAssignmentSaved]);
+  }, [myStaffRecord, user, ticketId, currentTeamId, assignTicket, onAssignmentSaved]);
 
   // Handle save assignment
   const handleSave = useCallback(() => {
@@ -126,7 +133,7 @@ export function AssignmentPanel({
   }, [currentUserId, currentTeamId, currentUserName, currentTeamName]);
 
   const isLoading = assignTicket.isPending;
-  const isAssignedToMe = currentUserId === user?.uid;
+  const isAssignedToMe = currentUserId === myStaffRecord?.id;
 
   return (
     <div className={cn(
@@ -222,7 +229,7 @@ export function AssignmentPanel({
           <button
             type="button"
             onClick={handleAssignToMe}
-            disabled={isLoading}
+            disabled={isLoading || !myStaffRecord}
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
               'bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-tertiary)]',
@@ -231,7 +238,7 @@ export function AssignmentPanel({
               'disabled:opacity-50 disabled:cursor-not-allowed'
             )}
           >
-            {isLoading && assignTicket.variables?.assigned_to === user?.uid ? (
+            {isLoading && assignTicket.variables?.assigned_to === myStaffRecord?.id ? (
               <InlineSpinner size="sm" />
             ) : (
               <UserPlus className="w-3.5 h-3.5" />
@@ -253,7 +260,7 @@ export function AssignmentPanel({
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
             >
-              {isLoading && assignTicket.variables?.assigned_to !== user?.uid ? (
+              {isLoading && assignTicket.variables?.assigned_to !== myStaffRecord?.id ? (
                 <InlineSpinner size="sm" />
               ) : (
                 <Save className="w-3.5 h-3.5" />
