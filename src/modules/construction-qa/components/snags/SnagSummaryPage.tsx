@@ -119,11 +119,21 @@ export function SnagSummaryPage() {
     const rows: Record<string, string | number>[] = [];
 
     for (const p of projects) {
-      rows.push({ Tier: 'Project', Label: p.project_name, Project: p.project_name, Total: p.total, Open: p.open, Assigned: p.assigned, 'In Progress': p.in_progress, Fixed: p.fixed, Verified: p.verified, Closed: p.closed, Reopened: p.reopened });
       for (const z of p.zones) {
-        rows.push({ Tier: 'Zone', Label: z.label, Project: p.project_name, Total: z.total, Open: z.open, Assigned: z.assigned, 'In Progress': z.in_progress, Fixed: z.fixed, Verified: z.verified, Closed: z.closed, Reopened: z.reopened });
         for (const pon of z.pons) {
-          rows.push({ Tier: 'PON', Label: pon.label, Project: p.project_name, Total: pon.total, Open: pon.open, Assigned: pon.assigned, 'In Progress': pon.in_progress, Fixed: pon.fixed, Verified: pon.verified, Closed: pon.closed, Reopened: pon.reopened });
+          rows.push({
+            'Project Name': p.project_name,
+            Zone: z.zoneNo !== null ? z.zoneNo : 'Unassigned',
+            PON: pon.ponNo !== null ? pon.ponNo : 'Unassigned',
+            Total: pon.total,
+            Open: pon.open,
+            Assigned: pon.assigned,
+            'In Progress': pon.in_progress,
+            Fixed: pon.fixed,
+            Verified: pon.verified,
+            Closed: pon.closed,
+            Reopened: pon.reopened,
+          });
         }
       }
     }
