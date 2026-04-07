@@ -22,8 +22,9 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app';
 // =============================================================================
 
 /**
- * Resolve a ticket's project to a WhatsApp group JID.
- * Returns null if no group is configured or enabled.
+ * Resolve a ticket's project to a snags-specific WhatsApp group JID.
+ * Looks up wa_group_config where group_type = 'snags'.
+ * Returns null if no snags group is configured or enabled.
  */
 async function resolveGroupJid(projectId: string): Promise<string | null> {
   try {
@@ -32,6 +33,7 @@ async function resolveGroupJid(projectId: string): Promise<string | null> {
       FROM projects p
       JOIN wa_group_config wg ON LOWER(wg.project_name) = LOWER(p.project_name)
       WHERE p.id = ${projectId}::uuid
+        AND wg.group_type = 'snags'
         AND wg.enabled = true
       LIMIT 1
     ` as Array<{ group_jid: string }>;
