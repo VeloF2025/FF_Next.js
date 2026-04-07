@@ -440,21 +440,22 @@ export async function getTicketById(id: string): Promise<Ticket> {
   logger.debug('Fetching ticket by ID', { id });
 
   try {
-    // Include assigned user and team info via LEFT JOINs
+    // Include assigned staff and team info via LEFT JOINs
+    // assigned_to references staff.id, not users.id
     const sql = `
       SELECT
         t.*,
         CASE
-          WHEN u.id IS NOT NULL THEN jsonb_build_object(
-            'id', u.id,
-            'name', COALESCE(u.first_name || ' ' || u.last_name, u.email),
-            'email', u.email
+          WHEN s.id IS NOT NULL THEN jsonb_build_object(
+            'id', s.id,
+            'name', COALESCE(s.first_name || ' ' || s.last_name, s.email),
+            'email', s.email
           )
           ELSE NULL
         END as assigned_user,
         tm.name as assigned_team_name
       FROM maintenance_tickets t
-      LEFT JOIN users u ON t.assigned_to = u.id
+      LEFT JOIN staff s ON t.assigned_to = s.id
       LEFT JOIN teams tm ON t.assigned_team_id = tm.id
       WHERE t.id = $1
     `;
@@ -788,16 +789,16 @@ export async function listTickets(
         t.*,
         t.type as ticket_type,
         CASE
-          WHEN u.id IS NOT NULL THEN jsonb_build_object(
-            'id', u.id,
-            'name', COALESCE(u.first_name || ' ' || u.last_name, u.email),
-            'email', u.email
+          WHEN s.id IS NOT NULL THEN jsonb_build_object(
+            'id', s.id,
+            'name', COALESCE(s.first_name || ' ' || s.last_name, s.email),
+            'email', s.email
           )
           ELSE NULL
         END as assigned_user,
         tm.name as assigned_team_name
       FROM maintenance_tickets t
-      LEFT JOIN users u ON t.assigned_to = u.id
+      LEFT JOIN staff s ON t.assigned_to = s.id
       LEFT JOIN teams tm ON t.assigned_team_id = tm.id
       ${whereClause ? whereClause.replace(/\b(status|type|priority|source|assigned_to|contractor_id|project_id|dr_number|qa_verified|sla_breached|assigned_team_id|ticket_uid|title|description|created_at)\b/g, 't.$1') : ''}
       ORDER BY t.created_at DESC

@@ -5,6 +5,8 @@
  * @module notifications/services/emailDelivery
  */
 
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import type { NotifyPayload } from '../types';
@@ -13,6 +15,15 @@ const sql = neon(process.env.DATABASE_URL!);
 
 const FROM_ADDRESS = 'FibreFlow <notifications@fibreflow.app>';
 const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app';
+
+// Pre-load logo as base64 for inline email embedding (CID attachment)
+let logoBase64: string | null = null;
+try {
+  const logoPath = join(process.cwd(), 'public/assets/vf/velocity-fibre-logo.jpg');
+  logoBase64 = readFileSync(logoPath).toString('base64');
+} catch {
+  log.warn('Could not load logo for email embedding', {}, 'EmailDelivery');
+}
 
 /**
  * Send an email notification to a user.
@@ -106,7 +117,9 @@ function buildDefaultEmailHtml(payload: NotifyPayload, firstName: string): strin
   };
   const color = severityColors[payload.severity || 'info'] || '#3b82f6';
   const ctaUrl = payload.action_url ? `${APP_BASE_URL}${payload.action_url}` : APP_BASE_URL;
-  const logoUrl = `${APP_BASE_URL}/assets/vf/velocity-fibre-logo.jpg`;
+  const logoUrl = logoBase64
+    ? `data:image/jpeg;base64,${logoBase64}`
+    : `${APP_BASE_URL}/assets/vf/velocity-fibre-logo.jpg`;
 
   return `
 <!DOCTYPE html>

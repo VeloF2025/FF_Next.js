@@ -107,12 +107,10 @@ export function TicketListItem({ ticket, compact = false, onClick }: TicketListI
           )}
 
           {/* Assigned To */}
-          {ticket.assigned_to && (
-            <span className="flex items-center gap-1">
-              <User className="w-3 h-3" />
-              Assigned
-            </span>
-          )}
+          <span className="flex items-center gap-1">
+            <User className="w-3 h-3" />
+            {ticket.assigned_user?.name || ticket.assigned_team_name || 'Unassigned'}
+          </span>
 
           {/* Created Time */}
           <span className="flex items-center gap-1">

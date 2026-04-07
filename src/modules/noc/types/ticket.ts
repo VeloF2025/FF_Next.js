@@ -210,6 +210,10 @@ export interface Ticket {
   updated_at: Date;
   closed_at: Date | null;
   closed_by: string | null; // UUID reference to users
+
+  // Joined fields (from list/detail queries)
+  assigned_user?: { id: string; name: string; email: string } | null;
+  assigned_team_name?: string | null;
 }
 
 /**
