@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { FileSpreadsheet, Search, X } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import type { ProjectNode, ZoneNode, PonNode } from '../../types/snag.types';
 import { fetchSnagStats, fetchSnagHierarchyStats } from '../../services/snagService';
 import { buildHierarchy } from './snagHierarchyUtils';
@@ -115,42 +115,74 @@ export function SnagSummaryPage() {
     { total: 0, open: 0, assigned: 0, in_progress: 0, fixed: 0, verified: 0, closed: 0, reopened: 0 }
   );
 
-  function exportExcel() {
-    const rows: Record<string, string | number>[] = [];
+  async function exportExcel() {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Snag Summary');
 
+    const headers = ['Project Name', 'Zone', 'PON', 'Total', 'Open', 'Assigned', 'In Progress', 'Fixed', 'Verified', 'Closed', 'Reopened'];
+    ws.addRow(headers);
+
+    // Style header row
+    const headerRow = ws.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
+    headerRow.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    headerRow.height = 20;
+
+    // Add data rows
     for (const p of projects) {
       for (const z of p.zones) {
         for (const pon of z.pons) {
-          rows.push({
-            'Project Name': p.project_name,
-            Zone: z.zoneNo !== null ? z.zoneNo : 'Unassigned',
-            PON: pon.ponNo !== null ? pon.ponNo : 'Unassigned',
-            Total: pon.total,
-            Open: pon.open,
-            Assigned: pon.assigned,
-            'In Progress': pon.in_progress,
-            Fixed: pon.fixed,
-            Verified: pon.verified,
-            Closed: pon.closed,
-            Reopened: pon.reopened,
-          });
+          ws.addRow([
+            p.project_name,
+            z.zoneNo !== null ? z.zoneNo : 'Unassigned',
+            pon.ponNo !== null ? pon.ponNo : 'Unassigned',
+            pon.total,
+            pon.open,
+            pon.assigned,
+            pon.in_progress,
+            pon.fixed,
+            pon.verified,
+            pon.closed,
+            pon.reopened,
+          ]);
         }
       }
     }
 
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Snag Summary');
-
-    // Auto-size columns
-    const colWidths = Object.keys(rows[0] ?? {}).map((key) => {
-      const maxLen = Math.max(key.length, ...rows.map((r) => String(r[key] ?? '').length));
-      return { wch: maxLen + 2 };
+    // Style data rows with alternating colors + borders
+    ws.eachRow((row, rowNum) => {
+      if (rowNum === 1) return; // Skip header
+      row.font = { size: 10, color: { argb: 'FFE5E7EB' } };
+      row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowNum % 2 === 0 ? 'FF1F2937' : 'FF111827' } };
+      row.alignment = { horizontal: 'right', vertical: 'middle' };
+      row.eachCell((cell) => {
+        cell.border = { top: { style: 'thin', color: { argb: 'FF374151' } }, bottom: { style: 'thin', color: { argb: 'FF374151' } }, left: { style: 'thin', color: { argb: 'FF374151' } }, right: { style: 'thin', color: { argb: 'FF374151' } } };
+      });
     });
-    ws['!cols'] = colWidths;
+
+    // Left-align text columns
+    ws.getColumn('A').alignment = { horizontal: 'left', vertical: 'middle' };
+    ws.getColumn('B').alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getColumn('C').alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // Set column widths
+    ws.columns = [
+      { width: 20 }, // Project Name
+      { width: 10 }, // Zone
+      { width: 10 }, // PON
+      { width: 10 }, // Total
+      { width: 10 }, // Open
+      { width: 12 }, // Assigned
+      { width: 14 }, // In Progress
+      { width: 10 }, // Fixed
+      { width: 12 }, // Verified
+      { width: 10 }, // Closed
+      { width: 12 }, // Reopened
+    ];
 
     const dateStr = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(wb, `snags-summary-${dateStr}.xlsx`);
+    await wb.xlsx.writeFile(`snags-summary-${dateStr}.xlsx`);
   }
 
   return (
@@ -185,7 +217,7 @@ export function SnagSummaryPage() {
           {!isLoading && projects.length > 0 && (
             <button
               type="button"
-              onClick={exportExcel}
+              onClick={() => void exportExcel()}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-200 transition-colors flex-shrink-0"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
