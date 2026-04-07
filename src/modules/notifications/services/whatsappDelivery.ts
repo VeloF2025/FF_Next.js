@@ -11,8 +11,8 @@ import type { NotifyPayload } from '../types';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-// WA Feedback proxy → bridge (for group messages)
-const WA_FEEDBACK_URL = process.env.WA_FEEDBACK_URL || 'http://100.96.203.105:8092';
+// WA Bridge on VPS (direct — legacy 8092 proxy is deprecated)
+const WA_FEEDBACK_URL = process.env.WA_BRIDGE_URL || process.env.WA_FEEDBACK_URL || 'http://72.61.197.178:8083';
 
 // WAHA API (for individual DMs) — proven in fleet-check-reminders.ts
 const WAHA_API_URL = process.env.WAHA_API_URL || 'http://100.96.203.105:3001';
