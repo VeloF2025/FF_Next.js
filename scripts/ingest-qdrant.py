@@ -8,16 +8,56 @@ Usage:
   python3 scripts/ingest-qdrant.py --source docs/INFRASTRUCTURE.md  # Single file
   python3 scripts/ingest-qdrant.py --dry-run    # Count chunks without embedding
 
-Reads .env.local for OPENAI_API_KEY and DATABASE_URL.
-Connects to Qdrant at localhost:6333 (must run on Velocity).
+Uses local Ollama nomic-embed-text (768-dim) for embeddings.
+Reads .env.local for DATABASE_URL (schema ingestion).
+Connects to Qdrant at localhost:6333 and GPU embed-server at localhost:11437 (must run on Velocity).
+
+Safety guards (ported from Ironman reindex-qdrant.py):
+- Lockfile prevents concurrent instances
+- Memory headroom check refuses to start if system is low on RAM
+- RSS limit kills the process if it exceeds 16GB
+- Chunk truncation for embedding input
+- Dimension validation on every vector
 """
 
 import argparse
+import fcntl
+import gc
 import hashlib
 import os
 import re
+import resource
 import sys
+import time
 from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Concurrency lock — only one ingestion at a time to prevent OOM
+# ---------------------------------------------------------------------------
+
+LOCK_PATH = "/tmp/reindex-qdrant.lock"
+_lock_fd = open(LOCK_PATH, "w")
+try:
+    fcntl.flock(_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except OSError:
+    print("ERROR: Another qdrant indexing process is already running. Exiting.")
+    sys.exit(1)
+
+# ---------------------------------------------------------------------------
+# Memory headroom check — refuse to start if system is low on RAM
+# ---------------------------------------------------------------------------
+
+try:
+    with open("/proc/meminfo") as f:
+        meminfo = {line.split(":")[0]: int(line.split()[1]) for line in f if len(line.split()) >= 2}
+    avail_gb = meminfo.get("MemAvailable", 0) / (1024 * 1024)
+    MIN_HEADROOM_GB = 8
+    if avail_gb < MIN_HEADROOM_GB:
+        print(f"ERROR: Only {avail_gb:.1f}GB available (minimum {MIN_HEADROOM_GB}GB required). Exiting to protect system stability.")
+        sys.exit(1)
+    print(f"Memory check: {avail_gb:.1f}GB available (minimum {MIN_HEADROOM_GB}GB)")
+except Exception as e:
+    print(f"Warning: Could not check available memory: {e}")
 
 # ---------------------------------------------------------------------------
 # Config
@@ -26,10 +66,13 @@ from pathlib import Path
 COLLECTION = "fibreflow_kb"
 QDRANT_HOST = "localhost"
 QDRANT_PORT = 6333
-EMBEDDING_MODEL = "text-embedding-3-small"
-EMBEDDING_DIM = 1536
-CHUNK_SIZE = 800        # max words per chunk
-EMBED_BATCH_SIZE = 50   # OpenAI batch limit
+OLLAMA_URL = "http://localhost:11437/v1/embeddings"
+EMBEDDING_MODEL = "nomic-embed-text"
+EMBEDDING_DIM = 768
+CHUNK_SIZE = 800          # max words per chunk
+MAX_EMBED_CHARS = 3200    # truncate text sent to Ollama (nomic context ~8k tokens)
+MAX_PAYLOAD_CHARS = 3000  # truncate content stored in payload
+RSS_LIMIT_MB = 16000      # kill if RSS exceeds this
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -207,49 +250,61 @@ def fetch_db_schema():
     return chunks
 
 # ---------------------------------------------------------------------------
-# Embedding
+# Embedding — local Ollama nomic-embed-text (768-dim)
 # ---------------------------------------------------------------------------
 
-def embed_texts(texts, api_key):
-    """Embed a list of texts via OpenAI API. Returns list of vectors."""
+EMBED_BATCH_SIZE = 20  # batch size for GPU embed-server
+
+
+def embed_texts(texts):
+    """Embed texts via local GPU embed-server (OpenAI-compatible API). Returns list of (index, vector) tuples."""
     import urllib.request
     import json
-    import time
 
-    all_embeddings = []
+    results = []
+
     for i in range(0, len(texts), EMBED_BATCH_SIZE):
-        batch = texts[i : i + EMBED_BATCH_SIZE]
+        batch = [t[:MAX_EMBED_CHARS] for t in texts[i : i + EMBED_BATCH_SIZE]]
+        batch = [t for t in batch if len(t) >= 10]
+        if not batch:
+            continue
+
         body = json.dumps({"model": EMBEDDING_MODEL, "input": batch}).encode()
 
         data = None
         for attempt in range(5):
             req = urllib.request.Request(
-                "https://api.openai.com/v1/embeddings",
+                OLLAMA_URL,
                 data=body,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
+                headers={"Content-Type": "application/json"},
             )
             try:
-                with urllib.request.urlopen(req, timeout=30) as resp:
+                with urllib.request.urlopen(req, timeout=60) as resp:
                     data = json.loads(resp.read())
                 break
             except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as e:
                 wait = 2 ** attempt
-                print(f"    Embed API error (attempt {attempt+1}/5): {e} — retrying in {wait}s")
+                print(f"    Embed error (attempt {attempt+1}/5): {e} — retrying in {wait}s")
                 time.sleep(wait)
+
         if data is None:
-            raise RuntimeError(f"OpenAI embeddings API failed after 5 retries for batch at index {i}")
+            print(f"    WARNING: Batch at index {i} failed after 5 retries. Skipping {len(batch)} chunks.")
+            continue
 
         for item in data["data"]:
-            all_embeddings.append(item["embedding"])
+            vec = item["embedding"]
+            idx = i + item["index"]
+            # Guardrail: validate dimension
+            if len(vec) != EMBEDDING_DIM:
+                print(f"    WARNING: Got {len(vec)}-dim vector, expected {EMBEDDING_DIM}. Skipping.")
+                continue
+            results.append((idx, vec))
 
         done = min(i + EMBED_BATCH_SIZE, len(texts))
-        if done < len(texts):
+        if done % 50 == 0 and done < len(texts):
             print(f"    Embedded {done}/{len(texts)} chunks...")
 
-    return all_embeddings
+    return results
 
 # ---------------------------------------------------------------------------
 # Deterministic point IDs
@@ -259,6 +314,18 @@ def point_id(source, chunk_index):
     """Deterministic int64 ID from source + chunk_index (so re-runs upsert, not duplicate)."""
     h = hashlib.sha256(f"{source}::{chunk_index}".encode()).hexdigest()
     return int(h[:15], 16)  # 60-bit int, fits Qdrant u64
+
+# ---------------------------------------------------------------------------
+# RSS check
+# ---------------------------------------------------------------------------
+
+def check_rss():
+    """Kill process if RSS exceeds limit."""
+    rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+    if rss_mb > RSS_LIMIT_MB:
+        print(f"\nERROR: RSS exceeded {RSS_LIMIT_MB}MB ({rss_mb:.0f}MB). Exiting to protect system.")
+        sys.exit(1)
+    return rss_mb
 
 # ---------------------------------------------------------------------------
 # Main
@@ -272,10 +339,6 @@ def main():
     args = parser.parse_args()
 
     load_env()
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key and not args.dry_run:
-        print("ERROR: Missing OPENAI_API_KEY")
-        sys.exit(1)
 
     from qdrant_client import QdrantClient
     from qdrant_client.models import (
@@ -285,20 +348,26 @@ def main():
 
     client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
 
-    # Ensure collection exists
+    # Ensure collection exists with correct dimensions
     collections = [c.name for c in client.get_collections().collections]
     if COLLECTION not in collections:
-        print(f"Creating collection '{COLLECTION}'...")
+        print(f"Creating collection '{COLLECTION}' ({EMBEDDING_DIM}-dim, cosine)...")
         client.create_collection(
             collection_name=COLLECTION,
             vectors_config=VectorParams(size=EMBEDDING_DIM, distance=Distance.COSINE),
         )
+    else:
+        # Validate existing collection dimensions
+        info = client.get_collection(COLLECTION)
+        existing_dim = info.config.params.vectors.size
+        if existing_dim != EMBEDDING_DIM:
+            print(f"ERROR: Collection '{COLLECTION}' has {existing_dim}-dim vectors but script expects {EMBEDDING_DIM}-dim.")
+            print(f"  Delete and recreate: curl -X DELETE http://localhost:6333/collections/{COLLECTION}")
+            sys.exit(1)
 
     # Get existing sources in collection
     existing_sources = set()
     if not args.force and not args.source:
-        scroll = client.scroll(COLLECTION, limit=1, with_payload=True, with_vectors=False)
-        # Fetch unique sources by scrolling
         offset = None
         batch_size = 100
         while True:
@@ -315,14 +384,16 @@ def main():
     # Discover sources
     sources = discover_sources(args.source)
     print(f"FibreFlow Qdrant Ingestion")
+    print(f"  Embedding: {EMBEDDING_MODEL} ({EMBEDDING_DIM}-dim, local Ollama)")
     print(f"  Sources found: {len(sources)}")
     print(f"  Mode: {'dry-run' if args.dry_run else 'force' if args.force else 'incremental'}")
     print()
 
     total_chunks = 0
     total_embedded = 0
+    total_failed = 0
 
-    for source_id, filepath in sources:
+    for si, (source_id, filepath) in enumerate(sources):
         print(f"  {source_id}")
 
         if not args.force and source_id in existing_sources:
@@ -351,31 +422,44 @@ def main():
                 ),
             )
 
-        # Embed
+        # Embed one at a time (Ollama doesn't batch)
         texts = [c["content"] for c in chunks]
-        embeddings = embed_texts(texts, api_key)
+        embedded = embed_texts(texts)
 
-        # Upsert points
+        # Upsert only successfully embedded points
         points = []
-        for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
+        for i, vec in embedded:
+            chunk = chunks[i]
             points.append(PointStruct(
                 id=point_id(source_id, i),
-                vector=emb,
+                vector=vec,
                 payload={
                     "source": chunk["source"],
                     "section": chunk["section"],
                     "chunk_index": i,
-                    "content": chunk["content"],
+                    "content": chunk["content"][:MAX_PAYLOAD_CHARS],
                     "metadata": {"ingested_by": "ingest-qdrant.py"},
                 },
             ))
+
+        source_failed = len(chunks) - len(embedded)
+        total_failed += source_failed
 
         # Upsert in batches of 100
         for j in range(0, len(points), 100):
             client.upsert(COLLECTION, points=points[j : j + 100])
 
-        total_embedded += len(chunks)
-        print(f"    Upserted {len(chunks)} points")
+        total_embedded += len(embedded)
+        msg = f"    Upserted {len(embedded)} points"
+        if source_failed:
+            msg += f" ({source_failed} failed)"
+        print(msg)
+
+        # Periodic memory check
+        if (si + 1) % 20 == 0:
+            gc.collect()
+            rss_mb = check_rss()
+            print(f"    [RSS: {rss_mb:.0f}MB]")
 
     # DB schema
     if not args.source:
@@ -398,36 +482,44 @@ def main():
                     )
 
                 texts = [c["content"] for c in schema_chunks]
-                embeddings = embed_texts(texts, api_key)
+                embedded = embed_texts(texts)
 
                 points = []
-                for i, (chunk, emb) in enumerate(zip(schema_chunks, embeddings)):
+                for i, vec in embedded:
+                    chunk = schema_chunks[i]
                     points.append(PointStruct(
                         id=point_id("db-schema", i),
-                        vector=emb,
+                        vector=vec,
                         payload={
                             "source": chunk["source"],
                             "section": chunk["section"],
                             "chunk_index": i,
-                            "content": chunk["content"],
+                            "content": chunk["content"][:MAX_PAYLOAD_CHARS],
                             "metadata": {"ingested_by": "ingest-qdrant.py"},
                         },
                     ))
 
+                schema_failed = len(schema_chunks) - len(embedded)
+                total_failed += schema_failed
+
                 for j in range(0, len(points), 100):
                     client.upsert(COLLECTION, points=points[j : j + 100])
 
-                total_embedded += len(schema_chunks)
-                print(f"    Upserted {len(schema_chunks)} points")
+                total_embedded += len(embedded)
+                print(f"    Upserted {len(embedded)} points")
 
     # Report
     info = client.get_collection(COLLECTION)
     print(f"\n{'=' * 50}")
-    print(f"  Chunks processed: {total_chunks}")
+    print(f"  Embedding:         {EMBEDDING_MODEL} ({EMBEDDING_DIM}-dim)")
+    print(f"  Chunks processed:  {total_chunks}")
     if not args.dry_run:
-        print(f"  Chunks embedded:  {total_embedded}")
+        print(f"  Chunks embedded:   {total_embedded}")
+        print(f"  Chunks failed:     {total_failed}")
     print(f"  Collection total:  {info.points_count} points")
     print(f"  Collection status: {info.status}")
+    rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+    print(f"  Peak RSS:          {rss_mb:.0f}MB")
     print(f"{'=' * 50}")
 
 

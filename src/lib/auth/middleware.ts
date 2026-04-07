@@ -245,18 +245,32 @@ export function withRole(requiredRole: AuthRole) {
 }
 
 /**
- * Permission-based access control middleware
+ * Permission-based access control middleware (DB-backed RBAC)
  * Must be used after withAuth
+ *
+ * Checks the full RBAC cascade: role_permissions → user_permission_overrides → ancestor blocking
+ * Uses userHasPermission() from @/lib/permissions which queries the database.
  */
-export function withPermission(requiredPermission: string) {
+export function withPermission(requiredPermission: string, action: 'view' | 'create' | 'edit' | 'delete' = 'view') {
   return (handler: AuthenticatedHandler): AuthenticatedHandler => {
     return async (req: NextApiRequest, res: NextApiResponse) => {
       const authReq = req as AuthenticatedNextApiRequest;
-      const hasPermission =
-        authReq.user.permissions.includes('all') ||
-        authReq.user.permissions.includes(requiredPermission);
 
-      if (!hasPermission) {
+      // Super admin bypass
+      if (authReq.user.role === 'super_admin') {
+        return handler(req, res);
+      }
+
+      const { userHasPermission } = await import('@/lib/permissions');
+      const allowed = await userHasPermission(authReq.user.id, requiredPermission, action);
+
+      if (!allowed) {
+        log.warn('Permission denied', {
+          userId: authReq.user.id,
+          email: authReq.user.email,
+          permission: requiredPermission,
+          action,
+        }, 'withPermission');
         return res.status(403).json({
           success: false,
           error: {

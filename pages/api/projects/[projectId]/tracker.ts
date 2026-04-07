@@ -5,10 +5,11 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
@@ -45,3 +46,5 @@ export default async function handler(
 
   return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
 }
+
+export default withAuth(handler);
