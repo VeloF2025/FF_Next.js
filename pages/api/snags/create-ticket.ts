@@ -123,8 +123,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const managerRows = await sql`
         SELECT person_id FROM v_project_team
         WHERE project_id = ${snag.project_id}
-          AND is_primary = true
           AND person_type = 'staff'
+          AND is_active = true
+          AND LOWER(role) = 'site manager'
         LIMIT 1
       ` as Array<{ person_id: string }>;
       siteManagerId = managerRows[0]?.person_id ?? undefined;
