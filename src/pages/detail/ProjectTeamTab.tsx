@@ -1,13 +1,36 @@
 /**
  * Project Team Tab Component
- * Sprint 1: Project Hub Foundation
- *
- * Displays unified team (staff + contractors) with primary manager
+ * Position-based team management with add/remove capability
  */
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { log } from '@/lib/logger';
+import {
+  Users, UserPlus, X, Search, Trash2, Crown,
+  HardHat, Cable, Wrench, ChevronDown,
+} from 'lucide-react';
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+const PROJECT_ROLES = [
+  'Project Manager',
+  'Site Manager',
+  'Civil Manager',
+  'Optical Manager',
+  'Technician',
+  'General',
+] as const;
+
+type ProjectRole = typeof PROJECT_ROLES[number];
+
+const ROLE_CONFIG: Record<ProjectRole, { icon: typeof Users; color: string; bgColor: string; singular: boolean }> = {
+  'Project Manager': { icon: Crown, color: 'text-amber-400', bgColor: 'bg-amber-500/10 border-amber-500/30', singular: true },
+  'Site Manager':    { icon: HardHat, color: 'text-blue-400', bgColor: 'bg-blue-500/10 border-blue-500/30', singular: true },
+  'Civil Manager':   { icon: Wrench, color: 'text-green-400', bgColor: 'bg-green-500/10 border-green-500/30', singular: true },
+  'Optical Manager': { icon: Cable, color: 'text-purple-400', bgColor: 'bg-purple-500/10 border-purple-500/30', singular: true },
+  'Technician':      { icon: Users, color: 'text-cyan-400', bgColor: 'bg-cyan-500/10 border-cyan-500/30', singular: false },
+  'General':         { icon: Users, color: 'text-gray-400', bgColor: 'bg-gray-500/10 border-gray-500/30', singular: false },
+};
 
 interface TeamMember {
   person_id: string;
@@ -18,65 +41,84 @@ interface TeamMember {
   role: string;
   is_active: boolean;
   is_primary: boolean;
-  start_date?: string;
 }
 
-interface PrimaryManager {
-  staff_id: string;
+interface SearchResult {
+  id: string;
   name: string;
-  role: string;
-  is_primary: boolean;
-}
-
-interface TeamData {
-  primaryManager: PrimaryManager | null;
-  members: TeamMember[];
-  stats: {
-    staff: number;
-    contractors: number;
-    total: number;
-  };
+  type: 'staff' | 'contractor';
+  position?: string;
+  email?: string;
 }
 
 interface ProjectTeamTabProps {
   projectId: string;
 }
 
+// ── Main Component ─────────────────────────────────────────────────────────────
+
 export function ProjectTeamTab({ projectId }: ProjectTeamTabProps) {
-  const router = useRouter();
-  const [teamData, setTeamData] = useState<TeamData | null>(null);
+  const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'staff' | 'contractor'>('all');
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [addingRole, setAddingRole] = useState<ProjectRole | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchTeam() {
-      try {
-        setLoading(true);
-        const response = await fetch(`/api/projects/${projectId}/team`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch team data');
-        }
-        const data = await response.json();
-        setTeamData(data.data);
-      } catch (err) {
-        log.error('Error fetching team', { error: err, projectId });
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
+  const fetchTeam = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/projects/${projectId}/team`);
+      if (!res.ok) throw new Error('Failed to fetch team');
+      const data = await res.json();
+      setMembers(data.data?.members || []);
+    } catch (err) {
+      log.error('Error fetching team', { error: err, projectId });
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
     }
-    fetchTeam();
   }, [projectId]);
+
+  useEffect(() => { fetchTeam(); }, [fetchTeam]);
+
+  const handleRemove = async (member: TeamMember) => {
+    if (!confirm(`Remove ${member.name} from this project?`)) return;
+    setRemoving(member.person_id);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/team`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ personId: member.person_id, personType: member.person_type }),
+      });
+      if (!res.ok) throw new Error('Failed to remove');
+      await fetchTeam();
+    } catch (err) {
+      log.error('Error removing member', { error: err });
+    } finally {
+      setRemoving(null);
+    }
+  };
+
+  const openAddForRole = (role: ProjectRole) => {
+    setAddingRole(role);
+    setAddModalOpen(true);
+  };
+
+  const handleAdded = () => {
+    setAddModalOpen(false);
+    setAddingRole(null);
+    fetchTeam();
+  };
 
   if (loading) {
     return (
       <div className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)] p-6">
         <div className="animate-pulse space-y-4">
           <div className="h-6 bg-[var(--ff-bg-secondary)] rounded w-1/4" />
-          <div className="grid grid-cols-3 gap-4">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-20 bg-[var(--ff-bg-secondary)] rounded" />
+          <div className="grid grid-cols-2 gap-4">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="h-24 bg-[var(--ff-bg-secondary)] rounded" />
             ))}
           </div>
         </div>
@@ -92,199 +134,324 @@ export function ProjectTeamTab({ projectId }: ProjectTeamTabProps) {
     );
   }
 
-  if (!teamData) return null;
+  // Group members by role
+  const membersByRole: Record<string, TeamMember[]> = {};
+  for (const role of PROJECT_ROLES) {
+    membersByRole[role] = [];
+  }
+  for (const m of members) {
+    const role = PROJECT_ROLES.includes(m.role as ProjectRole) ? m.role : 'General';
+    (membersByRole[role] = membersByRole[role] || []).push(m);
+  }
 
-  // Defensive: ensure members and stats exist
-  const members = teamData.members || [];
-  const stats = teamData.stats || { staff: 0, contractors: 0, total: 0 };
-  const filteredMembers = members.filter(m =>
-    filter === 'all' || m.person_type === filter
-  );
+  const totalCount = members.length;
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard
-          label="Total Team"
-          value={stats.total}
-          icon="users"
-          color="blue"
-        />
-        <StatCard
-          label="Staff Members"
-          value={stats.staff}
-          icon="user"
-          color="green"
-        />
-        <StatCard
-          label="Contractors"
-          value={stats.contractors}
-          icon="briefcase"
-          color="purple"
-        />
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Users className="w-5 h-5 text-[var(--ff-text-secondary)]" />
+          <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+            Project Team
+          </h3>
+          <span className="px-2 py-0.5 text-xs bg-[var(--ff-bg-secondary)] text-[var(--ff-text-secondary)] rounded-full">
+            {totalCount} member{totalCount !== 1 ? 's' : ''}
+          </span>
+        </div>
+        <button
+          onClick={() => { setAddingRole(null); setAddModalOpen(true); }}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+        >
+          <UserPlus className="w-4 h-4" />
+          Add Member
+        </button>
       </div>
 
-      {/* Primary Manager Card */}
-      {teamData.primaryManager && (
-        <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-blue-500/30 p-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
-              <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <div className="text-xs text-blue-400 font-medium tracking-wide mb-1">
-                Project Manager
-              </div>
-              <div className="text-lg font-semibold text-[var(--ff-text-primary)]">
-                {teamData.primaryManager.name}
-              </div>
-              <div className="text-sm text-[var(--ff-text-secondary)]">
-                {teamData.primaryManager.role}
-              </div>
-            </div>
-            <button
-              onClick={() => router.push(`/staff/${teamData.primaryManager?.staff_id}`)}
-              className="px-4 py-2 text-sm bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors"
+      {/* Position Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {PROJECT_ROLES.map(role => {
+          const config = ROLE_CONFIG[role];
+          const Icon = config.icon;
+          const roleMembers = membersByRole[role] || [];
+
+          return (
+            <div
+              key={role}
+              className={`rounded-lg border p-4 ${config.bgColor}`}
             >
-              View Profile
-            </button>
-          </div>
-        </div>
+              {/* Role Header */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Icon className={`w-4 h-4 ${config.color}`} />
+                  <span className={`text-sm font-semibold ${config.color}`}>
+                    {role}{!config.singular ? 's' : ''}
+                  </span>
+                  <span className="text-xs text-[var(--ff-text-tertiary)]">
+                    ({roleMembers.length})
+                  </span>
+                </div>
+                {(!config.singular || roleMembers.length === 0) && (
+                  <button
+                    onClick={() => openAddForRole(role)}
+                    className="p-1 rounded hover:bg-white/10 transition-colors"
+                    title={`Add ${role}`}
+                  >
+                    <UserPlus className="w-3.5 h-3.5 text-[var(--ff-text-tertiary)]" />
+                  </button>
+                )}
+              </div>
+
+              {/* Members in this role */}
+              {roleMembers.length === 0 ? (
+                <button
+                  onClick={() => openAddForRole(role)}
+                  className="w-full py-3 border border-dashed border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-tertiary)] hover:border-[var(--ff-text-secondary)] hover:text-[var(--ff-text-secondary)] transition-colors"
+                >
+                  + Assign {role}
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  {roleMembers.map(member => (
+                    <div
+                      key={member.person_id}
+                      className="flex items-center gap-3 bg-[var(--ff-card-bg)] rounded-lg px-3 py-2 group"
+                    >
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                        member.person_type === 'staff'
+                          ? 'bg-green-500/20 text-green-400'
+                          : 'bg-purple-500/20 text-purple-400'
+                      }`}>
+                        {member.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-[var(--ff-text-primary)] truncate">
+                          {member.name}
+                        </div>
+                        <div className="text-xs text-[var(--ff-text-tertiary)]">
+                          {member.person_type === 'staff' ? 'Staff' : 'Contractor'}
+                          {member.email ? ` · ${member.email}` : ''}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRemove(member)}
+                        disabled={removing === member.person_id}
+                        className="p-1.5 rounded opacity-0 group-hover:opacity-100 hover:bg-red-500/20 text-red-400 transition-all"
+                        title="Remove from project"
+                      >
+                        {removing === member.person_id
+                          ? <span className="w-3.5 h-3.5 block border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                          : <Trash2 className="w-3.5 h-3.5" />
+                        }
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Add Member Modal */}
+      {addModalOpen && (
+        <AddTeamMemberModal
+          projectId={projectId}
+          preselectedRole={addingRole}
+          onClose={() => { setAddModalOpen(false); setAddingRole(null); }}
+          onAdded={handleAdded}
+        />
       )}
-
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2">
-        {(['all', 'staff', 'contractor'] as const).map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-2 text-sm rounded-lg transition-colors ${
-              filter === f
-                ? 'bg-blue-500/20 text-blue-400'
-                : 'text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-secondary)]'
-            }`}
-          >
-            {f === 'all' ? 'All' : f === 'staff' ? 'Staff' : 'Contractors'}
-          </button>
-        ))}
-      </div>
-
-      {/* Team Members Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredMembers.map(member => (
-          <TeamMemberCard
-            key={member.person_id}
-            member={member}
-            onClick={() => router.push(
-              member.person_type === 'staff'
-                ? `/staff/${member.person_id}`
-                : `/contractors/${member.person_id}`
-            )}
-          />
-        ))}
-      </div>
-
-      {filteredMembers.length === 0 && (
-        <div className="text-center py-8 text-[var(--ff-text-secondary)]">
-          No {filter === 'all' ? 'team members' : filter === 'staff' ? 'staff' : 'contractors'} assigned to this project.
-        </div>
-      )}
-
-      {/* Quick Actions */}
-      <div className="flex gap-4">
-        <button
-          onClick={() => router.push(`/projects/${projectId}/edit?tab=team`)}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-        >
-          Manage Team
-        </button>
-        <button
-          onClick={() => router.push('/staff')}
-          className="px-4 py-2 bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-border-light)] text-[var(--ff-text-primary)] rounded-lg text-sm font-medium transition-colors"
-        >
-          View All Staff
-        </button>
-      </div>
     </div>
   );
 }
 
-function StatCard({ label, value, icon, color }: {
-  label: string;
-  value: number;
-  icon: string;
-  color: 'blue' | 'green' | 'purple';
+// ── Add Team Member Modal ──────────────────────────────────────────────────────
+
+function AddTeamMemberModal({
+  projectId,
+  preselectedRole,
+  onClose,
+  onAdded,
+}: {
+  projectId: string;
+  preselectedRole: ProjectRole | null;
+  onClose: () => void;
+  onAdded: () => void;
 }) {
-  const colorClasses = {
-    blue: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
-    green: 'bg-green-500/10 border-green-500/30 text-green-400',
-    purple: 'bg-purple-500/10 border-purple-500/30 text-purple-400',
+  const [role, setRole] = useState<ProjectRole>(preselectedRole || 'Technician');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => {
+      searchPeople(searchQuery);
+    }, 300);
+    return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current); };
+  }, [searchQuery, projectId]);
+
+  const searchPeople = async (q: string) => {
+    setSearching(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/team-search?q=${encodeURIComponent(q)}`);
+      if (!res.ok) throw new Error('Search failed');
+      const data = await res.json();
+      setSearchResults(data.data || []);
+    } catch (err) {
+      log.error('Search error', { error: err });
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
   };
 
-  const icons = {
-    users: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
-      </svg>
-    ),
-    user: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-      </svg>
-    ),
-    briefcase: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-      </svg>
-    ),
+  const handleAdd = async (person: SearchResult) => {
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/team`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          personId: person.id,
+          personType: person.type,
+          role,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Failed to add');
+      }
+      onAdded();
+    } catch (err) {
+      log.error('Error adding member', { error: err });
+      alert(err instanceof Error ? err.message : 'Failed to add team member');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className={`rounded-lg border p-4 ${colorClasses[color]}`}>
-      <div className="flex items-center gap-3">
-        {icons[icon as keyof typeof icons]}
-        <div>
-          <div className="text-2xl font-bold text-[var(--ff-text-primary)]">{value}</div>
-          <div className="text-sm opacity-80">{label}</div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-[var(--ff-card-bg)] rounded-xl border border-[var(--ff-border-light)] w-full max-w-lg mx-4 shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--ff-border-light)]">
+          <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+            Add Team Member
+          </h3>
+          <button onClick={onClose} className="p-1 hover:bg-[var(--ff-bg-secondary)] rounded transition-colors">
+            <X className="w-5 h-5 text-[var(--ff-text-secondary)]" />
+          </button>
         </div>
-      </div>
-    </div>
-  );
-}
 
-function TeamMemberCard({ member, onClick }: { member: TeamMember; onClick: () => void }) {
-  return (
-    <div
-      onClick={onClick}
-      className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)] p-4 hover:border-blue-500/50 cursor-pointer transition-colors"
-    >
-      <div className="flex items-start gap-3">
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-          member.person_type === 'staff'
-            ? 'bg-green-500/20 text-green-400'
-            : 'bg-purple-500/20 text-purple-400'
-        }`}>
-          {member.name.charAt(0).toUpperCase()}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-[var(--ff-text-primary)] truncate">
-              {member.name}
-            </span>
-            {member.is_primary && (
-              <span className="px-1.5 py-0.5 text-xs bg-blue-500/20 text-blue-400 rounded">
-                PM
-              </span>
+        <div className="px-6 py-4 space-y-4">
+          {/* Role Selector */}
+          <div>
+            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1.5">
+              Position
+            </label>
+            <div className="relative">
+              <button
+                onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
+                className="w-full flex items-center justify-between px-3 py-2.5 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)] hover:border-blue-500/50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const config = ROLE_CONFIG[role];
+                    const Icon = config.icon;
+                    return <Icon className={`w-4 h-4 ${config.color}`} />;
+                  })()}
+                  {role}
+                </div>
+                <ChevronDown className={`w-4 h-4 text-[var(--ff-text-tertiary)] transition-transform ${roleDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {roleDropdownOpen && (
+                <div className="absolute z-10 mt-1 w-full bg-[var(--ff-card-bg)] border border-[var(--ff-border-light)] rounded-lg shadow-xl overflow-hidden">
+                  {PROJECT_ROLES.map(r => {
+                    const config = ROLE_CONFIG[r];
+                    const Icon = config.icon;
+                    return (
+                      <button
+                        key={r}
+                        onClick={() => { setRole(r); setRoleDropdownOpen(false); }}
+                        className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left hover:bg-[var(--ff-bg-secondary)] transition-colors ${
+                          r === role ? 'bg-blue-500/10 text-blue-400' : 'text-[var(--ff-text-primary)]'
+                        }`}
+                      >
+                        <Icon className={`w-4 h-4 ${config.color}`} />
+                        {r}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Search */}
+          <div>
+            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1.5">
+              Search Staff or Contractor
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Type a name or email..."
+                className="w-full pl-10 pr-4 py-2.5 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:outline-none focus:border-blue-500/50"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          {/* Results */}
+          <div className="max-h-64 overflow-y-auto -mx-1 px-1">
+            {searching ? (
+              <div className="text-center py-6 text-sm text-[var(--ff-text-tertiary)]">
+                Searching...
+              </div>
+            ) : searchResults.length === 0 ? (
+              <div className="text-center py-6 text-sm text-[var(--ff-text-tertiary)]">
+                {searchQuery ? 'No results found' : 'Start typing to search'}
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {searchResults.map(person => (
+                  <button
+                    key={`${person.type}-${person.id}`}
+                    onClick={() => handleAdd(person)}
+                    disabled={submitting}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[var(--ff-bg-secondary)] transition-colors text-left disabled:opacity-50"
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                      person.type === 'staff'
+                        ? 'bg-green-500/20 text-green-400'
+                        : 'bg-purple-500/20 text-purple-400'
+                    }`}>
+                      {person.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-[var(--ff-text-primary)] truncate">
+                        {person.name}
+                      </div>
+                      <div className="text-xs text-[var(--ff-text-tertiary)]">
+                        {person.type === 'staff' ? 'Staff' : 'Contractor'}
+                        {person.position ? ` · ${person.position}` : ''}
+                        {person.email ? ` · ${person.email}` : ''}
+                      </div>
+                    </div>
+                    <UserPlus className="w-4 h-4 text-[var(--ff-text-tertiary)] shrink-0" />
+                  </button>
+                ))}
+              </div>
             )}
-          </div>
-          <div className="text-sm text-[var(--ff-text-secondary)] truncate">
-            {member.role}
-          </div>
-          <div className="text-xs text-[var(--ff-text-tertiary)] mt-1">
-            {member.person_type === 'staff' ? 'Staff' : 'Contractor'}
           </div>
         </div>
       </div>
