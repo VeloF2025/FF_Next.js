@@ -182,7 +182,14 @@ export function SnagSummaryPage() {
     ];
 
     const dateStr = new Date().toISOString().slice(0, 10);
-    await wb.xlsx.writeFile(`snags-summary-${dateStr}.xlsx`);
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `snags-summary-${dateStr}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
