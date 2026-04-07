@@ -37,6 +37,7 @@ import {
   triggerOnReassignment,
 } from '@/modules/noc/services/notificationTriggers';
 import { markLinkedDataSyncResolved } from '@/modules/noc/services/dataSyncResolution';
+import { notifySnagGroupOnStatusChange } from '@/modules/noc/services/snagGroupNotifications';
 import type { UpdateTicketPayload } from '@/modules/noc/types/ticket';
 import { TicketStatus } from '@/modules/noc/types/ticket';
 
@@ -304,6 +305,12 @@ export async function PUT(
         ).catch(err => {
           logger.error('Creator status notification error', { ticketId, error: err.message });
         });
+
+        // Snag tickets: notify project WhatsApp group on status change
+        notifySnagGroupOnStatusChange(updatedTicket, oldTicket.status, body.status as string)
+          .catch(err => {
+            logger.error('Snag WA group status notification error', { ticketId, error: err.message });
+          });
       }
     }
 

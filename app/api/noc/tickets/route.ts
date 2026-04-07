@@ -27,6 +27,7 @@ import {
   triggerOnTicketAssignment,
   triggerOnTeamAssignment,
 } from '@/modules/noc/services/notificationTriggers';
+import { notifySnagGroupOnCreate } from '@/modules/noc/services/snagGroupNotifications';
 import {
   TicketSource,
   TicketType,
@@ -279,6 +280,11 @@ export async function POST(req: NextRequest) {
         logger.error('Team assignment notification error on create', { ticketId: ticket.id, error: err.message });
       });
     }
+
+    // Snag tickets: notify project WhatsApp group (non-blocking)
+    notifySnagGroupOnCreate(ticket).catch(err => {
+      logger.error('Snag WA group notification error on create', { ticketId: ticket.id, error: err.message });
+    });
 
     return NextResponse.json(
       {
