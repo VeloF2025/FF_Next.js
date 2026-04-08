@@ -16,6 +16,7 @@ import {
   RefreshCw,
   LayoutGrid,
   List,
+  Download,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
 import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
@@ -63,6 +64,7 @@ export function PipelineDashboard() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [exporting, setExporting] = useState(false);
 
   // RBAC: Check if user is super_admin for Smartsheet sync access
   const { currentUser } = useAuth();
@@ -71,6 +73,25 @@ export function PipelineDashboard() {
   useEffect(() => {
     loadData();
   }, [search, statusFilter, page]);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const res = await fetch('/api/pipeline/export');
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Pipeline-Projects-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      log.error('Pipeline export failed', err, 'PipelineDashboard');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -182,6 +203,14 @@ export function PipelineDashboard() {
             {isSuperAdmin && (
               <SmartsheetSyncPanel compact onSyncComplete={loadData} />
             )}
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="p-2 rounded-lg border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] transition-colors disabled:opacity-50"
+              title="Export to Excel"
+            >
+              <Download className={`w-5 h-5 ${exporting ? 'animate-pulse' : ''}`} />
+            </button>
             <button
               onClick={loadData}
               className="p-2 rounded-lg border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] transition-colors"
