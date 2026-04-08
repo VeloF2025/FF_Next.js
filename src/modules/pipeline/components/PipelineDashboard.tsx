@@ -203,14 +203,14 @@ export function PipelineDashboard() {
             {isSuperAdmin && (
               <SmartsheetSyncPanel compact onSyncComplete={loadData} />
             )}
-            <button
+            {/* <button
               onClick={handleExport}
               disabled={exporting}
               className="p-2 rounded-lg border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] transition-colors disabled:opacity-50"
               title="Export to Excel"
             >
               <Download className={`w-5 h-5 ${exporting ? 'animate-pulse' : ''}`} />
-            </button>
+            </button> */}
             <button
               onClick={loadData}
               className="p-2 rounded-lg border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] transition-colors"
