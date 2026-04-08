@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { formatDisplayDateLong } from '@/utils/dateFormat';
-import { Calendar, FolderOpen, Users, CheckCircle, AlertTriangle, MapPin, TrendingUp, BarChart3, FileText, Clock, Target, PieChart, Activity } from 'lucide-react';
+import { Calendar, FolderOpen, Users, CheckCircle, AlertTriangle, MapPin, TrendingUp, FileText, Target, Activity } from 'lucide-react';
 import Link from 'next/link';
 import { ProjectOverviewCard } from './components/ProjectOverviewCard';
 import { RecentActivityFeed } from './components/RecentActivityFeed';
@@ -155,41 +155,27 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Executive Reports */}
+      {/* Quick Links */}
       <div>
-        <div className="flex items-center gap-2 mb-4">
-          <BarChart3 className="w-5 h-5 text-primary-400" />
-          <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Executive Reports</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-1">Quick Links</h2>
+        <h3 className="text-sm text-[var(--ff-text-tertiary)] mb-3">Reports</h3>
+        <div className="flex flex-wrap gap-2">
           {[
-            { title: 'Progress Today', icon: Activity, color: 'bg-blue-500/20 text-blue-400', route: '/reports/progress-today', permission: null },
-            { title: 'Activations', icon: FileText, color: 'bg-emerald-500/20 text-emerald-400', route: '/reports/weekly-activations', permission: Permission.ANALYTICS_READ },
-            { title: 'Report 3', icon: Target, color: 'bg-purple-500/20 text-purple-400', route: '/reports/placeholder-3', permission: null },
-            { title: 'Report 4', icon: PieChart, color: 'bg-amber-500/20 text-amber-400', route: '/reports/placeholder-4', permission: null },
-            { title: 'Report 5', icon: Clock, color: 'bg-cyan-500/20 text-cyan-400', route: '/reports/placeholder-5', permission: null },
-            { title: 'Report 6', icon: TrendingUp, color: 'bg-rose-500/20 text-rose-400', route: '/reports/placeholder-6', permission: null },
-          ].filter((report) => !report.permission || hasPermission(report.permission)).map((report) => {
-            const Icon = report.icon;
+            { title: 'Activation Progress', icon: Target, color: 'text-purple-400', route: '/activate/reports', permission: null },
+            { title: 'Progress Today', icon: Activity, color: 'text-blue-400', route: '/reports/progress-today', permission: null },
+            { title: 'Activations', icon: FileText, color: 'text-emerald-400', route: '/reports/weekly-activations', permission: Permission.ANALYTICS_READ },
+          ].filter((link) => !link.permission || hasPermission(link.permission)).map((link) => {
+            const Icon = link.icon;
             return (
               <Link
-                key={report.title}
-                href={report.route}
-                className="group bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-5 hover:border-primary-500/50 hover:shadow-lg transition-all duration-200 cursor-pointer"
+                key={link.title}
+                href={link.route}
+                className="group flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] hover:border-primary-500/50 hover:bg-[var(--ff-bg-tertiary)] transition-all duration-200"
               >
-                <div className={`w-10 h-10 rounded-lg ${report.color.split(' ')[0]} flex items-center justify-center mb-3`}>
-                  <Icon className={`w-5 h-5 ${report.color.split(' ')[1]}`} />
-                </div>
-                <h3 className="text-sm font-medium text-[var(--ff-text-primary)] group-hover:text-primary-400 transition-colors">
-                  {report.title}
-                </h3>
-                <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
-                  {report.title === 'Progress Today'
-                    ? 'Daily progress overview'
-                    : report.title === 'Activations'
-                      ? 'OES activations by project'
-                      : 'Coming soon'}
-                </p>
+                <Icon className={`w-4 h-4 ${link.color}`} />
+                <span className="text-sm font-medium text-[var(--ff-text-primary)] group-hover:text-primary-400 transition-colors">
+                  {link.title}
+                </span>
               </Link>
             );
           })}
