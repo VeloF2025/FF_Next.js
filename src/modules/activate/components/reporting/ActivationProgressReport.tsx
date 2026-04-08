@@ -41,7 +41,7 @@ interface ActivationProgressReportProps {
   refreshKey: number;
 }
 
-type SortField = 'project_name' | 'zone_no' | 'pon_no' | 'total_scope' | 'activated' | 'completion_percent';
+type SortField = 'project_name' | 'zone_no' | 'pon_no' | 'total_scope' | 'activated' | 'remaining' | 'completion_percent';
 type SortDir = 'asc' | 'desc';
 
 export function ActivationProgressReport({ filters, refreshKey }: ActivationProgressReportProps) {
@@ -336,7 +336,7 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
         />
         <SummaryCard
           label="Completion"
-          value={`${summary.completion_percent}%`}
+          value={`${summary.completion_percent.toFixed(1)}%`}
           subtext={`${summary.days_in_range} days in range`}
           color="purple"
           isPercent
@@ -572,7 +572,7 @@ function ProgressStats({ total, activated, percent, small }: ProgressStatsProps)
         percent >= 40 ? 'text-orange-600 dark:text-orange-400' :
         'text-red-600 dark:text-red-400'
       }`}>
-        {percent}%
+        {percent.toFixed(1)}%
       </span>
     </div>
   );
@@ -612,9 +612,7 @@ function FlatTableView({ rows, sortField, sortDir, onSort }: FlatTableViewProps)
               <SortHeader field="pon_no" label="PON" />
               <SortHeader field="total_scope" label="Total" />
               <SortHeader field="activated" label="Activated" />
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
-                Remaining
-              </th>
+              <SortHeader field="remaining" label="Remaining" />
               <SortHeader field="completion_percent" label="Progress" />
             </tr>
           </thead>
@@ -657,7 +655,7 @@ function FlatTableView({ rows, sortField, sortDir, onSort }: FlatTableViewProps)
                       row.completion_percent >= 40 ? 'text-orange-600 dark:text-orange-400' :
                       'text-red-600 dark:text-red-400'
                     }`}>
-                      {row.completion_percent}%
+                      {row.completion_percent.toFixed(1)}%
                     </span>
                   </div>
                 </td>
