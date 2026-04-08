@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Upload, Image, FileText, Film, Paperclip, X, Trash2 } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { Upload, Image, FileText, Film, Paperclip, Trash2 } from 'lucide-react';
 import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
+import { PhotoLightbox, type LightboxPhoto } from '@/components/PhotoLightbox';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface Attachment {
@@ -43,7 +44,7 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
@@ -146,6 +147,19 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
 
   const handleDragLeave = () => setDragOver(false);
 
+  // Build lightbox photo list from image attachments
+  const lightboxPhotos: LightboxPhoto[] = useMemo(() =>
+    attachments
+      .filter(a => isImageMime(a.mime_type) && a.storage_url)
+      .map(a => ({ url: a.storage_url!, label: a.filename })),
+    [attachments]
+  );
+
+  const openLightbox = (att: Attachment) => {
+    const idx = lightboxPhotos.findIndex(p => p.url === att.storage_url);
+    if (idx >= 0) setLightboxIndex(idx);
+  };
+
   const getFileIcon = (att: Attachment) => {
     if (isImageMime(att.mime_type)) return <Image className="w-5 h-5 text-blue-400" />;
     if (isVideoMime(att.mime_type)) return <Film className="w-5 h-5 text-purple-400" />;
@@ -227,7 +241,7 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
               {isImageMime(att.mime_type) && att.storage_url ? (
                 <div
                   className="aspect-square bg-black/20 cursor-pointer relative"
-                  onClick={() => setPreviewUrl(att.storage_url)}
+                  onClick={() => openLightbox(att)}
                 >
                   <img
                     src={att.storage_url}
@@ -239,7 +253,7 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
               ) : isVideoMime(att.mime_type) && att.storage_url ? (
                 <div
                   className="aspect-square bg-black/20 flex items-center justify-center cursor-pointer"
-                  onClick={() => setPreviewUrl(att.storage_url)}
+                  onClick={() => window.open(att.storage_url!, '_blank')}
                 >
                   <Film className="w-10 h-10 text-purple-400" />
                 </div>
@@ -289,41 +303,13 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
         </div>
       )}
 
-      {/* Full-size Preview Modal */}
-      {previewUrl && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Image/Video preview"
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-          style={{ zIndex: 99999 }}
-          onClick={() => setPreviewUrl(null)}
-        >
-          <button
-            type="button"
-            aria-label="Close preview"
-            onClick={() => setPreviewUrl(null)}
-            className="absolute top-4 right-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70"
-          >
-            <X className="w-6 h-6" />
-          </button>
-          {previewUrl.match(/\.(mp4|webm|mov|avi)$/i) ? (
-            <video
-              src={previewUrl}
-              controls
-              aria-label={`Video preview: ${previewUrl.split('/').pop()}`}
-              className="max-w-full max-h-[90vh] rounded-lg"
-              onClick={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <img
-              src={previewUrl}
-              alt="Preview"
-              className="max-w-full max-h-[90vh] object-contain rounded-lg"
-              onClick={(e) => e.stopPropagation()}
-            />
-          )}
-        </div>
+      {/* Photo Lightbox with zoom/pan/navigation */}
+      {lightboxIndex !== null && lightboxPhotos.length > 0 && (
+        <PhotoLightbox
+          photos={lightboxPhotos}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
       )}
     </div>
   );
