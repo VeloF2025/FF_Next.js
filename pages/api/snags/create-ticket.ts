@@ -189,8 +189,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     if (photoRows[0]?.photo_url) {
       await sql`
-        INSERT INTO maintenance_attachments (ticket_id, file_url, filename, file_type, mime_type, uploaded_by, description)
-        VALUES (${ticket.id}, ${photoRows[0].photo_url}, 'snag-before-photo.jpg', 'image', 'image/jpeg', ${user?.id ?? null}, ${'Before photo from ' + (snag.report_number ?? 'TQR report')})
+        INSERT INTO maintenance_attachments (ticket_id, file_url, storage_url, filename, file_type, mime_type, uploaded_by, description)
+        VALUES (${ticket.id}, ${photoRows[0].photo_url}, ${photoRows[0].photo_url}, 'snag-before-photo.jpg', 'image', 'image/jpeg', ${user?.id ?? null}, ${'Before photo from ' + (snag.report_number ?? 'TQR report')})
       `.catch((err) => {
         log.warn('Could not attach photo to ticket', { ticketId: ticket.id, error: err });
       });
