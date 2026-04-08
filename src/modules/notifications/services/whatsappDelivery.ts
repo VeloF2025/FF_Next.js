@@ -98,6 +98,35 @@ export async function sendWhatsAppGroup(
   }
 }
 
+/**
+ * Send a WhatsApp group message with an image.
+ * Uses the bridge /api/send endpoint with media_url for image download.
+ * Falls back to text-only if image sending fails.
+ */
+export async function sendWhatsAppGroupImage(
+  groupJid: string,
+  message: string,
+  imageUrl: string
+): Promise<void> {
+  const body = {
+    recipient: groupJid,
+    message,
+    media_url: imageUrl,
+  };
+
+  const response = await fetch(`${WA_FEEDBACK_URL}/api/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(60_000), // longer timeout for image download
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => 'unknown');
+    throw new Error(`WA group image send failed: HTTP ${response.status} — ${text}`);
+  }
+}
+
 // =============================================================================
 // Individual DMs (via WAHA on Velocity:3001)
 // =============================================================================
