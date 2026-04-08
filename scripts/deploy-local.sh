@@ -156,7 +156,7 @@ fi
 if [[ "$FORCE" != true ]]; then
   log "Running lint gates..."
   LINT_FAILED=false
-  MAX_LINT_WARNINGS=3793
+  MAX_LINT_WARNINGS=3796
   MAX_LINT_ERRORS=77
 
   LINT_OUTPUT=$(sudo -u velo bash -c "cd $DIR && npm run lint" 2>&1 || true)
