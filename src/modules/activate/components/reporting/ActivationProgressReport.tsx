@@ -594,9 +594,7 @@ function FlatTableView({ rows, sortField, sortDir, onSort }: FlatTableViewProps)
     >
       <div className="flex items-center gap-1">
         {label}
-        {sortField === field && (
-          <ArrowUpDown className={`h-3 w-3 ${sortDir === 'asc' ? 'rotate-180' : ''}`} />
-        )}
+        <ArrowUpDown className={`h-3 w-3 ${sortField === field ? 'text-blue-400' : 'opacity-30'} ${sortField === field && sortDir === 'asc' ? 'rotate-180' : ''}`} />
       </div>
     </th>
   );
