@@ -29,8 +29,8 @@ async function handler(
     const offsetNum = parseInt(offset as string);
 
     // Build search conditions
-    let whereConditions: string[] = [];
-    let params: any[] = [];
+    const whereConditions: string[] = [];
+    const params: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
 
     if (search) {
       const searchTerm = `%${search}%`;

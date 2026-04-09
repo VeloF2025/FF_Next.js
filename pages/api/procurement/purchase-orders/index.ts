@@ -27,7 +27,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     const offset = (pageNum - 1) * pageSizeNum;
 
     // Build dynamic query
-    let whereConditions = ['1=1'];
+    const whereConditions = ['1=1'];
     const params: (string | number | string[])[] = [];
     let paramIndex = 1;
 

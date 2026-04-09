@@ -28,7 +28,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Invalid path. Expected: /wa-photo/{drNumber}/{filename}');
   }
 
-  const [drNumber, filename] = path;
+  const drNumber = path[0]!;
+  const filename = path[1]!;
 
   // Security: Validate path components to prevent directory traversal
   if (filename.includes('..') || filename.includes('/') || drNumber.includes('..') || drNumber.includes('/')) {

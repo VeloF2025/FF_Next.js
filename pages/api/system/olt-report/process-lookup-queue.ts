@@ -219,18 +219,20 @@ async function processOneQueueItem(client: any, item: any, importId: string | un
     if (!hasInstalledRecord) {
       // No prop_id with this serial has "Installed" status — flag the one closest to installed
       const wrongStatusRecord = correctSerialRecords[0];
-      mismatchType = 'status_mismatch';
-      statusMismatchContext = JSON.stringify({
-        reason: 'status_mismatch',
-        propId: wrongStatusRecord.prop_id,
-        currentStatus: wrongStatusRecord.status || 'unknown',
-        expectedStatus: INSTALLED_STATUS,
-        message: `No prop record with correct serial has "${INSTALLED_STATUS}" status. Best match: "${wrongStatusRecord.status || 'unknown'}"`,
-      });
+      if (wrongStatusRecord) {
+        mismatchType = 'status_mismatch';
+        statusMismatchContext = JSON.stringify({
+          reason: 'status_mismatch',
+          propId: wrongStatusRecord.prop_id,
+          currentStatus: wrongStatusRecord.status || 'unknown',
+          expectedStatus: INSTALLED_STATUS,
+          message: `No prop record with correct serial has "${INSTALLED_STATUS}" status. Best match: "${wrongStatusRecord.status || 'unknown'}"`,
+        });
+      }
     }
   }
 
-  const bestRecord = records.find(r => r.ph_ont) || records[0];
+  const bestRecord = records.find(r => r.ph_ont) || records[0]!;
   await client.query(
     `UPDATE olt_onemap_lookup_queue
      SET status = 'completed', onemap_serial = $1, onemap_ups_serial = $2,

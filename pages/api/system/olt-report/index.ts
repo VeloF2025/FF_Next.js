@@ -72,7 +72,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Query from olt_mismatch_records (the authoritative source)
-    let conditions: string[] = [];
+    const conditions: string[] = [];
     const params: (string | number)[] = [];
     let paramIndex = 1;
 

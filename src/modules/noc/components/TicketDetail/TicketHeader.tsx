@@ -46,6 +46,25 @@ interface TicketHeaderProps {
   onPriorityChange?: (newPriority: string) => void;
 }
 
+/** Forward/backward workflow transitions — aligned to NOC Kanban columns */
+const TICKET_WORKFLOW_ACTIONS: Record<string, {
+  forward?: { status: string; label: string };
+  backward?: { status: string; label: string };
+}> = {
+  open:            { forward: { status: 'assigned',    label: 'Assign' } },
+  assigned:        { forward: { status: 'in_progress', label: 'Start Work' },        backward: { status: 'open',        label: 'Unassign' } },
+  in_progress:     { forward: { status: 'pending_qa',  label: 'Submit for QA' },     backward: { status: 'assigned',    label: 'Back to Assigned' } },
+  pending_qa:      { forward: { status: 'resolved',    label: 'Approve QA' },        backward: { status: 'in_progress', label: 'Reject QA' } },
+  qa_in_progress:  { forward: { status: 'resolved',    label: 'Approve QA' },        backward: { status: 'in_progress', label: 'Reject QA' } },
+  qa_rejected:     { forward: { status: 'pending_qa',  label: 'Resubmit for QA' },   backward: { status: 'assigned',    label: 'Back to Assigned' } },
+  qa_approved:     { forward: { status: 'resolved',    label: 'Mark Resolved' } },
+  pending_handover:{ forward: { status: 'resolved',    label: 'Mark Resolved' } },
+  handed_to_ops:   { forward: { status: 'resolved',    label: 'Mark Resolved' } },
+  resolved:        { forward: { status: 'verified',    label: 'Customer Confirmed' },backward: { status: 'in_progress', label: 'Customer Unhappy' } },
+  verified:        { forward: { status: 'closed',      label: 'Close Ticket' },      backward: { status: 'in_progress', label: 'Reopen' } },
+  closed:          {                                                                   backward: { status: 'open',        label: 'Reopen' } },
+};
+
 /**
  * 🟢 WORKING: Generate Google Maps URL from GPS coordinates
  */
@@ -119,6 +138,35 @@ export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange
           </div>
         </div>
       </div>
+
+      {/* Workflow Action Buttons — prominent, right below badges */}
+      {(() => {
+        const s = ticket.status;
+        const actions = TICKET_WORKFLOW_ACTIONS[s];
+        if (!actions?.forward && !actions?.backward) return null;
+        return (
+          <div className="flex items-center gap-2 mb-4">
+            {actions.backward && (
+              <button
+                type="button"
+                onClick={() => onStatusChange?.(actions.backward!.status)}
+                className="text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-1.5 rounded font-medium transition-colors"
+              >
+                ← {actions.backward.label}
+              </button>
+            )}
+            {actions.forward && (
+              <button
+                type="button"
+                onClick={() => onStatusChange?.(actions.forward!.status)}
+                className="text-xs bg-green-800 hover:bg-green-700 text-green-100 px-3 py-1.5 rounded font-medium transition-colors"
+              >
+                {actions.forward.label} →
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Title */}
       <h2 className="text-xl font-semibold text-[var(--ff-text-primary)] mb-4">{ticket.title}</h2>

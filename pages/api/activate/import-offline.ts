@@ -252,6 +252,7 @@ function validateDataSample(rows: ParsedOfflineRow[]): string[] {
 
   for (let i = 0; i < sampleSize; i++) {
     const row = rows[i];
+    if (!row) continue;
 
     // Drop number should start with DR
     if (row.drop_number && !row.drop_number.startsWith('DR')) {
