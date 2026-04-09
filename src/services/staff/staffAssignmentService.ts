@@ -14,6 +14,13 @@ interface FirestoreStaffDoc {
   [key: string]: unknown;
 }
 
+/** Firestore QueryDocumentSnapshot shape (firebase types are ts-ignored) */
+interface FirestoreDocSnapshot {
+  id: string;
+  ref: unknown;
+  data: () => Record<string, unknown>;
+}
+
 /**
  * Converts Firestore document to StaffMember type
  */
@@ -122,7 +129,7 @@ export const staffAssignmentService = {
       );
       
       const snapshot = await getDocs(staffQuery);
-      let availableStaff: StaffMember[] = snapshot.docs.map((doc) => docToStaffMember({
+      let availableStaff: StaffMember[] = snapshot.docs.map((doc: FirestoreDocSnapshot) => docToStaffMember({
         id: doc.id,
         ...doc.data()
       }));

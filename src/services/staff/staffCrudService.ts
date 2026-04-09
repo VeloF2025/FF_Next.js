@@ -19,6 +19,19 @@ interface FirestoreStaffDoc {
   [key: string]: unknown;
 }
 
+/** Firestore QueryDocumentSnapshot shape (firebase types are ts-ignored) */
+interface FirestoreDocSnapshot {
+  id: string;
+  ref: unknown;
+  data: () => Record<string, unknown>;
+  exists: () => boolean;
+}
+
+/** Firestore QuerySnapshot shape (firebase types are ts-ignored) */
+interface FirestoreQuerySnapshot {
+  docs: FirestoreDocSnapshot[];
+}
+
 /**
  * Converts Firestore document to StaffMember type
  */
@@ -42,11 +55,11 @@ export const staffCrudService = {
       const q = query(collection(db, 'staff'), orderBy('name', 'asc'));
       const snapshot = await getDocs(q);
       
-      let staffMembers: StaffMember[] = snapshot.docs.map((doc) => docToStaffMember({
+      let staffMembers: StaffMember[] = snapshot.docs.map((doc: FirestoreDocSnapshot) => docToStaffMember({
         id: doc.id,
         ...doc.data(),
       }));
-      
+
       // Apply all filters client-side
       if (filter?.status?.length) {
         staffMembers = staffMembers.filter((staff: StaffMember) =>
@@ -240,8 +253,8 @@ export const staffCrudService = {
     // Get all staff to avoid index requirements
     const q = query(collection(db, 'staff'), orderBy('name', 'asc'));
     
-    return onSnapshot(q, (snapshot) => {
-      let staffMembers: StaffMember[] = snapshot.docs.map((doc) => docToStaffMember({
+    return onSnapshot(q, (snapshot: FirestoreQuerySnapshot) => {
+      let staffMembers: StaffMember[] = snapshot.docs.map((doc: FirestoreDocSnapshot) => docToStaffMember({
         id: doc.id,
         ...doc.data(),
       }));
@@ -289,7 +302,7 @@ export const staffCrudService = {
   ): Unsubscribe {
     const docRef = doc(db, 'staff', staffId);
     
-    return onSnapshot(docRef, (snapshot) => {
+    return onSnapshot(docRef, (snapshot: FirestoreDocSnapshot) => {
       if (snapshot.exists()) {
         const staff = docToStaffMember({
           id: snapshot.id,

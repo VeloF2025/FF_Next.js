@@ -17,6 +17,14 @@ import { Project, ProjectListQuery } from '../../../types/project.types';
 import { ProjectQueryResult } from '../types/service.types';
 import { log } from '@/lib/logger';
 
+/** Firestore QueryDocumentSnapshot shape (firebase types are ts-ignored) */
+interface FirestoreDocSnapshot {
+  id: string;
+  ref: unknown;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data: () => Record<string, any>;
+}
+
 const COLLECTION_NAME = 'projects';
 
 export class ProjectQueryService {
@@ -64,7 +72,7 @@ export class ProjectQueryService {
       const projects: Project[] = [];
       let lastVisible: DocumentSnapshot | undefined;
       
-      snapshot.docs.slice(0, pageLimit).forEach((doc, index) => {
+      snapshot.docs.slice(0, pageLimit).forEach((doc: FirestoreDocSnapshot, index: number) => {
         if (index === pageLimit - 1) {
           lastVisible = doc;
         }
@@ -102,7 +110,7 @@ export class ProjectQueryService {
       );
       
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
+      return snapshot.docs.map((doc: FirestoreDocSnapshot) => ({
         id: doc.id,
         ...doc.data(),
         createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
@@ -123,7 +131,7 @@ export class ProjectQueryService {
       );
       
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
+      return snapshot.docs.map((doc: FirestoreDocSnapshot) => ({
         id: doc.id,
         ...doc.data(),
         createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
