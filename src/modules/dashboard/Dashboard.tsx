@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { formatDisplayDateLong } from '@/utils/dateFormat';
-import { Calendar, FolderOpen, Users, CheckCircle, AlertTriangle, MapPin, TrendingUp, FileText, Target, Activity } from 'lucide-react';
+import { Calendar, FolderOpen, Users, CheckCircle, AlertTriangle, MapPin, TrendingUp, FileText, Target, Activity, HardHat } from 'lucide-react';
 import Link from 'next/link';
 import { ProjectOverviewCard } from './components/ProjectOverviewCard';
 import { RecentActivityFeed } from './components/RecentActivityFeed';
@@ -158,12 +158,36 @@ export function Dashboard() {
       {/* Quick Links */}
       <div>
         <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-1">Quick Links</h2>
+
+        {/* Reports Section */}
         <h3 className="text-sm text-[var(--ff-text-tertiary)] mb-3">Reports</h3>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 mb-6">
           {[
             { title: 'Activation Progress', icon: Target, color: 'text-purple-400', route: '/activate/reports', permission: null },
             { title: 'Progress Today', icon: Activity, color: 'text-blue-400', route: '/reports/progress-today', permission: null },
             { title: 'Activations', icon: FileText, color: 'text-emerald-400', route: '/reports/weekly-activations', permission: Permission.ANALYTICS_READ },
+          ].filter((link) => !link.permission || hasPermission(link.permission)).map((link) => {
+            const Icon = link.icon;
+            return (
+              <Link
+                key={link.title}
+                href={link.route}
+                className="group flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] hover:border-primary-500/50 hover:bg-[var(--ff-bg-tertiary)] transition-all duration-200"
+              >
+                <Icon className={`w-4 h-4 ${link.color}`} />
+                <span className="text-sm font-medium text-[var(--ff-text-primary)] group-hover:text-primary-400 transition-colors">
+                  {link.title}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Tools Section */}
+        <h3 className="text-sm text-[var(--ff-text-tertiary)] mb-3">Tools</h3>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { title: 'Civil QA', icon: HardHat, color: 'text-orange-400', route: '/field-ops', permission: null },
           ].filter((link) => !link.permission || hasPermission(link.permission)).map((link) => {
             const Icon = link.icon;
             return (
