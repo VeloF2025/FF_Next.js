@@ -4583,7 +4583,7 @@ export function parseManualSections(): ManualSection[] {
   let contentBuffer: string[] = [];
   
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+    const line = lines[i]!;
     
     // Main section (## N. Title)
     if (line.match(/^## \d+\./)) {
