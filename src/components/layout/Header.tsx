@@ -96,7 +96,7 @@ export function Header({
   };
 
   return (
-    <header className="bg-[var(--ff-surface-primary)] border-b border-[var(--ff-border-primary)] shadow-sm">
+    <header className="bg-[var(--ff-surface-primary)] border-b border-[var(--ff-border-primary)] shadow-sm" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="px-4 lg:px-6 py-4">
         <div className="flex items-center justify-between">
           <BreadcrumbNavigation
