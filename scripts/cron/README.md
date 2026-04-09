@@ -1,10 +1,34 @@
-# Daily Reminders Cron Job Setup
+# Cron Jobs
 
 ## Overview
-This directory contains the cron job script that sends daily email reminders to users.
+This directory contains cron job scripts that run on the production server.
 
 ## Files
-- `send-daily-reminders.ts` - Main cron job script
+- `send-daily-reminders.ts` - Sends daily reminder emails to users with pending reminders
+- `send-morning-standup.ts` - Sends a per-user morning standup digest of outstanding
+  tickets (NOC + H&S + ManCo), Mon–Fri at 08:00 SAST
+
+## Morning Standup Quick Reference
+
+```bash
+# Normal run (send to everyone with at least one open ticket)
+npx tsx scripts/cron/send-morning-standup.ts
+
+# Dry-run: log what would be sent, but do not send any emails
+npx tsx scripts/cron/send-morning-standup.ts --dry-run
+
+# Send only to a single recipient (useful for testing end-to-end)
+npx tsx scripts/cron/send-morning-standup.ts --only=you@velocityfibre.com
+```
+
+VPS cron line (08:00 SAST, Monday–Friday):
+```cron
+0 8 * * 1-5 cd /var/www/fibreflow && /usr/bin/npx tsx scripts/cron/send-morning-standup.ts >> /var/log/morning-standup-cron.log 2>&1
+```
+
+---
+
+# Daily Reminders Cron Job Setup
 
 ## Prerequisites
 
