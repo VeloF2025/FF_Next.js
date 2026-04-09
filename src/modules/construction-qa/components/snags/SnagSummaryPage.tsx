@@ -19,6 +19,7 @@ import { COL_COUNT, SkeletonRow } from './SnagSummaryHelpers';
 import { SnagProjectRow } from './SnagProjectRow';
 import { SnagZoneRow } from './SnagZoneRow';
 import { SnagPonRow } from './SnagPonRow';
+import { SnagDrillDown } from './SnagDrillDown';
 
 export function SnagSummaryPage() {
   const router = useRouter();
@@ -30,6 +31,8 @@ export function SnagSummaryPage() {
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const [drillDown, setDrillDown] = useState<{ projectId: string; status: string } | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleSearchChange = useCallback((value: string) => {
     setSearchInput(value);
@@ -85,6 +88,24 @@ export function SnagSummaryPage() {
       n.has(key) ? n.delete(key) : n.add(key);
       return n;
     });
+  }
+
+  function handleStatusClick(projectId: string, status: string) {
+    if (drillDown?.projectId === projectId && drillDown?.status === status) {
+      setDrillDown(null);
+    } else {
+      setDrillDown({ projectId, status });
+    }
+  }
+
+  function handleDrillDownSnagUpdated() {
+    setRefreshKey((k) => k + 1);
+    Promise.all([fetchSnagStats(), fetchSnagHierarchyStats(undefined, searchTerm || undefined)])
+      .then(([statsData, hierarchyRows]) => {
+        const statsById = new Map(statsData.map((s) => [s.project_id, s]));
+        setProjects(buildHierarchy(hierarchyRows, statsById));
+      })
+      .catch(() => { /* non-fatal */ });
   }
 
   function navigateToProject(projectId: string) {
@@ -276,6 +297,7 @@ export function SnagSummaryPage() {
 
               {!isLoading && projects.flatMap((p: ProjectNode) => {
                 const isProjectExpanded = expandedProjects.has(p.project_id);
+                const isDrillDownActive = drillDown?.projectId === p.project_id;
                 const rows = [
                   <SnagProjectRow
                     key={`project-${p.project_id}`}
@@ -283,8 +305,21 @@ export function SnagSummaryPage() {
                     isExpanded={isProjectExpanded}
                     onToggle={toggleProject}
                     onNavigate={navigateToProject}
+                    onStatusClick={handleStatusClick}
+                    activeStatus={isDrillDownActive ? drillDown.status : null}
                   />,
                 ];
+
+                if (isDrillDownActive && drillDown) {
+                  rows.push(
+                    <SnagDrillDown
+                      key={`drill-${p.project_id}-${drillDown.status}-${refreshKey}`}
+                      projectId={p.project_id}
+                      status={drillDown.status}
+                      onSnagUpdated={handleDrillDownSnagUpdated}
+                    />
+                  );
+                }
 
                 if (isProjectExpanded) {
                   p.zones.forEach((z: ZoneNode) => {
