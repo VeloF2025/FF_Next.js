@@ -121,10 +121,23 @@ export function getActiveSubTabByPath(
     }
   }
 
-  // Check path matches
+  // Check exact path matches first
   for (const subTab of tab.subTabs) {
     const subTabPath = subTab.path.split('?')[0] || '';
-    if (fullPath === subTabPath || fullPath.startsWith(subTabPath + '/')) {
+    if (fullPath === subTabPath) {
+      return subTab;
+    }
+  }
+
+  // Then check prefix matches — longest path first to avoid parent stealing child routes
+  const sortedSubTabs = [...tab.subTabs].sort((a, b) => {
+    const aPath = a.path.split('?')[0] || '';
+    const bPath = b.path.split('?')[0] || '';
+    return bPath.length - aPath.length;
+  });
+  for (const subTab of sortedSubTabs) {
+    const subTabPath = subTab.path.split('?')[0] || '';
+    if (fullPath.startsWith(subTabPath + '/')) {
       return subTab;
     }
   }
