@@ -45,8 +45,8 @@ export async function readExcelFile<T = any>(
 
     validateHasWorksheets(workbook);
 
-    // Use first worksheet
-    const worksheet = workbook.worksheets[0];
+    // Use first worksheet (validated by validateHasWorksheets above)
+    const worksheet = workbook.worksheets[0]!;
     const worksheetName = worksheet.name;
 
     // Validate worksheet dimensions

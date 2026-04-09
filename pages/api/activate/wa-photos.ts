@@ -63,7 +63,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     // Build URLs for photo proxy
-    const photosWithUrls = photos.map((photo) => {
+    const photosWithUrls = photos.map((photo: Record<string, any>) => { // eslint-disable-line @typescript-eslint/no-explicit-any
       // Extract DR and filename from local_path
       // NEW local_path format: /var/lib/docker/volumes/boss-vps_dr_photos/_data/{DR}/{filename}
       let url = '';

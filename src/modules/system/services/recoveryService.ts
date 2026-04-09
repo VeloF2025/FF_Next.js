@@ -741,7 +741,7 @@ export async function triggerRecovery(
     `SELECT action_id FROM incident_actions WHERE incident_id = $1`,
     [incidentId]
   );
-  const attemptedIds = attemptedResult.rows.map((r) => r.action_id);
+  const attemptedIds = attemptedResult.rows.map((r: { action_id: string }) => r.action_id);
 
   const action = await serviceRegistry.getNextRecoveryAction(serviceId, attemptedIds);
 

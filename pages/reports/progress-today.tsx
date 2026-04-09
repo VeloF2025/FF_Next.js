@@ -209,7 +209,7 @@ export default function ProgressTodayPage() {
         {/* Metric cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {METRIC_CONFIG.map((metric) => {
-            const colors = COLOR_MAP[metric.color];
+            const colors = COLOR_MAP[metric.color] ?? { border: '', bg: '', iconBg: '', text: '' };
             const Icon = metric.icon;
             const current = data?.metrics[metric.key] ?? 0;
             const previous = data?.previousDay[metric.key] ?? 0;

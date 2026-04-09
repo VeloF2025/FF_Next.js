@@ -181,10 +181,10 @@ async function handler(
       success: true,
       message: 'Database initialized successfully',
       statistics: {
-        projects: projectCount.count,
-        sow_poles: polesCount.count,
-        sow_drops: dropsCount.count,
-        sow_fibre: fibreCount.count
+        projects: projectCount?.count ?? 0,
+        sow_poles: polesCount?.count ?? 0,
+        sow_drops: dropsCount?.count ?? 0,
+        sow_fibre: fibreCount?.count ?? 0
       }
     });
 

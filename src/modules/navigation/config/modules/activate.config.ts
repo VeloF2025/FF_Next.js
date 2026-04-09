@@ -7,7 +7,7 @@
  * - Reports: Analytics and reporting dashboards
  */
 
-import { LayoutDashboard, ClipboardCheck, BarChart3, Users, Database } from 'lucide-react';
+import { LayoutDashboard, ClipboardCheck, BarChart3, Users, Database, AlertTriangle } from 'lucide-react';
 import type { ModuleNavigationConfig } from '../../types';
 
 export const activateConfig: ModuleNavigationConfig = {
@@ -48,6 +48,14 @@ export const activateConfig: ModuleNavigationConfig = {
       icon: Users,
       path: '/activate/technicians',
       rbacKey: 'activate.technicians',
+    },
+    {
+      id: 'non-invoiceables',
+      label: 'Non-Invoiceables',
+      shortLabel: 'Non-Inv',
+      icon: AlertTriangle,
+      path: '/activate/non-invoiceables',
+      rbacKey: 'activate.non-invoiceables',
     },
     {
       id: 'data-sync',

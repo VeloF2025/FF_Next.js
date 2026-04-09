@@ -256,7 +256,7 @@ export function ClientAnalytics() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--ff-border-light)]">
-                {summary.topClientsByValue.slice(0, 5).map((client) => (
+                {summary.topClientsByValue.slice(0, 5).map((client: Record<string, any>) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
                   <tr key={client.id} className="hover:bg-[var(--ff-bg-hover)]">
                     <td className="py-3">
                       <div>
