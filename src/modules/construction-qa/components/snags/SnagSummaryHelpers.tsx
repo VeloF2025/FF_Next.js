@@ -16,9 +16,11 @@ export interface CountCellProps {
   value: number;
   colorClass: string;
   bgClass: string;
+  onClick?: () => void;
+  isActive?: boolean;
 }
 
-export function CountCell({ value, colorClass, bgClass }: CountCellProps) {
+export function CountCell({ value, colorClass, bgClass, onClick, isActive }: CountCellProps) {
   if (value === 0) {
     return (
       <td className="px-3 py-2 text-xs tabular-nums text-zinc-500 whitespace-nowrap text-right">
@@ -26,8 +28,18 @@ export function CountCell({ value, colorClass, bgClass }: CountCellProps) {
       </td>
     );
   }
+  const clickable = !!onClick;
+  const activeRing = isActive ? 'ring-2 ring-[var(--ff-primary-500)] ring-inset' : '';
+  const hoverClass = clickable ? 'cursor-pointer hover:brightness-125 transition-all' : '';
+
   return (
-    <td className={`px-3 py-2 text-xs tabular-nums whitespace-nowrap text-right ${bgClass}`}>
+    <td
+      className={`px-3 py-2 text-xs tabular-nums whitespace-nowrap text-right ${bgClass} ${activeRing} ${hoverClass}`}
+      onClick={onClick}
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.(); } : undefined}
+    >
       <span className={`font-medium ${colorClass}`}>{value}</span>
     </td>
   );

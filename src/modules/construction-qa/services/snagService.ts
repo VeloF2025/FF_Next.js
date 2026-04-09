@@ -73,6 +73,31 @@ export async function fetchSnagHierarchyStats(projectId?: string, search?: strin
   return json.data;
 }
 
+/** Row returned by the by-status API */
+export interface SnagByStatusRow {
+  id: string;
+  snag_number: number;
+  description: string;
+  severity: string;
+  status: string;
+  category: string;
+  pole_references: string[] | null;
+  assigned_to_name: string | null;
+  noc_ticket_id: string | null;
+  noc_ticket_uid: string | null;
+  zone_no: number | null;
+  pon_no: number | null;
+  created_at: string;
+}
+
+/** Fetch snags for a project filtered by effective status (for summary drill-down). */
+export async function fetchSnagsByStatus(projectId: string, status: string): Promise<SnagByStatusRow[]> {
+  const res = await fetch(`/api/snags/by-status?projectId=${projectId}&status=${status}`);
+  if (!res.ok) throw new Error(`by-status: ${res.status}`);
+  const json = await res.json() as { data: SnagByStatusRow[] };
+  return json.data;
+}
+
 /** Fetch distinct zone/PON options for a project (cascading filters). */
 export async function fetchZonePonOptions(projectId: string): Promise<{
   zones: number[];

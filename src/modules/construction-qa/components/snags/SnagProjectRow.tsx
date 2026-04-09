@@ -11,13 +11,27 @@ interface SnagProjectRowProps {
   isExpanded: boolean;
   onToggle: (id: string) => void;
   onNavigate: (projectId: string) => void;
+  onStatusClick?: (projectId: string, status: string) => void;
+  activeStatus?: string | null;
 }
+
+const STATUS_COLUMNS = [
+  { key: 'open',        color: 'text-red-300',    bg: 'bg-red-900/20' },
+  { key: 'assigned',    color: 'text-amber-300',  bg: 'bg-amber-900/20' },
+  { key: 'in_progress', color: 'text-amber-300',  bg: 'bg-amber-900/20' },
+  { key: 'pending_qa',  color: 'text-orange-300', bg: 'bg-orange-900/20' },
+  { key: 'resolved',    color: 'text-blue-300',   bg: 'bg-blue-900/20' },
+  { key: 'verified',    color: 'text-green-300',  bg: 'bg-green-900/20' },
+  { key: 'closed',      color: 'text-green-300',  bg: 'bg-green-900/20' },
+] as const;
 
 export function SnagProjectRow({
   project: p,
   isExpanded,
   onToggle,
   onNavigate,
+  onStatusClick,
+  activeStatus,
 }: SnagProjectRowProps) {
   return (
     <tr className="hover:bg-[var(--ff-bg-hover)] transition-colors">
@@ -49,13 +63,16 @@ export function SnagProjectRow({
         <span className="font-medium text-zinc-200">{p.total}</span>
       </td>
 
-      <CountCell value={p.open}        colorClass="text-red-300"    bgClass="bg-red-900/20" />
-      <CountCell value={p.assigned}    colorClass="text-amber-300"  bgClass="bg-amber-900/20" />
-      <CountCell value={p.in_progress} colorClass="text-amber-300"  bgClass="bg-amber-900/20" />
-      <CountCell value={p.pending_qa}  colorClass="text-orange-300" bgClass="bg-orange-900/20" />
-      <CountCell value={p.resolved}    colorClass="text-blue-300"   bgClass="bg-blue-900/20" />
-      <CountCell value={p.verified}    colorClass="text-green-300"  bgClass="bg-green-900/20" />
-      <CountCell value={p.closed}      colorClass="text-green-300"  bgClass="bg-green-900/20" />
+      {STATUS_COLUMNS.map(({ key, color, bg }) => (
+        <CountCell
+          key={key}
+          value={p[key]}
+          colorClass={color}
+          bgClass={bg}
+          onClick={p[key] > 0 && onStatusClick ? () => onStatusClick(p.project_id, key) : undefined}
+          isActive={activeStatus === key}
+        />
+      ))}
 
       {/* Latest TQR */}
       <td className="px-3 py-2 text-xs tabular-nums whitespace-nowrap">
