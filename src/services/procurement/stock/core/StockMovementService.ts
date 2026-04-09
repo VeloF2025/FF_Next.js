@@ -11,9 +11,9 @@ import {
   stockMovementItems, 
   cableDrums, 
   drumUsageHistory 
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 } from '@/lib/neon/schema/procurement/stock.schema';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { eq, and, sql } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import type {

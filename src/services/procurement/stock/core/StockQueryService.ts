@@ -5,9 +5,9 @@
 
 import { BaseService, type ServiceResponse } from '../../../core/BaseService';
 import { db } from '@/lib/neon/connection';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { stockPositions, stockMovements, stockMovementItems, cableDrums, drumUsageHistory } from '@/lib/neon/schema/procurement/stock.schema';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { eq, and, desc, asc, gte, lte, like, count, sum, sql } from 'drizzle-orm';
 import type {
   StockPosition,
