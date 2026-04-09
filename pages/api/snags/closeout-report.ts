@@ -147,13 +147,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (ticketIds.length > 0) {
       noteRows = await sql`
         SELECT
-          tn.ticket_id, tn.content, tn.note_type, tn.created_at,
+          mn.ticket_id, mn.content, mn.note_type, mn.created_at,
           (u.first_name || ' ' || u.last_name) AS created_by_name
-        FROM ticket_notes tn
-        LEFT JOIN users u ON u.id = tn.created_by
-        WHERE tn.ticket_id = ANY(${ticketIds})
-          AND tn.note_type IN ('internal', 'client')
-        ORDER BY tn.created_at ASC
+        FROM maintenance_notes mn
+        LEFT JOIN users u ON u.id = mn.created_by
+        WHERE mn.ticket_id = ANY(${ticketIds})
+          AND mn.note_type IN ('internal', 'external')
+        ORDER BY mn.created_at ASC
       ` as Array<Record<string, unknown>>;
     }
 
