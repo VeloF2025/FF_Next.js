@@ -83,20 +83,21 @@ async function fetchSnagBeforePhotoUrl(ticketId: string): Promise<string | null>
   }
 }
 
-/** Fetch the snag after-photo URL for a ticket */
-async function fetchSnagAfterPhotoUrl(ticketId: string): Promise<string | null> {
+/** Fetch all attachment photo URLs for a ticket, excluding the original before-photo */
+async function fetchAfterPhotoUrls(ticketId: string): Promise<string[]> {
   try {
     const rows = await sql`
-      SELECT sp.photo_url
-      FROM snag_photos sp
-      JOIN snags s ON s.id = sp.snag_id
-      WHERE s.noc_ticket_id = ${ticketId}::uuid
-        AND sp.phase = 'after'
-      LIMIT 1
-    ` as Array<{ photo_url: string }>;
-    return rows[0]?.photo_url ?? null;
+      SELECT storage_url
+      FROM maintenance_attachments
+      WHERE ticket_id = ${ticketId}::uuid
+        AND mime_type LIKE 'image/%'
+        AND storage_url IS NOT NULL
+        AND filename != 'snag-before-photo.jpg'
+      ORDER BY uploaded_at ASC
+    ` as Array<{ storage_url: string }>;
+    return rows.map(r => r.storage_url);
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -267,19 +268,28 @@ export async function notifySnagGroupOnStatusChange(
 
     const isResolution = newStatus === 'resolved' || newStatus === 'closed';
 
-    // For resolution/closure, fetch technician notes and after photo
-    const [resolutionNote, afterPhotoUrl] = isResolution
-      ? await Promise.all([fetchResolutionNote(ticket.id), fetchSnagAfterPhotoUrl(ticket.id)])
-      : [null, null];
+    // For resolution/closure, fetch technician notes and after photos
+    const [resolutionNote, afterPhotoUrls] = isResolution
+      ? await Promise.all([fetchResolutionNote(ticket.id), fetchAfterPhotoUrls(ticket.id)])
+      : [null, [] as string[]];
 
     const message = buildStatusUpdateMessage(ticket, oldStatus, newStatus, resolutionNote);
 
-    // Send with after photo for resolved/closed, fallback to text
-    if (afterPhotoUrl && isResolution) {
+    // Send with after photos for resolved/closed
+    if (afterPhotoUrls && afterPhotoUrls.length > 0 && isResolution) {
       try {
-        await sendWhatsAppGroupImage(groupJid, message, afterPhotoUrl);
-        logger.info('Snag ticket resolution with photo sent to WA group', {
-          ticketId: ticket.id, ticketUid: ticket.ticket_uid, oldStatus, newStatus, groupJid,
+        // First photo gets the full message caption
+        await sendWhatsAppGroupImage(groupJid, message, afterPhotoUrls[0]);
+        // Additional photos sent with short caption
+        for (let i = 1; i < afterPhotoUrls.length; i++) {
+          await sendWhatsAppGroupImage(
+            groupJid,
+            `📷 ${ticket.ticket_uid} — photo ${i + 1}/${afterPhotoUrls.length}`,
+            afterPhotoUrls[i]
+          );
+        }
+        logger.info('Snag ticket resolution with photos sent to WA group', {
+          ticketId: ticket.id, ticketUid: ticket.ticket_uid, photoCount: afterPhotoUrls.length, groupJid,
         });
         return;
       } catch (imgErr) {
