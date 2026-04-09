@@ -34,7 +34,7 @@ export class SOWDropImportService {
       );
       const existingDrops = await getDocs(existingDropsQuery);
       const existingDropNumbers = new Set(
-        existingDrops.docs.map(doc => doc.data().dropNumber)
+        existingDrops.docs.map((doc: { data: () => Record<string, any> }) => doc.data().dropNumber) // eslint-disable-line @typescript-eslint/no-explicit-any
       );
 
       for (const drop of drops) {

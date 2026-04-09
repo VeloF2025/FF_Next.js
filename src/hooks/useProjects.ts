@@ -2,9 +2,10 @@ import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { projectService } from '@/services/projectService';
 import { log } from '@/lib/logger';
-import { 
-  ProjectFormData, 
-  ProjectFilter 
+import {
+  Project,
+  ProjectFormData,
+  ProjectFilter
 } from '@/types/project.types';
 
 // Query Keys
@@ -186,7 +187,7 @@ export function useProjectSubscription(id: string, enabled = true) {
   React.useEffect(() => {
     if (!enableSubscription) return;
 
-    const unsubscribe = projectService.subscribeToProject(id, (project) => {
+    const unsubscribe = projectService.subscribeToProject(id, (project: Project | null) => {
       // Update the cache directly with real-time data
       queryClient.setQueryData(projectKeys.detail(id), project);
     });
@@ -208,7 +209,7 @@ export function useProjectsSubscription(filter?: ProjectFilter, enabled = true) 
     if (filter?.status?.[0]) subscribeFilter.status = filter.status[0];
     if (filter?.clientId?.[0]) subscribeFilter.clientId = filter.clientId[0];
     
-    const unsubscribe = projectService.subscribeToProjects((projects) => {
+    const unsubscribe = projectService.subscribeToProjects((projects: Project[]) => {
       // Update the cache with real-time data
       queryClient.setQueryData(projectKeys.list(filter), projects);
     }, subscribeFilter);

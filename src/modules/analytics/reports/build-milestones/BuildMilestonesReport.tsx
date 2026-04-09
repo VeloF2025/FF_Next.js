@@ -148,7 +148,7 @@ const ScopeChart = ({ rows }: { rows: BuildMilestoneRow[] }) => {
         <XAxis dataKey="name" tick={{ fill: CHART_TICK, fontSize: 11 }} />
         <YAxis tick={{ fill: CHART_TICK, fontSize: 11 }} />
         <Tooltip contentStyle={{ backgroundColor: CHART_TOOLTIP_BG, border: `1px solid ${CHART_TOOLTIP_BORDER}`, color: '#fff' }} />
-        <Legend onClick={e => toggle(e.dataKey as string)} wrapperStyle={{ cursor: 'pointer' }} />
+        <Legend onClick={(e: { dataKey?: string }) => toggle(e.dataKey as string)} wrapperStyle={{ cursor: 'pointer' }} />
         <Bar dataKey="PON Scope" fill={CHART_SCOPE} isAnimationActive={false}>
           <LabelList dataKey="PON Scope" position="top" fill={CHART_SCOPE_LABEL} fontSize={11} />
         </Bar>
@@ -259,7 +259,7 @@ const TimelineChart = ({ timeline, projectNames }: { timeline: BuildMilestoneMon
         <XAxis dataKey="name" tick={{ fill: CHART_TICK, fontSize: 11 }} />
         <YAxis tick={{ fill: CHART_TICK, fontSize: 11 }} />
         <Tooltip contentStyle={{ backgroundColor: CHART_TOOLTIP_BG, border: `1px solid ${CHART_TOOLTIP_BORDER}`, color: '#fff' }} />
-        <Legend onClick={e => toggle(e.dataKey as string)} wrapperStyle={{ cursor: 'pointer', fontSize: 11 }} />
+        <Legend onClick={(e: { dataKey?: string }) => toggle(e.dataKey as string)} wrapperStyle={{ cursor: 'pointer', fontSize: 11 }} />
         {projectNames.map((proj, i) => (
           <>
             <Bar key={`${proj}-rfo`} dataKey={`${proj} RFO`} fill={PALETTE[i % PALETTE.length]} isAnimationActive={false} opacity={0.9} />

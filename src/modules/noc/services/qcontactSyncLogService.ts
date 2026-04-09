@@ -347,7 +347,7 @@ export async function listSyncLogs(
       [SyncDirection.OUTBOUND]: 0,
     };
 
-    directionStatsResult.rows.forEach((row) => {
+    directionStatsResult.rows.forEach((row: { sync_direction: string; count: string }) => {
       byDirection[row.sync_direction as SyncDirection] = parseInt(row.count, 10);
     });
 
@@ -373,7 +373,7 @@ export async function listSyncLogs(
       [SyncStatus.PARTIAL]: 0,
     };
 
-    statusStatsResult.rows.forEach((row) => {
+    statusStatsResult.rows.forEach((row: { status: string; count: string }) => {
       byStatus[row.status as SyncStatus] = parseInt(row.count, 10);
     });
 

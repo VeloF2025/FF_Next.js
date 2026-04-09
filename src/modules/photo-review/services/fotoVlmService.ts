@@ -187,7 +187,7 @@ function buildSmartBatchEvaluationPrompt(drNumber: string): string {
 
 TASK: Analyze ALL provided photos and evaluate against these ${QA_STEPS.length} QA steps:
 
-${QA_STEPS.map((step, index) =>
+${QA_STEPS.map((step: { step_label: string; criteria: string }, index: number) =>
   `${index + 1}. **${step.step_label}**: ${step.criteria}`
 ).join('\n')}
 

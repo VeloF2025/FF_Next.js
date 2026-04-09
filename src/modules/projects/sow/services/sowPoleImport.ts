@@ -34,7 +34,7 @@ export class SOWPoleImportService {
       );
       const existingPoles = await getDocs(existingPolesQuery);
       const existingPoleNumbers = new Set(
-        existingPoles.docs.map(doc => doc.data().poleNumber)
+        existingPoles.docs.map((doc: { data: () => Record<string, any> }) => doc.data().poleNumber) // eslint-disable-line @typescript-eslint/no-explicit-any
       );
 
       for (const pole of poles) {

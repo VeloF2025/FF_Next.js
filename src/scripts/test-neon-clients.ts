@@ -19,7 +19,7 @@ async function testNeonClients() {
       WHERE table_name = 'clients'
       ORDER BY ordinal_position
     `;
-    columns.forEach(col => {
+    columns.forEach((col: { column_name: string; data_type: string; is_nullable: string }) => {
       log.info(`  - ${col.column_name}: ${col.data_type} ${col.is_nullable === 'NO' ? '(required);' : ''}`, {}, 'test-neon-clients');
     });
     
@@ -32,7 +32,7 @@ async function testNeonClients() {
         ORDER BY created_at DESC 
         LIMIT 3
       `;
-      sample.forEach((_client, _i) => {
+      sample.forEach((_client: Record<string, unknown>, _i: number) => {
       });
     }
     

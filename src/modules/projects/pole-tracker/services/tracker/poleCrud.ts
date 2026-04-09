@@ -68,7 +68,7 @@ export class PoleCrudService {
     const q = query(collection(db, POLE_COLLECTION), orderBy('poleNumber'));
     const snapshot = await getDocs(q);
     
-    return snapshot.docs.map(doc => ({
+    return snapshot.docs.map((doc: { id: string; data: () => Record<string, any> }) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
       id: doc.id,
       ...doc.data()
     } as Pole));

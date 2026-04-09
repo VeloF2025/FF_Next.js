@@ -11,7 +11,7 @@ export class PoleValidationService {
     const snapshot = await getDocs(q);
     
     if (excludeId) {
-      return snapshot.docs.every(doc => doc.id === excludeId);
+      return snapshot.docs.every((doc: { id: string }) => doc.id === excludeId);
     }
     
     return snapshot.empty;

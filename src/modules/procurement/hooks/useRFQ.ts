@@ -169,7 +169,7 @@ export function useRFQSubscription(rfqId: string, callback: (rfq: any) => void) 
   useQuery({
     queryKey: ['rfq-subscription', rfqId],
     queryFn: () => {
-      const unsubscribe = rfqService.subscribeToRFQ(rfqId, (rfq) => {
+      const unsubscribe = rfqService.subscribeToRFQ(rfqId, (rfq: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         queryClient.setQueryData(['rfqs', rfqId], rfq);
         callback(rfq);
       });
@@ -186,7 +186,7 @@ export function useRFQResponsesSubscription(rfqId: string, callback: (responses:
   useQuery({
     queryKey: ['rfq-responses-subscription', rfqId],
     queryFn: () => {
-      const unsubscribe = rfqService.subscribeToResponses(rfqId, (responses) => {
+      const unsubscribe = rfqService.subscribeToResponses(rfqId, (responses: any[]) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         queryClient.setQueryData(['rfq-responses', rfqId], responses);
         callback(responses);
       });

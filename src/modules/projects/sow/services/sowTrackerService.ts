@@ -152,7 +152,7 @@ export class SOWTrackerService {
       where('projectId', '==', projectId)
     );
     const polesSnapshot = await getDocs(polesQuery);
-    polesSnapshot.forEach(doc => {
+    polesSnapshot.forEach((doc: { data: () => Record<string, any> }) => { // eslint-disable-line @typescript-eslint/no-explicit-any
       const status = doc.data().status || 'pending';
       statusCounts[status] = (statusCounts[status] || 0) + 1;
     });

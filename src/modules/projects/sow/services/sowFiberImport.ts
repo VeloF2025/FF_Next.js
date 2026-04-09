@@ -34,7 +34,7 @@ export class SOWFiberImportService {
       );
       const existingFiber = await getDocs(existingFiberQuery);
       const existingSectionIds = new Set(
-        existingFiber.docs.map(doc => doc.data().sectionId)
+        existingFiber.docs.map((doc: { data: () => Record<string, any> }) => doc.data().sectionId) // eslint-disable-line @typescript-eslint/no-explicit-any
       );
 
       for (const fiber of fiberSections) {
