@@ -36,6 +36,7 @@ import { VerificationChecklist } from '../Verification/VerificationChecklist';
 import { QAReadinessCheck } from '../QAReadiness/QAReadinessCheck';
 import { AssignmentPanel } from '../Assignment/AssignmentPanel';
 import { RelatedTickets } from './RelatedTickets';
+import { NearbyTickets } from './NearbyTickets';
 import { NotesTab } from './NotesTab';
 import { AttachmentsTab } from './AttachmentsTab';
 import { useTicketNotes } from '../../hooks/useTicketNotesWithMutations';
@@ -407,6 +408,18 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
           <RelatedTickets
             ticketId={ticketId}
             drNumber={ticket.dr_number}
+          />
+
+          {/* Nearby Tickets - Show tickets within 100m */}
+          <NearbyTickets
+            ticketId={ticketId}
+            gpsCoordinates={
+              typeof ticket.gps_coordinates === 'string'
+                ? ticket.gps_coordinates
+                : ticket.gps_coordinates
+                  ? `${ticket.gps_coordinates.latitude},${ticket.gps_coordinates.longitude}`
+                  : null
+            }
           />
 
           {/* Actions */}

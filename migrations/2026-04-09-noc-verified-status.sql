@@ -1,5 +1,5 @@
 -- Add 'verified' status to maintenance_statuses lookup table
-INSERT INTO maintenance_statuses (code, label, color, sort_order, description)
+INSERT INTO maintenance_statuses (code, name, color, display_order, description)
 VALUES ('verified', 'Verified', 'success', 105, 'Resolution verified by team lead — ready to close')
 ON CONFLICT (code) DO NOTHING;
 
