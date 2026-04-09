@@ -28,15 +28,32 @@ interface SnagDetailProps {
   onPhotoDeleted: (photoId: string) => void;
 }
 
+/** Workflow order — matches NOC Kanban columns */
 const STATUS_OPTIONS: { value: SnagStatus; label: string }[] = [
   { value: 'open', label: 'Open' },
   { value: 'assigned', label: 'Assigned' },
   { value: 'in_progress', label: 'In Progress' },
-  { value: 'fixed', label: 'Fixed' },
+  { value: 'pending_qa', label: 'Pending QA' },
+  { value: 'resolved', label: 'Resolved' },
   { value: 'verified', label: 'Verified' },
   { value: 'closed', label: 'Closed' },
   { value: 'wont_fix', label: "Won't Fix" },
 ];
+
+/** Forward/backward transitions aligned to the agreed workflow */
+const WORKFLOW_ACTIONS: Record<string, {
+  forward?: { status: SnagStatus; label: string };
+  backward?: { status: SnagStatus; label: string };
+}> = {
+  open:        { forward: { status: 'assigned',    label: 'Assign' } },
+  assigned:    { forward: { status: 'in_progress', label: 'Start Work' },       backward: { status: 'open',        label: 'Unassign' } },
+  in_progress: { forward: { status: 'pending_qa',  label: 'Mark as Fixed' },    backward: { status: 'assigned',    label: 'Back to Assigned' } },
+  pending_qa:  { forward: { status: 'resolved',    label: 'Approve QA' },       backward: { status: 'in_progress', label: 'Reject QA' } },
+  fixed:       { forward: { status: 'resolved',    label: 'Approve QA' },       backward: { status: 'in_progress', label: 'Reject QA' } },
+  resolved:    { forward: { status: 'verified',    label: 'Customer Confirmed' }, backward: { status: 'in_progress', label: 'Customer Unhappy' } },
+  verified:    { forward: { status: 'closed',      label: 'Close' },            backward: { status: 'in_progress', label: 'Reopen' } },
+  closed:      {                                                                  backward: { status: 'open',        label: 'Reopen' } },
+};
 
 /** WORKING: Expanded inline snag detail with pole resolution */
 export function SnagDetail({ snag: initialSnag, photos, onClose, onUpdated, onPhotoAdded, onPhotoDeleted }: SnagDetailProps) {
@@ -194,6 +211,81 @@ export function SnagDetail({ snag: initialSnag, photos, onClose, onUpdated, onPh
         </button>
       </div>
 
+      {/* Workflow action bar — immediately below header */}
+      {(() => {
+        const actions = WORKFLOW_ACTIONS[snag.status];
+        return (
+          <div className="flex items-center gap-2 flex-wrap mb-3 pb-3 border-b border-zinc-800">
+            {/* Back button */}
+            {actions?.backward && (
+              <button
+                type="button"
+                onClick={() => { void handleStatusChange(actions.backward!.status); }}
+                disabled={saving}
+                className="text-xs bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-200 px-3 py-1.5 rounded font-medium transition-colors"
+              >
+                ← {actions.backward.label}
+              </button>
+            )}
+
+            {/* Status dropdown */}
+            <Select
+              value={snag.status}
+              onValueChange={(v) => { void handleStatusChange(v as SnagStatus); }}
+              disabled={saving}
+            >
+              <SelectTrigger className="w-36 h-8 bg-zinc-800 border-zinc-700 text-zinc-100 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-zinc-800 border-zinc-700">
+                {STATUS_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value} className="text-zinc-100 text-xs">
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Forward button */}
+            {actions?.forward && (
+              <button
+                type="button"
+                onClick={() => { void handleStatusChange(actions.forward!.status); }}
+                disabled={saving}
+                className="text-xs bg-green-800 hover:bg-green-700 disabled:opacity-50 text-green-100 px-3 py-1.5 rounded font-medium transition-colors"
+              >
+                {actions.forward.label} →
+              </button>
+            )}
+
+            {/* NOC ticket link / create */}
+            <div className="ml-auto">
+              {snag.noc_ticket_id ? (
+                <a
+                  href={`/noc/tickets/${snag.noc_ticket_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs bg-blue-900/60 hover:bg-blue-800/60 text-blue-300 border border-blue-700 px-3 py-1.5 rounded font-medium transition-colors"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  NOC {snag.noc_ticket_uid ?? 'Ticket'}
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { void handleCreateNocTicket(); }}
+                  disabled={saving || creatingTicket}
+                  className="flex items-center gap-1.5 text-xs bg-blue-900/60 hover:bg-blue-800/60 disabled:opacity-50 text-blue-300 border border-blue-700 px-3 py-1.5 rounded font-medium transition-colors"
+                >
+                  <Ticket className="h-3.5 w-3.5" />
+                  {creatingTicket ? 'Creating...' : 'Create NOC Ticket'}
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Pole Resolution */}
       {(snag.pole_references?.length ?? 0) > 0 && (
         <SnagPoleResolution snag={snag} onLinked={handlePoleLinked} />
@@ -211,59 +303,6 @@ export function SnagDetail({ snag: initialSnag, photos, onClose, onUpdated, onPh
             onPhotoDeleted={onPhotoDeleted}
           />
         ))}
-      </div>
-
-      {/* Action row */}
-      <div className="flex items-center gap-2 flex-wrap border-t border-zinc-800 pt-3">
-        <Select
-          value={snag.status}
-          onValueChange={(v) => { void handleStatusChange(v as SnagStatus); }}
-          disabled={saving}
-        >
-          <SelectTrigger className="w-36 h-8 bg-zinc-800 border-zinc-700 text-zinc-100 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="bg-zinc-800 border-zinc-700">
-            {STATUS_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value} className="text-zinc-100 text-xs">
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {snag.status === 'fixed' && (
-          <button
-            type="button"
-            onClick={() => { void handleMarkVerified(); }}
-            disabled={saving}
-            className="text-xs bg-green-800 hover:bg-green-700 disabled:opacity-50 text-green-100 px-3 py-1.5 rounded font-medium"
-          >
-            Mark Verified
-          </button>
-        )}
-
-        {snag.noc_ticket_id ? (
-          <a
-            href={`/noc/tickets/${snag.noc_ticket_id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs bg-blue-900/60 hover:bg-blue-800/60 text-blue-300 border border-blue-700 px-3 py-1.5 rounded font-medium transition-colors"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-            NOC {snag.noc_ticket_uid ?? 'Ticket'}
-          </a>
-        ) : (
-          <button
-            type="button"
-            onClick={() => { void handleCreateNocTicket(); }}
-            disabled={saving || creatingTicket}
-            className="flex items-center gap-1.5 text-xs bg-blue-900/60 hover:bg-blue-800/60 disabled:opacity-50 text-blue-300 border border-blue-700 px-3 py-1.5 rounded font-medium transition-colors"
-          >
-            <Ticket className="h-3.5 w-3.5" />
-            {creatingTicket ? 'Creating...' : 'Create NOC Ticket'}
-          </button>
-        )}
       </div>
 
       {/* Timeline */}

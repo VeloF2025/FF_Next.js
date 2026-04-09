@@ -16,25 +16,28 @@ interface SnagProjectCardProps {
 interface StatusBarProps {
   open: number;
   inProgress: number;
-  fixed: number;
+  pendingQa: number;
+  resolved: number;
   verified: number;
   total: number;
 }
 
-function StatusBar({ open, inProgress, fixed, verified, total }: StatusBarProps) {
+function StatusBar({ open, inProgress, pendingQa, resolved, verified, total }: StatusBarProps) {
   if (total === 0) {
     return <div className="h-1.5 bg-zinc-800 rounded-full" />;
   }
   const openPct    = Math.round((open / total) * 100);
   const ipPct      = Math.round((inProgress / total) * 100);
-  const fixedPct   = Math.round((fixed / total) * 100);
+  const pqaPct     = Math.round((pendingQa / total) * 100);
+  const resPct     = Math.round((resolved / total) * 100);
   const verPct     = Math.round((verified / total) * 100);
 
   return (
     <div className="flex h-1.5 rounded-full overflow-hidden bg-zinc-800 gap-px">
       {openPct > 0    && <div className="bg-red-500"    style={{ width: `${openPct}%` }} />}
       {ipPct > 0      && <div className="bg-yellow-500" style={{ width: `${ipPct}%` }} />}
-      {fixedPct > 0   && <div className="bg-blue-500"   style={{ width: `${fixedPct}%` }} />}
+      {pqaPct > 0     && <div className="bg-orange-500" style={{ width: `${pqaPct}%` }} />}
+      {resPct > 0     && <div className="bg-blue-500"   style={{ width: `${resPct}%` }} />}
       {verPct > 0     && <div className="bg-green-500"  style={{ width: `${verPct}%` }} />}
     </div>
   );
@@ -69,9 +72,10 @@ export function SnagProjectCard({ stats, onClick }: SnagProjectCardProps) {
 
       {/* Status bar */}
       <StatusBar
-        open={stats.open + stats.assigned + stats.reopened}
+        open={stats.open + stats.assigned}
         inProgress={stats.in_progress}
-        fixed={stats.fixed}
+        pendingQa={stats.pending_qa}
+        resolved={stats.resolved}
         verified={stats.verified + stats.closed}
         total={stats.total}
       />
@@ -88,9 +92,14 @@ export function SnagProjectCard({ stats, onClick }: SnagProjectCardProps) {
             {stats.in_progress} in progress
           </span>
         )}
-        {stats.fixed > 0 && (
+        {stats.pending_qa > 0 && (
+          <span className="text-xs bg-orange-900/50 text-orange-300 px-1.5 py-0.5 rounded">
+            {stats.pending_qa} pending QA
+          </span>
+        )}
+        {stats.resolved > 0 && (
           <span className="text-xs bg-blue-900/50 text-blue-300 px-1.5 py-0.5 rounded">
-            {stats.fixed} fixed
+            {stats.resolved} resolved
           </span>
         )}
         {stats.verified > 0 && (

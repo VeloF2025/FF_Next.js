@@ -25,10 +25,13 @@ import type {
 /** Map snag status → NOC ticket status for sync (returns undefined if no sync needed) */
 function mapSnagStatusToTicketStatus(snagStatus: SnagStatus): TicketStatus | undefined {
   switch (snagStatus) {
-    case 'fixed':    return TicketStatus.RESOLVED;
-    case 'verified': return TicketStatus.VERIFIED;
-    case 'closed':   return TicketStatus.CLOSED;
-    default:         return undefined;
+    case 'in_progress': return TicketStatus.IN_PROGRESS;
+    case 'pending_qa':  return TicketStatus.PENDING_QA;
+    case 'fixed':       return TicketStatus.PENDING_QA;  // legacy: treat as pending_qa
+    case 'resolved':    return TicketStatus.RESOLVED;
+    case 'verified':    return TicketStatus.VERIFIED;
+    case 'closed':      return TicketStatus.CLOSED;
+    default:            return undefined;
   }
 }
 
@@ -192,7 +195,7 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse) {
   }
 
   // Derive timestamp fields from status transition
-  const fixedAt     = body.status === 'fixed'    ? new Date().toISOString() : null;
+  const fixedAt     = (body.status === 'pending_qa' || body.status === 'fixed') ? new Date().toISOString() : null;
   const verifiedAt  = body.status === 'verified' ? new Date().toISOString() : null;
   const closedAt    = body.status === 'closed'   ? new Date().toISOString() : null;
   const assignedAt  = body.assigned_to           ? new Date().toISOString() : null;

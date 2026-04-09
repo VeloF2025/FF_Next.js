@@ -17,10 +17,10 @@ const ZERO_COUNTS: StatusCounts = {
   open: 0,
   assigned: 0,
   in_progress: 0,
-  fixed: 0,
+  pending_qa: 0,
+  resolved: 0,
   verified: 0,
   closed: 0,
-  reopened: 0,
 };
 
 function addCounts(acc: StatusCounts, row: StatusCounts): StatusCounts {
@@ -29,10 +29,10 @@ function addCounts(acc: StatusCounts, row: StatusCounts): StatusCounts {
     open: acc.open + row.open,
     assigned: acc.assigned + row.assigned,
     in_progress: acc.in_progress + row.in_progress,
-    fixed: acc.fixed + row.fixed,
+    pending_qa: acc.pending_qa + row.pending_qa,
+    resolved: acc.resolved + row.resolved,
     verified: acc.verified + row.verified,
     closed: acc.closed + row.closed,
-    reopened: acc.reopened + row.reopened,
   };
 }
 

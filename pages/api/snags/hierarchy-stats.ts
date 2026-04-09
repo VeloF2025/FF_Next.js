@@ -31,10 +31,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       open: string;
       assigned: string;
       in_progress: string;
-      fixed: string;
+      pending_qa: string;
+      resolved: string;
       verified: string;
       closed: string;
-      reopened: string;
     };
 
     let rows: RawRow[];
@@ -42,12 +42,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const searchPattern = searchTerm ? `%${searchTerm}%` : '';
 
     // All branches use NOC ticket status when a ticket is linked,
-    // otherwise fall back to snag status. Mapping:
-    //   NOC open → open | NOC assigned → assigned | NOC in_progress → in_progress
-    //   NOC pending_qa/qa_in_progress/qa_rejected → fixed (QA stage)
-    //   NOC qa_approved/pending_handover/handed_to_ops → verified
-    //   NOC resolved/closed → closed
-    //   (no ticket) uses snag's own status directly
+    // otherwise fall back to snag status. Aligned to NOC Kanban columns:
+    //   open:        NOC open         | snag open, reopened
+    //   assigned:    NOC assigned     | snag assigned
+    //   in_progress: NOC in_progress, qa_rejected | snag in_progress
+    //   pending_qa:  NOC pending_qa, qa_in_progress | snag pending_qa, fixed (legacy)
+    //   resolved:    NOC qa_approved, pending_handover, handed_to_ops, resolved | snag resolved
+    //   verified:    NOC verified     | snag verified
+    //   closed:      NOC closed, cancelled | snag closed
 
     if (projectId && typeof projectId === 'string' && searchTerm) {
       // Branch A — projectId + search
@@ -57,13 +59,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           COALESCE(pole.zone_no, dr.zone_no) AS zone_no,
           COALESCE(pole.pon_no, dr.pon_no) AS pon_no,
           COUNT(s.id) AS total,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'open' ELSE s.status = 'open' END) AS open,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'open' ELSE s.status IN ('open','reopened') END) AS open,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'assigned' ELSE s.status = 'assigned' END) AS assigned,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'in_progress' ELSE s.status = 'in_progress' END) AS in_progress,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('pending_qa','qa_in_progress','qa_rejected') ELSE s.status = 'fixed' END) AS fixed,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('verified','qa_approved','pending_handover','handed_to_ops') ELSE s.status = 'verified' END) AS verified,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('resolved','closed') ELSE s.status = 'closed' END) AS closed,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN FALSE ELSE s.status = 'reopened' END) AS reopened
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('in_progress','qa_rejected') ELSE s.status = 'in_progress' END) AS in_progress,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('pending_qa','qa_in_progress') ELSE s.status IN ('pending_qa','fixed') END) AS pending_qa,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('qa_approved','pending_handover','handed_to_ops','resolved') ELSE s.status = 'resolved' END) AS resolved,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'verified' ELSE s.status = 'verified' END) AS verified,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('closed','cancelled') ELSE s.status = 'closed' END) AS closed
         FROM projects p
         INNER JOIN snags s ON s.project_id = p.id
         LEFT JOIN maintenance_tickets t ON t.id = s.noc_ticket_id
@@ -87,13 +89,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           COALESCE(pole.zone_no, dr.zone_no) AS zone_no,
           COALESCE(pole.pon_no, dr.pon_no) AS pon_no,
           COUNT(s.id) AS total,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'open' ELSE s.status = 'open' END) AS open,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'open' ELSE s.status IN ('open','reopened') END) AS open,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'assigned' ELSE s.status = 'assigned' END) AS assigned,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'in_progress' ELSE s.status = 'in_progress' END) AS in_progress,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('pending_qa','qa_in_progress','qa_rejected') ELSE s.status = 'fixed' END) AS fixed,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('verified','qa_approved','pending_handover','handed_to_ops') ELSE s.status = 'verified' END) AS verified,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('resolved','closed') ELSE s.status = 'closed' END) AS closed,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN FALSE ELSE s.status = 'reopened' END) AS reopened
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('in_progress','qa_rejected') ELSE s.status = 'in_progress' END) AS in_progress,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('pending_qa','qa_in_progress') ELSE s.status IN ('pending_qa','fixed') END) AS pending_qa,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('qa_approved','pending_handover','handed_to_ops','resolved') ELSE s.status = 'resolved' END) AS resolved,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'verified' ELSE s.status = 'verified' END) AS verified,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('closed','cancelled') ELSE s.status = 'closed' END) AS closed
         FROM projects p
         INNER JOIN snags s ON s.project_id = p.id
         LEFT JOIN maintenance_tickets t ON t.id = s.noc_ticket_id
@@ -111,13 +113,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           COALESCE(pole.zone_no, dr.zone_no) AS zone_no,
           COALESCE(pole.pon_no, dr.pon_no) AS pon_no,
           COUNT(s.id) AS total,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'open' ELSE s.status = 'open' END) AS open,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'open' ELSE s.status IN ('open','reopened') END) AS open,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'assigned' ELSE s.status = 'assigned' END) AS assigned,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'in_progress' ELSE s.status = 'in_progress' END) AS in_progress,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('pending_qa','qa_in_progress','qa_rejected') ELSE s.status = 'fixed' END) AS fixed,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('verified','qa_approved','pending_handover','handed_to_ops') ELSE s.status = 'verified' END) AS verified,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('resolved','closed') ELSE s.status = 'closed' END) AS closed,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN FALSE ELSE s.status = 'reopened' END) AS reopened
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('in_progress','qa_rejected') ELSE s.status = 'in_progress' END) AS in_progress,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('pending_qa','qa_in_progress') ELSE s.status IN ('pending_qa','fixed') END) AS pending_qa,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('qa_approved','pending_handover','handed_to_ops','resolved') ELSE s.status = 'resolved' END) AS resolved,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'verified' ELSE s.status = 'verified' END) AS verified,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('closed','cancelled') ELSE s.status = 'closed' END) AS closed
         FROM projects p
         INNER JOIN snags s ON s.project_id = p.id
         LEFT JOIN maintenance_tickets t ON t.id = s.noc_ticket_id
@@ -140,13 +142,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           COALESCE(pole.zone_no, dr.zone_no) AS zone_no,
           COALESCE(pole.pon_no, dr.pon_no) AS pon_no,
           COUNT(s.id) AS total,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'open' ELSE s.status = 'open' END) AS open,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'open' ELSE s.status IN ('open','reopened') END) AS open,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'assigned' ELSE s.status = 'assigned' END) AS assigned,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'in_progress' ELSE s.status = 'in_progress' END) AS in_progress,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('pending_qa','qa_in_progress','qa_rejected') ELSE s.status = 'fixed' END) AS fixed,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('verified','qa_approved','pending_handover','handed_to_ops') ELSE s.status = 'verified' END) AS verified,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('resolved','closed') ELSE s.status = 'closed' END) AS closed,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN FALSE ELSE s.status = 'reopened' END) AS reopened
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('in_progress','qa_rejected') ELSE s.status = 'in_progress' END) AS in_progress,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('pending_qa','qa_in_progress') ELSE s.status IN ('pending_qa','fixed') END) AS pending_qa,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('qa_approved','pending_handover','handed_to_ops','resolved') ELSE s.status = 'resolved' END) AS resolved,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'verified' ELSE s.status = 'verified' END) AS verified,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('closed','cancelled') ELSE s.status = 'closed' END) AS closed
         FROM projects p
         INNER JOIN snags s ON s.project_id = p.id
         LEFT JOIN maintenance_tickets t ON t.id = s.noc_ticket_id
@@ -166,10 +168,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       open: parseInt(r.open, 10),
       assigned: parseInt(r.assigned, 10),
       in_progress: parseInt(r.in_progress, 10),
-      fixed: parseInt(r.fixed, 10),
+      pending_qa: parseInt(r.pending_qa, 10),
+      resolved: parseInt(r.resolved, 10),
       verified: parseInt(r.verified, 10),
       closed: parseInt(r.closed, 10),
-      reopened: parseInt(r.reopened, 10),
     }));
 
     return apiResponse.success(res, data);

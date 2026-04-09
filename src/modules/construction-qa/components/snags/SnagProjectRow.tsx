@@ -49,13 +49,13 @@ export function SnagProjectRow({
         <span className="font-medium text-zinc-200">{p.total}</span>
       </td>
 
-      <CountCell value={p.open}        colorClass="text-red-300"   bgClass="bg-red-900/20" />
-      <CountCell value={p.assigned}    colorClass="text-amber-300" bgClass="bg-amber-900/20" />
-      <CountCell value={p.in_progress} colorClass="text-amber-300" bgClass="bg-amber-900/20" />
-      <CountCell value={p.fixed}       colorClass="text-blue-300"  bgClass="bg-blue-900/20" />
-      <CountCell value={p.verified}    colorClass="text-green-300" bgClass="bg-green-900/20" />
-      <CountCell value={p.closed}      colorClass="text-green-300" bgClass="bg-green-900/20" />
-      <CountCell value={p.reopened}    colorClass="text-red-300"   bgClass="bg-red-900/20" />
+      <CountCell value={p.open}        colorClass="text-red-300"    bgClass="bg-red-900/20" />
+      <CountCell value={p.assigned}    colorClass="text-amber-300"  bgClass="bg-amber-900/20" />
+      <CountCell value={p.in_progress} colorClass="text-amber-300"  bgClass="bg-amber-900/20" />
+      <CountCell value={p.pending_qa}  colorClass="text-orange-300" bgClass="bg-orange-900/20" />
+      <CountCell value={p.resolved}    colorClass="text-blue-300"   bgClass="bg-blue-900/20" />
+      <CountCell value={p.verified}    colorClass="text-green-300"  bgClass="bg-green-900/20" />
+      <CountCell value={p.closed}      colorClass="text-green-300"  bgClass="bg-green-900/20" />
 
       {/* Latest TQR */}
       <td className="px-3 py-2 text-xs tabular-nums whitespace-nowrap">

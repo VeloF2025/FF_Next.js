@@ -107,19 +107,19 @@ export function SnagSummaryPage() {
       open:        acc.open        + p.open,
       assigned:    acc.assigned    + p.assigned,
       in_progress: acc.in_progress + p.in_progress,
-      fixed:       acc.fixed       + p.fixed,
+      pending_qa:  acc.pending_qa  + p.pending_qa,
+      resolved:    acc.resolved    + p.resolved,
       verified:    acc.verified    + p.verified,
       closed:      acc.closed      + p.closed,
-      reopened:    acc.reopened    + p.reopened,
     }),
-    { total: 0, open: 0, assigned: 0, in_progress: 0, fixed: 0, verified: 0, closed: 0, reopened: 0 }
+    { total: 0, open: 0, assigned: 0, in_progress: 0, pending_qa: 0, resolved: 0, verified: 0, closed: 0 }
   );
 
   async function exportExcel() {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Snag Summary');
 
-    const headers = ['Project Name', 'Zone', 'PON', 'Total', 'Open', 'Assigned', 'In Progress', 'Fixed', 'Verified', 'Closed', 'Reopened'];
+    const headers = ['Project Name', 'Zone', 'PON', 'Total', 'Open', 'Assigned', 'In Progress', 'Pending QA', 'Resolved', 'Verified', 'Closed'];
     ws.addRow(headers);
 
     // Style header row
@@ -141,10 +141,10 @@ export function SnagSummaryPage() {
             pon.open,
             pon.assigned,
             pon.in_progress,
-            pon.fixed,
+            pon.pending_qa,
+            pon.resolved,
             pon.verified,
             pon.closed,
-            pon.reopened,
           ]);
         }
       }
@@ -175,10 +175,10 @@ export function SnagSummaryPage() {
       { width: 10 }, // Open
       { width: 12 }, // Assigned
       { width: 14 }, // In Progress
-      { width: 10 }, // Fixed
+      { width: 14 }, // Pending QA
+      { width: 12 }, // Resolved
       { width: 12 }, // Verified
       { width: 10 }, // Closed
-      { width: 12 }, // Reopened
     ];
 
     const dateStr = new Date().toISOString().slice(0, 10);
@@ -246,7 +246,7 @@ export function SnagSummaryPage() {
           <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
             <thead className="sticky top-0 z-10 bg-[var(--ff-bg-tertiary)]">
               <tr>
-                {['Project', 'Total', 'Open', 'Assigned', 'In Progress', 'Fixed', 'Verified', 'Closed', 'Reopened', 'Latest TQR'].map((h) => (
+                {['Project', 'Total', 'Open', 'Assigned', 'In Progress', 'Pending QA', 'Resolved', 'Verified', 'Closed', 'Latest TQR'].map((h) => (
                   <th
                     key={h}
                     className="px-3 py-2 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide whitespace-nowrap"
@@ -328,10 +328,10 @@ export function SnagSummaryPage() {
                   <td className="px-3 py-2 text-xs tabular-nums font-bold text-red-300 whitespace-nowrap text-right">{totals.open}</td>
                   <td className="px-3 py-2 text-xs tabular-nums font-bold text-amber-300 whitespace-nowrap text-right">{totals.assigned}</td>
                   <td className="px-3 py-2 text-xs tabular-nums font-bold text-amber-300 whitespace-nowrap text-right">{totals.in_progress}</td>
-                  <td className="px-3 py-2 text-xs tabular-nums font-bold text-blue-300 whitespace-nowrap text-right">{totals.fixed}</td>
+                  <td className="px-3 py-2 text-xs tabular-nums font-bold text-orange-300 whitespace-nowrap text-right">{totals.pending_qa}</td>
+                  <td className="px-3 py-2 text-xs tabular-nums font-bold text-blue-300 whitespace-nowrap text-right">{totals.resolved}</td>
                   <td className="px-3 py-2 text-xs tabular-nums font-bold text-green-300 whitespace-nowrap text-right">{totals.verified}</td>
                   <td className="px-3 py-2 text-xs tabular-nums font-bold text-green-300 whitespace-nowrap text-right">{totals.closed}</td>
-                  <td className="px-3 py-2 text-xs tabular-nums font-bold text-red-300 whitespace-nowrap text-right">{totals.reopened}</td>
                   <td className="px-3 py-2 text-xs text-zinc-500 whitespace-nowrap">—</td>
                 </tr>
               )}

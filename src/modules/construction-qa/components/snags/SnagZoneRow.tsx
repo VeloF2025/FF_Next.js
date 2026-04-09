@@ -50,13 +50,13 @@ export function SnagZoneRow({
         <span className="font-medium text-zinc-200">{z.total}</span>
       </td>
 
-      <CountCell value={z.open}        colorClass="text-red-300"   bgClass="bg-red-900/20" />
-      <CountCell value={z.assigned}    colorClass="text-amber-300" bgClass="bg-amber-900/20" />
-      <CountCell value={z.in_progress} colorClass="text-amber-300" bgClass="bg-amber-900/20" />
-      <CountCell value={z.fixed}       colorClass="text-blue-300"  bgClass="bg-blue-900/20" />
-      <CountCell value={z.verified}    colorClass="text-green-300" bgClass="bg-green-900/20" />
-      <CountCell value={z.closed}      colorClass="text-green-300" bgClass="bg-green-900/20" />
-      <CountCell value={z.reopened}    colorClass="text-red-300"   bgClass="bg-red-900/20" />
+      <CountCell value={z.open}        colorClass="text-red-300"    bgClass="bg-red-900/20" />
+      <CountCell value={z.assigned}    colorClass="text-amber-300"  bgClass="bg-amber-900/20" />
+      <CountCell value={z.in_progress} colorClass="text-amber-300"  bgClass="bg-amber-900/20" />
+      <CountCell value={z.pending_qa}  colorClass="text-orange-300" bgClass="bg-orange-900/20" />
+      <CountCell value={z.resolved}    colorClass="text-blue-300"   bgClass="bg-blue-900/20" />
+      <CountCell value={z.verified}    colorClass="text-green-300"  bgClass="bg-green-900/20" />
+      <CountCell value={z.closed}      colorClass="text-green-300"  bgClass="bg-green-900/20" />
 
       <td className="px-3 py-2 text-xs text-zinc-600 whitespace-nowrap">—</td>
     </tr>

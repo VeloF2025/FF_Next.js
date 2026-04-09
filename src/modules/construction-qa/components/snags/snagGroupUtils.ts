@@ -6,7 +6,7 @@
 import type { Snag, ZonePonGroup, PonGroup } from '../../types/snag.types';
 
 const OPEN_STATUSES = new Set(['open', 'assigned', 'in_progress', 'reopened']);
-const FIXED_STATUSES = new Set(['fixed', 'verified', 'closed']);
+const FIXED_STATUSES = new Set(['pending_qa', 'fixed', 'resolved', 'verified', 'closed']);
 
 /**
  * Groups a flat snag list into a Zone → PON hierarchy.

@@ -20,7 +20,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     // Use NOC ticket status when a ticket is linked, otherwise fall back to snag status.
-    // This ensures counts reflect real NOC workflow progress.
+    // Aligned to NOC Kanban columns:
+    //   open:        NOC open         | snag open, reopened
+    //   assigned:    NOC assigned     | snag assigned
+    //   in_progress: NOC in_progress, qa_rejected | snag in_progress
+    //   pending_qa:  NOC pending_qa, qa_in_progress | snag pending_qa, fixed (legacy)
+    //   resolved:    NOC qa_approved, pending_handover, handed_to_ops, resolved | snag resolved
+    //   verified:    NOC verified     | snag verified
+    //   closed:      NOC closed, cancelled | snag closed
     const rows = await sql`
       SELECT
         p.id                    AS project_id,
@@ -28,32 +35,32 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         COUNT(s.id)             AS total,
         COUNT(s.id) FILTER (WHERE
           CASE WHEN t.id IS NOT NULL THEN t.status = 'open'
-               ELSE s.status = 'open' END
+               ELSE s.status IN ('open','reopened') END
         ) AS open,
         COUNT(s.id) FILTER (WHERE
           CASE WHEN t.id IS NOT NULL THEN t.status = 'assigned'
                ELSE s.status = 'assigned' END
         ) AS assigned,
         COUNT(s.id) FILTER (WHERE
-          CASE WHEN t.id IS NOT NULL THEN t.status = 'in_progress'
+          CASE WHEN t.id IS NOT NULL THEN t.status IN ('in_progress','qa_rejected')
                ELSE s.status = 'in_progress' END
         ) AS in_progress,
         COUNT(s.id) FILTER (WHERE
-          CASE WHEN t.id IS NOT NULL THEN t.status IN ('pending_qa','qa_in_progress','qa_rejected')
-               ELSE s.status = 'fixed' END
-        ) AS fixed,
+          CASE WHEN t.id IS NOT NULL THEN t.status IN ('pending_qa','qa_in_progress')
+               ELSE s.status IN ('pending_qa','fixed') END
+        ) AS pending_qa,
         COUNT(s.id) FILTER (WHERE
-          CASE WHEN t.id IS NOT NULL THEN t.status IN ('verified','qa_approved','pending_handover','handed_to_ops')
+          CASE WHEN t.id IS NOT NULL THEN t.status IN ('qa_approved','pending_handover','handed_to_ops','resolved')
+               ELSE s.status = 'resolved' END
+        ) AS resolved,
+        COUNT(s.id) FILTER (WHERE
+          CASE WHEN t.id IS NOT NULL THEN t.status = 'verified'
                ELSE s.status = 'verified' END
         ) AS verified,
         COUNT(s.id) FILTER (WHERE
-          CASE WHEN t.id IS NOT NULL THEN t.status IN ('resolved','closed')
+          CASE WHEN t.id IS NOT NULL THEN t.status IN ('closed','cancelled')
                ELSE s.status = 'closed' END
         ) AS closed,
-        COUNT(s.id) FILTER (WHERE
-          CASE WHEN t.id IS NOT NULL THEN FALSE
-               ELSE s.status = 'reopened' END
-        ) AS reopened,
         lr.report_number        AS latest_report_number,
         lr.audit_date           AS latest_report_date,
         lr.id                   AS latest_report_id
@@ -76,10 +83,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       open: string;
       assigned: string;
       in_progress: string;
-      fixed: string;
+      pending_qa: string;
+      resolved: string;
       verified: string;
       closed: string;
-      reopened: string;
       latest_report_number: string | null;
       latest_report_date: string | null;
       latest_report_id: string | null;
@@ -92,10 +99,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       open: parseInt(r.open, 10),
       assigned: parseInt(r.assigned, 10),
       in_progress: parseInt(r.in_progress, 10),
-      fixed: parseInt(r.fixed, 10),
+      pending_qa: parseInt(r.pending_qa, 10),
+      resolved: parseInt(r.resolved, 10),
       verified: parseInt(r.verified, 10),
       closed: parseInt(r.closed, 10),
-      reopened: parseInt(r.reopened, 10),
       latest_report_number: r.latest_report_number,
       latest_report_date: r.latest_report_date,
       latest_report_id: r.latest_report_id,

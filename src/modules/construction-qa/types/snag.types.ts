@@ -13,10 +13,12 @@ export type SnagStatus =
   | 'open'
   | 'assigned'
   | 'in_progress'
-  | 'fixed'
+  | 'pending_qa'
+  | 'resolved'
   | 'verified'
   | 'closed'
   | 'reopened'
+  | 'fixed'       // legacy — mapped to pending_qa in new workflow
   | 'wont_fix'
   | 'duplicate';
 
@@ -164,10 +166,10 @@ export interface SnagProjectStats {
   open: number;
   assigned: number;
   in_progress: number;
-  fixed: number;
+  pending_qa: number;
+  resolved: number;
   verified: number;
   closed: number;
-  reopened: number;
   latest_report_number: string | null;
   latest_report_date: string | null;
   latest_report_id: string | null;
@@ -186,15 +188,15 @@ export interface HierarchyRow {
   open: number;
   assigned: number;
   in_progress: number;
-  fixed: number;
+  pending_qa: number;
+  resolved: number;
   verified: number;
   closed: number;
-  reopened: number;
 }
 
 export interface StatusCounts {
   total: number; open: number; assigned: number; in_progress: number;
-  fixed: number; verified: number; closed: number; reopened: number;
+  pending_qa: number; resolved: number; verified: number; closed: number;
 }
 
 export interface PonNode extends StatusCounts {

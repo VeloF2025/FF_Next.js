@@ -37,13 +37,13 @@ export function SnagPonRow({
         <span className="font-medium text-zinc-200">{pon.total}</span>
       </td>
 
-      <CountCell value={pon.open}        colorClass="text-red-300"   bgClass="bg-red-900/20" />
-      <CountCell value={pon.assigned}    colorClass="text-amber-300" bgClass="bg-amber-900/20" />
-      <CountCell value={pon.in_progress} colorClass="text-amber-300" bgClass="bg-amber-900/20" />
-      <CountCell value={pon.fixed}       colorClass="text-blue-300"  bgClass="bg-blue-900/20" />
-      <CountCell value={pon.verified}    colorClass="text-green-300" bgClass="bg-green-900/20" />
-      <CountCell value={pon.closed}      colorClass="text-green-300" bgClass="bg-green-900/20" />
-      <CountCell value={pon.reopened}    colorClass="text-red-300"   bgClass="bg-red-900/20" />
+      <CountCell value={pon.open}        colorClass="text-red-300"    bgClass="bg-red-900/20" />
+      <CountCell value={pon.assigned}    colorClass="text-amber-300"  bgClass="bg-amber-900/20" />
+      <CountCell value={pon.in_progress} colorClass="text-amber-300"  bgClass="bg-amber-900/20" />
+      <CountCell value={pon.pending_qa}  colorClass="text-orange-300" bgClass="bg-orange-900/20" />
+      <CountCell value={pon.resolved}    colorClass="text-blue-300"   bgClass="bg-blue-900/20" />
+      <CountCell value={pon.verified}    colorClass="text-green-300"  bgClass="bg-green-900/20" />
+      <CountCell value={pon.closed}      colorClass="text-green-300"  bgClass="bg-green-900/20" />
 
       <td className="px-3 py-2 text-xs text-zinc-600 whitespace-nowrap">—</td>
     </tr>

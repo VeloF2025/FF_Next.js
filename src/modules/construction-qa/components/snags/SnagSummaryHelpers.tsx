@@ -6,7 +6,7 @@
 // Column count constant
 // ============================================================
 
-export const COL_COUNT = 10;
+export const COL_COUNT = 10; // Project, Total, Open, Assigned, In Progress, Pending QA, Resolved, Verified, Closed, Latest TQR
 
 // ============================================================
 // CountCell

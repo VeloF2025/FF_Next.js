@@ -28,6 +28,8 @@ export interface SnagSummary {
   in_progress: number;
   pending_qa: number;
   resolved: number;
+  verified: number;
+  closed: number;
   critical: number;
 }
 
@@ -38,6 +40,8 @@ type CountRow = {
   in_progress: string;
   pending_qa: string;
   resolved: string;
+  verified: string;
+  closed: string;
   critical: string;
 };
 
@@ -49,6 +53,8 @@ function parseRow(row: CountRow): SnagSummary {
     in_progress: parseInt(row.in_progress, 10),
     pending_qa:  parseInt(row.pending_qa,  10),
     resolved:    parseInt(row.resolved,    10),
+    verified:    parseInt(row.verified,    10),
+    closed:      parseInt(row.closed,      10),
     critical:    parseInt(row.critical ?? '0', 10),
   };
 }
@@ -69,24 +75,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const pn = typeof pon_no    === 'string' && pon_no    ? parseInt(pon_no, 10) : null;
 
     // Use the NOC ticket status when a ticket is linked, otherwise fall back to snag status.
-    // This ensures snag counts reflect real NOC workflow progress.
-    //
-    // Effective status mapping:
-    //   NOC open                                        → open
-    //   NOC assigned                                    → assigned
-    //   NOC in_progress                                 → in_progress
-    //   NOC pending_qa, qa_in_progress, qa_rejected     → pending_qa
-    //   NOC qa_approved, pending_handover, handed_to_ops, resolved, closed → resolved
-    //   (no ticket) snag open, reopened                 → open
-    //   (no ticket) snag assigned                       → assigned
-    //   (no ticket) snag in_progress                    → in_progress
-    //   (no ticket) snag fixed, verified, closed        → resolved
+    // Aligned to NOC Kanban columns:
+    //   open:        NOC open         | snag open, reopened
+    //   assigned:    NOC assigned     | snag assigned
+    //   in_progress: NOC in_progress, qa_rejected | snag in_progress
+    //   pending_qa:  NOC pending_qa, qa_in_progress | snag pending_qa, fixed (legacy)
+    //   resolved:    NOC qa_approved, pending_handover, handed_to_ops, resolved | snag resolved
+    //   verified:    NOC verified     | snag verified
+    //   closed:      NOC closed, cancelled | snag closed
     const rows = await sql`
       SELECT
         COUNT(*) AS total,
         COUNT(*) FILTER (WHERE
           CASE WHEN t.id IS NOT NULL
-            THEN t.status IN ('open')
+            THEN t.status = 'open'
             ELSE s.status IN ('open','reopened')
           END
         ) AS open,
@@ -98,22 +100,34 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ) AS assigned,
         COUNT(*) FILTER (WHERE
           CASE WHEN t.id IS NOT NULL
-            THEN t.status = 'in_progress'
+            THEN t.status IN ('in_progress','qa_rejected')
             ELSE s.status = 'in_progress'
           END
         ) AS in_progress,
         COUNT(*) FILTER (WHERE
           CASE WHEN t.id IS NOT NULL
-            THEN t.status IN ('pending_qa','qa_in_progress','qa_rejected')
-            ELSE FALSE
+            THEN t.status IN ('pending_qa','qa_in_progress')
+            ELSE s.status IN ('pending_qa','fixed')
           END
         ) AS pending_qa,
         COUNT(*) FILTER (WHERE
           CASE WHEN t.id IS NOT NULL
-            THEN t.status IN ('verified','qa_approved','pending_handover','handed_to_ops','resolved','closed')
-            ELSE s.status IN ('fixed','verified','closed')
+            THEN t.status IN ('qa_approved','pending_handover','handed_to_ops','resolved')
+            ELSE s.status = 'resolved'
           END
         ) AS resolved,
+        COUNT(*) FILTER (WHERE
+          CASE WHEN t.id IS NOT NULL
+            THEN t.status = 'verified'
+            ELSE s.status = 'verified'
+          END
+        ) AS verified,
+        COUNT(*) FILTER (WHERE
+          CASE WHEN t.id IS NOT NULL
+            THEN t.status IN ('closed','cancelled')
+            ELSE s.status = 'closed'
+          END
+        ) AS closed,
         COUNT(*) FILTER (WHERE s.severity IN ('critical','major')) AS critical
       FROM snags s
       LEFT JOIN maintenance_tickets t ON t.id = s.noc_ticket_id
@@ -127,7 +141,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         AND (${pn}::int  IS NULL OR COALESCE(pole.pon_no, dr.pon_no) = ${pn})
     ` as CountRow[];
 
-    const empty: CountRow = { total: '0', open: '0', assigned: '0', in_progress: '0', pending_qa: '0', resolved: '0', critical: '0' };
+    const empty: CountRow = { total: '0', open: '0', assigned: '0', in_progress: '0', pending_qa: '0', resolved: '0', verified: '0', closed: '0', critical: '0' };
     return apiResponse.success(res, parseRow(rows[0] ?? empty));
   } catch (error) {
     log.error('Snags count-summary API error', { error });
