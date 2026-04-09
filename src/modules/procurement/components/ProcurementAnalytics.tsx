@@ -2,6 +2,8 @@ import { TrendingUp, DollarSign, Clock, CheckCircle } from 'lucide-react';
 import { useBOQs } from '../hooks/useBOQ';
 import { useRFQs } from '../hooks/useRFQ';
 import { BOQStatus, RFQStatus } from '@/types/procurement.types';
+import type { BOQ } from '@/types/procurement/boq.types';
+import type { RFQ } from '@/types/procurement/rfq/core.types';
 
 export function ProcurementAnalytics() {
   const { data: boqs } = useBOQs();
@@ -11,28 +13,28 @@ export function ProcurementAnalytics() {
   const metrics = {
     boq: {
       total: boqs?.length || 0,
-      draft: boqs?.filter(b => b.status === BOQStatus.DRAFT).length || 0,
-      approved: boqs?.filter(b => b.status === BOQStatus.APPROVED).length || 0,
-      totalValue: boqs?.reduce((sum, b) => sum + (b.totalEstimatedValue || 0), 0) || 0,
-      averageValue: boqs && boqs.length > 0 
-        ? boqs.reduce((sum, b) => sum + (b.totalEstimatedValue || 0), 0) / boqs.length 
+      draft: boqs?.filter((b: BOQ) => b.status === BOQStatus.DRAFT).length || 0,
+      approved: boqs?.filter((b: BOQ) => b.status === BOQStatus.APPROVED).length || 0,
+      totalValue: boqs?.reduce((sum: number, b: BOQ) => sum + (b.totalEstimatedValue || 0), 0) || 0,
+      averageValue: boqs && boqs.length > 0
+        ? boqs.reduce((sum: number, b: BOQ) => sum + (b.totalEstimatedValue || 0), 0) / boqs.length
         : 0,
     },
     rfq: {
       total: rfqs?.length || 0,
-      sent: rfqs?.filter(r => r.status === RFQStatus.ISSUED).length || 0,
-      responsesReceived: rfqs?.filter(r => r.status === RFQStatus.RESPONSES_RECEIVED).length || 0,
-      awarded: rfqs?.filter(r => r.status === RFQStatus.AWARDED).length || 0,
-      responseRate: rfqs && rfqs.length > 0 
-        ? (rfqs.filter(r => r.respondedSuppliers && r.respondedSuppliers.length > 0).length / rfqs.length) * 100 
+      sent: rfqs?.filter((r: RFQ) => r.status === RFQStatus.ISSUED).length || 0,
+      responsesReceived: rfqs?.filter((r: RFQ) => r.status === RFQStatus.RESPONSES_RECEIVED).length || 0,
+      awarded: rfqs?.filter((r: RFQ) => r.status === RFQStatus.AWARDED).length || 0,
+      responseRate: rfqs && rfqs.length > 0
+        ? (rfqs.filter((r: RFQ) => r.respondedSuppliers && r.respondedSuppliers.length > 0).length / rfqs.length) * 100
         : 0,
     },
     efficiency: {
       approvalRate: boqs && boqs.length > 0 
-        ? (boqs.filter(b => b.status === BOQStatus.APPROVED).length / boqs.length) * 100 
+        ? (boqs.filter((b: BOQ) => b.status === BOQStatus.APPROVED).length / boqs.length) * 100
         : 0,
-      awardRate: rfqs && rfqs.length > 0 
-        ? (rfqs.filter(r => r.status === RFQStatus.AWARDED).length / rfqs.length) * 100 
+      awardRate: rfqs && rfqs.length > 0
+        ? (rfqs.filter((r: RFQ) => r.status === RFQStatus.AWARDED).length / rfqs.length) * 100
         : 0,
     },
   };

@@ -18,6 +18,17 @@ import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { ReportTabLayout } from '../ReportTabLayout';
 import { useOPEXData } from './useOPEXData';
 
+/** Row shape from the OPEX API response */
+interface OPEXRow {
+  category: string;
+  isTotal?: boolean;
+  monthly: Record<string, number>;
+  fy26?: number;
+  fy27?: number;
+  fy28?: number;
+  grandTotal: number;
+}
+
 const PALETTE = [
   '#3b82f6','#f97316','#22c55e','#a855f7','#eab308',
   '#06b6d4','#ec4899','#84cc16','#f43f5e','#8b5cf6',
@@ -123,12 +134,12 @@ export default function OPEXReport() {
     grandTotals: { fy26: 0, fy27: 0, fy28: 0, monthly: {}, total: 0 },
   };
 
-  const activeRows = rows.filter((r) => !r.isTotal);
-  const categories = activeRows.map((r) => r.category);
+  const activeRows = rows.filter((r: OPEXRow) => !r.isTotal);
+  const categories = activeRows.map((r: OPEXRow) => r.category);
   const anySelected = selectedCategories.size > 0;
 
   // Build chart data — zero out unselected categories so bars physically shrink
-  const chartData = months.map((m) => {
+  const chartData = months.map((m: string) => {
     const entry: Record<string, number | string> = { month: m };
     let monthTotal = 0;
     for (const row of activeRows) {
@@ -155,18 +166,18 @@ export default function OPEXReport() {
             <th className={thR}>FY26</th>
             <th className={thR}>FY27</th>
             <th className={thR}>FY28</th>
-            {months.map((m) => <th key={m} className={thR}>{m}</th>)}
+            {months.map((m: string) => <th key={m} className={thR}>{m}</th>)}
             <th className={thR}>Total</th>
           </tr>
         </thead>
         <tbody>
-          {activeRows.map((row, i) => (
+          {activeRows.map((row: OPEXRow, i: number) => (
             <tr key={row.category} className={i % 2 === 0 ? 'bg-gray-900' : 'bg-gray-800/60'}>
               <td className="px-3 py-2 text-gray-200 whitespace-nowrap" style={{ minWidth: 220 }}>{row.category}</td>
               <td className="px-3 py-2 text-right tabular-nums text-gray-300 whitespace-nowrap">{fZAR(row.fy26 ?? 0)}</td>
               <td className="px-3 py-2 text-right tabular-nums text-gray-300 whitespace-nowrap">{fZAR(row.fy27 ?? 0)}</td>
               <td className="px-3 py-2 text-right tabular-nums text-gray-300 whitespace-nowrap">{fZAR(row.fy28 ?? 0)}</td>
-              {months.map((m) => (
+              {months.map((m: string) => (
                 <td key={m} className="px-3 py-2 text-right tabular-nums text-gray-300 whitespace-nowrap">{fZAR(row.monthly[m] ?? 0)}</td>
               ))}
               <td className="px-3 py-2 text-right tabular-nums text-gray-300 whitespace-nowrap">{fZAR(row.grandTotal)}</td>
@@ -179,7 +190,7 @@ export default function OPEXReport() {
             <td className="px-3 py-2.5 text-right tabular-nums text-white whitespace-nowrap">{fZAR(grandTotals?.fy26 ?? 0)}</td>
             <td className="px-3 py-2.5 text-right tabular-nums text-white whitespace-nowrap">{fZAR(grandTotals?.fy27 ?? 0)}</td>
             <td className="px-3 py-2.5 text-right tabular-nums text-white whitespace-nowrap">{fZAR(grandTotals?.fy28 ?? 0)}</td>
-            {months.map((m) => (
+            {months.map((m: string) => (
               <td key={m} className="px-3 py-2.5 text-right tabular-nums text-white whitespace-nowrap">{fZAR(grandTotals?.monthly?.[m] ?? 0)}</td>
             ))}
             <td className="px-3 py-2.5 text-right tabular-nums text-white whitespace-nowrap">{fZAR(grandTotals?.total ?? 0)}</td>
@@ -219,9 +230,9 @@ export default function OPEXReport() {
                 if (name === '__total__') return null;
                 return [fZAR(value), name];
               }}
-              itemSorter={(item) => -(item.value as number)}
+              itemSorter={(item: { value?: number }) => -(item.value as number)}
             />
-            {categories.map((cat, idx) => {
+            {categories.map((cat: string, idx: number) => {
               const colour = PALETTE[idx % PALETTE.length];
               const isLast = idx === categories.length - 1;
               return (

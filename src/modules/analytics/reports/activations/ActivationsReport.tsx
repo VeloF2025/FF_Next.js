@@ -151,7 +151,7 @@ function ActivationsTable({ years, allProjects }: ActivationsTableProps) {
                 </tr>
 
                 {/* Month rows */}
-                {yearOpen && year.months.map((month) => {
+                {yearOpen && year.months.map((month: ActivationMonth) => {
                   const monthKey = `month-${month.monthKey}`;
                   const monthOpen = expanded.get(monthKey) ?? false;
                   return (
@@ -178,7 +178,7 @@ function ActivationsTable({ years, allProjects }: ActivationsTableProps) {
                       </tr>
 
                       {/* Week rows */}
-                      {monthOpen && month.weeks.map((week, wi) => (
+                      {monthOpen && month.weeks.map((week: ActivationWeek, wi: number) => (
                         <tr key={week.weekStart} className={wi % 2 === 0 ? 'bg-gray-900' : 'bg-gray-800/60'}>
                           <td className="px-3 py-2 text-gray-400 whitespace-nowrap pl-14">{week.weekLabel}</td>
                           {allProjects.map((name) => {
@@ -329,7 +329,7 @@ function ActivationsChart({ years, allProjects }: { years: ActivationYear[]; all
   let drilledMonth: ActivationMonth | undefined;
   if (drillMonth) {
     for (const yr of years) {
-      drilledMonth = yr.months.find((m) => m.monthKey === drillMonth);
+      drilledMonth = yr.months.find((m: ActivationMonth) => m.monthKey === drillMonth);
       if (drilledMonth) break;
     }
   }

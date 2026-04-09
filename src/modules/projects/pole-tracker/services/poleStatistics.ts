@@ -1,6 +1,12 @@
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 
+/** Firestore QueryDocumentSnapshot shape (firebase types are ts-ignored) */
+interface FirestoreDocSnapshot {
+  id: string;
+  data: () => Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+}
+
 export interface PoleStatistics {
   total: number;
   byStatus: Record<string, number>;
@@ -37,7 +43,7 @@ export class PoleStatisticsService {
     let photosCompletedCount = 0;
     let qualityPassedCount = 0;
 
-    snapshot.forEach(doc => {
+    snapshot.forEach((doc: FirestoreDocSnapshot) => {
       const data = doc.data();
       
       // Status counts
@@ -110,7 +116,7 @@ export class PoleStatisticsService {
     const snapshot = await getDocs(q);
     const dailyStats = new Map<string, { completed: number; started: number }>();
 
-    snapshot.forEach(doc => {
+    snapshot.forEach((doc: FirestoreDocSnapshot) => {
       const data = doc.data();
       const date = data.metadata?.lastUpdated?.toDate();
       
@@ -160,7 +166,7 @@ export class PoleStatisticsService {
     
     const issues: Array<{ id: string; poleNumber: string; issue: string }> = [];
 
-    snapshot.forEach(doc => {
+    snapshot.forEach((doc: FirestoreDocSnapshot) => {
       const data = doc.data();
       
       // Check for quality failures

@@ -75,7 +75,7 @@ const PreProvisionsTable = ({
                   <td className="px-3 py-2 text-right text-red-400 font-semibold">{year.notFound || '—'}</td>
                   <td className="px-3 py-2 text-right text-orange-400 font-semibold border-l-2 border-gray-500">{(year.open + year.notFound) || '—'}</td>
                 </tr>
-                {expanded && year.months.map((month) => (
+                {expanded && year.months.map((month: PreProvisionMonth) => (
                   <tr key={month.monthKey} className="bg-gray-900">
                     <td className="px-3 py-1.5 pl-9 text-gray-400 text-xs">{month.monthLabel}</td>
                     {allProjects.map(p => (
@@ -133,7 +133,7 @@ const PreProvisionsChart = ({ years, allProjects }: { years: PreProvisionYear[];
         <XAxis dataKey="name" tick={{ fill: '#d1d5db', fontSize: 11 }} />
         <YAxis tick={{ fill: '#d1d5db', fontSize: 11 }} />
         <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', color: '#fff' }} />
-        <Legend onClick={e => toggle(e.dataKey as string)} wrapperStyle={{ cursor: 'pointer' }} />
+        <Legend onClick={(e: { dataKey?: string }) => toggle(e.dataKey as string)} wrapperStyle={{ cursor: 'pointer' }} />
         <Bar dataKey="Activated" stackId="pp" fill="#22c55e" isAnimationActive={false} />
         <Bar dataKey="Open" stackId="pp" fill="#eab308" isAnimationActive={false} />
         <Bar dataKey="Not Found" stackId="pp" fill="#ef4444" isAnimationActive={false}>
@@ -204,7 +204,7 @@ const ByProjectTable = ({
                   ))}
                   <td className="px-3 py-2 text-right text-white font-semibold border-l border-gray-700">{year.logged}</td>
                 </tr>
-                {expanded && year.months.map(month => (
+                {expanded && year.months.map((month: PreProvisionMonth) => (
                   <tr key={month.monthKey} className="bg-gray-900">
                     <td className="px-3 py-1.5 pl-9 text-gray-400 text-xs sticky left-0 bg-gray-900">{month.monthLabel}</td>
                     {allProjects.map(p => (

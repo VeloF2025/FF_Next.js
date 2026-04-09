@@ -167,7 +167,7 @@ export function ServiceTemplatesTab({
 
   // Update search parameters handler for future use
   const updateSearchParams = (newParams: Partial<ServiceTemplateSearchParams>) => {
-    setSearchParams(prev => ({ ...prev, ...newParams }));
+    setSearchParams((prev: ServiceTemplateSearchParams) => ({ ...prev, ...newParams }));
   };
 
   // Temporarily silence unused variable warnings - these will be used when forms are implemented
@@ -289,7 +289,7 @@ export function ServiceTemplatesTab({
         {/* Children nodes */}
         {hasChildren && isExpanded && (
           <div className="ml-4 border-l-2 border-gray-100 pl-4">
-            {template.children!.map(child => (
+            {template.children!.map((child: ServiceTemplate) => (
               <TreeNode
                 key={child.id}
                 template={child}

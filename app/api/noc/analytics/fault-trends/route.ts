@@ -176,7 +176,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     });
 
     // Calculate total count
-    const totalCount = result.rows.reduce((sum, row) => sum + parseInt(row.count), 0);
+    const totalCount = result.rows.reduce((sum: number, row: { count: string }) => sum + parseInt(row.count), 0);
 
     return NextResponse.json(
       {

@@ -50,7 +50,7 @@ async function handler(
     let output = '';
     let errorOutput = '';
 
-    process.stdout.on('data', (data) => {
+    process.stdout.on('data', (data: Buffer) => {
       const lines = data.toString().split('\n');
       lines.forEach((line: string) => {
         if (line.trim()) {
@@ -60,7 +60,7 @@ async function handler(
       });
     });
 
-    process.stderr.on('data', (data) => {
+    process.stderr.on('data', (data: Buffer) => {
       const lines = data.toString().split('\n');
       lines.forEach((line: string) => {
         if (line.trim()) {
@@ -70,7 +70,7 @@ async function handler(
       });
     });
 
-    process.on('close', (code) => {
+    process.on('close', (code: number | null) => {
       if (code === 0) {
         // Try to parse stats from output
         const stats = {
@@ -95,7 +95,7 @@ async function handler(
       res.end();
     });
 
-    process.on('error', (error) => {
+    process.on('error', (error: Error) => {
       sendLog('error', `Failed to start sync: ${error.message}`);
       sendLog('complete', 'Poles sync failed', {
         success: false,

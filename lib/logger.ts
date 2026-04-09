@@ -74,10 +74,10 @@ const baseLogger = pino ? pino({
 
   // Format for better readability (both dev and prod for now)
   formatters: {
-    level: (label) => {
+    level: (label: string) => {
       return { level: label };
     },
-    bindings: (bindings) => {
+    bindings: (bindings: { pid: number; hostname: string }) => {
       return {
         pid: bindings.pid,
         host: bindings.hostname,
