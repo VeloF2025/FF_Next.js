@@ -2,7 +2,7 @@
 
 /** BillingCrossRefTab — Weekly billing deductions cross-referenced against existing tickets. */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';

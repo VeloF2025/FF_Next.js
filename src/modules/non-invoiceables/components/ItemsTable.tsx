@@ -8,7 +8,7 @@
  * per-row selection so callers can bulk-create QContact tickets.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';

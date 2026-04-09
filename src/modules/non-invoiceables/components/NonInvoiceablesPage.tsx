@@ -6,7 +6,7 @@
  * filtered by category when a card is clicked.
  */
 
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { ArrowLeft, LayoutDashboard, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { OverviewDashboard } from './OverviewDashboard';
