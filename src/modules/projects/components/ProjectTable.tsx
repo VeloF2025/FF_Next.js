@@ -145,22 +145,22 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
               <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                 Client
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide hidden md:table-cell">
                 Location
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                 Status
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide hidden md:table-cell">
                 Priority
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide hidden md:table-cell">
                 Duration
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide hidden lg:table-cell">
                 Budget
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide hidden lg:table-cell">
                 Health
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
@@ -208,7 +208,7 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
                 <td className="px-4 py-4 whitespace-nowrap">
                   <div className="text-sm text-[var(--ff-text-primary)]">{project.client_name || 'N/A'}</div>
                 </td>
-                <td className="px-4 py-4 whitespace-nowrap">
+                <td className="px-4 py-4 whitespace-nowrap hidden md:table-cell">
                   <div className="text-sm text-[var(--ff-text-primary)]">
                     {formatLocation(project)}
                   </div>
@@ -216,15 +216,15 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
                 <td className="px-4 py-4 whitespace-nowrap">
                   {getStatusBadge(project.status)}
                 </td>
-                <td className="px-4 py-4 whitespace-nowrap">
+                <td className="px-4 py-4 whitespace-nowrap hidden md:table-cell">
                   {getPriorityBadge(project.priority)}
                 </td>
-                <td className="px-4 py-4 whitespace-nowrap">
+                <td className="px-4 py-4 whitespace-nowrap hidden md:table-cell">
                   <div className="text-sm text-[var(--ff-text-primary)]">
                     {formatDate(project.start_date)} - {formatDate(project.end_date)}
                   </div>
                 </td>
-                <td className="px-4 py-4 whitespace-nowrap">
+                <td className="px-4 py-4 whitespace-nowrap hidden lg:table-cell">
                   <div className="text-sm font-medium text-[var(--ff-text-primary)]">
                     {formatCurrency(Number(project.budget_total || project.budget_allocated || project.budget))}
                   </div>
@@ -234,7 +234,7 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-4 whitespace-nowrap">
+                <td className="px-4 py-4 whitespace-nowrap hidden lg:table-cell">
                   {getBudgetHealthBadge(project)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

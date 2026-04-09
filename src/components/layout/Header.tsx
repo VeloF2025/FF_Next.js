@@ -1,4 +1,4 @@
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, MoreHorizontal } from 'lucide-react';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { HeaderProps, Notification } from './header/HeaderTypes';
@@ -43,6 +43,7 @@ export function Header({
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
@@ -95,7 +96,7 @@ export function Header({
   };
 
   return (
-    <header className="bg-[var(--ff-surface-primary)] border-b border-[var(--ff-border-primary)] shadow-sm">
+    <header className="bg-[var(--ff-surface-primary)] border-b border-[var(--ff-border-primary)] shadow-sm" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="px-4 lg:px-6 py-4">
         <div className="flex items-center justify-between">
           <BreadcrumbNavigation
@@ -104,10 +105,34 @@ export function Header({
             {...(onMenuClick && { onMenuClick })}
           />
 
-          {/* Center - Actions */}
+          {/* Center - Actions (desktop) */}
           {actions && (
             <div className="hidden lg:flex items-center space-x-2 mx-4">
               {actions}
+            </div>
+          )}
+
+          {/* Mobile actions overflow menu */}
+          {actions && (
+            <div className="relative lg:hidden mx-2">
+              <button
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                className="p-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-surface-secondary)] rounded-lg transition-colors"
+                aria-label="More actions"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+              {showMobileMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowMobileMenu(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-1 z-50 bg-[var(--ff-surface-primary)] border border-[var(--ff-border-primary)] rounded-lg shadow-lg py-1 min-w-[180px] flex flex-col">
+                    {actions}
+                  </div>
+                </>
+              )}
             </div>
           )}
 

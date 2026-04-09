@@ -12,7 +12,7 @@
  * Column headers show true counts from the summary endpoint.
  */
 
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { DragDropContext, Droppable, type DropResult } from '@hello-pangea/dnd';
 import type { Ticket, TicketFilters } from '../../types/ticket';
 import { useTickets } from '../../hooks/useTickets';
@@ -20,6 +20,7 @@ import { useTicketSummary } from '../../hooks/useTicketSummary';
 import { useUpdateTicket } from '../../hooks/useTicket';
 import { KanbanColumn } from './KanbanColumn';
 import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
+import { TicketList } from '../TicketList/TicketList';
 
 interface KanbanBoardProps {
   filters?: TicketFilters;
@@ -79,6 +80,15 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // Optimistic status overrides: ticketId → new status (applied instantly, cleared on API response)
   const [optimisticMoves, setOptimisticMoves] = useState<Record<string, DatabaseStatus>>({});
+  const [isMobile, setIsMobile] = useState(false);
+  const [forceKanban, setForceKanban] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   // Strip meta status filter (active/completed) — Kanban needs all statuses for columns
   const { status: metaStatus, ...apiFilters } = filters || {};
@@ -224,6 +234,23 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
     ? tickets.filter(t => visibleColumns.some(c => c.status === t.status)).length
     : tickets.length;
 
+  // Mobile fallback: show TicketList instead of Kanban unless user overrides
+  if (isMobile && !forceKanban) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="mb-3 flex justify-end">
+          <button
+            onClick={() => setForceKanban(true)}
+            className="px-3 py-1.5 text-xs font-medium text-blue-400 border border-blue-400/30 rounded-lg hover:bg-blue-400/10 transition-colors"
+          >
+            Switch to Kanban
+          </button>
+        </div>
+        <TicketList initialFilters={filters} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Error Toast */}
@@ -242,6 +269,18 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Mobile: Switch to List button (only when user forced Kanban) */}
+      {isMobile && forceKanban && (
+        <div className="mb-3 flex justify-end">
+          <button
+            onClick={() => setForceKanban(false)}
+            className="px-3 py-1.5 text-xs font-medium text-blue-400 border border-blue-400/30 rounded-lg hover:bg-blue-400/10 transition-colors"
+          >
+            Switch to List
           </button>
         </div>
       )}

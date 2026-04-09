@@ -88,7 +88,7 @@ export function PurchaseOrdersTab() {
               </div>
 
               {/* Search and Filter Bar */}
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
@@ -120,7 +120,7 @@ export function PurchaseOrdersTab() {
 
             {/* PO Stats Cards */}
             <div className="bg-card border-b border-border p-6">
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
                 <POStatCard
                   title="Draft"
                   count={2}

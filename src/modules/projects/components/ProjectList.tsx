@@ -110,7 +110,7 @@ export function ProjectList() {
 
       {/* Search and Filters */}
       <div className="bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)]">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-2">
           <form onSubmit={(e) => e.preventDefault()} className="flex-1 max-w-md">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--ff-text-tertiary)] h-4 w-4" />
