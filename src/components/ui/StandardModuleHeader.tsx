@@ -59,7 +59,7 @@ export function StandardModuleHeader({
         <h1 className="text-2xl font-semibold text-[var(--ff-text-primary)]">{title}</h1>
         <p className="text-[var(--ff-text-secondary)] mt-1">{description}</p>
       </div>
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
         {showImport && onImport && (
           importPermission ? (
             <PermissionGate permission={importPermission} action="create">
