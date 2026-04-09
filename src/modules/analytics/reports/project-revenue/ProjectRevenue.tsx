@@ -132,9 +132,9 @@ const ProfitabilityCharts = ({ rows }: { rows: ProjectProfitabilityRow[] }) => {
           <BarChart data={barData} margin={{ top: 16, right: 16, bottom: 60, left: 16 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
             <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 11 }} angle={-35} textAnchor="end" interval={0} />
-            <YAxis tick={{ fill: '#9ca3af', fontSize: 11 }} tickFormatter={v => `R ${(v/1_000_000).toFixed(1)}M`} />
-            <Tooltip {...TOOLTIP_STYLE} formatter={(v: number, name: string) => [fZAR(v), name]} labelFormatter={(l, p) => p?.[0]?.payload?.fullName ?? l} />
-            <Legend onClick={e => toggle(e.dataKey as string)} wrapperStyle={{ cursor: 'pointer', paddingTop: 8, fontSize: 12 }} />
+            <YAxis tick={{ fill: '#9ca3af', fontSize: 11 }} tickFormatter={(v: number) => `R ${(v/1_000_000).toFixed(1)}M`} />
+            <Tooltip {...TOOLTIP_STYLE} formatter={(v: number, name: string) => [fZAR(v), name]} labelFormatter={(l: string, p: Array<{ payload?: { fullName?: string } }>) => p?.[0]?.payload?.fullName ?? l} />
+            <Legend onClick={(e: { dataKey?: string }) => toggle(e.dataKey as string)} wrapperStyle={{ cursor: 'pointer', paddingTop: 8, fontSize: 12 }} />
             <Bar dataKey="Fcst Revenue" fill="#6b7280" maxBarSize={28} />
             <Bar dataKey="Actual Revenue" fill="#3b82f6" maxBarSize={28} />
             <Bar dataKey="Actual COS" fill="#f97316" maxBarSize={28} />
@@ -151,7 +151,7 @@ const ProfitabilityCharts = ({ rows }: { rows: ProjectProfitabilityRow[] }) => {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={marginData} layout="vertical" margin={{ top: 4, right: 80, bottom: 4, left: 16 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" horizontal={false} />
-                <XAxis type="number" tickFormatter={v => `${v}%`} tick={{ fill: '#9ca3af', fontSize: 11 }} />
+                <XAxis type="number" tickFormatter={(v: number) => `${v}%`} tick={{ fill: '#9ca3af', fontSize: 11 }} />
                 <YAxis type="category" dataKey="name" tick={{ fill: '#9ca3af', fontSize: 11 }} width={130} />
                 <Tooltip {...TOOLTIP_STYLE} formatter={(v: number, name: string) => [`${v}%`, name]} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />

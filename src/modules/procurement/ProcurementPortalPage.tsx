@@ -141,7 +141,7 @@ export function ProcurementPortalPage({ children }: ProcurementPortalPageProps) 
     
     // Update URL parameters
     if (project) {
-      setSearchParams(prev => {
+      setSearchParams((prev: URLSearchParams) => {
         const newParams = new URLSearchParams(prev);
         newParams.set('project', project.id);
         newParams.set('projectName', project.name);
@@ -150,7 +150,7 @@ export function ProcurementPortalPage({ children }: ProcurementPortalPageProps) 
         return newParams;
       });
     } else {
-      setSearchParams(prev => {
+      setSearchParams((prev: URLSearchParams) => {
         const newParams = new URLSearchParams(prev);
         newParams.delete('project');
         newParams.delete('projectName');
@@ -165,7 +165,7 @@ export function ProcurementPortalPage({ children }: ProcurementPortalPageProps) 
     setViewMode(mode);
     
     // Update URL parameters
-    setSearchParams(prev => {
+    setSearchParams((prev: URLSearchParams) => {
       const newParams = new URLSearchParams(prev);
       if (mode === 'all') {
         newParams.set('viewMode', 'all');
@@ -186,7 +186,7 @@ export function ProcurementPortalPage({ children }: ProcurementPortalPageProps) 
     setActiveTab(tabId);
     
     // Update URL with tab parameter
-    setSearchParams(prev => {
+    setSearchParams((prev: URLSearchParams) => {
       const newParams = new URLSearchParams(prev);
       newParams.set('tab', tabId);
       return newParams;

@@ -115,7 +115,7 @@ export function CostCentreRevenueTable({ rows }: Props) {
 
                 {/* Child project rows */}
                 {isExpanded &&
-                  row.children.map((child, ci) => (
+                  row.children.map((child: { project: string; revenue: number; cos: number; grossProfit: number; margin: number }, ci: number) => (
                     <tr
                       key={`child-${row.tier1}-${child.project}`}
                       className={ci % 2 === 0 ? 'bg-gray-900' : 'bg-gray-800/60'}

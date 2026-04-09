@@ -104,7 +104,7 @@ export function SOWImportPage() {
   if (!projectIdStr) {
     return (
       <ErrorBoundary
-        onError={(error, errorInfo) => {
+        onError={(error: Error, errorInfo: React.ErrorInfo) => {
           log.error('Error in SOW Import Page (project selection)', { error, errorInfo }, 'SOWImportPage');
         }}
       >
@@ -173,7 +173,7 @@ export function SOWImportPage() {
 
   return (
     <ErrorBoundary
-      onError={(error, errorInfo) => {
+      onError={(error: Error, errorInfo: React.ErrorInfo) => {
         log.error('Error in SOW Import Page (upload wizard)', { error, errorInfo }, 'SOWImportPage');
       }}
     >

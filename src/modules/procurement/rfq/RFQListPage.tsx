@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus, Send, Search, TrendingUp } from 'lucide-react';
 import { useRFQs } from '../hooks/useRFQ';
 import { RFQStatus } from '@/types/procurement.types';
+import type { RFQ } from '@/types/procurement/rfq/core.types';
 import { RFQCard } from '../components/RFQCard';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
@@ -18,7 +19,7 @@ export function RFQListPage() {
       : { status: statusFilter }
   );
 
-  const filteredRFQs = rfqs?.filter(rfq => {
+  const filteredRFQs = rfqs?.filter((rfq: RFQ) => {
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
       return (
@@ -51,9 +52,9 @@ export function RFQListPage() {
   // Calculate stats
   const stats = {
     total: rfqs?.length || 0,
-    sent: rfqs?.filter(r => r.status === RFQStatus.ISSUED).length || 0,
-    responsesReceived: rfqs?.filter(r => r.status === RFQStatus.RESPONSES_RECEIVED).length || 0,
-    awarded: rfqs?.filter(r => r.status === RFQStatus.AWARDED).length || 0,
+    sent: rfqs?.filter((r: RFQ) => r.status === RFQStatus.ISSUED).length || 0,
+    responsesReceived: rfqs?.filter((r: RFQ) => r.status === RFQStatus.RESPONSES_RECEIVED).length || 0,
+    awarded: rfqs?.filter((r: RFQ) => r.status === RFQStatus.AWARDED).length || 0,
   };
 
   return (
@@ -152,7 +153,7 @@ export function RFQListPage() {
         </div>
       ) : filteredRFQs && filteredRFQs.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredRFQs.map((rfq) => (
+          {filteredRFQs.map((rfq: RFQ) => (
             <RFQCard key={rfq.id} rfq={rfq} />
           ))}
         </div>

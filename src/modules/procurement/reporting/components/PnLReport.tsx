@@ -182,7 +182,7 @@ export function PnLReport() {
                 if (!sectionRows || sectionRows.length === 0) return null;
 
                 const isExpanded = expandedSections.has(section);
-                const sectionTotal = sectionRows.reduce((sum, r) => sum + r.total, 0);
+                const sectionTotal = sectionRows.reduce((sum: number, r: { total: number }) => sum + r.total, 0);
 
                 return (
                   <React.Fragment key={section}>
@@ -201,7 +201,7 @@ export function PnLReport() {
                       </td>
                       {columns.map((col) => {
                         const colTotal = sectionRows.reduce(
-                          (sum, r) => sum + (r.amounts[col] || 0), 0
+                          (sum: number, r: { amounts: Record<string, number> }) => sum + (r.amounts[col] || 0), 0
                         );
                         return (
                           <td key={col} className="p-3 text-right font-semibold text-[var(--ff-text-secondary)]">
@@ -215,7 +215,7 @@ export function PnLReport() {
                     </tr>
 
                     {/* Section Rows */}
-                    {isExpanded && sectionRows.map((row) => (
+                    {isExpanded && sectionRows.map((row: { accountId: string; accountName: string; category: string; amounts: Record<string, number>; total: number }) => (
                       <tr
                         key={row.accountId}
                         className="hover:bg-[var(--ff-bg-tertiary)]"

@@ -3,6 +3,7 @@ import { Plus, FileText, Clock, CheckCircle, Package } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useBOQs } from '../hooks/useBOQ';
 import { BOQStatus } from '@/types/procurement.types';
+import type { BOQ } from '@/types/procurement/boq.types';
 import { BOQCard } from '../components/BOQCard';
 import { useRouter } from 'next/router';
 import { formatDate } from '@/utils/dateFormat';
@@ -27,7 +28,7 @@ export function BOQListPage() {
       : { status: statusFilter }
   );
 
-  const filteredBOQs = boqs?.filter(boq => {
+  const filteredBOQs = boqs?.filter((boq: BOQ) => {
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
       return (
@@ -65,7 +66,7 @@ export function BOQListPage() {
     },
     {
       label: 'Approved BOQs',
-      value: boqs.filter(b => b.status === BOQStatus.APPROVED).length,
+      value: boqs.filter((b: BOQ) => b.status === BOQStatus.APPROVED).length,
       icon: CheckCircle,
       iconColor: 'text-green-600',
       iconBgColor: 'bg-green-500/20',
@@ -73,7 +74,7 @@ export function BOQListPage() {
     },
     {
       label: 'Draft BOQs',
-      value: boqs.filter(b => b.status === BOQStatus.DRAFT).length,
+      value: boqs.filter((b: BOQ) => b.status === BOQStatus.DRAFT).length,
       icon: Clock,
       iconColor: 'text-yellow-600',
       iconBgColor: 'bg-yellow-500/20',
@@ -81,7 +82,7 @@ export function BOQListPage() {
     },
     {
       label: 'Total Value',
-      value: `R ${boqs.reduce((sum, b) => sum + (b.totalEstimatedValue || 0), 0).toLocaleString()}`,
+      value: `R ${boqs.reduce((sum: number, b: BOQ) => sum + (b.totalEstimatedValue || 0), 0).toLocaleString()}`,
       icon: Package,
       iconColor: 'text-purple-600',
       iconBgColor: 'bg-purple-500/20',
@@ -226,7 +227,7 @@ export function BOQListPage() {
             </div>
           )}
           
-          {filteredBOQs?.map((boq) => (
+          {filteredBOQs?.map((boq: BOQ) => (
             <BOQCard key={boq.id} boq={boq} />
           ))}
         </div>
