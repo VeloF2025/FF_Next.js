@@ -4,15 +4,15 @@
  */
 
 import { db } from '@/lib/neon/connection';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { boqs, boqItems } from '@/lib/neon/schema';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { eq, and, isNull } from 'drizzle-orm';
 import { auditLogger, AuditAction } from '../auditLogger';
 import { performCatalogMatching } from './catalogMatcher';
 import { createMappingException } from './exceptionHandler';
 import type { ApiContext, BOQMappingResult } from './types';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import type { BOQException } from '@/lib/neon/schema';
 
 /**

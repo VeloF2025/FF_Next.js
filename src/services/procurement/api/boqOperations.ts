@@ -8,11 +8,11 @@ import { ProcurementError, RFQValidationError } from '../procurementErrors';
 import { validateSchema, ProcurementSchemas } from '@/lib/validation';
 import { auditLogger } from '../auditLogger';
 import { db } from '@/lib/neon/connection';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { boqs, boqItems, boqExceptions } from '@/lib/neon/schema';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { eq, and, desc, asc } from 'drizzle-orm';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import type { BOQ, NewBOQ, BOQItem, NewBOQItem, BOQException } from '@/lib/neon/schema';
 import type { ApiContext, BOQFilters, BOQImportData } from './types';
 

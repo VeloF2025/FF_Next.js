@@ -4,11 +4,11 @@
  */
 
 import { db } from '@/lib/neon/connection';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { boqExceptions, boqItems } from '@/lib/neon/schema';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { eq, and } from 'drizzle-orm';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import type { BOQItem, BOQException, NewBOQException } from '@/lib/neon/schema';
 import type { ApiContext, ExceptionResolution } from './types';
 import { createProcurementError } from '../procurementErrors';

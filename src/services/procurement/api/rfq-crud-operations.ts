@@ -8,11 +8,11 @@ import { ProcurementError, RFQValidationError } from '../procurementErrors';
 import { validateSchema, NewRFQSchema, UpdateRFQSchema } from '@/lib/validation/procurement.schemas';
 import { auditLogger } from '../auditLogger';
 import { db } from '@/lib/neon/connection';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { rfqs } from '@/lib/neon/schema';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { eq, and } from 'drizzle-orm';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import type { RFQ, NewRFQ } from '@/lib/neon/schema';
 import type { ApiContext } from './types';
 

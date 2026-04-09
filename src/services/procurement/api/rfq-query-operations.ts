@@ -6,11 +6,11 @@
 import { BaseService, type ServiceResponse } from '../../core/BaseService';
 import { auditLogger } from '../auditLogger';
 import { db } from '@/lib/neon/connection';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { rfqs } from '@/lib/neon/schema';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { eq, and, desc, asc, gte, lte } from 'drizzle-orm';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import type { RFQ } from '@/lib/neon/schema';
 import type { ApiContext, RFQFilters } from './types';
 

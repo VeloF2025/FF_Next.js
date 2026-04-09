@@ -29,7 +29,7 @@ interface CreateSheetInput {
 
 export async function createSheet(input: CreateSheetInput): Promise<EodInstallSheet> {
   // Insert sheet header
-  const [sheet] = await sql`
+  const rows = await sql`
     INSERT INTO eod_install_sheets (
       sheet_date, technician_name, technician_id,
       photo_url, photo_hash, entry_count, vlm_raw_json, uploaded_by
@@ -40,6 +40,7 @@ export async function createSheet(input: CreateSheetInput): Promise<EodInstallSh
     )
     RETURNING *
   `;
+  const sheet = rows[0]!;
 
   // Insert entries
   for (const entry of input.entries) {
@@ -125,13 +126,14 @@ export async function getSheetStats(): Promise<{
   lastUploadDate: string | null;
   pendingReconciliation: number;
 }> {
-  const [stats] = await sql`
+  const statsRows = await sql`
     SELECT
       COUNT(*)::int as total_sheets,
       MAX(sheet_date)::text as last_upload_date,
       (SELECT COUNT(*)::int FROM eod_install_sheet_entries WHERE match_status = 'pending') as pending_reconciliation
     FROM eod_install_sheets
   `;
+  const stats = statsRows[0]!;
   return {
     totalSheets: stats.total_sheets,
     lastUploadDate: stats.last_upload_date,

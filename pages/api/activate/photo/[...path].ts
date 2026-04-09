@@ -36,7 +36,8 @@ async function handler(
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
     }
 
-    const [drNumber, filename] = path;
+    const drNumber = path[0]!;
+    const filename = path[1]!;
 
     // Validate DR number format
     if (!drNumber.match(/^DR\d+$/i)) {

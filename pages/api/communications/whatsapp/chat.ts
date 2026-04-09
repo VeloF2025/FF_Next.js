@@ -140,7 +140,7 @@ function formatPhoneNumber(jid: string | null): string {
   // Extract number from JID (e.g., "27712345678@s.whatsapp.net" -> "+27 71 234 5678")
   const match = jid.match(/^(\d+)@/);
   if (match) {
-    const num = match[1];
+    const num = match[1]!;
     if (num.startsWith('27') && num.length === 11) {
       return `+27 ${num.slice(2, 4)} ${num.slice(4, 7)} ${num.slice(7)}`;
     }

@@ -7,9 +7,9 @@ import { BaseService, type ServiceResponse, type ServiceOptions } from '../../co
 import { procurementApiService } from '../procurementApiService';
 import { auditLogger, AuditAction } from '../auditLogger';
 import { db } from '@/lib/neon/connection';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { boqs } from '@/lib/neon/schema';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { count } from 'drizzle-orm';
 import { performAutomaticMapping } from './mappingOperations';
 import { resolveMappingException } from './exceptionHandler';
@@ -20,7 +20,7 @@ import type {
   BOQMappingResult,
   ExceptionResolution 
 } from './types';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import type { BOQException } from '@/lib/neon/schema';
 import { log } from '@/lib/logger';
 
