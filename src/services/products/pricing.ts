@@ -3,9 +3,9 @@
  * Handle price lists, pricing updates, and bulk price operations
  */
 
-// @ts-ignore — firebase not installed
+// @ts-expect-error — firebase not installed
 import { collection, doc, getDocs, getDoc, addDoc, updateDoc, query, where, orderBy, limit, Timestamp } from 'firebase/firestore';
-// @ts-ignore — firebase config
+// @ts-expect-error — firebase config
 import { db } from '@/config/firebase';
 import { Product, PriceList, PriceListItem, CreatePriceListData, PriceAdjustment } from './types';
 import { log } from '@/lib/logger';

@@ -3,9 +3,9 @@
  * Handle product searching, filtering, and queries
  */
 
-// @ts-ignore — firebase not installed
+// @ts-expect-error — firebase not installed
 import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
-// @ts-ignore — firebase config
+// @ts-expect-error — firebase config
 import { db } from '@/config/firebase';
 import { Product, ProductAvailability } from './types';
 import { log } from '@/lib/logger';

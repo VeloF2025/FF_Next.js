@@ -105,7 +105,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       RETURNING id, version
     `;
 
-    const newBoq = newBoqRows[0];
+    const newBoq = newBoqRows[0]!; // Guaranteed by INSERT RETURNING
 
     // Copy items — insert in batches for large BOQs
     for (const item of sourceItems) {

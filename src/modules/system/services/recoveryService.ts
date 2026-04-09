@@ -498,7 +498,7 @@ export async function approveAction(
     };
   }
 
-  const queueItem = queueResult.rows[0];
+  const queueItem = queueResult.rows[0]!;
 
   // Get the action
   const action = await serviceRegistry.getRecoveryActionById(queueItem.action_id);
@@ -576,7 +576,7 @@ export async function rejectAction(
     return false;
   }
 
-  const queueItem = queueResult.rows[0];
+  const queueItem = queueResult.rows[0]!;
 
   await db.query(
     `

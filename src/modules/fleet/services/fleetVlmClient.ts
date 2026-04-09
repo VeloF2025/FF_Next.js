@@ -267,7 +267,7 @@ export async function getVehicleCalibration(
       return null;
     }
 
-    const row = result[0];
+    const row = result[0]!; // Guaranteed by length check above
     return {
       id: row.id,
       vehicleId: row.vehicle_id,
