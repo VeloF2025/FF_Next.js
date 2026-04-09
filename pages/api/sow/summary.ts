@@ -4,6 +4,17 @@ import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 
+interface SowImportRow {
+  import_type: string;
+  count: string;
+  total_records: string;
+  processed_records: string;
+  last_import: string | null;
+  total_projects?: string;
+  total_imports?: string;
+  status?: string;
+}
+
 type SummarData = {
   success: boolean;
   data: any;
@@ -50,16 +61,16 @@ async function handler(
             projectId,
             projectName: project[0]?.project_name || 'Unknown Project',
             poles: {
-              total: sowImports.find(s => s.import_type === 'poles')?.total_records || 0,
-              processed: sowImports.find(s => s.import_type === 'poles')?.processed_records || 0
+              total: sowImports.find((s: SowImportRow) => s.import_type === 'poles')?.total_records || 0,
+              processed: sowImports.find((s: SowImportRow) => s.import_type === 'poles')?.processed_records || 0
             },
             drops: {
-              total: sowImports.find(s => s.import_type === 'drops')?.total_records || 0,
-              processed: sowImports.find(s => s.import_type === 'drops')?.processed_records || 0
+              total: sowImports.find((s: SowImportRow) => s.import_type === 'drops')?.total_records || 0,
+              processed: sowImports.find((s: SowImportRow) => s.import_type === 'drops')?.processed_records || 0
             },
             fibre: {
-              total: sowImports.find(s => s.import_type === 'fibre')?.total_records || 0,
-              processed: sowImports.find(s => s.import_type === 'fibre')?.processed_records || 0
+              total: sowImports.find((s: SowImportRow) => s.import_type === 'fibre')?.total_records || 0,
+              processed: sowImports.find((s: SowImportRow) => s.import_type === 'fibre')?.processed_records || 0
             },
             lastImport: sowImports[0]?.last_import || null,
             generatedAt: new Date().toISOString()
@@ -82,13 +93,13 @@ async function handler(
 
           const summary = {
             totalProjects: overallSummary[0]?.total_projects || 0,
-            totalImports: overallSummary.reduce((acc, curr) => acc + parseInt(curr.total_imports || 0), 0),
-            totalRecords: overallSummary.reduce((acc, curr) => acc + parseInt(curr.total_records || 0), 0),
-            processedRecords: overallSummary.reduce((acc, curr) => acc + parseInt(curr.processed_records || 0), 0),
+            totalImports: overallSummary.reduce((acc: number, curr: SowImportRow) => acc + parseInt(curr.total_imports || '0'), 0),
+            totalRecords: overallSummary.reduce((acc: number, curr: SowImportRow) => acc + parseInt(curr.total_records || '0'), 0),
+            processedRecords: overallSummary.reduce((acc: number, curr: SowImportRow) => acc + parseInt(curr.processed_records || '0'), 0),
             byType: {
-              poles: overallSummary.filter(s => s.import_type === 'poles'),
-              drops: overallSummary.filter(s => s.import_type === 'drops'),
-              fibre: overallSummary.filter(s => s.import_type === 'fibre')
+              poles: overallSummary.filter((s: SowImportRow) => s.import_type === 'poles'),
+              drops: overallSummary.filter((s: SowImportRow) => s.import_type === 'drops'),
+              fibre: overallSummary.filter((s: SowImportRow) => s.import_type === 'fibre')
             },
             generatedAt: new Date().toISOString()
           };

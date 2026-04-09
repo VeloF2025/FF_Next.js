@@ -20,6 +20,12 @@ interface FirestoreStaffDoc {
   [key: string]: unknown;
 }
 
+/** Firestore QueryDocumentSnapshot shape (firebase types are ts-ignored) */
+interface FirestoreDocSnapshot {
+  id: string;
+  data: () => Record<string, unknown>;
+}
+
 /**
  * Converts Firestore document to StaffMember type
  */
@@ -47,7 +53,7 @@ export const staffQueryService = {
       const snapshot = await getDocs(q);
       
       return snapshot.docs
-        .map((doc) => docToStaffMember({ id: doc.id, ...doc.data() }))
+        .map((doc: FirestoreDocSnapshot) => docToStaffMember({ id: doc.id, ...doc.data() }))
         .filter((staff: StaffMember) => staff.status === StaffStatus.ACTIVE)
         .map((staff: StaffMember) => ({
           id: staff.id!,
@@ -89,7 +95,7 @@ export const staffQueryService = {
       ];
       
       return snapshot.docs
-        .map((doc) => docToStaffMember({ id: doc.id, ...doc.data() }))
+        .map((doc: FirestoreDocSnapshot) => docToStaffMember({ id: doc.id, ...doc.data() }))
         .filter((staff: StaffMember) => {
           // Check if active
           if (staff.status !== StaffStatus.ACTIVE) return false;
@@ -190,7 +196,7 @@ export const staffQueryService = {
       );
       const snapshot = await getDocs(q);
       
-      return snapshot.docs.map((doc) => ({
+      return snapshot.docs.map((doc: FirestoreDocSnapshot) => ({
         id: doc.id,
         ...doc.data()
       } as ProjectAssignment));
@@ -213,7 +219,7 @@ export const staffQueryService = {
       );
       const snapshot = await getDocs(q);
       
-      return snapshot.docs.map((doc) => ({
+      return snapshot.docs.map((doc: FirestoreDocSnapshot) => ({
         id: doc.id,
         ...doc.data()
       } as ProjectAssignment));
@@ -228,7 +234,7 @@ export const staffQueryService = {
    */
   async getAllStaff(): Promise<StaffMember[]> {
     const snapshot = await getDocs(collection(db, 'staff'));
-    return snapshot.docs.map((doc) => docToStaffMember({
+    return snapshot.docs.map((doc: FirestoreDocSnapshot) => docToStaffMember({
       id: doc.id,
       ...doc.data()
     }));

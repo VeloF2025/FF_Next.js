@@ -15,6 +15,13 @@ import {
 import { db } from '@/config/firebase';
 import { Pole, POLE_COLLECTION } from './types';
 
+/** Firestore QueryDocumentSnapshot shape (firebase types are ts-ignored) */
+interface FirestoreDocSnapshot {
+  id: string;
+  ref: unknown;
+  data: () => Record<string, unknown>;
+}
+
 export class PoleSyncService {
   /**
    * Get poles with pending sync
@@ -27,7 +34,7 @@ export class PoleSyncService {
     );
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
+    return snapshot.docs.map((doc: FirestoreDocSnapshot) => ({
       id: doc.id,
       ...doc.data()
     } as Pole));
@@ -72,13 +79,13 @@ export class PoleSyncService {
     );
 
     const snapshot = await getDocs(q);
-    const poles = snapshot.docs.map(doc => ({
+    const poles = snapshot.docs.map((doc: FirestoreDocSnapshot) => ({
       id: doc.id,
       ...doc.data()
     } as Pole));
 
     // Mark all as pending for retry
-    const updates = poles.map(pole =>
+    const updates = poles.map((pole: Pole) =>
       updateDoc(doc(db, POLE_COLLECTION, pole.id!), {
         'metadata.syncStatus': 'pending',
         'metadata.syncError': null
@@ -104,11 +111,11 @@ export class PoleSyncService {
     );
 
     const snapshot = await getDocs(q);
-    const poles = snapshot.docs.map(doc => doc.data());
+    const poles = snapshot.docs.map((doc: FirestoreDocSnapshot) => doc.data());
 
-    const synced = poles.filter(p => p.metadata?.syncStatus === 'synced').length;
-    const pending = poles.filter(p => p.metadata?.syncStatus === 'pending').length;
-    const error = poles.filter(p => p.metadata?.syncStatus === 'error').length;
+    const synced = poles.filter((p: Record<string, unknown>) => (p.metadata as Record<string, unknown>)?.syncStatus === 'synced').length;
+    const pending = poles.filter((p: Record<string, unknown>) => (p.metadata as Record<string, unknown>)?.syncStatus === 'pending').length;
+    const error = poles.filter((p: Record<string, unknown>) => (p.metadata as Record<string, unknown>)?.syncStatus === 'error').length;
 
     return {
       synced,
@@ -128,8 +135,8 @@ export class PoleSyncService {
     );
 
     const snapshot = await getDocs(q);
-    const updates = snapshot.docs.map(doc =>
-      updateDoc(doc.ref, {
+    const updates = snapshot.docs.map((doc: FirestoreDocSnapshot) =>
+      updateDoc(doc.ref as any, {
         'metadata.syncStatus': 'pending',
         'metadata.syncError': null
       })

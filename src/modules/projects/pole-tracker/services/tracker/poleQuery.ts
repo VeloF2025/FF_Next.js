@@ -13,6 +13,13 @@ import {
 import { db } from '@/config/firebase';
 import { Pole, PoleFilters, POLE_COLLECTION } from './types';
 
+/** Firestore QueryDocumentSnapshot shape (firebase types are ts-ignored) */
+interface FirestoreDocSnapshot {
+  id: string;
+  ref: unknown;
+  data: () => Record<string, unknown>;
+}
+
 export class PoleQueryService {
   /**
    * Get poles for a project with filters
@@ -38,7 +45,7 @@ export class PoleQueryService {
     }
 
     const snapshot = await getDocs(q);
-    let poles = snapshot.docs.map(doc => ({
+    let poles = snapshot.docs.map((doc: FirestoreDocSnapshot) => ({
       id: doc.id,
       ...doc.data()
     } as Pole));
@@ -46,7 +53,7 @@ export class PoleQueryService {
     // Apply search filter (client-side)
     if (filters?.search) {
       const searchLower = filters.search.toLowerCase();
-      poles = poles.filter(pole =>
+      poles = poles.filter((pole: Pole) =>
         pole.poleNumber.toLowerCase().includes(searchLower) ||
         pole.location.toLowerCase().includes(searchLower)
       );
@@ -70,7 +77,7 @@ export class PoleQueryService {
     );
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
+    return snapshot.docs.map((doc: FirestoreDocSnapshot) => ({
       id: doc.id,
       ...doc.data()
     } as Pole));
@@ -91,7 +98,7 @@ export class PoleQueryService {
     );
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
+    return snapshot.docs.map((doc: FirestoreDocSnapshot) => ({
       id: doc.id,
       ...doc.data()
     } as Pole));
@@ -114,11 +121,11 @@ export class PoleQueryService {
     const searchLower = searchText.toLowerCase();
     
     return snapshot.docs
-      .map(doc => ({
+      .map((doc: FirestoreDocSnapshot) => ({
         id: doc.id,
         ...doc.data()
       } as Pole))
-      .filter(pole =>
+      .filter((pole: Pole) =>
         pole.poleNumber.toLowerCase().includes(searchLower) ||
         pole.location.toLowerCase().includes(searchLower) ||
         pole.phase.toLowerCase().includes(searchLower)
@@ -137,7 +144,7 @@ export class PoleQueryService {
     );
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
+    return snapshot.docs.map((doc: FirestoreDocSnapshot) => ({
       id: doc.id,
       ...doc.data()
     } as Pole));
