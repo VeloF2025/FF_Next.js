@@ -94,19 +94,26 @@ export const TICKET_STATUS_DEFINITIONS: Record<TicketStatus, TicketStatusMetadat
     color: 'info',
     order: 10,
   },
+  [TicketStatus.VERIFIED]: {
+    value: TicketStatus.VERIFIED,
+    label: 'Verified',
+    description: 'Resolution verified by team lead',
+    color: 'success',
+    order: 11,
+  },
   [TicketStatus.CLOSED]: {
     value: TicketStatus.CLOSED,
     label: 'Closed',
     description: 'Ticket approved and closed by team lead',
     color: 'success',
-    order: 11,
+    order: 12,
   },
   [TicketStatus.CANCELLED]: {
     value: TicketStatus.CANCELLED,
     label: 'Cancelled',
     description: 'Ticket cancelled or deleted (soft delete)',
     color: 'default',
-    order: 12,
+    order: 13,
   },
 };
 
@@ -260,8 +267,13 @@ export const VALID_STATUS_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
     TicketStatus.RESOLVED,
   ],
   [TicketStatus.RESOLVED]: [
+    TicketStatus.VERIFIED,     // Team lead verifies resolution
     TicketStatus.CLOSED,       // Team lead approves → closed
     TicketStatus.IN_PROGRESS,  // Team lead rejects → back to work
+  ],
+  [TicketStatus.VERIFIED]: [
+    TicketStatus.CLOSED,       // Verified → ready to close
+    TicketStatus.IN_PROGRESS,  // Revert if issue found
   ],
   [TicketStatus.CLOSED]: [],
   [TicketStatus.CANCELLED]: [],

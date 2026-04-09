@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   Clock,
   ArrowRight,
+  ShieldCheck,
 } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
@@ -115,6 +116,15 @@ export function TicketActions({ ticket, compact = false, onActionComplete }: Tic
       });
     }
 
+    if (ticket.status === 'resolved') {
+      actions.push({
+        label: 'Verify Resolution',
+        icon: ShieldCheck,
+        onClick: () => handleStatusChange('verified'),
+        variant: 'success' as const,
+      });
+    }
+
     return actions;
   };
 
@@ -128,7 +138,6 @@ export function TicketActions({ ticket, compact = false, onActionComplete }: Tic
         <div className={cn('flex flex-wrap gap-2', compact && 'flex-col')}>
           {availableActions.map((action) => {
             const Icon = action.icon;
-            const isPrimary = action.variant === 'primary';
 
             return (
               <button
@@ -138,9 +147,9 @@ export function TicketActions({ ticket, compact = false, onActionComplete }: Tic
                 disabled={isLoading}
                 className={cn(
                   'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
-                  isPrimary
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                    : 'bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
+                  action.variant === 'primary' ? 'bg-blue-600 hover:bg-blue-700 text-white' :
+                  action.variant === 'success' ? 'bg-green-600 hover:bg-green-700 text-white' :
+                  'bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
                 )}
               >
                 {isLoading ? (

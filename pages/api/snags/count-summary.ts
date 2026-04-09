@@ -110,7 +110,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ) AS pending_qa,
         COUNT(*) FILTER (WHERE
           CASE WHEN t.id IS NOT NULL
-            THEN t.status IN ('qa_approved','pending_handover','handed_to_ops','resolved','closed')
+            THEN t.status IN ('verified','qa_approved','pending_handover','handed_to_ops','resolved','closed')
             ELSE s.status IN ('fixed','verified','closed')
           END
         ) AS resolved,

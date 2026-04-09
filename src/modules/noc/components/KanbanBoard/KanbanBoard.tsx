@@ -27,7 +27,7 @@ interface KanbanBoardProps {
 }
 
 // Database status values — aligned with TicketStatus enum
-export type DatabaseStatus = 'new' | 'open' | 'assigned' | 'in_progress' | 'pending_qa' | 'qa_in_progress' | 'qa_rejected' | 'qa_approved' | 'pending_handover' | 'handed_to_ops' | 'resolved' | 'closed' | 'cancelled';
+export type DatabaseStatus = 'new' | 'open' | 'assigned' | 'in_progress' | 'pending_qa' | 'qa_in_progress' | 'qa_rejected' | 'qa_approved' | 'pending_handover' | 'handed_to_ops' | 'resolved' | 'verified' | 'closed' | 'cancelled';
 
 // Define visible columns and their order
 interface ColumnConfig {
@@ -40,6 +40,7 @@ const COLUMN_CONFIG: ColumnConfig[] = [
   { status: 'in_progress' },
   { status: 'pending_qa' },
   { status: 'resolved' },
+  { status: 'verified' },
   { status: 'closed' },
 ];
 
@@ -63,6 +64,7 @@ const COLUMN_STATUSES: Record<DatabaseStatus, string[]> = {
   in_progress: ['in_progress', 'qa_rejected'],
   pending_qa: ['pending_qa', 'qa_in_progress'],
   resolved: ['resolved', 'qa_approved', 'pending_handover', 'handed_to_ops'],
+  verified: ['verified'],
   closed: ['closed', 'cancelled'],
   // Not visible but needed for type completeness
   new: [], qa_in_progress: [], qa_rejected: [], qa_approved: [],
@@ -71,7 +73,7 @@ const COLUMN_STATUSES: Record<DatabaseStatus, string[]> = {
 
 // Active vs Completed column groups for sub-tab filtering
 const ACTIVE_STATUSES: DatabaseStatus[] = ['open', 'assigned', 'in_progress', 'pending_qa'];
-const COMPLETED_STATUSES: DatabaseStatus[] = ['resolved', 'closed'];
+const COMPLETED_STATUSES: DatabaseStatus[] = ['resolved', 'verified', 'closed'];
 
 // Max tickets fetched for Kanban (server caps at 200)
 const KANBAN_PAGE_SIZE = 200;

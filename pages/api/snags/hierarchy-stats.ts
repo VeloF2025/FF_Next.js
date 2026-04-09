@@ -61,7 +61,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'assigned' ELSE s.status = 'assigned' END) AS assigned,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'in_progress' ELSE s.status = 'in_progress' END) AS in_progress,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('pending_qa','qa_in_progress','qa_rejected') ELSE s.status = 'fixed' END) AS fixed,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('qa_approved','pending_handover','handed_to_ops') ELSE s.status = 'verified' END) AS verified,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('verified','qa_approved','pending_handover','handed_to_ops') ELSE s.status = 'verified' END) AS verified,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('resolved','closed') ELSE s.status = 'closed' END) AS closed,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN FALSE ELSE s.status = 'reopened' END) AS reopened
         FROM projects p
@@ -91,7 +91,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'assigned' ELSE s.status = 'assigned' END) AS assigned,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'in_progress' ELSE s.status = 'in_progress' END) AS in_progress,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('pending_qa','qa_in_progress','qa_rejected') ELSE s.status = 'fixed' END) AS fixed,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('qa_approved','pending_handover','handed_to_ops') ELSE s.status = 'verified' END) AS verified,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('verified','qa_approved','pending_handover','handed_to_ops') ELSE s.status = 'verified' END) AS verified,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('resolved','closed') ELSE s.status = 'closed' END) AS closed,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN FALSE ELSE s.status = 'reopened' END) AS reopened
         FROM projects p
@@ -115,7 +115,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'assigned' ELSE s.status = 'assigned' END) AS assigned,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'in_progress' ELSE s.status = 'in_progress' END) AS in_progress,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('pending_qa','qa_in_progress','qa_rejected') ELSE s.status = 'fixed' END) AS fixed,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('qa_approved','pending_handover','handed_to_ops') ELSE s.status = 'verified' END) AS verified,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('verified','qa_approved','pending_handover','handed_to_ops') ELSE s.status = 'verified' END) AS verified,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('resolved','closed') ELSE s.status = 'closed' END) AS closed,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN FALSE ELSE s.status = 'reopened' END) AS reopened
         FROM projects p
@@ -144,7 +144,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'assigned' ELSE s.status = 'assigned' END) AS assigned,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status = 'in_progress' ELSE s.status = 'in_progress' END) AS in_progress,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('pending_qa','qa_in_progress','qa_rejected') ELSE s.status = 'fixed' END) AS fixed,
-          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('qa_approved','pending_handover','handed_to_ops') ELSE s.status = 'verified' END) AS verified,
+          COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('verified','qa_approved','pending_handover','handed_to_ops') ELSE s.status = 'verified' END) AS verified,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN t.status IN ('resolved','closed') ELSE s.status = 'closed' END) AS closed,
           COUNT(s.id) FILTER (WHERE CASE WHEN t.id IS NOT NULL THEN FALSE ELSE s.status = 'reopened' END) AS reopened
         FROM projects p

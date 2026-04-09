@@ -335,6 +335,17 @@ export async function PUT(
       });
     }
 
+    // When ticket is verified, mark linked snag as verified
+    if (body.status === TicketStatus.VERIFIED && updatedTicket.source === 'snags') {
+      sql`
+        UPDATE snags
+        SET status = 'verified', verified_at = NOW(), verified_by = ${actingUser.id ?? null}
+        WHERE noc_ticket_id = ${ticketId}
+      `.catch(err => {
+        logger.error('Snag verified sync error', { ticketId, error: err instanceof Error ? err.message : String(err) });
+      });
+    }
+
     return NextResponse.json({
       success: true,
       data: updatedTicket,

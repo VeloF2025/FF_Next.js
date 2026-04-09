@@ -104,6 +104,7 @@ export enum TicketStatus {
   PENDING_HANDOVER = 'pending_handover',
   HANDED_TO_OPS = 'handed_to_ops', // Renamed from HANDED_TO_MAINTENANCE
   RESOLVED = 'resolved', // Work completed, pending formal closure
+  VERIFIED = 'verified',
   CLOSED = 'closed',
   CANCELLED = 'cancelled',
 }
@@ -216,6 +217,7 @@ export interface Ticket {
 
   // Joined fields (from list/detail queries)
   assigned_user?: { id: string; name: string; email: string } | null;
+  created_user?: { id: string; name: string } | null;
   assigned_team_name?: string | null;
 }
 

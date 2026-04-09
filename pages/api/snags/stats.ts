@@ -43,7 +43,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                ELSE s.status = 'fixed' END
         ) AS fixed,
         COUNT(s.id) FILTER (WHERE
-          CASE WHEN t.id IS NOT NULL THEN t.status IN ('qa_approved','pending_handover','handed_to_ops')
+          CASE WHEN t.id IS NOT NULL THEN t.status IN ('verified','qa_approved','pending_handover','handed_to_ops')
                ELSE s.status = 'verified' END
         ) AS verified,
         COUNT(s.id) FILTER (WHERE

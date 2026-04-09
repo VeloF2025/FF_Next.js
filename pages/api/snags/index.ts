@@ -26,7 +26,7 @@ import type {
 function mapSnagStatusToTicketStatus(snagStatus: SnagStatus): TicketStatus | undefined {
   switch (snagStatus) {
     case 'fixed':    return TicketStatus.RESOLVED;
-    case 'verified': return TicketStatus.RESOLVED;
+    case 'verified': return TicketStatus.VERIFIED;
     case 'closed':   return TicketStatus.CLOSED;
     default:         return undefined;
   }

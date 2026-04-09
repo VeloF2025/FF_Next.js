@@ -453,13 +453,21 @@ export async function getTicketById(id: string): Promise<Ticket> {
           )
           ELSE NULL
         END as assigned_user,
+        CASE
+          WHEN cu.id IS NOT NULL THEN jsonb_build_object(
+            'id', cu.id,
+            'name', COALESCE(cu.first_name || ' ' || cu.last_name, cu.email)
+          )
+          ELSE NULL
+        END as created_user,
         tm.name as assigned_team_name
       FROM maintenance_tickets t
       LEFT JOIN staff s ON t.assigned_to = s.id
+      LEFT JOIN users cu ON t.created_by = cu.id
       LEFT JOIN teams tm ON t.assigned_team_id = tm.id
       WHERE t.id = $1
     `;
-    const ticket = await queryOne<Ticket & { assigned_user?: { id: string; name: string; email: string }; assigned_team_name?: string }>(sql, [id]);
+    const ticket = await queryOne<Ticket & { assigned_user?: { id: string; name: string; email: string }; created_user?: { id: string; name: string }; assigned_team_name?: string }>(sql, [id]);
 
     if (!ticket) {
       throw new Error(`Ticket with ID ${id} not found`);
@@ -796,9 +804,17 @@ export async function listTickets(
           )
           ELSE NULL
         END as assigned_user,
+        CASE
+          WHEN cu.id IS NOT NULL THEN jsonb_build_object(
+            'id', cu.id,
+            'name', COALESCE(cu.first_name || ' ' || cu.last_name, cu.email)
+          )
+          ELSE NULL
+        END as created_user,
         tm.name as assigned_team_name
       FROM maintenance_tickets t
       LEFT JOIN staff s ON t.assigned_to = s.id
+      LEFT JOIN users cu ON t.created_by = cu.id
       LEFT JOIN teams tm ON t.assigned_team_id = tm.id
       ${whereClause ? whereClause.replace(/\b(status|type|priority|source|assigned_to|contractor_id|project_id|dr_number|qa_verified|sla_breached|assigned_team_id|ticket_uid|title|description|created_at)\b/g, 't.$1') : ''}
       ORDER BY t.created_at DESC

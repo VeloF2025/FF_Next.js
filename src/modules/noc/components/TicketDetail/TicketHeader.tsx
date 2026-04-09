@@ -199,6 +199,26 @@ export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange
           </div>
         )}
 
+        {/* Created By */}
+        {ticket.created_user && (
+          <div>
+            <div className="flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] mb-1">
+              <User className="w-4 h-4" />
+              Created By
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center">
+                <span className="text-xs text-white font-medium">
+                  {ticket.created_user.name?.charAt(0) || 'U'}
+                </span>
+              </div>
+              <p className="text-sm text-[var(--ff-text-primary)]">
+                {ticket.created_user.name}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Assigned To */}
         {ticket.assigned_to && (
           <div>
