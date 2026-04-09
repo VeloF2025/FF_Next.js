@@ -3,9 +3,9 @@
  * Handle product availability, activation, and discontinuation
  */
 
-// @ts-ignore — firebase not installed
+// @ts-expect-error — firebase not installed
 import { doc, updateDoc, Timestamp } from 'firebase/firestore';
-// @ts-ignore — firebase config
+// @ts-expect-error — firebase config
 import { db } from '@/config/firebase';
 import { ProductAvailability } from './types';
 import { log } from '@/lib/logger';

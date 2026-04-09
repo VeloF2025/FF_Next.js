@@ -16,7 +16,7 @@ import { getVlmFewShotExamples, buildVlmFewShotPrompt } from '@/services/vlmLear
 
 const logger = createLogger('fieldOpsVlmService');
 const VLM_URL = process.env.VLM_SERVICE_URL || 'http://100.96.203.105:8100';
-const VLM_MODEL = 'Qwen3-VL-8B-Instruct';
+const VLM_MODEL = process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-32B-Instruct-AWQ';
 
 function getDb() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL not set');

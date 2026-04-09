@@ -4,7 +4,7 @@
  */
 
 import { BaseService, type ServiceResponse } from '../../core/BaseService';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import type { RFQ } from '@/lib/neon/schema';
 import type { ApiContext, RFQFilters } from './types';
 import { RFQCrudOperations } from './rfq-crud-operations';
