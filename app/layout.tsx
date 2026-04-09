@@ -2,13 +2,18 @@
  * Root Layout for App Router
  */
 
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import '../styles/globals.css';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: 'FibreFlow',
   description: 'Fiber network project management system',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
 };
 
 /**
