@@ -4,9 +4,9 @@
  */
 
 import { db } from '@/lib/neon/connection';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { auditLog, type NewAuditLog } from '@/lib/neon/schema';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { eq, and, gte, lte, inArray, desc } from 'drizzle-orm';
 import { 
   AuditAction, 

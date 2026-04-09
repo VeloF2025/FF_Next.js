@@ -578,6 +578,7 @@ export async function runAnomalyDetection(options: {
       // Check each transaction for anomalies
       for (let i = 0; i < transactions.length; i++) {
         const tx = transactions[i];
+        if (!tx) continue;
         const efficiency = parseFloat(String(tx.litres_per_100km)) || 0;
         const pricePerLitre = parseFloat(String(tx.price_per_litre)) || 0;
 

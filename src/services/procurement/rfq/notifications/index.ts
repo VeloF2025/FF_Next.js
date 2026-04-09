@@ -18,7 +18,7 @@ export type {
 
 // Email services
 import { RFQEmailService } from './emailService';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { RFQEmailValidator } from './email/email-validator';
 export { RFQEmailService };
 export type { 
@@ -27,13 +27,13 @@ export type {
 } from './emailService';
 
 // Deadline alerts
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { RFQDeadlineAlerts } from './deadlineAlerts';
 export { RFQDeadlineAlerts };
 export type { 
   DeadlineAlert, 
   AlertThresholds 
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 } from './deadlineAlerts';
 
 // Backward compatibility - consolidated notification class

@@ -109,6 +109,7 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
       const trend = calculateTrend(periods.slice(-6)); // Use last 6 periods for trend
       
       const lastPeriod = periods[periods.length - 1];
+      if (!lastPeriod) break;
       periods.push({
         period: futureDate.toISOString().slice(0, 7), // YYYY-MM format for chart periods
         date: futureDate,

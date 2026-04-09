@@ -1,23 +1,21 @@
 /**
  * RFQ Subscriptions - Legacy Compatibility Layer
-// @ts-ignore
  * @deprecated Use modular components from './subscription' instead
  * This file maintains backward compatibility for existing imports
-// @ts-ignore
  * New code should import from './subscription' directly
  */
 
 // Re-export everything from the modular structure
-export { 
+export {
   RFQSubscriptionManager as RFQSubscriptions,
   RFQFilterEngine,
   RFQSubscriberCrud
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 } from './subscription';
 
 export type { 
   SubscriptionFilter, 
   SubscriptionOptions, 
-  SubscriptionCallback 
-// @ts-ignore
+  SubscriptionCallback
+// @ts-expect-error — module lacks type declarations
 } from './subscription';

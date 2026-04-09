@@ -642,7 +642,7 @@ export async function getDriverScorecard(
       throw new Error('Driver not found');
     }
 
-    const driver = driverInfo[0];
+    const driver = driverInfo[0]!; // Guaranteed by length check above
 
     // Get current score
     const currentScoreResult = await sql`

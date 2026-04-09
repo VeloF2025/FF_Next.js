@@ -3,9 +3,9 @@
  * Handles Firebase real-time operations
  */
 
-// @ts-ignore — firebase not installed
+// @ts-expect-error — firebase not installed
 import { collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, query, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
-// @ts-ignore — firebase config
+// @ts-expect-error — firebase config
 import { db } from '@/config/firebase';
 import type { Project } from '@/types/project.types';
 import type { Client } from '@/types/client.types';

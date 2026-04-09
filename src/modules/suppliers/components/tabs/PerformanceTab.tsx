@@ -312,7 +312,7 @@ export function PerformanceTab() {
     );
   }
 
-  const currentPeriod = mockPerformanceData.find(p => p.period === selectedPeriod) || mockPerformanceData[0];
+  const currentPeriod = (mockPerformanceData.find(p => p.period === selectedPeriod) || mockPerformanceData[0])!;
 
   return (
     <div className="space-y-6">

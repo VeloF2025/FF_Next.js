@@ -7,9 +7,9 @@ import { BaseService, type ServiceResponse } from '../../core/BaseService';
 import { ProcurementError } from '../procurementErrors';
 import { auditLogger } from '../auditLogger';
 import { db } from '@/lib/neon/connection';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { rfqs } from '@/lib/neon/schema';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { eq, and } from 'drizzle-orm';
 import type { ApiContext } from './types';
 
