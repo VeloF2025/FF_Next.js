@@ -286,8 +286,8 @@ export function ModuleNav({ tabs, getActiveTabId, accentColor }: ModuleNavProps)
     const handler = (e: MouseEvent) => {
       if (navRef.current && !navRef.current.contains(e.target as Node)) setOpenTab(null);
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
   }, []);
 
   /** Close open menu on route change (asPath includes query params) */
