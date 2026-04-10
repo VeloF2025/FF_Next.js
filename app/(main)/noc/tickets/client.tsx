@@ -15,8 +15,7 @@
  * 🟢 WORKING: Ticket list page integrates TicketList and KanbanBoard components
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useEffect, useMemo } from 'react';
 import { ModulePage } from '@/components/module-page';
 import { nocConfig } from '@/modules/navigation';
 import { TicketList } from '@/modules/noc/components/TicketList/TicketList';
@@ -28,6 +27,7 @@ import Link from 'next/link';
 import { Search, Users, User, X } from 'lucide-react';
 import { TicketSummaryTiles } from '@/modules/noc/components/TicketList/TicketSummaryTiles';
 import { useProjects } from '@/hooks/useProjects';
+import { useUrlFilters } from '@/hooks/useUrlFilters';
 import type { TicketFilters } from '@/modules/noc/types/ticket';
 
 type ViewMode = 'table' | 'kanban' | 'grid';
@@ -53,14 +53,27 @@ const GridIcon = () => (
 );
 
 export default function TicketsListPageClient() {
-  const searchParams = useSearchParams();
-  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
-  const [ticketScope, setTicketScope] = useState<TicketScope>('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('');
-  const [filterSource, setFilterSource] = useState('');
-  const [filterDatePreset, setFilterDatePreset] = useState('');
-  const [filterProject, setFilterProject] = useState('');
+  // All filters synced bidirectionally with URL search params
+  const { filters: urlFilters, setFilter, setMultiple } = useUrlFilters({
+    status: '',
+    type: '',
+    source: '',
+    date: '',
+    project: '',
+    scope: '',
+    view: '',
+    search: '',
+  });
+
+  const viewMode = (urlFilters.view || 'kanban') as ViewMode;
+  const ticketScope = (urlFilters.scope || 'all') as TicketScope;
+  const searchTerm = urlFilters.search;
+  const filterType = urlFilters.type;
+  const filterSource = urlFilters.source;
+  const filterDatePreset = urlFilters.date;
+  const filterProject = urlFilters.project;
+  const statusFilter = urlFilters.status || undefined;
+
   const { teamIds } = useMyTeams();
   const { currentUser } = useAuth();
   const { data: projects = [] } = useProjects();
@@ -68,30 +81,35 @@ export default function TicketsListPageClient() {
     .filter((p) => p.status === 'active' || p.status === 'in_progress')
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  // Read status filter from URL params (Active/Completed sub-tabs)
-  const statusFilter = searchParams?.get('status') || undefined;
-
-  // Load saved preferences from localStorage
+  // Also persist view/scope to localStorage as fallback
   useEffect(() => {
-    const saved = localStorage.getItem('ticketsViewMode') as ViewMode | null;
-    if (saved && (saved === 'table' || saved === 'kanban' || saved === 'grid')) {
-      setViewMode(saved);
+    if (urlFilters.view) localStorage.setItem('ticketsViewMode', urlFilters.view);
+    if (urlFilters.scope) localStorage.setItem('ticketsScope', urlFilters.scope);
+  }, [urlFilters.view, urlFilters.scope]);
+
+  // On mount, if URL doesn't have view/scope, load from localStorage
+  useEffect(() => {
+    if (!urlFilters.view) {
+      const saved = localStorage.getItem('ticketsViewMode') as ViewMode | null;
+      if (saved && (saved === 'table' || saved === 'kanban' || saved === 'grid')) {
+        setFilter('view', saved);
+      }
     }
-    const savedScope = localStorage.getItem('ticketsScope') as TicketScope | null;
-    if (savedScope && (savedScope === 'all' || savedScope === 'my_tickets' || savedScope === 'my_team')) {
-      setTicketScope(savedScope);
+    if (!urlFilters.scope) {
+      const saved = localStorage.getItem('ticketsScope') as TicketScope | null;
+      if (saved && (saved === 'all' || saved === 'my_tickets' || saved === 'my_team')) {
+        setFilter('scope', saved);
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Save preference to localStorage
   const handleViewChange = (mode: ViewMode) => {
-    setViewMode(mode);
-    localStorage.setItem('ticketsViewMode', mode);
+    setFilter('view', mode);
   };
 
   const handleScopeChange = (scope: TicketScope) => {
-    setTicketScope(scope);
-    localStorage.setItem('ticketsScope', scope);
+    setFilter('scope', scope);
   };
 
   // Compute date range from preset
@@ -255,12 +273,12 @@ export default function TicketsListPageClient() {
               type="text"
               placeholder="Search tickets..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => setFilter('search', e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] text-base sm:text-sm placeholder:text-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary-500)]/50"
             />
             {searchTerm && (
               <button
-                onClick={() => setSearchTerm('')}
+                onClick={() => setFilter('search', '')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]"
                 aria-label="Clear search"
               >
@@ -273,7 +291,7 @@ export default function TicketsListPageClient() {
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible">
             <select
               value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
+              onChange={(e) => setFilter('type', e.target.value)}
               className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
                 ${filterType
                   ? 'bg-blue-500/10 border-blue-500/30 text-blue-300'
@@ -296,7 +314,7 @@ export default function TicketsListPageClient() {
             </select>
             <select
               value={filterSource}
-              onChange={(e) => setFilterSource(e.target.value)}
+              onChange={(e) => setFilter('source', e.target.value)}
               className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
                 ${filterSource
                   ? 'bg-purple-500/10 border-purple-500/30 text-purple-300'
@@ -318,7 +336,7 @@ export default function TicketsListPageClient() {
             </select>
             <select
               value={filterDatePreset}
-              onChange={(e) => setFilterDatePreset(e.target.value)}
+              onChange={(e) => setFilter('date', e.target.value)}
               className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
                 ${filterDatePreset
                   ? 'bg-green-500/10 border-green-500/30 text-green-300'
@@ -333,7 +351,7 @@ export default function TicketsListPageClient() {
             </select>
             <select
               value={filterProject}
-              onChange={(e) => setFilterProject(e.target.value)}
+              onChange={(e) => setFilter('project', e.target.value)}
               className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0 max-w-[180px]
                 ${filterProject
                   ? 'bg-orange-500/10 border-orange-500/30 text-orange-300'
@@ -349,7 +367,7 @@ export default function TicketsListPageClient() {
             </select>
             {hasActiveFilters && (
               <button
-                onClick={() => { setFilterType(''); setFilterSource(''); setFilterDatePreset(''); setFilterProject(''); }}
+                onClick={() => setMultiple({ type: '', source: '', date: '', project: '' })}
                 className="p-1.5 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] rounded hover:bg-[var(--ff-bg-secondary)]"
                 title="Clear all filters"
               >
