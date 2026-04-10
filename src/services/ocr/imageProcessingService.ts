@@ -15,13 +15,14 @@ import { execSync } from 'child_process';
 import sharp from 'sharp';
 import type formidable from 'formidable';
 import { log } from '@/lib/logger';
+import { VLM_API_URL, VLM_MODEL } from '@/lib/vlm';
 
 /** Max image dimensions for VLM (keeps the model under its token/image-size limit) */
 const MAX_IMAGE_WIDTH = 1280;
 const MAX_IMAGE_HEIGHT = 960;
 
-/** VLLM endpoint — shared with vlmExtractionService */
-const VLLM_ENDPOINT = process.env.VLLM_ENDPOINT || 'http://100.96.203.105:8100';
+/** VLM endpoint — shared with vlmExtractionService */
+const VLLM_ENDPOINT = VLM_API_URL;
 
 /**
  * Detect whether an image needs rotation using the VLM.
@@ -43,7 +44,7 @@ Return ONLY the number, nothing else.`;
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ',
+        model: VLM_MODEL,
         messages: [
           {
             role: 'user',

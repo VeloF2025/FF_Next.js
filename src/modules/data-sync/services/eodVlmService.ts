@@ -9,10 +9,11 @@
  */
 
 import {
-  VLM_API_ENDPOINT,
-  VLM_MODEL,
-  VLM_TIMEOUT_MS,
-} from '@/modules/activate/services/vlmClient';
+  VLM_CHAT_ENDPOINT as VLM_API_ENDPOINT,
+  VLM_EXTRACTION_MODEL as VLM_MODEL,
+  VLM_TIMEOUT_DEFAULT as VLM_TIMEOUT_MS,
+  stripThinkTags,
+} from '@/lib/vlm';
 import { optimizeForVlm } from '@/modules/activate/services/imagePreprocessService';
 import { scanAllBarcodes } from '@/modules/activate/services/enhancedBarcodeService';
 import { normalizeSerial } from '@/modules/activate/services/serialExtractor';
@@ -292,8 +293,7 @@ async function extractOntSerials(fullResBase64: string, rowCount: number): Promi
     // Parse
     const block = content.match(/```(?:json)?\n([\s\S]*?)\n```/);
     if (block) content = block[1];
-    const thinkEnd = content.indexOf('</think>');
-    if (thinkEnd !== -1) content = content.slice(thinkEnd + 8).trim();
+    content = stripThinkTags(content);
 
     const serials: Array<{ row: number; serial: string }> = JSON.parse(content);
 
@@ -392,8 +392,7 @@ export async function extractEodSheet(
     let jsonStr = content;
     const codeBlock = jsonStr.match(/```(?:json)?\n([\s\S]*?)\n```/);
     if (codeBlock) jsonStr = codeBlock[1];
-    const thinkEnd = jsonStr.indexOf('</think>');
-    if (thinkEnd !== -1) jsonStr = jsonStr.slice(thinkEnd + 8).trim();
+    jsonStr = stripThinkTags(jsonStr);
 
     const parsed: EodVlmExtraction = JSON.parse(jsonStr);
 

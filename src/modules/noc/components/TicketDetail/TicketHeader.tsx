@@ -32,6 +32,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { log } from '@/lib/logger';
+import { useAuth } from '@/contexts/AuthContext';
+import { getVisibleActions } from '@/modules/construction-qa/utils/snagPermissions';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ClickableStatusBadge } from './ClickableStatusBadge';
@@ -97,6 +99,8 @@ function getGoogleMapsUrl(lat: number, lng: number): string {
  * 🟢 WORKING: Ticket header component
  */
 export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange, onPriorityChange }: TicketHeaderProps) {
+  const { currentUser: authUser } = useAuth();
+
   // Get GPS coordinates from enrichment or ticket
   const gps = ticket.fibreflow_enrichment?.fibreflow_gps
     || ticket.fibreflow_enrichment?.onemap_gps
@@ -165,9 +169,14 @@ export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange
         const s = ticket.status;
         const actions = getWorkflowActions(s, ticket.ticket_type);
         if (!actions?.forward && !actions?.backward) return null;
+        const vis = getVisibleActions(s, {
+          userId: authUser?.id ?? null,
+          userRole: authUser?.role ?? null,
+          ticketAssignedTo: ticket.assigned_to ?? null,
+        });
         return (
           <div className="flex items-center gap-2 mb-4">
-            {actions.backward && (
+            {actions.backward && vis.showBackward && (
               <button
                 type="button"
                 onClick={() => onStatusChange?.(actions.backward!.status)}
@@ -176,7 +185,7 @@ export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange
                 ← {actions.backward.label}
               </button>
             )}
-            {actions.forward && (
+            {actions.forward && vis.showForward && (
               <button
                 type="button"
                 onClick={() => onStatusChange?.(actions.forward!.status)}
@@ -185,7 +194,7 @@ export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange
                 {actions.forward.label} →
               </button>
             )}
-            {actions.reject && (
+            {actions.reject && vis.showReject && (
               <button
                 type="button"
                 onClick={() => onStatusChange?.(actions.reject!.status)}

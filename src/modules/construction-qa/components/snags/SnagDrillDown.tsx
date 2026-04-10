@@ -12,6 +12,8 @@ import { fetchSnagsByStatus, type SnagByStatusRow } from '../../services/snagSer
 import { updateSnag } from '../../services/snagService';
 import type { SnagStatus } from '../../types/snag.types';
 import { log } from '@/lib/logger';
+import { useAuth } from '@/contexts/AuthContext';
+import { getVisibleActions } from '../../utils/snagPermissions';
 import { COL_COUNT } from './SnagSummaryHelpers';
 
 interface SnagDrillDownProps {
@@ -90,6 +92,7 @@ function groupByZonePon(snags: SnagByStatusRow[]): ZoneGroup[] {
 }
 
 export function SnagDrillDown({ projectId, status, onSnagUpdated }: SnagDrillDownProps) {
+  const { currentUser } = useAuth();
   const [zones, setZones] = useState<ZoneGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -201,26 +204,35 @@ export function SnagDrillDown({ projectId, status, onSnagUpdated }: SnagDrillDow
                     </a>
                   )}
                 </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {actions?.backward && (
-                    <button type="button" onClick={() => { void handleStatusChange(snag.id, actions.backward!.status); }} disabled={isSaving}
-                      className="text-[10px] bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-300 px-2 py-1 rounded transition-colors">
-                      ← {actions.backward.label}
-                    </button>
-                  )}
-                  {actions?.forward && (
-                    <button type="button" onClick={() => { void handleStatusChange(snag.id, actions.forward!.status); }} disabled={isSaving}
-                      className="text-[10px] bg-green-800 hover:bg-green-700 disabled:opacity-50 text-green-100 px-2 py-1 rounded font-medium transition-colors">
-                      {actions.forward.label} →
-                    </button>
-                  )}
-                  {actions?.reject && (
-                    <button type="button" onClick={() => { void handleStatusChange(snag.id, actions.reject!.status); }} disabled={isSaving}
-                      className="text-[10px] bg-red-900 hover:bg-red-800 disabled:opacity-50 text-red-200 px-2 py-1 rounded transition-colors">
-                      {actions.reject.label}
-                    </button>
-                  )}
-                </div>
+                {(() => {
+                  const vis = getVisibleActions(snag.status, {
+                    userId: currentUser?.id ?? null,
+                    userRole: currentUser?.role ?? null,
+                    ticketAssignedTo: null, // Not available in drill-down; role-based only
+                  });
+                  return (
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {actions?.backward && vis.showBackward && (
+                        <button type="button" onClick={() => { void handleStatusChange(snag.id, actions.backward!.status); }} disabled={isSaving}
+                          className="text-[10px] bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-300 px-2 py-1 rounded transition-colors">
+                          ← {actions.backward.label}
+                        </button>
+                      )}
+                      {actions?.forward && vis.showForward && (
+                        <button type="button" onClick={() => { void handleStatusChange(snag.id, actions.forward!.status); }} disabled={isSaving}
+                          className="text-[10px] bg-green-800 hover:bg-green-700 disabled:opacity-50 text-green-100 px-2 py-1 rounded font-medium transition-colors">
+                          {actions.forward.label} →
+                        </button>
+                      )}
+                      {actions?.reject && vis.showReject && (
+                        <button type="button" onClick={() => { void handleStatusChange(snag.id, actions.reject!.status); }} disabled={isSaving}
+                          className="text-[10px] bg-red-900 hover:bg-red-800 disabled:opacity-50 text-red-200 px-2 py-1 rounded transition-colors">
+                          {actions.reject.label}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </td>
           </tr>

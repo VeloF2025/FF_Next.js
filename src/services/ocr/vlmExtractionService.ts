@@ -8,6 +8,13 @@
  */
 
 import { log } from '@/lib/logger';
+import {
+  VLM_EXTRACTION_MODEL,
+  VLM_CHAT_ENDPOINT,
+  VLM_TIMEOUT_DEFAULT,
+  VLM_MAX_TOKENS_OCR,
+  checkVlmHealth,
+} from '@/lib/vlm';
 import { FIELD_MAPPINGS } from './documentClassificationService';
 import { getEnhancedPrompt, getBasePrompt } from './documentPromptEnhancer';
 import { crossValidateSaIdWithDob } from './saIdValidationService';
@@ -22,25 +29,17 @@ export interface ExtractedField {
 
 export type ExtractedFields = Record<string, ExtractedField>;
 
-/** VLLM endpoint for Qwen3-VL */
-const VLLM_ENDPOINT = process.env.VLLM_ENDPOINT || 'http://100.96.203.105:8100';
-
 /**
- * Check whether the VLLM service is reachable and serving the VLM model.
+ * Check whether the VLM service is reachable and serving the VLM model.
  *
- * @returns `true` if the health check passes within 5 seconds, `false` otherwise.
+ * @returns `true` if the health check passes within the configured timeout, `false` otherwise.
  */
 export async function isVllmAvailable(): Promise<boolean> {
-  try {
-    const healthCheck = await fetch(`${VLLM_ENDPOINT}/v1/models`, {
-      method: 'GET',
-      signal: AbortSignal.timeout(5000),
-    });
-    return healthCheck.ok;
-  } catch {
+  const result = await checkVlmHealth();
+  if (!result.available) {
     log.warn('VLLM endpoint not available for OCR');
-    return false;
   }
+  return result.available;
 }
 
 /**
@@ -66,11 +65,11 @@ export async function callVlmForExtraction(
 
   log.info('Calling Qwen3-VL for OCR', { documentType, fileUrl });
 
-  const vlmResponse = await fetch(`${VLLM_ENDPOINT}/v1/chat/completions`, {
+  const vlmResponse = await fetch(VLM_CHAT_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ',
+      model: VLM_EXTRACTION_MODEL,
       messages: [
         {
           role: 'user',
@@ -80,10 +79,10 @@ export async function callVlmForExtraction(
           ],
         },
       ],
-      max_tokens: 1000,
+      max_tokens: VLM_MAX_TOKENS_OCR,
       temperature: 0.1,
     }),
-    signal: AbortSignal.timeout(55000),
+    signal: AbortSignal.timeout(VLM_TIMEOUT_DEFAULT),
   });
 
   if (!vlmResponse.ok) {
