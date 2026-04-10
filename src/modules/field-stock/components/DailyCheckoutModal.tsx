@@ -133,7 +133,7 @@ function SignatureCanvas({
       const scaleY = canvas.height / rect.height;
 
       if ('touches' in e) {
-        const touch = e.touches[0];
+        const touch = e.touches[0]!;
         return {
           x: (touch.clientX - rect.left) * scaleX,
           y: (touch.clientY - rect.top) * scaleY,

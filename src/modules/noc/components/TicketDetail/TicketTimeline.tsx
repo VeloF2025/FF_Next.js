@@ -76,7 +76,7 @@ export function TicketTimeline({ events, compact = false }: TicketTimelineProps)
 
       <div className="space-y-4">
         {events.map((event, index) => {
-          const config = getEventConfig(event.type);
+          const config = getEventConfig(event.type)!;
           const Icon = config.icon;
 
           return (

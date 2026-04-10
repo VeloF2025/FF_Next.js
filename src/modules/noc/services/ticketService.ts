@@ -135,8 +135,8 @@ export async function logTicketChanges(params: {
 
   // Log status change as its own activity
   if (statusChanged) {
-    const from = fieldChanges.status.from || 'none';
-    const to = fieldChanges.status.to;
+    const from = fieldChanges.status!.from || 'none';
+    const to = fieldChanges.status!.to;
     await logTicketActivity({
       ticketId,
       activityType: 'status_change',

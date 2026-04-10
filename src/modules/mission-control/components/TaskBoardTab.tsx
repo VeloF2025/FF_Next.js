@@ -28,7 +28,7 @@ function TaskCard({ task, onMove, onDelete }: {
   onMove: (id: number, status: string) => void;
   onDelete: (id: number) => void;
 }) {
-  const priorityStyle = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.normal;
+  const priorityStyle = (PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.normal)!;
   const agentColor = task.assigned_to ? AGENT_COLORS[task.assigned_to.toLowerCase()] || '#6b7280' : '#6b7280';
 
   return (

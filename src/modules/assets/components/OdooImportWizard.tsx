@@ -260,7 +260,7 @@ export function OdooImportWizard({ isOpen, onClose, onComplete }: OdooImportWiza
 
   if (!isOpen) return null;
 
-  const step = STEPS[currentStep];
+  const step = STEPS[currentStep]!;
   const StepIcon = step.icon;
 
   return (

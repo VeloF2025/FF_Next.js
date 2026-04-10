@@ -414,7 +414,7 @@ export default function PipelinesPage() {
           ) : (
             <div className="space-y-2">
               {filtered.map((thread) => {
-                const statusCfg = STATUS_CONFIG[thread.status] ?? STATUS_CONFIG.active;
+                const statusCfg = (STATUS_CONFIG[thread.status] ?? STATUS_CONFIG.active)!;
                 const StatusIcon = statusCfg.icon;
                 const stepLabel = STEP_LABELS[Number(thread.currentStep)] ?? `Step ${thread.currentStep}`;
                 const value = thread.poTotal ?? thread.estimatedTotal;

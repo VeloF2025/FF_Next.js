@@ -229,7 +229,7 @@ async function syncToSharePoint(
   let failed = 0;
 
   for (let i = 0; i < drops.length; i++) {
-    const drop = drops[i];
+    const drop = drops[i]!;
     const rowNum = nextRow + i;
 
     try {

@@ -125,20 +125,20 @@ export async function getPaginatedDrops(
     let totalCount: number;
     if (search) {
       const searchPattern = `%${search.toLowerCase()}%`;
-      const [countResult] = await sql`
+      const countRows = await sql`
         SELECT COUNT(*) as count
         FROM qa_photo_reviews q
         WHERE q.project != 'Marketing Activations'
           AND (LOWER(q.drop_number) LIKE ${searchPattern} OR LOWER(q.project) LIKE ${searchPattern})
       `;
-      totalCount = parseInt(countResult.count, 10);
+      totalCount = parseInt(countRows[0]!.count, 10);
     } else {
-      const [countResult] = await sql`
+      const countRows = await sql`
         SELECT COUNT(*) as count
         FROM qa_photo_reviews q
         WHERE q.project != 'Marketing Activations'
       `;
-      totalCount = parseInt(countResult.count, 10);
+      totalCount = parseInt(countRows[0]!.count, 10);
     }
 
     // Get paginated data with LIMIT/OFFSET

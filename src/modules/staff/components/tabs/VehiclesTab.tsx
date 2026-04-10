@@ -26,7 +26,7 @@ const displayToIso = (displayDate: string): string | null => {
   const match = displayDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (match) {
     const [, day, month, year] = match;
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    return `${year}-${month!.padStart(2, '0')}-${day!.padStart(2, '0')}`;
   }
   return null;
 };
