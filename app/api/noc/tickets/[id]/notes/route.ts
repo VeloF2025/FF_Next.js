@@ -243,7 +243,7 @@ export async function POST(
         SELECT id FROM users WHERE clerk_id = ${userId}
       `;
       if (users.length > 0) {
-        createdBy = users[0].id;
+        createdBy = users[0]!.id;
       }
     }
 

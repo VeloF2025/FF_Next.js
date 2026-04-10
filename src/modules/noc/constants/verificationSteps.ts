@@ -697,6 +697,76 @@ export const VERIFICATION_STEPS_BY_TICKET_TYPE: Record<string, VerificationStepT
       category: 'documentation',
     },
   ],
+  sales_lead: [
+    {
+      step_number: 1,
+      step_name: 'Contact Verification',
+      step_description: 'Verify contact details and confirm interest. Record initial requirements.',
+      photo_required: false,
+      required_for_qa: true,
+      category: 'investigation',
+    },
+    {
+      step_number: 2,
+      step_name: 'Lead Qualification',
+      step_description: 'Assess feasibility, coverage area, and service requirements.',
+      photo_required: false,
+      required_for_qa: true,
+      category: 'investigation',
+    },
+    {
+      step_number: 3,
+      step_name: 'Outcome',
+      step_description: 'Record outcome — converted, deferred, or declined. Link to project if converted.',
+      photo_required: false,
+      required_for_qa: true,
+      category: 'documentation',
+    },
+  ],
+  unspecified: [
+    {
+      step_number: 1,
+      step_name: 'Triage',
+      step_description: 'Assess the ticket and assign the correct type and sub-type.',
+      photo_required: false,
+      required_for_qa: true,
+      category: 'investigation',
+    },
+    {
+      step_number: 2,
+      step_name: 'Resolution',
+      step_description: 'Resolve the issue or reassign to the appropriate team.',
+      photo_required: false,
+      required_for_qa: true,
+      category: 'documentation',
+    },
+  ],
+  internal_snag: [
+    {
+      step_number: 1,
+      step_name: 'Assess Snag',
+      step_description: 'Assess the reported internal snag. Confirm the issue.',
+      photo_required: false,
+      required_for_qa: true,
+      category: 'preparation',
+    },
+    {
+      step_number: 2,
+      step_name: 'Perform Rectification',
+      step_description: 'Complete the repair or corrective work.',
+      photo_required: false,
+      required_for_qa: true,
+      category: 'installation',
+    },
+    {
+      step_number: 3,
+      step_name: 'After Photo',
+      step_description: 'Capture after photo showing rectification complete.',
+      photo_required: true,
+      required_for_qa: true,
+      category: 'documentation',
+    },
+  ],
 };
 
 /**

@@ -130,7 +130,7 @@ function parseSection(
       const monthly: ProjectMonthlyData = { actual };
 
       for (let c = 0; c < monthSerials.length; c++) {
-        if (monthSerials[c] <= currentMonthSerial) {
+        if (monthSerials[c]! <= currentMonthSerial) {
           const label = serialToMonthLabel(monthSerials[c]);
           // cols 3+ correspond to month index c
           monthly[label] = toNumber(row[3 + c]);

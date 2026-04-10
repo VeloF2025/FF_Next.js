@@ -181,21 +181,21 @@ export function DRPhotoGallery({ steps, drNumber, isLoading }: DRPhotoGalleryPro
                             </p>
 
                             {/* Evaluation Info */}
-                            {steps[selectedIndex].evaluation && (
+                            {steps[selectedIndex]!.evaluation && (
                                 <div className="mt-4 p-4 bg-[var(--ff-bg-secondary)] rounded-lg max-w-md mx-auto">
                                     <div className="flex items-center justify-center gap-2 mb-2">
-                                        {steps[selectedIndex].evaluation.pass ? (
+                                        {steps[selectedIndex]!.evaluation.pass ? (
                                             <CheckCircle className="w-5 h-5 text-green-400" />
                                         ) : (
                                             <XCircle className="w-5 h-5 text-red-400" />
                                         )}
                                         <span className="font-semibold">
-                                            Score: {steps[selectedIndex].evaluation.score}/10
+                                            Score: {steps[selectedIndex]!.evaluation.score}/10
                                         </span>
                                     </div>
-                                    {steps[selectedIndex].evaluation.findings.length > 0 && (
+                                    {steps[selectedIndex]!.evaluation.findings.length > 0 && (
                                         <ul className="text-sm text-[var(--ff-text-tertiary)] text-left list-disc list-inside">
-                                            {steps[selectedIndex].evaluation.findings.map((f, i) => (
+                                            {steps[selectedIndex]!.evaluation.findings.map((f, i) => (
                                                 <li key={i}>{f}</li>
                                             ))}
                                         </ul>

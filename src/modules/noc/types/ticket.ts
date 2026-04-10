@@ -60,24 +60,57 @@ export enum TicketSource {
  * Ticket Type - Classification of ticket
  */
 export enum TicketType {
-  FAULT_REPAIR = 'fault_repair', // Renamed from MAINTENANCE
+  // Fibertime (QContact)
+  FAULT_REPAIR = 'fault_repair',
   NEW_INSTALLATION = 'new_installation',
-  MODIFICATION = 'modification',
   ONT_SWAP = 'ont_swap',
+  MODIFICATION = 'modification',
   INCIDENT = 'incident',
-  // Health & Safety ticket types
-  HSE_INCIDENT = 'hse_incident', // H&S incident requiring investigation
-  HSE_NEAR_MISS = 'hse_near_miss', // Near miss for tracking and prevention
-  // Investigation types
-  SERIAL_MISMATCH = 'serial_mismatch', // Serial number mismatch investigation
-  OLT_INVESTIGATION = 'olt_investigation', // OLT serial mismatch investigation
-  // Pre-provision
-  PRE_PROVISION = 'pre_provision', // PP Data ONT investigation
+  // Non-Invoiceable (Weekly imports / PP data)
+  PRE_PROVISION = 'pre_provision',
+  OLT_INVESTIGATION = 'olt_investigation',
+  SERIAL_MISMATCH = 'serial_mismatch',
+  // HSE
+  HSE_INCIDENT = 'hse_incident',
+  HSE_NEAR_MISS = 'hse_near_miss',
   // DevOps
-  DEV_OPS = 'dev_ops', // FibreFlow application bug/error/feature
-  // Construction quality
-  SNAG = 'snag', // Construction quality snag from TQR audit
-  INTERNAL_SNAG = 'internal_snag', // Internal / FT site walk snag (manually logged)
+  DEV_OPS = 'dev_ops',
+  // Snags (Construction QA)
+  SNAG = 'snag',
+  INTERNAL_SNAG = 'internal_snag',
+  // Sales
+  SALES_LEAD = 'sales_lead',
+  // Catch-all
+  UNSPECIFIED = 'unspecified',
+}
+
+/**
+ * Ticket Sub-Type (T2 category within a T1 group)
+ */
+export enum TicketSubType {
+  // Snags
+  TERA = 'tera',
+  INTERNAL = 'internal',
+  // Non-Invoiceable
+  OFFLINE = 'offline',
+  MISMATCH = 'mismatch',
+  NO_ENTRY = 'no_entry',
+  LEVEL = 'level',
+  // HSE
+  INCIDENT = 'incident',
+  HSE = 'hse',
+  // DevOps
+  DEVOPS = 'devops',
+  // Sales
+  LEAD = 'lead',
+  // Fibertime
+  NEW = 'new',
+  FAULT = 'fault',
+  MNT = 'mnt',
+  // Modification
+  MODIFICATION = 'modification',
+  // Catch-all
+  UNSPECIFIED = 'unspecified',
 }
 
 /**
@@ -158,6 +191,7 @@ export interface Ticket {
   title: string;
   description: string | null;
   ticket_type: TicketType;
+  sub_type: TicketSubType | null;
   priority: TicketPriority;
   status: TicketStatus;
 

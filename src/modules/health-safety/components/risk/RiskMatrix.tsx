@@ -43,7 +43,7 @@ export function RiskMatrix({ data, onCellClick }: RiskMatrixProps) {
           {[1, 2, 3, 4, 5].map((s) => (
             <div key={s} className="text-[10px] text-[var(--ff-text-tertiary)] text-center px-1">
               <div className="font-medium">{s}</div>
-              <div className="truncate">{SEVERITY_SCALE[s].label}</div>
+              <div className="truncate">{SEVERITY_SCALE[s]!.label}</div>
             </div>
           ))}
         </div>
@@ -59,7 +59,7 @@ export function RiskMatrix({ data, onCellClick }: RiskMatrixProps) {
             <div className="text-[10px] text-[var(--ff-text-tertiary)] flex items-center justify-end pr-2">
               <div className="text-right">
                 <div className="font-medium">{l}</div>
-                <div className="truncate">{LIKELIHOOD_SCALE[l].label}</div>
+                <div className="truncate">{LIKELIHOOD_SCALE[l]!.label}</div>
               </div>
             </div>
             {[1, 2, 3, 4, 5].map((s) => {

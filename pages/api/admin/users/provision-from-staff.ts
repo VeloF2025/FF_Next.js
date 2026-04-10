@@ -87,7 +87,7 @@ async function handler(
         if (existingUser.length > 0) {
           // Link existing user to staff
           await sql`
-            UPDATE staff SET user_id = ${existingUser[0].id}, updated_at = NOW()
+            UPDATE staff SET user_id = ${existingUser[0]!.id}, updated_at = NOW()
             WHERE id = ${staff.staff_id}
           `;
           skipped++;

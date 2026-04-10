@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
         const itemsInColumn = await sql`
           SELECT COUNT(*) as count FROM wishlist_items WHERE status = ${name}
         `;
-        if (parseInt(itemsInColumn[0].count, 10) > 0) {
+        if (parseInt(itemsInColumn[0]!.count, 10) > 0) {
           return NextResponse.json(
             { error: `Cannot delete column "${name}" - it contains items. Move items first.` },
             { status: 400 }

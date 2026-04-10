@@ -135,7 +135,7 @@ async function getSchema(tables: string[]): Promise<string> {
     const grouped: Record<string, string[]> = {};
     for (const row of result.rows) {
       if (!grouped[row.table_name]) grouped[row.table_name] = [];
-      grouped[row.table_name].push(`  ${row.column_name} ${row.data_type}${row.is_nullable === 'YES' ? ' (nullable)' : ''}`);
+      grouped[row.table_name]!.push(`  ${row.column_name} ${row.data_type}${row.is_nullable === 'YES' ? ' (nullable)' : ''}`);
     }
 
     return Object.entries(grouped)
