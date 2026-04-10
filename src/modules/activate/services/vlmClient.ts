@@ -16,7 +16,7 @@ import {
   optimizeForVlm,
   type BlurDetectionResult,
 } from './imagePreprocessService';
-import { VLM_API_URL as _VLM_API_URL, VLM_CHAT_ENDPOINT as _VLM_ENDPOINT, VLM_EXTRACTION_MODEL as _VLM_MODEL, VLM_TIMEOUT_DEFAULT as _VLM_TIMEOUT, VLM_TEMPERATURE as _VLM_TEMP, VLM_MAX_TOKENS_OCR } from '@/lib/vlm';
+import { VLM_CHAT_ENDPOINT, VLM_EXTRACTION_MODEL, VLM_TIMEOUT_DEFAULT, VLM_TEMPERATURE, VLM_MAX_TOKENS_OCR } from '@/lib/vlm';
 
 // Component logger
 export const vlmLogger = createLogger('VlmExtraction');
@@ -41,7 +41,8 @@ export const ENABLE_BLUR_DETECTION =
 // CONFIGURATION
 // ============================================================================
 
-export const VLM_API_BASE =
+// VLM config from @/lib/vlm
+// export const VLM_API_BASE =
   process.env.VLM_API_URL || 'http://100.96.203.105:8100';
 
 // ============================================================================
@@ -143,7 +144,7 @@ export async function callVlmExtraction<T>(
   context: string
 ): Promise<{ success: boolean; data: T | null; error?: string }> {
   const requestBody = {
-    model: VLM_MODEL,
+    model: VLM_EXTRACTION_MODEL,
     messages: [
       {
         role: 'user',
@@ -161,10 +162,10 @@ export async function callVlmExtraction<T>(
   };
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_DEFAULT);
 
   try {
-    const response = await fetch(VLM_API_ENDPOINT, {
+    const response = await fetch(VLM_CHAT_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody),
