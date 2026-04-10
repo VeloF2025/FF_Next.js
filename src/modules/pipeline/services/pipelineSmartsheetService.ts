@@ -288,7 +288,7 @@ export async function createSyncHistory(
     RETURNING id
   `) as Record<string, unknown>[];
 
-  return result[0].id as string;
+  return result[0]!.id as string;
 }
 
 export async function updateSyncHistory(
@@ -507,7 +507,7 @@ export async function syncFromSmartsheet(
 
         if (existingProject.length > 0) {
           // Update existing project
-          projectId = existingProject[0].id;
+          projectId = existingProject[0]!.id;
           await sql`
             UPDATE pipeline_projects SET
               project_name = ${projectName},
@@ -560,7 +560,7 @@ export async function syncFromSmartsheet(
             )
             RETURNING id
           `) as { id: string }[];
-          projectId = newProject[0].id;
+          projectId = newProject[0]!.id;
           stats.created++;
         }
 

@@ -34,15 +34,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         SELECT COUNT(*)::int as cnt FROM manco_action_item_meetings
         WHERE manco_action_item_id = ${String(manco_action_item_id)}::uuid
       `;
-      if (Number(existingLinks[0].cnt) === 1) {
+      if (Number(existingLinks[0]!.cnt) === 1) {
         await sql`
           UPDATE manco_action_items SET source_meeting_id = ${meetingIdNum}, updated_at = NOW()
           WHERE id = ${String(manco_action_item_id)}::uuid
         `;
       }
 
-      log.info('Meeting linked to manco item', { itemId: manco_action_item_id, meetingId: meetingIdNum, meetingTitle: meeting[0].title });
-      return apiResponse.success(res, { linked: result.length > 0, meeting_title: meeting[0].title });
+      log.info('Meeting linked to manco item', { itemId: manco_action_item_id, meetingId: meetingIdNum, meetingTitle: meeting[0]!.title });
+      return apiResponse.success(res, { linked: result.length > 0, meeting_title: meeting[0]!.title });
     } catch (error: unknown) {
       log.error('Error linking meeting', { error });
       return apiResponse.internalError(res, error);

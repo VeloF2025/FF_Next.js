@@ -39,9 +39,9 @@ async function fetchContractorInfo(contractorId: string): Promise<ContractorBasi
   if (result.length === 0) return null;
 
   return {
-    id: result[0].id,
-    name: result[0].company_name,
-    status: result[0].status,
+    id: result[0]!.id,
+    name: result[0]!.company_name,
+    status: result[0]!.status,
   };
 }
 

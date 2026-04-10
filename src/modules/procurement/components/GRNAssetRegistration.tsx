@@ -188,7 +188,7 @@ export function GRNAssetRegistration({ grnId, onComplete }: GRNAssetRegistration
   const removeEntry = useCallback((itemId: string, index: number) => {
     setEntries((prev) => ({
       ...prev,
-      [itemId]: prev[itemId].filter((_, i) => i !== index),
+      [itemId]: prev[itemId]!.filter((_, i) => i !== index),
     }));
   }, []);
 
@@ -197,7 +197,7 @@ export function GRNAssetRegistration({ grnId, onComplete }: GRNAssetRegistration
     (itemId: string, index: number, field: keyof RegistrationEntry, value: string) => {
       setEntries((prev) => ({
         ...prev,
-        [itemId]: prev[itemId].map((entry, i) =>
+        [itemId]: prev[itemId]!.map((entry, i) =>
           i === index ? { ...entry, [field]: value } : entry
         ),
       }));
@@ -218,7 +218,7 @@ export function GRNAssetRegistration({ grnId, onComplete }: GRNAssetRegistration
       if (scanningItemId && scanningEntryIndex !== null) {
         setEntries((prev) => ({
           ...prev,
-          [scanningItemId]: prev[scanningItemId].map((entry, i) =>
+          [scanningItemId]: prev[scanningItemId]!.map((entry, i) =>
             i === scanningEntryIndex
               ? {
                   ...entry,

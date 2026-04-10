@@ -436,7 +436,7 @@ async function queueForApproval(
   );
 
   log.info(`[RecoveryService] Queued action ${actionId} for approval (level ${escalationLevel})`);
-  return result.rows[0].id;
+  return result.rows[0]!.id;
 }
 
 /**

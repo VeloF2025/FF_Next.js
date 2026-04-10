@@ -105,7 +105,7 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
     
     // Calculate total price for the line item
     if (field === 'unitPrice' || field === 'quantity') {
-      newLineItems[index].totalPrice = newLineItems[index].unitPrice * newLineItems[index].quantity;
+      newLineItems[index]!.totalPrice = newLineItems[index]!.unitPrice * newLineItems[index]!.quantity;
     }
 
     setFormData(prev => ({ ...prev, lineItems: newLineItems }));

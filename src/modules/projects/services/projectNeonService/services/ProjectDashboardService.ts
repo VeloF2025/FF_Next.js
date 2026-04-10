@@ -292,10 +292,10 @@ export async function getHSSummary(projectId: string): Promise<HSSummary> {
     };
   }
 
-  const score = Number(audit[0].overall_score);
+  const score = Number(audit[0]!.overall_score);
   return {
     latestScore: score,
     complianceStatus: score >= 80 ? 'compliant' : 'non-compliant',
-    lastAuditDate: audit[0].created_at?.toISOString?.() || audit[0].created_at,
+    lastAuditDate: audit[0]!.created_at?.toISOString?.() || audit[0]!.created_at,
   };
 }
