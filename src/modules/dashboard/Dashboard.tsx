@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { formatDisplayDateLong } from '@/utils/dateFormat';
-import { Calendar, FolderOpen, Users, CheckCircle, AlertTriangle, MapPin, TrendingUp, FileText, Target, Activity, HardHat } from 'lucide-react';
+import { Calendar, FolderOpen, Users, CheckCircle, AlertTriangle, MapPin, TrendingUp, FileText, Target, Activity } from 'lucide-react';
 import Link from 'next/link';
 import { ProjectOverviewCard } from './components/ProjectOverviewCard';
 import { RecentActivityFeed } from './components/RecentActivityFeed';
 import { QuickActions } from './components/QuickActions';
+import { DynamicTools } from './components/DynamicTools';
+import { PinnedLinks } from './components/PinnedLinks';
 import { StaleProjectsWidget } from './components/StaleProjectsWidget';
 import { StatsGrid } from '../../components/dashboard/EnhancedStatCard';
 import { useMainDashboardData } from '../../hooks/useDashboardData';
@@ -183,26 +185,12 @@ export function Dashboard() {
           })}
         </div>
 
-        {/* Tools Section */}
-        <h3 className="text-sm text-[var(--ff-text-tertiary)] mb-3">Tools</h3>
-        <div className="flex flex-wrap gap-2">
-          {[
-            { title: 'Civil QA', icon: HardHat, color: 'text-orange-400', route: '/field-ops', permission: null },
-          ].filter((link) => !link.permission || hasPermission(link.permission)).map((link) => {
-            const Icon = link.icon;
-            return (
-              <Link
-                key={link.title}
-                href={link.route}
-                className="group flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] hover:border-primary-500/50 hover:bg-[var(--ff-bg-tertiary)] transition-all duration-200"
-              >
-                <Icon className={`w-4 h-4 ${link.color}`} />
-                <span className="text-sm font-medium text-[var(--ff-text-primary)] group-hover:text-primary-400 transition-colors">
-                  {link.title}
-                </span>
-              </Link>
-            );
-          })}
+        {/* Tools Section - Dynamic based on role / usage */}
+        <DynamicTools />
+
+        {/* Pinned Views Section */}
+        <div className="mt-4">
+          <PinnedLinks />
         </div>
       </div>
 

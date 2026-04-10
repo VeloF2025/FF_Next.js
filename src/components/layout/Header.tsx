@@ -6,6 +6,7 @@ import { BreadcrumbNavigation } from './header/BreadcrumbNavigation';
 import { SearchBar } from './header/SearchBar';
 import { NotificationsDropdown } from './header/NotificationsDropdown';
 import { UserMenuDropdown } from './header/UserMenuDropdown';
+import { PinButton } from './header/PinButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { log } from '@/lib/logger';
 import { formatDisplayDate } from '@/utils/dateFormat';
@@ -146,6 +147,9 @@ export function Header({
             )}
 
             <ThemeToggle variant="compact" showLabel={false} />
+
+            {/* Pin current view to dashboard */}
+            <PinButton />
 
             {/* Sync/Refresh button */}
             <button

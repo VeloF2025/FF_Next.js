@@ -61,6 +61,22 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
     setSidebarOpen(false);
   }, [pathname]);
 
+  // Track page visits for dynamic dashboard tools
+  useEffect(() => {
+    if (!pathname || !currentUser) return;
+    if (pathname.startsWith('/auth') || pathname.startsWith('/api')) return;
+
+    const controller = new AbortController();
+    fetch('/api/tracking/page-visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ route: pathname }),
+      signal: controller.signal,
+    }).catch(() => {});
+
+    return () => controller.abort();
+  }, [pathname, currentUser]);
+
   // Get page metadata based on current route
   const getPageMeta = (): PageMeta => {
     const path = pathname || '/';
