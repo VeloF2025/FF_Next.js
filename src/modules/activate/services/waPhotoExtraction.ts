@@ -118,7 +118,7 @@ function isValidUpsSerial(serial: string | null): boolean {
     return false;
   }
 
-  if (s.length < 12 || s.length > 22) {
+  if (s.length < 18 || s.length > 22) {
     vlmLogger.debug(
       `Rejected UPS serial with wrong length (${s.length}): ${serial}`
     );

@@ -23,13 +23,13 @@ function parseWebVTT(transcript: string, keywords: string[]): TranscriptCue[] {
 
   let i = 0;
   while (i < lines.length) {
-    const line = lines[i].trim();
+    const line = lines[i]!.trim();
 
     if (line.includes('-->')) {
-      const timestamp = line.split('-->')[0].trim();
+      const timestamp = line.split('-->')[0]!.trim();
 
       if (i + 1 < lines.length) {
-        const nextLine = lines[i + 1].trim();
+        const nextLine = lines[i + 1]!.trim();
         const speakerMatch = nextLine.match(/<v\s+([^>]+)>/);
         let speaker = '';
         let text = '';
@@ -81,7 +81,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (itemRows.length === 0) {
       return apiResponse.notFound(res, 'Manco action item', manco_action_item_id);
     }
-    const actionItemText = String(itemRows[0].action_item);
+    const actionItemText = String(itemRows[0]!.action_item);
 
     // Fetch the meeting transcript
     const meetingRows = await sql`
@@ -109,7 +109,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       WHERE manco_action_item_id = ${String(manco_action_item_id)}::uuid
         AND content LIKE ${prefix + '%'}
     `;
-    if (Number(existing[0].cnt) > 0) {
+    if (Number(existing[0]!.cnt) > 0) {
       return apiResponse.success(res, { comments_inserted: 0, reason: 'Comments already extracted' });
     }
 

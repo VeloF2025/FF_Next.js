@@ -261,9 +261,9 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, vehicleId:
 
   if (existing.length === 0) return apiResponse.notFound(res, 'Odometer reading', recordId);
 
-  const oldReading = existing[0].reading;
-  const prevReading = existing[0].previous_reading;
-  const recordedAt = existing[0].recorded_at;
+  const oldReading = existing[0]!.reading;
+  const prevReading = existing[0]!.previous_reading;
+  const recordedAt = existing[0]!.recorded_at;
   const newKmSinceLast = prevReading !== null ? newReading - prevReading : null;
 
   await sql`UPDATE fleet_odometer_history
@@ -279,8 +279,8 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, vehicleId:
 
   if (nextRecord.length > 0) {
     await sql`UPDATE fleet_odometer_history
-      SET previous_reading = ${newReading}, km_since_last = ${nextRecord[0].reading - newReading}
-      WHERE id = ${nextRecord[0].id}`;
+      SET previous_reading = ${newReading}, km_since_last = ${nextRecord[0]!.reading - newReading}
+      WHERE id = ${nextRecord[0]!.id}`;
   }
 
   log.info('Admin corrected odometer reading', { vehicleId, recordId, oldReading, newReading });
