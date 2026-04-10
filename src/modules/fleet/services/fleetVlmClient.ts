@@ -346,7 +346,7 @@ export async function updateCalibrationLearningStatus(
  */
 export async function checkFleetVlmHealth(): Promise<boolean> {
   try {
-    const response = await fetch(`${VLM_API_BASE}/v1/models`, {
+    const response = await fetch(`${_VLM_URL}/v1/models`, {
       method: 'GET',
       signal: AbortSignal.timeout(5000),
     });

@@ -130,7 +130,7 @@ async function checkVLM(): Promise<ServiceStatus> {
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     // Check /v1/models endpoint (standard for vLLM)
-    const response = await fetch(`${VLM_API_BASE}/v1/models`, {
+    const response = await fetch(`${VLM_API_URL}/v1/models`, {
       signal: controller.signal,
     });
     clearTimeout(timeoutId);

@@ -18,7 +18,6 @@
 // Client utilities and shared types
 export {
   FleetVlmError,
-  VLM_API_BASE,
   getVehicleCalibration,
   checkFleetVlmHealth,
   updateCalibrationLearningStatus,
