@@ -153,7 +153,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const hasTickets = ticketsTableExists[0]?.exists;
     const auditStats = auditStatsResult[0];
-    const totalProjects = totalProjectsResult[0].count;
+    const totalProjects = totalProjectsResult[0]!.count;
 
     // Batch 2: Incident queries (conditional, depend on hasTickets)
     let incidentStats = {

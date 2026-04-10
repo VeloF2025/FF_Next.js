@@ -128,7 +128,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         if (parseResult.errors.length > 0) {
           return apiResponse.validationError(res, {
-            csv: 'CSV parsing error: ' + parseResult.errors[0].message,
+            csv: 'CSV parsing error: ' + parseResult.errors[0]!.message,
           });
         }
 

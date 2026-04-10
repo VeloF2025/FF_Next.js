@@ -28,7 +28,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           VALUES (${userId}, ${email})
           RETURNING id, user_id, email, enabled, send_time, timezone, created_at, updated_at
         `;
-      } else if (!preferences[0].email && email) {
+      } else if (!preferences[0]!.email && email) {
         // Update existing preference with email if missing
         preferences = await sql`
           UPDATE reminder_preferences

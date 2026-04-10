@@ -175,7 +175,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, userId: str
       const newSowData = {
         ...currentSowData,
         [type]: {
-          importId: sowImportResult[0].id,
+          importId: sowImportResult[0]!.id,
           recordCount: processedResult.processedCount,
           lastImported: new Date().toISOString(),
         }

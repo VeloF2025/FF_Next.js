@@ -102,7 +102,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const drBFoundOn1Map = drBSearch.success && drBSearch.records.length > 0;
     const drBOneMapSerial = drBFoundOn1Map
-      ? (drBSearch.records.find(r => r.ph_ont)?.ph_ont || drBSearch.records[0].ph_ont)
+      ? (drBSearch.records.find(r => r.ph_ont)?.ph_ont || drBSearch.records[0]!.ph_ont)
       : null;
     const drBOneMapUps = drBFoundOn1Map
       ? drBSearch.records.find(r => r.br_ser)?.br_ser || null

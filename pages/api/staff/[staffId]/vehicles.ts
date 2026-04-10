@@ -150,7 +150,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           LIMIT 1
         `;
         if (fleetMatch.length > 0) {
-          fleetVehicleId = fleetMatch[0].id as string;
+          fleetVehicleId = fleetMatch[0]!.id as string;
         }
       }
 
