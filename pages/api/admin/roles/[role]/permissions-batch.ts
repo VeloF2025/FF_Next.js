@@ -83,7 +83,7 @@ async function handler(
         ${req.user.id},
         'role_permissions_batch_update',
         'role',
-        ${roleData[0].id}::uuid,
+        ${roleData[0]!.id}::uuid,
         ${JSON.stringify({
           role,
           permissionsUpdated: permissions.length,

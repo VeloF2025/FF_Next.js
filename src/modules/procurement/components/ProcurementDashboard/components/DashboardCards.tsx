@@ -38,10 +38,10 @@ export function DashboardCards({ cards }: DashboardCardsProps) {
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <div className={`p-3 rounded-md ${(colorMap[card.color] ?? colorMap.blue).bg}`}>
+                  <div className={`p-3 rounded-md ${(colorMap[card.color] ?? colorMap.blue)!.bg}`}>
                     <Icon 
                       aria-hidden="true"
-                      className={`h-6 w-6 ${(colorMap[card.color] ?? colorMap.blue).text}`} 
+                      className={`h-6 w-6 ${(colorMap[card.color] ?? colorMap.blue)!.text}`} 
                     />
                   </div>
                 </div>

@@ -68,8 +68,8 @@ async function handler(
         'user_permission',
         ${userId},
         ${JSON.stringify({
-          targetUser: userResult[0].email,
-          targetRole: userResult[0].role,
+          targetUser: userResult[0]!.email,
+          targetRole: userResult[0]!.role,
           overridesCreated: result.overridesCreated,
           overridesRemoved: result.overridesRemoved,
           totalPermissions: desiredPermissions.length,

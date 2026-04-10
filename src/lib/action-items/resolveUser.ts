@@ -22,7 +22,7 @@ export async function resolveUserByName(name: string): Promise<string | null> {
     WHERE LOWER(first_name || ' ' || last_name) = ${trimmed}
     LIMIT 1
   `;
-  if (exact.length > 0) return exact[0].id as string;
+  if (exact.length > 0) return exact[0]!.id as string;
 
   // Try partial match: name contains both first and last name
   const partial = await sql`
@@ -33,7 +33,7 @@ export async function resolveUserByName(name: string): Promise<string | null> {
       AND ${trimmed} LIKE '%' || LOWER(first_name) || '%'
     LIMIT 1
   `;
-  if (partial.length > 0) return partial[0].id as string;
+  if (partial.length > 0) return partial[0]!.id as string;
 
   return null;
 }

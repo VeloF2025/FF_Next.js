@@ -154,7 +154,7 @@ export async function trackResolutionTime(
 
   if (result.rows.length === 0) return;
 
-  const createdAt = new Date(result.rows[0].created_at);
+  const createdAt = new Date(result.rows[0]!.created_at);
   const durationSeconds = Math.floor((resolvedAt.getTime() - createdAt.getTime()) / 1000);
 
   await db.query(
@@ -181,7 +181,7 @@ export async function trackAttempts(incidentId: string): Promise<{ attemptCount:
     [incidentId]
   );
 
-  return { attemptCount: parseInt(result.rows[0].count, 10) };
+  return { attemptCount: parseInt(result.rows[0]!.count, 10) };
 }
 
 /**

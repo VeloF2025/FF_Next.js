@@ -341,7 +341,7 @@ export async function syncDocumentsFromSmartsheet(
             `) as { id: string }[];
 
             if (existingApproval.length > 0) {
-              approvalId = existingApproval[0].id;
+              approvalId = existingApproval[0]!.id;
             } else {
               // Create approval
               const newApproval = (await sql`
@@ -352,7 +352,7 @@ export async function syncDocumentsFromSmartsheet(
                 )
                 RETURNING id
               `) as { id: string }[];
-              approvalId = newApproval[0].id;
+              approvalId = newApproval[0]!.id;
             }
           }
         }

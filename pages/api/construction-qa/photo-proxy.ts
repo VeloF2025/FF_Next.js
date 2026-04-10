@@ -173,8 +173,8 @@ async function resolveLatestVersion(objectPath: string): Promise<string | null> 
     if (lines.length === 0) return null;
 
     // Last line has latest version: "... v20260310120500-7bc5005f"
-    const parts = lines[lines.length - 1].trim().split(/\s+/);
-    const version = parts[parts.length - 1].replace(/\/$/, '');
+    const parts = lines[lines.length - 1]!.trim().split(/\s+/);
+    const version = parts[parts.length - 1]!.replace(/\/$/, '');
     if (!version.startsWith('v2')) return null;
 
     return `${objectPath}/${version}`;

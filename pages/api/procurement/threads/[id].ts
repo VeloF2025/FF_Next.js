@@ -199,7 +199,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
     if (existing.length === 0) {
       return apiResponse.notFound(res, 'Procurement thread', id);
     }
-    if (existing[0].status === 'cancelled') {
+    if (existing[0]!.status === 'cancelled') {
       return apiResponse.badRequest(res, 'This pipeline is already cancelled');
     }
 
@@ -217,7 +217,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
 
     log.info('Procurement thread discarded', {
       threadId: id,
-      threadNumber: existing[0].thread_number,
+      threadNumber: existing[0]!.thread_number,
       reason: reason.trim(),
       cancelledBy: userId,
     }, 'procurement-threads');

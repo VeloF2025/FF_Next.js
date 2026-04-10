@@ -563,7 +563,7 @@ export async function batchSetUserPermissions(
   // Get user's role
   const userResult = await sql`SELECT role FROM users WHERE id = ${userId}`;
   if (userResult.length === 0) throw new Error('User not found');
-  const userRole = userResult[0].role;
+  const userRole = userResult[0]!.role;
 
   // Get role-based permissions
   const rolePerms = await getRolePermissions(userRole);
@@ -635,7 +635,7 @@ export async function createRoleFromUserPermissions(
     RETURNING id
   `;
 
-  const roleId = newRole[0].id;
+  const roleId = newRole[0]!.id;
 
   // Filter to permissions that have at least one action enabled
   const activePermsForRole = effectivePerms.filter(

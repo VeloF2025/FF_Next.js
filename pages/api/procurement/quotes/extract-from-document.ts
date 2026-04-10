@@ -379,7 +379,7 @@ async function getRfqWithItems(rfqId: string): Promise<{ rfqNumber: string; item
     `;
 
     return {
-      rfqNumber: rfqResult[0].rfq_number,
+      rfqNumber: rfqResult[0]!.rfq_number,
       items: itemsResult.map((row: any) => ({
         id: row.id,
         description: row.description || '',
@@ -485,7 +485,7 @@ async function saveExtractionRecord(data: {
     RETURNING id
   `;
 
-  return result[0].id;
+  return result[0]!.id;
 }
 
 /**

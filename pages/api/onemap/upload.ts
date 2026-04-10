@@ -176,7 +176,7 @@ async function storeInDatabase(records: any[], importId: string) {
         RETURNING id
       `;
       
-      const propertyDbId = propertyResult[0].id;
+      const propertyDbId = propertyResult[0]!.id;
       propertyIds.set(record.property_id, propertyDbId);
       
       // Insert pole record if pole number exists
@@ -292,7 +292,7 @@ async function handler(
       RETURNING id
     `;
     
-    const importId = importResult[0].id;
+    const importId = importResult[0]!.id;
 
     try {
       // Parse the 1Map Excel file

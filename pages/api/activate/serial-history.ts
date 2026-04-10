@@ -100,8 +100,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     ont_changes: history.filter((h) => h.change_type === 'ont_serial').length,
     ups_changes: history.filter((h) => h.change_type === 'ups_serial').length,
     swaps_detected: history.filter((h) => h.metadata?.swap_detected).length,
-    first_recorded: history.length > 0 ? history[history.length - 1].detected_at : null,
-    last_change: history.length > 0 ? history[0].detected_at : null,
+    first_recorded: history.length > 0 ? history[history.length - 1]!.detected_at : null,
+    last_change: history.length > 0 ? history[0]!.detected_at : null,
   };
 
   return apiResponse.success(res, {
