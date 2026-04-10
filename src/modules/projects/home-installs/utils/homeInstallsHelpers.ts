@@ -30,8 +30,8 @@ export function filterHomeInstalls(
 
   // Apply date filter
   if (dateFilter !== 'all') {
-    const today = new Date().toISOString().split('T')[0];
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+    const today = new Date().toISOString().split('T')[0]!;
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]!;
     
     switch (dateFilter) {
       case 'today':
@@ -41,7 +41,7 @@ export function filterHomeInstalls(
         filtered = filtered.filter(install => install.scheduledDate === tomorrow);
         break;
       case 'this_week': {
-        const weekFromNow = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+        const weekFromNow = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]!;
         filtered = filtered.filter(install => 
           install.scheduledDate >= today && install.scheduledDate <= weekFromNow
         );

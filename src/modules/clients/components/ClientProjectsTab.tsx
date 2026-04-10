@@ -276,7 +276,7 @@ export function ClientProjectsTab({ clientId, clientName, requiresPO }: ClientPr
               </thead>
               <tbody className="divide-y divide-[var(--ff-border-light)]">
                 {filteredProjects.map((project) => {
-                  const statusConf = statusConfig[project.status] || statusConfig.active;
+                  const statusConf = (statusConfig[project.status] || statusConfig.active)!;
                   const StatusIcon = statusConf.icon;
                   
                   return (

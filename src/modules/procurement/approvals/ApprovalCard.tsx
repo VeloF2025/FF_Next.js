@@ -77,7 +77,7 @@ interface Props {
 export function ApprovalCard({ item, onApprove, onReject, actioningId }: Props) {
   const router = useRouter();
   const tc = typeConfig[item.documentType] || { label: item.documentType, color: 'bg-gray-500/20 text-gray-400', icon: FileText };
-  const sb = statusBadge[item.status] || statusBadge.pending;
+  const sb = (statusBadge[item.status] || statusBadge.pending)!;
   const TypeIcon = tc.icon;
   const isPending = item.status === 'pending';
 

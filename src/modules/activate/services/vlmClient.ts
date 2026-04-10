@@ -44,7 +44,7 @@ export const VLM_API_BASE =
   process.env.VLM_API_URL || 'http://100.96.203.105:8100';
 export const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
 export const VLM_MODEL =
-  process.env.VLM_EXTRACTION_MODEL || process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-32B-Instruct-AWQ';
+  process.env.VLM_EXTRACTION_MODEL || process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ';
 export const VLM_TIMEOUT_MS = 60000; // 1 minute per extraction
 export const VLM_TEMPERATURE = 0.1; // Low for consistent extraction
 

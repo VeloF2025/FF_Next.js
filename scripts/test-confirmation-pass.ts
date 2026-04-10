@@ -19,7 +19,7 @@ const sql = neon(process.env.DATABASE_URL!);
 const ONEMAP_HOST = process.env.ONEMAP_INTERNAL_URL || 'http://100.96.203.105:8003';
 const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
 const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
-const VLM_MODEL = process.env.VLM_EXTRACTION_MODEL || 'QuantTrio/Qwen3-VL-32B-Instruct-AWQ';
+const VLM_MODEL = process.env.VLM_EXTRACTION_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ';
 
 const args = process.argv.slice(2);
 const LIMIT = parseInt(args.find((_, i, a) => a[i - 1] === '--limit') || '30', 10);

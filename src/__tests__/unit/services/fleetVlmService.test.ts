@@ -590,7 +590,7 @@ describe('checkFleetVlmHealth', () => {
       ok: true,
       json: async () => ({
         data: [
-          { id: 'QuantTrio/Qwen3-VL-32B-Instruct-AWQ' },
+          { id: 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ' },
         ],
       }),
     });

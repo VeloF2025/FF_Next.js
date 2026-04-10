@@ -40,7 +40,7 @@ const ONEMAP_PROXY   = 'https://dev.fibreflow.app';
 const WA_PHOTO_BASE  = 'http://72.61.197.178:8866';
 const WA_PATH_PFX    = '/var/lib/docker/volumes/boss-vps_dr_photos/_data/';
 const VLM_URL        = 'http://100.96.203.105:8100/v1/chat/completions';
-const VLM_MODEL      = 'QuantTrio/Qwen3-VL-32B-Instruct-AWQ';
+const VLM_MODEL      = 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ';
 const VLM_CONCURRENCY= 2;
 // Concurrency / timeout adjusted per-mode in main()
 const VLM_TIMEOUT    = 60_000;

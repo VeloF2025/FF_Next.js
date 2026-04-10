@@ -116,7 +116,7 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
       },
     };
 
-    const config = healthConfig[health] || healthConfig.not_set;
+    const config = (healthConfig[health] || healthConfig.not_set)!;
 
     return (
       <div className="flex flex-col gap-1">

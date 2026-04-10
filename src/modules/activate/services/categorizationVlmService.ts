@@ -33,7 +33,7 @@ import {
 
 const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
 const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
-const VLM_MODEL = process.env.VLM_CATEGORIZATION_MODEL || process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-32B-Instruct-AWQ';
+const VLM_MODEL = process.env.VLM_CATEGORIZATION_MODEL || process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ';
 const VLM_TIMEOUT_MS = 180000; // 3 minutes per batch
 const VLM_MAX_BATCH_SIZE = 6; // Max photos per VLM call (token limit)
 const VLM_TEMPERATURE = 0.1; // Low for consistent categorization

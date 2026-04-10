@@ -103,7 +103,7 @@ export function EodReconciliationTab() {
             </thead>
             <tbody>
               {rows.map((row, i) => {
-                const cfg = STATUS_CONFIG[row.match_status] || STATUS_CONFIG.pending;
+                const cfg = (STATUS_CONFIG[row.match_status] || STATUS_CONFIG.pending)!;
                 return (
                   <tr key={i} className={`border-b border-[var(--ff-border-light)] ${cfg.bg}`}>
                     <td className="px-3 py-2 text-[var(--ff-text-primary)] font-mono text-xs">

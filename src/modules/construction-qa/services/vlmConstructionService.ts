@@ -16,7 +16,7 @@ import { recordCorrectExtraction, getVlmFewShotExamples, buildVlmFewShotPrompt }
 const sql = neon(process.env.DATABASE_URL!);
 const MODULE = 'cqa-vlm';
 const VLM_URL = process.env.VLM_SERVICE_URL || 'http://100.96.203.105:8100';
-const VLM_MODEL = process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-32B-Instruct-AWQ';
+const VLM_MODEL = process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ';
 const MAX_IMAGE_DIM = 1024;
 
 interface ValidateOptions {

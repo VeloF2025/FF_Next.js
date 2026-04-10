@@ -48,7 +48,7 @@ MINIO_CONTAINER = "qfieldcloud-minio-1"
 # -- VLM config ----------------------------------------------------------------
 
 VLM_URL = "http://100.96.203.105:8100"
-VLM_MODEL = "QuantTrio/Qwen3-VL-32B-Instruct-AWQ"
+VLM_MODEL = "QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ"
 VLM_MAX_DIM = 1024
 
 # ==============================================================================

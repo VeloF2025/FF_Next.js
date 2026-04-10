@@ -180,7 +180,7 @@ async function processOneItem(client: any, item: any, importId: string | undefin
   else if (wrongCount > 0) { mismatchType = 'note4_wrong_serial'; }
   else if (emptyCount > 0 && correctCount === 0) { mismatchType = 'note4_empty_barcode'; }
 
-  const bestRecord = records.find(r => r.ph_ont) || records[0];
+  const bestRecord = (records.find(r => r.ph_ont) || records[0])!;
   await client.query(
     `UPDATE olt_onemap_lookup_queue
      SET status = 'completed', onemap_serial = $1, onemap_ups_serial = $2,
