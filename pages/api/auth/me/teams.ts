@@ -24,11 +24,13 @@ async function handler(
   }
 
   try {
+    // team_members links via email, not user_id — resolve the user's email first
     const result = await pool.query(
       `SELECT t.id, t.name, t.team_type
        FROM teams t
        JOIN team_members tmem ON tmem.team_id = t.id
-       WHERE tmem.user_id = $1 AND tmem.is_active = true`,
+       JOIN users u ON LOWER(u.email) = LOWER(tmem.email)
+       WHERE u.id = $1 AND tmem.is_active = true`,
       [req.user.id]
     );
 

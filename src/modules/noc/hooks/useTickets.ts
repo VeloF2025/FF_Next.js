@@ -39,12 +39,16 @@ export const ticketsKeys = {
 /**
  * 🟢 WORKING: Fetch tickets list from API
  */
+// "active" and "completed" are sub-tab meta-groups, not real DB statuses.
+// Strip them so the API doesn't filter by a non-existent status value.
+const META_STATUSES = new Set(['active', 'completed']);
+
 async function fetchTickets(filters?: TicketFilters): Promise<TicketListResult> {
   // Build query string from filters
   const params = new URLSearchParams();
 
   if (filters) {
-    if (filters.status) params.append('status', filters.status);
+    if (filters.status && !META_STATUSES.has(filters.status)) params.append('status', filters.status);
     if (filters.ticket_type) params.append('ticket_type', filters.ticket_type);
     if (filters.priority) params.append('priority', filters.priority);
     if (filters.source) params.append('source', filters.source);

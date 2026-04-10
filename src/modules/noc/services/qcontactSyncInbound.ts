@@ -169,19 +169,19 @@ function mapTicketType(category: string | null, subcategory?: string | null): st
   const combined = [category, subcategory].filter(Boolean).join(' ').toLowerCase();
 
   if (!combined) {
-    return 'fault';
+    return 'fault_repair';
   }
 
-  // Connectivity issues → fault
+  // Connectivity issues → fault_repair
   if (combined.includes('connectivity') || combined.includes('signal') || combined.includes('link light')) {
-    return 'fault';
+    return 'fault_repair';
   }
   // ONT-specific: swap or move
   if (combined.includes('ontmove') || combined.includes('ont move')) {
     return 'ont_swap';
   }
   if (combined.includes('ont')) {
-    return 'fault';
+    return 'fault_repair';
   }
   // Maintenance/repair work
   if (combined.includes('maintenance') || combined.includes('follow-up') || combined.includes('repair') || combined.includes('damage')) {
@@ -189,18 +189,18 @@ function mapTicketType(category: string | null, subcategory?: string | null): st
   }
   // Installation
   if (combined.includes('installation') || combined.includes('new install')) {
-    return 'installation';
+    return 'new_installation';
   }
   // Incidents
   if (combined.includes('incident')) {
     return 'incident';
   }
-  // Bundle issues → fault
+  // Bundle issues → fault_repair
   if (combined.includes('bundle')) {
-    return 'fault';
+    return 'fault_repair';
   }
 
-  return 'fault';
+  return 'fault_repair';
 }
 
 /**

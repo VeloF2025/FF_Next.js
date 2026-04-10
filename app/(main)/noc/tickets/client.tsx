@@ -121,6 +121,8 @@ export default function TicketsListPageClient() {
   }, [filterDatePreset]);
 
   // Create filters object for components (include status from URL sub-tabs)
+  // Note: "active"/"completed" are meta-groups for column filtering, not DB statuses.
+  // KanbanBoard already strips them; useTickets hook will also strip them before API calls.
   const filters: TicketFilters = useMemo(() => {
     const f: TicketFilters = {
       search: searchTerm || undefined,
