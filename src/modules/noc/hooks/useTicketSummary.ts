@@ -5,6 +5,8 @@ import type { TicketFilters } from '../types/ticket';
 
 export interface TicketSummaryData {
   counts: Record<string, number>;
+  /** Per-ticket-type counts — used for T1 category grouping */
+  typeCounts: Record<string, number>;
   total: number;
 }
 
@@ -13,7 +15,14 @@ async function fetchSummary(filters?: TicketFilters): Promise<TicketSummaryData>
 
   if (filters) {
     if (filters.status) params.append('status', String(filters.status));
-    if (filters.ticket_type) params.append('ticket_type', String(filters.ticket_type));
+    // ticket_type can be a single value or an array (from T1 category expansion)
+    if (filters.ticket_type) {
+      if (Array.isArray(filters.ticket_type)) {
+        filters.ticket_type.forEach((t) => params.append('ticket_type', t));
+      } else {
+        params.append('ticket_type', String(filters.ticket_type));
+      }
+    }
     if (filters.priority) params.append('priority', String(filters.priority));
     if (filters.source) params.append('source', String(filters.source));
     if (filters.assigned_to) params.append('assigned_to', filters.assigned_to);
@@ -52,6 +61,7 @@ export function useTicketSummary(filters?: TicketFilters) {
 
   return {
     counts: query_.data?.counts ?? {},
+    typeCounts: query_.data?.typeCounts ?? {},
     total: query_.data?.total ?? 0,
     isLoading: query_.isLoading,
     isError: query_.isError,

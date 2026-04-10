@@ -680,10 +680,17 @@ export async function listTickets(
     }
 
     if (filters.ticket_type) {
-      // Note: Using 'type' column which exists in the current schema
-      whereClauses.push(`type = $${paramCounter}`);
-      values.push(filters.ticket_type);
-      paramCounter++;
+      // ticket_type can be a single value or an array (from T1 category expansion)
+      if (Array.isArray(filters.ticket_type)) {
+        const placeholders = filters.ticket_type.map((_, i) => `$${paramCounter + i}`).join(', ');
+        whereClauses.push(`type IN (${placeholders})`);
+        values.push(...filters.ticket_type);
+        paramCounter += filters.ticket_type.length;
+      } else {
+        whereClauses.push(`type = $${paramCounter}`);
+        values.push(filters.ticket_type);
+        paramCounter++;
+      }
     }
 
     if (filters.assigned_to) {

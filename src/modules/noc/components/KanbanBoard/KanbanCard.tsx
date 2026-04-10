@@ -13,6 +13,7 @@ import { formatDisplayDateShort } from '@/utils/dateFormat';
 import type { Ticket } from '../../types/ticket';
 import { TicketPriority } from '../../types/ticket';
 import type { DatabaseStatus } from './KanbanBoard';
+import { getT1Label, getT2Label } from '../../constants/ticketCategories';
 
 interface KanbanCardProps {
   ticket: Ticket;
@@ -119,15 +120,20 @@ export function KanbanCard({ ticket, isDragging, onQuickMove, canMoveForward, ca
         </div>
       )}
 
-      {/* Header: UID, Category, Priority */}
+      {/* Header: UID, T1 category, T2 sub_type, Priority */}
       <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs font-mono text-[var(--ff-text-muted)]">
             {ticket.ticket_uid}
           </span>
-          {(ticket as any).category && (
-            <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${categoryStyle.bg} ${categoryStyle.text}`}>
-              {(ticket as any).category}
+          {/* T1 category label */}
+          <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${categoryStyle.bg} ${categoryStyle.text}`}>
+            {getT1Label(ticket.ticket_type)}
+          </span>
+          {/* T2 sub_type badge */}
+          {ticket.sub_type && (
+            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-indigo-500/15 text-indigo-300">
+              {getT2Label(ticket.sub_type)}
             </span>
           )}
         </div>

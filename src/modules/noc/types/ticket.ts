@@ -340,6 +340,12 @@ export type TicketStatusGroup = 'active' | 'completed';
 export interface TicketFilters {
   status?: TicketStatus | TicketStatus[] | TicketStatusGroup;
   ticket_type?: TicketType | TicketType[];
+  /**
+   * T1 category filter — client-side virtual filter that expands to the
+   * underlying ticket_type values for the selected category.
+   * Handled by the TicketFilters component before sending to the API.
+   */
+  t1_category?: string;
   priority?: TicketPriority | TicketPriority[];
   source?: TicketSource | TicketSource[];
   assigned_to?: string; // User ID

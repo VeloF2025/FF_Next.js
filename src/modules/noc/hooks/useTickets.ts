@@ -48,10 +48,17 @@ async function fetchTickets(filters?: TicketFilters): Promise<TicketListResult> 
   const params = new URLSearchParams();
 
   if (filters) {
-    if (filters.status && !META_STATUSES.has(filters.status)) params.append('status', filters.status);
-    if (filters.ticket_type) params.append('ticket_type', filters.ticket_type);
-    if (filters.priority) params.append('priority', filters.priority);
-    if (filters.source) params.append('source', filters.source);
+    if (filters.status && !META_STATUSES.has(filters.status as string)) params.append('status', filters.status as string);
+    // ticket_type can be a single value or an array (from T1 category expansion)
+    if (filters.ticket_type) {
+      if (Array.isArray(filters.ticket_type)) {
+        filters.ticket_type.forEach((t) => params.append('ticket_type', t));
+      } else {
+        params.append('ticket_type', filters.ticket_type);
+      }
+    }
+    if (filters.priority) params.append('priority', filters.priority as string);
+    if (filters.source) params.append('source', filters.source as string);
     if (filters.assigned_to) params.append('assigned_to', filters.assigned_to);
     if (filters.assigned_team_id) params.append('assigned_team_id', filters.assigned_team_id);
     if (filters.project_id) params.append('project_id', filters.project_id);

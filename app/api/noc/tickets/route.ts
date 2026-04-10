@@ -99,7 +99,9 @@ export async function GET(req: NextRequest) {
       filters.status = searchParams.get('status') as any;
     }
     if (searchParams.has('ticket_type')) {
-      filters.ticket_type = searchParams.get('ticket_type') as any;
+      const types = searchParams.getAll('ticket_type');
+      // Array when T1 category filter expanded multiple types; single otherwise
+      filters.ticket_type = types.length === 1 ? (types[0] as any) : (types as any);
     }
     if (searchParams.has('priority')) {
       filters.priority = searchParams.get('priority') as any;

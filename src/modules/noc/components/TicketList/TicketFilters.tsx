@@ -19,6 +19,25 @@ import { Search, Filter, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useProjects } from '@/hooks/useProjects';
 import type { TicketFilters as TicketFiltersType } from '../../types/ticket';
+import { TicketType } from '../../types/ticket';
+import {
+  T1_LABELS,
+  T1_CATEGORY_MAP,
+  type T1Category,
+} from '../../constants/ticketCategories';
+
+/**
+ * Maps each T1 category to the underlying TicketType values it represents.
+ * Derived from T1_CATEGORY_MAP (inverted).
+ */
+const T1_TO_TYPES: Record<T1Category, TicketType[]> = (() => {
+  const result: Record<string, TicketType[]> = {};
+  for (const [type, cat] of Object.entries(T1_CATEGORY_MAP)) {
+    if (!result[cat]) result[cat] = [];
+    result[cat].push(type as TicketType);
+  }
+  return result as Record<T1Category, TicketType[]>;
+})();
 
 interface TicketFiltersProps {
   /** Current filters */
@@ -47,15 +66,38 @@ export function TicketFilters({ filters, onFiltersChange, compact = false }: Tic
     });
   };
 
+  /**
+   * Handle T1 category filter — stores t1_category on the filters object
+   * and expands to ticket_type array so the API receives concrete type values.
+   */
+  const handleT1CategoryChange = (cat: string) => {
+    if (!cat) {
+      // Clear both virtual and expanded filters
+      const { t1_category: _t1, ticket_type: _tt, ...rest } = filters;
+      onFiltersChange(rest);
+      return;
+    }
+    const types = T1_TO_TYPES[cat as T1Category] ?? [];
+    onFiltersChange({
+      ...filters,
+      t1_category: cat,
+      ticket_type: types.length > 0 ? (types as TicketFiltersType['ticket_type']) : undefined,
+    });
+  };
+
   // 🟢 WORKING: Clear all filters
   const handleClearFilters = () => {
     onFiltersChange({});
   };
 
   // 🟢 WORKING: Check if any filters are active
-  const hasActiveFilters = Object.keys(filters).some(
-    (key) => key !== 'page' && key !== 'pageSize' && filters[key as keyof TicketFiltersType] !== undefined
-  );
+  // Exclude internal pagination keys and ticket_type when t1_category is set
+  // (ticket_type is a derived expansion of t1_category — count them as one filter)
+  const hasActiveFilters = Object.keys(filters).some((key) => {
+    if (key === 'page' || key === 'pageSize') return false;
+    if (key === 'ticket_type' && filters.t1_category) return false;
+    return filters[key as keyof TicketFiltersType] !== undefined;
+  });
 
   return (
     <div className="space-y-4">
@@ -88,7 +130,11 @@ export function TicketFilters({ filters, onFiltersChange, compact = false }: Tic
           {!compact && <span>Filters</span>}
           {hasActiveFilters && (
             <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white text-xs font-medium">
-              {Object.keys(filters).filter(k => k !== 'page' && k !== 'pageSize' && filters[k as keyof TicketFiltersType]).length}
+              {Object.keys(filters).filter((k) => {
+                if (k === 'page' || k === 'pageSize') return false;
+                if (k === 'ticket_type' && filters.t1_category) return false;
+                return !!filters[k as keyof TicketFiltersType];
+              }).length}
             </span>
           )}
         </button>
@@ -138,22 +184,22 @@ export function TicketFilters({ filters, onFiltersChange, compact = false }: Tic
             </select>
           </div>
 
-          {/* Type Filter */}
+          {/* T1 Category Filter */}
           <div>
             <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-2">
-              Type
+              Category
             </label>
             <select
-              value={filters.ticket_type || ''}
-              onChange={(e) => handleFilterChange('ticket_type', e.target.value)}
+              value={filters.t1_category || ''}
+              onChange={(e) => handleT1CategoryChange(e.target.value)}
               className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             >
-              <option value="">All Types</option>
-              <option value="incident">Incident</option>
-              <option value="maintenance">Maintenance</option>
-              <option value="modification">Modification</option>
-              <option value="new_installation">New Installation</option>
-              <option value="ont_swap">ONT Swap</option>
+              <option value="">All Categories</option>
+              {(Object.keys(T1_LABELS) as T1Category[]).map((cat) => (
+                <option key={cat} value={cat}>
+                  {T1_LABELS[cat]}
+                </option>
+              ))}
             </select>
           </div>
 

@@ -1,9 +1,12 @@
 /**
- * Ticket Summary API — lightweight status counts
+ * Ticket Summary API — lightweight status + type counts
  *
  * GET /api/noc/tickets/summary
  *
- * Returns { status: count } map via a single GROUP BY query.
+ * Returns:
+ *   - { status: count } map via GROUP BY status
+ *   - { type: count } map via GROUP BY type (for T1 category grouping)
+ *
  * Replaces fetching 2000+ rows just to count client-side.
  */
 
@@ -15,6 +18,11 @@ const logger = createLogger('noc:api:tickets:summary');
 
 interface StatusCount {
   status: string;
+  count: string;
+}
+
+interface TypeCount {
+  type: string;
   count: string;
 }
 
@@ -57,7 +65,17 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    addFilter('ticket_type', 'type');
+    // ticket_type supports multiple values (T1 category expansion)
+    const ticketTypes = searchParams.getAll('ticket_type');
+    if (ticketTypes.length === 1) {
+      whereClauses.push(`type = $${p++}`);
+      values.push(ticketTypes[0]!);
+    } else if (ticketTypes.length > 1) {
+      const placeholders = ticketTypes.map((_, i) => `$${p + i}`).join(', ');
+      whereClauses.push(`type IN (${placeholders})`);
+      values.push(...ticketTypes);
+      p += ticketTypes.length;
+    }
     addFilter('priority', 'priority');
     addFilter('source', 'source');
 
@@ -114,27 +132,43 @@ export async function GET(req: NextRequest) {
       ? `WHERE ${whereClauses.join(' AND ')}`
       : '';
 
-    const sql = `
+    const statusSql = `
       SELECT status, COUNT(*)::text as count
       FROM maintenance_tickets
       ${whereClause}
       GROUP BY status
     `;
 
-    const rows = await query<StatusCount>(sql, values);
+    const typeSql = `
+      SELECT type, COUNT(*)::text as count
+      FROM maintenance_tickets
+      ${whereClause}
+      GROUP BY type
+    `;
+
+    const [statusRows, typeRows] = await Promise.all([
+      query<StatusCount>(statusSql, values),
+      query<TypeCount>(typeSql, values),
+    ]);
 
     // Build { status: number } map + total
     const counts: Record<string, number> = {};
     let total = 0;
-    for (const row of rows) {
+    for (const row of statusRows) {
       const c = parseInt(row.count, 10);
       counts[row.status] = c;
       total += c;
     }
 
+    // Build { type: number } map for T1 category grouping client-side
+    const typeCounts: Record<string, number> = {};
+    for (const row of typeRows) {
+      typeCounts[row.type] = parseInt(row.count, 10);
+    }
+
     return NextResponse.json({
       success: true,
-      data: { counts, total },
+      data: { counts, total, typeCounts },
       meta: { timestamp: new Date().toISOString() },
     });
   } catch (error) {

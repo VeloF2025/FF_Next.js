@@ -29,6 +29,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { TicketStatusBadge } from './TicketStatusBadge';
 import type { Ticket } from '../../types/ticket';
+import { getT1Label, getT2Label } from '../../constants/ticketCategories';
 
 interface TicketListItemProps {
   /** Ticket data */
@@ -70,6 +71,18 @@ export function TicketListItem({ ticket, compact = false, onClick }: TicketListI
           <span className={cn('text-xs font-medium uppercase', getPriorityBadgeStyle(ticket.priority))}>
             {ticket.priority}
           </span>
+
+          {/* T1 category label */}
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] border border-[var(--ff-border-light)]">
+            {getT1Label(ticket.ticket_type)}
+          </span>
+
+          {/* T2 sub_type badge — only shown when sub_type is present */}
+          {ticket.sub_type && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+              {getT2Label(ticket.sub_type)}
+            </span>
+          )}
 
           {/* QA Ready Indicator */}
           {ticket.qa_ready && (
@@ -119,8 +132,8 @@ export function TicketListItem({ ticket, compact = false, onClick }: TicketListI
           </span>
         </div>
 
-        {/* Fault Cause (if maintenance ticket) */}
-        {ticket.ticket_type === 'maintenance' && ticket.fault_cause && (
+        {/* Fault Cause (if fibertime ticket) */}
+        {ticket.fault_cause && (
           <div className="mt-2 text-xs text-[var(--ff-text-tertiary)]">
             <span className="capitalize">{ticket.fault_cause.replace(/_/g, ' ')}</span>
           </div>
