@@ -69,10 +69,12 @@ This photo shows a printed sticker with TWO serial numbers:
 
 2. UPS SERIAL NUMBER:
    - Full model+serial string printed under the barcode on the Gizzu UPS sticker
-   - Format: "GU18W12V" (model prefix) + 10 numeric digits = 18-19 characters total
+   - Format: "GU18W12V" (model prefix) + 10 numeric digits = EXACTLY 18 characters total
    - Example shape: GU18W12V##########
-   - IMPORTANT: Read the ENTIRE string under the barcode — do NOT drop "12V" from the middle
-   - Usually labeled "UPS Serial" or "Gizzu Serial"
+   - IMPORTANT: Read the ENTIRE string — do NOT drop "12V" from the middle
+   - ⚠️ The UPS sticker is OFTEN UPSIDE DOWN — rotate text mentally before reading
+   - ⚠️ If you read fewer than 18 characters, you are MISSING digits — look at the barcode numbers above the text
+   - The barcode printed above the text contains the SAME serial — cross-check both
 
 ⚠️ VALIDATION (check before answering):
 - ONT serial must be exactly 12 chars starting with ALCLB4
