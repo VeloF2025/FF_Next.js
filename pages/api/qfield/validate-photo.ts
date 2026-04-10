@@ -15,7 +15,7 @@ import { log } from '@/lib/logger';
 // VLM service configuration
 const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
 const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
-const VLM_MODEL = 'Qwen/Qwen3-VL-8B-Instruct';
+const VLM_MODEL = process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-32B-Instruct-AWQ';
 const VLM_TIMEOUT_MS = 30000; // 30 seconds for real-time use
 
 // API key for QField plugin — required env var, no fallback

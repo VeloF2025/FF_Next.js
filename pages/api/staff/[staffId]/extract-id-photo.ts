@@ -211,7 +211,7 @@ If no face photo found: {"found": false}`;
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'Qwen/Qwen3-VL-8B-Instruct',
+      model: process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-32B-Instruct-AWQ',
       messages: [
         {
           role: 'user',

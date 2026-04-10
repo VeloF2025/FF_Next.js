@@ -238,7 +238,7 @@ async function handler(
           ${result.confidence},
           ${result.plateMatches ?? null},
           ${expectedPlate ?? null},
-          ${'Qwen/Qwen3-VL-8B-Instruct'},
+          ${process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-32B-Instruct-AWQ'},
           ${result.rawResponse ?? null},
           ${processingTimeMs},
           ${result.error ? 'failed' : 'completed'},
@@ -259,7 +259,7 @@ async function handler(
           sourceTable: 'fleet_check_records',
           vlmExtractedValue: String(result.extractedNumeric ?? result.extractedValue),
           vlmConfidence: result.confidence,
-          vlmModel: 'Qwen/Qwen3-VL-8B-Instruct',
+          vlmModel: process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-32B-Instruct-AWQ',
           correctedValue: overrideValue,
           correctionReason: 'human_override',
         }).catch(e => log.warn('FleetVlmApi', `Learning correction record failed (non-critical): ${e}`));
