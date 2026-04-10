@@ -1671,6 +1671,7 @@ function OdometerTab({
   loading,
   onRefresh,
   currentUserId,
+  userRole,
 }: {
   vehicleId: string;
   odometerHistory: OdometerReading[];

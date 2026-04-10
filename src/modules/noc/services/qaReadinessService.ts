@@ -62,14 +62,12 @@ export async function runReadinessCheck(
       id: string;
       ticket_uid: string;
       dr_number: string | null;
-      pole_number: string | null;
-      pon_number: string | null;
-      zone_id: string | null;
+      pole_id: string | null;
+      pon: string | null;
+      zone: string | null;
       ont_serial: string | null;
-      ont_rx_level: number | null;
     }>(
-      `SELECT id, ticket_uid, dr_number, pole_number, pon_number, zone_id,
-              ont_serial, ont_rx_level
+      `SELECT id, ticket_uid, dr_number, pole_id, pon, zone, ont_serial
        FROM maintenance_tickets
        WHERE id = $1`,
       [ticketId]
@@ -83,7 +81,7 @@ export async function runReadinessCheck(
     const photoResult = await queryOne<{ count: number }>(
       `SELECT COUNT(*) as count
        FROM maintenance_attachments
-       WHERE ticket_id = $1 AND file_type = 'photo' AND is_evidence = true`,
+       WHERE ticket_id = $1 AND is_evidence = true`,
       [ticketId]
     );
 
@@ -96,12 +94,11 @@ export async function runReadinessCheck(
       photos_count: photosCount,
       photos_required_count: photosRequiredCount,
       dr_number: ticket.dr_number,
-      pole_number: ticket.pole_number,
-      pon_number: ticket.pon_number,
-      zone_id: ticket.zone_id,
+      pole_number: ticket.pole_id,
+      pon_number: ticket.pon,
+      zone_id: ticket.zone,
       ont_serial: ticket.ont_serial,
-      ont_rx_level: ticket.ont_rx_level,
-      // platforms_data is optional - could be added for cross-platform validation
+      ont_rx_level: null,
     });
 
     logger.info('Validation result', {

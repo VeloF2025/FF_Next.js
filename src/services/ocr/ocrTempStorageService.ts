@@ -44,9 +44,14 @@ export async function uploadForOcr(
   const uploadResult = await uploadStaffDocument(staffId, fileBuffer, uploadFilename, 'temp_ocr');
   storagePaths.push(uploadResult.path);
 
-  // Rewrite public URL to internal VF Storage URL so the VLLM can reach it
+  // Rewrite URL to internal VF Storage URL so the VLM can reach it
   let fileUrl = uploadResult.url;
-  if (fileUrl.includes('vf.fibreflow.app')) {
+  if (fileUrl.startsWith('/storage/')) {
+    // Relative path from VFStorageService — strip /storage/ prefix and use internal URL
+    const urlPath = fileUrl.replace(/^\/storage/, '');
+    fileUrl = `${VF_STORAGE_INTERNAL_URL}${urlPath}`;
+    log.info('Converted relative storage URL to internal for OCR', { original: uploadResult.url, internal: fileUrl });
+  } else if (fileUrl.includes('vf.fibreflow.app')) {
     const urlPath = new URL(fileUrl).pathname.replace(/^\/storage/, '');
     fileUrl = `${VF_STORAGE_INTERNAL_URL}${urlPath}`;
     log.info('Converted public URL to internal for OCR', { original: uploadResult.url, internal: fileUrl });
