@@ -262,7 +262,7 @@ export function AllProjectsOverview({
                     }`}>
                       {project.status}
                     </span>
-                    {project.alertCount > 0 && (
+                    {(project.alertCount ?? 0) > 0 && (
                       <span className="ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-500/20 text-red-400">
                         {project.alertCount} alerts
                       </span>

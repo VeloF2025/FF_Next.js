@@ -21,7 +21,7 @@ export class ColumnMapper {
     
     // Try to detect headers
     for (let i = startRow; i < Math.min(startRow + 10, rawData.length); i++) {
-      const row = rawData[i];
+      const row = rawData[i]!;
       const rowObj = this.arrayToObject(row, this.getDefaultColumnMapping());
       
       if (isHeaderRow(rowObj)) {

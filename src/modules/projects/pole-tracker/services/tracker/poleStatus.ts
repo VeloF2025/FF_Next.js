@@ -97,7 +97,7 @@ export class PoleStatusService {
       throw new Error('No previous status to revert to');
     }
 
-    const previousEntry = history[history.length - 2];
+    const previousEntry = history[history.length - 2]!;
     await this.updateStatus(
       id,
       previousEntry.status,

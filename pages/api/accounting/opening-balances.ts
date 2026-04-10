@@ -83,6 +83,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         )
         RETURNING *
       `;
+      const entry = entryRows[0]!;
 
       // Create journal lines
       for (const b of balances as { accountId: string; debit: number; credit: number }[]) {
