@@ -334,7 +334,7 @@ async function upsertReview(
 
   if (existing.length > 0) {
     // Update photo count from actual photo records (not additive — prevents drift)
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+
     const existingRow = existing[0]!;
     await sql`
       UPDATE construction_qa_reviews
@@ -362,7 +362,7 @@ async function upsertReview(
       LIMIT 1
     `;
     if (pole.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  
       const p = pole[0]!;
       zoneNo = p.zone_no != null ? Number(p.zone_no) : null;
       ponNo = p.pon_no != null ? Number(p.pon_no) : null;
@@ -374,7 +374,7 @@ async function upsertReview(
       LIMIT 1
     `;
     if (span.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  
       const s = span[0]!;
       zoneNo = s.zone_no != null ? Number(s.zone_no) : null;
       ponNo = s.pon_no != null ? Number(s.pon_no) : null;
@@ -386,7 +386,7 @@ async function upsertReview(
       LIMIT 1
     `;
     if (joint.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  
       const j = joint[0]!;
       zoneNo = j.zone_no != null ? Number(j.zone_no) : null;
       ponNo = j.pon_no != null ? Number(j.pon_no) : null;
@@ -409,7 +409,6 @@ async function upsertReview(
 
   result.reviewsCreated++;
 
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const newReviewRow = newReview[0]!;
 
   // Log activity

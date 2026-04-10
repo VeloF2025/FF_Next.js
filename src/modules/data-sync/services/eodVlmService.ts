@@ -90,7 +90,7 @@ async function findAllBarcodes(variants: string[]): Promise<string[]> {
       const result = await scanAllBarcodes(variants[i]!);
       if (result.success) {
         for (const bc of result.barcodes) {
-          let val = bc.value.toUpperCase().replace(/^SN:/, '').replace(/[\s\-]/g, '');
+          const val = bc.value.toUpperCase().replace(/^SN:/, '').replace(/[\s\-]/g, '');
           if (ONT_PATTERN.test(val) || ONT_PATTERN.test(`SN:${val}`)) {
             const normalized = normalizeSerial(val);
             if (normalized && !HALLUCINATION_BLOCKLIST.has(normalized)) {
@@ -179,7 +179,7 @@ function normalizeDrNumber(dr: string | null): string | null {
 
 function cleanOntSerial(serial: string | null): string | null {
   if (!serial) return null;
-  let s = serial.toUpperCase().replace(/^SN:/, '').replace(/[\s\-]/g, '');
+  const s = serial.toUpperCase().replace(/^SN:/, '').replace(/[\s\-]/g, '');
   if (HALLUCINATION_BLOCKLIST.has(s)) return null;
   return normalizeSerial(s);
 }

@@ -357,7 +357,7 @@ export async function runCrossValidationIfReady(projectId: string): Promise<Cros
       return null;
     }
 
-    const po = poRows[0];
+    const po = poRows[0]!; // Guaranteed by length check above
 
     // 2. Check for active BSS
     const bssRows = await sql`
@@ -385,8 +385,8 @@ export async function runCrossValidationIfReady(projectId: string): Promise<Cros
       return null;
     }
 
-    const bssDoc = bssRows[0];
-    const mssDoc = mssRows[0];
+    const bssDoc = bssRows[0]!;
+    const mssDoc = mssRows[0]!;
 
     log.info('All 3 documents present — running cross-validation', {
       projectId,

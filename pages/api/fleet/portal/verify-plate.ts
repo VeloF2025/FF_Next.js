@@ -272,7 +272,7 @@ async function handler(
       });
     }
 
-    const vehicle = vehicleRows[0];
+    const vehicle = vehicleRows[0]!;
 
     // Step 4: Get assigned driver details if exists
     let assignedDriver: {
@@ -378,7 +378,7 @@ async function handler(
     ` as CheckInRow[];
 
     if (checkInRows.length > 0) {
-      const row = checkInRows[0];
+      const row = checkInRows[0]!;
       lastCheckIn = {
         id: row.id,
         checkType: row.check_type,

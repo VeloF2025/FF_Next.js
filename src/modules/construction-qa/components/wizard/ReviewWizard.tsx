@@ -335,14 +335,13 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
     const idx = PHASES.findIndex(p => p.key === phase);
     if (idx < PHASES.length - 1) {
       await saveProgress();
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+
       setPhase(PHASES[idx + 1]!.key);
     }
   };
 
   const goPrev = () => {
     const idx = PHASES.findIndex(p => p.key === phase);
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     if (idx > 0) setPhase(PHASES[idx - 1]!.key);
   };
 

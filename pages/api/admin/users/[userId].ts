@@ -66,7 +66,7 @@ async function handleGet(
       return apiResponse.notFound(res, 'User', userId);
     }
 
-    const user = userResult[0];
+    const user = userResult[0]!;
 
     // Get effective permissions
     const permissions = await getUserEffectivePermissions(userId);
@@ -116,7 +116,7 @@ async function handlePatch(
       return apiResponse.notFound(res, 'User', userId);
     }
 
-    const currentUser = userResult[0];
+    const currentUser = userResult[0]!;
 
     // Prevent demoting self
     if (role && role !== 'super_admin' && userId === req.user.id) {
