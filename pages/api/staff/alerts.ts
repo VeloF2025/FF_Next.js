@@ -284,13 +284,14 @@ async function getExpiringDocuments(days: number): Promise<ExpiryAlert[]> {
  */
 async function getComplianceStats(): Promise<ComplianceStats> {
   // Get total active staff count
-  const [countResult] = await sql`
+  const countRows = await sql`
     SELECT COUNT(*) as total FROM staff WHERE status = 'active' OR is_active = true
   `;
+  const countResult = countRows[0]!;
   const totalStaff = parseInt(countResult.total as string);
 
   // Get counts for various document types
-  const [statsResult] = await sql`
+  const statsRows = await sql`
     SELECT
       COUNT(*) FILTER (WHERE sa_id_number IS NOT NULL) as with_id,
       COUNT(*) FILTER (WHERE passport_number IS NOT NULL) as with_passport,
@@ -300,9 +301,10 @@ async function getComplianceStats(): Promise<ComplianceStats> {
     FROM staff
     WHERE status = 'active' OR is_active = true
   `;
+  const statsResult = statsRows[0]!;
 
   // Get verified document counts from staff_documents
-  const [verifiedDocs] = await sql`
+  const verifiedDocsRows = await sql`
     SELECT
       COUNT(DISTINCT staff_id) FILTER (WHERE document_type = 'sa_id' AND verification_status = 'verified') as verified_id,
       COUNT(DISTINCT staff_id) FILTER (WHERE document_type = 'passport' AND verification_status = 'verified') as verified_passport,
@@ -311,6 +313,7 @@ async function getComplianceStats(): Promise<ComplianceStats> {
       COUNT(DISTINCT staff_id) FILTER (WHERE document_type = 'employment_contract' AND verification_status = 'verified') as verified_contract
     FROM staff_documents
   `;
+  const verifiedDocs = verifiedDocsRows[0]!;
 
   // Find staff missing key documents (including employment contract/IC agreement)
   const missingDocs = await sql`

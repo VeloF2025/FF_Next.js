@@ -3,9 +3,9 @@
  * Handle real-time data subscriptions for product management
  */
 
-// @ts-ignore — firebase not installed
+// @ts-expect-error — firebase not installed
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
-// @ts-ignore — firebase config
+// @ts-expect-error — firebase config
 import { db } from '@/config/firebase';
 import { Product, ProductCallback } from './types';
 

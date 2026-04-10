@@ -3,7 +3,7 @@
  * Comprehensive reporting system for procurement operations
  */
 
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { boqService } from '../boqService';
 import { supplierService } from '@/services/suppliers/supplierService';
 import { log } from '@/lib/logger';

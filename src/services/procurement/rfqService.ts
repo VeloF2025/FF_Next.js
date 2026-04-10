@@ -7,5 +7,5 @@
  */
 
 // Re-export the main service and all modules from the new structure
-// @ts-ignore
+// @ts-expect-error — re-export from modular structure
 export { rfqService, RFQOperations, RFQLifecycle, RFQNotifications } from './rfq/index';

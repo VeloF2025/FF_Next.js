@@ -83,7 +83,7 @@ export default withAuth(withErrorHandler(async (
     }
 
     // 4. Create stock_movement record
-    const [movement] = await sql`
+    const movementRows = await sql`
       INSERT INTO stock_movements (
         id,
         project_id,
@@ -119,6 +119,7 @@ export default withAuth(withErrorHandler(async (
       )
       RETURNING id, reference_number, movement_type
     `;
+    const movement = movementRows[0]!;
 
     log.info('Created stock movement for GRN', {
       movementId: movement.id,
@@ -203,7 +204,7 @@ export default withAuth(withErrorHandler(async (
     }
 
     // 6. Update GRN status to 'completed'
-    const [updatedGrn] = await sql`
+    const updatedGrnRows = await sql`
       UPDATE goods_receipt_notes
       SET
         status = 'completed',
@@ -214,6 +215,7 @@ export default withAuth(withErrorHandler(async (
       WHERE id = ${grnId}
       RETURNING id, grn_number, status
     `;
+    const updatedGrn = updatedGrnRows[0]!;
 
     logUpdate('goods_receipt_note', grnId, {
       status: 'completed',
