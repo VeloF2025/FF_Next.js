@@ -248,7 +248,7 @@ export default function SnagResolvePage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-5">
           <h3 className="text-sm font-semibold text-zinc-300 mb-3">Snag Description</h3>
-          <p className="text-sm text-zinc-200 whitespace-pre-wrap">{ticket.description}</p>
+          <DescriptionWithGPS text={ticket.description} />
         </div>
 
         <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-5">
@@ -385,6 +385,52 @@ export default function SnagResolvePage() {
 }
 
 // ─── Page Shell (no sidebar, minimal layout) ─────────────────────────────────
+
+/** Renders description text with GPS coordinates as clickable Google Maps links */
+function DescriptionWithGPS({ text }: { text: string }) {
+  // Match GPS patterns like "GPS: -26.709608,27.02253381" or bare "-26.123,27.456"
+  const gpsRegex = /(GPS:\s*)?(-?\d{1,3}\.\d{3,10})\s*[,;]\s*(-?\d{1,3}\.\d{3,10})/g;
+
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = gpsRegex.exec(text)) !== null) {
+    // Add text before the match
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+
+    const lat = match[2];
+    const lng = match[3];
+    const label = match[0]; // Full matched text like "GPS: -26.709608,27.02253381"
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+
+    parts.push(
+      <a
+        key={match.index}
+        href={mapsUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-400 hover:text-blue-300 underline inline-flex items-center gap-1"
+      >
+        {label}
+        <svg className="w-3 h-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+        </svg>
+      </a>
+    );
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return <p className="text-sm text-zinc-200 whitespace-pre-wrap">{parts}</p>;
+}
 
 function PageShell({ children }: { children: React.ReactNode }) {
   return (
