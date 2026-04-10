@@ -131,7 +131,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
   if (isError || !ticket) {
     return (
       <div className="p-8">
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 sm:p-6">
           <div className="flex items-start gap-3 mb-4">
             <AlertTriangle className="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
@@ -168,7 +168,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
 
       {/* Tab Navigation */}
       <div className="border-b border-[var(--ff-border-light)]">
-        <nav className="flex gap-1" aria-label="Tabs">
+        <nav className="flex gap-1 overflow-x-auto scrollbar-none" aria-label="Tabs">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;
@@ -179,7 +179,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
                 className={cn(
-                  'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors',
+                  'flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0',
                   isActive
                     ? 'border-blue-500 text-blue-400'
                     : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
@@ -214,7 +214,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
             <>
               {/* Description */}
               {ticket.description && (
-                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
+                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4 sm:p-6">
                   <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-3">
                     Description
                   </h3>
@@ -236,7 +236,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
               )}
 
               {/* Additional Details */}
-              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
+              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4 sm:p-6">
                 <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">
                   Additional Details
                 </h3>
@@ -368,7 +368,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
 
           {/* Activity Tab */}
           {activeTab === 'activity' && (
-            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
+            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4 sm:p-6">
               <div className="flex items-center gap-2 mb-4">
                 <History className="w-5 h-5 text-[var(--ff-text-secondary)]" />
                 <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
@@ -384,7 +384,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
 
           {/* Attachments Tab */}
           {activeTab === 'attachments' && (
-            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
+            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4 sm:p-6">
               <AttachmentsTab ticketId={ticketId} />
             </div>
           )}
@@ -426,7 +426,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
           />
 
           {/* Actions */}
-          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
+          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Actions</h3>
             <TicketActions ticket={ticket} onActionComplete={handleActionComplete} />
           </div>
@@ -481,7 +481,7 @@ function BeforePhoto({ ticketId }: { ticketId: string }) {
   const displayAfter = afterPhotos;
 
   return (
-    <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
+    <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4 sm:p-6">
       <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-3">
         Photo Evidence
       </h3>

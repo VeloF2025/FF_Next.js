@@ -35,6 +35,7 @@ import {
   triggerOnTeamAssignment,
   triggerCreatorStatusUpdate,
   triggerOnReassignment,
+  triggerOnTicketResolution,
 } from '@/modules/noc/services/notificationTriggers';
 import { markLinkedDataSyncResolved } from '@/modules/noc/services/dataSyncResolution';
 import { notifySnagGroupOnStatusChange } from '@/modules/noc/services/snagGroupNotifications';
@@ -312,6 +313,13 @@ export async function PUT(
             logger.error('Snag WA group status notification error', { ticketId, error: err.message });
           });
       }
+    }
+
+    // Notify ticket creator when ticket is resolved (email + in-app notification)
+    if (body.status === 'resolved' && oldTicket?.status !== 'resolved') {
+      triggerOnTicketResolution(updatedTicket).catch(err => {
+        logger.error('Resolution notification error', { ticketId, error: err.message });
+      });
     }
 
     // When ticket is resolved/closed, mark linked Data Sync records as resolved

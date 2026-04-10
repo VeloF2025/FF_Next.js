@@ -107,7 +107,7 @@ export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange
     || (ticket.gps_coordinates ? parseGPSString(ticket.gps_coordinates) : null);
 
   return (
-    <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
+    <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4 sm:p-6">
       {/* Back Button */}
       <Link
         href={backLink}
@@ -120,7 +120,7 @@ export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange
       {/* Ticket UID and Badges */}
       <div className="flex items-start justify-between gap-4 mb-4">
         <div className="flex-1 min-w-0">
-          <h1 className="text-3xl font-bold text-[var(--ff-text-primary)] mb-2">{ticket.ticket_uid}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--ff-text-primary)] mb-2">{ticket.ticket_uid}</h1>
 
           <div className="flex items-center gap-2 flex-wrap">
             <ClickableStatusBadge
@@ -175,12 +175,12 @@ export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange
           ticketAssignedTo: ticket.assigned_to ?? null,
         });
         return (
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
             {actions.backward && vis.showBackward && (
               <button
                 type="button"
                 onClick={() => onStatusChange?.(actions.backward!.status)}
-                className="text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-1.5 rounded font-medium transition-colors"
+                className="text-sm sm:text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-4 py-2.5 sm:px-3 sm:py-1.5 rounded font-medium transition-colors"
               >
                 ← {actions.backward.label}
               </button>
@@ -189,7 +189,7 @@ export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange
               <button
                 type="button"
                 onClick={() => onStatusChange?.(actions.forward!.status)}
-                className="text-xs bg-green-800 hover:bg-green-700 text-green-100 px-3 py-1.5 rounded font-medium transition-colors"
+                className="text-sm sm:text-xs bg-green-800 hover:bg-green-700 text-green-100 px-4 py-2.5 sm:px-3 sm:py-1.5 rounded font-medium transition-colors"
               >
                 {actions.forward.label} →
               </button>
@@ -198,7 +198,7 @@ export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange
               <button
                 type="button"
                 onClick={() => onStatusChange?.(actions.reject!.status)}
-                className="text-xs bg-red-900 hover:bg-red-800 text-red-200 px-3 py-1.5 rounded transition-colors"
+                className="text-sm sm:text-xs bg-red-900 hover:bg-red-800 text-red-200 px-4 py-2.5 sm:px-3 sm:py-1.5 rounded transition-colors"
               >
                 {actions.reject.label}
               </button>

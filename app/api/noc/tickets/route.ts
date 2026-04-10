@@ -28,6 +28,7 @@ import {
   triggerOnTeamAssignment,
 } from '@/modules/noc/services/notificationTriggers';
 import { notifySnagGroupOnCreate } from '@/modules/noc/services/snagGroupNotifications';
+import { initializeVerificationSteps } from '@/modules/noc/services/verificationService';
 import {
   TicketSource,
   TicketType,
@@ -278,6 +279,13 @@ export async function POST(req: NextRequest) {
     } else if (ticket.assigned_team_id) {
       triggerOnTeamAssignment(ticket).catch(err => {
         logger.error('Team assignment notification error on create', { ticketId: ticket.id, error: err.message });
+      });
+    }
+
+    // Auto-initialize verification steps for the ticket (non-blocking)
+    if (body.ticket_type) {
+      initializeVerificationSteps(ticket.id, body.ticket_type).catch(err => {
+        logger.error('Verification step init error on create', { ticketId: ticket.id, type: body.ticket_type, error: err.message });
       });
     }
 

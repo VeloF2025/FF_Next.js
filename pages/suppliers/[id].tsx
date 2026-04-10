@@ -294,7 +294,7 @@ export default function SupplierDetailPage() {
       blacklisted: { color: 'bg-red-100 text-red-800', icon: <XCircle className="h-3 w-3" /> }
     };
 
-    const config = statusConfig[status.toLowerCase()] || statusConfig.pending;
+    const config = (statusConfig[status.toLowerCase()] || statusConfig.pending)!;
 
     return (
       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${config.color}`}>

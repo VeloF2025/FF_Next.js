@@ -118,7 +118,7 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
       )}
 
       {/* Section 1: Source & Classification */}
-      <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 sm:p-6 border border-[var(--ff-border-light)]">
         <SourceSection
           formData={form.formData}
           errors={form.errors}
@@ -129,7 +129,7 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
 
       {/* Section 2a: DevOps Details — shown BEFORE details for dev_ops tickets (screenshot-first) */}
       {sections.devops && (
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 sm:p-6 border border-[var(--ff-border-light)]">
           <DevOpsSection
             formData={form.formData}
             errors={form.errors}
@@ -141,7 +141,7 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
       )}
 
       {/* Section 2b: Ticket Details */}
-      <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 sm:p-6 border border-[var(--ff-border-light)]">
         <DetailsSection
           formData={form.formData}
           errors={form.errors}
@@ -152,7 +152,7 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
 
       {/* Section 3: Location (DR Lookup) — hidden for DevOps tickets */}
       {sections.location && (
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 sm:p-6 border border-[var(--ff-border-light)]">
           <LocationSection
             formData={form.formData}
             errors={form.errors}
@@ -167,7 +167,7 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
 
       {/* Section 4: Equipment Information — hidden for DevOps/HSE/Incident tickets */}
       {sections.equipment && (
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 sm:p-6 border border-[var(--ff-border-light)]">
           <EquipmentSection
             formData={form.formData}
             errors={form.errors}
@@ -179,7 +179,7 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
 
       {/* Section 5: Client Information — hidden for DevOps/HSE/investigation tickets */}
       {sections.client && (
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 sm:p-6 border border-[var(--ff-border-light)]">
           <ClientSection
             formData={form.formData}
             errors={form.errors}
@@ -190,7 +190,7 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
       )}
 
       {/* Section 6: Assignment — always shown */}
-      <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 sm:p-6 border border-[var(--ff-border-light)]">
         <AssignmentSection
           formData={form.formData}
           errors={form.errors}
@@ -210,31 +210,32 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
         />
       )}
 
-      {/* Form Actions */}
-      <div className="flex items-center justify-between pt-4 border-t border-[var(--ff-border-light)]">
+      {/* Form Actions — sticky on mobile for easy access */}
+      <div className="flex items-center justify-between pt-4 border-t border-[var(--ff-border-light)] sticky bottom-0 bg-[var(--ff-bg-primary)] pb-4 sm:static sm:pb-0 z-10">
         <button
           type="button"
           onClick={form.reset}
           disabled={form.isSubmitting || !form.isDirty}
-          className="inline-flex items-center gap-2 px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-2 px-3 py-3 sm:px-4 sm:py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <RotateCcw className="w-4 h-4" />
-          Clear Form
+          <span className="hidden sm:inline">Clear Form</span>
+          <span className="sm:hidden">Clear</span>
         </button>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={handleCancel}
             disabled={form.isSubmitting}
-            className="px-4 py-2 rounded-lg border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)] disabled:opacity-50"
+            className="px-4 py-3 sm:py-2 rounded-lg border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)] disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={form.isSubmitting}
-            className="inline-flex items-center gap-2 px-6 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-5 py-3 sm:px-6 sm:py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
             {form.isSubmitting ? (
               <>

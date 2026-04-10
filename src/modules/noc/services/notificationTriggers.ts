@@ -45,6 +45,7 @@ const logger = createLogger('notificationTriggers');
 export type NotificationEventType =
   | 'ticket.assigned'
   | 'ticket.qa_rejected'
+  | 'ticket.resolved'
   | 'ticket.closed'
   | 'ticket.sla_warning';
 
@@ -315,6 +316,7 @@ export class NotificationTriggerService {
       'ticket.assigned',
       'ticket.qa_rejected',
       'ticket.closed',
+      'ticket.resolved',
       'ticket.sla_warning',
     ].includes(type);
   }
@@ -329,6 +331,8 @@ export class NotificationTriggerService {
         return this.preferences.ticket_assigned ?? true;
       case 'ticket.qa_rejected':
         return this.preferences.qa_rejected ?? true;
+      case 'ticket.resolved':
+        return true;
       case 'ticket.closed':
         return this.preferences.ticket_closed ?? true;
       case 'ticket.sla_warning':
@@ -348,6 +352,8 @@ export class NotificationTriggerService {
         return NotificationUseCase.TICKET_ASSIGNED;
       case 'ticket.qa_rejected':
         return NotificationUseCase.QA_REJECTED;
+      case 'ticket.resolved':
+        return NotificationUseCase.TICKET_RESOLVED;
       case 'ticket.closed':
         return NotificationUseCase.TICKET_CLOSED;
       case 'ticket.sla_warning':
@@ -807,6 +813,55 @@ export async function triggerOnTicketClosure(ticket: Ticket): Promise<TriggerRes
   const service = getDefaultNotificationTriggerService();
   return await service.handleEvent({
     type: 'ticket.closed',
+    ticket_id: ticket.id,
+    ticket,
+    new_status: ticket.status,
+    timestamp: new Date(),
+  });
+}
+
+/**
+ * Trigger notification on ticket resolution — notifies the ticket CREATOR.
+ * For DevOps tickets (internal), tells the reporter the fix is ready to verify.
+ * Sends both an in-app notification and an email.
+ */
+export async function triggerOnTicketResolution(ticket: Ticket): Promise<TriggerResult> {
+  const isDevOps = ticket.ticket_type === 'dev_ops';
+  const creator = await lookupCreator(ticket.created_by);
+
+  if (creator) {
+    const title = isDevOps
+      ? `Fix ready for verification — ${ticket.ticket_uid}`
+      : `Ticket ${ticket.ticket_uid} resolved`;
+    const body = isDevOps
+      ? `The fix for "${ticket.title}" has been deployed. Please verify and click "Verify Fix".`
+      : `Your ticket "${ticket.title}" has been resolved. Please confirm the resolution.`;
+
+    const emailPayload = {
+      event_type: 'noc.ticket_resolved',
+      title,
+      body,
+      action_url: `/noc/tickets/${ticket.id}`,
+      source_module: 'maintenance',
+      source_id: ticket.id,
+      recipient_user_ids: [creator.id],
+    };
+
+    notify(emailPayload).catch((err) => {
+      logger.error('Failed to send resolution notification', { error: err, ticketId: ticket.id });
+    });
+    deliverEmail(creator.id, emailPayload, null).catch((err) => {
+      logger.error('Failed to send resolution email', { error: err, ticketId: ticket.id });
+    });
+  } else {
+    logger.warn('Cannot send resolution notification — creator not found', {
+      ticketId: ticket.id, createdBy: ticket.created_by,
+    });
+  }
+
+  const service = getDefaultNotificationTriggerService();
+  return await service.handleEvent({
+    type: 'ticket.resolved',
     ticket_id: ticket.id,
     ticket,
     new_status: ticket.status,

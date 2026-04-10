@@ -335,8 +335,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             drBSetSuccess = true; // Already there
           } else if (!drBSearchResult.records.some(r => r.br_ser)) {
             // DR B has no UPS — set it
-            const drBRecord = drBSearchResult.records.find(r => r.ph_ont && !r.br_ser)
-              || drBSearchResult.records[0];
+            const drBRecord = (drBSearchResult.records.find(r => r.ph_ont && !r.br_ser)
+              || drBSearchResult.records[0])!;
             const currentOnt = drBRecord.ph_ont || drBCorrectSerial || '';
             const upsResult = await oneMapApi.updateOntAndUpsSerial(
               drBRecord.prop_id,

@@ -69,7 +69,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Create checkout record
-    const [checkout] = await sql`
+    const checkoutRows = await sql`
       INSERT INTO tool_checkouts (
         stock_item_id, serial_id, serial_number,
         checked_out_by, project_id, job_site_name,
@@ -81,6 +81,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       )
       RETURNING *
     `;
+    const checkout = checkoutRows[0]!;
 
     // Update serial status
     await sql`

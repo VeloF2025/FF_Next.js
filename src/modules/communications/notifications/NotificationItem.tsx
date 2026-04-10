@@ -52,7 +52,7 @@ function formatTimestamp(iso: string): string {
 }
 
 export function NotificationItem({ notification, onMarkRead }: NotificationItemProps) {
-  const severity = SEVERITY_STYLES[notification.severity] || SEVERITY_STYLES.info;
+  const severity = (SEVERITY_STYLES[notification.severity] || SEVERITY_STYLES.info)!;
   const SeverityIcon = severity.icon;
   const ModuleIcon = notification.source_module
     ? MODULE_ICONS[notification.source_module] || Bell

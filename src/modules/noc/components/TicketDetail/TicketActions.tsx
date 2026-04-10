@@ -118,7 +118,7 @@ export function TicketActions({ ticket, compact = false, onActionComplete }: Tic
 
     if (ticket.status === 'resolved') {
       actions.push({
-        label: 'Verify Resolution',
+        label: ticket.ticket_type === 'dev_ops' ? 'Verify Fix' : 'Verify Resolution',
         icon: ShieldCheck,
         onClick: () => handleStatusChange('verified'),
         variant: 'success' as const,

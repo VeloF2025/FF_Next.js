@@ -292,9 +292,9 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
                     type="button"
                     aria-label="Delete attachment"
                     onClick={(e) => { e.stopPropagation(); handleDelete(att.id, att.filename); }}
-                    className="text-[10px] text-red-400 hover:text-red-300 flex items-center gap-0.5 opacity-100 transition-opacity"
+                    className="text-xs sm:text-[10px] text-red-400 hover:text-red-300 flex items-center gap-1 p-1 -m-1 transition-opacity"
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <Trash2 className="w-4 h-4 sm:w-3 sm:h-3" />
                   </button>
                 </div>
               </div>

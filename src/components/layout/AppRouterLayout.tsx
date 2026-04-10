@@ -157,7 +157,7 @@ export function AppRouterLayout({ children }: AppRouterLayoutProps) {
         />
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto bg-[var(--ff-background-primary)]">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-[var(--ff-background-primary)]">
           <div className="min-h-full">
             {children}
           </div>

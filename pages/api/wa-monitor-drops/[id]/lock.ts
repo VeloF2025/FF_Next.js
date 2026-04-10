@@ -78,7 +78,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
 
       // Lock is available - acquire it
-      const [updated] = await sql`
+      const updatedRows = await sql`
         UPDATE qa_photo_reviews
         SET
           locked_by = ${userName},
@@ -86,6 +86,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         WHERE id = ${id}
         RETURNING locked_by as "lockedBy", locked_at as "lockedAt"
       `;
+      const updated = updatedRows[0]!;
 
       return res.status(200).json({
         success: true,

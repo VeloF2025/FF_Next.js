@@ -177,8 +177,8 @@ class XLSXCompatibilityLayer {
     const match = cell.match(/([A-Z]+)(\d+)/);
     if (!match) return { r: 0, c: 0 };
     
-    const colStr = match[1];
-    const rowStr = match[2];
+    const colStr = match[1]!;
+    const rowStr = match[2]!;
     
     let col = 0;
     for (let i = 0; i < colStr.length; i++) {

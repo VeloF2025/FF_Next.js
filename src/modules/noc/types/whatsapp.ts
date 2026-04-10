@@ -100,6 +100,7 @@ export enum NotificationUseCase {
   TICKET_ASSIGNED = 'ticket_assigned',
   QA_REJECTED = 'qa_rejected',
   QA_APPROVED = 'qa_approved',
+  TICKET_RESOLVED = 'ticket_resolved',
   TICKET_CLOSED = 'ticket_closed',
   SLA_WARNING = 'sla_warning',
   RISK_EXPIRING = 'risk_expiring',

@@ -63,7 +63,7 @@ export function ModulePage({
       <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
         {/* Module Header */}
         {!hideHeader && (
-          <div className="px-6 py-4">
+          <div className="px-4 sm:px-6 py-4">
             <ModuleHeader
               title={config.moduleName}
               description={config.description}
@@ -75,7 +75,7 @@ export function ModulePage({
 
         {/* Tab Navigation */}
         {!hideTabs && visibleTabs.length > 0 && (
-          <div className={`${hideHeader ? 'pt-4' : ''} px-6 border-t border-[var(--ff-border-light)]`}>
+          <div className={`${hideHeader ? 'pt-4' : ''} px-4 sm:px-6 border-t border-[var(--ff-border-light)]`}>
             <ModuleTabs
               tabs={visibleTabs}
               activeTab={activeTab}
@@ -93,7 +93,7 @@ export function ModulePage({
 
       {/* Sub-tabs (if current tab has them) */}
       {!hideTabs && currentSubTabs.length > 0 && (
-        <div className="px-6 pt-4 bg-[var(--ff-bg-primary)]">
+        <div className="px-4 sm:px-6 pt-4 bg-[var(--ff-bg-primary)]">
           <SubTabs
             subTabs={currentSubTabs}
             activeSubTab={activeSubTab}
@@ -107,7 +107,7 @@ export function ModulePage({
       )}
 
       {/* Content */}
-      <div className={`p-6 ${contentClassName}`}>
+      <div className={`p-4 sm:p-6 ${contentClassName}`}>
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--ff-primary-500)]" />
