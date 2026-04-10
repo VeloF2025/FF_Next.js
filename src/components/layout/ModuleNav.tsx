@@ -297,7 +297,7 @@ export function ModuleNav({ tabs, getActiveTabId, accentColor }: ModuleNavProps)
 
   return (
     <nav ref={navRef} className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] relative z-30">
-      <div className="flex items-center gap-0 px-2 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+      <div className="flex items-center gap-0 px-2" style={{ scrollbarWidth: 'none' }}>
         {tabs.map(t => (
           <div key={t.id} className="relative flex-shrink-0">
             {t.href ? (
