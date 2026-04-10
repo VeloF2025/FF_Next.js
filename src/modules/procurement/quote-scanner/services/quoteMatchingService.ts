@@ -324,16 +324,16 @@ function levenshteinDistance(s1: string, s2: string): number {
   }
 
   for (let j = 0; j <= n; j++) {
-    matrix[0][j] = j;
+    matrix[0]![j] = j;
   }
 
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
       const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
-      matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1,      // deletion
-        matrix[i][j - 1] + 1,      // insertion
-        matrix[i - 1][j - 1] + cost // substitution
+      matrix[i]![j] = Math.min(
+        matrix[i - 1]![j] + 1,      // deletion
+        matrix[i]![j - 1] + 1,      // insertion
+        matrix[i - 1]![j - 1] + cost // substitution
       );
     }
   }

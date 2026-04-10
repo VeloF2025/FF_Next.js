@@ -211,17 +211,17 @@ async function handleUploadDocument(
 
     return apiResponse.success(res, {
       document: {
-        id: newDoc[0].id,
-        clientId: newDoc[0].client_id,
-        documentType: newDoc[0].document_type,
-        status: newDoc[0].status,
-        filename: newDoc[0].filename,
-        fileUrl: newDoc[0].file_url,
-        fileSize: newDoc[0].file_size,
-        uploadedAt: newDoc[0].uploaded_at,
-        uploadedBy: newDoc[0].uploaded_by,
-        createdAt: newDoc[0].created_at,
-        updatedAt: newDoc[0].updated_at,
+        id: newDoc[0]!.id,
+        clientId: newDoc[0]!.client_id,
+        documentType: newDoc[0]!.document_type,
+        status: newDoc[0]!.status,
+        filename: newDoc[0]!.filename,
+        fileUrl: newDoc[0]!.file_url,
+        fileSize: newDoc[0]!.file_size,
+        uploadedAt: newDoc[0]!.uploaded_at,
+        uploadedBy: newDoc[0]!.uploaded_by,
+        createdAt: newDoc[0]!.created_at,
+        updatedAt: newDoc[0]!.updated_at,
       },
     });
   } catch (error) {

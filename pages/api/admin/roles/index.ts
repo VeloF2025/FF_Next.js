@@ -161,24 +161,24 @@ async function handlePost(
         ${req.user.id},
         'role_create',
         'role',
-        ${newRole[0].id},
+        ${newRole[0]!.id},
         ${JSON.stringify({ name, displayName, description, createdBy: req.user.email })}::jsonb,
         ${(req.headers['x-forwarded-for'] as string)?.split(',')[0] || null}
       )
     `;
 
-    log.info({ roleId: newRole[0].id, name }, 'Custom role created');
+    log.info({ roleId: newRole[0]!.id, name }, 'Custom role created');
 
     return apiResponse.created(res, {
-      id: newRole[0].id,
-      name: newRole[0].name,
-      displayName: newRole[0].display_name,
-      description: newRole[0].description,
-      color: newRole[0].color,
-      isSystem: newRole[0].is_system,
-      isActive: newRole[0].is_active,
-      sortOrder: newRole[0].sort_order,
-      createdAt: newRole[0].created_at,
+      id: newRole[0]!.id,
+      name: newRole[0]!.name,
+      displayName: newRole[0]!.display_name,
+      description: newRole[0]!.description,
+      color: newRole[0]!.color,
+      isSystem: newRole[0]!.is_system,
+      isActive: newRole[0]!.is_active,
+      sortOrder: newRole[0]!.sort_order,
+      createdAt: newRole[0]!.created_at,
     });
   } catch (error) {
     log.error({ error }, 'Error creating role');

@@ -93,20 +93,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const response: ProgressTodayResponse = {
       asOfDate: new Date().toISOString().split('T')[0],
       metrics: {
-        polesPlanted: Number(polesToday[0].count),
-        stringingCompleted: Number(stringingToday[0].count),
-        rfosCompleted: Number(rfosToday[0].count),
-        atpsCompleted: Number(atpsToday[0].count),
-        totalInstalls: Number(installsToday[0].count),
-        totalActivated: Number(activatedToday[0].count),
+        polesPlanted: Number(polesToday[0]!.count),
+        stringingCompleted: Number(stringingToday[0]!.count),
+        rfosCompleted: Number(rfosToday[0]!.count),
+        atpsCompleted: Number(atpsToday[0]!.count),
+        totalInstalls: Number(installsToday[0]!.count),
+        totalActivated: Number(activatedToday[0]!.count),
       },
       previousDay: {
-        polesPlanted: Number(polesYesterday[0].count),
-        stringingCompleted: Number(stringingYesterday[0].count),
-        rfosCompleted: Number(rfosYesterday[0].count),
-        atpsCompleted: Number(atpsYesterday[0].count),
-        totalInstalls: Number(installsYesterday[0].count),
-        totalActivated: Number(activatedYesterday[0].count),
+        polesPlanted: Number(polesYesterday[0]!.count),
+        stringingCompleted: Number(stringingYesterday[0]!.count),
+        rfosCompleted: Number(rfosYesterday[0]!.count),
+        atpsCompleted: Number(atpsYesterday[0]!.count),
+        totalInstalls: Number(installsYesterday[0]!.count),
+        totalActivated: Number(activatedYesterday[0]!.count),
       },
     };
 

@@ -33,7 +33,7 @@ function extractStepInfo(filename: string): { step: number; label: string; criti
     const match = filename.match(/step(\d+)_(.+?)_\d{8}/);
     if (match) {
         const stepNum = parseInt(match[1], 10);
-        const stepKey = match[2];
+        const stepKey = match[2]!;
         const info = STEP_LABELS[stepKey];
         if (info) {
             return { step: stepNum, label: info.label, critical: info.critical };

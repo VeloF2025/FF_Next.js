@@ -62,22 +62,22 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
         boq_id, boq_item_id, action, field_changed,
         old_value, new_value, changed_by_name, change_summary
       ) VALUES (
-        ${boqItem[0].boq_id}::uuid,
+        ${boqItem[0]!.boq_id}::uuid,
         ${boqItemId}::uuid,
         'stock_mapped',
         'stock_item_id',
         '',
-        ${stockItem[0].item_code || stockItem[0].name},
+        ${stockItem[0]!.item_code || stockItem[0]!.name},
         ${userName},
-        ${'Manually mapped to stock item: ' + (stockItem[0].item_code || stockItem[0].name)}
+        ${'Manually mapped to stock item: ' + (stockItem[0]!.item_code || stockItem[0]!.name)}
       )
     `;
 
     // Optionally save as supplier code mapping for future imports
-    if (saveAsSupplierMapping && boqItem[0].item_code) {
+    if (saveAsSupplierMapping && boqItem[0]!.item_code) {
       const existingMapping = await sql`
         SELECT id FROM supplier_item_codes
-        WHERE LOWER(supplier_item_code) = LOWER(${boqItem[0].item_code})
+        WHERE LOWER(supplier_item_code) = LOWER(${boqItem[0]!.item_code})
           AND stock_item_id = ${stockItemId}::uuid
       `;
 
@@ -89,14 +89,14 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
           ) VALUES (
             ${stockItemId}::uuid,
             ${supplierId ? Number(supplierId) : null},
-            ${boqItem[0].item_code},
-            ${boqItem[0].description},
+            ${boqItem[0]!.item_code},
+            ${boqItem[0]!.description},
             true,
             ${userName}
           )
         `;
         log.info('Saved supplier code mapping from manual BOQ mapping', {
-          supplierCode: boqItem[0].item_code,
+          supplierCode: boqItem[0]!.item_code,
           stockItemId,
         });
       }
@@ -105,15 +105,15 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
     log.info('BOQ item manually mapped to stock item', {
       boqItemId,
       stockItemId,
-      stockCode: stockItem[0].item_code,
+      stockCode: stockItem[0]!.item_code,
     });
 
     return apiResponse.success(res, {
       boqItemId,
       stockItemId,
-      stockCode: stockItem[0].item_code,
-      stockName: stockItem[0].name,
-      savedSupplierMapping: saveAsSupplierMapping && boqItem[0].item_code ? true : false,
+      stockCode: stockItem[0]!.item_code,
+      stockName: stockItem[0]!.name,
+      savedSupplierMapping: saveAsSupplierMapping && boqItem[0]!.item_code ? true : false,
     });
   } catch (error) {
     log.error('Failed to map BOQ item to stock item', error);

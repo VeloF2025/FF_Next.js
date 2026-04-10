@@ -37,7 +37,7 @@ async function handler(
   if (userResult.length === 0) {
     return apiResponse.notFound(res, 'User', userId);
   }
-  const user = userResult[0];
+  const user = userResult[0]!;
 
   if (req.method === 'GET') {
     return handleGet(req, res, userId, user.role);

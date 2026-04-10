@@ -66,12 +66,12 @@ async function handler(
         ${sourceRole},
         ${newName},
         ${newDisplayName},
-        ${description || `Cloned from ${sourceRoleData[0].display_name}`},
+        ${description || `Cloned from ${sourceRoleData[0]!.display_name}`},
         ${req.user.id}
       ) as new_role_id
     `;
 
-    const newRoleId = result[0].new_role_id;
+    const newRoleId = result[0]!.new_role_id;
 
     // Get the new role data
     const newRoleData = await sql`
@@ -97,7 +97,7 @@ async function handler(
           sourceRole,
           newName,
           newDisplayName,
-          permissionsCloned: parseInt(permCount[0].count),
+          permissionsCloned: parseInt(permCount[0]!.count),
           clonedBy: req.user.email,
         })}::jsonb,
         ${(req.headers['x-forwarded-for'] as string)?.split(',')[0] || null}
@@ -107,16 +107,16 @@ async function handler(
     log.info({ newRoleId, sourceRole, newName }, 'Role cloned successfully');
 
     return apiResponse.created(res, {
-      id: newRoleData[0].id,
-      name: newRoleData[0].name,
-      displayName: newRoleData[0].display_name,
+      id: newRoleData[0]!.id,
+      name: newRoleData[0]!.name,
+      displayName: newRoleData[0]!.display_name,
       description: newRoleData[0].description,
       color: newRoleData[0].color,
       isSystem: newRoleData[0].is_system,
       isActive: newRoleData[0].is_active,
       sortOrder: newRoleData[0].sort_order,
       createdAt: newRoleData[0].created_at,
-      permissionsCloned: parseInt(permCount[0].count),
+      permissionsCloned: parseInt(permCount[0]!.count),
       clonedFrom: sourceRole,
     });
   } catch (error) {

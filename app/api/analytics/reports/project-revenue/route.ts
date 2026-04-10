@@ -99,7 +99,7 @@ function matchProject(name: string, pcNames: string[]): string | null {
   if (exact) return exact;
   // Prefix match: "Thembisa POP 1" → "Thembisa POP 1 (P1/2)"
   const prefix = pcNames.find(p => {
-    const pn = norm(p).split(' (')[0];
+    const pn = norm(p).split(' (')[0]!;
     return n === pn || n.startsWith(pn) || pn.startsWith(n);
   });
   return prefix ?? null;
