@@ -81,7 +81,7 @@ export default async function handler(
       });
     }
 
-    const config = configResult[0];
+    const config = configResult[0]!; // Guaranteed by length check above
 
     // Check if sync is enabled
     if (config.sync_enabled === false) {

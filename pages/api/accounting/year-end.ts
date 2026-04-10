@@ -38,7 +38,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       // Get revenue/expense totals per year
       const yearsWithTotals = await Promise.all(years.map(async (fy) => {
-        const [rev] = await sql`
+        const revRows = await sql`
           SELECT COALESCE(SUM(jl.credit - jl.debit), 0)::numeric as total
           FROM gl_journal_lines jl
           JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
@@ -48,7 +48,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             AND je.entry_date >= ${fy.start_date}
             AND je.entry_date <= ${fy.end_date}
         `;
-        const [exp] = await sql`
+        const rev = revRows[0]!;
+        const expRows = await sql`
           SELECT COALESCE(SUM(jl.debit - jl.credit), 0)::numeric as total
           FROM gl_journal_lines jl
           JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
@@ -58,6 +59,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             AND je.entry_date >= ${fy.start_date}
             AND je.entry_date <= ${fy.end_date}
         `;
+        const exp = expRows[0]!;
 
         return {
           ...fy,
@@ -100,10 +102,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
 
       // Get year date range
-      const [yearRange] = await sql`
+      const yearRangeRows = await sql`
         SELECT MIN(start_date) as start_date, MAX(end_date) as end_date
         FROM fiscal_periods WHERE fiscal_year = ${yearLabel}
       `;
+      const yearRange = yearRangeRows[0]!;
 
       // Calculate net income (Revenue - Expenses)
       const revenueAccounts = await sql`
@@ -160,7 +163,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const totalDebit = totalRevenue + (netIncome < 0 ? Math.abs(netIncome) : 0);
       const totalCredit = totalExpenses + (netIncome >= 0 ? netIncome : 0);
 
-      const [closingEntry] = await sql`
+      const closingEntryRows = await sql`
         INSERT INTO gl_journal_entries (
           id, entry_number, entry_date, description,
           source, status, total_debit, total_credit,
@@ -176,6 +179,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         )
         RETURNING *
       `;
+      const closingEntry = closingEntryRows[0]!;
 
       // DR Revenue accounts (to zero them)
       for (const rev of revenueAccounts) {
