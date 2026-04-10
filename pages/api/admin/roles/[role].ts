@@ -73,7 +73,7 @@ async function handleGet(
     const userCountResult = await sql`
       SELECT COUNT(*) as count FROM users WHERE role = ${role}
     `;
-    const userCount = parseInt(userCountResult[0].count) || 0;
+    const userCount = parseInt(userCountResult[0]!.count) || 0;
 
     return apiResponse.success(res, {
       id: roleRecord.id,
@@ -190,7 +190,7 @@ async function handleDelete(
     const userCountResult = await sql`
       SELECT COUNT(*) as count FROM users WHERE role = ${role} AND is_active = true
     `;
-    const userCount = parseInt(userCountResult[0].count) || 0;
+    const userCount = parseInt(userCountResult[0]!.count) || 0;
 
     if (userCount > 0) {
       return apiResponse.badRequest(

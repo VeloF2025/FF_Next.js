@@ -23,6 +23,7 @@ import { TicketType } from '../../types/ticket';
 import {
   T1_LABELS,
   T1_CATEGORY_MAP,
+  SOURCE_LABELS,
   type T1Category,
 } from '../../constants/ticketCategories';
 
@@ -173,7 +174,7 @@ export function TicketFilters({ filters, onFiltersChange, compact = false }: Tic
               <option value="assigned">Assigned</option>
               <option value="cancelled">Cancelled</option>
               <option value="closed">Closed</option>
-              <option value="handed_to_maintenance">Handed to Maintenance</option>
+              <option value="handed_to_ops">Handed to Ops</option>
               <option value="in_progress">In Progress</option>
               <option value="open">Open</option>
               <option value="pending_handover">Pending Handover</option>
@@ -181,6 +182,8 @@ export function TicketFilters({ filters, onFiltersChange, compact = false }: Tic
               <option value="qa_approved">QA Approved</option>
               <option value="qa_in_progress">QA In Progress</option>
               <option value="qa_rejected">QA Rejected</option>
+              <option value="resolved">Resolved</option>
+              <option value="verified">Verified</option>
             </select>
           </div>
 
@@ -219,6 +222,23 @@ export function TicketFilters({ filters, onFiltersChange, compact = false }: Tic
               <option value="high">High</option>
               <option value="urgent">Urgent</option>
               <option value="critical">Critical</option>
+            </select>
+          </div>
+
+          {/* Source Filter */}
+          <div>
+            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-2">
+              Source
+            </label>
+            <select
+              value={(filters.source as string) || ''}
+              onChange={(e) => handleFilterChange('source', e.target.value)}
+              className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            >
+              <option value="">All Sources</option>
+              {Object.entries(SOURCE_LABELS).sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
             </select>
           </div>
 

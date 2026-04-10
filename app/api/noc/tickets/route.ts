@@ -51,7 +51,12 @@ const VALID_SOURCES: TicketSource[] = [
   TicketSource.REVENUE,
   TicketSource.ONT_SWAP,
   TicketSource.MANUAL,
+  TicketSource.OFFLINE_REPORT,
+  TicketSource.QA_REVIEW,
+  TicketSource.HSE_REPORT,
+  TicketSource.WA_MAINTENANCE,
   TicketSource.PP_DATA,
+  TicketSource.OLT_MISMATCH,
   TicketSource.DEV_OPS,
   TicketSource.SNAGS,
 ];

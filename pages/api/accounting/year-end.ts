@@ -97,8 +97,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         WHERE fiscal_year = ${yearLabel} AND status = 'open'
       `;
 
-      if (Number(openPeriods[0].cnt) > 0) {
-        return apiResponse.badRequest(res, `${openPeriods[0].cnt} periods still open. Close all periods first.`);
+      if (Number(openPeriods[0]!.cnt) > 0) {
+        return apiResponse.badRequest(res, `${openPeriods[0]!.cnt} periods still open. Close all periods first.`);
       }
 
       // Get year date range

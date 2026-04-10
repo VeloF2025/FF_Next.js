@@ -167,8 +167,8 @@ function buildForecast(project: ConduitProject) {
 
   // ── COS categories ────────────────────────────────────────────────────────
   const cosTotals = cosTotal.map((_, i) =>
-    (cosAdHoc[i] ?? 0) + cosCasuals[i] + cosFuel[i] + cosOverheads[i] +
-    cosSales[i] + cosStock[i] + cosActivation[i]
+    (cosAdHoc[i] ?? 0) + (cosCasuals[i] ?? 0) + (cosFuel[i] ?? 0) + (cosOverheads[i] ?? 0) +
+    (cosSales[i] ?? 0) + (cosStock[i] ?? 0) + (cosActivation[i] ?? 0)
   );
 
   const cosCategories: ForecastRow[] = [

@@ -2155,30 +2155,30 @@ function OdometerTab({
                   <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
                     <div
                       className={`h-full ${
-                        fuelHistory[0].fuelLevel > 50 ? 'bg-green-500' :
-                        fuelHistory[0].fuelLevel > 25 ? 'bg-amber-500' : 'bg-red-500'
+                        fuelHistory[0]!.fuelLevel > 50 ? 'bg-green-500' :
+                        fuelHistory[0]!.fuelLevel > 25 ? 'bg-amber-500' : 'bg-red-500'
                       }`}
-                      style={{ width: `${fuelHistory[0].fuelLevel}%` }}
+                      style={{ width: `${fuelHistory[0]!.fuelLevel}%` }}
                     />
                   </div>
                   <span className="font-bold text-[var(--ff-text-primary)] whitespace-nowrap">
-                    {fuelHistory[0].fuelLevel}%
+                    {fuelHistory[0]!.fuelLevel}%
                   </span>
                 </div>
                 <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
-                  {formatDate(fuelHistory[0].recordedAt)} via {fuelHistory[0].source}
+                  {formatDate(fuelHistory[0]!.recordedAt)} via {fuelHistory[0]!.source}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-[var(--ff-text-secondary)] mb-1">Last Change</p>
                 <p className={`text-xl font-bold ${
-                  fuelHistory[0].levelChange !== null
-                    ? fuelHistory[0].levelChange > 0 ? 'text-green-600' :
-                      fuelHistory[0].levelChange < 0 ? 'text-red-600' : 'text-gray-600'
+                  fuelHistory[0]!.levelChange !== null
+                    ? fuelHistory[0]!.levelChange > 0 ? 'text-green-600' :
+                      fuelHistory[0]!.levelChange < 0 ? 'text-red-600' : 'text-gray-600'
                     : 'text-[var(--ff-text-tertiary)]'
                 }`}>
-                  {fuelHistory[0].levelChange !== null
-                    ? `${fuelHistory[0].levelChange > 0 ? '+' : ''}${fuelHistory[0].levelChange}%`
+                  {fuelHistory[0]!.levelChange !== null
+                    ? `${fuelHistory[0]!.levelChange > 0 ? '+' : ''}${fuelHistory[0]!.levelChange}%`
                     : '-'}
                 </p>
               </div>

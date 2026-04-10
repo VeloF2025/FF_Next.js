@@ -291,9 +291,9 @@ async function handler(
 
       if (staffRows.length > 0) {
         assignedDriver = {
-          name: `${staffRows[0].first_name} ${staffRows[0].last_name}`.trim(),
-          idNumber: staffRows[0].id_number,
-          phone: staffRows[0].phone,
+          name: `${staffRows[0]!.first_name} ${staffRows[0]!.last_name}`.trim(),
+          idNumber: staffRows[0]!.id_number,
+          phone: staffRows[0]!.phone,
         };
       }
     }
@@ -313,9 +313,9 @@ async function handler(
 
     if (odometerRows.length > 0) {
       lastOdometer = {
-        reading: odometerRows[0].reading,
-        recordedAt: odometerRows[0].recorded_at,
-        source: odometerRows[0].source,
+        reading: odometerRows[0]!.reading,
+        recordedAt: odometerRows[0]!.recorded_at,
+        source: odometerRows[0]!.source,
       };
     } else {
       // Fallback: Get last ODO from check-in records if history is empty
@@ -330,8 +330,8 @@ async function handler(
 
       if (checkInOdoRows.length > 0) {
         lastOdometer = {
-          reading: checkInOdoRows[0].odometer_reading,
-          recordedAt: checkInOdoRows[0].check_date,
+          reading: checkInOdoRows[0]!.odometer_reading,
+          recordedAt: checkInOdoRows[0]!.check_date,
           source: 'check-in',
         };
       }
@@ -348,9 +348,9 @@ async function handler(
 
     if (fuelRows.length > 0) {
       lastFuel = {
-        level: fuelRows[0].fuel_level,
-        recordedAt: fuelRows[0].recorded_at,
-        source: fuelRows[0].source,
+        level: fuelRows[0]!.fuel_level,
+        recordedAt: fuelRows[0]!.recorded_at,
+        source: fuelRows[0]!.source,
       };
     }
 
