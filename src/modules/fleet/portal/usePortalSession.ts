@@ -115,7 +115,7 @@ export function usePortalSession(): UsePortalSessionReturn {
               setDriver(result.driver);
             }
 
-            return result;
+            return { ...result, success: true };
           } else {
             // Server returned an error - don't retry these
             const rawError = result?.error || data.error || 'Authentication failed';

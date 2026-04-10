@@ -372,7 +372,7 @@ function isHeaderRow(row: any[]): boolean {
  * Extract data from simple format (headers in row 0, data in row 1+)
  */
 function extractSimpleFormat(rawData: any[][]): any[] {
-  const headerRow = rawData[0];
+  const headerRow = rawData[0]!;
 
   // Find column indices
   let dateCol = -1, drCol = -1, timeCol = -1;
@@ -393,7 +393,7 @@ function extractSimpleFormat(rawData: any[][]): any[] {
   // Extract data rows (start from row 1)
   const results: any[] = [];
   for (let i = 1; i < rawData.length; i++) {
-    const row = rawData[i];
+    const row = rawData[i]!;
     const dateValue = row[dateCol];
     const drValue = row[drCol];
     const timeValue = timeCol !== -1 ? row[timeCol] : null;
@@ -417,8 +417,8 @@ function extractSimpleFormat(rawData: any[][]): any[] {
 function extractMultiProjectFormat(rawData: any[][], projectName: string): any[] {
   if (rawData.length < 3) return []; // Need at least: row 0 (projects), row 1 (headers), row 2 (data)
 
-  const projectRow = rawData[0]; // Row with project names
-  const headerRow = rawData[1];  // Row with "Date", "DR nr", "Time"
+  const projectRow = rawData[0]!; // Row with project names
+  const headerRow = rawData[1]!;  // Row with "Date", "DR nr", "Time"
 
   // Find which column group contains this project
   let projectColumnStart = -1;
@@ -458,7 +458,7 @@ function extractMultiProjectFormat(rawData: any[][], projectName: string): any[]
   // Extract data rows (skip row 0 and 1)
   const results: any[] = [];
   for (let i = 2; i < rawData.length; i++) {
-    const row = rawData[i];
+    const row = rawData[i]!;
     const dateValue = row[dateCol];
     const drValue = row[drCol];
     const timeValue = timeCol !== -1 ? row[timeCol] : null;

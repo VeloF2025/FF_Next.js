@@ -99,7 +99,7 @@ export default async function handler(
       });
     }
 
-    const dbUser = users[0];
+    const dbUser = users[0]!; // Guaranteed by length check above
 
     // Check if user is active — return same error as invalid credentials to prevent enumeration
     if (!dbUser.is_active) {
