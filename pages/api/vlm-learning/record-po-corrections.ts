@@ -6,7 +6,7 @@ import { withAuth } from '@/lib/auth/middleware';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res, req.method || '');
+    return apiResponse.methodNotAllowed(res, req.method || '', ['POST']);
   }
 
   try {
@@ -21,7 +21,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.success(res, { recorded: true });
   } catch (err) {
     log.error('Failed to record PO form corrections', { err });
-    return apiResponse.error(res, 'Failed to record corrections');
+    return apiResponse.internalError(res, err instanceof Error ? err : new Error('Failed to record corrections'));
   }
 }
 

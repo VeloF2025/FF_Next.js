@@ -67,6 +67,7 @@ const MODULE_LABELS: Record<VlmModule, string> = {
   staff: 'Staff',
   qfield: 'QField',
   construction_qa: 'Construction QA',
+  'data-sync': 'Data Sync',
 };
 
 export default function VlmLearningPage() {
@@ -77,7 +78,7 @@ export default function VlmLearningPage() {
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
   // Check permissions
-  const hasAccess = hasPermission(Permission.SYSTEM_ADMIN) || user?.role === 'super_admin';
+  const hasAccess = hasPermission(Permission.SYSTEM_ADMIN);
 
   // Handle URL tab parameter
   useEffect(() => {
@@ -310,11 +311,11 @@ function OverviewTab() {
                     color: '#fff',
                   }}
                   labelStyle={{ color: '#9CA3AF' }}
-                  formatter={(value: number, name: string) => {
+                  formatter={((value: number, name: string) => {
                     if (name === 'ratePercent') return [`${value}%`, 'Accuracy'];
                     if (name === 'count') return [value, 'Extractions'];
                     return [value, name];
-                  }}
+                  }) as any}
                 />
                 <Line
                   type="monotone"
