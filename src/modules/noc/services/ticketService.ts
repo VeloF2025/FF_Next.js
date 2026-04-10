@@ -656,9 +656,25 @@ export async function listTickets(
     let paramCounter = 1;
 
     if (filters.status) {
-      whereClauses.push(`status = $${paramCounter}`);
-      values.push(filters.status);
-      paramCounter++;
+      // Support meta-groups (active/completed) used by sub-tabs, not just individual DB statuses
+      const ACTIVE_STATUSES = ['open', 'assigned', 'in_progress', 'pending_qa'];
+      const COMPLETED_STATUSES = ['resolved', 'verified', 'closed'];
+
+      if (filters.status === 'active') {
+        const placeholders = ACTIVE_STATUSES.map((_, i) => `$${paramCounter + i}`).join(', ');
+        whereClauses.push(`status IN (${placeholders})`);
+        values.push(...ACTIVE_STATUSES);
+        paramCounter += ACTIVE_STATUSES.length;
+      } else if (filters.status === 'completed') {
+        const placeholders = COMPLETED_STATUSES.map((_, i) => `$${paramCounter + i}`).join(', ');
+        whereClauses.push(`status IN (${placeholders})`);
+        values.push(...COMPLETED_STATUSES);
+        paramCounter += COMPLETED_STATUSES.length;
+      } else {
+        whereClauses.push(`status = $${paramCounter}`);
+        values.push(filters.status);
+        paramCounter++;
+      }
     }
 
     if (filters.ticket_type) {
@@ -675,6 +691,9 @@ export async function listTickets(
         `SELECT id FROM staff WHERE user_id = $1 LIMIT 1`,
         [filters.assigned_to]
       );
+      if (!staffLookup) {
+        logger.warn('No staff record found for user_id — "My Tickets" filter may return no results', { user_id: filters.assigned_to });
+      }
       const resolvedId = staffLookup?.id || filters.assigned_to;
       whereClauses.push(`assigned_to = $${paramCounter}`);
       values.push(resolvedId);

@@ -12,6 +12,7 @@ async function fetchSummary(filters?: TicketFilters): Promise<TicketSummaryData>
   const params = new URLSearchParams();
 
   if (filters) {
+    if (filters.status) params.append('status', String(filters.status));
     if (filters.ticket_type) params.append('ticket_type', String(filters.ticket_type));
     if (filters.priority) params.append('priority', String(filters.priority));
     if (filters.source) params.append('source', String(filters.source));

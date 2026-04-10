@@ -35,6 +35,28 @@ export async function GET(req: NextRequest) {
       }
     };
 
+    // status: supports both individual DB statuses and meta-groups (active/completed)
+    const statusParam = searchParams.get('status');
+    if (statusParam) {
+      const ACTIVE_STATUSES = ['open', 'assigned', 'in_progress', 'pending_qa'];
+      const COMPLETED_STATUSES = ['resolved', 'verified', 'closed'];
+
+      if (statusParam === 'active') {
+        const placeholders = ACTIVE_STATUSES.map((_, i) => `$${p + i}`).join(', ');
+        whereClauses.push(`status IN (${placeholders})`);
+        values.push(...ACTIVE_STATUSES);
+        p += ACTIVE_STATUSES.length;
+      } else if (statusParam === 'completed') {
+        const placeholders = COMPLETED_STATUSES.map((_, i) => `$${p + i}`).join(', ');
+        whereClauses.push(`status IN (${placeholders})`);
+        values.push(...COMPLETED_STATUSES);
+        p += COMPLETED_STATUSES.length;
+      } else {
+        whereClauses.push(`status = $${p++}`);
+        values.push(statusParam);
+      }
+    }
+
     addFilter('ticket_type', 'type');
     addFilter('priority', 'priority');
     addFilter('source', 'source');
@@ -47,6 +69,9 @@ export async function GET(req: NextRequest) {
         `SELECT id FROM staff WHERE user_id = $1 LIMIT 1`,
         [assignedTo]
       );
+      if (!staffLookup) {
+        logger.warn('No staff record found for user_id — "My Tickets" counts may be inaccurate', { user_id: assignedTo });
+      }
       const resolvedId = staffLookup?.id || assignedTo;
       whereClauses.push(`assigned_to = $${p++}`);
       values.push(resolvedId);

@@ -77,6 +77,7 @@ export enum TicketType {
   DEV_OPS = 'dev_ops', // FibreFlow application bug/error/feature
   // Construction quality
   SNAG = 'snag', // Construction quality snag from TQR audit
+  INTERNAL_SNAG = 'internal_snag', // Internal / FT site walk snag (manually logged)
 }
 
 /**
@@ -296,11 +297,14 @@ export interface UpdateTicketPayload {
   sla_breached?: boolean;
 }
 
+/** Meta-status groups used by Active/Completed sub-tabs */
+export type TicketStatusGroup = 'active' | 'completed';
+
 /**
  * Ticket list filters
  */
 export interface TicketFilters {
-  status?: TicketStatus | TicketStatus[];
+  status?: TicketStatus | TicketStatus[] | TicketStatusGroup;
   ticket_type?: TicketType | TicketType[];
   priority?: TicketPriority | TicketPriority[];
   source?: TicketSource | TicketSource[];
