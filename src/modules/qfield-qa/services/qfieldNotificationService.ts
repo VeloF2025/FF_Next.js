@@ -365,12 +365,12 @@ export async function sendBulkRejectionNotifications(
     }
 
     const result = await sendQFieldNotification('rejection', {
-      validationId: photos[0].id,
+      validationId: photos[0]!.id,
       photoKey: photos.length === 1
-        ? photos[0].photo_key
+        ? photos[0]!.photo_key
         : `${photos.length} photos`,
       projectId,
-      projectName: photos[0].project_name,
+      projectName: photos[0]!.project_name,
       notes: photos.length === 1
         ? notes
         : `${photos.length} photos rejected: ${notes}`,

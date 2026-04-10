@@ -649,8 +649,8 @@ export async function runAnomalyDetection(options: {
         // Frequent fills check
         if (i >= config.frequentFillCount - 1) {
           const recentFills = transactions.slice(Math.max(0, i - config.frequentFillCount + 1), i + 1);
-          const firstDate = new Date(recentFills[0].transaction_date);
-          const lastDate = new Date(recentFills[recentFills.length - 1].transaction_date);
+          const firstDate = new Date(recentFills[0]!.transaction_date);
+          const lastDate = new Date(recentFills[recentFills.length - 1]!.transaction_date);
           const daysDiff = (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24);
 
           if (daysDiff <= config.frequentFillDays) {
@@ -663,8 +663,8 @@ export async function runAnomalyDetection(options: {
               evidence: {
                 fillCount: config.frequentFillCount,
                 days: daysDiff,
-                firstDate: recentFills[0].transaction_date,
-                lastDate: recentFills[recentFills.length - 1].transaction_date,
+                firstDate: recentFills[0]!.transaction_date,
+                lastDate: recentFills[recentFills.length - 1]!.transaction_date,
               },
               suggestedAction: 'Review fill pattern and verify legitimate usage',
             });

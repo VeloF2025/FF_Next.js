@@ -142,7 +142,7 @@ export async function isAlertSuppressed(serviceId: string): Promise<{
   if (result.rows.length > 0) {
     return {
       suppressed: true,
-      reason: result.rows[0].reason,
+      reason: result.rows[0]!.reason,
     };
   }
 
@@ -172,7 +172,7 @@ export async function isDuplicateAlert(
     [serviceId, issueType, windowStart]
   );
 
-  return parseInt(result.rows[0].count, 10) > 0;
+  return parseInt(result.rows[0]!.count, 10) > 0;
 }
 
 /**
@@ -350,8 +350,8 @@ export async function sendWhatsAppAlert(details: AlertDetails): Promise<AlertRes
     );
 
     if (actionResult.rows.length > 0) {
-      serviceName = actionResult.rows[0].name;
-      serviceId = actionResult.rows[0].id;
+      serviceName = actionResult.rows[0]!.name;
+      serviceId = actionResult.rows[0]!.id;
     }
   }
 
@@ -541,7 +541,7 @@ export async function getPendingCount(): Promise<number> {
     WHERE status = 'pending'
   `);
 
-  return parseInt(result.rows[0].count, 10);
+  return parseInt(result.rows[0]!.count, 10);
 }
 
 /**
