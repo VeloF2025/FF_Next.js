@@ -272,7 +272,7 @@ export async function extractSerialsFromWaPhoto(
         const rotatedBuffer = await sharp(imgBuffer).rotate(180).jpeg({ quality: 85 }).toBuffer();
         const rotatedBase64 = rotatedBuffer.toString("base64");
         const rotResult = await callVlmExtraction<{ upsSerial: { found: boolean; serial: string | null; confidence: number } }>(rotatedBase64, `Extract ONLY the UPS serial. Format: GU18W12V + 10 digits = EXACTLY 18 chars. Return JSON: {"upsSerial":{"found":true,"serial":"...","confidence":0.95}}`, "WA UPS retry rotated");
-        if (rotResult.success \&\& rotResult.data?.upsSerial?.found \&\& rotResult.data.upsSerial.serial) {
+        if (rotResult.success && rotResult.data?.upsSerial?.found && rotResult.data.upsSerial.serial) {
           const rn = rotResult.data.upsSerial.serial.trim().toUpperCase().replace(/[\s-]/g, "");
           if (isValidUpsSerial(rn)) { finalUps = rn; upsConfidence = rotResult.data.upsSerial.confidence; vlmLogger.info(`UPS recovered via rotation: ${finalUps}`); }
         }
