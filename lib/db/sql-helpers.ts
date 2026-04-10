@@ -72,7 +72,7 @@ export async function getById<T>(table: string, id: string): Promise<SingleResul
     WHERE id = ${id}
     LIMIT 1
   `;
-  return result[0] as T || null;
+  return (result as Record<string, unknown>[])[0] as T || null;
 }
 
 export async function deleteById(table: string, id: string): Promise<boolean> {
@@ -100,7 +100,7 @@ export async function count(table: string, filters?: FilterOptions): Promise<num
 
   const values = filters ? Object.values(filters).filter(v => v !== undefined && v !== null) : [];
   const result = await sql(query, values);
-  return result[0]?.count || 0;
+  return (result as any[])[0]?.count || 0;
 }
 
 // ============================================
@@ -127,7 +127,7 @@ export async function getClientById(id: string): Promise<SingleResult<Client>> {
     WHERE id = ${id} 
     LIMIT 1
   `;
-  return result[0] as Client || null;
+  return (result as any[])[0] as Client || null;
 }
 
 export async function createClient(client: Partial<Client>): Promise<Client> {
@@ -148,7 +148,7 @@ export async function createClient(client: Partial<Client>): Promise<Client> {
     )
     RETURNING *
   `;
-  return result[0] as Client;
+  return (result as any[])[0] as Client;
 }
 
 export async function updateClient(id: string, updates: Partial<Client>): Promise<SingleResult<Client>> {
@@ -166,7 +166,7 @@ export async function updateClient(id: string, updates: Partial<Client>): Promis
   `;
 
   const result = await sql(query, values);
-  return result[0] as Client || null;
+  return (result as any[])[0] as Client || null;
 }
 
 // ============================================
@@ -191,7 +191,7 @@ export async function getProjectById(id: string): Promise<SingleResult<Project>>
     WHERE id = ${id} 
     LIMIT 1
   `;
-  return result[0] as Project || null;
+  return (result as any[])[0] as Project || null;
 }
 
 export async function getProjectsByClientId(clientId: string): Promise<QueryResult<Project>> {
@@ -219,7 +219,7 @@ export async function createProject(project: Partial<Project>): Promise<Project>
     )
     RETURNING *
   `;
-  return result[0] as Project;
+  return (result as any[])[0] as Project;
 }
 
 export async function updateProject(id: string, updates: Partial<Project>): Promise<SingleResult<Project>> {
@@ -237,7 +237,7 @@ export async function updateProject(id: string, updates: Partial<Project>): Prom
   `;
 
   const result = await sql(query, values);
-  return result[0] as Project || null;
+  return (result as any[])[0] as Project || null;
 }
 
 // ============================================
@@ -263,7 +263,7 @@ export async function getStaffById(id: string): Promise<SingleResult<Staff>> {
     WHERE id = ${id} 
     LIMIT 1
   `;
-  return result[0] as Staff || null;
+  return (result as any[])[0] as Staff || null;
 }
 
 export async function getStaffByDepartment(department: string): Promise<QueryResult<Staff>> {
@@ -291,7 +291,7 @@ export async function createStaff(staff: Partial<Staff>): Promise<Staff> {
     )
     RETURNING *
   `;
-  return result[0] as Staff;
+  return (result as any[])[0] as Staff;
 }
 
 // ============================================
@@ -363,7 +363,7 @@ export async function getContractorById(id: string): Promise<SingleResult<Contra
     WHERE id = ${id} 
     LIMIT 1
   `;
-  return result[0] as Contractor || null;
+  return (result as any[])[0] as Contractor || null;
 }
 
 export async function getContractorsByRAGStatus(ragStatus: string): Promise<QueryResult<Contractor>> {

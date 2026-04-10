@@ -40,7 +40,7 @@ async function handleGet(res: NextApiResponse, projectId: string) {
       SELECT id, project_name, pipeline_project_id
       FROM projects
       WHERE id = ${projectId}
-    `;
+    ` as any[];
 
     if (projectResult.length === 0) {
       return apiResponse.notFound(res, 'Project', projectId);
@@ -53,7 +53,7 @@ async function handleGet(res: NextApiResponse, projectId: string) {
       SELECT pipeline_project_id FROM project_pipeline_links
       WHERE project_id = ${projectId} AND is_primary = true
       LIMIT 1
-    `;
+    ` as any[];
 
     // Use junction table if available, fall back to legacy column
     let pipelineProjectId: string | null = null;
@@ -162,7 +162,7 @@ async function handlePost(
       SELECT id, pipeline_project_id
       FROM projects
       WHERE id = ${projectId}
-    `;
+    ` as any[];
 
     if (projectResult.length === 0) {
       return apiResponse.notFound(res, 'Project', projectId);
@@ -175,7 +175,7 @@ async function handlePost(
       SELECT pipeline_project_id FROM project_pipeline_links
       WHERE project_id = ${projectId} AND is_primary = true
       LIMIT 1
-    `;
+    ` as any[];
 
     // Use junction table if available, fall back to legacy column
     let pipelineProjectId: string | null = null;
@@ -192,7 +192,7 @@ async function handlePost(
     // Verify the approval type is a wayleave type
     const typeResult = await sql`
       SELECT id, category FROM pipeline_approval_types WHERE id = ${approval_type_id}
-    `;
+    ` as any[];
 
     if (typeResult.length === 0) {
       return apiResponse.notFound(res, 'Approval type', approval_type_id);

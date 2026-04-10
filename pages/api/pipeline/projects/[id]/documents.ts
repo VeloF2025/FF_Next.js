@@ -212,7 +212,7 @@ async function handlePatch(
         AND pipeline_project_id = ${projectId}
         AND is_active = true
       RETURNING id, is_required
-    `;
+    ` as any[];
 
     if (result.length === 0) {
       return apiResponse.notFound(res, 'Document', docId);
@@ -243,7 +243,7 @@ async function handleDelete(
       WHERE id = ${docId}
         AND pipeline_project_id = ${projectId}
       RETURNING id
-    `;
+    ` as any[];
 
     if (result.length === 0) {
       return apiResponse.notFound(res, 'Document', docId);

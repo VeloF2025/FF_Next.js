@@ -103,7 +103,7 @@ async function handlePatch(
     const existingLink = await sql`
       SELECT id, pipeline_project_id, is_primary FROM project_pipeline_links
       WHERE id = ${linkId} AND project_id = ${projectId}
-    `;
+    ` as any[];
 
     if (existingLink.length === 0) {
       return apiResponse.notFound(res, 'Pipeline link', linkId);
@@ -117,14 +117,14 @@ async function handlePatch(
         UPDATE project_pipeline_links
         SET is_primary = false, updated_at = NOW()
         WHERE project_id = ${projectId} AND is_primary = true AND id != ${linkId}
-      `;
+      ` as any[];
 
       // Update legacy column for backward compatibility
       await sql`
         UPDATE projects
         SET pipeline_project_id = ${currentLink.pipeline_project_id}
         WHERE id = ${projectId}
-      `;
+      ` as any[];
     }
 
     // Update the link
@@ -135,7 +135,7 @@ async function handlePatch(
         link_order = COALESCE(${link_order}, link_order),
         updated_at = NOW()
       WHERE id = ${linkId}
-    `;
+    ` as any[];
 
     // Fetch with joined details
     const link = await sql`
@@ -179,7 +179,7 @@ async function handleDelete(
     const existingLink = await sql`
       SELECT id, is_primary, pipeline_project_id FROM project_pipeline_links
       WHERE id = ${linkId} AND project_id = ${projectId}
-    `;
+    ` as any[];
 
     if (existingLink.length === 0) {
       return apiResponse.notFound(res, 'Pipeline link', linkId);
@@ -191,7 +191,7 @@ async function handleDelete(
     // Delete the link
     await sql`
       DELETE FROM project_pipeline_links WHERE id = ${linkId}
-    `;
+    ` as any[];
 
     // If this was the primary link, set another link as primary (if any exist)
     if (wasPrimary) {
@@ -200,7 +200,7 @@ async function handleDelete(
         WHERE project_id = ${projectId}
         ORDER BY link_order ASC, linked_at ASC
         LIMIT 1
-      `;
+      ` as any[];
 
       if (remainingLinks.length > 0) {
         const newPrimaryId = (remainingLinks[0] as { id: string }).id;
@@ -209,19 +209,19 @@ async function handleDelete(
           SET is_primary = true, updated_at = NOW()
           WHERE id = ${newPrimaryId}
           RETURNING pipeline_project_id
-        `;
+        ` as any[];
 
         // Update legacy column
         await sql`
           UPDATE projects
           SET pipeline_project_id = ${(newPrimary[0] as { pipeline_project_id: string }).pipeline_project_id}
           WHERE id = ${projectId}
-        `;
+        ` as any[];
       } else {
         // No links remaining, clear legacy column
         await sql`
           UPDATE projects SET pipeline_project_id = NULL WHERE id = ${projectId}
-        `;
+        ` as any[];
       }
     }
 

@@ -58,7 +58,7 @@ async function handleGet(res: NextApiResponse, projectId: string) {
     // Verify project exists
     const projectResult = await sql`
       SELECT id, project_name FROM projects WHERE id = ${projectId}
-    `;
+    ` as any[];
 
     if (projectResult.length === 0) {
       return apiResponse.notFound(res, 'Project', projectId);
@@ -124,7 +124,7 @@ async function handlePost(
     if (userId) {
       const staffResult = await sql`
         SELECT id FROM staff WHERE user_id = ${userId} LIMIT 1
-      `;
+      ` as any[];
       staffId = staffResult.length > 0 ? (staffResult[0] as { id: string }).id : null;
     }
 
@@ -135,7 +135,7 @@ async function handlePost(
     // Verify project exists
     const projectResult = await sql`
       SELECT id, project_name FROM projects WHERE id = ${projectId}
-    `;
+    ` as any[];
 
     if (projectResult.length === 0) {
       return apiResponse.notFound(res, 'Project', projectId);
@@ -146,7 +146,7 @@ async function handlePost(
       SELECT id, project_name, pipeline_status
       FROM pipeline_projects
       WHERE id = ${pipeline_project_id} AND is_deleted = false
-    `;
+    ` as any[];
 
     if (pipelineResult.length === 0) {
       return apiResponse.notFound(res, 'Pipeline project', pipeline_project_id);
@@ -156,7 +156,7 @@ async function handlePost(
     const existingLink = await sql`
       SELECT id FROM project_pipeline_links
       WHERE project_id = ${projectId} AND pipeline_project_id = ${pipeline_project_id}
-    `;
+    ` as any[];
 
     if (existingLink.length > 0) {
       return apiResponse.conflict(res, 'This pipeline project is already linked');
@@ -168,7 +168,7 @@ async function handlePost(
         UPDATE project_pipeline_links
         SET is_primary = false, updated_at = NOW()
         WHERE project_id = ${projectId} AND is_primary = true
-      `;
+      ` as any[];
     }
 
     // Get max link_order for this project
@@ -176,13 +176,13 @@ async function handlePost(
       SELECT COALESCE(MAX(link_order), -1) + 1 as next_order
       FROM project_pipeline_links
       WHERE project_id = ${projectId}
-    `;
+    ` as any[];
     const linkOrder = (orderResult[0] as { next_order: number }).next_order;
 
     // Check if this is the first link (should be primary by default)
     const existingLinks = await sql`
       SELECT COUNT(*) as count FROM project_pipeline_links WHERE project_id = ${projectId}
-    `;
+    ` as any[];
     const isFirstLink = (existingLinks[0] as { count: string }).count === '0';
     const shouldBePrimary = is_primary || isFirstLink;
 
@@ -214,7 +214,7 @@ async function handlePost(
         UPDATE projects
         SET pipeline_project_id = ${pipeline_project_id}
         WHERE id = ${projectId}
-      `;
+      ` as any[];
     }
 
     // Fetch with joined pipeline details
@@ -228,7 +228,7 @@ async function handlePost(
       FROM project_pipeline_links ppl
       JOIN pipeline_projects pp ON pp.id = ppl.pipeline_project_id
       WHERE ppl.id = ${(result[0] as { id: string }).id}
-    `;
+    ` as any[];
 
     log.info('Created pipeline link', {
       projectId,

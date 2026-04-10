@@ -56,7 +56,7 @@ export function TemplateUsageChart({ templateUsage }: TemplateUsageChartProps) {
                   index === 3 ? 'bg-orange-500' : 'bg-gray-500'
                 }`}
                 style={{
-                  width: `${Math.min(100, (template.projectCount / templateUsage[0]?.projectCount) * 100)}%`
+                  width: `${Math.min(100, (template.projectCount / templateUsage[0]!.projectCount) * 100)}%`
                 }}
               />
             </div>

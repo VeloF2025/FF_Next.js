@@ -44,7 +44,7 @@ async function handleGet(res: NextApiResponse, projectId: string, approvalId: st
     // Verify project exists and get pipeline link
     const projectResult = await sql`
       SELECT id, pipeline_project_id FROM projects WHERE id = ${projectId}
-    `;
+    ` as any[];
 
     if (projectResult.length === 0) {
       return apiResponse.notFound(res, 'Project', projectId);
@@ -100,7 +100,7 @@ async function handlePut(
     // Verify project exists and get pipeline link
     const projectResult = await sql`
       SELECT id, pipeline_project_id FROM projects WHERE id = ${projectId}
-    `;
+    ` as any[];
 
     if (projectResult.length === 0) {
       return apiResponse.notFound(res, 'Project', projectId);
@@ -120,7 +120,7 @@ async function handlePut(
       WHERE a.id = ${approvalId}
         AND a.pipeline_project_id = ${project.pipeline_project_id}
         AND t.category = 'wayleave'
-    `;
+    ` as any[];
 
     if (existing.length === 0) {
       return apiResponse.notFound(res, 'Wayleave approval', approvalId);
@@ -235,7 +235,7 @@ async function handleDelete(
     // Verify project exists and get pipeline link
     const projectResult = await sql`
       SELECT id, pipeline_project_id FROM projects WHERE id = ${projectId}
-    `;
+    ` as any[];
 
     if (projectResult.length === 0) {
       return apiResponse.notFound(res, 'Project', projectId);
@@ -255,7 +255,7 @@ async function handleDelete(
       WHERE a.id = ${approvalId}
         AND a.pipeline_project_id = ${project.pipeline_project_id}
         AND t.category = 'wayleave'
-    `;
+    ` as any[];
 
     if (existing.length === 0) {
       return apiResponse.notFound(res, 'Wayleave approval', approvalId);
@@ -271,7 +271,7 @@ async function handleDelete(
     await sql`
       DELETE FROM pipeline_project_approvals
       WHERE id = ${approvalId}
-    `;
+    ` as any[];
 
     log.info('Deleted wayleave approval', {
       projectId,

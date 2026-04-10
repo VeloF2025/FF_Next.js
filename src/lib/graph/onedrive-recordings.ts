@@ -184,7 +184,7 @@ export async function scrapeOneDriveRecordings(
         // Check if already scraped
         const existing = await sql`
           SELECT id FROM meetings WHERE onedrive_item_id = ${item.id}
-        `;
+        ` as any[];
         if (existing.length > 0) {
           result.alreadyProcessed++;
           continue;
@@ -209,7 +209,7 @@ export async function scrapeOneDriveRecordings(
               AND onedrive_item_id IS NULL
             ORDER BY ABS(EXTRACT(EPOCH FROM (meeting_date - ${recordingDate.toISOString()}::timestamptz)))
             LIMIT 1
-          `;
+          ` as any[];
 
           let meetingId: number;
 
@@ -258,7 +258,7 @@ export async function scrapeOneDriveRecordings(
                   onedrive_item_id = ${item.id},
                   updated_at = NOW()
               WHERE id = ${meetingId}
-            `;
+            ` as any[];
             result.newDownloads++;
             log.info('Recording downloaded', {
               meetingId, filePath, sizeMB: (sizeBytes / 1024 / 1024).toFixed(1),
@@ -273,23 +273,23 @@ export async function scrapeOneDriveRecordings(
                   onedrive_item_id = ${item.id},
                   updated_at = NOW()
               WHERE id = ${meetingId}
-            `;
+            ` as any[];
           }
 
           // Run LLM enrichment if not already done
           const meetingRow = await sql`
             SELECT processing_status FROM meetings WHERE id = ${meetingId}
-          `;
+          ` as any[];
           if (meetingRow[0]?.processing_status !== 'completed') {
             try {
-              await sql`UPDATE meetings SET processing_status = 'processing', updated_at = NOW() WHERE id = ${meetingId}`;
+              await sql`UPDATE meetings SET processing_status = 'processing', updated_at = NOW() WHERE id = ${meetingId}` as any[];
               await processWithLLM(meetingId);
-              await sql`UPDATE meetings SET processing_status = 'completed', processed_at = NOW(), updated_at = NOW() WHERE id = ${meetingId}`;
+              await sql`UPDATE meetings SET processing_status = 'completed', processed_at = NOW(), updated_at = NOW() WHERE id = ${meetingId}` as any[];
               result.enriched++;
             } catch (llmErr: unknown) {
               const msg = llmErr instanceof Error ? llmErr.message : String(llmErr);
               log.warn('LLM enrichment failed', { meetingId, error: msg }, LOGGER);
-              await sql`UPDATE meetings SET processing_status = 'failed', processing_error = ${msg}, updated_at = NOW() WHERE id = ${meetingId}`;
+              await sql`UPDATE meetings SET processing_status = 'failed', processing_error = ${msg}, updated_at = NOW() WHERE id = ${meetingId}` as any[];
             }
           }
 
