@@ -590,7 +590,7 @@ export async function processWhatsAppResponse(
     return { success: false, error: 'Approval not found or already processed' };
   }
 
-  const item = result.rows[0];
+  const item = result.rows[0]!;
 
   // Check expiry
   if (new Date(item.token_expires_at) < new Date()) {

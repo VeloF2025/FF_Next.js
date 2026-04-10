@@ -537,7 +537,7 @@ export default function BOQDetailPage() {
     );
   }
 
-  const status = statusConfig[boq.status] || statusConfig.draft;
+  const status = (statusConfig[boq.status] || statusConfig.draft)!;
   const StatusIcon = status.icon;
   const hiddenCount = items.length - displayItems.length;
 
@@ -1077,7 +1077,7 @@ export default function BOQDetailPage() {
                   <div className="divide-y divide-[var(--ff-border-light)]">
                     {versions.map((v) => {
                       const isCurrent = v.id === boq.id;
-                      const vStatus = statusConfig[v.status] || statusConfig.draft;
+                      const vStatus = (statusConfig[v.status] || statusConfig.draft)!;
                       return (
                         <div key={v.id} className={`px-6 py-4 ${isCurrent ? 'bg-blue-500/5' : ''}`}>
                           <div className="flex items-center justify-between">

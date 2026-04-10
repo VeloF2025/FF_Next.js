@@ -90,7 +90,7 @@ export async function validateSerial(
     };
   }
 
-  const serial = serials[0];
+  const serial = serials[0]!; // Guaranteed by length check above
 
   // Check if already installed
   if (serial.status === 'installed') {

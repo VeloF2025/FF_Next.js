@@ -439,7 +439,15 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
   );
 }
 
-/** Fetches and displays photo attachments for a ticket on the Overview tab */
+/** Classify a photo as before/after based on filename conventions */
+function classifyPhoto(filename: string): 'before' | 'after' | 'other' {
+  const lower = (filename ?? '').toLowerCase();
+  if (lower.includes('before') || lower.includes('snag-before')) return 'before';
+  if (lower.includes('after') || lower.includes('snag-after') || lower.includes('fix')) return 'after';
+  return 'other';
+}
+
+/** Fetches and displays Before / After photo comparison for a ticket on the Overview tab */
 function BeforePhoto({ ticketId }: { ticketId: string }) {
   const [photos, setPhotos] = useState<Array<{ id: string; filename: string; storage_url: string }>>([]);
 
@@ -464,31 +472,84 @@ function BeforePhoto({ ticketId }: { ticketId: string }) {
 
   if (photos.length === 0) return null;
 
+  const beforePhotos = photos.filter((p) => classifyPhoto(p.filename) === 'before');
+  const afterPhotos = photos.filter((p) => classifyPhoto(p.filename) === 'after');
+  const otherPhotos = photos.filter((p) => classifyPhoto(p.filename) === 'other');
+
+  // If no clear before/after split, treat first photos as before
+  const displayBefore = beforePhotos.length > 0 ? beforePhotos : (otherPhotos.length > 0 ? otherPhotos : photos);
+  const displayAfter = afterPhotos;
+
   return (
     <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
       <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-3">
         Photo Evidence
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {photos.map((photo) => (
-          <a
-            key={photo.id}
-            href={photo.storage_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block overflow-hidden rounded-lg border border-[var(--ff-border-light)] hover:border-blue-500/50 transition-colors"
-          >
-            <img
-              src={photo.storage_url}
-              alt={photo.filename}
-              className="w-full h-48 object-cover"
-              loading="lazy"
-            />
-            <div className="px-3 py-2 bg-[var(--ff-bg-tertiary)]">
-              <span className="text-xs text-[var(--ff-text-secondary)]">{photo.filename}</span>
+        {/* BEFORE column */}
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-red-400 bg-red-500/10 px-2 py-0.5 rounded">
+              Before
+            </span>
+          </div>
+          {displayBefore.length > 0 ? displayBefore.map((photo) => (
+            <a
+              key={photo.id}
+              href={photo.storage_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block overflow-hidden rounded-lg border-2 border-red-500/30 hover:border-red-500/60 transition-colors mb-2"
+            >
+              <img
+                src={photo.storage_url}
+                alt={photo.filename}
+                className="w-full h-48 object-cover"
+                loading="lazy"
+              />
+              <div className="px-3 py-2 bg-[var(--ff-bg-tertiary)]">
+                <span className="text-xs text-[var(--ff-text-secondary)]">{photo.filename}</span>
+              </div>
+            </a>
+          )) : (
+            <div className="h-48 rounded-lg border-2 border-dashed border-zinc-700 flex items-center justify-center">
+              <span className="text-xs text-zinc-500">No before photo</span>
             </div>
-          </a>
-        ))}
+          )}
+        </div>
+
+        {/* AFTER column */}
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-green-400 bg-green-500/10 px-2 py-0.5 rounded">
+              After
+            </span>
+          </div>
+          {displayAfter.length > 0 ? displayAfter.map((photo) => (
+            <a
+              key={photo.id}
+              href={photo.storage_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block overflow-hidden rounded-lg border-2 border-green-500/30 hover:border-green-500/60 transition-colors mb-2"
+            >
+              <img
+                src={photo.storage_url}
+                alt={photo.filename}
+                className="w-full h-48 object-cover"
+                loading="lazy"
+              />
+              <div className="px-3 py-2 bg-[var(--ff-bg-tertiary)]">
+                <span className="text-xs text-[var(--ff-text-secondary)]">{photo.filename}</span>
+              </div>
+            </a>
+          )) : (
+            <div className="h-48 rounded-lg border-2 border-dashed border-zinc-700 flex flex-col items-center justify-center gap-2">
+              <span className="text-xs text-zinc-500">No after photo yet</span>
+              <span className="text-[10px] text-zinc-600">Upload via Attachments tab or Verification step</span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

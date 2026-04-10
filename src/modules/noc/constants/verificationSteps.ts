@@ -655,6 +655,48 @@ export const VERIFICATION_STEPS_BY_TICKET_TYPE: Record<string, VerificationStepT
   hse_incident: HSE_INCIDENT_STEPS,
   hse_near_miss: HSE_NEAR_MISS_STEPS,
   dev_ops: DEV_OPS_STEPS,
+  snag: [
+    {
+      step_number: 1,
+      step_name: 'Assess Snag',
+      step_description: 'Visit site and assess the reported snag. Confirm the issue matches the description and before photo.',
+      photo_required: false,
+      required_for_qa: true,
+      category: 'preparation',
+    },
+    {
+      step_number: 2,
+      step_name: 'Perform Rectification',
+      step_description: 'Complete the repair or corrective work as required. Follow quality standards.',
+      photo_required: false,
+      required_for_qa: true,
+      category: 'installation',
+    },
+    {
+      step_number: 3,
+      step_name: 'After Photo (Proof of Fix)',
+      step_description: 'Upload an after photo showing the completed rectification. This photo will be used in the closeout report to the client. Take from the same angle as the before photo.',
+      photo_required: true,
+      required_for_qa: true,
+      category: 'documentation',
+    },
+    {
+      step_number: 4,
+      step_name: 'Quality Check',
+      step_description: 'Verify the fix meets quality standards. Ensure no new issues were introduced.',
+      photo_required: false,
+      required_for_qa: true,
+      category: 'testing',
+    },
+    {
+      step_number: 5,
+      step_name: 'Documentation & Sign-off',
+      step_description: 'Add notes describing the work done. Record materials used if applicable.',
+      photo_required: false,
+      required_for_qa: true,
+      category: 'documentation',
+    },
+  ],
 };
 
 /**

@@ -66,7 +66,7 @@ async function handleGet(id: string, res: NextApiResponse) {
       WHERE supplier_id = ${parseInt(id)}
     `;
 
-    const statistics = avgResult[0];
+    const statistics = avgResult[0]!;
 
     return res.status(200).json({
       success: true,

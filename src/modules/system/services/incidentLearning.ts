@@ -619,7 +619,7 @@ export async function applySuggestion(
     throw new Error('Suggestion not found or already processed');
   }
 
-  const s = suggestion.rows[0];
+  const s = suggestion.rows[0]!; // Guaranteed by length check above
 
   // Update action risk level
   await serviceRegistry.updateActionRiskLevel(s.action_id, s.suggested_level);
@@ -1004,7 +1004,7 @@ export async function getImprovingActions(): Promise<ActionTrend[]> {
   `);
 
   return result.rows
-    .filter((r) => r.previousRate !== null && r.currentRate > r.previousRate)
+    .filter((r) => r.previousRate !== null && r.currentRate > r.previousRate!)
     .map((r) => ({
       actionId: r.actionId,
       actionName: r.actionName,
@@ -1044,7 +1044,7 @@ export async function getDecliningActions(): Promise<ActionTrend[]> {
   `);
 
   return result.rows
-    .filter((r) => r.previousRate !== null && r.currentRate < r.previousRate)
+    .filter((r) => r.previousRate !== null && r.currentRate < r.previousRate!)
     .map((r) => ({
       actionId: r.actionId,
       actionName: r.actionName,
