@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/router';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { Pin, X, Calendar, Loader2 } from 'lucide-react';
 import { log } from '@/lib/logger';
 import { cn } from '@/utils/cn';
@@ -11,7 +11,8 @@ interface PinButtonProps {
 }
 
 export function PinButton({ className }: PinButtonProps) {
-  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [isPinned, setIsPinned] = useState(false);
   const [showPopover, setShowPopover] = useState(false);
   const [label, setLabel] = useState('');
@@ -20,7 +21,8 @@ export function PinButton({ className }: PinButtonProps) {
   const [loading, setLoading] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  const currentRoute = router.asPath;
+  const search = searchParams?.toString();
+  const currentRoute = search ? `${pathname}?${search}` : (pathname || '/');
   const isDashboard = currentRoute === '/dashboard' || currentRoute === '/';
 
   // Check if current route is pinned
