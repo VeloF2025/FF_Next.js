@@ -94,7 +94,7 @@ WARN_DISTANCE_M = 25
 
 # VLM config (Qwen3-VL on Velocity)
 VLM_URL = "http://100.96.203.105:8100"
-VLM_MODEL = "Qwen/Qwen3-VL-8B-Instruct"
+VLM_MODEL = "QuantTrio/Qwen3-VL-32B-Instruct-AWQ"
 VLM_MAX_DIM = 1024  # Max image dimension for VLM token budget
 
 

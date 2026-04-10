@@ -37,7 +37,7 @@ async function testVlm(imagePath: string, prompt: string, label: string) {
   const base64Resized = await resizeImageForVlm(base64Original);
   
   const requestBody = {
-    model: 'Qwen/Qwen3-VL-8B-Instruct',
+    model: 'QuantTrio/Qwen3-VL-32B-Instruct-AWQ',
     messages: [{
       role: 'user',
       content: [

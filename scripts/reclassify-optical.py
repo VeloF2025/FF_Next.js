@@ -28,7 +28,7 @@ from PIL import Image
 
 DB_URL = os.environ.get("DATABASE_URL", "")
 VLM_URL = "http://100.96.203.105:8100"
-VLM_MODEL = "Qwen/Qwen3-VL-8B-Instruct"
+VLM_MODEL = "QuantTrio/Qwen3-VL-32B-Instruct-AWQ"
 BASE = "/home/velo/storage/qa-photos"
 MAX_IMAGE_DIM = 512
 CONFIDENCE_THRESHOLD = 0.70

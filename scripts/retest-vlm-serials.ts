@@ -35,7 +35,7 @@ const SINCE = sinceArg || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOSt
 // VLM config
 const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
 const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
-const VLM_MODEL = process.env.VLM_EXTRACTION_MODEL || 'Qwen/Qwen3-VL-8B-Instruct';
+const VLM_MODEL = process.env.VLM_EXTRACTION_MODEL || 'QuantTrio/Qwen3-VL-32B-Instruct-AWQ';
 
 // Import the prompts and helpers inline (can't import from TS modules easily in scripts)
 // We'll call the VLM directly with the same prompts from vlmExtractionService.ts

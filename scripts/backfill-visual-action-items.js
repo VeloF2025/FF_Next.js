@@ -30,7 +30,7 @@ const meetingIdx = args.indexOf('--meeting-id');
 const MEETING_ID = meetingIdx >= 0 ? parseInt(args[meetingIdx + 1], 10) : null;
 
 const VLM_URL = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
-const VLM_MODEL = 'Qwen/Qwen3-VL-8B-Instruct';
+const VLM_MODEL = 'QuantTrio/Qwen3-VL-32B-Instruct-AWQ';
 const INTERVAL_SEC = 10;
 const DIFF_THRESHOLD = 5;
 const MAX_FRAMES = 100;
