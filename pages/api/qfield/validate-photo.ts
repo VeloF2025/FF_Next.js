@@ -11,12 +11,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { VLM_CHAT_ENDPOINT, VLM_MODEL, VLM_TIMEOUT_REALTIME } from '@/lib/vlm';
 
 // VLM service configuration
-const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
-const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
-const VLM_MODEL = process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ';
-const VLM_TIMEOUT_MS = 30000; // 30 seconds for real-time use
 
 // API key for QField plugin — required env var, no fallback
 const QFIELD_API_KEY = process.env.QFIELD_PLUGIN_API_KEY;
@@ -189,7 +186,7 @@ export default async function handler(
     const prompt = VALIDATION_PROMPTS[workType] || VALIDATION_PROMPTS.general;
 
     // Call VLM service
-    const vlmResponse = await fetch(VLM_API_ENDPOINT, {
+    const vlmResponse = await fetch(VLM_CHAT_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -212,7 +209,7 @@ export default async function handler(
         max_tokens: 400,
         temperature: 0.1,
       }),
-      signal: AbortSignal.timeout(VLM_TIMEOUT_MS),
+      signal: AbortSignal.timeout(VLM_TIMEOUT_REALTIME),
     });
 
     if (!vlmResponse.ok) {

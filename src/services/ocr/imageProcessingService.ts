@@ -22,7 +22,6 @@ const MAX_IMAGE_WIDTH = 1280;
 const MAX_IMAGE_HEIGHT = 960;
 
 /** VLM endpoint — shared with vlmExtractionService */
-const VLLM_ENDPOINT = VLM_API_URL;
 
 /**
  * Detect whether an image needs rotation using the VLM.
@@ -40,7 +39,7 @@ Answer with ONLY one of these options:
 Return ONLY the number, nothing else.`;
 
   try {
-    const response = await fetch(`${VLLM_ENDPOINT}/v1/chat/completions`, {
+    const response = await fetch(`${VLM_API_URL}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

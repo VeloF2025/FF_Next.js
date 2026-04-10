@@ -26,16 +26,12 @@ import {
   buildPositiveExamplesPromptSection,
   hasConfirmedCorrect,
 } from '@/modules/qa-learning';
+import { VLM_CHAT_ENDPOINT, VLM_CATEGORIZATION_MODEL, VLM_TIMEOUT_BATCH, VLM_BATCH_SIZE, VLM_MAX_TOKENS_CATEGORIZATION, VLM_TEMPERATURE } from '@/lib/vlm';
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
 
-const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
-const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
-const VLM_MODEL = process.env.VLM_CATEGORIZATION_MODEL || process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ';
-const VLM_TIMEOUT_MS = 180000; // 3 minutes per batch
-const VLM_MAX_BATCH_SIZE = 6; // Max photos per VLM call (token limit)
 const VLM_TEMPERATURE = 0.1; // Low for consistent categorization
 
 // ============================================================================
@@ -228,7 +224,7 @@ async function callVlmForCategorization(
   const prompt = buildCategorizationPrompt(photos.length, drNumber, fewShotExamples, positiveExamples);
 
   const requestBody = {
-    model: VLM_MODEL,
+    model: VLM_CATEGORIZATION_MODEL,
     messages: [
       {
         role: 'user',
@@ -246,17 +242,17 @@ async function callVlmForCategorization(
         ],
       },
     ],
-    max_tokens: 4000,
+    max_tokens: VLM_MAX_TOKENS_CATEGORIZATION,
     temperature: VLM_TEMPERATURE,
   };
 
-  log.info(`Calling ${VLM_MODEL} for ${drNumber} (${photos.length} photos)...`, undefined, 'CategorizationVlm');
+  log.info(`Calling ${VLM_CATEGORIZATION_MODEL} for ${drNumber} (${photos.length} photos)...`, undefined, 'CategorizationVlm');
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_BATCH);
 
   try {
-    const response = await fetch(VLM_API_ENDPOINT, {
+    const response = await fetch(VLM_CHAT_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -346,7 +342,7 @@ export interface PhotoInput {
 export async function categorizePhotos(
   drNumber: string,
   photos: PhotoInput[],
-  batchSize: number = VLM_MAX_BATCH_SIZE
+  batchSize: number = VLM_BATCH_SIZE
 ): Promise<VlmCategorizationResult[]> {
   const startTime = Date.now();
   const results: VlmCategorizationResult[] = [];

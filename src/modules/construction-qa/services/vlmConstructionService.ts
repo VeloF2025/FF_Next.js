@@ -12,11 +12,10 @@ import { log } from '@/lib/logger';
 import { getChecklist } from '../types/construction.types';
 import type { Discipline, VlmStepResult, VlmOverallResult } from '../types';
 import { recordCorrectExtraction, getVlmFewShotExamples, buildVlmFewShotPrompt } from '@/services/vlmLearningService';
+import { VLM_API_URL, VLM_MODEL, VLM_MAX_TOKENS_OCR } from '@/lib/vlm';
 
 const sql = neon(process.env.DATABASE_URL!);
 const MODULE = 'cqa-vlm';
-const VLM_URL = process.env.VLM_SERVICE_URL || 'http://100.96.203.105:8100';
-const VLM_MODEL = process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ';
 const MAX_IMAGE_DIM = 1024;
 
 interface ValidateOptions {
@@ -266,7 +265,7 @@ async function callVlm(
   stepLabel: string,
 ): Promise<VlmStepResult> {
   try {
-    const response = await fetch(`${VLM_URL}/v1/chat/completions`, {
+    const response = await fetch(`${VLM_API_URL}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -280,7 +279,7 @@ async function callVlm(
             ],
           },
         ],
-        max_tokens: 1024,
+        max_tokens: VLM_MAX_TOKENS_OCR,
         temperature: 0.1,
       }),
     });
@@ -444,7 +443,6 @@ ${fewShotSection ? `\n${fewShotSection}\n` : ''}${classificationBlock}${validati
 
   return base;
 }
-
 
 /**
  * Build a URL for the VLM to access the photo.

@@ -12,6 +12,7 @@ import { log } from '@/lib/logger';
 import sharp from 'sharp';
 import { neon } from '@/lib/db-neon';
 import { VlmAnalysisType } from '../types/check-in.types';
+import { VLM_API_URL as _VLM_URL, VLM_FLEET_MODEL, VLM_TIMEOUT_DEFAULT, VLM_MAX_IMAGE_WIDTH, VLM_MAX_IMAGE_HEIGHT, VLM_JPEG_QUALITY, VLM_MAX_TOKENS_QUICK, VLM_TEMPERATURE, checkVlmHealth } from '@/lib/vlm';
 
 // Database connection for calibration queries
 export const sql = neon(process.env.DATABASE_URL!);
@@ -20,18 +21,8 @@ export const sql = neon(process.env.DATABASE_URL!);
 // CONFIGURATION
 // ============================================================================
 
-export const VLM_API_BASE =
-  process.env.VLM_API_URL || 'http://100.96.203.105:8100';
-export const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
-export const VLM_MODEL =
-  process.env.FLEET_VLM_MODEL || process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ';
-export const VLM_TIMEOUT_MS = 60000; // 1 minute for single image
-
 // Image size limits for VLM processing
 // Large images (4K+) cause token limit errors and incorrect readings
-export const VLM_MAX_WIDTH = 1280;
-export const VLM_MAX_HEIGHT = 960;
-export const VLM_JPEG_QUALITY = 85;
 
 // ============================================================================
 // ERROR CLASS
@@ -69,7 +60,7 @@ export async function resizeImageForVlm(base64Image: string): Promise<string> {
     const height = metadata.height || 0;
     const format = metadata.format || 'unknown';
 
-    const needsResize = width > VLM_MAX_WIDTH || height > VLM_MAX_HEIGHT;
+    const needsResize = width > VLM_MAX_IMAGE_WIDTH || height > VLM_MAX_IMAGE_HEIGHT;
     const needsConvert = format !== 'jpeg' && format !== 'jpg';
 
     if (!needsResize && !needsConvert) {
@@ -87,7 +78,7 @@ export async function resizeImageForVlm(base64Image: string): Promise<string> {
 
     let pipeline = sharp(inputBuffer);
     if (needsResize) {
-      pipeline = pipeline.resize(VLM_MAX_WIDTH, VLM_MAX_HEIGHT, {
+      pipeline = pipeline.resize(VLM_MAX_IMAGE_WIDTH, VLM_MAX_IMAGE_HEIGHT, {
         fit: 'inside',
         withoutEnlargement: true,
       });
@@ -132,7 +123,7 @@ export async function callVlmApi(
   const resizedImage = await resizeImageForVlm(base64Image);
 
   const requestBody = {
-    model: VLM_MODEL,
+    model: VLM_FLEET_MODEL,
     messages: [
       {
         role: 'user',
@@ -147,7 +138,7 @@ export async function callVlmApi(
         ],
       },
     ],
-    max_tokens: 500,
+    max_tokens: VLM_MAX_TOKENS_QUICK,
     temperature: 0.1, // Low temperature for consistent extraction
   };
 
@@ -155,9 +146,9 @@ export async function callVlmApi(
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_MS);
+    const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_DEFAULT);
 
-    const response = await fetch(VLM_API_ENDPOINT, {
+    const response = await fetch(`${_VLM_URL}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody),
@@ -366,11 +357,11 @@ export async function checkFleetVlmHealth(): Promise<boolean> {
 
     const data = await response.json();
     const hasModel = data.data?.some(
-      (m: { id: string }) => m.id === VLM_MODEL || m.id.includes('Qwen')
+      (m: { id: string }) => m.id === VLM_FLEET_MODEL || false /* removed model-specific check */
     );
 
     if (!hasModel) {
-      log.warn('FleetVlmService', `${VLM_MODEL} model not found in vLLM`);
+      log.warn('FleetVlmService', `${VLM_FLEET_MODEL} model not found in vLLM`);
     }
 
     return hasModel;

@@ -14,12 +14,12 @@ import sharp from 'sharp';
 import { withAuth } from '@/lib/auth';
 import { recordCorrectExtraction } from '@/services/vlmLearningService';
 import { apiResponse } from '@/lib/apiResponse';
+import { VLM_API_URL, VLM_CHAT_ENDPOINT, VLM_EXTRACTION_MODEL } from '@/lib/vlm';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('ExtractIdPhotoAPI');
 
 // VLLM endpoint for Qwen3-VL
-const VLLM_ENDPOINT = process.env.VLLM_ENDPOINT || 'http://100.96.203.105:8100';
 const VF_STORAGE_URL = process.env.VF_STORAGE_URL || 'http://100.96.203.105:8091';
 
 interface BoundingBox {
@@ -67,7 +67,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Check if VLLM is available
     let vllmAvailable = false;
     try {
-      const healthCheck = await fetch(`${VLLM_ENDPOINT}/v1/models`, {
+      const healthCheck = await fetch(`${VLM_API_URL}/v1/models`, {
         method: 'GET',
         signal: AbortSignal.timeout(5000),
       });
@@ -207,11 +207,11 @@ Return JSON only:
 
 If no face photo found: {"found": false}`;
 
-  const response = await fetch(`${VLLM_ENDPOINT}/v1/chat/completions`, {
+  const response = await fetch(`${VLM_API_URL}/v1/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ',
+      model: VLM_EXTRACTION_MODEL,
       messages: [
         {
           role: 'user',

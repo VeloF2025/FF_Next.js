@@ -16,14 +16,11 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { execSync } from 'child_process';
 import { recordCorrectExtraction } from '@/services/vlmLearningService';
+import { VLM_CHAT_ENDPOINT, VLM_QA_MODEL, VLM_TIMEOUT_DEFAULT } from '@/lib/vlm';
 
 const sql = neon(process.env.DATABASE_URL!);
 
 // VLM service configuration - use OpenAI-compatible endpoint
-const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
-const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
-const VLM_MODEL = process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ';
-const VLM_TIMEOUT_MS = 60000; // 60 seconds
 const MINIO_BUCKET = process.env.MINIO_BUCKET || 'qfieldcloud-prod';
 
 // Batch processing settings
@@ -238,11 +235,11 @@ async function validatePhoto(photoKey: string, workType: string): Promise<VLMRes
   const prompt = VALIDATION_PROMPTS[workType] || VALIDATION_PROMPTS.pole_installation;
 
   // Call VLM service with OpenAI-compatible format
-  const response = await fetch(VLM_API_ENDPOINT, {
+  const response = await fetch(VLM_CHAT_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: VLM_MODEL,
+      model: VLM_QA_MODEL,
       messages: [
         {
           role: 'user',
@@ -261,7 +258,7 @@ async function validatePhoto(photoKey: string, workType: string): Promise<VLMRes
       max_tokens: 500,
       temperature: 0.1,
     }),
-    signal: AbortSignal.timeout(VLM_TIMEOUT_MS),
+    signal: AbortSignal.timeout(VLM_TIMEOUT_DEFAULT),
   });
 
   if (!response.ok) {

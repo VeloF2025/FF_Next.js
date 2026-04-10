@@ -23,6 +23,7 @@ import {
 import type { VlmAnalysisType } from '@/modules/fleet/types/check-in.types';
 import { withFleetAuth } from '@/lib/auth/middleware';
 import { recordVlmCorrection, recordCorrectExtraction } from '@/services/vlmLearningService';
+import { VLM_FLEET_MODEL } from '@/lib/vlm';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -238,7 +239,7 @@ async function handler(
           ${result.confidence},
           ${result.plateMatches ?? null},
           ${expectedPlate ?? null},
-          ${process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ'},
+          ${VLM_FLEET_MODEL},
           ${result.rawResponse ?? null},
           ${processingTimeMs},
           ${result.error ? 'failed' : 'completed'},
@@ -259,7 +260,7 @@ async function handler(
           sourceTable: 'fleet_check_records',
           vlmExtractedValue: String(result.extractedNumeric ?? result.extractedValue),
           vlmConfidence: result.confidence,
-          vlmModel: process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ',
+          vlmModel: VLM_FLEET_MODEL,
           correctedValue: overrideValue,
           correctionReason: 'human_override',
         }).catch(e => log.warn('FleetVlmApi', `Learning correction record failed (non-critical): ${e}`));

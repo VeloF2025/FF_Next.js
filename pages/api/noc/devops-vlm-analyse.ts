@@ -11,13 +11,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { createLogger } from '@/lib/logger';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import { VLM_CHAT_ENDPOINT, VLM_EXTRACTION_MODEL, VLM_TIMEOUT_DEFAULT, VLM_MAX_TOKENS_ANALYSIS } from '@/lib/vlm';
 
 const logger = createLogger('noc:devops-vlm');
-
-const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
-const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
-const VLM_MODEL = process.env.VLM_EXTRACTION_MODEL || process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ';
-const VLM_TIMEOUT_MS = 60000;
 
 const FIBREFLOW_MODULES = [
   'Dashboard', 'NOC', 'Activate', 'Procurement', 'Accounting',
@@ -82,14 +78,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     logger.info('Analysing DevOps screenshot via VLM');
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_MS);
+    const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_DEFAULT);
 
-    const vlmResponse = await fetch(VLM_API_ENDPOINT, {
+    const vlmResponse = await fetch(VLM_CHAT_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
       body: JSON.stringify({
-        model: VLM_MODEL,
+        model: VLM_EXTRACTION_MODEL,
         messages: [
           {
             role: 'user',
@@ -99,7 +95,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             ],
           },
         ],
-        max_tokens: 2048,
+        max_tokens: VLM_MAX_TOKENS_ANALYSIS,
         temperature: 0.1,
       }),
     });

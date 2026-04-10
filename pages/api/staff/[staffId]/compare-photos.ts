@@ -11,12 +11,12 @@ import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
+import { VLM_API_URL, VLM_CHAT_ENDPOINT, VLM_MODEL } from '@/lib/vlm';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffPhotoCompareAPI');
 
 // VLLM endpoint for Qwen3-VL
-const VLLM_ENDPOINT = process.env.VLLM_ENDPOINT || 'http://100.96.203.105:8100';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -52,7 +52,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Check if VLLM is available (use /v1/models endpoint)
     let vllmAvailable = false;
     try {
-      const healthCheck = await fetch(`${VLLM_ENDPOINT}/v1/models`, {
+      const healthCheck = await fetch(`${VLM_API_URL}/v1/models`, {
         method: 'GET',
         signal: AbortSignal.timeout(5000),
       });
@@ -137,11 +137,11 @@ Provide your response in the following exact JSON format:
 
 Only respond with the JSON, no additional text.`;
 
-  const response = await fetch(`${VLLM_ENDPOINT}/v1/chat/completions`, {
+  const response = await fetch(`${VLM_API_URL}/v1/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ',
+      model: VLM_MODEL,
       messages: [
         {
           role: 'user',

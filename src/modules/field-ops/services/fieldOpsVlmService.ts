@@ -13,10 +13,9 @@
 import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { getVlmFewShotExamples, buildVlmFewShotPrompt } from '@/services/vlmLearningService';
+import { VLM_API_URL, VLM_MODEL, VLM_MAX_TOKENS_QUICK } from '@/lib/vlm';
 
 const logger = createLogger('fieldOpsVlmService');
-const VLM_URL = process.env.VLM_SERVICE_URL || 'http://100.96.203.105:8100';
-const VLM_MODEL = process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ';
 
 function getDb() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL not set');
@@ -132,7 +131,7 @@ async function runVlmAnalysis(photoPath: string, discipline: string): Promise<Vl
   }
 
   try {
-    const response = await fetch(`${VLM_URL}/v1/chat/completions`, {
+    const response = await fetch(`${VLM_API_URL}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -146,7 +145,7 @@ async function runVlmAnalysis(photoPath: string, discipline: string): Promise<Vl
             ],
           },
         ],
-        max_tokens: 512,
+        max_tokens: VLM_MAX_TOKENS_QUICK,
         temperature: 0.1,
       }),
     });

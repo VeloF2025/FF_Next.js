@@ -16,6 +16,7 @@ import {
   optimizeForVlm,
   type BlurDetectionResult,
 } from './imagePreprocessService';
+import { VLM_API_URL as _VLM_API_URL, VLM_CHAT_ENDPOINT as _VLM_ENDPOINT, VLM_EXTRACTION_MODEL as _VLM_MODEL, VLM_TIMEOUT_DEFAULT as _VLM_TIMEOUT, VLM_TEMPERATURE as _VLM_TEMP, VLM_MAX_TOKENS_OCR } from '@/lib/vlm';
 
 // Component logger
 export const vlmLogger = createLogger('VlmExtraction');
@@ -42,11 +43,6 @@ export const ENABLE_BLUR_DETECTION =
 
 export const VLM_API_BASE =
   process.env.VLM_API_URL || 'http://100.96.203.105:8100';
-export const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
-export const VLM_MODEL =
-  process.env.VLM_EXTRACTION_MODEL || process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ';
-export const VLM_TIMEOUT_MS = 60000; // 1 minute per extraction
-export const VLM_TEMPERATURE = 0.1; // Low for consistent extraction
 
 // ============================================================================
 // BASE TYPES
@@ -160,7 +156,7 @@ export async function callVlmExtraction<T>(
         ],
       },
     ],
-    max_tokens: 1000,
+    max_tokens: VLM_MAX_TOKENS_OCR,
     temperature: VLM_TEMPERATURE,
   };
 

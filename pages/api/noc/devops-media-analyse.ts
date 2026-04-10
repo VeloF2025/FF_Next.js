@@ -17,15 +17,13 @@ import formidable from 'formidable';
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
+import { VLM_CHAT_ENDPOINT, VLM_EXTRACTION_MODEL, VLM_MAX_TOKENS_OCR } from '@/lib/vlm';
 
 const logger = createLogger('noc:devops-media');
 
 // Disable Next.js body parser for file uploads
 export const config = { api: { bodyParser: false } };
 
-const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
-const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
-const VLM_MODEL = process.env.VLM_EXTRACTION_MODEL || process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ';
 const MAX_FRAMES = 3;
 const MAX_DIMENSION = 1024;
 
@@ -133,11 +131,11 @@ Describe what you see:
 
 Be specific and concise. Focus on what's wrong.`;
 
-  const response = await fetch(VLM_API_ENDPOINT, {
+  const response = await fetch(VLM_CHAT_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: VLM_MODEL,
+      model: VLM_EXTRACTION_MODEL,
       messages: [{
         role: 'user',
         content: [
@@ -145,7 +143,7 @@ Be specific and concise. Focus on what's wrong.`;
           { type: 'image_url', image_url: { url: frameBase64, detail: 'high' } },
         ],
       }],
-      max_tokens: 1024,
+      max_tokens: VLM_MAX_TOKENS_OCR,
       temperature: 0.1,
     }),
   });
@@ -197,7 +195,7 @@ Return ONLY valid JSON.`;
     body: JSON.stringify({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 1024,
+      max_tokens: VLM_MAX_TOKENS_OCR,
       temperature: 0.1,
     }),
   });

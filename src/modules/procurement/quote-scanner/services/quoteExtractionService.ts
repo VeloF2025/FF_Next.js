@@ -25,16 +25,12 @@ import {
   buildVlmFewShotPrompt,
   recordCorrectExtraction,
 } from '@/services/vlmLearningService';
+import { VLM_CHAT_ENDPOINT, VLM_EXTRACTION_MODEL, VLM_TIMEOUT_DOCUMENT, VLM_MAX_TOKENS_DOCUMENT, VLM_TEMPERATURE } from '@/lib/vlm';
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
 
-const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
-const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
-const VLM_MODEL = process.env.VLM_EXTRACTION_MODEL || process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ';
-const VLM_TIMEOUT_MS = 90000; // 90 seconds for complex documents
-const VLM_TEMPERATURE = 0.1;
 const MAX_IMAGE_DIMENSION = 1280;
 const JPEG_QUALITY = 0.85;
 
@@ -313,11 +309,11 @@ export async function extractQuoteFromMultipleImages(
 
 async function callVlmApi(imageDataUrl: string, customPrompt?: string): Promise<string | null> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_DOCUMENT);
 
   try {
     const payload = {
-      model: VLM_MODEL,
+      model: VLM_EXTRACTION_MODEL,
       messages: [
         {
           role: 'user',
@@ -331,7 +327,7 @@ async function callVlmApi(imageDataUrl: string, customPrompt?: string): Promise<
       max_tokens: 4000, // Higher for complex quotes with many items
     };
 
-    const response = await fetch(VLM_API_ENDPOINT, {
+    const response = await fetch(VLM_CHAT_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

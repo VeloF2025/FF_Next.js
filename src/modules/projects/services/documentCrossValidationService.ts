@@ -11,13 +11,9 @@
 import { log } from '@/lib/logger';
 import { createLoggedSql } from '@/lib/db-logger';
 import { normalizeStorageUrl } from '@/services/vfStorageAdapter';
+import { VLM_CHAT_ENDPOINT, VLM_EXTRACTION_MODEL, VLM_TIMEOUT_DOCUMENT, VLM_MAX_TOKENS_QA } from '@/lib/vlm';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
-
-const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
-const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
-const VLM_MODEL = process.env.VLM_EXTRACTION_MODEL || process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ';
-const VLM_TIMEOUT_MS = 90000;
 
 // ============================================================================
 // TYPES
@@ -99,15 +95,15 @@ Return ONLY valid JSON (no markdown, no explanation):
 
 async function callVlm(imageDataUrl: string, prompt: string): Promise<string> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), VLM_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), VLM_TIMEOUT_DOCUMENT);
 
   try {
-    const response = await fetch(VLM_API_ENDPOINT, {
+    const response = await fetch(VLM_CHAT_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
       body: JSON.stringify({
-        model: VLM_MODEL,
+        model: VLM_EXTRACTION_MODEL,
         messages: [{
           role: 'user',
           content: [
@@ -115,7 +111,7 @@ async function callVlm(imageDataUrl: string, prompt: string): Promise<string> {
             { type: 'text', text: prompt },
           ],
         }],
-        max_tokens: 2000,
+        max_tokens: VLM_MAX_TOKENS_QA,
         temperature: 0.1,
       }),
     });

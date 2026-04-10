@@ -14,16 +14,11 @@
 
 import { log } from '@/lib/logger';
 import { recordCorrectExtraction } from '@/services/vlmLearningService';
+import { VLM_CHAT_ENDPOINT, VLM_EXTRACTION_MODEL, VLM_TIMEOUT_DEFAULT, VLM_MAX_TOKENS_OCR, VLM_TEMPERATURE } from '@/lib/vlm';
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
-
-const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
-const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
-const VLM_MODEL = process.env.VLM_EXTRACTION_MODEL || process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ';
-const VLM_TIMEOUT_MS = 60000;
-const VLM_TEMPERATURE = 0.1;
 
 // ============================================================================
 // TYPES
@@ -182,11 +177,11 @@ export async function extractAssetFromImageUrl(
 
 async function callVlmApi(imageDataUrl: string): Promise<string | null> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_DEFAULT);
 
   try {
     const payload = {
-      model: VLM_MODEL,
+      model: VLM_EXTRACTION_MODEL,
       messages: [
         {
           role: 'user',
@@ -197,10 +192,10 @@ async function callVlmApi(imageDataUrl: string): Promise<string | null> {
         },
       ],
       temperature: VLM_TEMPERATURE,
-      max_tokens: 1000,
+      max_tokens: VLM_MAX_TOKENS_OCR,
     };
 
-    const response = await fetch(VLM_API_ENDPOINT, {
+    const response = await fetch(VLM_CHAT_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

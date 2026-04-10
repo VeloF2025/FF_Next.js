@@ -14,6 +14,7 @@
 
 import { log, createLogger } from '@/lib/logger';
 import { STEP_LABELS } from '../utils/stepMapper';
+import { VLM_CHAT_ENDPOINT, VLM_QA_MODEL, VLM_TIMEOUT_QA, VLM_MAX_TOKENS_QA, VLM_TEMPERATURE } from '@/lib/vlm';
 
 // Component logger
 const logger = createLogger('VlmQaValidation');
@@ -21,12 +22,6 @@ const logger = createLogger('VlmQaValidation');
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
-
-const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
-const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
-const VLM_MODEL = process.env.VLM_QA_MODEL || process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ';
-const VLM_TIMEOUT_MS = 120000; // 2 minutes per photo
-const VLM_TEMPERATURE = 0.1; // Low for consistent QA results
 
 // ============================================================================
 // TYPES
@@ -336,7 +331,7 @@ async function callVlmForQa(
   const prompt = buildQaPrompt(step, drNumber);
 
   const requestBody = {
-    model: VLM_MODEL,
+    model: VLM_QA_MODEL,
     messages: [
       {
         role: 'user',
@@ -349,15 +344,15 @@ async function callVlmForQa(
         ],
       },
     ],
-    max_tokens: 2000,
+    max_tokens: VLM_MAX_TOKENS_QA,
     temperature: VLM_TEMPERATURE,
   };
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_QA);
 
   try {
-    const response = await fetch(VLM_API_ENDPOINT, {
+    const response = await fetch(VLM_CHAT_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody),

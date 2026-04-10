@@ -9,11 +9,9 @@
  */
 
 import { createLogger } from '@/lib/logger';
+import { VLM_API_URL, VLM_MODEL, VLM_TIMEOUT_REALTIME, VLM_MAX_TOKENS_QUICK } from '@/lib/vlm';
 
 const logger = createLogger('poleInstallClassifier');
-const VLM_URL = process.env.VLM_API_URL || process.env.VLM_SERVICE_URL || 'http://100.96.203.105:8100';
-const VLM_MODEL = process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ';
-const VLM_TIMEOUT_MS = 30_000;
 
 // ============================================================================
 // Types
@@ -169,10 +167,10 @@ export async function classifyPolePhoto(
   const imageDataUrl = `data:image/jpeg;base64,${photoBase64}`;
   const prompt = buildClassificationPrompt(poleHint);
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_REALTIME);
 
   try {
-    const response = await fetch(`${VLM_URL}/v1/chat/completions`, {
+    const response = await fetch(`${VLM_API_URL}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
@@ -187,7 +185,7 @@ export async function classifyPolePhoto(
             ],
           },
         ],
-        max_tokens: 512,
+        max_tokens: VLM_MAX_TOKENS_QUICK,
         temperature: 0.1,
       }),
     });
@@ -216,10 +214,10 @@ export async function classifyPolePhoto(
     return result;
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      logger.error('VLM classification timed out', { poleHint, timeoutMs: VLM_TIMEOUT_MS });
+      logger.error('VLM classification timed out', { poleHint, timeoutMs: VLM_TIMEOUT_REALTIME });
       return {
         ...FALLBACK_CLASSIFICATION,
-        issues: [`VLM request timed out after ${VLM_TIMEOUT_MS / 1000}s`],
+        issues: [`VLM request timed out after ${VLM_TIMEOUT_REALTIME / 1000}s`],
         feedback: 'AI classification timed out — manual review required',
       };
     }
