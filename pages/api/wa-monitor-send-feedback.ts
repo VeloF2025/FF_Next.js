@@ -241,7 +241,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    const drop = drops[0];
+    const drop = drops[0]!;
 
     // 2. Get group JID for project
     const groupConfig = PROJECT_GROUPS[drop.project];

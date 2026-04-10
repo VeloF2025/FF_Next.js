@@ -55,7 +55,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Fetch current assignment
-    const [current] = await sql`
+    const currentRows = await sql`
       SELECT id, contractor_id, project_id, role, assignment_status,
              start_date, end_date, actual_end_date, workload_percentage,
              estimated_hours, actual_hours, performance_rating, quality_score,
@@ -64,6 +64,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
              assigned_by, removed_by, created_at, updated_at
       FROM contractor_projects WHERE id = ${id}
     `;
+    const current = currentRows[0]!;
 
     // Use provided values or keep current ones
     const updatedData = {

@@ -176,7 +176,8 @@ async function getInstalledOnt(itemCode: string, project: string, limit: number,
       WHERE si.item_code = ${itemCode} AND sl.name ILIKE ${'%' + project + '%'}
       ORDER BY dr.drop_number LIMIT ${limit} OFFSET ${offset}
     `;
-    const [c] = await sql`SELECT COUNT(DISTINCT ss.id)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN stock_locations sl ON ss.current_location_id = sl.id JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ont_serial_scanned)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode} AND sl.name ILIKE ${'%' + project + '%'}`;
+    const cRows = await sql`SELECT COUNT(DISTINCT ss.id)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN stock_locations sl ON ss.current_location_id = sl.id JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ont_serial_scanned)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode} AND sl.name ILIKE ${'%' + project + '%'}`;
+    const c = cRows[0]!;
     return { rows, total: c.c };
   }
   const rows = await sql`
@@ -187,7 +188,8 @@ async function getInstalledOnt(itemCode: string, project: string, limit: number,
     WHERE si.item_code = ${itemCode}
     ORDER BY dr.drop_number LIMIT ${limit} OFFSET ${offset}
   `;
-  const [c] = await sql`SELECT COUNT(DISTINCT ss.id)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ont_serial_scanned)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode}`;
+  const cRows = await sql`SELECT COUNT(DISTINCT ss.id)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ont_serial_scanned)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode}`;
+  const c = cRows[0]!;
   return { rows, total: c.c };
 }
 
@@ -200,7 +202,8 @@ async function getInstalledUps(itemCode: string, project: string, limit: number,
       WHERE si.item_code = ${itemCode} AND sl.name ILIKE ${'%' + project + '%'}
       ORDER BY dr.drop_number LIMIT ${limit} OFFSET ${offset}
     `;
-    const [c] = await sql`SELECT COUNT(DISTINCT ss.id)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN stock_locations sl ON ss.current_location_id = sl.id JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ups_serial_scanned)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode} AND sl.name ILIKE ${'%' + project + '%'}`;
+    const cRows = await sql`SELECT COUNT(DISTINCT ss.id)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN stock_locations sl ON ss.current_location_id = sl.id JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ups_serial_scanned)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode} AND sl.name ILIKE ${'%' + project + '%'}`;
+    const c = cRows[0]!;
     return { rows, total: c.c };
   }
   const rows = await sql`
@@ -210,7 +213,8 @@ async function getInstalledUps(itemCode: string, project: string, limit: number,
     WHERE si.item_code = ${itemCode}
     ORDER BY dr.drop_number LIMIT ${limit} OFFSET ${offset}
   `;
-  const [c] = await sql`SELECT COUNT(DISTINCT ss.id)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ups_serial_scanned)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode}`;
+  const cRows = await sql`SELECT COUNT(DISTINCT ss.id)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ups_serial_scanned)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode}`;
+  const c = cRows[0]!;
   return { rows, total: c.c };
 }
 
@@ -223,7 +227,8 @@ async function getNotInstalledOnt(itemCode: string, project: string, limit: numb
       WHERE si.item_code = ${itemCode} AND sl.name ILIKE ${'%' + project + '%'} AND dr.id IS NULL
       ORDER BY ss.serial_number LIMIT ${limit} OFFSET ${offset}
     `;
-    const [c] = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN stock_locations sl ON ss.current_location_id = sl.id LEFT JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ont_serial_scanned)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode} AND sl.name ILIKE ${'%' + project + '%'} AND dr.id IS NULL`;
+    const cRows = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN stock_locations sl ON ss.current_location_id = sl.id LEFT JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ont_serial_scanned)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode} AND sl.name ILIKE ${'%' + project + '%'} AND dr.id IS NULL`;
+    const c = cRows[0]!;
     return { rows, total: c.c };
   }
   const rows = await sql`
@@ -233,7 +238,8 @@ async function getNotInstalledOnt(itemCode: string, project: string, limit: numb
     WHERE si.item_code = ${itemCode} AND dr.id IS NULL
     ORDER BY ss.serial_number LIMIT ${limit} OFFSET ${offset}
   `;
-  const [c] = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id LEFT JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ont_serial_scanned)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode} AND dr.id IS NULL`;
+  const cRows = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id LEFT JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ont_serial_scanned)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode} AND dr.id IS NULL`;
+  const c = cRows[0]!;
   return { rows, total: c.c };
 }
 
@@ -246,7 +252,8 @@ async function getNotInstalledUps(itemCode: string, project: string, limit: numb
       WHERE si.item_code = ${itemCode} AND sl.name ILIKE ${'%' + project + '%'} AND dr.id IS NULL
       ORDER BY ss.serial_number LIMIT ${limit} OFFSET ${offset}
     `;
-    const [c] = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN stock_locations sl ON ss.current_location_id = sl.id LEFT JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ups_serial_scanned)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode} AND sl.name ILIKE ${'%' + project + '%'} AND dr.id IS NULL`;
+    const cRows = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN stock_locations sl ON ss.current_location_id = sl.id LEFT JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ups_serial_scanned)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode} AND sl.name ILIKE ${'%' + project + '%'} AND dr.id IS NULL`;
+    const c = cRows[0]!;
     return { rows, total: c.c };
   }
   const rows = await sql`
@@ -256,7 +263,8 @@ async function getNotInstalledUps(itemCode: string, project: string, limit: numb
     WHERE si.item_code = ${itemCode} AND dr.id IS NULL
     ORDER BY ss.serial_number LIMIT ${limit} OFFSET ${offset}
   `;
-  const [c] = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id LEFT JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ups_serial_scanned)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode} AND dr.id IS NULL`;
+  const cRows = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id LEFT JOIN dr_photo_unified_reviews dr ON UPPER(TRIM(dr.ups_serial_scanned)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode} AND dr.id IS NULL`;
+  const c = cRows[0]!;
   return { rows, total: c.c };
 }
 
@@ -270,7 +278,8 @@ async function getActivatedOnt(itemCode: string, project: string, limit: number,
       WHERE si.item_code = ${itemCode} AND sl.name ILIKE ${'%' + project + '%'}
       ORDER BY oes.activation_date DESC LIMIT ${limit} OFFSET ${offset}
     `;
-    const [c] = await sql`SELECT COUNT(DISTINCT ss.id)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN stock_locations sl ON ss.current_location_id = sl.id JOIN oes_activations oes ON UPPER(TRIM(oes.serial_number)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode} AND sl.name ILIKE ${'%' + project + '%'}`;
+    const cRows = await sql`SELECT COUNT(DISTINCT ss.id)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN stock_locations sl ON ss.current_location_id = sl.id JOIN oes_activations oes ON UPPER(TRIM(oes.serial_number)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode} AND sl.name ILIKE ${'%' + project + '%'}`;
+    const c = cRows[0]!;
     return { rows, total: c.c };
   }
   const rows = await sql`
@@ -281,7 +290,8 @@ async function getActivatedOnt(itemCode: string, project: string, limit: number,
     WHERE si.item_code = ${itemCode}
     ORDER BY oes.activation_date DESC LIMIT ${limit} OFFSET ${offset}
   `;
-  const [c] = await sql`SELECT COUNT(DISTINCT ss.id)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN oes_activations oes ON UPPER(TRIM(oes.serial_number)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode}`;
+  const cRows = await sql`SELECT COUNT(DISTINCT ss.id)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN oes_activations oes ON UPPER(TRIM(oes.serial_number)) = UPPER(TRIM(ss.serial_number)) WHERE si.item_code = ${itemCode}`;
+  const c = cRows[0]!;
   return { rows, total: c.c };
 }
 
@@ -303,7 +313,8 @@ async function getAllWithMatches(itemCode: string, type: string, project: string
           WHERE si.item_code = ${itemCode} AND sl.name ILIKE ${'%' + project + '%'}
           ORDER BY ss.serial_number LIMIT ${limit} OFFSET ${offset}
         `;
-    const [c] = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN stock_locations sl ON ss.current_location_id = sl.id WHERE si.item_code = ${itemCode} AND sl.name ILIKE ${'%' + project + '%'}`;
+    const cRows = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN stock_locations sl ON ss.current_location_id = sl.id WHERE si.item_code = ${itemCode} AND sl.name ILIKE ${'%' + project + '%'}`;
+    const c = cRows[0]!;
     return { rows, total: c.c };
   }
   const rows = type === 'ont'
@@ -322,7 +333,8 @@ async function getAllWithMatches(itemCode: string, type: string, project: string
         WHERE si.item_code = ${itemCode}
         ORDER BY ss.serial_number LIMIT ${limit} OFFSET ${offset}
       `;
-  const [c] = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id WHERE si.item_code = ${itemCode}`;
+  const cRows = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id WHERE si.item_code = ${itemCode}`;
+  const c = cRows[0]!;
   return { rows, total: c.c };
 }
 
@@ -355,7 +367,8 @@ async function getPpFlaggedRows(itemCode: string, project: string, ppStatusFilte
       WHERE si.item_code = ${itemCode} AND ss.pp_flagged = TRUE AND sl.name ILIKE ${'%' + project + '%'}
       ORDER BY ss.pp_resolution_status, ss.serial_number LIMIT ${limit} OFFSET ${offset}
     `;
-    const [c] = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN stock_locations sl ON ss.current_location_id = sl.id WHERE si.item_code = ${itemCode} AND ss.pp_flagged = TRUE AND sl.name ILIKE ${'%' + project + '%'}`;
+    const cRows = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id JOIN stock_locations sl ON ss.current_location_id = sl.id WHERE si.item_code = ${itemCode} AND ss.pp_flagged = TRUE AND sl.name ILIKE ${'%' + project + '%'}`;
+    const c = cRows[0]!;
     return { rows, total: c.c };
   }
   const rows = await sql`
@@ -367,7 +380,8 @@ async function getPpFlaggedRows(itemCode: string, project: string, ppStatusFilte
     WHERE si.item_code = ${itemCode} AND ss.pp_flagged = TRUE
     ORDER BY ss.pp_resolution_status, ss.serial_number LIMIT ${limit} OFFSET ${offset}
   `;
-  const [c] = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id WHERE si.item_code = ${itemCode} AND ss.pp_flagged = TRUE`;
+  const cRows = await sql`SELECT COUNT(*)::int as c FROM stock_serials ss JOIN stock_items si ON ss.stock_item_id = si.id WHERE si.item_code = ${itemCode} AND ss.pp_flagged = TRUE`;
+  const c = cRows[0]!;
   return { rows, total: c.c };
 }
 

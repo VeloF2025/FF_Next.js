@@ -202,9 +202,9 @@ async function handler(
       critical_issues: string;
     }>;
 
-    const odometerData = odometerStats[0];
-    const fuelData = fuelStats[0];
-    const checkInData = checkInStats[0];
+    const odometerData = odometerStats[0]!;
+    const fuelData = fuelStats[0]!;
+    const checkInData = checkInStats[0]!;
 
     // Calculate average per day
     const readingsCount = parseInt(odometerData.readings_count);

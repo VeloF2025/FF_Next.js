@@ -104,7 +104,7 @@ export async function aggregateMetrics(projectId: string): Promise<AggregatedMet
     };
   }
 
-  const row = result[0];
+  const row = result[0]!;
 
   return {
     budget: {

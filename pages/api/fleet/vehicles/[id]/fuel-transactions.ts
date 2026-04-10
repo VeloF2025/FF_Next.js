@@ -208,7 +208,7 @@ async function handleGet(
 
   const total = parseInt(countResult[0]?.total || '0', 10);
   const transactions = rows.map(rowToTransaction);
-  const stats = statsResult[0];
+  const stats = statsResult[0]!;
 
   return apiResponse.success(res, {
     transactions,
@@ -563,7 +563,7 @@ async function handlePatch(
     return apiResponse.notFound(res, 'Fuel transaction', body.transactionId);
   }
 
-  const current = existingTx[0];
+  const current = existingTx[0]!;
 
   // Build update values
   const transactionDate = body.transactionDate || current.transaction_date;
@@ -725,8 +725,8 @@ async function recalculateFuelEfficiency(vehicleId: string): Promise<number> {
 
   // Calculate for each subsequent transaction
   for (let i = 1; i < transactions.length; i++) {
-    const current = transactions[i];
-    const previous = transactions[i - 1];
+    const current = transactions[i]!;
+    const previous = transactions[i - 1]!;
 
     const kmSinceLastFill = current.odometer_reading - previous.odometer_reading;
     const litres = parseFloat(current.litres);

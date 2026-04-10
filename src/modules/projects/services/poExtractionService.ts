@@ -29,7 +29,7 @@ import type { RecordCorrectionInput } from '@/types/vlm-learning';
 
 const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
 const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
-const VLM_MODEL = process.env.VLM_EXTRACTION_MODEL || 'Qwen/Qwen3-VL-8B-Instruct';
+const VLM_MODEL = process.env.VLM_EXTRACTION_MODEL || process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-32B-Instruct-AWQ';
 const VLM_TIMEOUT_MS = 90000; // 90 seconds for complex documents
 const VLM_TEMPERATURE = 0.1;
 

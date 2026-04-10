@@ -24,7 +24,7 @@ export const VLM_API_BASE =
   process.env.VLM_API_URL || 'http://100.96.203.105:8100';
 export const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
 export const VLM_MODEL =
-  process.env.FLEET_VLM_MODEL || 'Qwen/Qwen3-VL-8B-Instruct';
+  process.env.FLEET_VLM_MODEL || process.env.VLM_MODEL || 'QuantTrio/Qwen3-VL-32B-Instruct-AWQ';
 export const VLM_TIMEOUT_MS = 60000; // 1 minute for single image
 
 // Image size limits for VLM processing
