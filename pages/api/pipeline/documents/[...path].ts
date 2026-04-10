@@ -56,7 +56,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache 24 hours
 
     // For PDFs, set inline display
-    const filename = pathSegments[pathSegments.length - 1];
+    const filename = pathSegments[pathSegments.length - 1]!;
     if (filename.toLowerCase().endsWith('.pdf')) {
       res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
     }

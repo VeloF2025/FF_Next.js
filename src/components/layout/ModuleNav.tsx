@@ -313,7 +313,7 @@ export function ModuleNav({ tabs, getActiveTabId, accentColor }: ModuleNavProps)
               </Link>
             ) : (
               <button
-                onClick={() => setOpenTab(openTab === t.id ? null : t.id)}
+                onClick={(e) => { e.stopPropagation(); setOpenTab(prev => prev === t.id ? null : t.id); }}
                 className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors inline-flex items-center gap-1 ${
                   activeTab === t.id
                     ? `${accent.activeBorder} ${accent.activeText}`

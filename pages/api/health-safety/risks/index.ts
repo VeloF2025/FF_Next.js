@@ -114,7 +114,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, 'hazard_description, risk_category, likelihood, and severity are required');
   }
 
-  const [risk] = await sql`
+  const riskRows = await sql`
     INSERT INTO hs_risk_register (
       project_id, hazard_description, risk_category,
       site_location, activity_description, persons_at_risk,
@@ -141,6 +141,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       ${userId}
     )
     RETURNING *
+  const risk = riskRows[0]!;
   `;
 
   await sql`

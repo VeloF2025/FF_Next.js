@@ -66,7 +66,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       // Create opening balance journal entry
-      const [entry] = await sql`
+      const entryRows = await sql`
         INSERT INTO gl_journal_entries (
           id, entry_number, entry_date, description,
           source, status, fiscal_period_id,

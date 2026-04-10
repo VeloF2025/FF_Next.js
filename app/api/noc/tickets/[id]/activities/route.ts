@@ -133,7 +133,7 @@ export async function GET(
       );
     }
 
-    const ticket = tickets[0];
+    const ticket = tickets[0]!;
     const activities: TicketActivity[] = [];
 
     // Fetch QContact activities if this is a QContact ticket with external_id

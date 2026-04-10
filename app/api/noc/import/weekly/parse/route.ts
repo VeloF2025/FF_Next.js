@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
 
       // Score each sheet
       availableSheets = workbook.SheetNames.map(name => {
-        const sheet = workbook.Sheets[name];
+        const sheet = workbook.Sheets[name]!;
         const range = sheet['!ref'] ? XLSX.utils.decode_range(sheet['!ref']) : null;
         const rows = range ? range.e.r - range.s.r + 1 : 0;
 

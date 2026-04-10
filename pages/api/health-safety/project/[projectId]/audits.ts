@@ -112,7 +112,7 @@ async function handlePost(projectId: string, req: NextApiRequest, res: NextApiRe
   }
 
   // Create audit
-  const [audit] = await sql`
+  const auditRows = await sql`
     INSERT INTO hs_project_audits (
       project_id, auditor_id, audit_type, audit_date,
       notes, weather_conditions, site_personnel_count, status
@@ -128,6 +128,7 @@ async function handlePost(projectId: string, req: NextApiRequest, res: NextApiRe
     )
     RETURNING *
   `;
+  const audit = auditRows[0]!;
 
   // If template exists, pre-populate responses with 'not_checked'
   if (project.template_id) {

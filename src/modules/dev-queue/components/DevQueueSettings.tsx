@@ -79,7 +79,7 @@ export function DevQueueSettings({ columns, onColumnsUpdated }: DevQueueSettings
   };
 
   const handleRemoveColumn = (index: number) => {
-    const column = columnSettings[index];
+    const column = columnSettings[index]!;
     const originalColumn = columns.find((c) => c.id === column.id);
 
     if (originalColumn && originalColumn.items.length > 0) {

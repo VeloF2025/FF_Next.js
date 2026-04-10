@@ -91,11 +91,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   }
 
   // Create template
-  const [template] = await sql`
+  const templateRows = await sql`
     INSERT INTO hs_checklist_templates (name, category, description, is_default, is_active)
     VALUES (${name}, ${category}, ${description || null}, ${is_default}, true)
     RETURNING *
   `;
+  const template = templateRows[0]!;
 
   // Create items if provided
   if (items.length > 0) {

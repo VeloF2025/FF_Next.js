@@ -66,7 +66,7 @@ export interface MigrationOptions {
  * Generate VF UID for a specific date using atomic sequence
  */
 async function generateVfUidForDate(date: Date): Promise<string> {
-  const dateStr = date.toISOString().split('T')[0];
+  const dateStr = date.toISOString().split('T')[0]!;
   const formattedDate = dateStr.replace(/-/g, '');
 
   const result = await queryOne<{ last_sequence: number }>(

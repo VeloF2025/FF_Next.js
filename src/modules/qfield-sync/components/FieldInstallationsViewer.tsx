@@ -453,7 +453,7 @@ export function FieldInstallationsViewer() {
                           <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                             <MapPin className="h-3 w-3" />
                             {pole.address || 'GPS Captured'}
-                            {pole.image_count > 0 && (
+                            {(pole.image_count ?? 0) > 0 && (
                               <>
                                 <Camera className="h-3 w-3 ml-2" />
                                 {pole.image_count} photos
