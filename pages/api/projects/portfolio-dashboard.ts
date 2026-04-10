@@ -297,7 +297,7 @@ async function handler(
       : 0;
 
     // H&S compliance - run separately with fallbacks
-    let compliance = {
+    const compliance = {
       avg_hs_score: 0,
       open_incidents: 0,
       pending_audits: 0,

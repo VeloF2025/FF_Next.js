@@ -184,7 +184,7 @@ export async function parseFTPaymentPdf(
   const project = extractProjectFromFilename(filename);
 
   // ── Load pdf-parse v2 at runtime (CommonJS module) ─────────────────────
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // Dynamic require: pdf-parse uses CommonJS
   const pdfParseModule = require('pdf-parse') as { PDFParse: new (data: Uint8Array) => { getText(): Promise<{ pages: { text: string }[] }> } };
   const { PDFParse } = pdfParseModule;
 

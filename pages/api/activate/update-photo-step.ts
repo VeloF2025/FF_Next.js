@@ -79,7 +79,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       return apiResponse.error(res, ErrorCode.NOT_FOUND, `Photo ${photoFilename} not found in categorization`);
     }
 
-    const catResult = currentResults[catIndex];
+    const catResult = currentResults[catIndex]!; // Guaranteed by catIndex !== -1 check above
     const previousStep = catResult.human_override_step ?? catResult.vlm_predicted_step;
 
     // Update categorization result

@@ -46,7 +46,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.notFound(res, 'Project', projectId);
     }
 
-    const project = dashboardData[0];
+    const project = dashboardData[0]!; // Guaranteed by length check above
 
     // Format response with clear categories
     const response = {
