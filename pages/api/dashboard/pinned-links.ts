@@ -73,6 +73,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.created(res, { pin: result[0] });
     }
 
+    if (req.method === 'PATCH') {
+      const { orderedIds } = req.body;
+
+      if (!Array.isArray(orderedIds)) {
+        return apiResponse.badRequest(res, 'orderedIds array is required');
+      }
+
+      for (let i = 0; i < orderedIds.length; i++) {
+        await sql`
+          UPDATE user_pinned_links
+          SET sort_order = ${i}
+          WHERE id = ${orderedIds[i]} AND user_id = ${userId}
+        `;
+      }
+
+      return apiResponse.success(res, { reordered: true });
+    }
+
     if (req.method === 'DELETE') {
       const { id, route } = req.query;
 
@@ -93,7 +111,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.success(res, { unpinned: true });
     }
 
-    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST', 'DELETE']);
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST', 'PATCH', 'DELETE']);
   } catch (error) {
     log.error('Failed to manage pinned links', { error, userId });
     return apiResponse.internalError(res, 'Failed to manage pinned links');
