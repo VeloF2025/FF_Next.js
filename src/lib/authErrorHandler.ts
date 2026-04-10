@@ -25,13 +25,14 @@ export function handleAuthError(options?: {
 
   const currentPath = window.location.pathname + window.location.search;
 
-  // Don't redirect if already on sign-in, auth pages, or fleet portal/check-in (uses plate-based auth)
+  // Don't redirect if already on sign-in, auth pages, or public pages (fleet portal, snag resolve)
   if (
     currentPath.startsWith('/sign-in') ||
     currentPath.startsWith('/auth/') ||
     currentPath.startsWith('/fleet/portal') ||
     currentPath.startsWith('/fleet/check-in') ||
-    currentPath.startsWith('/fleet/vehicles/')
+    currentPath.startsWith('/fleet/vehicles/') ||
+    currentPath.startsWith('/snag/resolve')
   ) {
     return;
   }
@@ -122,7 +123,8 @@ export function installAuthInterceptor() {
         url.includes('/api/auth/check-email') ||
         url.includes('/api/fleet/portal/') ||
         url.includes('/api/fleet/check-in/') ||
-        url.includes('/api/fleet/vehicles/');
+        url.includes('/api/fleet/vehicles/') ||
+        url.includes('/api/snags/shared/');
 
       if (!isExcludedPath) {
         handleAuthError();

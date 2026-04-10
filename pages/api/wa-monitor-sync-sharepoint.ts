@@ -240,7 +240,7 @@ async function syncToSharePoint(
 
   // Write each project's data with retry
   for (let i = 0; i < drops.length; i++) {
-    const drop = drops[i];
+    const drop = drops[i]!;
     const rowNum = nextRow + i;
 
     try {

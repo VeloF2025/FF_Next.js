@@ -65,7 +65,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const entryRef = reference || `Transfer: ${fromAcct?.account_name} → ${toAcct?.account_name}`;
     const txDate = transferDate || new Date().toISOString().split('T')[0];
 
-    const [entry] = await sql`
+    const entryRows = await sql`
       INSERT INTO gl_journal_entries (
         id, entry_number, entry_date, description,
         source, status, fiscal_period_id,
@@ -81,6 +81,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       )
       RETURNING *
     `;
+    const entry = entryRows[0]!;
 
     // Create journal lines: DR destination, CR source
     await sql`

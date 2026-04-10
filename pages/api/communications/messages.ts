@@ -329,7 +329,7 @@ async function handlePost(
       RETURNING *
     `;
 
-    const message = messageRows[0];
+    const message = messageRows[0]!;
 
     // Insert recipients
     for (const recipientId of recipients) {
