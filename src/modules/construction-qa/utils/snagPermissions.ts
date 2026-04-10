@@ -17,7 +17,7 @@ const QA_APPROVER_ROLES = new Set(['super_admin', 'manager', 'admin']);
  */
 const QA_APPROVER_USER_IDS = new Set([
   '8ef76ee3-7c01-47d7-8819-bda77d71d411', // Chantall Cordier
-  // Charl White — add ID here when user is created
+  '0525fbd2-eb77-419a-a989-47c0e641f06b', // Jacques White
 ]);
 
 /** Actions that require QA approval permission */
