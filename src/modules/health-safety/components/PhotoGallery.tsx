@@ -74,7 +74,6 @@ export function PhotoGallery({
             onClick={() => setLightboxIdx(idx)}
             className="group relative rounded-lg overflow-hidden border border-[var(--ff-border-light)] hover:border-[var(--ff-primary-500)] transition-colors"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={photo.url}
               alt={photo.caption || `Photo ${idx + 1}`}
@@ -133,7 +132,6 @@ export function PhotoGallery({
               </div>
             )}
 
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={current.url}
               alt={current.caption || `Photo ${lightboxIdx + 1} of ${photos.length}`}

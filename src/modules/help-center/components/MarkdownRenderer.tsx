@@ -227,7 +227,7 @@ function MarkdownBlock({ block, searchHighlight }: { block: Block; searchHighlig
 
 function InlineMarkdown({ text, highlight }: { text: string; highlight?: string }) {
   // Process inline markdown: bold, italic, code, links, images
-  let processed = text;
+  const processed = text;
 
   // Split into segments to handle inline code, bold, italic, links
   const segments = parseInline(processed);

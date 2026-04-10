@@ -74,7 +74,7 @@ async function handler(
           continue;
         }
 
-        const previousValue = current[0];
+        const previousValue = current[0]!; // Guaranteed by length check above
         let newValue: Record<string, unknown> = {};
 
         // Execute action

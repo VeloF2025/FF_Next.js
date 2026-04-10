@@ -478,7 +478,6 @@ function ChecklistItemCard({
       {/* Photo thumbnail */}
       {item.photo_url && (
         <div className="mt-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={item.photo_url}
             alt="Evidence"

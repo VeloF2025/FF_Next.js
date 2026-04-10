@@ -120,7 +120,6 @@ export function IncidentPhotoUpload({
               key={idx}
               className="relative group rounded-lg overflow-hidden border border-[var(--ff-border-light)]"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={photo.url}
                 alt={photo.caption || `Evidence ${idx + 1}`}

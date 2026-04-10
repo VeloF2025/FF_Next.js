@@ -52,7 +52,7 @@ export default withAuth(withErrorHandler(async (
       return apiResponse.notFound(res, 'Requisition', requisitionId);
     }
 
-    const requisition = requisitions[0];
+    const requisition = requisitions[0]!; // Guaranteed by length check above
 
     // Check if RFQ already exists for this requisition
     const existingRfq = await sql`
@@ -61,7 +61,7 @@ export default withAuth(withErrorHandler(async (
 
     if (existingRfq.length > 0) {
       // Return existing RFQ instead of erroring — allows wizard to recover
-      const existing = existingRfq[0];
+      const existing = existingRfq[0]!;
       return apiResponse.success(res, {
         id: existing.id as string,
         rfqNumber: existing.rfq_number as string,
@@ -106,12 +106,12 @@ export default withAuth(withErrorHandler(async (
       RETURNING id, rfq_number, project_id, title, status
     `;
 
-    const rfq = insertedRfqs[0];
+    const rfq = insertedRfqs[0]!; // INSERT RETURNING always returns a row
     const rfqId = rfq.id;
 
     // Copy requisition items to RFQ items
     for (let i = 0; i < reqItems.length; i++) {
-      const item = reqItems[i];
+      const item = reqItems[i]!;
       await sql`
         INSERT INTO rfq_items (
           rfq_id, project_id, line_number, description, quantity, uom,

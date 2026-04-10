@@ -83,7 +83,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
     };
 
     for (let i = 0; i < lines.length; i++) {
-      let line = lines[i];
+      const line = lines[i];
 
       // Handle code blocks
       if (line.startsWith('```')) {

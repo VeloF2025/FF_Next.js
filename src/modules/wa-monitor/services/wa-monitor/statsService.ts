@@ -91,15 +91,15 @@ export async function getProjectStats(projectName: string): Promise<{
   const sql = getDbConnection();
   try {
     // Get current date in SAST timezone
-    const [dateInfo] = (await sql`
+    const dateInfo = ((await sql`
       SELECT
         CURRENT_DATE AT TIME ZONE 'Africa/Johannesburg' as today,
         (CURRENT_DATE AT TIME ZONE 'Africa/Johannesburg' - INTERVAL '7 days')::date as week_start,
         (CURRENT_DATE AT TIME ZONE 'Africa/Johannesburg' - INTERVAL '30 days')::date as month_start
-    `) as unknown as DatePeriodRow[];
+    `) as unknown as DatePeriodRow[])[0]!;
 
     // Today's stats
-    const [todayStats] = (await sql`
+    const todayStats = ((await sql`
       SELECT
         COUNT(DISTINCT drop_number) as total,
         COUNT(DISTINCT CASE
@@ -114,10 +114,10 @@ export async function getProjectStats(projectName: string): Promise<{
       FROM qa_photo_reviews
       WHERE project = ${projectName}
         AND DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg') = ${dateInfo.today}::date
-    `) as unknown as StatsRow[];
+    `) as unknown as StatsRow[])[0]!;
 
     // This week's stats
-    const [weekStats] = (await sql`
+    const weekStats = ((await sql`
       SELECT
         COUNT(DISTINCT drop_number) as total,
         COUNT(DISTINCT CASE
@@ -132,10 +132,10 @@ export async function getProjectStats(projectName: string): Promise<{
       FROM qa_photo_reviews
       WHERE project = ${projectName}
         AND DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg') >= ${dateInfo.week_start}::date
-    `) as unknown as StatsRow[];
+    `) as unknown as StatsRow[])[0]!;
 
     // This month's stats
-    const [monthStats] = (await sql`
+    const monthStats = ((await sql`
       SELECT
         COUNT(DISTINCT drop_number) as total,
         COUNT(DISTINCT CASE
@@ -150,10 +150,10 @@ export async function getProjectStats(projectName: string): Promise<{
       FROM qa_photo_reviews
       WHERE project = ${projectName}
         AND DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg') >= ${dateInfo.month_start}::date
-    `) as unknown as StatsRow[];
+    `) as unknown as StatsRow[])[0]!;
 
     // All-time stats
-    const [allTimeStats] = (await sql`
+    const allTimeStats = ((await sql`
       SELECT
         COUNT(DISTINCT drop_number) as total,
         COUNT(DISTINCT CASE
@@ -167,7 +167,7 @@ export async function getProjectStats(projectName: string): Promise<{
         END) as complete
       FROM qa_photo_reviews
       WHERE project = ${projectName}
-    `) as unknown as StatsRow[];
+    `) as unknown as StatsRow[])[0]!;
 
     // Helper to calculate stats
     const calcStats = (total: string, complete: string) => {
@@ -247,12 +247,12 @@ export async function getAllProjectsStatsSummary(
   const sql = getDbConnection();
   try {
     // Get current date in SAST timezone
-    const [dateInfo] = (await sql`
+    const dateInfo = ((await sql`
       SELECT
         CURRENT_DATE AT TIME ZONE 'Africa/Johannesburg' as today,
         (CURRENT_DATE AT TIME ZONE 'Africa/Johannesburg' - INTERVAL '7 days')::date as week_ago,
         (CURRENT_DATE AT TIME ZONE 'Africa/Johannesburg' - INTERVAL '30 days')::date as month_ago
-    `) as unknown as DateRangeRow[];
+    `) as unknown as DateRangeRow[])[0]!;
 
     // Determine date range for main query
     const queryStartDate = startDate || dateInfo.today;
@@ -300,7 +300,7 @@ export async function getAllProjectsStatsSummary(
     `) as unknown as ProjectStatsRow[];
 
     // 3. Weekly trends
-    const [weeklyStats] = (await sql`
+    const weeklyStats = ((await sql`
       SELECT
         COUNT(DISTINCT drop_number) as total,
         COUNT(DISTINCT CASE
@@ -314,10 +314,10 @@ export async function getAllProjectsStatsSummary(
         END) as complete
       FROM qa_photo_reviews
       WHERE DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg') >= ${dateInfo.week_ago}::date
-    `) as unknown as StatsRow[];
+    `) as unknown as StatsRow[])[0]!;
 
     // 4. Monthly trends
-    const [monthlyStats] = (await sql`
+    const monthlyStats = ((await sql`
       SELECT
         COUNT(DISTINCT drop_number) as total,
         COUNT(DISTINCT CASE
@@ -331,10 +331,10 @@ export async function getAllProjectsStatsSummary(
         END) as complete
       FROM qa_photo_reviews
       WHERE DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg') >= ${dateInfo.month_ago}::date
-    `) as unknown as StatsRow[];
+    `) as unknown as StatsRow[])[0]!;
 
     // 5. Outstanding drops
-    const [outstandingStats] = (await sql`
+    const outstandingStats = ((await sql`
       SELECT
         COUNT(DISTINCT CASE
           WHEN NOT (
@@ -360,18 +360,18 @@ export async function getAllProjectsStatsSummary(
           THEN drop_number
         END) as needs_attention
       FROM qa_photo_reviews
-    `) as unknown as OutstandingRow[];
+    `) as unknown as OutstandingRow[])[0]!;
 
     // 6. Resubmission stats
-    const [resubmissionStats] = (await sql`
+    const resubmissionStats = ((await sql`
       SELECT
         COUNT(DISTINCT drop_number) as total_drops,
         COUNT(DISTINCT CASE WHEN resubmitted = true THEN drop_number END) as resubmitted_drops
       FROM qa_photo_reviews
-    `) as unknown as ResubmissionRow[];
+    `) as unknown as ResubmissionRow[])[0]!;
 
     // 7. Common failure points
-    const [failureStats] = (await sql`
+    const failureStats = ((await sql`
       SELECT
         COUNT(CASE WHEN step_01_house_photo = false THEN 1 END) as step_01_fails,
         COUNT(CASE WHEN step_02_cable_from_pole = false THEN 1 END) as step_02_fails,
@@ -389,10 +389,10 @@ export async function getAllProjectsStatsSummary(
       FROM qa_photo_reviews
       WHERE DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg')
         BETWEEN ${queryStartDate}::date AND ${queryEndDate}::date
-    `) as unknown as FailureStatsRow[];
+    `) as unknown as FailureStatsRow[])[0]!;
 
     // 8. Feedback stats
-    const [feedbackStats] = (await sql`
+    const feedbackStats = ((await sql`
       SELECT
         COUNT(DISTINCT CASE WHEN feedback_sent IS NOT NULL THEN drop_number END) as sent,
         COUNT(DISTINCT CASE
@@ -410,7 +410,7 @@ export async function getAllProjectsStatsSummary(
       FROM qa_photo_reviews
       WHERE DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg')
         BETWEEN ${queryStartDate}::date AND ${queryEndDate}::date
-    `) as unknown as FeedbackStatsRow[];
+    `) as unknown as FeedbackStatsRow[])[0]!;
 
     // 9. Agent performance for the selected date range
     const agentStats = (await sql`
