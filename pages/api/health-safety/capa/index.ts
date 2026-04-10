@@ -180,7 +180,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
 
   const userId = (req as any).userId || null;
 
-  const [capa] = await sql`
+  const capaRows = await sql`
     INSERT INTO hs_corrective_actions (
       source_type, source_id, project_id, contractor_id,
       title, description, severity, due_date,
@@ -207,6 +207,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     )
     RETURNING *
   `;
+  const capa = capaRows[0]!;
 
   // Log activity
   await sql`

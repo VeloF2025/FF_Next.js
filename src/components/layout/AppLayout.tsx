@@ -385,7 +385,7 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
         {isSystem && <SystemNav />}
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-[var(--ff-background-primary)]" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-[var(--ff-background-primary)] relative z-10" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <div className="min-h-full">
             {children}
           </div>

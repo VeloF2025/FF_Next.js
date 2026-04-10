@@ -48,11 +48,12 @@ async function handleGet(contractorId: string, res: NextApiResponse) {
   }
 
   // Get compliance record
-  const [compliance] = await sql`
+  const complianceRows = await sql`
     SELECT id, contractor_id, overall_score, rag_status, training_records,
            last_audit_date, next_audit_due, notes, created_at, updated_at
     FROM hs_contractor_compliance WHERE contractor_id = ${contractorId}
   `;
+  const compliance = complianceRows[0]!;
 
   // Get documents
   const documents = await sql`

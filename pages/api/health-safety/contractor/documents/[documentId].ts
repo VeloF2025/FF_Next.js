@@ -40,7 +40,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 }
 
 async function handleGet(documentId: string, res: NextApiResponse) {
-  const [document] = await sql`
+  const documentRows = await sql`
     SELECT
       d.*,
       c.company_name as contractor_name,
@@ -54,6 +54,7 @@ async function handleGet(documentId: string, res: NextApiResponse) {
     JOIN contractors c ON c.id = d.contractor_id
     WHERE d.id = ${documentId}
   `;
+  const document = documentRows[0]!;
 
   if (!document) {
     return apiResponse.notFound(res, 'Document', documentId);

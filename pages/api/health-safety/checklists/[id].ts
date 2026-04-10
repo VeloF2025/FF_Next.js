@@ -39,7 +39,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 }
 
 async function handleGet(id: string, res: NextApiResponse) {
-  const [template] = await sql`
+  const templateRows = await sql`
     SELECT
       t.*,
       COALESCE(
@@ -62,6 +62,7 @@ async function handleGet(id: string, res: NextApiResponse) {
     WHERE t.id = ${id}
     GROUP BY t.id
   `;
+  const template = templateRows[0]!;
 
   if (!template) {
     return apiResponse.notFound(res, 'Checklist template', id);

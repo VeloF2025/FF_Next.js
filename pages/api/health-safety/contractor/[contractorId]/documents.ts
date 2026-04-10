@@ -201,7 +201,7 @@ async function handlePost(contractorId: string, req: NextApiRequest, res: NextAp
   }
 
   // Create document record
-  const [document] = await sql`
+  const documentRows = await sql`
     INSERT INTO hs_contractor_documents (
       contractor_id, document_type, document_number, file_url, file_name,
       issue_date, expiry_date, status, notes
@@ -218,6 +218,7 @@ async function handlePost(contractorId: string, req: NextApiRequest, res: NextAp
     )
     RETURNING *
   `;
+  const document = documentRows[0]!;
 
   // Log activity
   await sql`
