@@ -50,7 +50,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           FROM serial_change_history sch
           LEFT JOIN dr_photo_unified_reviews u ON sch.drop_number = u.drop_number
           ORDER BY sch.detected_at DESC LIMIT ${limitNum}
-        `;
+        ` as any[];
 
     // Summary stats
     const stats = await sql`
@@ -63,7 +63,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         COUNT(DISTINCT drop_number) as unique_drs
       FROM serial_change_history
       WHERE detected_at > NOW() - INTERVAL '7 days'
-    `;
+    ` as any[];
 
     return apiResponse.success(res, {
       mode: 'recent',
@@ -90,7 +90,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       serial_swap_status
     FROM dr_photo_unified_reviews
     WHERE drop_number = ${dropNumber}
-  `;
+  ` as any[];
 
   const current = currentSerials[0] || {};
 

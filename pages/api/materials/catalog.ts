@@ -157,7 +157,7 @@ async function handlePost(
     const existing = await sql`
       SELECT id FROM material_catalog
       WHERE LOWER(item_code) = LOWER(${body.itemCode})
-    `;
+    ` as any[];
 
     if (existing.length > 0) {
       return apiResponse.conflict(res, `Material with item code '${body.itemCode}' already exists`);

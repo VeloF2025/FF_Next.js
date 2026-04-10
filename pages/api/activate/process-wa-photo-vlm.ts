@@ -80,7 +80,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       SELECT ont_serial_scanned, ups_serial_scanned
       FROM dr_photo_unified_reviews
       WHERE drop_number = ${dropNumber}
-    `;
+    ` as any[];
     const onemapOnt = currentData[0]?.ont_serial_scanned || null;
     const onemapUps = currentData[0]?.ups_serial_scanned || null;
 
@@ -126,7 +126,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             vlm_processed_at = NOW(),
             updated_at = NOW()
           WHERE id = ${photo.id}
-        `;
+        ` as any[];
 
         // Track best extraction for each serial type
         if (extraction.ontSerial && extraction.confidence > (bestOnt?.confidence || 0)) {
@@ -168,7 +168,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           UPDATE wa_photos
           SET vlm_processed = true, vlm_processed_at = NOW(), updated_at = NOW()
           WHERE id = ${photo.id}
-        `;
+        ` as any[];
       }
     }
 

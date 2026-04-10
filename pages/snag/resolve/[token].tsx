@@ -129,18 +129,16 @@ export default function SnagResolvePage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('uploaded_by', 'external-subcontractor');
-      formData.append('is_evidence', 'true');
-      formData.append('verification_step_id', stepId);
+      formData.append('action', 'upload_photo');
+      formData.append('stepId', stepId);
 
-      const res = await fetch(`/api/noc/tickets/${data.ticket.id}/attachments`, {
+      const res = await fetch(`/api/snags/shared/${token}`, {
         method: 'POST',
         body: formData,
       });
       if (!res.ok) throw new Error('Upload failed');
 
-      // Also mark the step as complete
-      await performAction('complete_step', { stepId });
+      await fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
@@ -181,7 +179,7 @@ export default function SnagResolvePage() {
   return (
     <PageShell>
       <Head>
-        <title>{ticket.ticket_uid} — Snag Resolution | FibreFlow</title>
+        <title>{ticket.ticket_uid} — Ticket Resolution | FibreFlow</title>
       </Head>
 
       {/* Header */}

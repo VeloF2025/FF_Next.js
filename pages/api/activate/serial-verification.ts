@@ -63,7 +63,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       FROM dr_photo_unified_reviews
       WHERE drop_number = ${dropNumber}
         AND serial_verification_computed_at IS NOT NULL
-    `;
+    ` as any[];
 
     if (precomputed.length > 0 && precomputed[0].serial_verification_status) {
       const row = precomputed[0];

@@ -131,7 +131,7 @@ export function ClientAnalytics() {
             <PieChart className="w-5 h-5 text-[var(--ff-text-tertiary)]" />
           </div>
           <div className="space-y-3">
-            {Object.entries(summary.clientsByStatus).map(([status, count]) => {
+            {Object.entries(summary.clientsByStatus).map(([status, count]: [string, number]) => {
               const percentage = (count / summary.totalClients) * 100;
               return (
                 <div key={status}>

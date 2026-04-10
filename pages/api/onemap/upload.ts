@@ -57,7 +57,7 @@ async function parseOneMapFile(filePath: string) {
   // Process the main sheet (SHEET1)
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
-  const jsonData = XLSX.utils.sheet_to_json(worksheet);
+  const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, any>[];
   
   for (const row of jsonData) {
     // Extract coordinates from the Latitude Longitude field if individual fields are empty

@@ -65,7 +65,7 @@ async function handleSync(req: NextApiRequest, res: NextApiResponse) {
     const results = await syncAllWorkspaces({ full, fetchDetails });
     return apiResponse.success(res, results);
   } catch (err) {
-    log.error('exfo-sync', { error: error instanceof Error ? error.message : String(error) });
+    log.error('exfo-sync', { error: err instanceof Error ? err.message : String(err) });
     return apiResponse.internalError(res, err);
   }
 }
@@ -93,7 +93,7 @@ async function handleGetHistory(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, { history: rows });
   } catch (err) {
-    log.error('exfo-sync', { error: error instanceof Error ? error.message : String(error) });
+    log.error('exfo-sync', { error: err instanceof Error ? err.message : String(err) });
     return apiResponse.internalError(res, err);
   }
 }

@@ -36,7 +36,7 @@ async function handleGet(_req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, { configs });
   } catch (err) {
-    log.error('exfo-config', { error: error instanceof Error ? error.message : String(error) });
+    log.error('exfo-config', { error: err instanceof Error ? err.message : String(err) });
     return apiResponse.internalError(res, err);
   }
 }
@@ -68,7 +68,7 @@ async function handleUpsert(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, rows[0]);
   } catch (err) {
-    log.error('exfo-config', { error: error instanceof Error ? error.message : String(error) });
+    log.error('exfo-config', { error: err instanceof Error ? err.message : String(err) });
     return apiResponse.internalError(res, err);
   }
 }
@@ -83,7 +83,7 @@ async function handleDelete(req: NextApiRequest, res: NextApiResponse) {
     await sql`DELETE FROM exfo_sync_config WHERE id = ${id}::UUID`;
     return apiResponse.success(res, { deleted: true });
   } catch (err) {
-    log.error('exfo-config', { error: error instanceof Error ? error.message : String(error) });
+    log.error('exfo-config', { error: err instanceof Error ? err.message : String(err) });
     return apiResponse.internalError(res, err);
   }
 }
