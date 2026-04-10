@@ -98,8 +98,8 @@ export function OverviewDashboard({ project, onCategoryClick }: OverviewDashboar
       if (!res.ok) {
         throw new Error(`Failed to load overview (${res.status})`);
       }
-      const data = (await res.json()) as NonInvoiceableOverview;
-      setOverview(data);
+      const json = (await res.json()) as { success: boolean; data: NonInvoiceableOverview };
+      setOverview(json.data);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       log.error('OverviewDashboard: fetch failed', { error: msg });
