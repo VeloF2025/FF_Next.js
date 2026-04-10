@@ -213,11 +213,11 @@ export async function markApproved(
     `) as Record<string, unknown>[];
 
     if (latestDoc.length > 0) {
-      if (!issueDate && latestDoc[0].issue_date) {
-        issueDate = latestDoc[0].issue_date as string;
+      if (!issueDate && latestDoc[0]!.issue_date) {
+        issueDate = latestDoc[0]!.issue_date as string;
       }
-      if (!expiryDate && latestDoc[0].expiry_date) {
-        expiryDate = latestDoc[0].expiry_date as string;
+      if (!expiryDate && latestDoc[0]!.expiry_date) {
+        expiryDate = latestDoc[0]!.expiry_date as string;
       }
     }
   }

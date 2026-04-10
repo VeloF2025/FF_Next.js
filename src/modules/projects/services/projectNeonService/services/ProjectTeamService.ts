@@ -69,10 +69,10 @@ export async function getPrimaryManager(projectId: string): Promise<PrimaryManag
   }
 
   return {
-    staff_id: result[0].staff_id,
-    name: result[0].name,
-    role: result[0].role || 'Project Manager',
-    is_primary: result[0].is_primary,
+    staff_id: result[0]!.staff_id,
+    name: result[0]!.name,
+    role: result[0]!.role || 'Project Manager',
+    is_primary: result[0]!.is_primary,
   };
 }
 
