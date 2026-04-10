@@ -46,14 +46,15 @@ interface TicketHeaderProps {
   onPriorityChange?: (newPriority: string) => void;
 }
 
-/** Forward/backward workflow transitions — aligned to NOC Kanban columns */
+/** Forward/backward/reject workflow transitions — aligned to NOC Kanban columns */
 const TICKET_WORKFLOW_ACTIONS: Record<string, {
   forward?: { status: string; label: string };
   backward?: { status: string; label: string };
+  reject?: { status: string; label: string };
 }> = {
   open:            { forward: { status: 'assigned',    label: 'Assign' } },
-  assigned:        { forward: { status: 'in_progress', label: 'Start Work' },        backward: { status: 'open',        label: 'Unassign' } },
-  in_progress:     { forward: { status: 'pending_qa',  label: 'Submit for QA' },     backward: { status: 'assigned',    label: 'Back to Assigned' } },
+  assigned:        { forward: { status: 'in_progress', label: 'Start Work' },        backward: { status: 'open',        label: 'Unassign' }, reject: { status: 'cancelled', label: 'Not Resolvable' } },
+  in_progress:     { forward: { status: 'pending_qa',  label: 'Submit for QA' },     backward: { status: 'assigned',    label: 'Back to Assigned' }, reject: { status: 'cancelled', label: 'Not Resolvable' } },
   pending_qa:      { forward: { status: 'resolved',    label: 'Approve QA' },        backward: { status: 'in_progress', label: 'Reject QA' } },
   qa_in_progress:  { forward: { status: 'resolved',    label: 'Approve QA' },        backward: { status: 'in_progress', label: 'Reject QA' } },
   qa_rejected:     { forward: { status: 'pending_qa',  label: 'Resubmit for QA' },   backward: { status: 'assigned',    label: 'Back to Assigned' } },
@@ -63,6 +64,7 @@ const TICKET_WORKFLOW_ACTIONS: Record<string, {
   resolved:        { forward: { status: 'verified',    label: 'Customer Confirmed' },backward: { status: 'in_progress', label: 'Customer Unhappy' } },
   verified:        { forward: { status: 'closed',      label: 'Close Ticket' },      backward: { status: 'in_progress', label: 'Reopen' } },
   closed:          {                                                                   backward: { status: 'open',        label: 'Reopen' } },
+  cancelled:       {                                                                   backward: { status: 'open',        label: 'Reopen' } },
 };
 
 /**
@@ -162,6 +164,15 @@ export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange
                 className="text-xs bg-green-800 hover:bg-green-700 text-green-100 px-3 py-1.5 rounded font-medium transition-colors"
               >
                 {actions.forward.label} →
+              </button>
+            )}
+            {actions.reject && (
+              <button
+                type="button"
+                onClick={() => onStatusChange?.(actions.reject!.status)}
+                className="text-xs bg-red-900 hover:bg-red-800 text-red-200 px-3 py-1.5 rounded transition-colors"
+              >
+                {actions.reject.label}
               </button>
             )}
           </div>

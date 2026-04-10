@@ -43,15 +43,17 @@ const STATUS_OPTIONS: { value: SnagStatus; label: string }[] = [
 const WORKFLOW_ACTIONS: Record<string, {
   forward?: { status: SnagStatus; label: string };
   backward?: { status: SnagStatus; label: string };
+  reject?: { status: SnagStatus; label: string };
 }> = {
   open:        { forward: { status: 'assigned',    label: 'Assign' } },
-  assigned:    { forward: { status: 'in_progress', label: 'Start Work' },       backward: { status: 'open',        label: 'Unassign' } },
-  in_progress: { forward: { status: 'pending_qa',  label: 'Mark as Fixed' },    backward: { status: 'assigned',    label: 'Back to Assigned' } },
+  assigned:    { forward: { status: 'in_progress', label: 'Start Work' },       backward: { status: 'open',        label: 'Unassign' }, reject: { status: 'wont_fix', label: 'Not Resolvable' } },
+  in_progress: { forward: { status: 'pending_qa',  label: 'Mark as Fixed' },    backward: { status: 'assigned',    label: 'Back to Assigned' }, reject: { status: 'wont_fix', label: 'Not Resolvable' } },
   pending_qa:  { forward: { status: 'resolved',    label: 'Approve QA' },       backward: { status: 'in_progress', label: 'Reject QA' } },
   fixed:       { forward: { status: 'resolved',    label: 'Approve QA' },       backward: { status: 'in_progress', label: 'Reject QA' } },
   resolved:    { forward: { status: 'verified',    label: 'Customer Confirmed' }, backward: { status: 'in_progress', label: 'Customer Unhappy' } },
   verified:    { forward: { status: 'closed',      label: 'Close' },            backward: { status: 'in_progress', label: 'Reopen' } },
   closed:      {                                                                  backward: { status: 'open',        label: 'Reopen' } },
+  wont_fix:    { forward: { status: 'closed',      label: 'Approve Rejection' }, backward: { status: 'in_progress', label: 'Send Back' } },
 };
 
 /** Inline snag detail panel for table row expansion (no modal overlay) */
@@ -265,6 +267,16 @@ export function SnagDetailPanel({
                 className="text-xs bg-green-800 hover:bg-green-700 disabled:opacity-50 text-green-100 px-3 py-1.5 rounded font-medium transition-colors"
               >
                 {actions.forward.label} →
+              </button>
+            )}
+            {actions?.reject && (
+              <button
+                type="button"
+                onClick={() => { void handleStatusChange(actions.reject!.status); }}
+                disabled={saving}
+                className="text-xs bg-red-900 hover:bg-red-800 disabled:opacity-50 text-red-200 px-3 py-1.5 rounded transition-colors"
+              >
+                {actions.reject.label}
               </button>
             )}
 
