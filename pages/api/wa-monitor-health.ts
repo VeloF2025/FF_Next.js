@@ -309,9 +309,10 @@ async function checkDatabaseConnection(): Promise<HealthCheck> {
 async function checkTableExists(): Promise<HealthCheck> {
   try {
     const start = Date.now();
-    const [result] = await sql`
+    const resultRows = await sql`
       SELECT COUNT(*) as total FROM qa_photo_reviews
     `;
+    const result = resultRows[0]!;
     const latency = Date.now() - start;
 
     const total = parseInt(result.total, 10);
@@ -336,13 +337,14 @@ async function checkTableExists(): Promise<HealthCheck> {
 async function checkRecentData(): Promise<HealthCheck> {
   try {
     const start = Date.now();
-    const [result] = await sql`
+    const resultRows2 = await sql`
       SELECT
         COUNT(*) as count_24h,
         MAX(created_at) as latest_timestamp
       FROM qa_photo_reviews
       WHERE created_at > NOW() - INTERVAL '24 hours'
     `;
+    const result = resultRows2[0]!;
     const latency = Date.now() - start;
 
     const count = parseInt(result.count_24h, 10);

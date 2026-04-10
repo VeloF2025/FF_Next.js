@@ -121,6 +121,7 @@ function validateOltDataSample(records: OltRecord[]): string[] {
 
   for (let i = 0; i < sampleSize; i++) {
     const record = records[i];
+    if (!record) continue;
 
     // DR number should match pattern
     if (!record.drNumber.match(/^DR\d+$/i)) {

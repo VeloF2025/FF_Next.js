@@ -32,7 +32,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         WHERE DATE(whatsapp_message_date AT TIME ZONE 'Africa/Johannesburg') = CURRENT_DATE
       `;
 
-    const stats = statsResult[0];
+    const stats = statsResult[0]!;
 
     // Get recent submissions with GPS data from onemap_properties
     // Use subquery to get only one GPS coordinate per drop (the earliest one)

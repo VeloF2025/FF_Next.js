@@ -16,7 +16,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -28,7 +28,10 @@ import {
   Phone,
   Mail,
   ExternalLink,
+  Share2,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { log } from '@/lib/logger';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ClickableStatusBadge } from './ClickableStatusBadge';
@@ -66,6 +69,22 @@ const TICKET_WORKFLOW_ACTIONS: Record<string, {
   closed:          {                                                                   backward: { status: 'open',        label: 'Reopen' } },
   cancelled:       {                                                                   backward: { status: 'open',        label: 'Reopen' } },
 };
+
+/** DevOps tickets are internal — use different labels for the resolved step */
+const DEVOPS_RESOLVED_ACTIONS = {
+  forward: { status: 'verified', label: 'Fix Verified' },
+  backward: { status: 'in_progress', label: 'Fix Not Working' },
+};
+
+/** Get workflow actions for a given status, with ticket-type overrides */
+function getWorkflowActions(status: string, ticketType?: string) {
+  const actions = TICKET_WORKFLOW_ACTIONS[status];
+  if (!actions) return undefined;
+  if (status === 'resolved' && ticketType === 'dev_ops') {
+    return DEVOPS_RESOLVED_ACTIONS;
+  }
+  return actions;
+}
 
 /**
  * 🟢 WORKING: Generate Google Maps URL from GPS coordinates
@@ -144,7 +163,7 @@ export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange
       {/* Workflow Action Buttons — prominent, right below badges */}
       {(() => {
         const s = ticket.status;
-        const actions = TICKET_WORKFLOW_ACTIONS[s];
+        const actions = getWorkflowActions(s, ticket.ticket_type);
         if (!actions?.forward && !actions?.backward) return null;
         return (
           <div className="flex items-center gap-2 mb-4">
@@ -175,6 +194,7 @@ export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange
                 {actions.reject.label}
               </button>
             )}
+            <ShareButton ticketId={ticket.id} />
           </div>
         );
       })()}
@@ -415,4 +435,44 @@ function parseGPSString(gpsString: string): { latitude: number; longitude: numbe
   if (isNaN(lat) || isNaN(lng)) return null;
 
   return { latitude: lat, longitude: lng, address: null };
+}
+
+/** Share button — creates a share token and copies the public URL to clipboard */
+function ShareButton({ ticketId }: { ticketId: string }) {
+  const [sharing, setSharing] = useState(false);
+
+  const handleShare = async () => {
+    setSharing(true);
+    try {
+      const res = await fetch('/api/snags/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticketId }),
+      });
+      if (!res.ok) throw new Error('Failed to create share link');
+      const json = await res.json();
+      const url = json.data?.url;
+      if (url) {
+        await navigator.clipboard.writeText(url);
+        toast.success('Share link copied to clipboard');
+      }
+    } catch (err) {
+      log.error('Failed to create share link', { err, ticketId });
+      toast.error('Failed to create share link');
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={() => { void handleShare(); }}
+      disabled={sharing}
+      className="text-xs bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-200 px-3 py-1.5 rounded font-medium transition-colors flex items-center gap-1.5 ml-auto"
+    >
+      <Share2 className="w-3.5 h-3.5" />
+      {sharing ? 'Copying...' : 'Share'}
+    </button>
+  );
 }
