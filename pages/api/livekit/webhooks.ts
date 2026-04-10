@@ -96,7 +96,7 @@ async function handler(
                     // Get file results from egress info
                     const fileResults = event.egressInfo.fileResults;
                     const recordingPath = fileResults && fileResults.length > 0
-                        ? fileResults[0].filename
+                        ? fileResults[0]!.filename
                         : null;
 
                     if (recordingPath) {

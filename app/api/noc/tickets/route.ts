@@ -69,6 +69,9 @@ const VALID_TYPES: TicketType[] = [
   TicketType.HSE_NEAR_MISS,
   TicketType.DEV_OPS,
   TicketType.SNAG,
+  TicketType.INTERNAL_SNAG,
+  TicketType.SALES_LEAD,
+  TicketType.UNSPECIFIED,
 ];
 
 const VALID_PRIORITIES: TicketPriority[] = [

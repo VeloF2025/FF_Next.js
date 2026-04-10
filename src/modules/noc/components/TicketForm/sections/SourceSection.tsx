@@ -5,7 +5,7 @@
 
 'use client';
 
-import { Tag, Wrench, PlusCircle, RefreshCw, AlertCircle, ShieldAlert, Search, FileSearch, Bug } from 'lucide-react';
+import { Tag, Wrench, PlusCircle, RefreshCw, AlertCircle, ShieldAlert, Search, FileSearch, Bug, BugPlay, TrendingUp, HelpCircle } from 'lucide-react';
 import {
   TicketSource,
   TicketType,
@@ -39,6 +39,10 @@ const TICKET_TYPE_ICONS: Record<TicketType, React.ReactNode> = {
   [TicketType.OLT_INVESTIGATION]: <Search className="w-4 h-4" />,
   [TicketType.PRE_PROVISION]: <FileSearch className="w-4 h-4" />,
   [TicketType.DEV_OPS]: <Bug className="w-4 h-4" />,
+  [TicketType.SNAG]: <BugPlay className="w-4 h-4" />,
+  [TicketType.INTERNAL_SNAG]: <BugPlay className="w-4 h-4" />,
+  [TicketType.SALES_LEAD]: <TrendingUp className="w-4 h-4" />,
+  [TicketType.UNSPECIFIED]: <HelpCircle className="w-4 h-4" />,
 };
 
 export function SourceSection({ formData, errors, setField, disabled }: SourceSectionProps) {

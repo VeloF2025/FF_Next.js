@@ -333,9 +333,10 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
         ont_serial,
         client_name,
         client_contact,
-        client_email
+        client_email,
+        sub_type
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
       )
       RETURNING *
     `;
@@ -379,6 +380,7 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
       payload.client_name || null,
       payload.client_contact || null,
       payload.client_email || null,
+      payload.sub_type || null,
     ];
 
     const ticket = await queryOne<Ticket>(sql, values);

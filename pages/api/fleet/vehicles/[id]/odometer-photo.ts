@@ -108,7 +108,7 @@ async function handlePost(
     return apiResponse.notFound(res, 'Vehicle', vehicleId);
   }
 
-  const registration = vehicleCheck[0].registration as string;
+  const registration = vehicleCheck[0]!.registration as string;
 
   log.info('Processing odometer photo', { vehicleId, registration });
 

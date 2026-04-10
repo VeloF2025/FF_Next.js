@@ -57,6 +57,10 @@ const SECTIONS_BY_TYPE: Record<string, SectionVisibility> = {
   olt_investigation: { location: true,  equipment: true,  client: false, fault: false, devops: false },
   pre_provision:     { location: true,  equipment: true,  client: false, fault: false, devops: false },
   dev_ops:           { location: false, equipment: false, client: false, fault: false, devops: true  },
+  snag:              { location: true,  equipment: false, client: false, fault: false, devops: false },
+  internal_snag:     { location: true,  equipment: false, client: false, fault: false, devops: false },
+  sales_lead:        { location: false, equipment: false, client: true,  fault: false, devops: false },
+  unspecified:       { location: true,  equipment: false, client: true,  fault: false, devops: false },
 };
 
 const DEFAULT_SECTIONS: SectionVisibility = {

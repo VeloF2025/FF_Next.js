@@ -161,8 +161,10 @@ function mapPriority(qcontactPriority: string | null): string {
  * After split: category = parent (Connectivity, General, Maintenance)
  *              subcategory = child (ONT/Gizzu, Maintenance, PropertyDamage)
  *
- * DB constraint allows: fault, fault_repair, installation, new_installation,
- *                       modification, ont_swap, incident, other
+ * Sales/lead categories: When QContact is configured with sales categories such as
+ *   'Sales', 'Lead', 'Enquiry', 'New Customer', 'Sales Enquiry', 'Prospect'
+ *   these will map to sales_lead. Add QContact category names here as they are
+ *   configured in the QContact sales pipeline.
  */
 function mapTicketType(category: string | null, subcategory?: string | null): string {
   // Combine both for matching (handles cases like General + Maintenance)
@@ -172,6 +174,18 @@ function mapTicketType(category: string | null, subcategory?: string | null): st
     return 'fault_repair';
   }
 
+  // Sales / lead enquiries → sales_lead
+  // TODO: Add actual QContact sales category names when QContact sales pipeline is configured
+  if (
+    combined.includes('sales') ||
+    combined.includes('lead') ||
+    combined.includes('enquiry') ||
+    combined.includes('enquiries') ||
+    combined.includes('new customer') ||
+    combined.includes('prospect')
+  ) {
+    return 'sales_lead';
+  }
   // Connectivity issues → fault_repair
   if (combined.includes('connectivity') || combined.includes('signal') || combined.includes('link light')) {
     return 'fault_repair';

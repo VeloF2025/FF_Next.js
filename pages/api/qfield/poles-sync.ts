@@ -116,7 +116,7 @@ async function handler(
 
 function extractNumber(text: string, pattern: RegExp): number {
   const match = text.match(pattern);
-  return match ? parseInt(match[1].replace(/,/g, ''), 10) : 0;
+  return match ? parseInt(match[1]!.replace(/,/g, ''), 10) : 0;
 }
 
 export default withAuth(handler);

@@ -43,7 +43,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       )
       RETURNING id
     `;
-    outboxId = insertResult[0].id;
+    outboxId = insertResult[0]!.id;
 
     // Send via Resend
     const { resend } = await import('@/lib/email/resendClient');

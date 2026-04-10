@@ -114,7 +114,7 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
             is_active = true,
             updated_at = NOW(),
             created_by = ${userName}
-        WHERE id = ${existing[0].id}::uuid
+        WHERE id = ${existing[0]!.id}::uuid
         RETURNING *
       `;
     } else {

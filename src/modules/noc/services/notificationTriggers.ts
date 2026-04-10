@@ -825,20 +825,48 @@ export async function triggerOnTicketClosure(ticket: Ticket): Promise<TriggerRes
  * For DevOps tickets (internal), tells the reporter the fix is ready to verify.
  * Sends both an in-app notification and an email.
  */
-export async function triggerOnTicketResolution(ticket: Ticket): Promise<TriggerResult> {
-  // Only notify for user-created tickets, not system/automated ones (OES, QContact, PP data, etc.)
-  const USER_SOURCES = ['manual', 'internal', 'dev_ops', 'snags', 'ont_swap', 'construction'];
-  if (!USER_SOURCES.includes(ticket.source)) {
-    logger.info('Skipping resolution notification — system-created ticket', {
-      ticketId: ticket.id, source: ticket.source,
+/**
+ * Determine if a ticket should trigger a resolution notification.
+ * User-created tickets always notify. QContact Fibertime tickets notify the assignee.
+ * System bulk tickets (pp_data, olt_mismatch, weekly_report) never notify.
+ */
+function shouldNotifyOnResolution(ticket: Ticket): boolean {
+  const userSources = ['manual', 'internal', 'dev_ops', 'snags', 'ont_swap', 'construction'];
+  if (userSources.includes(ticket.source)) return true;
+
+  const fibertimeTypes = ['new_installation', 'fault_repair', 'ont_swap', 'modification', 'incident'];
+  if (ticket.source === 'qcontact' && fibertimeTypes.includes(ticket.ticket_type)) return true;
+
+  return false;
+}
+
+/**
+ * Resolve the right recipient for a resolution notification.
+ * QContact tickets → assigned user (team lead). Others → ticket creator.
+ */
+async function resolveResolutionRecipient(ticket: Ticket): Promise<UserLookup | null> {
+  if (ticket.source === 'qcontact' && ticket.assigned_to) {
+    const assignee = await resolveUserIdFromStaff(ticket.assigned_to);
+    if (assignee) return assignee;
+    logger.warn('QContact ticket assignee not found, falling back to creator', {
+      ticketId: ticket.id, assignedTo: ticket.assigned_to,
     });
-    return { success: true, notifications_sent: 0 };
+  }
+  return lookupCreator(ticket.created_by);
+}
+
+export async function triggerOnTicketResolution(ticket: Ticket): Promise<TriggerResult> {
+  if (!shouldNotifyOnResolution(ticket)) {
+    logger.info('Skipping resolution notification', {
+      ticketId: ticket.id, source: ticket.source, type: ticket.ticket_type,
+    });
+    return { success: true, notification_sent: false };
   }
 
   const isDevOps = ticket.ticket_type === 'dev_ops';
-  const creator = await lookupCreator(ticket.created_by);
+  const recipient = await resolveResolutionRecipient(ticket);
 
-  if (creator) {
+  if (recipient) {
     const title = isDevOps
       ? `Fix ready for verification — ${ticket.ticket_uid}`
       : `Ticket ${ticket.ticket_uid} resolved`;
@@ -853,18 +881,18 @@ export async function triggerOnTicketResolution(ticket: Ticket): Promise<Trigger
       action_url: `/noc/tickets/${ticket.id}`,
       source_module: 'maintenance',
       source_id: ticket.id,
-      recipient_user_ids: [creator.id],
+      recipient_user_ids: [recipient.id],
     };
 
     notify(emailPayload).catch((err) => {
       logger.error('Failed to send resolution notification', { error: err, ticketId: ticket.id });
     });
-    deliverEmail(creator.id, emailPayload, null).catch((err) => {
+    deliverEmail(recipient.id, emailPayload, null).catch((err) => {
       logger.error('Failed to send resolution email', { error: err, ticketId: ticket.id });
     });
   } else {
-    logger.warn('Cannot send resolution notification — creator not found', {
-      ticketId: ticket.id, createdBy: ticket.created_by,
+    logger.warn('Cannot send resolution notification — recipient not found', {
+      ticketId: ticket.id, source: ticket.source, createdBy: ticket.created_by,
     });
   }
 

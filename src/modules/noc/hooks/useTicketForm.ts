@@ -438,6 +438,7 @@ export const TICKET_SOURCE_LABELS: Record<TicketSource, string> = {
   [TicketSource.PP_DATA]: 'PP Data',
   [TicketSource.OLT_MISMATCH]: 'OLT Mismatch',
   [TicketSource.DEV_OPS]: 'DevOps',
+  [TicketSource.SNAGS]: 'Snags',
 };
 
 export const TICKET_TYPE_LABELS: Record<TicketType, string> = {
@@ -452,6 +453,10 @@ export const TICKET_TYPE_LABELS: Record<TicketType, string> = {
   [TicketType.OLT_INVESTIGATION]: 'OLT Investigation',
   [TicketType.PRE_PROVISION]: 'Pre-Provision',
   [TicketType.DEV_OPS]: 'DevOps',
+  [TicketType.SNAG]: 'Snag',
+  [TicketType.INTERNAL_SNAG]: 'Internal Snag',
+  [TicketType.SALES_LEAD]: 'Sales Lead',
+  [TicketType.UNSPECIFIED]: 'Unspecified',
 };
 
 export const TICKET_PRIORITY_LABELS: Record<TicketPriority, string> = {
