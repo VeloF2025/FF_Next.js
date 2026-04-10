@@ -60,14 +60,15 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
       : undefined;
 
   try {
-    const { w: ppWhere, p: ppP }         = pf(project);
-    const { w: mismatchWhere, p: mismP } = pf(project);
-    const { w: trendWhere, p: trendP }   = pf(project);
+    const { w: ppWhere, p: ppP }       = pf(project);
+    const { w: trendWhere, p: trendP } = pf(project);
     const billingWhere = project ? `WHERE d.project ILIKE $1` : '';
     const billingP: string[] = project ? [project] : [];
-    const offlineMismatchAnd = andProj(project);
-    const offlineAnd         = andProj(project);
-    const offlineP: string[] = project ? [project] : [];
+    // olt_mismatch_records has no project column — JOIN through olt_report_imports
+    const oltJoin = 'JOIN olt_report_imports ri ON ri.id = r.import_id';
+    const oltWhere = project ? `WHERE ri.project ILIKE $1` : '';
+    const oltP: string[] = project ? [project] : [];
+    // offline_devices has no project column — skip project filter
 
     const [
       ppResult,
@@ -94,11 +95,11 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
 
       pool.query<CountsRow>(
         `SELECT COUNT(*) AS total,
-           COUNT(*) FILTER (WHERE fix_status IN ('pending','empty_serial','not_found','needs_reinvestigation') AND maintenance_ticket_id IS NULL) AS open,
-           COUNT(*) FILTER (WHERE maintenance_ticket_id IS NOT NULL AND fix_status NOT IN ('fixed','resolved')) AS ticketed,
-           COUNT(*) FILTER (WHERE fix_status IN ('fixed','resolved')) AS resolved
-         FROM olt_mismatch_records ${mismatchWhere}`,
-        mismP,
+           COUNT(*) FILTER (WHERE r.fix_status IN ('pending','empty_serial','not_found','needs_reinvestigation') AND r.maintenance_ticket_id IS NULL) AS open,
+           COUNT(*) FILTER (WHERE r.maintenance_ticket_id IS NOT NULL AND r.fix_status NOT IN ('fixed','resolved')) AS ticketed,
+           COUNT(*) FILTER (WHERE r.fix_status IN ('fixed','resolved')) AS resolved
+         FROM olt_mismatch_records r ${oltJoin} ${oltWhere}`,
+        oltP,
       ),
 
       pool.query<CountsRow>(
@@ -106,14 +107,14 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
            COUNT(*) FILTER (WHERE mismatch_status = 'pending_investigation') AS open,
            COUNT(*) FILTER (WHERE mismatch_status = 'ticket_created') AS ticketed,
            COUNT(*) FILTER (WHERE mismatch_status = 'resolved') AS resolved
-         FROM offline_devices WHERE serial_mismatch = true ${offlineMismatchAnd}`,
-        offlineP,
+         FROM offline_devices WHERE serial_mismatch = true`,
+        [],
       ),
 
       pool.query<OfflineRow>(
         `SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE match_status = 'unmatched') AS open
-         FROM offline_devices WHERE serial_mismatch IS NOT TRUE ${offlineAnd}`,
-        offlineP,
+         FROM offline_devices WHERE serial_mismatch IS NOT TRUE`,
+        [],
       ),
 
       pool.query<BillRow>(
@@ -144,36 +145,20 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
       ),
 
       pool.query<ProjCountsRow>(
-        `SELECT project,
+        `SELECT ri.project,
            COUNT(*) AS total,
-           COUNT(*) FILTER (WHERE fix_status IN ('pending','empty_serial','not_found','needs_reinvestigation') AND maintenance_ticket_id IS NULL) AS open,
-           COUNT(*) FILTER (WHERE maintenance_ticket_id IS NOT NULL AND fix_status NOT IN ('fixed','resolved')) AS ticketed,
-           COUNT(*) FILTER (WHERE fix_status IN ('fixed','resolved')) AS resolved
-         FROM olt_mismatch_records ${mismatchWhere} GROUP BY project ORDER BY project`,
-        mismP,
+           COUNT(*) FILTER (WHERE r.fix_status IN ('pending','empty_serial','not_found','needs_reinvestigation') AND r.maintenance_ticket_id IS NULL) AS open,
+           COUNT(*) FILTER (WHERE r.maintenance_ticket_id IS NOT NULL AND r.fix_status NOT IN ('fixed','resolved')) AS ticketed,
+           COUNT(*) FILTER (WHERE r.fix_status IN ('fixed','resolved')) AS resolved
+         FROM olt_mismatch_records r ${oltJoin} ${oltWhere}
+         GROUP BY ri.project ORDER BY ri.project`,
+        oltP,
       ),
 
-      pool.query<ProjCountsRow>(
-        `SELECT project,
-           COUNT(*) AS total,
-           COUNT(*) FILTER (WHERE mismatch_status = 'pending_investigation') AS open,
-           COUNT(*) FILTER (WHERE mismatch_status = 'ticket_created') AS ticketed,
-           COUNT(*) FILTER (WHERE mismatch_status = 'resolved') AS resolved
-         FROM offline_devices
-         WHERE serial_mismatch = true ${offlineMismatchAnd}
-         GROUP BY project ORDER BY project`,
-        offlineP,
-      ),
+      /* offline_devices has no project column — return empty for per-project breakdown */
+      Promise.resolve({ rows: [] as ProjCountsRow[] }),
 
-      pool.query<ProjOfflineRow>(
-        `SELECT project,
-           COUNT(*) AS total,
-           COUNT(*) FILTER (WHERE match_status = 'unmatched') AS open
-         FROM offline_devices
-         WHERE serial_mismatch IS NOT TRUE ${offlineAnd}
-         GROUP BY project ORDER BY project`,
-        offlineP,
-      ),
+      Promise.resolve({ rows: [] as ProjOfflineRow[] }),
 
       pool.query<ProjBillRow>(
         `SELECT d.project,

@@ -147,16 +147,16 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
 
     // ── 2 & 3. Serial mismatches (OLT + offline_devices mismatch) ────────────
     if (!catFilter || catFilter === 'serial_mismatch') {
-      // 2a. olt_mismatch_records
+      // 2a. olt_mismatch_records (no project col — JOIN through olt_report_imports)
       const { sql: w1, params: p1 } = buildWhere({
-        projectCol: 'r.project', dropCol: 'r.drop_number',
+        projectCol: 'ri.project', dropCol: 'r.drop_number',
         ticketCol: 'r.maintenance_ticket_id',
         project, search, hasTicket,
         extraFixed: ["r.fix_status NOT IN ('fixed', 'resolved')"],
       });
       queries.push(
         pool.query(
-          `SELECT r.id, r.drop_number, r.project, r.olt_serial, r.wrong_onemap_serial,
+          `SELECT r.id, r.drop_number, ri.project, r.olt_serial, r.wrong_onemap_serial,
                   r.fix_status, r.maintenance_ticket_id, r.created_at,
                   mt.uid AS ticket_uid, mt.status AS ticket_status,
                   oa.serial_number AS oes_serial, dr.ont_serial_scanned AS wa_serial, d.zone,
@@ -165,6 +165,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
                   (SELECT MAX(bd.week_ending) FROM ft_billing_deductions bd
                    WHERE bd.dr_number = r.drop_number AND bd.deduction_note = 'note4') AS last_billed
            FROM olt_mismatch_records r
+           JOIN olt_report_imports ri ON ri.id = r.import_id
            LEFT JOIN maintenance_tickets mt ON mt.id = r.maintenance_ticket_id
            LEFT JOIN oes_activations oa ON oa.drop_number = r.drop_number
            LEFT JOIN dr_photo_unified_reviews dr ON dr.drop_number = r.drop_number
@@ -186,16 +187,17 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
         }))),
       );
 
-      // 2b. offline_devices where serial_mismatch = true
+      // 2b. offline_devices where serial_mismatch = true (no project col — get from drops→projects)
       const { sql: w2, params: p2 } = buildWhere({
-        projectCol: 'od.project', dropCol: 'od.drop_number',
+        projectCol: 'p.project_name', dropCol: 'od.drop_number',
         ticketCol: 'od.mismatch_ticket_id',
         project, search, hasTicket,
         extraFixed: ["od.serial_mismatch = true", "od.mismatch_status != 'resolved'"],
       });
       queries.push(
         pool.query(
-          `SELECT od.id, od.drop_number, od.project, od.serial_number AS offline_serial,
+          `SELECT od.id, od.drop_number, COALESCE(p.project_name, 'Unknown') AS project,
+                  od.serial_number AS offline_serial,
                   od.mismatch_status, od.mismatch_ticket_id, od.olt_serial, od.created_at,
                   od.last_down_reason, od.offline_bucket,
                   mt.uid AS ticket_uid, mt.status AS ticket_status,
@@ -205,6 +207,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
            LEFT JOIN oes_activations oa ON oa.drop_number = od.drop_number
            LEFT JOIN dr_photo_unified_reviews dr ON dr.drop_number = od.drop_number
            LEFT JOIN drops d ON d.drop_number = od.drop_number
+           LEFT JOIN projects p ON p.id = d.project_id
            ${w2}`, p2,
         ).then(({ rows }) => rows.map((r) => {
           const status: ActionStatus =
@@ -229,19 +232,21 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
     // ── 4. Pure offline devices ───────────────────────────────────────────────
     if (!catFilter || catFilter === 'offline') {
       const { sql: w, params } = buildWhere({
-        projectCol: 'od.project', dropCol: 'od.drop_number',
+        projectCol: 'p.project_name', dropCol: 'od.drop_number',
         ticketCol: null,
         project, search, hasTicket: undefined,
         extraFixed: ['od.serial_mismatch IS NOT TRUE'],
       });
       queries.push(
         pool.query(
-          `SELECT od.id, od.drop_number, od.project, od.serial_number,
+          `SELECT od.id, od.drop_number, COALESCE(p.project_name, 'Unknown') AS project,
+                  od.serial_number,
                   od.last_down_reason, od.offline_bucket, od.match_status, od.created_at,
                   oa.ont_rx_sig_dbm AS signal_dbm, d.zone
            FROM offline_devices od
            LEFT JOIN oes_activations oa ON oa.drop_number = od.drop_number
            LEFT JOIN drops d ON d.drop_number = od.drop_number
+           LEFT JOIN projects p ON p.id = d.project_id
            ${w}`, params,
         ).then(({ rows }) => rows.map((r) => base({
           id: `offline_devices:${r.id}`, dr_number: r.drop_number, project: r.project,

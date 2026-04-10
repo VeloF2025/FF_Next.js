@@ -14,7 +14,7 @@ import { getDbConnection } from './_shared';
 export async function calculateSummary(): Promise<WaMonitorSummary> {
   try {
     const sql = getDbConnection();
-    const [stats] = await sql`
+    const statsRows = await sql`
       SELECT
         COUNT(*) as total,
         COUNT(CASE
@@ -150,7 +150,7 @@ export async function calculateSummaryFast(): Promise<WaMonitorSummary> {
       `,
     ]);
 
-    const stats = statsResult[0];
+    const stats = statsResult[0]!;
     const totalCount = parseInt(stats.total, 10);
     const completeCount = parseInt(stats.complete || '0', 10);
 

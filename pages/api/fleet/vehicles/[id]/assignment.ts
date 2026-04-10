@@ -175,7 +175,7 @@ async function handlePost(
     return apiResponse.notFound(res, 'Staff member', body.staffId);
   }
 
-  const staff = staffCheck[0];
+  const staff = staffCheck[0]!;
 
   // Check for valid driver's license
   const licenseCheck = await sql`
@@ -212,7 +212,7 @@ async function handlePost(
   const assignmentStart = body.assignmentStart || new Date().toISOString().split('T')[0];
 
   // Create new assignment linked to fleet vehicle
-  const [created] = await sql`
+  const createdRows = await sql`
     INSERT INTO vehicle_assignments (
       staff_id,
       fleet_vehicle_id,
@@ -238,6 +238,7 @@ async function handlePost(
     )
     RETURNING *
   `;
+  const created = createdRows[0]!;
 
   // Update staff has_company_vehicle flag
   await sql`
@@ -283,7 +284,7 @@ async function handleDelete(
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'No active assignment for this vehicle');
   }
 
-  const existing = existingRows[0];
+  const existing = existingRows[0]!;
 
   // Deactivate assignment
   await sql`

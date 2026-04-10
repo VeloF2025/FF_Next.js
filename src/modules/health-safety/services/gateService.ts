@@ -136,7 +136,7 @@ async function getOrCreateCompliance(contractorId: number) {
   `;
 
   if (existing.length > 0) {
-    return existing[0];
+    return existing[0]!;
   }
 
   // Create new compliance record with default values
@@ -146,7 +146,7 @@ async function getOrCreateCompliance(contractorId: number) {
     RETURNING *
   `;
 
-  return created[0];
+  return created[0]!;
 }
 
 /**

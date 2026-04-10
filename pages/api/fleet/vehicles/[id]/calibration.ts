@@ -197,7 +197,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
 
         // Create new calibration
-        const [newCalibration] = await sql`
+        const newCalibrationRows = await sql`
           INSERT INTO fleet_vehicle_calibration (
             vehicle_id,
             calibrated_by,
@@ -221,6 +221,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           )
           RETURNING *
         `;
+        const newCalibration = newCalibrationRows[0]!;
 
         // Log the calibration event to audit log
         await sql`
