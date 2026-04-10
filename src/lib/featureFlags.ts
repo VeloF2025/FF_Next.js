@@ -44,7 +44,7 @@ export const FEATURE_FLAGS: Record<string, FeatureFlag> = {
  * @returns true if unified review should be shown, false to use old system
  */
 export function isUnifiedReviewEnabled(project: string): boolean {
-  const flag = FEATURE_FLAGS.UNIFIED_DR_REVIEW;
+  const flag = FEATURE_FLAGS.UNIFIED_DR_REVIEW!;
 
   if (!flag.enabled) {
     return false;
@@ -63,7 +63,7 @@ export function isUnifiedReviewEnabled(project: string): boolean {
  * Get current rollout stage for unified review
  */
 export function getUnifiedReviewRolloutStage(): FeatureFlag['rolloutStage'] {
-  return FEATURE_FLAGS.UNIFIED_DR_REVIEW.rolloutStage;
+  return FEATURE_FLAGS.UNIFIED_DR_REVIEW!.rolloutStage;
 }
 
 /**
@@ -120,7 +120,7 @@ export function progressRollout(week: '6.1' | '6.3' | '6.4'): void {
  * Get list of projects currently enabled for unified review
  */
 export function getEnabledProjects(): Project[] {
-  const flag = FEATURE_FLAGS.UNIFIED_DR_REVIEW;
+  const flag = FEATURE_FLAGS.UNIFIED_DR_REVIEW!;
 
   if (!flag.enabled) {
     return [];

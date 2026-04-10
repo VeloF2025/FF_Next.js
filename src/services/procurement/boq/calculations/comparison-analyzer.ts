@@ -4,7 +4,7 @@
  */
 
 import { BOQ } from '../../../../types/procurement/boq.types';
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { BOQCrud } from '../crud';
 import { log } from '@/lib/logger';
 

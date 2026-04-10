@@ -3,7 +3,7 @@
  * Handles project budget calculations and risk analysis
  */
 
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import { BOQCrud } from '../crud';
 import { BOQ } from '../../../../types/procurement/boq.types';
 import { log } from '@/lib/logger';

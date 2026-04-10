@@ -3,7 +3,7 @@
  * Handles automatic catalog matching for BOQ items
  */
 
-// @ts-ignore
+// @ts-expect-error — module lacks type declarations
 import type { BOQItem } from '@/lib/neon/schema';
 import type { CatalogMatchResult } from './types';
 

@@ -31,7 +31,7 @@ async function handler(
       FROM drops
     `;
 
-    const stats = statsQuery[0];
+    const stats = statsQuery[0]!; // Aggregate query always returns a row
 
     const completionRate = stats.total_drops > 0
       ? (stats.completed_drops / stats.total_drops) * 100

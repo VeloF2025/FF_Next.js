@@ -247,6 +247,7 @@ async function processSOWData(type: string, data: Array<Record<string, any>>): P
   // Validate and process each record
   for (let i = 0; i < data.length; i++) {
     const record = data[i];
+    if (!record) continue;
     const recordErrors: string[] = [];
     
     // Check required fields
