@@ -119,14 +119,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse<MeetingContextR
 
     let meetingId: number | null = null;
     if (linkedMeetings.length > 0) {
-      meetingId = Number(linkedMeetings[0].meeting_id);
+      meetingId = Number(linkedMeetings[0]!.meeting_id);
     } else {
       const legacy = await sql`
         SELECT source_meeting_id FROM manco_action_items
         WHERE id = ${item_id} AND source_meeting_id IS NOT NULL
       `;
-      if (legacy.length > 0 && legacy[0].source_meeting_id) {
-        meetingId = Number(legacy[0].source_meeting_id);
+      if (legacy.length > 0 && legacy[0]!.source_meeting_id) {
+        meetingId = Number(legacy[0]!.source_meeting_id);
       }
     }
 

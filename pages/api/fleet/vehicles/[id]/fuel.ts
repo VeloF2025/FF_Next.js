@@ -225,9 +225,9 @@ async function handlePatch(
     return apiResponse.notFound(res, 'Fuel reading', recordId);
   }
 
-  const oldLevel = existing[0].fuel_level;
-  const prevLevel = existing[0].previous_level;
-  const recordedAt = existing[0].recorded_at;
+  const oldLevel = existing[0]!.fuel_level;
+  const prevLevel = existing[0]!.previous_level;
+  const recordedAt = existing[0]!.recorded_at;
 
   // Recalculate level_change for this record based on its previous_level
   const newLevelChange = prevLevel !== null ? body.fuelLevel - prevLevel : null;
@@ -250,12 +250,12 @@ async function handlePatch(
   ` as Array<{ id: string; fuel_level: number }>;
 
   if (nextRecord.length > 0) {
-    const nextLevelChange = nextRecord[0].fuel_level - body.fuelLevel;
+    const nextLevelChange = nextRecord[0]!.fuel_level - body.fuelLevel;
     await sql`
       UPDATE fleet_fuel_history
       SET previous_level = ${body.fuelLevel},
           level_change = ${nextLevelChange}
-      WHERE id = ${nextRecord[0].id}
+      WHERE id = ${nextRecord[0]!.id}
     `;
   }
 

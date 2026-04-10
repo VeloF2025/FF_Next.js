@@ -68,7 +68,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         action: 'test-auto-sync',
         step: 'success',
         dropNumber: testDropNumber,
-        queueItemId: queueItems[0].id
+        queueItemId: queueItems[0]!.id
       });
 
       return res.status(200).json({
@@ -77,11 +77,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         details: {
           dropInserted: testDropNumber,
           queueItem: {
-            id: queueItems[0].id,
-            drop_number: queueItems[0].drop_number,
-            status: queueItems[0].status,
-            attempts: queueItems[0].attempts,
-            created_at: queueItems[0].created_at,
+            id: queueItems[0]!.id,
+            drop_number: queueItems[0]!.drop_number,
+            status: queueItems[0]!.status,
+            attempts: queueItems[0]!.attempts,
+            created_at: queueItems[0]!.created_at,
           },
           nextStep: 'Call POST /api/onemap/process-sync-queue to process the queue',
         },

@@ -36,18 +36,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     const summary = {
-      totalClients: parseInt(clientResult[0].total_clients || '0'),
-      activeClients: parseInt(clientResult[0].active_clients || '0'),
-      inactiveClients: parseInt(clientResult[0].inactive_clients || '0'),
+      totalClients: parseInt(clientResult[0]!.total_clients || '0'),
+      activeClients: parseInt(clientResult[0]!.active_clients || '0'),
+      inactiveClients: parseInt(clientResult[0]!.inactive_clients || '0'),
       prospectClients: 0,
-      totalProjects: parseInt(projectResult[0].total_projects || '0'),
-      totalProjectValue: parseFloat(projectResult[0].total_value || '0'),
+      totalProjects: parseInt(projectResult[0]!.total_projects || '0'),
+      totalProjectValue: parseFloat(projectResult[0]!.total_value || '0'),
       averageProjectValue: 0,
       topClientsByValue: [],
       clientsByCategory: {},
       clientsByStatus: {
-        ACTIVE: parseInt(clientResult[0].active_clients || '0'),
-        INACTIVE: parseInt(clientResult[0].inactive_clients || '0')
+        ACTIVE: parseInt(clientResult[0]!.active_clients || '0'),
+        INACTIVE: parseInt(clientResult[0]!.inactive_clients || '0')
       },
       clientsByPriority: {
         HIGH: 0

@@ -826,6 +826,15 @@ export async function triggerOnTicketClosure(ticket: Ticket): Promise<TriggerRes
  * Sends both an in-app notification and an email.
  */
 export async function triggerOnTicketResolution(ticket: Ticket): Promise<TriggerResult> {
+  // Only notify for user-created tickets, not system/automated ones (OES, QContact, PP data, etc.)
+  const USER_SOURCES = ['manual', 'internal', 'dev_ops', 'snags', 'ont_swap', 'construction'];
+  if (!USER_SOURCES.includes(ticket.source)) {
+    logger.info('Skipping resolution notification — system-created ticket', {
+      ticketId: ticket.id, source: ticket.source,
+    });
+    return { success: true, notifications_sent: 0 };
+  }
+
   const isDevOps = ticket.ticket_type === 'dev_ops';
   const creator = await lookupCreator(ticket.created_by);
 

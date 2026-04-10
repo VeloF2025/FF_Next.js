@@ -83,8 +83,8 @@ async function handler(
           ${JSON.stringify({
             roleName: name,
             displayName,
-            sourceUser: userResult[0].email,
-            sourceRole: userResult[0].role,
+            sourceUser: userResult[0]!.email,
+            sourceRole: userResult[0]!.role,
             permissionCount: result.permissionCount,
             createdBy: req.user.email,
           })}::jsonb,
@@ -131,11 +131,11 @@ async function handler(
         ${req.user.id},
         'role_update_from_user',
         'role',
-        ${roleData[0].id}::uuid,
+        ${roleData[0]!.id}::uuid,
         ${JSON.stringify({
           roleName: existingRole,
-          sourceUser: userResult[0].email,
-          sourceRole: userResult[0].role,
+          sourceUser: userResult[0]!.email,
+          sourceRole: userResult[0]!.role,
           permissionCount: result.permissionCount,
           updatedBy: req.user.email,
         })}::jsonb,
@@ -149,9 +149,9 @@ async function handler(
     );
 
     return apiResponse.success(res, {
-      message: `Role "${roleData[0].display_name}" updated with ${result.permissionCount} permissions`,
+      message: `Role "${roleData[0]!.display_name}" updated with ${result.permissionCount} permissions`,
       name: existingRole,
-      displayName: roleData[0].display_name,
+      displayName: roleData[0]!.display_name,
       permissionCount: result.permissionCount,
     });
   } catch (error) {
