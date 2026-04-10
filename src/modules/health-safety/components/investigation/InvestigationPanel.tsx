@@ -125,7 +125,7 @@ export function InvestigationPanel({ ticketId, onComplete }: InvestigationPanelP
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          root_cause: rootCause || (whyEntries.length > 0 ? whyEntries[whyEntries.length - 1].answer : undefined),
+          root_cause: rootCause || (whyEntries.length > 0 ? whyEntries[whyEntries.length - 1]!.answer : undefined),
           root_cause_method: rootCauseMethod,
           root_cause_analysis: whyEntries,
           contributing_factors: contributingFactors.filter(Boolean),

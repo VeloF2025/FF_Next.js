@@ -192,7 +192,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
           );
 
           // Check if next line is separator
-          if (i + 1 < lines.length && lines[i + 1].match(/^\s*\|[\s\|\-:]+\|\s*$/)) {
+          if (i + 1 < lines.length && lines[i + 1]!.match(/^\s*\|[\s\|\-:]+\|\s*$/)) {
             isTableHeader = false;
             i++; // Skip separator line
           } else if (isTableHeader) {

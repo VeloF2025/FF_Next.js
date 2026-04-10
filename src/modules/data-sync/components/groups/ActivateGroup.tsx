@@ -51,7 +51,7 @@ export function ActivateGroup({ activeTab, onTabChange }: ActivateGroupProps) {
   // Sync URL with active tab on mount
   useEffect(() => {
     if (!activeTab && accessibleTabs.length > 0) {
-      onTabChange(accessibleTabs[0].id);
+      onTabChange(accessibleTabs[0]!.id);
     }
   }, [activeTab, onTabChange, accessibleTabs]);
 

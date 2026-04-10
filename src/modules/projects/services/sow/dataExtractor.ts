@@ -94,7 +94,7 @@ export class SOWDataExtractor {
     const data = [];
 
     for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',');
+      const values = lines[i]!.split(',');
       if (values.length === headers.length) {
         const row: any = {};
         headers.forEach((header, index) => {

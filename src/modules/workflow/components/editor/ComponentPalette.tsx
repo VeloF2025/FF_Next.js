@@ -213,7 +213,7 @@ export function ComponentPalette() {
     if (!acc[item.category]) {
       acc[item.category] = [];
     }
-    acc[item.category].push(item);
+    acc[item.category]!.push(item);
     return acc;
   }, {} as Record<string, PaletteItem[]>);
 

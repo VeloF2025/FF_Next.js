@@ -198,7 +198,7 @@ function MarkdownBlock({ block, searchHighlight }: { block: Block; searchHighlig
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-card/5">
-                {block.rows[0].map((cell, i) => (
+                {block.rows[0]!.map((cell, i) => (
                   <th key={i} className="px-4 py-2 text-left font-semibold text-gray-200 border-b border-white/10">
                     <InlineMarkdown text={cell} highlight={searchHighlight} />
                   </th>

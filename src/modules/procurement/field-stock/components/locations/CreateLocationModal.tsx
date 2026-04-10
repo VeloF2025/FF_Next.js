@@ -218,7 +218,7 @@ export function CreateLocationModal({ isOpen, onClose, onCreated }: CreateLocati
 function generateCode(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return '';
-  if (words.length === 1) return words[0].substring(0, 8).toUpperCase();
+  if (words.length === 1) return words[0]!.substring(0, 8).toUpperCase();
   return words.map(w => w.substring(0, 4)).join('-').substring(0, 15).toUpperCase();
 }
 

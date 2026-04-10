@@ -118,7 +118,7 @@ export function FieldOpsReportsPage() {
   // Group zone/pon rows by project
   const zonePonByProject = byZonePon.reduce<Record<string, { name: string; rows: ZonePonRow[] }>>((acc, row) => {
     if (!acc[row.project_id]) acc[row.project_id] = { name: row.project_name, rows: [] };
-    acc[row.project_id].rows.push(row);
+    acc[row.project_id]!.rows.push(row);
     return acc;
   }, {});
 

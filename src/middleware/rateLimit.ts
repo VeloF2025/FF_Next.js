@@ -272,7 +272,7 @@ export class SlidingWindowRateLimiter {
     }
 
     const resetTime = timestamps.length > 0
-      ? timestamps[0] + windowMs
+      ? timestamps[0]! + windowMs
       : now + windowMs;
 
     return {

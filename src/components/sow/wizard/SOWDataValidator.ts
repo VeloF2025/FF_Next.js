@@ -235,7 +235,7 @@ const validateFibreData = (data: any[]): ValidationResult => {
       let toPoint = '';
       if (label && label.includes('-')) {
         const parts = label.split('-');
-        fromPoint = parts[0].split('.').slice(-1)[0]; // Get last part before dash
+        fromPoint = parts[0]!.split('.').slice(-1)[0]; // Get last part before dash
         toPoint = parts[1]; // Everything after dash
       }
       

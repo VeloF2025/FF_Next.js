@@ -136,7 +136,7 @@ export function FiveWhysForm({ entries, onChange }: FiveWhysFormProps) {
         <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/30">
           <p className="text-xs font-medium text-green-400 mb-1">Root Cause Identified:</p>
           <p className="text-sm text-[var(--ff-text-primary)]">
-            {entries[entries.length - 1].answer}
+            {entries[entries.length - 1]!.answer}
           </p>
         </div>
       )}

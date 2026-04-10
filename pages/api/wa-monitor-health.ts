@@ -177,7 +177,7 @@ async function checkProcess(name: string, command: string): Promise<HealthCheck>
 
     // Parse process info
     const lines = stdout.trim().split('\n');
-    const processInfo = lines[0].split(/\s+/);
+    const processInfo = lines[0]!.split(/\s+/);
 
     return {
       status: 'up',

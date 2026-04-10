@@ -243,7 +243,7 @@ export async function quickGateCheck(contractorId: number): Promise<boolean> {
     return result.can_assign;
   }
 
-  return compliance[0].is_gate_approved;
+  return compliance[0]!.is_gate_approved;
 }
 
 /**

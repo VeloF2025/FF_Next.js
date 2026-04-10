@@ -128,7 +128,7 @@ async function handlePatch(
       const superAdminCount = await sql`
         SELECT COUNT(*) as count FROM users WHERE role = 'super_admin' AND is_active = true
       `;
-      if (parseInt(superAdminCount[0].count) <= 1) {
+      if (parseInt(superAdminCount[0]!.count) <= 1) {
         return apiResponse.badRequest(res, 'Cannot remove the last super admin');
       }
     }

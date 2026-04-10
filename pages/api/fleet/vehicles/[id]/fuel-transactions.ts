@@ -720,7 +720,7 @@ async function recalculateFuelEfficiency(vehicleId: string): Promise<number> {
   await sql`
     UPDATE fleet_fuel_transactions
     SET km_since_last_fill = NULL, litres_per_100km = NULL
-    WHERE id = ${transactions[0].id}
+    WHERE id = ${transactions[0]!.id}
   `;
 
   // Calculate for each subsequent transaction

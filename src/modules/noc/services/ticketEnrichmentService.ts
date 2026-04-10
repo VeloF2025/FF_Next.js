@@ -273,7 +273,7 @@ function parseProjectFromDRPattern(drNumber: string): string | null {
   // Pattern: DR-{PROJECT}-{ZONE}-{NUMBER}
   const match = drNumber.match(/^DR-([A-Z]+)-/i);
   if (match) {
-    const projectCode = match[1].toUpperCase();
+    const projectCode = match[1]!.toUpperCase();
     return DR_PREFIX_PROJECT_MAP[projectCode] || null;
   }
 

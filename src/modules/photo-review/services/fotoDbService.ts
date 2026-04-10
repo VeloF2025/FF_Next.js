@@ -234,7 +234,7 @@ export async function getDropSubmitterPhone(drNumber: string): Promise<string | 
       return null;
     }
 
-    return rows[0].submitted_by || null;
+    return rows[0]!.submitted_by || null;
   } catch (error) {
     log.error(`Error getting submitter phone for DR ${drNumber}`, { error }, 'fotoDbService');
     return null;

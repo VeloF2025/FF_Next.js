@@ -45,7 +45,7 @@ export function useHelpCenter(): UseHelpCenterReturn {
       
       // Set initial section if available
       if (parsedSections.length > 0 && !parsedSections.find(s => s.id === currentSectionId)) {
-        setCurrentSectionId(parsedSections[0].id);
+        setCurrentSectionId(parsedSections[0]!.id);
       }
     } catch (error) {
       // Silently fail and show empty sections — manual content optional for app function
