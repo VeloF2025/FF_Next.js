@@ -32,7 +32,7 @@ import { VLM_CHAT_ENDPOINT, VLM_CATEGORIZATION_MODEL, VLM_TIMEOUT_BATCH, VLM_BAT
 // CONFIGURATION
 // ============================================================================
 
-const VLM_TEMPERATURE = 0.1; // Low for consistent categorization
+// VLM_TEMPERATURE imported from @/lib/vlm (0.1 for consistent categorization)
 
 // ============================================================================
 // ERROR HANDLING
