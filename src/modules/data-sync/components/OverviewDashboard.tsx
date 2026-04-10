@@ -20,6 +20,7 @@ import {
   Map,
   CreditCard,
   ClipboardList,
+  ShieldAlert,
 } from 'lucide-react';
 import type { TabGroupId, DataSyncStats } from '../types';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
@@ -80,6 +81,14 @@ const CATEGORY_CARDS: {
     description: 'QFieldCloud project management, sync configuration, and field data integration',
     color: 'text-emerald-400',
     bgColor: 'bg-emerald-500/10',
+  },
+  {
+    id: 'non_invoiceables',
+    label: 'Non-Invoiceables',
+    icon: ShieldAlert,
+    description: 'Unified action centre for pre-provisions, serial mismatches, offline, and billing deductions',
+    color: 'text-rose-400',
+    bgColor: 'bg-rose-500/10',
   },
   {
     id: 'billing',
@@ -257,6 +266,10 @@ export function OverviewDashboard({ onGroupSelect, accessibleGroups }: OverviewD
             icon: CheckCircle,
           },
         ] : [];
+      case 'non_invoiceables':
+        return [
+          { label: 'Action Centre', value: 'View', icon: ShieldAlert },
+        ];
       case 'history':
         return [
           { label: 'View All', value: 'Timeline', icon: Clock },

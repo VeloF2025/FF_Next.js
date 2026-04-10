@@ -6,7 +6,7 @@
 import type { LucideIcon } from 'lucide-react';
 
 // Tab group identifiers
-export type TabGroupId = 'noc' | 'activate' | 'olt' | 'eod' | 'qfield' | 'history' | 'billing';
+export type TabGroupId = 'noc' | 'activate' | 'olt' | 'eod' | 'qfield' | 'history' | 'billing' | 'non_invoiceables';
 
 // Individual tab within a group
 export interface Tab {

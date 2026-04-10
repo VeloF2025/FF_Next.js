@@ -30,6 +30,7 @@ import {
   Lock,
   CreditCard,
   ClipboardList,
+  ShieldAlert,
 } from 'lucide-react';
 import type { TabGroupId } from '../types';
 import { OverviewDashboard } from './OverviewDashboard';
@@ -40,6 +41,7 @@ import { EodGroup } from './groups/EodGroup';
 import { QFieldGroup } from './groups/QFieldGroup';
 import { HistoryGroup } from './groups/HistoryGroup';
 import { BillingGroup } from './groups/BillingGroup';
+import { NonInvoiceablesPage } from '@/modules/non-invoiceables/components/NonInvoiceablesPage';
 import { usePermission } from '@/hooks/usePermission';
 import { useSystemFeatures } from '../hooks/useSystemFeatures';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -54,6 +56,7 @@ const GROUP_PERMISSION_KEYS: Record<TabGroupId, string> = {
   qfield: 'system.data-sync.qfield',
   history: 'system.data-sync.history',
   billing: 'system.data-sync.billing',
+  non_invoiceables: 'activate.non-invoiceables',
 };
 
 // Tab group configuration
@@ -92,6 +95,12 @@ const TAB_GROUPS: {
     label: 'QField',
     icon: MapPin,
     description: 'QFieldCloud projects for OES and data sync targets',
+  },
+  {
+    id: 'non_invoiceables',
+    label: 'Non-Invoiceables',
+    icon: ShieldAlert,
+    description: 'Unified action centre for pre-provisions, mismatches, offline, and billing deductions',
   },
   {
     id: 'billing',
@@ -347,6 +356,10 @@ export function DataSyncPage({ groupFilter }: DataSyncPageProps) {
             activeTab={activeTab}
             onTabChange={(tab) => handleTabChange('qfield', tab)}
           />
+        )}
+
+        {activeGroup === 'non_invoiceables' && (
+          <NonInvoiceablesPage />
         )}
 
         {activeGroup === 'billing' && (

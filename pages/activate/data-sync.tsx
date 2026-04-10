@@ -14,7 +14,7 @@ const ActivateDataSyncPage: NextPage = () => {
   return (
     <AppLayout>
       <ModulePage config={activateConfig}>
-        <DataSyncPage groupFilter={['activate', 'olt', 'eod', 'billing', 'history']} />
+        <DataSyncPage groupFilter={['activate', 'olt', 'eod', 'non_invoiceables', 'billing', 'history']} />
       </ModulePage>
     </AppLayout>
   );
