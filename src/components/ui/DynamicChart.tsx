@@ -71,7 +71,7 @@ const ChartLoader = () => (
 );
 
 // Wrapper components with error boundaries and better error handling
-export const DynamicBarChart: React.FC<any> = (props) => (
+export const DynamicBarChart: React.FC<ChartComponentProps> = (props) => (
   <ChartErrorBoundary>
     <Suspense fallback={<ChartLoader />}>
       <LazyBarChart {...props} />
@@ -79,7 +79,7 @@ export const DynamicBarChart: React.FC<any> = (props) => (
   </ChartErrorBoundary>
 );
 
-export const DynamicBar: React.FC<any> = (props) => (
+export const DynamicBar: React.FC<ChartComponentProps> = (props) => (
   <ChartErrorBoundary>
     <Suspense fallback={null}>
       <LazyBar {...props} />
@@ -87,7 +87,7 @@ export const DynamicBar: React.FC<any> = (props) => (
   </ChartErrorBoundary>
 );
 
-export const DynamicLineChart: React.FC<any> = (props) => (
+export const DynamicLineChart: React.FC<ChartComponentProps> = (props) => (
   <ChartErrorBoundary>
     <Suspense fallback={<ChartLoader />}>
       <LazyLineChart {...props} />
@@ -95,7 +95,7 @@ export const DynamicLineChart: React.FC<any> = (props) => (
   </ChartErrorBoundary>
 );
 
-export const DynamicLine: React.FC<any> = (props) => (
+export const DynamicLine: React.FC<ChartComponentProps> = (props) => (
   <ChartErrorBoundary>
     <Suspense fallback={null}>
       <LazyLine {...props} />
@@ -103,7 +103,7 @@ export const DynamicLine: React.FC<any> = (props) => (
   </ChartErrorBoundary>
 );
 
-export const DynamicPieChart: React.FC<any> = (props) => (
+export const DynamicPieChart: React.FC<ChartComponentProps> = (props) => (
   <ChartErrorBoundary>
     <Suspense fallback={<ChartLoader />}>
       <LazyPieChart {...props} />
@@ -111,7 +111,7 @@ export const DynamicPieChart: React.FC<any> = (props) => (
   </ChartErrorBoundary>
 );
 
-export const DynamicPie: React.FC<any> = (props) => (
+export const DynamicPie: React.FC<ChartComponentProps> = (props) => (
   <ChartErrorBoundary>
     <Suspense fallback={null}>
       <LazyPie {...props} />
@@ -119,37 +119,37 @@ export const DynamicPie: React.FC<any> = (props) => (
   </ChartErrorBoundary>
 );
 
-export const DynamicCell: React.FC<any> = (props) => (
+export const DynamicCell: React.FC<ChartComponentProps> = (props) => (
   <Suspense fallback={null}>
     <LazyCell {...props} />
   </Suspense>
 );
 
-export const DynamicXAxis: React.FC<any> = (props) => (
+export const DynamicXAxis: React.FC<ChartComponentProps> = (props) => (
   <Suspense fallback={null}>
     <LazyXAxis {...props} />
   </Suspense>
 );
 
-export const DynamicYAxis: React.FC<any> = (props) => (
+export const DynamicYAxis: React.FC<ChartComponentProps> = (props) => (
   <Suspense fallback={null}>
     <LazyYAxis {...props} />
   </Suspense>
 );
 
-export const DynamicCartesianGrid: React.FC<any> = (props) => (
+export const DynamicCartesianGrid: React.FC<ChartComponentProps> = (props) => (
   <Suspense fallback={null}>
     <LazyCartesianGrid {...props} />
   </Suspense>
 );
 
-export const DynamicTooltip: React.FC<any> = (props) => (
+export const DynamicTooltip: React.FC<ChartComponentProps> = (props) => (
   <Suspense fallback={null}>
     <LazyTooltip {...props} />
   </Suspense>
 );
 
-export const DynamicResponsiveContainer: React.FC<any> = (props) => (
+export const DynamicResponsiveContainer: React.FC<ChartComponentProps> = (props) => (
   <ChartErrorBoundary>
     <Suspense fallback={<ChartLoader />}>
       <LazyResponsiveContainer {...props} />
@@ -157,19 +157,19 @@ export const DynamicResponsiveContainer: React.FC<any> = (props) => (
   </ChartErrorBoundary>
 );
 
-export const DynamicLegend: React.FC<any> = (props) => (
+export const DynamicLegend: React.FC<ChartComponentProps> = (props) => (
   <Suspense fallback={null}>
     <LazyLegend {...props} />
   </Suspense>
 );
 
-export const DynamicLabelList: React.FC<any> = (props) => (
+export const DynamicLabelList: React.FC<ChartComponentProps> = (props) => (
   <Suspense fallback={null}>
     <LazyLabelList {...props} />
   </Suspense>
 );
 
-export const DynamicRadarChart: React.FC<any> = (props) => (
+export const DynamicRadarChart: React.FC<ChartComponentProps> = (props) => (
   <ChartErrorBoundary>
     <Suspense fallback={<ChartLoader />}>
       <LazyRadarChart {...props} />
@@ -177,31 +177,31 @@ export const DynamicRadarChart: React.FC<any> = (props) => (
   </ChartErrorBoundary>
 );
 
-export const DynamicRadar: React.FC<any> = (props) => (
+export const DynamicRadar: React.FC<ChartComponentProps> = (props) => (
   <Suspense fallback={null}>
     <LazyRadar {...props} />
   </Suspense>
 );
 
-export const DynamicPolarGrid: React.FC<any> = (props) => (
+export const DynamicPolarGrid: React.FC<ChartComponentProps> = (props) => (
   <Suspense fallback={null}>
     <LazyPolarGrid {...props} />
   </Suspense>
 );
 
-export const DynamicPolarAngleAxis: React.FC<any> = (props) => (
+export const DynamicPolarAngleAxis: React.FC<ChartComponentProps> = (props) => (
   <Suspense fallback={null}>
     <LazyPolarAngleAxis {...props} />
   </Suspense>
 );
 
-export const DynamicPolarRadiusAxis: React.FC<any> = (props) => (
+export const DynamicPolarRadiusAxis: React.FC<ChartComponentProps> = (props) => (
   <Suspense fallback={null}>
     <LazyPolarRadiusAxis {...props} />
   </Suspense>
 );
 
-export const DynamicComposedChart: React.FC<any> = (props) => (
+export const DynamicComposedChart: React.FC<ChartComponentProps> = (props) => (
   <ChartErrorBoundary>
     <Suspense fallback={<ChartLoader />}>
       <LazyComposedChart {...props} />
@@ -209,7 +209,7 @@ export const DynamicComposedChart: React.FC<any> = (props) => (
   </ChartErrorBoundary>
 );
 
-export const DynamicAreaChart: React.FC<any> = (props) => (
+export const DynamicAreaChart: React.FC<ChartComponentProps> = (props) => (
   <ChartErrorBoundary>
     <Suspense fallback={<ChartLoader />}>
       <LazyAreaChart {...props} />
@@ -217,7 +217,7 @@ export const DynamicAreaChart: React.FC<any> = (props) => (
   </ChartErrorBoundary>
 );
 
-export const DynamicArea: React.FC<any> = (props) => (
+export const DynamicArea: React.FC<ChartComponentProps> = (props) => (
   <Suspense fallback={null}>
     <LazyArea {...props} />
   </Suspense>
