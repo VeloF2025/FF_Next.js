@@ -34,8 +34,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
       await sql`SELECT account_subtype FROM gl_accounts LIMIT 1`;
       hasSubtype = true;
-    } catch {
-      // Column doesn't exist
+    } catch (err) {
+      log.warn('reports-cash-flow', { message: 'account_subtype column absent — falling back to name-matching', err });
     }
 
     // Get opening cash balance (bank accounts at start_date)
@@ -70,7 +70,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         openingBalance = Number(openingCash?.balance || 0);
       }
-    } catch {
+    } catch (err) {
+      log.warn('reports-cash-flow', { message: 'Failed to fetch opening cash balance — defaulting to 0', err });
       openingBalance = 0;
     }
 
@@ -117,7 +118,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         arChangeVal = Number(arChange?.change || 0);
       }
-    } catch { arChangeVal = 0; }
+    } catch (err) { log.warn('reports-cash-flow', { message: 'AR change query failed — defaulting to 0', err }); arChangeVal = 0; }
 
     // Changes in AP (payable)
     let apChangeVal = 0;
@@ -147,7 +148,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         apChangeVal = Number(apChange?.change || 0);
       }
-    } catch { apChangeVal = 0; }
+    } catch (err) { log.warn('reports-cash-flow', { message: 'AP change query failed — defaulting to 0', err }); apChangeVal = 0; }
 
     // Investing: fixed asset changes
     let investingChangeVal = 0;
@@ -180,7 +181,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         investingChangeVal = Number(investingChange?.change || 0);
       }
-    } catch { investingChangeVal = 0; }
+    } catch (err) { log.warn('reports-cash-flow', { message: 'Investing change query failed — defaulting to 0', err }); investingChangeVal = 0; }
 
     // Financing: equity + loan changes
     let financingChangeVal = 0;
@@ -212,7 +213,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         financingChangeVal = Number(financingChange?.change || 0);
       }
-    } catch { financingChangeVal = 0; }
+    } catch (err) { log.warn('reports-cash-flow', { message: 'Financing change query failed — defaulting to 0', err }); financingChangeVal = 0; }
 
     const operatingTotal = Number(netIncome?.net_income || 0) + arChangeVal + apChangeVal;
     const investingTotal = investingChangeVal;

@@ -40,8 +40,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
       await sql`SELECT account_subtype FROM gl_accounts LIMIT 1`;
       hasSubtype = true;
-    } catch {
-      // Column absent — fall back to name-matching
+    } catch (err) {
+      log.warn('cash-flow-export', { message: 'account_subtype column absent — falling back to name-matching', err });
     }
 
     // Opening cash balance (bank accounts before period start)
@@ -75,7 +75,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         openingBalance = Number(row?.balance || 0);
       }
-    } catch {
+    } catch (err) {
+      log.warn('cash-flow-export', { message: 'Failed to fetch opening cash balance — defaulting to 0', err });
       openingBalance = 0;
     }
 
@@ -123,7 +124,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         arChange = Number(row?.change || 0);
       }
-    } catch { arChange = 0; }
+    } catch (err) { log.warn('cash-flow-export', { message: 'AR change query failed — defaulting to 0', err }); arChange = 0; }
 
     // Change in Accounts Payable
     let apChange = 0;
@@ -153,7 +154,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         apChange = Number(row?.change || 0);
       }
-    } catch { apChange = 0; }
+    } catch (err) { log.warn('cash-flow-export', { message: 'AP change query failed — defaulting to 0', err }); apChange = 0; }
 
     // Investing: fixed asset changes
     let investingChange = 0;
@@ -186,7 +187,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         investingChange = Number(row?.change || 0);
       }
-    } catch { investingChange = 0; }
+    } catch (err) { log.warn('cash-flow-export', { message: 'Investing change query failed — defaulting to 0', err }); investingChange = 0; }
 
     // Financing: equity changes (excluding retained earnings)
     let financingChange = 0;
@@ -218,7 +219,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         financingChange = Number(row?.change || 0);
       }
-    } catch { financingChange = 0; }
+    } catch (err) { log.warn('cash-flow-export', { message: 'Financing change query failed — defaulting to 0', err }); financingChange = 0; }
 
     const operatingTotal = netIncome + arChange + apChange;
     const investingTotal = investingChange;

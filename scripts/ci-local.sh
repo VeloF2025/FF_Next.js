@@ -32,9 +32,9 @@ MODE="${1:---full}"
 START_TIME=$(date +%s)
 
 # --- Baselines (ratchet: lower these as you fix issues, never raise) ---
-MAX_LINT_WARNINGS=3823
+MAX_LINT_WARNINGS=3503
 MAX_LINT_ERRORS=77
-MAX_SILENT_CATCHES=94
+MAX_SILENT_CATCHES=84
 
 pass() { echo -e "${GREEN}  ✓ $*${NC}"; PASSED=$((PASSED + 1)); }
 fail() { echo -e "${RED}  ✗ $*${NC}"; FAILED=$((FAILED + 1)); }
