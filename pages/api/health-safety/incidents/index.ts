@@ -21,6 +21,7 @@ import { createTicket } from '@/modules/noc/services/ticketService';
 import {
   TicketSource,
   TicketType,
+  TicketCategory,
   TicketPriority,
 } from '@/modules/noc/types/ticket';
 import { log } from '@/lib/logger';
@@ -590,10 +591,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, `Invalid incident type: ${incident_type}`);
   }
 
-  // Determine ticket type
-  const ticketType = incident_type === 'near_miss'
-    ? TicketType.HSE_NEAR_MISS
-    : TicketType.HSE_INCIDENT;
+  // All HSE tickets use the maintenance discipline.
+  // The incident sub-type (incident vs near-miss) is preserved in source_type
+  // and the hs_ticket_details.incident_type column.
+  const ticketType = TicketType.MAINTENANCE;
   const sourceType = incident_type === 'near_miss' ? 'hse_near_miss' : 'hse_incident';
 
   // Determine priority and SLA based on severity
@@ -622,6 +623,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     source: TicketSource.HSE_REPORT,
     source_type: sourceType,
     ticket_type: ticketType,
+    ticket_category: TicketCategory.HSE_INCIDENT,
     title: autoTitle,
     description: description || undefined,
     priority,

@@ -148,7 +148,7 @@ async function handler(
     // Create the ticket (with optional team assignment)
     const ticket = await createTicket({
       source: TicketSource.WA_MAINTENANCE,
-      ticket_type: TicketType.FAULT_REPAIR,
+      ticket_type: TicketType.MAINTENANCE,
       title: `Maintenance Issue - ${body.drop_number}`,
       description,
       priority,

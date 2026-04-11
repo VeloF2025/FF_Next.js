@@ -76,7 +76,7 @@ describe('NotificationTriggerService', () => {
     external_id: null,
     title: 'Fiber installation required',
     description: 'Customer needs fiber installation at DR12345',
-    ticket_type: TicketType.NEW_INSTALLATION,
+    ticket_type: TicketType.ACTIVATIONS,
     priority: TicketPriority.NORMAL,
     status: TicketStatus.ASSIGNED,
     dr_number: 'DR12345',

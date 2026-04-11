@@ -231,12 +231,8 @@ function validateFormData(data: TicketFormData): TicketFormErrors {
     }
   }
 
-  // Fault cause required for Maintenance (new two-axis) and fault_repair
-  // (legacy auto-ingest). Snag/HSE/DevOps/Sales/Unspecified do not need one.
-  const needsFaultCause =
-    data.category === TicketCategory.MAINTENANCE ||
-    data.ticket_type === TicketType.FAULT_REPAIR;
-  if (needsFaultCause && !data.fault_cause) {
+  // Fault cause required only for Maintenance category tickets.
+  if (data.ticket_category === TicketCategory.MAINTENANCE && !data.fault_cause) {
     errors.fault_cause = 'Fault cause is required for maintenance tickets';
   }
 
@@ -477,21 +473,6 @@ export const TICKET_SOURCE_LABELS: Record<TicketSource, string> = {
 };
 
 export const TICKET_TYPE_LABELS: Record<TicketType, string> = {
-  // Legacy (pre-April-11 vocabulary) — kept until PR 4
-  [TicketType.FAULT_REPAIR]: 'Maintenance',
-  [TicketType.NEW_INSTALLATION]: 'New Installation',
-  [TicketType.MODIFICATION]: 'Modification',
-  [TicketType.ONT_SWAP]: 'ONT Swap',
-  [TicketType.INCIDENT]: 'Incident',
-  [TicketType.HSE_INCIDENT]: 'H&S Incident',
-  [TicketType.HSE_NEAR_MISS]: 'H&S Near Miss',
-  [TicketType.SERIAL_MISMATCH]: 'Serial Mismatch',
-  [TicketType.OLT_INVESTIGATION]: 'OLT Investigation',
-  [TicketType.PRE_PROVISION]: 'Pre-Provision',
-  [TicketType.SNAG]: 'Snag',
-  [TicketType.INTERNAL_SNAG]: 'Internal Snag',
-  [TicketType.SALES_LEAD]: 'Sales Lead',
-  // Disciplines (April-11 taxonomy)
   [TicketType.CIVILS]: 'Civils',
   [TicketType.OPTICAL]: 'Optical',
   [TicketType.ACTIVATIONS]: 'Activations',

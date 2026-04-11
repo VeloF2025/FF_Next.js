@@ -16,10 +16,8 @@ import { createLogger } from '@/lib/logger';
 const logger = createLogger('olt-report:tickets');
 
 const VALID_TICKET_TYPES: string[] = [
-  TicketType.OLT_INVESTIGATION,
-  TicketType.SERIAL_MISMATCH,
-  TicketType.FAULT_REPAIR,
-  TicketType.ONT_SWAP,
+  TicketType.MAINTENANCE,
+  TicketType.ACTIVATIONS,
 ];
 
 async function handler(

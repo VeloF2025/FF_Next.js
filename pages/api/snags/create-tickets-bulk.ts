@@ -16,10 +16,12 @@ import { createTicket } from '@/modules/noc/services/ticketService';
 import {
   TicketSource,
   TicketType,
+  TicketCategory,
   TicketPriority,
   TicketStatus,
 } from '@/modules/noc/types/ticket';
 import type { Snag, SnagSeverity } from '@/modules/construction-qa/types/snag.types';
+import { classifySnagDiscipline } from '@/modules/construction-qa/services/tqr-pdf-parser';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -28,9 +30,11 @@ const sql = neon(process.env.DATABASE_URL!);
 // to keep files independent and under 300 lines)
 // ============================================================
 
-function mapCategoryToTicketType(_category: string): TicketType {
-  // All snag categories map to the dedicated SNAG ticket type
-  return TicketType.SNAG;
+function disciplineForSnag(description: string): TicketType {
+  const d = classifySnagDiscipline(description);
+  if (d === 'optical')     return TicketType.OPTICAL;
+  if (d === 'activations') return TicketType.ACTIVATIONS;
+  return TicketType.CIVILS;
 }
 
 function mapSeverityToPriority(severity: SnagSeverity): TicketPriority {
@@ -119,7 +123,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           source_type: 'snag',
           title,
           description: descParts.join('\n'),
-          ticket_type: mapCategoryToTicketType(snag.category),
+          ticket_type: disciplineForSnag(snag.description ?? ''),
+          ticket_category: TicketCategory.SNAG,
           priority: mapSeverityToPriority(snag.severity),
           project_id: snag.project_id,
           uid_prefix: 'SNG',

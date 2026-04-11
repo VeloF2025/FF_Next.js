@@ -110,7 +110,7 @@ ${notes ?? 'Please investigate the serial number discrepancy. Possible causes: O
     // Create ticket via standard service
     const ticket = await createTicket({
       source: TicketSource.QA_REVIEW,
-      ticket_type: TicketType.SERIAL_MISMATCH,
+      ticket_type: TicketType.MAINTENANCE,
       title: `Serial Mismatch Investigation: ${device.drop_number}`,
       description: ticketDescription,
       priority: PRIORITY_MAP[priority] || TicketPriority.NORMAL,

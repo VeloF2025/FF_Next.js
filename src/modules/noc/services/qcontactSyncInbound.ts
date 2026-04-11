@@ -226,15 +226,6 @@ function mapQContactClassification(
 }
 
 /**
- * Back-compat shim for the rest of this file during the transition —
- * older code paths still call mapTicketType(cat, sub) expecting just the
- * discipline. Deprecated in favour of mapQContactClassification().
- */
-function mapTicketType(category: string | null, subcategory?: string | null): string {
-  return mapQContactClassification(category, subcategory).ticket_type;
-}
-
-/**
  * Extended ticket payload with all QContact fields
  */
 export interface ExtendedTicketPayload extends CreateTicketPayload {

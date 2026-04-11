@@ -6,7 +6,7 @@
 'use client';
 
 import { AlertTriangle } from 'lucide-react';
-import { FaultCause, TicketType } from '../../../types/ticket';
+import { FaultCause } from '../../../types/ticket';
 import { FAULT_CAUSE_LABELS, type TicketFormData, type TicketFormErrors } from '../../../hooks/useTicketForm';
 
 interface FaultSectionProps {
@@ -27,13 +27,9 @@ const FAULT_CAUSE_DESCRIPTIONS: Record<FaultCause, string> = {
 };
 
 export function FaultSection({ formData, errors, setField, disabled }: FaultSectionProps) {
-  // Show for legacy fault_repair auto-ingest AND the new Maintenance
-  // category from the April-11 two-axis taxonomy. TicketForm.tsx now guards
-  // the outer render by category, so this internal guard is belt-and-braces
-  // for any future caller that renders FaultSection directly.
-  const isMaintenanceCategory = formData.category === 'maintenance';
-  const isLegacyFaultRepair = formData.ticket_type === TicketType.FAULT_REPAIR;
-  if (!isMaintenanceCategory && !isLegacyFaultRepair) {
+  // Only shown for Maintenance category tickets. TicketForm.tsx guards the
+  // outer render; this is belt-and-braces for any direct caller.
+  if (formData.ticket_category !== 'maintenance') {
     return null;
   }
 

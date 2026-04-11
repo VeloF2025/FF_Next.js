@@ -29,7 +29,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { TicketStatusBadge } from './TicketStatusBadge';
 import type { Ticket } from '../../types/ticket';
-import { getT1Label, getT2Label } from '../../constants/ticketCategories';
+import { getT1Label, getTicketCategoryLabel } from '../../constants/ticketCategories';
 
 interface TicketListItemProps {
   /** Ticket data */
@@ -80,7 +80,7 @@ export function TicketListItem({ ticket, compact = false, onClick }: TicketListI
           {/* T1 ticket_category badge (new April-11 axis) */}
           {ticket.ticket_category && (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-              {getT2Label(ticket.ticket_category)}
+              {getTicketCategoryLabel(ticket.ticket_category)}
             </span>
           )}
 

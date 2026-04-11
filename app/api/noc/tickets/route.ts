@@ -63,20 +63,11 @@ const VALID_SOURCES: TicketSource[] = [
 ];
 
 const VALID_TYPES: TicketType[] = [
-  TicketType.FAULT_REPAIR,
-  TicketType.NEW_INSTALLATION,
-  TicketType.MODIFICATION,
-  TicketType.ONT_SWAP,
-  TicketType.INCIDENT,
-  TicketType.PRE_PROVISION,
-  TicketType.SERIAL_MISMATCH,
-  TicketType.OLT_INVESTIGATION,
-  TicketType.HSE_INCIDENT,
-  TicketType.HSE_NEAR_MISS,
+  TicketType.CIVILS,
+  TicketType.OPTICAL,
+  TicketType.ACTIVATIONS,
+  TicketType.MAINTENANCE,
   TicketType.DEV_OPS,
-  TicketType.SNAG,
-  TicketType.INTERNAL_SNAG,
-  TicketType.SALES_LEAD,
   TicketType.UNSPECIFIED,
 ];
 

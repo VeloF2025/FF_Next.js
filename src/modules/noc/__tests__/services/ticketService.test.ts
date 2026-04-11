@@ -64,7 +64,7 @@ describe('Ticket Service - CRUD Operations', () => {
       const payload: CreateTicketPayload = {
         source: TicketSource.AD_HOC,
         title: 'Fiber cut at Pole 123',
-        ticket_type: TicketType.FAULT_REPAIR,
+        ticket_type: TicketType.MAINTENANCE,
         description: 'Customer reports no internet connectivity',
         priority: TicketPriority.HIGH,
         dr_number: 'DR-2024-001',
@@ -136,7 +136,7 @@ describe('Ticket Service - CRUD Operations', () => {
       const payload: CreateTicketPayload = {
         source: TicketSource.QCONTACT,
         title: 'Customer complaint',
-        ticket_type: TicketType.FAULT_REPAIR
+        ticket_type: TicketType.MAINTENANCE
       };
 
       const mockCreatedTicket = {
@@ -211,7 +211,7 @@ describe('Ticket Service - CRUD Operations', () => {
       const invalidPayload: CreateTicketPayload = {
         source: TicketSource.AD_HOC,
         title: '',
-        ticket_type: TicketType.FAULT_REPAIR
+        ticket_type: TicketType.MAINTENANCE
       };
 
       await expect(createTicket(invalidPayload)).rejects.toThrow(
@@ -226,7 +226,7 @@ describe('Ticket Service - CRUD Operations', () => {
       const invalidPayload = {
         source: 'invalid_source',
         title: 'Test ticket',
-        ticket_type: TicketType.FAULT_REPAIR
+        ticket_type: TicketType.MAINTENANCE
       } as CreateTicketPayload;
 
       await expect(createTicket(invalidPayload)).rejects.toThrow(
@@ -241,7 +241,7 @@ describe('Ticket Service - CRUD Operations', () => {
       const payload: CreateTicketPayload = {
         source: TicketSource.AD_HOC,
         title: 'Test ticket',
-        ticket_type: TicketType.FAULT_REPAIR
+        ticket_type: TicketType.MAINTENANCE
       };
 
       const mockCreatedTicket = {
@@ -305,7 +305,7 @@ describe('Ticket Service - CRUD Operations', () => {
         ticket_uid: 'FT406824',
         source: TicketSource.AD_HOC,
         title: 'Test ticket',
-        ticket_type: TicketType.FAULT_REPAIR,
+        ticket_type: TicketType.MAINTENANCE,
         priority: TicketPriority.NORMAL,
         status: TicketStatus.OPEN,
         created_at: new Date('2024-01-15T10:00:00Z'),
@@ -394,7 +394,7 @@ describe('Ticket Service - CRUD Operations', () => {
         external_id: 'QC-12345',
         title: 'Complete ticket',
         description: 'Full description',
-        ticket_type: TicketType.FAULT_REPAIR,
+        ticket_type: TicketType.MAINTENANCE,
         priority: TicketPriority.HIGH,
         status: TicketStatus.IN_PROGRESS,
         dr_number: 'DR-2024-001',
@@ -455,7 +455,7 @@ describe('Ticket Service - CRUD Operations', () => {
         ticket_uid: 'FT406824',
         source: TicketSource.AD_HOC,
         title: 'Test ticket',
-        ticket_type: TicketType.FAULT_REPAIR,
+        ticket_type: TicketType.MAINTENANCE,
         priority: TicketPriority.NORMAL,
         status: TicketStatus.IN_PROGRESS, // Updated
         assigned_to: 'user-uuid-123', // Updated
@@ -519,7 +519,7 @@ describe('Ticket Service - CRUD Operations', () => {
         ticket_uid: 'FT406824',
         source: TicketSource.AD_HOC,
         title: 'Updated title', // Updated
-        ticket_type: TicketType.FAULT_REPAIR,
+        ticket_type: TicketType.MAINTENANCE,
         priority: TicketPriority.NORMAL,
         status: TicketStatus.OPEN,
         updated_at: new Date(),
@@ -609,7 +609,7 @@ describe('Ticket Service - CRUD Operations', () => {
         source: TicketSource.AD_HOC,
         title: updatePayload.title!,
         description: updatePayload.description!,
-        ticket_type: TicketType.FAULT_REPAIR,
+        ticket_type: TicketType.MAINTENANCE,
         priority: updatePayload.priority!,
         status: updatePayload.status!,
         assigned_to: updatePayload.assigned_to!,
@@ -670,7 +670,7 @@ describe('Ticket Service - CRUD Operations', () => {
         ticket_uid: 'FT406824',
         source: TicketSource.AD_HOC,
         title: 'Test ticket',
-        ticket_type: TicketType.FAULT_REPAIR,
+        ticket_type: TicketType.MAINTENANCE,
         priority: TicketPriority.NORMAL,
         status: TicketStatus.CLOSED,
         created_at: new Date('2024-01-15T10:00:00Z'),
@@ -729,7 +729,7 @@ describe('Ticket Service - CRUD Operations', () => {
         ticket_uid: 'FT406824',
         source: TicketSource.AD_HOC,
         title: 'Test ticket',
-        ticket_type: TicketType.FAULT_REPAIR,
+        ticket_type: TicketType.MAINTENANCE,
         priority: TicketPriority.NORMAL,
         status: TicketStatus.CANCELLED, // Soft deleted
         created_at: new Date('2024-01-15T10:00:00Z'),
@@ -799,7 +799,7 @@ describe('Ticket Service - CRUD Operations', () => {
         ticket_uid: 'FT406824',
         source: TicketSource.AD_HOC,
         title: 'Test ticket',
-        ticket_type: TicketType.FAULT_REPAIR,
+        ticket_type: TicketType.MAINTENANCE,
         priority: TicketPriority.NORMAL,
         status: TicketStatus.CANCELLED,
         created_at: new Date(),
@@ -858,7 +858,7 @@ describe('Ticket Service - CRUD Operations', () => {
           ticket_uid: 'FT406824',
           source: TicketSource.AD_HOC,
           title: 'Ticket 1',
-          ticket_type: TicketType.FAULT_REPAIR,
+          ticket_type: TicketType.MAINTENANCE,
           priority: TicketPriority.NORMAL,
           status: TicketStatus.OPEN,
           created_at: new Date('2024-01-15T10:00:00Z'),
@@ -900,7 +900,7 @@ describe('Ticket Service - CRUD Operations', () => {
           ticket_uid: 'FT406825',
           source: TicketSource.QCONTACT,
           title: 'Ticket 2',
-          ticket_type: TicketType.INCIDENT,
+          ticket_type: TicketType.MAINTENANCE,
           priority: TicketPriority.HIGH,
           status: TicketStatus.IN_PROGRESS,
           created_at: new Date('2024-01-16T10:00:00Z'),
@@ -960,7 +960,7 @@ describe('Ticket Service - CRUD Operations', () => {
           ticket_uid: 'FT406824',
           source: TicketSource.AD_HOC,
           title: 'Open Ticket',
-          ticket_type: TicketType.FAULT_REPAIR,
+          ticket_type: TicketType.MAINTENANCE,
           priority: TicketPriority.NORMAL,
           status: TicketStatus.OPEN,
           created_at: new Date(),
@@ -1019,7 +1019,7 @@ describe('Ticket Service - CRUD Operations', () => {
           ticket_uid: 'FT406824',
           source: TicketSource.AD_HOC,
           title: 'Maintenance Ticket',
-          ticket_type: TicketType.FAULT_REPAIR,
+          ticket_type: TicketType.MAINTENANCE,
           priority: TicketPriority.NORMAL,
           status: TicketStatus.OPEN,
           created_at: new Date(),
@@ -1060,12 +1060,12 @@ describe('Ticket Service - CRUD Operations', () => {
 
       (query as any).mockResolvedValue(mockTickets);
 
-      const result = await listTickets({ ticket_type: TicketType.FAULT_REPAIR });
+      const result = await listTickets({ ticket_type: TicketType.MAINTENANCE });
 
       expect(query).toHaveBeenCalled();
       const callArgs = (query as any).mock.calls[0];
       expect(callArgs[0]).toContain('ticket_type');
-      expect(callArgs[1]).toContain(TicketType.FAULT_REPAIR);
+      expect(callArgs[1]).toContain(TicketType.MAINTENANCE);
       expect(result.tickets).toEqual(mockTickets);
     });
 
@@ -1078,7 +1078,7 @@ describe('Ticket Service - CRUD Operations', () => {
           ticket_uid: 'FT406824',
           source: TicketSource.AD_HOC,
           title: 'Assigned Ticket',
-          ticket_type: TicketType.FAULT_REPAIR,
+          ticket_type: TicketType.MAINTENANCE,
           priority: TicketPriority.NORMAL,
           status: TicketStatus.ASSIGNED,
           assigned_to: assigneeId,
@@ -1136,7 +1136,7 @@ describe('Ticket Service - CRUD Operations', () => {
           ticket_uid: 'FT406824',
           source: TicketSource.AD_HOC,
           title: 'Filtered Ticket',
-          ticket_type: TicketType.FAULT_REPAIR,
+          ticket_type: TicketType.MAINTENANCE,
           priority: TicketPriority.HIGH,
           status: TicketStatus.IN_PROGRESS,
           assigned_to: 'user-uuid-123',
@@ -1179,7 +1179,7 @@ describe('Ticket Service - CRUD Operations', () => {
 
       const result = await listTickets({
         status: TicketStatus.IN_PROGRESS,
-        ticket_type: TicketType.FAULT_REPAIR,
+        ticket_type: TicketType.MAINTENANCE,
         assigned_to: 'user-uuid-123'
       });
 
@@ -1187,7 +1187,7 @@ describe('Ticket Service - CRUD Operations', () => {
       const callArgs = (query as any).mock.calls[0];
       expect(callArgs[0]).toContain('WHERE');
       expect(callArgs[1]).toContain(TicketStatus.IN_PROGRESS);
-      expect(callArgs[1]).toContain(TicketType.FAULT_REPAIR);
+      expect(callArgs[1]).toContain(TicketType.MAINTENANCE);
       expect(callArgs[1]).toContain('user-uuid-123');
       expect(result.tickets).toEqual(mockTickets);
     });
@@ -1200,7 +1200,7 @@ describe('Ticket Service - CRUD Operations', () => {
           ticket_uid: 'FT406826',
           source: TicketSource.AD_HOC,
           title: 'Ticket 3',
-          ticket_type: TicketType.FAULT_REPAIR,
+          ticket_type: TicketType.MAINTENANCE,
           priority: TicketPriority.NORMAL,
           status: TicketStatus.OPEN,
           created_at: new Date(),

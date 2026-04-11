@@ -20,116 +20,10 @@ export interface TicketTypeMetadata {
 }
 
 /**
- * Complete ticket type definitions
- * 🟢 WORKING: All ticket types with metadata for UI display
+ * Complete ticket type (discipline) definitions.
+ * 🟢 WORKING: Five-discipline vocabulary from the April-11 two-axis taxonomy.
  */
 export const TICKET_TYPE_DEFINITIONS: Record<TicketType, TicketTypeMetadata> = {
-  [TicketType.FAULT_REPAIR]: {
-    value: TicketType.FAULT_REPAIR,
-    label: 'Maintenance',
-    description: 'Repair or fix existing fiber network issue or fault',
-    icon: 'Build',
-    requiresDR: true,
-  },
-  [TicketType.NEW_INSTALLATION]: {
-    value: TicketType.NEW_INSTALLATION,
-    label: 'New Installation',
-    description: 'New fiber installation or drop activation',
-    icon: 'FiberNew',
-    requiresDR: true,
-  },
-  [TicketType.MODIFICATION]: {
-    value: TicketType.MODIFICATION,
-    label: 'Modification',
-    description: 'Modify existing installation (relocation, upgrade)',
-    icon: 'Edit',
-    requiresDR: true,
-  },
-  [TicketType.ONT_SWAP]: {
-    value: TicketType.ONT_SWAP,
-    label: 'ONT Swap',
-    description: 'Replace or swap ONT device',
-    icon: 'SwapHoriz',
-    requiresDR: true,
-  },
-  [TicketType.INCIDENT]: {
-    value: TicketType.INCIDENT,
-    label: 'Incident',
-    description: 'Network incident or outage affecting multiple customers',
-    icon: 'Warning',
-    requiresDR: false,
-  },
-  [TicketType.PRE_PROVISION]: {
-    value: TicketType.PRE_PROVISION,
-    label: 'Pre-Provision',
-    description: 'Pre-provisioning investigation or check',
-    icon: 'Search',
-    requiresDR: true,
-  },
-  [TicketType.OLT_INVESTIGATION]: {
-    value: TicketType.OLT_INVESTIGATION,
-    label: 'OLT Investigation',
-    description: 'OLT port or configuration investigation',
-    icon: 'Search',
-    requiresDR: true,
-  },
-  [TicketType.SERIAL_MISMATCH]: {
-    value: TicketType.SERIAL_MISMATCH,
-    label: 'Serial Mismatch',
-    description: 'ONT serial number mismatch between OLT and records',
-    icon: 'Search',
-    requiresDR: true,
-  },
-  [TicketType.HSE_INCIDENT]: {
-    value: TicketType.HSE_INCIDENT,
-    label: 'H&S Incident',
-    description: 'Health and safety incident on site',
-    icon: 'ShieldAlert',
-    requiresDR: false,
-  },
-  [TicketType.HSE_NEAR_MISS]: {
-    value: TicketType.HSE_NEAR_MISS,
-    label: 'H&S Near Miss',
-    description: 'Health and safety near miss event',
-    icon: 'ShieldAlert',
-    requiresDR: false,
-  },
-  [TicketType.DEV_OPS]: {
-    value: TicketType.DEV_OPS,
-    label: 'DevOps',
-    description: 'FibreFlow application issue or bug',
-    icon: 'BugReport',
-    requiresDR: false,
-  },
-  [TicketType.SNAG]: {
-    value: TicketType.SNAG,
-    label: 'Snag',
-    description: 'Construction quality snag from TQR audit',
-    icon: 'BugReport',
-    requiresDR: false,
-  },
-  [TicketType.INTERNAL_SNAG]: {
-    value: TicketType.INTERNAL_SNAG,
-    label: 'Internal Snag',
-    description: 'Internal quality snag raised by FibreFlow team',
-    icon: 'BugReport',
-    requiresDR: false,
-  },
-  [TicketType.SALES_LEAD]: {
-    value: TicketType.SALES_LEAD,
-    label: 'Sales Lead',
-    description: 'Sales enquiry or new customer lead',
-    icon: 'TrendingUp',
-    requiresDR: false,
-  },
-  [TicketType.UNSPECIFIED]: {
-    value: TicketType.UNSPECIFIED,
-    label: 'Unspecified',
-    description: 'Ticket type not yet determined or does not fit other categories',
-    icon: 'HelpOutline',
-    requiresDR: false,
-  },
-  // ---- Discipline vocabulary (April-11 two-axis taxonomy) ----
   [TicketType.CIVILS]: {
     value: TicketType.CIVILS,
     label: 'Civils',
@@ -156,6 +50,20 @@ export const TICKET_TYPE_DEFINITIONS: Record<TicketType, TicketTypeMetadata> = {
     label: 'Maintenance',
     description: 'Generic maintenance / catch-all for non-discipline-specific work',
     icon: 'Build',
+    requiresDR: false,
+  },
+  [TicketType.DEV_OPS]: {
+    value: TicketType.DEV_OPS,
+    label: 'DevOps',
+    description: 'FibreFlow application issue or bug',
+    icon: 'BugReport',
+    requiresDR: false,
+  },
+  [TicketType.UNSPECIFIED]: {
+    value: TicketType.UNSPECIFIED,
+    label: 'Unspecified',
+    description: 'Ticket type not yet determined or does not fit other categories',
+    icon: 'HelpOutline',
     requiresDR: false,
   },
 };

@@ -161,7 +161,7 @@ export async function createInfrastructureTicket(
       source: TicketSource.CONSTRUCTION,
       title,
       description,
-      ticket_type: TicketType.FAULT_REPAIR,
+      ticket_type: TicketType.MAINTENANCE,
       priority: TicketPriority.HIGH,
       project_id: escalation.project_id || undefined,
       created_by: createdBy,

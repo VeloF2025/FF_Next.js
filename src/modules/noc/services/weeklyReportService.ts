@@ -565,7 +565,7 @@ export async function processImportBatch(
           external_id: ftRef || `row-${row.row_number}`,
           title: row.title || (row as any).issue || 'Imported Ticket',
           description: row.description || row.fault_description || (row as any).issue,
-          ticket_type: row.ticket_type as any || TicketType.FAULT_REPAIR,
+          ticket_type: row.ticket_type as any || TicketType.MAINTENANCE,
           priority: (row.priority as any) || 'normal',
           status: (row as any).status?.toLowerCase() as any || 'open',
           dr_number: drNumber,
