@@ -142,6 +142,7 @@ CHANGELOG.md.backup.*
 
 # Generated documentation and runtime data
 docs/wa-digests/
+docs/weekly-dev-reports/
 # docs/schema/ contains DATABASE_SCHEMA_INDEX.md (keep tracked)
 
 # Claude Code local-only (session state, not team-shared)
