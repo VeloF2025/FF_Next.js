@@ -79,6 +79,52 @@ function toInt(s: string | undefined): number {
   return isNaN(n) ? 0 : n;
 }
 
+/**
+ * Merge duplicate zone rows by summing planned + installed counts.
+ * Some projects (e.g. Tembisa POP01) ship PDFs with two sections —
+ * "Drop" and "Spare" — that both reference the same zone number.
+ * Without this, the unique constraint on (week_ending, project_id, zone_no)
+ * would reject the second row at insert time.
+ */
+function dedupeZones(zones: ZoneUptakeRow[]): ZoneUptakeRow[] {
+  const byZone = new Map<number, ZoneUptakeRow>();
+  for (const z of zones) {
+    const existing = byZone.get(z.zoneNo);
+    if (!existing) {
+      byZone.set(z.zoneNo, { ...z });
+    } else {
+      existing.plannedDrops += z.plannedDrops;
+      existing.installed += z.installed;
+      // Recompute pct weighted by planned drops
+      existing.pctInstalled = existing.plannedDrops > 0
+        ? (existing.installed / existing.plannedDrops) * 100
+        : 0;
+    }
+  }
+  return [...byZone.values()].sort((a, b) => a.zoneNo - b.zoneNo);
+}
+
+/** Merge duplicate (zone, pon) rows. Same rationale as dedupeZones. */
+function dedupePons(pons: ZonePonUptakeRow[]): ZonePonUptakeRow[] {
+  const byKey = new Map<string, ZonePonUptakeRow>();
+  for (const p of pons) {
+    const key = `${p.zoneNo}:${p.ponNo}`;
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, { ...p });
+    } else {
+      existing.plannedDrops += p.plannedDrops;
+      existing.installed += p.installed;
+      existing.pctInstalled = existing.plannedDrops > 0
+        ? (existing.installed / existing.plannedDrops) * 100
+        : 0;
+    }
+  }
+  return [...byKey.values()].sort((a, b) =>
+    a.zoneNo === b.zoneNo ? a.ponNo - b.ponNo : a.zoneNo - b.zoneNo,
+  );
+}
+
 // ─── Parser ────────────────────────────────────────────────────────────────
 
 /**
@@ -144,15 +190,27 @@ export async function parseZoneUptakePdf(
     warnings.push('Grand Total line not found in uptake PDF');
   }
 
+  // Dedupe in case the PDF has a Drop + Spare split with overlapping zones.
+  const dedupedZones = dedupeZones(zones);
+  const dedupedPons = dedupePons(pons);
+
   log.info('Uptake PDF parsed', {
     filename,
-    zoneCount: zones.length,
-    ponCount: pons.length,
+    rawZoneCount: zones.length,
+    dedupedZoneCount: dedupedZones.length,
+    rawPonCount: pons.length,
+    dedupedPonCount: dedupedPons.length,
     grandTotal,
     warningCount: warnings.length,
   }, 'billing-uptake-pdf');
 
-  return { zones, pons, grandTotal, hasPonBreakdown, parseWarnings: warnings };
+  return {
+    zones: dedupedZones,
+    pons: dedupedPons,
+    grandTotal,
+    hasPonBreakdown,
+    parseWarnings: warnings,
+  };
 }
 
 // ─── Per-zone parser ────────────────────────────────────────────────────────
