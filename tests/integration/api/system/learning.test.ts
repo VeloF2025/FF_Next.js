@@ -20,11 +20,14 @@ import * as path from 'path';
 
 // Mock database
 vi.mock('@/lib/db', () => ({
+  db: { query: vi.fn(), connect: vi.fn(), end: vi.fn() },
+  pool: { query: vi.fn(), connect: vi.fn(), end: vi.fn() },
   query: vi.fn(),
   getClient: vi.fn(() => ({
     query: vi.fn(),
     release: vi.fn(),
   })),
+  sql: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock auth

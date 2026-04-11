@@ -5,6 +5,17 @@ import '@testing-library/jest-dom';
 // Mock environment variables
 process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
 
+// Mock @/lib/db (pool + named exports — per-file mocks override this)
+vi.mock('@/lib/db', () => ({
+  db: { query: vi.fn(), connect: vi.fn(), end: vi.fn() },
+  pool: { query: vi.fn(), connect: vi.fn(), end: vi.fn() },
+  query: vi.fn(),
+  getClient: vi.fn(() => ({ query: vi.fn(), release: vi.fn() })),
+  sql: vi.fn().mockResolvedValue([]),
+  getDbCircuitStats: vi.fn(() => ({ state: 'closed', failures: 0 })),
+  resetDbCircuit: vi.fn(),
+}));
+
 // Mock @neondatabase/serverless
 vi.mock('@neondatabase/serverless', () => ({
   neon: vi.fn(() => {
