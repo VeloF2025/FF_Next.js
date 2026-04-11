@@ -52,7 +52,8 @@ async function checkService(service: { name: string; port: number; url: string }
       latencyMs,
       checkedAt: new Date().toISOString(),
     }
-  } catch {
+  } catch (error) {
+    log.warn('deploy-health', { message: `Service check failed: ${service.name}`, error: error instanceof Error ? error.message : String(error) });
     return {
       name: service.name,
       port: service.port,
@@ -70,7 +71,8 @@ function getSystemdStatus(service: string): SystemdService {
     const active = execSync(`systemctl is-active ${service} 2>/dev/null`, { timeout: 2000 }).toString().trim()
     const sub = execSync(`systemctl show -p SubState --value ${service} 2>/dev/null`, { timeout: 2000 }).toString().trim()
     return { service, active, sub }
-  } catch {
+  } catch (error) {
+    log.warn('deploy-health', { message: `Systemd status check failed: ${service}`, error: error instanceof Error ? error.message : String(error) });
     return { service, active: 'unknown', sub: 'unknown' }
   }
 }
@@ -82,7 +84,8 @@ function getRecentLogs(): string[] {
       { timeout: 3000, encoding: 'utf-8' }
     )
     return logs.trim().split('\n').filter((l) => l)
-  } catch {
+  } catch (error) {
+    log.warn('deploy-health', { message: 'Failed to fetch recent logs', error: error instanceof Error ? error.message : String(error) });
     return ['(Unable to fetch logs)']
   }
 }
@@ -100,7 +103,8 @@ async function getGitHubStatus() {
     if (!res.ok) return { configured: false, message: 'GitHub API error' }
     const data = (await res.json()) as { workflow_runs?: unknown[] }
     return { configured: true, runs: data.workflow_runs || [] }
-  } catch {
+  } catch (error) {
+    log.warn('deploy-health', { message: 'GitHub API unreachable', error: error instanceof Error ? error.message : String(error) });
     return { configured: false, message: 'GitHub API unreachable' }
   }
 }

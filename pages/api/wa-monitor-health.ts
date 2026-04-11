@@ -223,6 +223,7 @@ async function checkSystemdService(name: string, command: string): Promise<Healt
       };
     }
   } catch (error) {
+    log.warn('wa-monitor-health', { message: `Systemd service check failed: ${name}`, error: error instanceof Error ? error.message : String(error) });
     return {
       status: 'down',
       details: { name },
@@ -259,6 +260,7 @@ async function checkLogActivity(command: string): Promise<HealthCheck> {
       error: status !== 'up' ? `No log activity for ${ageMinutes} minutes` : undefined,
     };
   } catch (error) {
+    log.warn('wa-monitor-health', { message: 'Log activity check failed', error: error instanceof Error ? error.message : String(error) });
     return {
       status: 'down',
       details: {},
@@ -298,6 +300,7 @@ async function checkDatabaseConnection(): Promise<HealthCheck> {
       latency_ms: latency,
     };
   } catch (error) {
+    log.warn('wa-monitor-health', { message: 'Database connection check failed', error: error instanceof Error ? error.message : String(error) });
     return {
       status: 'down',
       details: {},
@@ -326,6 +329,7 @@ async function checkTableExists(): Promise<HealthCheck> {
       latency_ms: latency,
     };
   } catch (error) {
+    log.warn('wa-monitor-health', { message: 'Table existence check failed', error: error instanceof Error ? error.message : String(error) });
     return {
       status: 'down',
       details: { table_name: 'qa_photo_reviews' },
@@ -362,6 +366,7 @@ async function checkRecentData(): Promise<HealthCheck> {
       error: count === 0 ? 'No drops received in last 24 hours' : undefined,
     };
   } catch (error) {
+    log.warn('wa-monitor-health', { message: 'Recent data check failed', error: error instanceof Error ? error.message : String(error) });
     return {
       status: 'down',
       details: {},
@@ -430,6 +435,7 @@ async function checkAPIEndpoint(name: string, url: string): Promise<HealthCheck>
       error: latency > 2000 ? 'Response time > 2s (slow)' : undefined,
     };
   } catch (error) {
+    log.warn('wa-monitor-health', { message: `API endpoint check failed: ${name}`, error: error instanceof Error ? error.message : String(error) });
     return {
       status: 'down',
       details: { name, url },
