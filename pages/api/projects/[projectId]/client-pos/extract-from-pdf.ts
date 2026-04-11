@@ -15,7 +15,7 @@ import { promisify } from 'util';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth, withRole, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { VFStorageService } from '@/services/vfStorageAdapter';
 import { extractPOFromImage, extractPOFromMultipleImages } from '@/modules/projects/services/poExtractionService';
 import type { POExtractionAPIResponse } from '@/modules/projects/types/po-extraction.types';
@@ -32,7 +32,7 @@ export const config = {
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 const ALLOWED_TYPES = ['application/pdf'];
 
-export default withAuth(withErrorHandler(async (
+export default withAuth(withRole('super_admin')(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
@@ -149,7 +149,7 @@ export default withAuth(withErrorHandler(async (
     log.error('[POExtraction] Failed to process PDF', { projectId, error });
     return apiResponse.internalError(res, error instanceof Error ? error : new Error('Failed to process PDF'));
   }
-}));
+})));
 
 /**
  * Convert PDF to images using pdftoppm

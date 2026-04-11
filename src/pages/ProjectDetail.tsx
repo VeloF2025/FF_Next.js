@@ -14,6 +14,9 @@ import { ProjectProgressCard } from './detail/ProjectProgressCard';
 import { ProjectDetailHeader } from './detail/ProjectDetailHeader';
 import { ProjectStatusBadges } from './detail/ProjectStatusBadges';
 import { ProjectTabs, TabId } from './detail/ProjectTabs';
+import { FINANCE_RESTRICTED_TAB_IDS } from './detail/ProjectDetailUtils';
+import { useAuth } from '@/contexts/AuthContext';
+import { UserRole } from '@/types/auth.types';
 import { ProjectKeyDetails } from './detail/ProjectKeyDetails';
 import { ProjectQuickStats } from './detail/ProjectQuickStats';
 import { ProjectHierarchyTab } from './detail/ProjectHierarchyTab';
@@ -79,6 +82,25 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
   const tabFromUrl = router.query.tab as string | undefined;
   const normalizedTab = tabFromUrl ? (TAB_ALIASES[tabFromUrl] || tabFromUrl) : 'overview';
   const activeTab = normalizedTab as TabId;
+
+  // Finance section (Dashboard, Income, Budget, Documents) is super-admin only.
+  // Direct URL access is silently redirected to Overview.
+  const { hasRole } = useAuth();
+  const isSuperAdmin = hasRole(UserRole.SUPER_ADMIN);
+  const financeRestricted =
+    !isSuperAdmin &&
+    (FINANCE_RESTRICTED_TAB_IDS as readonly string[]).includes(activeTab);
+
+  useEffect(() => {
+    if (financeRestricted && id) {
+      router.replace(
+        { pathname: router.pathname, query: { ...router.query, tab: 'overview' } },
+        undefined,
+        { shallow: true },
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [financeRestricted, id]);
 
   // Handle tab change - update URL
   const handleTabChange = (newTab: TabId) => {
@@ -267,7 +289,7 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
         <ProjectTimelineTab />
       )}
 
-      {activeTab === 'finance-dashboard' && (
+      {activeTab === 'finance-dashboard' && isSuperAdmin && (
         <FinanceDashboardTab
           projectId={id!}
           onNavigateToIncome={() => handleTabChange('income')}
@@ -275,11 +297,11 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
         />
       )}
 
-      {activeTab === 'income' && (
+      {activeTab === 'income' && isSuperAdmin && (
         <ProjectIncomeTab projectId={id!} />
       )}
 
-      {activeTab === 'budget' && (
+      {activeTab === 'budget' && isSuperAdmin && (
         <div className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)] p-6">
           <div className="text-center py-8">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
@@ -311,7 +333,7 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
         />
       )}
 
-      {activeTab === 'documents' && (
+      {activeTab === 'documents' && isSuperAdmin && (
         <ProjectDocumentsTab projectId={id!} />
       )}
 

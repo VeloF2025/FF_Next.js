@@ -15,7 +15,7 @@ import type {
   CreateBudgetItemRequest,
   FiberBudgetCategoryCode,
 } from '@/types/procurement/material-catalog.types';
-import { withAuth } from '@/lib/auth';
+import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
 const DATABASE_URL = process.env.DATABASE_URL!;
@@ -306,4 +306,4 @@ async function handlePost(
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withRole('super_admin')(handler));

@@ -9,6 +9,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout';
+import { useAuth } from '@/contexts/AuthContext';
+import { UserRole } from '@/types/auth.types';
 import {
   BudgetOverviewCard,
   CategoryBreakdownTable,
@@ -43,6 +45,15 @@ interface BudgetPageData {
 export default function ProjectBudgetPage() {
   const router = useRouter();
   const { id: projectId } = router.query;
+  const { hasRole, loading: authLoading } = useAuth();
+  const isSuperAdmin = hasRole(UserRole.SUPER_ADMIN);
+
+  // Finance section is super-admin only. Redirect to the project overview.
+  useEffect(() => {
+    if (!authLoading && !isSuperAdmin && projectId) {
+      router.replace(`/projects/${projectId}`);
+    }
+  }, [authLoading, isSuperAdmin, projectId, router]);
 
   const [data, setData] = useState<BudgetPageData>({
     budget: null,

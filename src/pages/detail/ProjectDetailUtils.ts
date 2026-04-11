@@ -74,6 +74,18 @@ export interface TabGroup {
 }
 
 /**
+ * The entire "Finance" tab group (Dashboard, Income, Budget, Documents) is
+ * restricted to super admins. Keep this list in sync with the 'finance'
+ * group in getGroupedTabConfig below.
+ */
+export const FINANCE_RESTRICTED_TAB_IDS = [
+  'finance-dashboard',
+  'income',
+  'budget',
+  'documents',
+] as const;
+
+/**
  * Get flat tab configuration (legacy support)
  * Sprint 1: Added Team, Procurement, Maintenance tabs
  */

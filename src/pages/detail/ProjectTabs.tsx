@@ -6,6 +6,8 @@
  */
 
 import { useMemo, useCallback } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { UserRole } from '@/types/auth.types';
 import { getGroupedTabConfig, TabGroup } from './ProjectDetailUtils';
 
 export type TabId = 'overview' | 'team' | 'procurement' | 'maintenance' | 'hierarchy' | 'sow' | 'boq' | 'agreements' | 'wayleaves' | 'timeline' | 'budget' | 'hs' | 'finance-dashboard' | 'income' | 'documents' | 'pon-stages' | 'pon-progress' | 'prereqs' | 'sp-tracker' | 'site-visits';
@@ -29,7 +31,13 @@ function findGroupForTab(groups: TabGroup[], tabId: string): string | null {
 }
 
 export function ProjectTabs({ activeTab, onTabChange, badges = {} }: ProjectTabsProps) {
-  const groups = useMemo(() => getGroupedTabConfig(), []);
+  const { hasRole } = useAuth();
+  const isSuperAdmin = hasRole(UserRole.SUPER_ADMIN);
+
+  const groups = useMemo(() => {
+    const all = getGroupedTabConfig();
+    return isSuperAdmin ? all : all.filter((g) => g.id !== 'finance');
+  }, [isSuperAdmin]);
 
   // Determine which group is active based on the active tab
   const activeGroupId = useMemo(

@@ -11,7 +11,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth, withRole, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { VFStorageService, normalizeStorageUrl } from '@/services/vfStorageAdapter';
 import type { ProjectDocument, ProjectDocumentCreateInput, ProjectDocumentType } from '@/modules/projects/types/po-extraction.types';
 
@@ -28,7 +28,7 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB for documents
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 const VALID_DOC_TYPES: ProjectDocumentType[] = ['bss', 'mss', 'contract', 'amendment', 'wayleave', 'permit', 'other'];
 
-export default withAuth(withErrorHandler(async (
+export default withAuth(withRole('super_admin')(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
@@ -50,7 +50,7 @@ export default withAuth(withErrorHandler(async (
   }
 
   return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
-}));
+})));
 
 async function handleGet(
   req: NextApiRequest,
