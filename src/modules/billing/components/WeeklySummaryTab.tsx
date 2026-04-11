@@ -150,6 +150,16 @@ export function WeeklySummaryTab() {
     return anyValue ? total : null;
   };
 
+  // "Currently Excluded" KPI — derived from the latest week's rows so it
+  // matches the week-totals row in the table below. Excludes pre-provisions
+  // (those are a separate withhold category, not a deduction).
+  const latestWeekRows = weekGroups[0]?.[1] ?? [];
+  const currentlyExcludedFromRows =
+    sumField(latestWeekRows, 'ft_note1_count') +
+    sumField(latestWeekRows, 'ft_note2_count') +
+    sumField(latestWeekRows, 'ft_note4_count') +
+    sumField(latestWeekRows, 'ft_note5_count');
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -167,11 +177,11 @@ export function WeeklySummaryTab() {
             {loading ? (
               <InlineSpinner size="md" />
             ) : (
-              (metrics?.currentlyExcluded ?? '—')
+              currentlyExcludedFromRows.toLocaleString()
             )}
           </p>
           <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
-            Distinct DRs in latest week&apos;s deductions
+            N1 + N2 + N4 + N5 across latest week
           </p>
         </div>
 

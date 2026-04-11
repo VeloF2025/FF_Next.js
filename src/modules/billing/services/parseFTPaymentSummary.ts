@@ -168,8 +168,13 @@ function findLabelValue(lines: string[], label: string): string | null {
 
 /**
  * Search for the first line in `lines` that contains `label` (case-insensitive)
- * and return the integer found on that line (or the next non-empty line).
- * Returns null when not found; pushes to `warnings` array.
+ * and return the first integer that appears AFTER the label on that line
+ * (or on the next non-empty line).
+ *
+ * Historical bug: this used to pull the first integer from the whole line,
+ * which meant "Lower than -26 dB threshold -2" picked up `-26` from the
+ * label text instead of `-2`, the real count. Scoping the integer search
+ * to the post-label substring fixes that without any label-specific logic.
  */
 function findCountByLabel(
   lines: string[],
@@ -180,20 +185,23 @@ function findCountByLabel(
   const labelLower = label.toLowerCase();
 
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i]!.toLowerCase().includes(labelLower)) {
-      // Try the same line first
-      const same = extractNumberAfterLabel(lines[i]!);
-      if (same !== null) return Math.abs(same);
+    const line = lines[i]!;
+    const idx = line.toLowerCase().indexOf(labelLower);
+    if (idx === -1) continue;
 
-      // Try the next non-empty line
-      for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
-        const next = extractNumberAfterLabel(lines[j]!);
-        if (next !== null) return Math.abs(next);
-      }
+    // Only look at the portion of the line AFTER the label
+    const after = line.slice(idx + labelLower.length);
+    const same = extractNumberAfterLabel(after);
+    if (same !== null) return Math.abs(same);
 
-      warnings.push(`Found label "${label}" but could not extract a number for ${fieldName}`);
-      return 0;
+    // Try the next non-empty line (unscoped — the label is done with)
+    for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+      const next = extractNumberAfterLabel(lines[j]!);
+      if (next !== null) return Math.abs(next);
     }
+
+    warnings.push(`Found label "${label}" but could not extract a number for ${fieldName}`);
+    return 0;
   }
 
   warnings.push(`Label not found in PDF: "${label}" (${fieldName} defaulted to 0)`);
@@ -350,25 +358,31 @@ export async function parseFTPaymentPdf(
   }
 
   // ── Pre-provisions ───────────────────────────────────────────────────────
-  // Line format: "Pre-Provisioned    0    -163"
-  // We want the absolute value of the negative number (actual pre-provisions deducted).
+  // Line format: "Pre-Provisioned 20% of Pre-provisioned withheld   0   -180 OES Report, as at 05 Apr 2026"
+  // The count we want is the negative number just before the trailing report
+  // label. Historical bug: when no negative existed, the fallback took
+  // max(|allNums|) which then picked up stray year numbers (e.g. 2026) from
+  // the "as at <date>" suffix. Fix: only accept explicitly negative values,
+  // default 0 otherwise. That matches FT's semantics — "no withhold".
   let preProvisionsCount = 0;
+  let preProvLineFound = false;
   for (const line of lines) {
     if (/pre-prov/i.test(line)) {
-      // Grab all integers on the line; the last (or most negative) is the deduction
-      const allNums = [...line.matchAll(/-?\d+/g)].map(m => parseInt(m[0], 10));
-      // Prefer the most negative value; that is the pre-provisions deduction
-      const negative = allNums.filter(n => n < 0);
-      if (negative.length > 0) {
-        preProvisionsCount = Math.abs(Math.min(...negative));
-      } else if (allNums.length > 0) {
-        preProvisionsCount = Math.max(...allNums.map(Math.abs));
+      preProvLineFound = true;
+      // Strip any "as at <date>" tail so date digits can't leak in.
+      const stripped = line.replace(/as\s+at\b.*$/i, '');
+      const nums = [...stripped.matchAll(/-?\d+/g)]
+        .map((m) => parseInt(m[0], 10))
+        .filter((n) => !isNaN(n));
+      const negatives = nums.filter((n) => n < 0);
+      if (negatives.length > 0) {
+        preProvisionsCount = Math.abs(Math.min(...negatives));
       }
       break;
     }
   }
-  if (preProvisionsCount === 0) {
-    warnings.push('Could not find Pre-Provisioned count — defaulted to 0');
+  if (!preProvLineFound) {
+    warnings.push('Could not find Pre-Provisioned line — defaulted to 0');
   }
 
   // ── Total claimable for payment ──────────────────────────────────────────
