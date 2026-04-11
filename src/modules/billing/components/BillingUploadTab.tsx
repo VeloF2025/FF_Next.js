@@ -252,13 +252,16 @@ export function BillingUploadTab() {
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
-  const canImport = useMemo(
-    () =>
-      uploadState === 'previewed' &&
-      previewRows.length > 0 &&
-      previewRows.every((r) => r.resolved.matched && r.summary && !r.fatalError),
-    [uploadState, previewRows],
+  const readyRows = useMemo(
+    () => previewRows.filter((r) => r.resolved.matched && r.summary && !r.fatalError),
+    [previewRows],
   );
+  const blockedRows = useMemo(
+    () => previewRows.filter((r) => !(r.resolved.matched && r.summary && !r.fatalError)),
+    [previewRows],
+  );
+  const canImport =
+    uploadState === 'previewed' && readyRows.length > 0;
 
   const displayRows: (ProjectBundlePreview | ProjectBundleImport)[] =
     importRows.length > 0 ? importRows : previewRows;
@@ -385,20 +388,35 @@ export function BillingUploadTab() {
 
       {/* Import / reset actions */}
       {uploadState === 'previewed' && (
-        <div className="flex justify-end gap-3">
-          <Button type="button" variant="ghost" onClick={handleReset}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            onClick={() => { void handleImport(); }}
-            disabled={!canImport}
-            title={canImport ? undefined : 'Resolve all projects first'}
-          >
-            <Upload className="w-4 h-4" />
-            Import all
-          </Button>
+        <div className="flex flex-col items-end gap-2">
+          {blockedRows.length > 0 && (
+            <div className="text-xs text-amber-400 flex items-center gap-2">
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>
+                {blockedRows.length} blocked:{' '}
+                {blockedRows
+                  .map((r) => r.resolved.projectName ?? r.projectHint ?? '(unnamed)')
+                  .join(', ')}
+                {' '}— will be skipped
+              </span>
+            </div>
+          )}
+          <div className="flex gap-3">
+            <Button type="button" variant="ghost" onClick={handleReset}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => { void handleImport(); }}
+              disabled={!canImport}
+              title={canImport ? undefined : 'No projects ready to import'}
+            >
+              <Upload className="w-4 h-4" />
+              Import {readyRows.length} ready
+              {blockedRows.length > 0 ? ` · skip ${blockedRows.length}` : ''}
+            </Button>
+          </div>
         </div>
       )}
 
