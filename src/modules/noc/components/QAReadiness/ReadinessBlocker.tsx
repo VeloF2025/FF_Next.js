@@ -14,7 +14,6 @@
 
 'use client';
 
-import React from 'react';
 import { AlertTriangle, CheckCircle2, Lock, PlayCircle, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { QAReadinessCheck } from '../../types/verification';

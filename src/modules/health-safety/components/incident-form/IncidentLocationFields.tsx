@@ -2,7 +2,6 @@
  * Incident Location Fields - Location text, project, contractor, GPS
  */
 
-import React from 'react';
 import { MapPin } from 'lucide-react';
 
 /** Slim project option for incident location form dropdown */

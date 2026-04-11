@@ -15,7 +15,6 @@
 
 'use client';
 
-import React from 'react';
 import { Clock, AlertCircle, FileText, ExternalLink, ArrowRight } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';

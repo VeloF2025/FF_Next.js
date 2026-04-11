@@ -1,4 +1,3 @@
-import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 
 /** Single line item in the BOQ form */

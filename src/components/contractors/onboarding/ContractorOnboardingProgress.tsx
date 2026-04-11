@@ -5,7 +5,6 @@
 
 'use client';
 
-import React from 'react';
 
 export interface OnboardingProgress {
   totalStages: number;

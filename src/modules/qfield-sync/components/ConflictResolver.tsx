@@ -3,7 +3,7 @@
  * Interface for resolving sync conflicts between QFieldCloud and FibreFlow
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { AlertTriangle, ChevronRight, Check } from 'lucide-react';
 import { SyncConflict } from '../types/qfield-sync.types';
 import { log } from '@/lib/logger';

@@ -3,7 +3,7 @@
  * Slide-out panel showing department details, staff list, and report
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Edit, Trash2, Users, ChevronRight } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import { Badge } from '@/shared/components/ui/Badge';

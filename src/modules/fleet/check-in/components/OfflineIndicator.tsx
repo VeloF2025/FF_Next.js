@@ -3,7 +3,6 @@
  * Shows offline status and sync queue
  */
 
-import React from 'react';
 import { Wifi, WifiOff, Cloud, CloudOff, RefreshCw } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useOfflineSync } from '../hooks/useOfflineSync';

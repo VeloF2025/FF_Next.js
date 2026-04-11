@@ -1,5 +1,5 @@
 // 🟢 WORKING: WorkflowAnalytics component - analytics dashboard for workflow performance
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useWorkflowAnalytics } from './analytics/hooks/useWorkflowAnalytics';
 import type { DateRange } from './analytics/types/analytics.types';
 import {

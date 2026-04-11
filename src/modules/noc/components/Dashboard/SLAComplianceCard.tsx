@@ -13,7 +13,6 @@
 
 'use client';
 
-import React from 'react';
 import { CheckCircle2, XCircle, TrendingUp, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

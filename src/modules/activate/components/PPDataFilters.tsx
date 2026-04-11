@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import { Search, XCircle, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 

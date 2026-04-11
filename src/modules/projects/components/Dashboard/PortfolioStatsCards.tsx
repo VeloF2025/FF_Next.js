@@ -3,7 +3,6 @@
  * Displays project status counts using EnhancedStatCard (same as main dashboard)
  */
 
-import React from 'react';
 import {
   Folder,
   Clock,

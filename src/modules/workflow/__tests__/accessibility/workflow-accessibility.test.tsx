@@ -1,5 +1,4 @@
 // Accessibility tests for workflow system components
-import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe, toHaveNoViolations } from 'jest-axe';

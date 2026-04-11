@@ -3,7 +3,7 @@
  * Development tools for tracking component performance
  */
 
-import React, { ComponentType, useRef, useEffect } from 'react';
+import { ComponentType, useRef, useEffect } from 'react';
 import { log } from '@/lib/logger';
 
 /**

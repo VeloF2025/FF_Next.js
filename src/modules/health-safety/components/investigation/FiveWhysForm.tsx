@@ -4,7 +4,6 @@
  * Structured 5-whys input that builds a causal chain from symptom to root cause.
  */
 
-import React from 'react';
 import { Plus, Trash2, HelpCircle } from 'lucide-react';
 
 export interface WhyEntry {

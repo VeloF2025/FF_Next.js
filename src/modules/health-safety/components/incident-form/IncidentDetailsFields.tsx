@@ -2,7 +2,6 @@
  * Incident Details - Title, description, immediate actions, DoL flags
  */
 
-import React from 'react';
 import { SEVERITY_CONFIG, type HSSeverity } from '@/modules/health-safety/types/ticket.types';
 
 interface IncidentDetailsFieldsProps {

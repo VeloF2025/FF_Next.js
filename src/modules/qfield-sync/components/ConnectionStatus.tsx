@@ -3,7 +3,6 @@
  * Displays the connection status for QFieldCloud or FibreFlow
  */
 
-import React from 'react';
 import { LucideIcon, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 
 interface ConnectionStatusProps {

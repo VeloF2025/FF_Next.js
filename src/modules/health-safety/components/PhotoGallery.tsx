@@ -5,7 +5,7 @@
  * opens it in a lightbox overlay.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, ZoomIn, Camera, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export interface GalleryPhoto {

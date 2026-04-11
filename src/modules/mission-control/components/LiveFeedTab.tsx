@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, MessageSquare, Bell } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';

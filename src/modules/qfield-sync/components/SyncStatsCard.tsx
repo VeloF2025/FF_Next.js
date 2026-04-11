@@ -3,7 +3,6 @@
  * Displays synchronization statistics
  */
 
-import React from 'react';
 import { Activity, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { SyncStats } from '../types/qfield-sync.types';
 

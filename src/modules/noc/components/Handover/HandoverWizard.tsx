@@ -15,7 +15,7 @@
 
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   CheckCircle2,

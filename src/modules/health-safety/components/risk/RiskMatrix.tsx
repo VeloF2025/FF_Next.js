@@ -2,7 +2,6 @@
  * Risk Matrix - 5x5 visual heatmap of likelihood vs severity
  */
 
-import React from 'react';
 import { LIKELIHOOD_SCALE, SEVERITY_SCALE } from '@/modules/health-safety/types/risk.types';
 
 interface MatrixCell {

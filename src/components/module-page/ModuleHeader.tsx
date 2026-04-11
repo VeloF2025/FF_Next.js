@@ -6,7 +6,6 @@
 
 'use client';
 
-import React from 'react';
 import type { ModuleHeaderProps } from './types';
 
 export function ModuleHeader({

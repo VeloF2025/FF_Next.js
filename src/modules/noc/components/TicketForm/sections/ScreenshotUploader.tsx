@@ -9,7 +9,6 @@
 
 'use client';
 
-import React from 'react';
 import {
   Camera, Upload, CheckCircle, AlertCircle, X,
   Maximize2, Monitor, Video, Mic, FileVideo, FileAudio,

@@ -3,7 +3,6 @@
  * Displays historical sync jobs in a table format
  */
 
-import React from 'react';
 import { CheckCircle, XCircle, Clock, ArrowRight } from 'lucide-react';
 import { SyncJob } from '../types/qfield-sync.types';
 

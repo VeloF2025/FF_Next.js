@@ -3,7 +3,6 @@
  * Displays aggregated drops/fiber progress
  */
 
-import React from 'react';
 import { Signal } from 'lucide-react';
 import type { NetworkProgress } from './types';
 

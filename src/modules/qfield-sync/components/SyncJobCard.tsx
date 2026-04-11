@@ -3,7 +3,6 @@
  * Displays current sync job progress and status
  */
 
-import React from 'react';
 import { X, CheckCircle, AlertCircle } from 'lucide-react';
 import { SyncJob } from '../types/qfield-sync.types';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';

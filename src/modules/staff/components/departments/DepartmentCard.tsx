@@ -3,7 +3,6 @@
  * Displays department summary in a card format
  */
 
-import React from 'react';
 import { Card, CardContent } from '@/shared/components/ui/Card';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Users, User, UserMinus, Building2 } from 'lucide-react';

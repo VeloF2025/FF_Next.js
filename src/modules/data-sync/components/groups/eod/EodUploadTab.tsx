@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { Upload, CheckCircle, Camera, XCircle, AlertTriangle } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';

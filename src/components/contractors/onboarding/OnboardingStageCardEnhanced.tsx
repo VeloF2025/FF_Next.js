@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Upload, CheckCircle2, XCircle } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
 import { ContractorDocument, DOCUMENT_TYPE_LABELS, DocumentType } from '@/types/contractor-document.types';

@@ -4,7 +4,6 @@
  * Displays important alerts for document issues
  */
 
-import React from 'react';
 import { AlertTriangle, XCircle, Info, AlertCircle } from 'lucide-react';
 import type { DocumentAlert } from '../types/documentReport.types';
 

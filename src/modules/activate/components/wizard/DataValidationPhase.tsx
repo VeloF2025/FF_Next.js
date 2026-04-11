@@ -4,7 +4,7 @@
  * Phase 3 of QA Wizard - Extracts and validates technical data from photos.
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { log } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';

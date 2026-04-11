@@ -5,7 +5,7 @@
  * Requires both front and back sides to be uploaded.
  */
 
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useDropzone, DropzoneState } from 'react-dropzone';
 import {
   Upload,

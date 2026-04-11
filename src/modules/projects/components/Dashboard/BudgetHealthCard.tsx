@@ -3,7 +3,6 @@
  * Displays aggregated budget metrics with health indicator
  */
 
-import React from 'react';
 import type { BudgetMetrics } from './types';
 
 interface BudgetHealthCardProps {

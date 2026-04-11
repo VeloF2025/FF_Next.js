@@ -7,7 +7,7 @@
  * - Generates and sends WhatsApp feedback to technicians
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { log } from '@/lib/logger';
 import type { QaWizardState, QaDecision } from '../../types/unified.types';
 import {

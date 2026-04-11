@@ -3,7 +3,7 @@
  * Displays connection status, pending sync items, and sync progress
  */
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   WifiOff,
   RefreshCw,

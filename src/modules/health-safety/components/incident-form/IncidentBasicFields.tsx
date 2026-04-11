@@ -2,7 +2,6 @@
  * Incident Basic Fields - Type, severity, date/time classification
  */
 
-import React from 'react';
 import {
   INCIDENT_TYPE_CONFIG,
   SEVERITY_CONFIG,

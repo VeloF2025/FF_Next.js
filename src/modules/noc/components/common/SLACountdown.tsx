@@ -13,7 +13,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Clock, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { formatDistanceToNow, differenceInHours, differenceInMinutes, isPast } from 'date-fns';
 import { cn } from '@/lib/utils';

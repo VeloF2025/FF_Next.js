@@ -4,7 +4,6 @@
  * Displays contractor documents in a table format with status, expiry, and actions
  */
 
-import React from 'react';
 import { FileText, Eye, Upload, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { DocumentInfo, TeamMemberDocuments } from '../types/documentReport.types';

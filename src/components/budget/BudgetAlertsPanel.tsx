@@ -5,7 +5,6 @@
  * Displays active budget alerts with acknowledge and resolve actions
  */
 
-import React from 'react';
 import { AlertTriangle, XCircle, Info, Check, CheckCheck } from 'lucide-react';
 import { formatDisplayDateTime } from '@/utils/dateFormat';
 import type { BudgetAlert, AlertSeverity, AlertStatus } from '@/types/budget';

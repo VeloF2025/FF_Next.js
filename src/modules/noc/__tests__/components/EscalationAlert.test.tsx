@@ -9,7 +9,6 @@
  * - RepeatFaultMap: Visual map, severity colors, filtering, statistics
  */
 
-import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EscalationAlert } from '../../components/Escalation/EscalationAlert';

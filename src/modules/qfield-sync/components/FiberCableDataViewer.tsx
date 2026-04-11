@@ -3,7 +3,7 @@
  * Displays actual fiber cable data from QFieldCloud and FibreFlow
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Cable, MapPin, Activity, CheckCircle, Clock, AlertCircle, RefreshCw, Download } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';

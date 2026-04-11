@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { formatDisplayDate } from '@/utils/dateFormat';

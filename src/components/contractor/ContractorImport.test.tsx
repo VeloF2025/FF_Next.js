@@ -3,7 +3,6 @@
  * Tests for the main contractor import UI component
  */
 
-import React from 'react';
 import { describe, it, expect, beforeEach, vi, type MockedObject } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';

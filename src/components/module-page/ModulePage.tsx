@@ -20,7 +20,6 @@
 
 'use client';
 
-import React from 'react';
 import { ModuleTabs, SubTabs, useModuleTabs } from '@/modules/navigation';
 import { ModuleHeader } from './ModuleHeader';
 import type { ModulePageProps } from './types';

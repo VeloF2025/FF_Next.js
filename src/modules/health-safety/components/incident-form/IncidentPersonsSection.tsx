@@ -2,7 +2,6 @@
  * Incident Persons Section - Injured persons and witnesses
  */
 
-import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import type { PersonInvolved } from '@/modules/health-safety/types/ticket.types';
 

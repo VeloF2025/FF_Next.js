@@ -3,7 +3,6 @@
  * Displays recent project activity with quick navigation
  */
 
-import React from 'react';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import type { RecentProject } from './types';

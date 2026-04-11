@@ -3,7 +3,7 @@
  * Displays poles and drops data from QFieldCloud and FibreFlow
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   MapPin,
   Home,

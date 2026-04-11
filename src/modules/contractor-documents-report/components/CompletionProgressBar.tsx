@@ -4,7 +4,6 @@
  * Visual progress indicator for document completion percentage
  */
 
-import React from 'react';
 import { getProgressBarColor } from '../utils/completenessCalculator';
 
 interface CompletionProgressBarProps {

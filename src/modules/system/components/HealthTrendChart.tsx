@@ -3,7 +3,7 @@
  * Displays historical health data as a simple visual chart
  */
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 

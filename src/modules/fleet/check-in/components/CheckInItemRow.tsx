@@ -3,7 +3,7 @@
  * Single checklist item with pass/fail toggle
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { CheckCircle, XCircle, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import type { CheckItem, CreateCheckResponseInput } from '../../types/check-in.types';
 

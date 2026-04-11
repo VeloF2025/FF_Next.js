@@ -9,7 +9,7 @@
  * - Separate Internal Notes and Technician Feedback
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { log } from '@/lib/logger';
 import { PhotoLightbox, type LightboxPhoto } from '@/components/PhotoLightbox';
 import type {

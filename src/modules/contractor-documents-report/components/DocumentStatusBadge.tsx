@@ -4,7 +4,6 @@
  * Displays a colored badge with icon and label for document status
  */
 
-import React from 'react';
 import { CheckCircle, Clock, AlertTriangle, XCircle, RefreshCw, Square } from 'lucide-react';
 import type { DocumentDisplayStatus } from '../types/documentReport.types';
 import { getStatusBadgeProps } from '../utils/documentStatusRules';

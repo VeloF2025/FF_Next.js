@@ -13,7 +13,7 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, PlayCircle, RefreshCw } from 'lucide-react';
 import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';

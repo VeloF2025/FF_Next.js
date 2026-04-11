@@ -15,7 +15,7 @@
 
 'use client';
 
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { Check, Camera, Clock, User } from 'lucide-react';
 import { PhotoUpload } from './PhotoUpload';
 import { formatDisplayDateTime } from '@/utils/dateFormat';

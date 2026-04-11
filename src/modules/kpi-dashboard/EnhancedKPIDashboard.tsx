@@ -16,7 +16,7 @@
  * @date 2026-02-01
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   BarChart3,

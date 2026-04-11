@@ -3,7 +3,6 @@
  * Displays analytics and stats for a department
  */
 
-import React from 'react';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import { Card, CardContent } from '@/shared/components/ui/Card';
 import {

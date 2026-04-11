@@ -3,7 +3,7 @@
  * Main check-in form for drivers (mobile-first) with daily/weekly modes
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle,

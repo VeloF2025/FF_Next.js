@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { X } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { TeamSelector } from '@/modules/noc/components/Assignment/TeamSelector';

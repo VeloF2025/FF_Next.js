@@ -6,7 +6,6 @@
 
 'use client';
 
-import React from 'react';
 import Link from 'next/link';
 import { Lock } from 'lucide-react';
 import type { TabConfig, TabBadge } from '../types';

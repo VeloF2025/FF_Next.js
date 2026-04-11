@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Search, Check } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { QFieldProject, QFieldCloudProject } from '../../../types';

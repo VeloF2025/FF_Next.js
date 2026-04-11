@@ -12,7 +12,7 @@
 
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { User, Users, UserPlus, Save, X } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';

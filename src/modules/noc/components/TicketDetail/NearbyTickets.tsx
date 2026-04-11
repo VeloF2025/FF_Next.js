@@ -7,7 +7,6 @@
 
 'use client';
 
-import React from 'react';
 import Link from 'next/link';
 import { RefreshCw, MapPin, AlertCircle } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';

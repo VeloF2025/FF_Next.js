@@ -3,7 +3,6 @@
  * Main dashboard component for project portfolio overview
  */
 
-import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ShieldCheck, Wrench } from 'lucide-react';
 import { PortfolioStatsCards } from './PortfolioStatsCards';

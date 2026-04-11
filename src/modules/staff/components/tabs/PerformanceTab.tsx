@@ -17,7 +17,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   BarChart3,
   TrendingUp,

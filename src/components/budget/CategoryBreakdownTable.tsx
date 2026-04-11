@@ -5,7 +5,6 @@
  * Displays budget categories with allocated, committed, actual, and available amounts
  */
 
-import React from 'react';
 import { Pencil } from 'lucide-react';
 import type { BudgetCategory } from '@/types/budget';
 

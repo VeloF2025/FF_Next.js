@@ -10,7 +10,7 @@
  * - Action buttons
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { log } from '@/lib/logger';
 import { Button } from '@/components/ui/button';

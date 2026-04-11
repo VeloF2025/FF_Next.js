@@ -15,7 +15,6 @@
 
 'use client';
 
-import React from 'react';
 import { Users, AlertCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { WorkloadByAssignee } from '../../services/dashboardService';

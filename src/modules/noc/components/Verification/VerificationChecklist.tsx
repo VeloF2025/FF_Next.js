@@ -16,7 +16,7 @@
 
 'use client';
 
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useAuth } from '@/contexts/AuthContext';

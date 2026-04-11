@@ -16,7 +16,6 @@
  *   <ProgressBar value={60} label="Stage" thresholds={STAGE_THRESHOLDS} />
  */
 
-import React from 'react';
 import { cn } from '@/lib/utils';
 
 export interface ProgressBarThresholds {

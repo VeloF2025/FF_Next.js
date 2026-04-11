@@ -5,7 +5,6 @@
 
 'use client';
 
-import React from 'react';
 import { Lock } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useOltState, OLT_TABS } from '../../hooks/useOltState';

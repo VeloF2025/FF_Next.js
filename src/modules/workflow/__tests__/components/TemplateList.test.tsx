@@ -1,5 +1,4 @@
 // Component tests for TemplateList
-import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TemplateList } from '../../components/templates/TemplateList';

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Wifi, WifiOff, Clock, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDisplayDate } from '@/utils/dateFormat';

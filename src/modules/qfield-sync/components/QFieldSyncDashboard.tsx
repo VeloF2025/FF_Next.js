@@ -3,7 +3,7 @@
  * Main dashboard for managing QFieldCloud to FibreFlow synchronization
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ArrowDownUp,
   Cloud,

@@ -6,7 +6,6 @@
  * Shows utilization donut chart, key metrics, and active alerts
  */
 
-import React from 'react';
 import Link from 'next/link';
 import { AlertTriangle, CheckCircle2, XCircle, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
 import type { BudgetHealth, BudgetStatus } from '@/types/budget';

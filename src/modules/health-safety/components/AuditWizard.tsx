@@ -5,7 +5,7 @@
  * Groups checklist items by category and allows pass/fail/na responses.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import useSWR from 'swr';
 import {
   CheckCircle,

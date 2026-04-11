@@ -4,7 +4,6 @@
  * Phase 1 of QA Wizard - Validates prerequisites before detailed review.
  */
 
-import React from 'react';
 import { Button } from '@/components/ui/button';
 import type { QaWizardState } from '../../types/unified.types';
 

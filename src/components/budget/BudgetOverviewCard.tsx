@@ -5,7 +5,6 @@
  * Displays summary budget information including total, committed, and available amounts
  */
 
-import React from 'react';
 import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import type { BudgetHealth, BudgetStatus } from '@/types/budget';
 

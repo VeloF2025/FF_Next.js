@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Search, RefreshCw, Loader2, AlertCircle, XCircle, Wrench } from 'lucide-react';
 import { log } from '@/lib/logger';
 import toast from 'react-hot-toast';

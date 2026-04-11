@@ -3,7 +3,6 @@
  * Shows check-in result after submission
  */
 
-import React from 'react';
 import {
   CheckCircle,
   XCircle,

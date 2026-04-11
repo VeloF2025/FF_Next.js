@@ -5,7 +5,6 @@
 
 'use client';
 
-import React from 'react';
 import type { EodVlmEntry } from '../../../types';
 
 interface EodEntryTableProps {

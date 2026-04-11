@@ -11,7 +11,7 @@
  * 4. If approved → Show summary and enable "Continue"
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { log } from '@/lib/logger';
 import type {
   VlmCategorizationResult,
