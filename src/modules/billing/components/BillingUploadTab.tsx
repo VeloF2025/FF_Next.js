@@ -7,7 +7,7 @@
 
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Upload,
   FileText,
@@ -22,9 +22,17 @@ import toast from 'react-hot-toast';
 import { log } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
 
-type Project = 'Lawley' | 'Mohadin' | 'Mamelodi';
+interface BillableProject {
+  id: string;
+  name: string;
+}
 
-const PROJECTS: Project[] = ['Lawley', 'Mohadin', 'Mamelodi'];
+interface ResolvedProject {
+  matched: boolean;
+  project: BillableProject | null;
+  candidates: BillableProject[];
+  rawInput: string;
+}
 
 interface BillingPreview {
   weekEnding: string;
@@ -56,7 +64,6 @@ type UploadState = 'idle' | 'previewing' | 'previewed' | 'importing' | 'imported
 
 // 🟢 WORKING: Full upload + preview + import + reconcile flow
 export function BillingUploadTab() {
-  const [project, setProject] = useState<Project>('Lawley');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [xlsxFile, setXlsxFile] = useState<File | null>(null);
   const [isDraggingPdf, setIsDraggingPdf] = useState(false);
@@ -65,6 +72,31 @@ export function BillingUploadTab() {
   const [uploadState, setUploadState] = useState<UploadState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [parseWarnings, setParseWarnings] = useState<string[]>([]);
+  const [resolvedProject, setResolvedProject] = useState<ResolvedProject | null>(null);
+  const [billableProjects, setBillableProjects] = useState<BillableProject[]>([]);
+  /** User override for when auto-detection fails/ambiguous. Empty = use resolvedProject. */
+  const [projectOverride, setProjectOverride] = useState<string>('');
+
+  // Lazy-load billable projects once — used to populate the override dropdown.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/billing/projects');
+        if (!res.ok) return;
+        const data: Record<string, unknown> = await res.json();
+        const payload = (data.data ?? data) as { projects?: BillableProject[] };
+        if (!cancelled && Array.isArray(payload.projects)) {
+          setBillableProjects(payload.projects);
+        }
+      } catch (err) {
+        log.warn('Failed to load billable projects list', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // ── Drag & Drop handlers ──────────────────────────────────────────────────
 
@@ -116,7 +148,9 @@ export function BillingUploadTab() {
     try {
       const formData = new FormData();
       formData.append('action', 'preview');
-      formData.append('project', project);
+      // Only send an explicit override when the user picked one from the
+      // fallback dropdown; otherwise let the backend auto-detect from the PDF.
+      if (projectOverride) formData.append('project', projectOverride);
       formData.append('pdfFile', pdfFile);
       if (xlsxFile) formData.append('notesFile', xlsxFile);
 
@@ -169,6 +203,18 @@ export function BillingUploadTab() {
       const warnings = Array.isArray(data.parseWarnings) ? (data.parseWarnings as string[]) : [];
       setParseWarnings(warnings);
 
+      // Capture auto-resolution result so the UI can show detected project
+      // or prompt for a fallback override.
+      const rp = data.resolvedProject as Record<string, unknown> | undefined;
+      if (rp && typeof rp === 'object') {
+        setResolvedProject({
+          matched: Boolean(rp.matched),
+          project: (rp.project as BillableProject | null) ?? null,
+          candidates: Array.isArray(rp.candidates) ? (rp.candidates as BillableProject[]) : [],
+          rawInput: String(rp.rawInput ?? ''),
+        });
+      }
+
       setUploadState('previewed');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Preview failed');
@@ -187,7 +233,7 @@ export function BillingUploadTab() {
     try {
       const formData = new FormData();
       formData.append('action', 'import');
-      formData.append('project', project);
+      if (projectOverride) formData.append('project', projectOverride);
       formData.append('pdfFile', pdfFile);
       if (xlsxFile) formData.append('notesFile', xlsxFile);
 
@@ -292,6 +338,8 @@ export function BillingUploadTab() {
     setUploadState('idle');
     setError(null);
     setParseWarnings([]);
+    setResolvedProject(null);
+    setProjectOverride('');
   };
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -311,26 +359,75 @@ export function BillingUploadTab() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  const needsOverride =
+    resolvedProject !== null && !resolvedProject.matched;
+
   return (
     <div className="space-y-6">
-      {/* Project Selector */}
-      <div className="max-w-xs">
-        <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-          Project
-        </label>
-        <select
-          value={project}
-          onChange={(e) => setProject(e.target.value as Project)}
-          disabled={isLoading || isLocked}
-          className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-md bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-transparent disabled:opacity-50"
-        >
-          {PROJECTS.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Auto-detection status — only rendered once a preview has run */}
+      {resolvedProject && resolvedProject.matched && resolvedProject.project && (
+        <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 flex items-center gap-3">
+          <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
+          <div className="text-sm">
+            <span className="text-[var(--ff-text-secondary)]">Detected project: </span>
+            <span className="font-semibold text-[var(--ff-text-primary)]">
+              {resolvedProject.project.name}
+            </span>
+            <span className="text-[var(--ff-text-tertiary)]"> (from filename)</span>
+          </div>
+        </div>
+      )}
+
+      {/* Override dropdown — shown only when auto-detection failed or is ambiguous */}
+      {needsOverride && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 space-y-3">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-medium text-amber-400">
+                Could not auto-detect project from filename
+              </p>
+              <p className="text-[var(--ff-text-secondary)] mt-1">
+                Parsed: <span className="font-mono">{resolvedProject?.rawInput || '(empty)'}</span>
+                {resolvedProject && resolvedProject.candidates.length > 0 && (
+                  <> — {resolvedProject.candidates.length} candidate(s) matched.</>
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="max-w-sm">
+            <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+              Pick project manually
+            </label>
+            <select
+              value={projectOverride}
+              onChange={(e) => setProjectOverride(e.target.value)}
+              disabled={isLoading || isLocked}
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-md bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-transparent disabled:opacity-50"
+            >
+              <option value="">— Select a project —</option>
+              {billableProjects.map((p) => (
+                <option key={p.id} value={p.name}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            {projectOverride && (
+              <div className="mt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => { void handlePreview(); }}
+                  disabled={isLoading}
+                >
+                  Re-preview with {projectOverride}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* PDF Drop Zone */}
       {!pdfFile ? (
@@ -559,6 +656,8 @@ export function BillingUploadTab() {
                   type="button"
                   variant="primary"
                   onClick={() => { void handleImport(); }}
+                  disabled={needsOverride}
+                  title={needsOverride ? 'Resolve the project first' : undefined}
                 >
                   <Upload className="w-4 h-4" />
                   Import

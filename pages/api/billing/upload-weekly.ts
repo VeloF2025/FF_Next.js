@@ -17,6 +17,10 @@ import {
   type ParsedPaymentSummary,
   type ParsedDeduction,
 } from '@/modules/billing/services/parseFTPaymentSummary';
+import {
+  resolveProjectName,
+  type BillableProject,
+} from '@/modules/billing/services/resolveProjectName';
 
 const logger = createLogger('api/billing/upload-weekly');
 
@@ -34,6 +38,16 @@ interface UploadPreviewResponse {
   summary: ParsedPaymentSummary;
   deductionCount: number | null;
   parseWarnings: string[];
+  /** PDF-extracted project name auto-resolved against billable projects. */
+  resolvedProject: {
+    matched: boolean;
+    /** Canonical {id, name} when matched; null when unresolved or ambiguous. */
+    project: BillableProject | null;
+    /** Candidate list when ambiguous or unresolved (empty when zero matches). */
+    candidates: BillableProject[];
+    /** Raw string extracted from the PDF filename. */
+    rawInput: string;
+  };
 }
 
 interface UploadImportResponse {
@@ -111,15 +125,20 @@ async function handler(
     const pdfFilename = pdfFile.originalFilename ?? 'payment-summary.pdf';
     const summary = await parseFTPaymentPdf(pdfBuffer, pdfFilename);
 
-    // Apply project override (frontend field wins over PDF-extracted value)
-    if (projectOverride?.trim()) {
-      summary.project = projectOverride.trim();
-    }
-    if (!summary.project) {
-      return apiResponse.badRequest(
-        res,
-        'Could not determine project from PDF filename. Provide "project" field.'
-      );
+    // ── Resolve project against the DB ──────────────────────────────────────
+    // Priority: explicit override (user picked from dropdown) > filename-extracted.
+    const rawProjectInput = projectOverride?.trim() || summary.project || '';
+    const resolution = await resolveProjectName(rawProjectInput);
+
+    // When resolved, stamp the canonical name on the summary so downstream
+    // writes use the exact DB-side spelling (e.g. "Thembisa POP 1").
+    if (resolution.matched && resolution.project) {
+      summary.project = resolution.project.name;
+    } else {
+      // Keep the raw parsed value for the preview response so the UI can show
+      // what was attempted, but leave resolution.matched=false so the caller
+      // knows to prompt for an override.
+      summary.project = rawProjectInput;
     }
 
     // ── Parse deduction notes XLSX (optional) ───────────────────────────────
@@ -144,21 +163,38 @@ async function handler(
         summary,
         deductionCount: notesPath ? deductions.length : null,
         parseWarnings: allWarnings,
+        resolvedProject: {
+          matched: resolution.matched,
+          project: resolution.project,
+          candidates: resolution.candidates,
+          rawInput: resolution.rawInput,
+        },
       };
       return res.status(200).json(previewRes);
     }
 
     // ── IMPORT ──────────────────────────────────────────────────────────────
-    // Lookup price_per_drop from the active CPO for this project
+    // Import requires a resolved project — fail loudly rather than silently
+    // stamping an unresolved name into ft_weekly_billing.
+    if (!resolution.matched || !resolution.project) {
+      const detail = resolution.candidates.length > 0
+        ? ` Candidates: ${resolution.candidates.map(c => c.name).join(', ')}.`
+        : '';
+      return apiResponse.badRequest(
+        res,
+        `Could not resolve project "${resolution.rawInput}" to a billable project with an active CPO.${detail} Pick a project from the dropdown and retry.`,
+      );
+    }
+
+    // Lookup price_per_drop from the active CPO for the resolved project
     const priceResult = await pool.query<{ price_per_drop: string }>(
       `SELECT cpo.price_per_drop
-       FROM client_purchase_orders cpo
-       JOIN projects p ON p.id = cpo.project_id
-       WHERE p.project_name ILIKE $1
-         AND cpo.status = 'active'
-       ORDER BY cpo.created_at DESC
-       LIMIT 1`,
-      [summary.project]
+         FROM client_purchase_orders cpo
+        WHERE cpo.project_id = $1
+          AND cpo.status = 'active'
+        ORDER BY cpo.created_at DESC
+        LIMIT 1`,
+      [resolution.project.id]
     );
 
     const pricePerDrop = priceResult.rows[0]?.price_per_drop
