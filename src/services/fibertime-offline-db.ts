@@ -57,7 +57,8 @@ const COL_COUNT = 18;
 
 /**
  * Batch-upsert offline ONT rows into offline_devices.
- * Uses ON CONFLICT (drop_number, report_date) to update existing records.
+ * Plain INSERT — idempotency is handled at batch level (isAlreadyImported check).
+ * The unique constraint on offline_devices is multi-column; batch-level guards prevent re-import.
  */
 export async function upsertOfflineRows(
   rows: OfflineOntRow[],
@@ -67,7 +68,7 @@ export async function upsertOfflineRows(
   reportDate: string
 ): Promise<UpsertStats> {
   let inserted = 0;
-  let updated = 0;
+  const updated = 0;
   let matched_drops = 0;
   let matched_oes = 0;
   let unmatched = 0;
@@ -127,30 +128,10 @@ export async function upsertOfflineRows(
          drop_id, oes_activation_id, match_status,
          expected_serial, serial_mismatch,
          report_date
-       ) VALUES ${placeholders.join(', ')}
-       ON CONFLICT (drop_number, report_date) DO UPDATE SET
-         serial_number    = EXCLUDED.serial_number,
-         area_code        = EXCLUDED.area_code,
-         ont_address      = EXCLUDED.ont_address,
-         olt_rack         = EXCLUDED.olt_rack,
-         olt_shelf        = EXCLUDED.olt_shelf,
-         olt_slot         = EXCLUDED.olt_slot,
-         olt_port         = EXCLUDED.olt_port,
-         olt_ont          = EXCLUDED.olt_ont,
-         last_down_reason = EXCLUDED.last_down_reason,
-         last_inform_date = EXCLUDED.last_inform_date,
-         drop_id          = EXCLUDED.drop_id,
-         oes_activation_id = EXCLUDED.oes_activation_id,
-         match_status     = EXCLUDED.match_status,
-         expected_serial  = EXCLUDED.expected_serial,
-         serial_mismatch  = EXCLUDED.serial_mismatch
-       RETURNING (xmax = 0) AS is_insert`,
+       ) VALUES ${placeholders.join(', ')}`,
       values
     );
-
-    for (const r of chunkResult.rows as Array<{ is_insert: boolean }>) {
-      if (r.is_insert) { inserted++; } else { updated++; }
-    }
+    inserted += chunkResult.rowCount ?? 0;
 
     logger.info('Upsert batch complete', {
       processed: Math.min(i + BATCH_SIZE, rows.length),
