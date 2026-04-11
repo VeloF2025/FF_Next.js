@@ -8,7 +8,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { BarChart3, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { BarChart3, Clock, CheckCircle, AlertCircle, ChevronRight, ChevronDown } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { FtWeeklyBilling } from '@/modules/data-sync/types';
 
@@ -37,6 +37,20 @@ export function WeeklySummaryTab() {
   const [projectOptions, setProjectOptions] = useState<BillableProjectOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** Expanded weeks by week_ending ISO date. Empty set = all collapsed. */
+  const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set());
+
+  const toggleWeek = (weekEnding: string) => {
+    setExpandedWeeks((prev) => {
+      const next = new Set(prev);
+      if (next.has(weekEnding)) {
+        next.delete(weekEnding);
+      } else {
+        next.add(weekEnding);
+      }
+      return next;
+    });
+  };
 
   // Lazy-load billable project list for the filter dropdown.
   useEffect(() => {
@@ -301,94 +315,110 @@ export function WeeklySummaryTab() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--ff-border-light)]">
-                {weekGroups.map(([weekEnding, weekRows]) => (
-                  <React.Fragment key={weekEnding}>
-                    {weekRows.map((row) => (
+                {weekGroups.map(([weekEnding, weekRows]) => {
+                  const isExpanded = expandedWeeks.has(weekEnding);
+                  return (
+                    <React.Fragment key={weekEnding}>
+                      {/* Week total row — always rendered, clickable to expand */}
                       <tr
-                        key={row.id}
-                        className="hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+                        className="bg-[var(--ff-bg-tertiary)] font-semibold cursor-pointer hover:bg-[var(--ff-bg-secondary)] transition-colors"
+                        onClick={() => toggleWeek(weekEnding)}
+                        aria-expanded={isExpanded}
                       >
-                        <td className="px-3 py-3 text-[var(--ff-text-primary)] font-medium whitespace-nowrap">
-                          {formatDate(row.week_ending)}
+                        <td className="px-3 py-2.5 text-[var(--ff-text-primary)] whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            {isExpanded ? (
+                              <ChevronDown className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
+                            )}
+                            {formatDate(weekEnding)}
+                          </div>
                         </td>
-                        <td className="px-3 py-3 text-[var(--ff-text-secondary)] whitespace-nowrap">
-                          {row.project}
+                        <td className="px-3 py-2.5 text-[var(--ff-text-secondary)] italic">
+                          Week total ({weekRows.length} project{weekRows.length === 1 ? '' : 's'})
                         </td>
-                        <td className="px-3 py-3 text-right text-[var(--ff-text-primary)] tabular-nums">
-                          {row.ft_total_onts.toLocaleString()}
+                        <td className="px-3 py-2.5 text-right text-[var(--ff-text-primary)] tabular-nums">
+                          {sumField(weekRows, 'ft_total_onts').toLocaleString()}
                         </td>
-                        <td className="px-3 py-3 text-right text-[var(--ff-text-primary)] tabular-nums">
-                          {row.ft_claimable.toLocaleString()}
+                        <td className="px-3 py-2.5 text-right text-[var(--ff-text-primary)] tabular-nums">
+                          {sumField(weekRows, 'ft_claimable').toLocaleString()}
                         </td>
-                        <td className="px-3 py-3 text-right text-orange-300 tabular-nums">
-                          {row.ft_note1_count.toLocaleString()}
+                        <td className="px-3 py-2.5 text-right text-orange-300 tabular-nums">
+                          {sumField(weekRows, 'ft_note1_count').toLocaleString()}
                         </td>
-                        <td className="px-3 py-3 text-right text-blue-300 tabular-nums">
-                          {row.ft_note2_count.toLocaleString()}
+                        <td className="px-3 py-2.5 text-right text-blue-300 tabular-nums">
+                          {sumField(weekRows, 'ft_note2_count').toLocaleString()}
                         </td>
-                        <td className="px-3 py-3 text-right text-red-300 tabular-nums">
-                          {row.ft_note4_count.toLocaleString()}
+                        <td className="px-3 py-2.5 text-right text-red-300 tabular-nums">
+                          {sumField(weekRows, 'ft_note4_count').toLocaleString()}
                         </td>
-                        <td className="px-3 py-3 text-right text-purple-300 tabular-nums">
-                          {row.ft_note5_count.toLocaleString()}
+                        <td className="px-3 py-2.5 text-right text-purple-300 tabular-nums">
+                          {sumField(weekRows, 'ft_note5_count').toLocaleString()}
                         </td>
-                        <td className="px-3 py-3 text-right text-cyan-300 tabular-nums">
-                          {row.ft_pre_provisions_count.toLocaleString()}
+                        <td className="px-3 py-2.5 text-right text-cyan-300 tabular-nums">
+                          {sumField(weekRows, 'ft_pre_provisions_count').toLocaleString()}
                         </td>
-                        <td className="px-3 py-3 text-right text-[var(--ff-text-secondary)] tabular-nums">
-                          {row.ft_total_claimable.toLocaleString()}
+                        <td className="px-3 py-2.5 text-right text-[var(--ff-text-secondary)] tabular-nums">
+                          {sumField(weekRows, 'ft_total_claimable').toLocaleString()}
                         </td>
-                        <td className="px-3 py-3 text-right text-[var(--ff-text-primary)] tabular-nums">
-                          {formatCurrency(row.invoice_total)}
+                        <td className="px-3 py-2.5 text-right text-[var(--ff-text-primary)] tabular-nums">
+                          {formatCurrency(sumInvoice(weekRows))}
                         </td>
-                        <td className="px-3 py-3 text-center">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${STATUS_BADGE[row.reconciliation_status]}`}
-                          >
-                            {row.reconciliation_status}
-                          </span>
-                        </td>
+                        <td className="px-3 py-2.5" />
                       </tr>
-                    ))}
-                    {/* Per-week totals row */}
-                    <tr className="bg-[var(--ff-bg-tertiary)] font-semibold border-t-2 border-[var(--ff-accent)]/30">
-                      <td className="px-3 py-2.5 text-[var(--ff-text-primary)] whitespace-nowrap">
-                        {formatDate(weekEnding)}
-                      </td>
-                      <td className="px-3 py-2.5 text-[var(--ff-text-secondary)] italic">
-                        Week total ({weekRows.length})
-                      </td>
-                      <td className="px-3 py-2.5 text-right text-[var(--ff-text-primary)] tabular-nums">
-                        {sumField(weekRows, 'ft_total_onts').toLocaleString()}
-                      </td>
-                      <td className="px-3 py-2.5 text-right text-[var(--ff-text-primary)] tabular-nums">
-                        {sumField(weekRows, 'ft_claimable').toLocaleString()}
-                      </td>
-                      <td className="px-3 py-2.5 text-right text-orange-300 tabular-nums">
-                        {sumField(weekRows, 'ft_note1_count').toLocaleString()}
-                      </td>
-                      <td className="px-3 py-2.5 text-right text-blue-300 tabular-nums">
-                        {sumField(weekRows, 'ft_note2_count').toLocaleString()}
-                      </td>
-                      <td className="px-3 py-2.5 text-right text-red-300 tabular-nums">
-                        {sumField(weekRows, 'ft_note4_count').toLocaleString()}
-                      </td>
-                      <td className="px-3 py-2.5 text-right text-purple-300 tabular-nums">
-                        {sumField(weekRows, 'ft_note5_count').toLocaleString()}
-                      </td>
-                      <td className="px-3 py-2.5 text-right text-cyan-300 tabular-nums">
-                        {sumField(weekRows, 'ft_pre_provisions_count').toLocaleString()}
-                      </td>
-                      <td className="px-3 py-2.5 text-right text-[var(--ff-text-secondary)] tabular-nums">
-                        {sumField(weekRows, 'ft_total_claimable').toLocaleString()}
-                      </td>
-                      <td className="px-3 py-2.5 text-right text-[var(--ff-text-primary)] tabular-nums">
-                        {formatCurrency(sumInvoice(weekRows))}
-                      </td>
-                      <td className="px-3 py-2.5" />
-                    </tr>
-                  </React.Fragment>
-                ))}
+
+                      {/* Per-project breakdown — only rendered when expanded */}
+                      {isExpanded && weekRows.map((row) => (
+                        <tr
+                          key={row.id}
+                          className="bg-[var(--ff-bg-secondary)]/50 hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+                        >
+                          <td className="px-3 py-3 text-[var(--ff-text-tertiary)] whitespace-nowrap pl-10">
+                            {formatDate(row.week_ending)}
+                          </td>
+                          <td className="px-3 py-3 text-[var(--ff-text-secondary)] whitespace-nowrap">
+                            {row.project}
+                          </td>
+                          <td className="px-3 py-3 text-right text-[var(--ff-text-primary)] tabular-nums">
+                            {row.ft_total_onts.toLocaleString()}
+                          </td>
+                          <td className="px-3 py-3 text-right text-[var(--ff-text-primary)] tabular-nums">
+                            {row.ft_claimable.toLocaleString()}
+                          </td>
+                          <td className="px-3 py-3 text-right text-orange-300 tabular-nums">
+                            {row.ft_note1_count.toLocaleString()}
+                          </td>
+                          <td className="px-3 py-3 text-right text-blue-300 tabular-nums">
+                            {row.ft_note2_count.toLocaleString()}
+                          </td>
+                          <td className="px-3 py-3 text-right text-red-300 tabular-nums">
+                            {row.ft_note4_count.toLocaleString()}
+                          </td>
+                          <td className="px-3 py-3 text-right text-purple-300 tabular-nums">
+                            {row.ft_note5_count.toLocaleString()}
+                          </td>
+                          <td className="px-3 py-3 text-right text-cyan-300 tabular-nums">
+                            {row.ft_pre_provisions_count.toLocaleString()}
+                          </td>
+                          <td className="px-3 py-3 text-right text-[var(--ff-text-secondary)] tabular-nums">
+                            {row.ft_total_claimable.toLocaleString()}
+                          </td>
+                          <td className="px-3 py-3 text-right text-[var(--ff-text-primary)] tabular-nums">
+                            {formatCurrency(row.invoice_total)}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${STATUS_BADGE[row.reconciliation_status]}`}
+                            >
+                              {row.reconciliation_status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
