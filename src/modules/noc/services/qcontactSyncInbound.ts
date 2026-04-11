@@ -150,32 +150,49 @@ function mapPriority(qcontactPriority: string | null): string {
 }
 
 /**
- * Map QContact category + subcategory to FibreFlow ticket type
- * 🟢 WORKING: Category to ticket_type conversion
+ * Map a QContact category + subcategory to the FibreFlow two-axis taxonomy:
+ * returns both the discipline (ticket_type) and the T1 category
+ * (ticket_category). Part of PR 3/4 in the April-11 taxonomy refactor.
  *
- * QContact categories (verified 2026-01-27):
- *   Connectivity::ONT/Gizzu, Connectivity::PoorSignal, Connectivity::Laptop/Mobile/Other
- *   Connectivity|To be determined, Connectivity|Link Light
- *   General|Maintenance, Maintenance::PropertyDamage, Maintenance::ONTMove
+ * QContact category values seen in production (901 rows as of 2026-04-11):
+ *   Connectivity    785 rows (ONT/Gizzu, PoorSignal, Link Light, Laptop)
+ *   Maintenance     107 rows (Follow-Up, PropertyDamage, ONTMove)
+ *   NewInstallation   3 rows
+ *   SmartTV           2 rows
+ *   Other             3 rows
+ *   General           1 row
  *
- * After split: category = parent (Connectivity, General, Maintenance)
- *              subcategory = child (ONT/Gizzu, Maintenance, PropertyDamage)
+ * Discipline mapping (per April-11 Q2 answer — "good for now, we can adjust later"):
+ *   Connectivity / fault work         → optical     (fibre / signal issues)
+ *   ONT swap / move                   → activations (service turn-up work)
+ *   NewInstallation / install         → activations (service turn-up work)
+ *   Maintenance / repair / damage     → optical     (fallback to fibre team)
+ *   Bundle                            → optical
+ *   Sales / lead / enquiry            → maintenance (sales_lead category +
+ *                                                   generic maintenance team)
+ *   Incident                          → maintenance (maps to the legacy
+ *                                                   maintenance discipline)
+ *   Anything else                     → optical (fallback — QContact is
+ *                                                predominantly fibre-fault
+ *                                                driven)
  *
- * Sales/lead categories: When QContact is configured with sales categories such as
- *   'Sales', 'Lead', 'Enquiry', 'New Customer', 'Sales Enquiry', 'Prospect'
- *   these will map to sales_lead. Add QContact category names here as they are
- *   configured in the QContact sales pipeline.
+ * T1 ticket_category mapping:
+ *   sales/lead/enquiry → sales_lead
+ *   everything else    → maintenance
+ *
+ * QContact tickets never become snags or DevOps tickets.
  */
-function mapTicketType(category: string | null, subcategory?: string | null): string {
-  // Combine both for matching (handles cases like General + Maintenance)
+function mapQContactClassification(
+  category: string | null,
+  subcategory?: string | null
+): { ticket_type: string; ticket_category: string } {
   const combined = [category, subcategory].filter(Boolean).join(' ').toLowerCase();
 
   if (!combined) {
-    return 'fault_repair';
+    return { ticket_type: 'optical', ticket_category: 'maintenance' };
   }
 
-  // Sales / lead enquiries → sales_lead
-  // TODO: Add actual QContact sales category names when QContact sales pipeline is configured
+  // Sales / lead enquiries → sales_lead T1, maintenance discipline
   if (
     combined.includes('sales') ||
     combined.includes('lead') ||
@@ -184,37 +201,37 @@ function mapTicketType(category: string | null, subcategory?: string | null): st
     combined.includes('new customer') ||
     combined.includes('prospect')
   ) {
-    return 'sales_lead';
-  }
-  // Connectivity issues → fault_repair
-  if (combined.includes('connectivity') || combined.includes('signal') || combined.includes('link light')) {
-    return 'fault_repair';
-  }
-  // ONT-specific: swap or move
-  if (combined.includes('ontmove') || combined.includes('ont move')) {
-    return 'ont_swap';
-  }
-  if (combined.includes('ont')) {
-    return 'fault_repair';
-  }
-  // Maintenance/repair work
-  if (combined.includes('maintenance') || combined.includes('follow-up') || combined.includes('repair') || combined.includes('damage')) {
-    return 'fault_repair';
-  }
-  // Installation
-  if (combined.includes('installation') || combined.includes('new install')) {
-    return 'new_installation';
-  }
-  // Incidents
-  if (combined.includes('incident')) {
-    return 'incident';
-  }
-  // Bundle issues → fault_repair
-  if (combined.includes('bundle')) {
-    return 'fault_repair';
+    return { ticket_type: 'maintenance', ticket_category: 'sales_lead' };
   }
 
-  return 'fault_repair';
+  // ONT swap / move → activations
+  if (combined.includes('ontmove') || combined.includes('ont move')) {
+    return { ticket_type: 'activations', ticket_category: 'maintenance' };
+  }
+
+  // New installation → activations
+  if (combined.includes('installation') || combined.includes('new install')) {
+    return { ticket_type: 'activations', ticket_category: 'maintenance' };
+  }
+
+  // Incidents → generic maintenance discipline
+  if (combined.includes('incident')) {
+    return { ticket_type: 'maintenance', ticket_category: 'maintenance' };
+  }
+
+  // Everything else (Connectivity, ONT, Maintenance, Follow-Up, Damage,
+  // Bundle, Signal, Link Light, SmartTV) → optical discipline as the
+  // fallback, since these are overwhelmingly fibre-fault tickets.
+  return { ticket_type: 'optical', ticket_category: 'maintenance' };
+}
+
+/**
+ * Back-compat shim for the rest of this file during the transition —
+ * older code paths still call mapTicketType(cat, sub) expecting just the
+ * discipline. Deprecated in favour of mapQContactClassification().
+ */
+function mapTicketType(category: string | null, subcategory?: string | null): string {
+  return mapQContactClassification(category, subcategory).ticket_type;
 }
 
 /**
@@ -248,12 +265,15 @@ export function mapQContactTicketToFibreFlow(
   const gpsCoordinates = customFields.gps_coordinates as string | undefined;
   const ontSerial = customFields.ont_serial as string | undefined;
 
+  const classification = mapQContactClassification(qcontactTicket.category, qcontactTicket.subcategory);
+
   const payload: ExtendedTicketPayload = {
     source: TicketSource.QCONTACT,
     external_id: qcontactTicket.id,
     title: qcontactTicket.title,
     description: qcontactTicket.description || undefined,
-    ticket_type: mapTicketType(qcontactTicket.category, qcontactTicket.subcategory) as TicketType,
+    ticket_type: classification.ticket_type as TicketType,
+    ticket_category: classification.ticket_category,
     priority: mapPriority(qcontactTicket.priority) as TicketPriority,
     // Contact Info
     client_name: qcontactTicket.customer_name || undefined,
@@ -400,7 +420,9 @@ export async function syncSingleInboundTicket(
     if (existingTicketId) {
       // UPDATE existing ticket's status, type, category, and backfill timestamps
       const mappedStatus = mapQContactStatusToFibreFlow(qcontactTicket.status);
-      const mappedType = mapTicketType(qcontactTicket.category, qcontactTicket.subcategory);
+      const classification = mapQContactClassification(qcontactTicket.category, qcontactTicket.subcategory);
+      const mappedType = classification.ticket_type;
+      const mappedTicketCategory = classification.ticket_category;
       const qcCreatedAt = qcontactTicket.created_at ? new Date(qcontactTicket.created_at) : null;
       const qcUpdatedAt = qcontactTicket.updated_at ? new Date(qcontactTicket.updated_at) : null;
       const qcLoggedDate = qcCreatedAt ? qcCreatedAt.toISOString().split('T')[0] : null;
@@ -428,6 +450,7 @@ export async function syncSingleInboundTicket(
             type = $2,
             category = $3,
             subcategory = $4,
+            ticket_category = $9,
             updated_at = COALESCE($6, NOW()),
             created_at = COALESCE($7, created_at),
             original_logged_date = COALESCE(original_logged_date, $8)
@@ -444,6 +467,7 @@ export async function syncSingleInboundTicket(
           qcUpdatedAt?.toISOString() || null,
           qcCreatedAt?.toISOString() || null,
           qcLoggedDate,
+          mappedTicketCategory,
         ]
       );
 
@@ -517,13 +541,14 @@ export async function syncSingleInboundTicket(
         ont_serial,
         category,
         subcategory,
+        ticket_category,
         created_by,
         created_at,
         updated_at,
         original_logged_date
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-        $21, $22, $23, $24
+        $21, $22, $23, $24, $25
       )
       RETURNING *
     `;
@@ -547,8 +572,9 @@ export async function syncSingleInboundTicket(
       ticketPayload.client_email || null,
       ticketPayload.gps_coordinates || null,
       ticketPayload.ont_serial || null,
-      ticketPayload.category || null,
-      ticketPayload.subcategory || null,
+      ticketPayload.category || null,          // QContact hierarchy
+      ticketPayload.subcategory || null,       // QContact subcategory
+      ticketPayload.ticket_category || null,   // T1 taxonomy (new April-11 axis)
       QCONTACT_SYSTEM_USER_ID,
       qcCreatedAt.toISOString(),
       qcUpdatedAt.toISOString(),

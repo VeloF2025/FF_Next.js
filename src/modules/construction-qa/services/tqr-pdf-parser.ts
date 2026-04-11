@@ -98,6 +98,91 @@ function detectCategory(findingHeader: string): TqrFinding['category'] {
 }
 
 // ============================================================
+// Discipline Classification
+// ============================================================
+
+/**
+ * Classify a TQR finding description into a work discipline for team
+ * routing. Used by PR 3 of the April-11 NOC taxonomy refactor to populate
+ * maintenance_tickets.type (discipline) for snag tickets created from TQR
+ * PDF imports.
+ *
+ * The TQR `category` field (quality / health / safety / environment /
+ * traffic) is an audit-axis classification and does not map to work
+ * disciplines — every TQR finding regardless of category can be civils,
+ * optical, or activations work. The real signal is the finding text.
+ *
+ * Keyword lists are ordered by specificity: optical checks run first (the
+ * most discriminating vocabulary), then activations, then civils as the
+ * fallback since the bulk of TQR findings are civils (pole, compaction,
+ * trench, chamber, backfill) work.
+ */
+export type SnagDiscipline = 'civils' | 'optical' | 'activations';
+
+const OPTICAL_KEYWORDS = [
+  'splice', 'splicing', 'fusion',
+  'fiber', 'fibre',
+  'otdr', 'attenuation', 'insertion loss',
+  'connector', 'closure', 'rosette',
+  'slack', 'drop cable', 'feeder', 'distribution cable',
+  'micro duct', 'microduct',
+  'odf', 'patch panel',
+  'cable management', 'cable labelling', 'cable labeling',
+];
+
+const ACTIVATIONS_KEYWORDS = [
+  'ont', 'olt',
+  'activation', 'activate', 'provisioning', 'provision',
+  'service turn', 'turn up', 'turn-up',
+  'light level', 'rx level', 'tx level', 'power level',
+  'signal', 'connectivity', 'link light',
+  'install complete', 'incomplete install',
+];
+
+const CIVILS_KEYWORDS = [
+  'compaction', 'backfill',
+  'trench', 'trenching',
+  'pole', 'poles',
+  'conduit', 'duct',
+  'chamber', 'manhole', 'hand hole', 'handhole',
+  'excavation',
+  'reinstatement', 'reinstate',
+  'paving', 'concrete',
+  'surface', 'earthworks',
+  'dome joint', 'joint',
+  'ground level', 'depth',
+];
+
+/**
+ * Classify a TQR finding description into a work discipline.
+ * Defaults to 'civils' when no keywords match — the vast majority of TQR
+ * findings are civil-work audit items (pole placement, trench quality,
+ * compaction) so civils is the safest fallback.
+ */
+export function classifySnagDiscipline(description: string): SnagDiscipline {
+  if (!description) return 'civils';
+  const lower = description.toLowerCase();
+
+  // Optical is most specific — check first
+  for (const keyword of OPTICAL_KEYWORDS) {
+    if (lower.includes(keyword)) return 'optical';
+  }
+
+  // Activations next
+  for (const keyword of ACTIVATIONS_KEYWORDS) {
+    if (lower.includes(keyword)) return 'activations';
+  }
+
+  // Civils keywords as the explicit positive case
+  for (const keyword of CIVILS_KEYWORDS) {
+    if (lower.includes(keyword)) return 'civils';
+  }
+
+  // Fallback — TQR is predominantly a civils audit
+  return 'civils';
+}
+
+// ============================================================
 // Metadata Parser
 // ============================================================
 

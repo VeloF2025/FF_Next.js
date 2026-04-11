@@ -341,17 +341,57 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
       RETURNING *
     `;
 
-    // Auto-assign dev_ops tickets to the DevOps team if not already assigned
-    if (payload.ticket_type === TicketType.DEV_OPS && !payload.assigned_team_id) {
-      const devOpsTeam = await queryOne<{ id: string; name: string }>(
-        `SELECT id, name FROM teams WHERE name = 'DevOps' AND is_active = true LIMIT 1`,
-        []
+    // Auto-assign by (project_id, discipline) when the caller hasn't picked
+    // a team manually. Applies to every discipline value added by the
+    // April-11 taxonomy (civils / optical / activations / maintenance /
+    // dev_ops). The lookup prefers per-project teams over global ones, then
+    // prefers internal teams over contractor teams, per the Q3 decision.
+    //
+    // For dev_ops, project_id is typically NULL (the DevOps team is
+    // cross-project), so the query falls through to the global-team row.
+    //
+    // See migration 277 for the team.discipline + team.project_id columns
+    // and migration 278 for the backfill rules.
+    const DISCIPLINE_TYPES: ReadonlyArray<TicketType> = [
+      TicketType.CIVILS,
+      TicketType.OPTICAL,
+      TicketType.ACTIVATIONS,
+      TicketType.MAINTENANCE,
+      TicketType.DEV_OPS,
+    ];
+    if (
+      DISCIPLINE_TYPES.includes(payload.ticket_type) &&
+      !payload.assigned_team_id
+    ) {
+      const team = await queryOne<{ id: string; name: string }>(
+        `SELECT id, name FROM teams
+         WHERE discipline = $1
+           AND is_active = true
+           AND (project_id = $2 OR project_id IS NULL)
+         ORDER BY
+           -- Prefer per-project over global
+           (project_id = $2) DESC,
+           -- Then internal over contractor (Q3: internal first)
+           (contractor_id IS NULL) DESC,
+           name
+         LIMIT 1`,
+        [payload.ticket_type, payload.project_id || null]
       );
-      if (devOpsTeam) {
-        payload.assigned_team_id = devOpsTeam.id;
-        payload.assigned_team = devOpsTeam.id;
-        status = 'assigned';
-        logger.info('Auto-assigned DevOps ticket to DevOps team', { teamId: devOpsTeam.id });
+      if (team) {
+        payload.assigned_team_id = team.id;
+        payload.assigned_team = team.name;
+        status = TicketStatus.ASSIGNED;
+        logger.info('Auto-assigned ticket to discipline team', {
+          discipline: payload.ticket_type,
+          project_id: payload.project_id || null,
+          team_id: team.id,
+          team_name: team.name,
+        });
+      } else {
+        logger.warn('No matching discipline team found — ticket will be unassigned', {
+          discipline: payload.ticket_type,
+          project_id: payload.project_id || null,
+        });
       }
     }
 

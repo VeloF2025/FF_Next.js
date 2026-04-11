@@ -22,10 +22,12 @@ import { notifySnagGroupOnCreate } from '@/modules/noc/services/snagGroupNotific
 import {
   TicketSource,
   TicketType,
+  TicketCategory,
   TicketPriority,
   TicketStatus,
 } from '@/modules/noc/types/ticket';
-import type { Snag, SnagCategory, SnagSeverity } from '@/modules/construction-qa/types/snag.types';
+import type { Snag, SnagSeverity } from '@/modules/construction-qa/types/snag.types';
+import { classifySnagDiscipline } from '@/modules/construction-qa/services/tqr-pdf-parser';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -33,10 +35,18 @@ const sql = neon(process.env.DATABASE_URL!);
 // Mapping helpers
 // ============================================================
 
-/** Map snag category → NOC ticket type */
-function mapCategoryToTicketType(_category: SnagCategory): TicketType {
-  // All snag categories map to the dedicated SNAG ticket type
-  return TicketType.SNAG;
+/**
+ * Map a TQR-sourced snag to a work discipline (ticket_type). Runs the
+ * finding description through the keyword classifier in tqr-pdf-parser so
+ * the resulting ticket routes to the right team — civils / optical /
+ * activations. See migration 278 for the team.discipline column this feeds.
+ */
+function discipline(snag: { description?: string | null }): TicketType {
+  const text = snag.description || '';
+  const d = classifySnagDiscipline(text);
+  if (d === 'optical')     return TicketType.OPTICAL;
+  if (d === 'activations') return TicketType.ACTIVATIONS;
+  return TicketType.CIVILS;
 }
 
 /** Map snag severity → ticket priority */
@@ -157,7 +167,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       source_type: 'snag',
       title,
       description: descParts.join('\n'),
-      ticket_type: mapCategoryToTicketType(snag.category),
+      ticket_type: discipline(snag),
+      ticket_category: TicketCategory.SNAG,
       priority: mapSeverityToPriority(snag.severity),
       project_id: snag.project_id,
       uid_prefix: 'SNG',

@@ -11,7 +11,7 @@
  * - Pagination support
  * - Input validation
  * - Proper error handling with standard API responses
- * - Follows Zero Tolerance protocol (no console.log, proper error handling)
+ * - Follows Zero Tolerance protocol (structured logger only, proper error handling)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -38,6 +38,7 @@ import type {
   CreateTicketPayload,
   TicketFilters,
 } from '@/modules/noc/types/ticket';
+import { isValidManualTaxonomy } from '@/modules/noc/constants/manualTicketTaxonomy';
 
 const logger = createLogger('maintenance:api:tickets');
 
@@ -242,6 +243,22 @@ export async function POST(req: NextRequest) {
     // Validate optional enums if provided
     if (body.priority && !VALID_PRIORITIES.includes(body.priority)) {
       errors.priority = `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(', ')}`;
+    }
+
+    // Manual submissions must land on an approved (ticket_category, ticket_type)
+    // pair from MANUAL_TICKET_TAXONOMY. Auto-ingest callers (QContact sync, TQR
+    // import, WhatsApp bridge) use their own classification paths and bypass
+    // this check because they authenticate with system users and write
+    // non-manual source values.
+    if (body.source === TicketSource.MANUAL) {
+      if (!body.ticket_category) {
+        errors.ticket_category = 'Category is required for manual tickets';
+      } else if (
+        body.ticket_type &&
+        !isValidManualTaxonomy(body.ticket_category, body.ticket_type)
+      ) {
+        errors.ticket_type = 'Invalid category / discipline combination for manual ticket';
+      }
     }
 
     // If validation errors, return 422
