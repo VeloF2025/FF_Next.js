@@ -17,6 +17,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { createLogger } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { runOesSync } from '@/services/fibertime-oes-sync';
+import { FibertimeAuthExpiredError } from '@/lib/sharepoint/fibertime-sp-client';
 
 const logger = createLogger('api:fibertime/oes-sync');
 
@@ -56,6 +57,16 @@ export default async function handler(
 
     return apiResponse.success(res, report, 'OES sync complete');
   } catch (error: unknown) {
+    if (error instanceof FibertimeAuthExpiredError) {
+      logger.error('Fibertime SharePoint session expired', { error: error.message });
+      res.status(503).json({
+        success: false,
+        error: 'Fibertime SharePoint session expired',
+        message: error.message,
+        action: 'Run scripts/fibertime-sp-login.ts on the Velocity server to refresh cookies',
+      });
+      return;
+    }
     logger.error('Fibertime OES sync failed', {
       error: error instanceof Error ? error.message : String(error),
     });

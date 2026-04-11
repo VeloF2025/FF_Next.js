@@ -30,8 +30,9 @@ import {
 import {
   listFolderFiles,
   downloadFileBuffer,
-  type DriveItem,
-} from '@/lib/graph/fibertime-sharepoint';
+  FibertimeAuthExpiredError,
+  type SpFileItem,
+} from '@/lib/sharepoint/fibertime-sp-client';
 
 const logger = createLogger('services:fibertime-oes-sync');
 
@@ -73,10 +74,10 @@ export interface SyncReport {
  * Drafts look like `oes_status_report_LAW_20260411 1.xlsx` — those are excluded.
  */
 export function findTodaysFile(
-  files: DriveItem[],
+  files: SpFileItem[],
   site: Site,
   date: string
-): DriveItem | null {
+): SpFileItem | null {
   const expectedName = `oes_status_report_${site}_${date}.xlsx`;
   return files.find(f => f.name === expectedName) ?? null;
 }
@@ -234,6 +235,8 @@ export async function syncSite(site: Site, date: string): Promise<SiteResult> {
       ...result,
     };
   } catch (error: unknown) {
+    // Auth expiry is a hard failure — bubble up so the API can return 503
+    if (error instanceof FibertimeAuthExpiredError) throw error;
     const errMsg = error instanceof Error ? error.message : String(error);
     logger.error('Site sync failed', { site, date, error: errMsg });
     return { site, status: 'error', error: errMsg };
@@ -263,6 +266,13 @@ export async function runOesSync(date?: string): Promise<SyncReport> {
   const sites = await Promise.allSettled(
     ACTIVE_SITES.map(site => syncSite(site, reportDate))
   );
+
+  // Propagate auth expiry immediately — it affects all sites, no point continuing
+  for (const outcome of sites) {
+    if (outcome.status === 'rejected' && outcome.reason instanceof FibertimeAuthExpiredError) {
+      throw outcome.reason;
+    }
+  }
 
   const results: SiteResult[] = sites.map((outcome, idx) => {
     if (outcome.status === 'fulfilled') return outcome.value;
