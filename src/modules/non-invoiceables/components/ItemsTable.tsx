@@ -148,7 +148,7 @@ export function ItemsTable({ category, project, onCreateTickets }: ItemsTablePro
         const envelope = await res.json() as { success: boolean; data: NonInvoiceableItemsResponse };
         setData(envelope.data);
         if (!projectFilter && !searchDebounced && page === 1) {
-          const projects = Array.from(new Set(json.items.map((i) => i.project))).sort();
+          const projects = Array.from(new Set(envelope.data.items.map((i) => i.project))).sort();
           setProjectOptions((prev) => Array.from(new Set([...prev, ...projects])).sort());
         }
       } catch (err) {

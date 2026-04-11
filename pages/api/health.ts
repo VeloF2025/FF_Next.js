@@ -34,7 +34,7 @@ export default async function handler(
 
   try {
     // Lightweight connectivity check — no version() call that would expose PG version
-    const result = await sql`SELECT 1 AS check`;
+    const result = await sql`SELECT 1 AS check` as any[];
 
     if (result?.[0]?.check !== 1) {
       log.error('health-check: unexpected database response');

@@ -54,7 +54,7 @@ const createMockLogger = () => {
   const mockLog = (level: string) => (...args: unknown[]) => {
     if (isBrowser && !isProduction) {
       // eslint-disable-next-line no-console
-      console[level === 'fatal' ? 'error' : level]?.(...args) || console.log(...args);
+      (console as any)[level === 'fatal' ? 'error' : level]?.(...args) || console.log(...args);
     }
   };
   return {

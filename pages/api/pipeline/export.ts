@@ -329,7 +329,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Length', (buffer as Buffer).length);
+    res.setHeader('Content-Length', (buffer as unknown as Buffer).length);
     res.status(200).send(buffer);
 
     log.info('Pipeline export generated', {

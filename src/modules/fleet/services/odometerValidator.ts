@@ -51,8 +51,8 @@ export function detectDigitConfusion(
   const differences: string[] = [];
   for (let i = 0; i < str1.length; i++) {
     if (str1[i] !== str2[i]) {
-      const d1 = str1[i];
-      const d2 = str2[i];
+      const d1 = str1[i]!;
+      const d2 = str2[i]!;
       if (
         confusionPairs[d1]?.includes(d2) ||
         confusionPairs[d2]?.includes(d1)

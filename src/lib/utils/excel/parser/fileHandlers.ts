@@ -25,7 +25,7 @@ export class ExcelFileHandler {
       onProgress?.(0.6);
       
       // Use first worksheet
-      const firstSheetName = workbook.SheetNames[0];
+      const firstSheetName = workbook.SheetNames[0]!;
       const worksheet = workbook.Sheets[firstSheetName];
       
       if (!worksheet) {

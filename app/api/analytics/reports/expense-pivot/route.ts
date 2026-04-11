@@ -195,7 +195,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       for (const mk of months) {
         const val = catMap.get(mk) ?? 0;
         monthly[mk] = val;
-        const year = mk.split('-')[0];
+        const year = mk.split('-')[0]!;
         yearTotals[year] = (yearTotals[year] ?? 0) + val;
         grandTotal += val;
       }
@@ -218,9 +218,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     for (const mk of months) {
       gtMonthly[mk] = rows.reduce((sum, r) => sum + (r.monthly[mk] ?? 0), 0);
-      const year = mk.split('-')[0];
-      gtYearTotals[year] = (gtYearTotals[year] ?? 0) + gtMonthly[mk];
-      gtGrandTotal += gtMonthly[mk];
+      const year = mk.split('-')[0]!;
+      gtYearTotals[year] = (gtYearTotals[year] ?? 0) + gtMonthly[mk]!;
+      gtGrandTotal += gtMonthly[mk]!;
     }
     for (const yr of years) {
       if (!(yr in gtYearTotals)) gtYearTotals[yr] = 0;

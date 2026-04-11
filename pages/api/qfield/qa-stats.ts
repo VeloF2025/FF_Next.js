@@ -19,7 +19,7 @@ async function handler(
   }
 
   try {
-    const authReq = req as AuthenticatedRequest;
+    const authReq = req as unknown as AuthenticatedRequest;
     const currentUser = authReq.user?.email || authReq.user?.username;
     const { projectId } = req.query;
 

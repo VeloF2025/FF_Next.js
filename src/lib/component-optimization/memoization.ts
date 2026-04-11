@@ -20,7 +20,7 @@ export function deepMemo<T extends ComponentType<any>>(
   Component: T,
   propsAreEqual?: (prev: any, next: any) => boolean
 ): T {
-  return memo(Component, propsAreEqual || deepEqual) as T;
+  return memo(Component, propsAreEqual || deepEqual) as unknown as T;
 }
 
 /**
@@ -28,5 +28,5 @@ export function deepMemo<T extends ComponentType<any>>(
  * Best for simple props
  */
 export function shallowMemo<T extends ComponentType<any>>(Component: T): T {
-  return memo(Component) as T;
+  return memo(Component) as unknown as T;
 }

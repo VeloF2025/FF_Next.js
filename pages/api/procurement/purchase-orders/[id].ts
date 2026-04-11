@@ -286,7 +286,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
 async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string) {
   try {
     const { action, notes, reason } = req.body;
-    const authReq = req as AuthenticatedRequest;
+    const authReq = req as unknown as AuthenticatedRequest;
     const userId = authReq.user?.id || 'system';
     const userName = authReq.user?.name || 'System';
 

@@ -170,7 +170,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
     }
 
     const buffer = await wb.xlsx.writeBuffer();
-    return new NextResponse(buffer as Buffer, {
+    return new NextResponse(buffer as unknown as Buffer, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="master-tracker-${projectId}.xlsx"`,

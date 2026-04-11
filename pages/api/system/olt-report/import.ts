@@ -147,8 +147,8 @@ function validateOltDataSample(records: OltRecord[]): string[] {
 
 async function parseExcelFile(filePath: string): Promise<ParseResult> {
   const workbook = XLSX.readFile(filePath);
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
+  const sheetName = workbook.SheetNames[0]!;
+  const sheet = workbook.Sheets[sheetName]!;
   const data = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 });
 
   const warnings: string[] = [];

@@ -441,7 +441,7 @@ export async function getProjectAnalytics(projectId: string): Promise<SingleResu
     SELECT * FROM project_analytics
     WHERE project_id = ${projectId}
     LIMIT 1
-  `;
+  ` as any[];
   return result[0] as ProjectAnalytics || null;
 }
 
@@ -450,7 +450,7 @@ export async function getClientAnalytics(clientId: string): Promise<SingleResult
     SELECT * FROM client_analytics
     WHERE client_id = ${clientId}
     LIMIT 1
-  `;
+  ` as any[];
   return result[0] as ClientAnalytics || null;
 }
 
@@ -563,7 +563,7 @@ export async function createDocument(doc: Partial<Document>): Promise<Document> 
       ${doc.uploaded_by}, ${doc.status || 'active'}, ${doc.metadata}
     )
     RETURNING *
-  `;
+  ` as any[];
   return result[0] as Document;
 }
 
@@ -604,7 +604,7 @@ export async function getPaginated<T>(
   }
 
   const countQuery = `SELECT COUNT(*) as total FROM ${table} ${whereClause}`;
-  const countResult = await sql(countQuery, values);
+  const countResult = await sql(countQuery, values) as any[];
   const total = countResult[0]?.total || 0;
 
   values.push(pageSize, offset);

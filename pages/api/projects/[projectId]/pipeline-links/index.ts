@@ -206,7 +206,7 @@ async function handlePost(
         ${notes || null}
       )
       RETURNING *
-    `;
+    ` as any[];
 
     // Also update the legacy column if this is primary (backward compatibility)
     if (shouldBePrimary) {

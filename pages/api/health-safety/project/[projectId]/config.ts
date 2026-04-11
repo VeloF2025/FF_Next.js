@@ -114,7 +114,7 @@ async function handlePut(projectId: string, req: NextApiRequest, res: NextApiRes
   const frequencyDays =
     audit_frequency === 'custom'
       ? custom_frequency_days || 7
-      : { daily: 1, weekly: 7, fortnightly: 14, monthly: 30 }[audit_frequency] || 7;
+      : ({ daily: 1, weekly: 7, fortnightly: 14, monthly: 30 } as Record<string, number>)[audit_frequency] || 7;
 
   const nextAuditDue = new Date();
   nextAuditDue.setDate(nextAuditDue.getDate() + frequencyDays);

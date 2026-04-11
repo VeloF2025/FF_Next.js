@@ -70,7 +70,7 @@ async function handleGet(res: NextApiResponse, projectId: string, approvalId: st
       WHERE a.id = ${approvalId}
         AND a.pipeline_project_id = ${project.pipeline_project_id}
         AND t.category = 'wayleave'
-    `;
+    ` as any[];
 
     if (result.length === 0) {
       return apiResponse.notFound(res, 'Wayleave approval', approvalId);
@@ -204,7 +204,7 @@ async function handlePut(
       FROM pipeline_project_approvals a
       JOIN pipeline_approval_types t ON a.approval_type_id = t.id
       WHERE a.id = ${approvalId}
-    `;
+    ` as any[];
 
     log.info('Updated wayleave approval', {
       projectId,

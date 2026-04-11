@@ -137,7 +137,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         // Parse Excel (Enhanced for Janice's multi-project format)
         const fileBuffer = fs.readFileSync(uploadedFile.filepath);
         const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
-        const firstSheetName = workbook.SheetNames[0];
+        const firstSheetName = workbook.SheetNames[0]!;
         const worksheet = workbook.Sheets[firstSheetName];
 
         // Get raw array data (includes row 0 with project names, row 1 with headers)

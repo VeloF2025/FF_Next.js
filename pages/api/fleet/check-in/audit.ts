@@ -188,8 +188,8 @@ async function handler(
 
     // Execute queries - use sql.query() for parameterized dynamic SQL
     const [countResult, records] = await Promise.all([
-      sql.query(countQuery, params) as Promise<{ total: string }[]>,
-      sql.query(dataQuery, params) as Promise<Record<string, unknown>[]>,
+      sql.query(countQuery, params) as unknown as Promise<{ total: string }[]>,
+      sql.query(dataQuery, params) as unknown as Promise<Record<string, unknown>[]>,
     ]);
 
     const total = parseInt(countResult[0]?.total || '0', 10);

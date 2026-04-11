@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, MessageSquare, ListTodo, Wifi, WifiOff, Clock } from 'lucide-react';
+import { Users, MessageSquare, ListTodo, Wifi, WifiOff, Clock, Loader } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import type { MCDashboard } from '../types';

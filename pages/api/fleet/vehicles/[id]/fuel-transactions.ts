@@ -185,11 +185,11 @@ async function handleGet(
       WHERE vehicle_id = ${vehicleId}
       ORDER BY transaction_date DESC, created_at DESC
       LIMIT ${limitNum} OFFSET ${offsetNum}
-    ` as Promise<FuelTransactionRow[]>,
+    ` as unknown as Promise<FuelTransactionRow[]>,
     sql`
       SELECT COUNT(*) as total FROM fleet_fuel_transactions
       WHERE vehicle_id = ${vehicleId}
-    ` as Promise<Array<{ total: string }>>,
+    ` as unknown as Promise<Array<{ total: string }>>,
     sql`
       SELECT
         COALESCE(SUM(amount_rand), 0) as total_spent,
@@ -198,7 +198,7 @@ async function handleGet(
         COUNT(*) as transaction_count
       FROM fleet_fuel_transactions
       WHERE vehicle_id = ${vehicleId}
-    ` as Promise<Array<{
+    ` as unknown as Promise<Array<{
       total_spent: string;
       total_litres: string;
       avg_consumption: string;

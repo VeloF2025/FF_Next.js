@@ -236,7 +236,7 @@ export async function scrapeOneDriveRecordings(
                 'fetching', NOW(), NOW()
               )
               RETURNING id
-            `;
+            ` as any[];
             meetingId = newRows[0]!.id as number;
             result.created++;
             log.info('Created meeting from OneDrive recording', {

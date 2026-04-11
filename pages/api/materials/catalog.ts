@@ -195,7 +195,7 @@ async function handlePost(
       RETURNING id, item_code, description, category, budget_category, uom,
                 standard_rate, keywords, normalized_description, status,
                 created_by, created_at, updated_at
-    `;
+    ` as any[];
 
     const material = mapRowToMaterial(result[0]);
 

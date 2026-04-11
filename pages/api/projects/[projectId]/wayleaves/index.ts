@@ -222,7 +222,7 @@ async function handlePost(
         ${userName}
       )
       RETURNING *
-    `;
+    ` as any[];
 
     // Fetch with type info
     const approvalWithType = await sql`
@@ -236,7 +236,7 @@ async function handlePost(
       FROM pipeline_project_approvals a
       JOIN pipeline_approval_types t ON a.approval_type_id = t.id
       WHERE a.id = ${(result[0] as { id: string }).id}
-    `;
+    ` as any[];
 
     log.info('Created wayleave approval for project', {
       projectId,

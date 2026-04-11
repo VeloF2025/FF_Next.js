@@ -179,7 +179,7 @@ async function handlePost(
         NOW()
       )
       RETURNING id
-    `;
+    ` as any[];
 
     return apiResponse.success(res, { id: result[0].id }, 201);
   } catch (error) {

@@ -130,8 +130,8 @@ class XLSXCompatibilityLayer {
    */
   static async write(workbook: any, _options: any = {}): Promise<ArrayBuffer> {
     try {
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
+      const sheetName = workbook.SheetNames[0]!;
+      const worksheet = workbook.Sheets[sheetName]!;
       
       // Convert xlsx format back to data array
       const data = this.sheetToJson(worksheet);

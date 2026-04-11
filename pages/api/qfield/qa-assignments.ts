@@ -106,7 +106,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
 async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const authReq = req as AuthenticatedRequest;
+    const authReq = req as unknown as AuthenticatedRequest;
     const userId = authReq.user?.email || authReq.user?.username || 'unknown';
 
     const { validationIds, assignee, dueDate, priority, notes } = req.body;

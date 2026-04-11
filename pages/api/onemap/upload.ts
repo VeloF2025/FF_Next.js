@@ -55,8 +55,8 @@ async function parseOneMapFile(filePath: string) {
   const records = [];
   
   // Process the main sheet (SHEET1)
-  const sheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
+  const sheetName = workbook.SheetNames[0]!;
+  const worksheet = workbook.Sheets[sheetName]!;
   const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, any>[];
   
   for (const row of jsonData) {

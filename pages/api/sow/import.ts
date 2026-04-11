@@ -40,7 +40,7 @@ async function handler(
     // Parse Excel data from base64
     const buffer = Buffer.from(fileData, 'base64');
     const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]!];
     const rawData = XLSX.utils.sheet_to_json(worksheet);
 
     if (!rawData || rawData.length === 0) {

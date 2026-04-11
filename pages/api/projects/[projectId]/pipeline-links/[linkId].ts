@@ -73,7 +73,7 @@ async function handleGet(res: NextApiResponse, projectId: string, linkId: string
       JOIN pipeline_projects pp ON pp.id = ppl.pipeline_project_id
       LEFT JOIN clients c ON c.id = pp.client_id
       WHERE ppl.id = ${linkId} AND ppl.project_id = ${projectId}
-    `;
+    ` as any[];
 
     if (link.length === 0) {
       return apiResponse.notFound(res, 'Pipeline link', linkId);
@@ -149,7 +149,7 @@ async function handlePatch(
       FROM project_pipeline_links ppl
       JOIN pipeline_projects pp ON pp.id = ppl.pipeline_project_id
       WHERE ppl.id = ${linkId}
-    `;
+    ` as any[];
 
     log.info('Updated pipeline link', {
       projectId,

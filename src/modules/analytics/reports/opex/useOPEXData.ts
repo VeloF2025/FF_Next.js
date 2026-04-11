@@ -1,6 +1,6 @@
 // 🟢 WORKING: React Query hook for Operational Expenses (OPEX tab)
 import { useQuery } from '@tanstack/react-query';
-import type { OPEXData } from '@/app/api/analytics/reports/opex/route';
+import type { OPEXData, OPEXRow } from '@/app/api/analytics/reports/opex/route';
 
 export type { OPEXData, OPEXRow };
 

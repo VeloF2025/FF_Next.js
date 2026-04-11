@@ -43,7 +43,7 @@ async function handler(
   }
 
   try {
-    const authReq = req as AuthenticatedRequest;
+    const authReq = req as unknown as AuthenticatedRequest;
     const userId = authReq.user?.email || authReq.user?.username || 'unknown';
     const { action, validationIds, notes, assignee, dueDate, priority, escalationReason } = req.body as ActionRequest;
 

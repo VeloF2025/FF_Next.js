@@ -43,7 +43,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Verify project exists
     const projectResult = await sql`
       SELECT id, project_name FROM projects WHERE id = ${projectId}
-    `;
+    ` as any[];
 
     if (projectResult.length === 0) {
       return apiResponse.notFound(res, 'Project', projectId);
