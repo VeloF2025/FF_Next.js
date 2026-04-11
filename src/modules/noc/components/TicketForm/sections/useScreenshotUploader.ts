@@ -17,10 +17,17 @@ import {
 
 interface UseScreenshotUploaderOptions {
   onFieldsExtracted: (fields: Record<string, string>) => void;
+  onFileAdded?: (file: File) => void;
+  onFileRemoved?: (index: number) => void;
   disabled?: boolean;
 }
 
-export function useScreenshotUploader({ onFieldsExtracted, disabled }: UseScreenshotUploaderOptions) {
+export function useScreenshotUploader({
+  onFieldsExtracted,
+  onFileAdded,
+  onFileRemoved,
+  disabled,
+}: UseScreenshotUploaderOptions) {
   const [previews, setPreviews] = useState<MediaPreview[]>([]);
   const [isAnalysing, setIsAnalysing] = useState(false);
   const [analysingType, setAnalysingType] = useState<MediaType>('image');
@@ -97,6 +104,7 @@ export function useScreenshotUploader({ onFieldsExtracted, disabled }: UseScreen
         : await processMedia(file, mediaType);
 
       onFieldsExtracted(fields);
+      onFileAdded?.(file);
       setAnalysisComplete(true);
 
       const typeLabel = mediaType === 'image' ? 'screenshot' : mediaType === 'video' ? 'screen recording' : 'voice memo';
@@ -107,7 +115,7 @@ export function useScreenshotUploader({ onFieldsExtracted, disabled }: UseScreen
     } finally {
       setIsAnalysing(false);
     }
-  }, [processImage, processMedia, onFieldsExtracted]);
+  }, [processImage, processMedia, onFieldsExtracted, onFileAdded]);
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -147,7 +155,8 @@ export function useScreenshotUploader({ onFieldsExtracted, disabled }: UseScreen
 
   const removePreview = useCallback((index: number) => {
     setPreviews(prev => prev.filter((_, i) => i !== index));
-  }, []);
+    onFileRemoved?.(index);
+  }, [onFileRemoved]);
 
   return {
     previews,

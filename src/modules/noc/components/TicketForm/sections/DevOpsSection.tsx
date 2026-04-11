@@ -14,6 +14,8 @@ interface DevOpsSectionProps {
   errors: TicketFormErrors;
   setField: <K extends keyof TicketFormData>(field: K, value: TicketFormData[K]) => void;
   setFields: (fields: Partial<TicketFormData>) => void;
+  onFileAdded?: (file: File) => void;
+  onFileRemoved?: (index: number) => void;
   disabled?: boolean;
 }
 
@@ -40,7 +42,7 @@ const ENVIRONMENTS: { value: string; label: string; color: string }[] = [
   { value: 'local', label: 'Local', color: 'bg-blue-500/20 border-blue-500 text-blue-400' },
 ];
 
-export function DevOpsSection({ formData, errors, setField, setFields, disabled }: DevOpsSectionProps) {
+export function DevOpsSection({ formData, errors, setField, setFields, onFileAdded, onFileRemoved, disabled }: DevOpsSectionProps) {
   const handleFieldsExtracted = (fields: Record<string, string>) => {
     // Map VLM output to form fields (including title/description which live in DetailsSection)
     const mapped: Partial<TicketFormData> = {};
@@ -72,8 +74,15 @@ export function DevOpsSection({ formData, errors, setField, setFields, disabled 
         </span>
       </div>
 
-      {/* Screenshot Upload + VLM Analysis */}
-      <ScreenshotUploader onFieldsExtracted={handleFieldsExtracted} disabled={disabled} />
+      {/* Screenshot Upload + VLM Analysis (required for DevOps tickets) */}
+      <ScreenshotUploader
+        onFieldsExtracted={handleFieldsExtracted}
+        onFileAdded={onFileAdded}
+        onFileRemoved={onFileRemoved}
+        required
+        validationError={errors.screenshot}
+        disabled={disabled}
+      />
 
       {/* Affected Module */}
       <div>

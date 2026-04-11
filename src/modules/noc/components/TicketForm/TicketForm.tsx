@@ -143,6 +143,8 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
             errors={form.errors}
             setField={form.setField}
             setFields={form.setFields}
+            onFileAdded={form.addMediaFile}
+            onFileRemoved={form.removeMediaFile}
             disabled={form.isSubmitting}
           />
         </div>

@@ -16,8 +16,12 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { createLogger } from '@/lib/logger';
+import { useAuth } from '@/contexts/AuthContext';
 import { useDRLookup } from './useDRLookup';
 import { useCreateTicket } from './useTickets';
+
+const logger = createLogger('maintenance:hooks:ticket-form');
 import {
   TicketSource,
   TicketType,
@@ -107,6 +111,9 @@ export interface UseTicketFormResult {
   isSubmitting: boolean;
   submitError: string | null;
 
+  // Uploaded media (screenshots / recordings / voice memos) attached after creation
+  mediaFiles: File[];
+
   // DR Lookup state
   drLookup: {
     isLoading: boolean;
@@ -119,6 +126,8 @@ export interface UseTicketFormResult {
   // Form actions
   setField: <K extends keyof TicketFormData>(field: K, value: TicketFormData[K]) => void;
   setFields: (fields: Partial<TicketFormData>) => void;
+  addMediaFile: (file: File) => void;
+  removeMediaFile: (index: number) => void;
   lookupDR: (drNumber: string) => Promise<void>;
   clearDRLookup: () => void;
   validate: () => boolean;
@@ -169,7 +178,7 @@ const initialFormData: TicketFormData = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^[+]?[\d\s-()]{7,20}$/;
 
-function validateFormData(data: TicketFormData): TicketFormErrors {
+function validateFormData(data: TicketFormData, mediaFiles: File[]): TicketFormErrors {
   const errors: TicketFormErrors = {};
 
   // Required fields
@@ -236,6 +245,12 @@ function validateFormData(data: TicketFormData): TicketFormErrors {
     errors.fault_cause = 'Fault cause is required for maintenance tickets';
   }
 
+  // DevOps tickets must include a "before" screenshot / recording at creation.
+  // Rule: feedback_devops_before_photo — no retroactive uploads allowed.
+  if (data.ticket_type === TicketType.DEV_OPS && mediaFiles.length === 0) {
+    errors.screenshot = 'A screenshot, recording, or voice memo is required for DevOps tickets';
+  }
+
   return errors;
 }
 
@@ -263,6 +278,7 @@ function validateFormData(data: TicketFormData): TicketFormErrors {
  */
 export function useTicketForm(): UseTicketFormResult {
   const router = useRouter();
+  const { user } = useAuth();
   const drLookupHook = useDRLookup();
   const createTicketMutation = useCreateTicket();
 
@@ -270,6 +286,23 @@ export function useTicketForm(): UseTicketFormResult {
   const [errors, setErrors] = useState<TicketFormErrors>({});
   const [isDirty, setIsDirty] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+
+  const addMediaFile = useCallback((file: File) => {
+    setMediaFiles(prev => [...prev, file]);
+    setIsDirty(true);
+    setErrors(prev => {
+      if (!prev.screenshot) return prev;
+      const next = { ...prev };
+      delete next.screenshot;
+      return next;
+    });
+  }, []);
+
+  const removeMediaFile = useCallback((index: number) => {
+    setMediaFiles(prev => prev.filter((_, i) => i !== index));
+    setIsDirty(true);
+  }, []);
 
   // ==================== Field Setters ====================
 
@@ -336,10 +369,10 @@ export function useTicketForm(): UseTicketFormResult {
   // ==================== Validation ====================
 
   const validate = useCallback((): boolean => {
-    const validationErrors = validateFormData(formData);
+    const validationErrors = validateFormData(formData, mediaFiles);
     setErrors(validationErrors);
     return Object.keys(validationErrors).length === 0;
-  }, [formData]);
+  }, [formData, mediaFiles]);
 
   // ==================== Submit ====================
 
@@ -408,13 +441,56 @@ export function useTicketForm(): UseTicketFormResult {
 
     try {
       const ticket = await createTicketMutation.mutateAsync(payload);
+
+      // Persist uploaded media (screenshots / recordings / voice memos) as ticket
+      // attachments. For DevOps tickets this is mandatory (see validateFormData);
+      // for other types it is optional. Upload failures surface inline but don't
+      // block the redirect — the ticket has already been created.
+      if (mediaFiles.length > 0) {
+        const uploadedBy = user?.uid || '';
+        const uploadErrors: string[] = [];
+        await Promise.all(
+          mediaFiles.map(async (file) => {
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('is_evidence', 'true');
+            if (uploadedBy) fd.append('uploaded_by', uploadedBy);
+            try {
+              const res = await fetch(`/api/noc/tickets/${ticket.id}/attachments`, {
+                method: 'POST',
+                credentials: 'include',
+                body: fd,
+              });
+              if (!res.ok) {
+                let errMessage = `Upload failed (${res.status})`;
+                try {
+                  const errBody = await res.json();
+                  if (errBody?.error?.message) errMessage = errBody.error.message;
+                } catch (parseErr) {
+                  logger.warn('Could not parse attachment upload error body', { parseErr });
+                }
+                throw new Error(errMessage);
+              }
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : 'unknown error';
+              logger.error('DevOps screenshot upload failed', { ticketId: ticket.id, filename: file.name, error: msg });
+              uploadErrors.push(msg);
+            }
+          })
+        );
+        if (uploadErrors.length > 0) {
+          setSubmitError(`Ticket created but ${uploadErrors.length} attachment(s) failed: ${uploadErrors.join('; ')}`);
+        }
+      }
+
       // Redirect to ticket detail on success
       router.push(`/noc/tickets/${ticket.id}`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create ticket';
+      logger.error('Ticket creation failed', { error: errorMessage });
       setSubmitError(errorMessage);
     }
-  }, [formData, validate, createTicketMutation, router]);
+  }, [formData, validate, createTicketMutation, router, mediaFiles, user]);
 
   // ==================== Reset ====================
 
@@ -423,6 +499,7 @@ export function useTicketForm(): UseTicketFormResult {
     setErrors({});
     setIsDirty(false);
     setSubmitError(null);
+    setMediaFiles([]);
     drLookupHook.clear();
   }, [drLookupHook]);
 
@@ -434,6 +511,7 @@ export function useTicketForm(): UseTicketFormResult {
     isDirty,
     isSubmitting: createTicketMutation.isPending,
     submitError,
+    mediaFiles,
     drLookup: {
       isLoading: drLookupHook.isLoading,
       isFound: drLookupHook.isFound,
@@ -443,6 +521,8 @@ export function useTicketForm(): UseTicketFormResult {
     },
     setField,
     setFields,
+    addMediaFile,
+    removeMediaFile,
     lookupDR,
     clearDRLookup,
     validate,

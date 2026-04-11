@@ -22,16 +22,27 @@ import { ACCEPTED_TYPES, ANALYSING_MESSAGES } from './screenshotUtils';
 
 interface ScreenshotUploaderProps {
   onFieldsExtracted: (fields: Record<string, string>) => void;
+  onFileAdded?: (file: File) => void;
+  onFileRemoved?: (index: number) => void;
+  required?: boolean;
+  validationError?: string;
   disabled?: boolean;
 }
 
-export function ScreenshotUploader({ onFieldsExtracted, disabled }: ScreenshotUploaderProps) {
+export function ScreenshotUploader({
+  onFieldsExtracted,
+  onFileAdded,
+  onFileRemoved,
+  required,
+  validationError,
+  disabled,
+}: ScreenshotUploaderProps) {
   const {
     previews, isAnalysing, analysingType, isDragging, error,
     analysisComplete, successMessage, showLightbox,
     setShowLightbox, setError, fileInputRef,
     handleFileInput, handleDragOver, handleDragLeave, handleDrop, handlePaste, removePreview,
-  } = useScreenshotUploader({ onFieldsExtracted, disabled });
+  } = useScreenshotUploader({ onFieldsExtracted, onFileAdded, onFileRemoved, disabled });
 
   const analysingMsg = ANALYSING_MESSAGES[analysingType];
 
@@ -41,7 +52,14 @@ export function ScreenshotUploader({ onFieldsExtracted, disabled }: ScreenshotUp
       <div className="flex items-start gap-3 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
         <Monitor className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
         <div className="text-sm">
-          <p className="font-medium text-purple-300">AI-powered bug reporting</p>
+          <p className="font-medium text-purple-300 flex items-center gap-2">
+            AI-powered bug reporting
+            {required && (
+              <span className="text-[10px] uppercase tracking-wide font-semibold bg-red-500/20 text-red-300 border border-red-500/30 px-1.5 py-0.5 rounded">
+                Required
+              </span>
+            )}
+          </p>
           <p className="text-purple-300/70 mt-0.5">
             Press <kbd className="px-1.5 py-0.5 bg-purple-500/20 rounded text-xs font-mono">F12</kbd> to open DevTools,
             then capture the error. Upload a <strong>screenshot</strong>, <strong>screen recording</strong>, or <strong>voice memo</strong> —
@@ -73,7 +91,7 @@ export function ScreenshotUploader({ onFieldsExtracted, disabled }: ScreenshotUp
             ? 'border-purple-400 bg-purple-400/10 scale-[1.01]'
             : 'border-[var(--ff-border-light)] hover:border-purple-400/50 hover:bg-purple-500/5',
           (disabled || isAnalysing) && 'opacity-50 cursor-not-allowed',
-          error && 'border-red-400/50'
+          (error || validationError) && 'border-red-400/50'
         )}
       >
         {isAnalysing ? (
@@ -104,6 +122,14 @@ export function ScreenshotUploader({ onFieldsExtracted, disabled }: ScreenshotUp
         <div className="flex items-center gap-2 p-2.5 bg-green-500/10 border border-green-500/30 rounded-lg">
           <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
           <span className="text-sm text-green-300">{successMessage}</span>
+        </div>
+      )}
+
+      {/* Form-level validation error (e.g. "screenshot required for DevOps") */}
+      {validationError && !error && previews.length === 0 && (
+        <div className="flex items-center gap-2 p-2.5 bg-red-500/10 border border-red-500/30 rounded-lg">
+          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+          <span className="text-sm text-red-300">{validationError}</span>
         </div>
       )}
 
