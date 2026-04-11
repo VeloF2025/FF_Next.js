@@ -21,19 +21,8 @@ import {
   Check,
   X,
   Users,
-  Upload,
-  Bell,
-  Cake,
-  Shield,
-  Building2,
   User,
-  BarChart3,
-  Briefcase,
-  Car,
-  FileText,
   FolderKanban,
-  MessageSquare,
-  Activity,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
 
@@ -359,7 +348,6 @@ export function SystemSettingsTab() {
               {moduleGroup.sections.map((section) => {
                 const Icon = section.icon;
                 const isExpanded = expandedSections.has(section.id);
-                const isSavingGroup = savingKeys.has(section.groupKey);
                 const justSavedGroup = lastSaved === section.groupKey;
 
                 return (

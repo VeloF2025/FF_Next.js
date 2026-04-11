@@ -8,9 +8,7 @@ import { log } from '@/lib/logger';
 import { formatDisplayMonthYear } from '@/utils/dateFormat';
 
 // PARTIAL: Drizzle ORM stubs — staffPerformance table not yet migrated to drizzle
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const neonDb: unknown = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const staffPerformance: unknown = {};
 
 /** Shape of a single team member returned from the analytics API */
