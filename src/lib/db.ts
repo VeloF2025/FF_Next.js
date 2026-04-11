@@ -33,7 +33,7 @@ const pool = new Pool({
   ssl: true,
   max: 20,
   min: 2,                           // keep 2 idle connections ready
-  idleTimeoutMillis: 30_000,
+  idleTimeoutMillis: 300_000,       // 5 min — keeps min-pool alive between the 60s db-health pings
   connectionTimeoutMillis: 30_000,  // 30s — Neon cold starts can take 10-15s
   keepAlive: true,
   keepAliveInitialDelayMillis: 10_000,
