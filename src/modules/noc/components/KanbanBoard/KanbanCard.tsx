@@ -120,20 +120,20 @@ export function KanbanCard({ ticket, isDragging, onQuickMove, canMoveForward, ca
         </div>
       )}
 
-      {/* Header: UID, T1 category, T2 sub_type, Priority */}
+      {/* Header: UID, T1 category, discipline, Priority */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs font-mono text-[var(--ff-text-muted)]">
             {ticket.ticket_uid}
           </span>
-          {/* T1 category label */}
+          {/* T1 label from discipline fallback */}
           <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${categoryStyle.bg} ${categoryStyle.text}`}>
             {getT1Label(ticket.ticket_type)}
           </span>
-          {/* T2 sub_type badge */}
-          {ticket.sub_type && (
+          {/* T1 ticket_category badge (new April-11 axis) */}
+          {ticket.ticket_category && (
             <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-indigo-500/15 text-indigo-300">
-              {getT2Label(ticket.sub_type)}
+              {getT2Label(ticket.ticket_category)}
             </span>
           )}
         </div>

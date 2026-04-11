@@ -77,10 +77,10 @@ export function TicketListItem({ ticket, compact = false, onClick }: TicketListI
             {getT1Label(ticket.ticket_type)}
           </span>
 
-          {/* T2 sub_type badge — only shown when sub_type is present */}
-          {ticket.sub_type && (
+          {/* T1 ticket_category badge (new April-11 axis) */}
+          {ticket.ticket_category && (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-              {getT2Label(ticket.sub_type)}
+              {getT2Label(ticket.ticket_category)}
             </span>
           )}
 

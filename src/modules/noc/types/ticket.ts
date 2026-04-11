@@ -191,7 +191,14 @@ export interface Ticket {
   title: string;
   description: string | null;
   ticket_type: TicketType;
-  sub_type: TicketSubType | null;
+  /**
+   * T1 — what KIND of ticket this is. New column added by migration 277.
+   * The name is ticket_category (not just `category`) because
+   * maintenance_tickets already has a legacy `category` column holding
+   * QContact's category hierarchy (Connectivity, Maintenance, ...) for
+   * QContact-ingested tickets.
+   */
+  ticket_category: TicketSubType | null;
   priority: TicketPriority;
   status: TicketStatus;
 
@@ -295,6 +302,12 @@ export interface CreateTicketPayload {
   environment?: 'production' | 'dev' | 'local';
   steps_to_reproduce?: string;
   browser_info?: string;
+  /**
+   * T1 category — what kind of ticket. Added by migration 277 as a new
+   * column (maintenance_tickets.ticket_category) since the `category`
+   * column is already used by QContact's inbound category hierarchy.
+   */
+  ticket_category?: TicketSubType | string;
 }
 
 /**

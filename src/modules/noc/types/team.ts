@@ -17,6 +17,18 @@ export enum TeamType {
 }
 
 /**
+ * Work discipline — matches ticket_type for auto-assignment routing.
+ * A team with discipline='optical' receives optical-classified tickets.
+ * See migration 277.
+ */
+export type TeamDiscipline =
+  | 'civils'
+  | 'optical'
+  | 'activations'
+  | 'maintenance'
+  | 'dev_ops';
+
+/**
  * Core Team interface matching database schema
  */
 export interface Team {
@@ -26,6 +38,18 @@ export interface Team {
   team_type: TeamType | string;
   lead_user_id: string | null;
   contractor_id: string | null;
+  /**
+   * Per-project team scoping — tickets created against this project_id prefer
+   * teams scoped to the project. NULL = global / cross-project team. Added by
+   * migration 277.
+   */
+  project_id: string | null;
+  /**
+   * Work discipline for auto-assign routing. NULL means the team has no
+   * discipline classification yet (legacy rows) and won't be picked by the
+   * discipline-based auto-assign query. Added by migration 277.
+   */
+  discipline: TeamDiscipline | null;
   is_active: boolean;
   created_at: Date;
   updated_at: Date;
