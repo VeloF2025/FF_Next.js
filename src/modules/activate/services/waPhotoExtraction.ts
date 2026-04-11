@@ -68,13 +68,17 @@ This photo shows a printed sticker with TWO serial numbers:
    ❌ Do NOT extract model/part numbers (start with "STN")
 
 2. UPS SERIAL NUMBER:
-   - Full model+serial string printed under the barcode on the Gizzu UPS sticker
+   - Full model+serial string printed BELOW the barcode on the Gizzu UPS sticker
    - Format: "GU18W12V" (model prefix) + 10 numeric digits = EXACTLY 18 characters total
    - Example shape: GU18W12V##########
    - IMPORTANT: Read the ENTIRE string — do NOT drop "12V" from the middle
-   - ⚠️ The UPS sticker is OFTEN UPSIDE DOWN — rotate text mentally before reading
-   - ⚠️ If you read fewer than 18 characters, you are MISSING digits — look at the barcode numbers above the text
-   - The barcode printed above the text contains the SAME serial — cross-check both
+   - ⚠️ The small "GU18W12V" text ABOVE the barcode is the MODEL CODE, NOT the serial.
+     The REAL serial is the long string printed BELOW the barcode (starts with GU18W12V + 10 digits).
+   - ⚠️ The UPS sticker is OFTEN ROTATED (upside down or sideways) — rotate text mentally before reading
+   - ⚠️ If you cannot clearly read the 10 digits after GU18W12V, return found:false.
+     NEVER pad with zeros, NEVER invent placeholder digits, NEVER return GU18W12V0000000000.
+     A null answer is MUCH better than a wrong serial.
+   - The barcode itself encodes the SAME serial — cross-check if possible
 
 ⚠️ VALIDATION (check before answering):
 - ONT serial must be exactly 12 chars starting with ALCLB4
@@ -101,11 +105,20 @@ CRITICAL: Only extract serials you can ACTUALLY READ. null is better than wrong.
 // UPS VALIDATION
 // ============================================================================
 
+/** Known UPS hallucination values the VLM tends to emit when it can't read digits */
+const UPS_HALLUCINATION_BLOCKLIST = new Set<string>([
+  'GU18W12V0000000000',
+  'GU18W12V1111111111',
+  'GU18W12V1234567890',
+  'GU18W12V25-0030103',
+  'GU18W12V25-04C30103',
+]);
+
 /**
  * Validate UPS/Gizzu serial format.
  * - Must start with GU18W
- * - Must be 12–22 characters (GU18W12V + 10 digits = 18-19 typical)
- * - Must not be a prompt example (hallucination guard)
+ * - Must be 18–22 characters (GU18W12V + 10 digits = 18 typical)
+ * - Must not be a prompt example or known hallucination (zero-padding, repeated digits)
  */
 function isValidUpsSerial(serial: string | null): boolean {
   if (!serial) return false;
@@ -123,6 +136,29 @@ function isValidUpsSerial(serial: string | null): boolean {
       `Rejected UPS serial with wrong length (${s.length}): ${serial}`
     );
     return false;
+  }
+
+  if (UPS_HALLUCINATION_BLOCKLIST.has(s)) {
+    vlmLogger.warn(`Rejected UPS hallucination (blocklist): ${serial}`);
+    return false;
+  }
+
+  // Suffix anti-hallucination: reject all-zero, all-same-digit, or mostly-zero
+  // suffixes after the GU18W12V prefix. Real Gizzu serials are high-entropy.
+  const suffix = s.startsWith('GU18W12V') ? s.slice(8) : '';
+  if (suffix.length >= 10) {
+    const digits = suffix.slice(0, 10);
+    if (/^(\d)\1{9}$/.test(digits)) {
+      vlmLogger.warn(`Rejected UPS hallucination (repeated digit): ${serial}`);
+      return false;
+    }
+    const zeroCount = (digits.match(/0/g) || []).length;
+    if (zeroCount >= 7) {
+      vlmLogger.warn(
+        `Rejected UPS hallucination (${zeroCount}/10 zeros): ${serial}`
+      );
+      return false;
+    }
   }
 
   return true;
@@ -263,18 +299,31 @@ export async function extractSerialsFromWaPhoto(
       }
     }
 
-    // Retry UPS with 180° rotation if initial read failed (sticker often upside down)
+    // Retry UPS with rotations if initial read failed. The Gizzu sticker is
+    // often upside down (180°) or sideways (90°/270°) on the shipping box.
     if (!finalUps) {
+      const rotationRetryPrompt = `Extract ONLY the UPS serial from the Gizzu sticker. The real serial is printed BELOW the barcode and has format GU18W12V + 10 digits = EXACTLY 18 chars. The small "GU18W12V" text above the barcode is the MODEL CODE, not the serial. If you cannot read the 10 digits clearly, return found:false — NEVER pad with zeros. Return JSON: {"upsSerial":{"found":true,"serial":"...","confidence":0.95}}`;
       try {
-        vlmLogger.info("UPS serial missing — retrying with 180° rotated image");
         const sharp = (await import("sharp")).default;
         const imgBuffer = Buffer.from(base64, "base64");
-        const rotatedBuffer = await sharp(imgBuffer).rotate(180).jpeg({ quality: 85 }).toBuffer();
-        const rotatedBase64 = rotatedBuffer.toString("base64");
-        const rotResult = await callVlmExtraction<{ upsSerial: { found: boolean; serial: string | null; confidence: number } }>(rotatedBase64, `Extract ONLY the UPS serial. Format: GU18W12V + 10 digits = EXACTLY 18 chars. Return JSON: {"upsSerial":{"found":true,"serial":"...","confidence":0.95}}`, "WA UPS retry rotated");
-        if (rotResult.success && rotResult.data?.upsSerial?.found && rotResult.data.upsSerial.serial) {
-          const rn = rotResult.data.upsSerial.serial.trim().toUpperCase().replace(/[\s-]/g, "");
-          if (isValidUpsSerial(rn)) { finalUps = rn; upsConfidence = rotResult.data.upsSerial.confidence; vlmLogger.info(`UPS recovered via rotation: ${finalUps}`); }
+        for (const angle of [180, 90, 270]) {
+          if (finalUps) break;
+          try {
+            vlmLogger.info(`UPS serial missing — retrying with ${angle}° rotated image`);
+            const rotatedBuffer = await sharp(imgBuffer).rotate(angle).jpeg({ quality: 85 }).toBuffer();
+            const rotatedBase64 = rotatedBuffer.toString("base64");
+            const rotResult = await callVlmExtraction<{ upsSerial: { found: boolean; serial: string | null; confidence: number } }>(rotatedBase64, rotationRetryPrompt, `WA UPS retry ${angle}°`);
+            if (rotResult.success && rotResult.data?.upsSerial?.found && rotResult.data.upsSerial.serial) {
+              const rn = rotResult.data.upsSerial.serial.trim().toUpperCase().replace(/[\s-]/g, "");
+              if (rotResult.data.upsSerial.confidence >= VLM_CONFIDENCE_FLOOR && isValidUpsSerial(rn)) {
+                finalUps = rn;
+                upsConfidence = rotResult.data.upsSerial.confidence;
+                vlmLogger.info(`UPS recovered via ${angle}° rotation: ${finalUps}`);
+              }
+            }
+          } catch (innerErr) {
+            vlmLogger.warn(`UPS ${angle}° rotation retry failed: ${innerErr}`);
+          }
         }
       } catch (retryErr) { vlmLogger.warn(`UPS rotation retry failed: ${retryErr}`); }
     }
