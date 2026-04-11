@@ -114,18 +114,29 @@ function tokensFuzzySubset(sub: string[], sup: string[]): boolean {
 }
 
 /**
- * Fetch all projects with an active client_purchase_orders row.
- * Sorted alphabetically for stable dropdown display.
+ * Fetch all projects that could be the target of a weekly billing upload.
+ *
+ * Historically this was scoped to projects with an active
+ * `client_purchase_orders` row, but that conflated two concerns:
+ *
+ *   - "Can we RESOLVE this PDF to a project?" — always yes when the project
+ *     exists in `projects`, regardless of CPO state.
+ *   - "Can we PRICE the invoice?" — separate question, handled by the
+ *     bundle import step via its own CPO lookup; absence just produces a
+ *     null `invoice_total`.
+ *
+ * So this function now returns every project. Callers that want the
+ * CPO-active subset should join `client_purchase_orders` themselves.
  */
 export async function fetchBillableProjects(): Promise<BillableProject[]> {
   // Lazy import so pure-function consumers (and unit tests) don't pay the
   // cost of loading the Neon driver at module init.
   const { default: pool } = await import('@/lib/db');
   const result = await pool.query<{ id: string; project_name: string }>(
-    `SELECT DISTINCT p.id, p.project_name
+    `SELECT p.id, p.project_name
        FROM projects p
-       JOIN client_purchase_orders cpo ON cpo.project_id = p.id
-      WHERE cpo.status = 'active'
+      WHERE p.project_name IS NOT NULL
+        AND p.project_name <> ''
       ORDER BY p.project_name ASC`,
   );
   return result.rows.map(r => ({ id: r.id, name: r.project_name }));

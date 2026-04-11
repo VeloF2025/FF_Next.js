@@ -266,6 +266,12 @@ async function importProjectResult(
       ? parseFloat(priceRes.rows[0].price_per_drop)
       : null;
 
+    if (pricePerDrop === null) {
+      r.parseWarnings.push(
+        `No active CPO for "${canonicalName}" — row saved but invoice total will be null until a CPO is added.`,
+      );
+    }
+
     const taxRate = 15.0;
     const invoiceSubtotal =
       pricePerDrop !== null
