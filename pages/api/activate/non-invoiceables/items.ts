@@ -116,7 +116,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
         pool.query(
           `SELECT pp.id, pp.serial_number, pp.project, pp.resolution_status,
                   pp.maintenance_ticket_id, pp.created_at, pp.registered_date,
-                  mt.uid AS ticket_uid, mt.status AS ticket_status,
+                  mt.ticket_uid AS ticket_uid, mt.status AS ticket_status,
                   oa.serial_number AS oes_serial,
                   (SELECT COUNT(*) FROM ft_billing_deductions bd
                    WHERE bd.dr_number = pp.serial_number AND bd.deduction_note = 'note4') AS billing_count,
@@ -158,7 +158,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
         pool.query(
           `SELECT r.id, r.drop_number, ri.project, r.olt_serial, r.wrong_onemap_serial,
                   r.fix_status, r.maintenance_ticket_id, r.created_at,
-                  mt.uid AS ticket_uid, mt.status AS ticket_status,
+                  mt.ticket_uid AS ticket_uid, mt.status AS ticket_status,
                   oa.serial_number AS oes_serial, dr.ont_serial_scanned AS wa_serial, d.zone,
                   (SELECT COUNT(*) FROM ft_billing_deductions bd
                    WHERE bd.dr_number = r.drop_number AND bd.deduction_note = 'note4') AS billing_count,
@@ -200,7 +200,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
                   od.serial_number AS offline_serial,
                   od.mismatch_status, od.mismatch_ticket_id, od.olt_serial, od.created_at,
                   od.last_down_reason, od.offline_bucket,
-                  mt.uid AS ticket_uid, mt.status AS ticket_status,
+                  mt.ticket_uid AS ticket_uid, mt.status AS ticket_status,
                   oa.serial_number AS oes_serial, dr.ont_serial_scanned AS wa_serial, d.zone
            FROM offline_devices od
            LEFT JOIN maintenance_tickets mt ON mt.id = od.mismatch_ticket_id
