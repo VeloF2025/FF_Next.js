@@ -21,7 +21,6 @@
 import 'dotenv/config';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as readline from 'readline';
 import { chromium } from 'playwright';
 
 // ============================================================================
@@ -29,6 +28,7 @@ import { chromium } from 'playwright';
 // ============================================================================
 
 const SP_URL = 'https://isizweprojects.sharepoint.com/sites/FibertimeReports';
+const LOGIN_URL = 'https://fibertime.com/contractor-reports';
 const LOGIN_EMAIL = 'reporting@velocityfibre.co.za';
 
 function getCookieFile(): string {
@@ -42,16 +42,6 @@ function getCookieFile(): string {
     process.exit(1);
   }
   return f;
-}
-
-function waitForEnter(prompt: string): Promise<void> {
-  return new Promise(resolve => {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    rl.question(prompt, () => {
-      rl.close();
-      resolve();
-    });
-  });
 }
 
 // ============================================================================
@@ -82,8 +72,8 @@ async function main(): Promise<void> {
 
   const page = await context.newPage();
 
-  process.stdout.write(`Navigating to ${SP_URL}...\n`);
-  await page.goto(SP_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+  process.stdout.write(`Navigating to ${LOGIN_URL}...\n`);
+  await page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
   // Pre-fill email if the Microsoft login form is shown
   try {
@@ -102,15 +92,29 @@ async function main(): Promise<void> {
   }
 
   process.stdout.write('\nComplete the login in the browser window (enter OTP, approve prompts, etc.)\n');
-  process.stdout.write('When you can see the SharePoint site content, press Enter here to save cookies.\n\n');
+  process.stdout.write('Waiting for authentication to complete...\n\n');
 
-  await waitForEnter('Press Enter when logged in → ');
+  // Poll until we're on the SharePoint site (not on a login/auth page)
+  const deadline = Date.now() + 5 * 60_000; // 5 min max
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 3_000));
+    const currentUrl = page.url();
+    const isOnSharePoint =
+      currentUrl.includes('isizweprojects.sharepoint.com/sites/FibertimeReports') &&
+      !currentUrl.includes('AccessDenied') &&
+      !currentUrl.includes('login.microsoftonline.com') &&
+      !currentUrl.includes('/_layouts/15/Authenticate');
+    process.stdout.write(`  URL: ${currentUrl.substring(0, 80)}...\n`);
+    if (isOnSharePoint) {
+      process.stdout.write('\nAuthentication detected!\n');
+      break;
+    }
+  }
 
-  // Verify we landed on the SharePoint site
   const currentUrl = page.url();
-  if (!currentUrl.includes('sharepoint.com')) {
-    process.stderr.write(`\nWARNING: Current URL does not look like SharePoint: ${currentUrl}\n`);
-    process.stderr.write('Cookies will be saved anyway — verify they work by running the sync.\n\n');
+  if (!currentUrl.includes('isizweprojects.sharepoint.com')) {
+    process.stderr.write(`\nWARNING: Authentication may not have completed. URL: ${currentUrl}\n`);
+    process.stderr.write('Saving cookies anyway — verify they work by running the sync.\n\n');
   }
 
   // Save ALL cookies from the browser context

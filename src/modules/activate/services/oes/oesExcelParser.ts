@@ -145,9 +145,10 @@ const PP_PROJECT_CODE_MAP: Record<string, string> = {
 
 /** Parse PP DATA sheet from an already-loaded workbook. Returns null if not found. */
 export function parsePPDataSheet(workbook: XLSX.WorkBook): PPRow[] | null {
-  const ppSheetName = workbook.SheetNames.find(name =>
-    name.toUpperCase().includes('PP')
-  );
+  const ppSheetName = workbook.SheetNames.find(name => {
+    const u = name.toUpperCase();
+    return u.includes('PP') || u.includes('PRE-PROV') || u.includes('PREPROVISIONED') || u.includes('PRE PROV') || u.includes('PROVISIONED');
+  });
 
   if (!ppSheetName) return null;
 
@@ -171,7 +172,8 @@ export function parsePPDataSheet(workbook: XLSX.WorkBook): PPRow[] | null {
       if (typeof row[2] === 'number') {
         dateRegistered = excelDateToISO(row[2]);
       } else {
-        dateRegistered = String(row[2]).trim();
+        // Strip time component if present: "2025-08-01 08:32:36" → "2025-08-01"
+        dateRegistered = String(row[2]).trim().slice(0, 10);
       }
     }
 
