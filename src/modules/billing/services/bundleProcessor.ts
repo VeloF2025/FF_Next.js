@@ -212,9 +212,24 @@ export async function processProjectGroup(
     fatalError = err instanceof Error ? err.message : String(err);
   }
 
-  // Resolve project against DB — prefer PDF Site over filename hint
-  const rawInput = (summary?.site?.trim()) || group.projectHint || '';
-  const resolution = resolveProjectNameAgainst(rawInput, billable);
+  // Resolve project against the DB with a cascade:
+  //   1. PDF Site (e.g. "Lawley") — normally most authoritative
+  //   2. Filename hint (e.g. "Tembisa POP01") — falls back when the Site
+  //      field is too generic (Tembisa matches 3 POP variants)
+  //   3. Combined site + hint — last-ditch if both are individually ambiguous
+  //
+  // We pick the first cascade step that produces a unique match.
+  const site = summary?.site?.trim() ?? '';
+  const hint = group.projectHint?.trim() ?? '';
+  const candidates: string[] = [];
+  if (site) candidates.push(site);
+  if (hint && hint !== site) candidates.push(hint);
+  if (site && hint && site !== hint) candidates.push(`${site} ${hint}`);
+
+  let resolution = resolveProjectNameAgainst(candidates[0] ?? '', billable);
+  for (let i = 1; i < candidates.length && !resolution.matched; i++) {
+    resolution = resolveProjectNameAgainst(candidates[i]!, billable);
+  }
 
   // Reconcile check: FT total ONTs ≈ uptake grand-total installed
   let reconcile: ProjectBundleResult['reconcile'] = null;
