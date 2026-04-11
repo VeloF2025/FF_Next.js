@@ -1,79 +1,151 @@
 ---
 name: fibertime-sync
-description: Fibertime SharePoint OES sync — nightly pull of Nokia OES activation reports from isizweprojects.sharepoint.com into FibreFlow. Covers cookie refresh, manual trigger, PP data backfill, and auth troubleshooting. USE WHEN user says 'fibertime sync', 'fibertime sharepoint', 'OES cron', 'SP cookies', 'cookie expired', 'refresh cookies', 'fibertime auth', 'PP backfill'.
+description: Fibertime SharePoint syncs — OES activation reports + Offline ONT reports. Cookie refresh, manual trigger, PP backfill, offline dispute detection. USE WHEN user says 'fibertime sync', 'fibertime sharepoint', 'OES cron', 'offline sync', 'offline ONT', 'SP cookies', 'cookie expired', 'refresh cookies', 'fibertime auth', 'PP backfill', 'dispute candidate', 'offline report'.
 ---
 
-# Fibertime SharePoint OES Sync
+# Fibertime SharePoint Syncs
 
-Nightly automated pull of Nokia OES reports from Fibertime's SharePoint into FibreFlow's OES pipeline.
+Two nightly SharePoint pulls from Fibertime into FibreFlow:
 
-## Overview
+| Sync | Schedule | Endpoint | Folder |
+|------|----------|----------|--------|
+| **OES Activation** | 22:30 SAST | `POST /api/fibertime/oes-sync` | `OES Report/Sites/{SITE}/` |
+| **Offline ONT** | 22:45 SAST | `POST /api/fibertime/offline-sync` | `Offline ONT Report/Sites/{SITE}/` |
 
 | What | Detail |
 |------|--------|
 | **Sites** | LAW, MAM, MOA, TEM (ETW excluded) |
-| **Schedule** | 22:30 SAST nightly (cron on Velocity) |
-| **Endpoint** | `POST /api/fibertime/oes-sync` |
 | **Auth** | Playwright cookie file (refreshed every 30–90 days) |
 | **Cookie file** | `/home/velo/.fibertime-sp-cookies.json` |
 | **Login email** | `reporting@velocityfibre.co.za` |
 | **SharePoint** | `isizweprojects.sharepoint.com/sites/FibertimeReports` |
 
-## File Naming Convention
+---
 
+## OES Activation Sync
+
+### File Naming
 Nokia names files: `oes_status_report_{SITE}_{YYYYMMDD}.xlsx`
 Draft files (with numeric suffix) are ignored: `oes_status_report_LAW_20260411 1.xlsx`
 
-Each site's file lives at: `OES Report/Sites/{SITE}/`
-
-## Key Files
+### Key Files
 
 | File | Purpose |
 |------|---------|
-| `pages/api/fibertime/oes-sync.ts` | API endpoint (cron calls this) |
+| `pages/api/fibertime/oes-sync.ts` | API endpoint |
 | `src/services/fibertime-oes-sync.ts` | Core sync logic |
 | `src/lib/sharepoint/fibertime-sp-client.ts` | Cookie-based SP REST client |
 | `src/modules/activate/services/oes/oesExcelParser.ts` | Excel parser incl. PP sheet |
-| `scripts/fibertime-sp-login.ts` | Interactive cookie refresh script |
+
+### Manual Trigger
+
+```bash
+curl -s -X POST https://app.fibreflow.app/api/fibertime/oes-sync \
+  -H "Authorization: Bearer $(sudo -u velo grep CRON_SECRET /home/velo/fibreflow-production/.env.local | cut -d= -f2)" \
+  -H "Content-Type: application/json" | jq .
+
+# Specific date
+curl -s -X POST https://app.fibreflow.app/api/fibertime/oes-sync \
+  -H "Authorization: Bearer $(sudo -u velo grep CRON_SECRET /home/velo/fibreflow-production/.env.local | cut -d= -f2)" \
+  -H "Content-Type: application/json" -d '{"date":"20260410"}' | jq .
+```
+
+Site statuses: `imported` | `skipped` (already done) | `not_available` (file not on SP yet) | `error`
+
+---
+
+## Offline ONT Sync
+
+Nightly pull of offline ONT reports. Creates `offline_devices` records and NOC maintenance tickets.
+
+### File Naming
+`offline_ont_report_{SITE}_{YYYYMMDD}.xlsx` — sheet: "Offline ONTs"
+Columns: Drop Number, Area, Serial Number, Reason, Last Event Time, ONT Address
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `pages/api/fibertime/offline-sync.ts` | API endpoint |
+| `src/services/fibertime-offline-sync.ts` | Core sync logic |
+| `src/services/fibertime-offline-db.ts` | DB upsert, recovery detection, NOC tickets |
+| `src/lib/sharepoint/offlineOntParser.ts` | Excel parser |
+
+### Manual Trigger
+
+```bash
+curl -s -X POST https://app.fibreflow.app/api/fibertime/offline-sync \
+  -H "Authorization: Bearer $(sudo -u velo grep CRON_SECRET /home/velo/fibreflow-production/.env.local | cut -d= -f2)" \
+  -H "Content-Type: application/json" | jq .
+
+# Specific date
+curl -s -X POST https://app.fibreflow.app/api/fibertime/offline-sync \
+  -H "Authorization: Bearer $(sudo -u velo grep CRON_SECRET /home/velo/fibreflow-production/.env.local | cut -d= -f2)" \
+  -H "Content-Type: application/json" -d '{"date":"20260411"}' | jq .
+```
+
+### Dispute Detection (Note 5)
+
+Note 5 billing deductions (Offline) are cross-referenced with `offline_devices`:
+- **dispute_candidate** — Note 5 deduction but no offline record in 14-day window
+- **recovered** — offline record exists but device already recovered before billing
+- **dying_gasp** — transient signal loss (Dying Gasp reason)
+
+View at: `/activate/data-sync?group=non_invoiceables` → Billing Crossref tab
+
+### Maintenance Teams (NOC tickets)
+
+| Site | Team UUID |
+|------|-----------|
+| LAW | `0c15b3b9-a878-4fef-8291-772dcd1460c3` |
+| MAM | `ed032579-91ad-45e2-9e25-c41c5f9217dd` |
+| MOA | `e3dd6115-c874-4bdb-a5f5-091f472bef1e` |
+| TEM | `827cf861-c798-4e4d-812d-79ff2f2b750f` |
+
+### Historical Backfill
+
+```bash
+# Run from offline-sync worktree
+cd /home/hein/Workspace/FF_Next.js-offline-sync
+FIBERTIME_SP_COOKIE_FILE=/home/velo/.fibertime-sp-cookies.json \
+  npx tsx backfill-offline-ont.ts
+
+# Single site
+FIBERTIME_SP_COOKIE_FILE=/home/velo/.fibertime-sp-cookies.json \
+  BACKFILL_SITE=LAW npx tsx backfill-offline-ont.ts
+
+# Dry run (list only, no DB writes)
+FIBERTIME_SP_COOKIE_FILE=/home/velo/.fibertime-sp-cookies.json \
+  BACKFILL_DRY_RUN=1 npx tsx backfill-offline-ont.ts
+```
+
+**Note**: Uses `listFolderFilesAlt` (GetFolderByServerRelativeUrl) — the Path API returns 403 for this folder.
 
 ---
 
 ## Cookie Refresh (Auth Expired)
 
-Cookies last 30–90 days. When expired the API returns HTTP 503:
-
-```json
-{
-  "success": false,
-  "error": "Fibertime SharePoint session expired",
-  "action": "Run scripts/fibertime-sp-login.ts on the Velocity server to refresh cookies"
-}
-```
-
-### How to Refresh
+Both syncs use the same cookie file. When expired the API returns HTTP 503.
 
 **Must run headed (requires display) on Velocity:**
 
 ```bash
-# Run as hein on Velocity — needs DISPLAY for Playwright browser
 DISPLAY=:1 FIBERTIME_SP_COOKIE_FILE=/tmp/fibertime-sp-cookies.json \
   npx tsx -r dotenv/config scripts/fibertime-sp-login.ts
 ```
 
-1. A Chromium window opens at `https://fibertime.com/contractor-reports`
+1. Chromium opens at `https://fibertime.com/contractor-reports`
 2. Email `reporting@velocityfibre.co.za` is pre-filled
-3. Complete OTP in the browser (check email for the code)
-4. Script polls until SharePoint URL is detected — no manual step needed
-5. Cookies saved to temp file automatically
+3. Complete OTP in browser (check email)
+4. Script polls until SharePoint URL detected — auto-saves cookies
 
-Then copy to velo's home:
 ```bash
 sudo cp /tmp/fibertime-sp-cookies.json /home/velo/.fibertime-sp-cookies.json
 sudo chown velo:velo /home/velo/.fibertime-sp-cookies.json
 rm /tmp/fibertime-sp-cookies.json
 ```
 
-**Verify** the cookie file was populated:
+**Verify:**
 ```bash
 python3 -c "
 import json
@@ -85,112 +157,80 @@ print(f'Total: {len(cookies)}, SharePoint: {len(sp)}')
 
 ---
 
-## Manual Sync Trigger
-
-Trigger a sync for any date:
-
-```bash
-# Trigger for today (SAST default)
-curl -s -X POST https://app.fibreflow.app/api/fibertime/oes-sync \
-  -H "Authorization: Bearer $(sudo -u velo grep CRON_SECRET /home/velo/fibreflow-production/.env.local | cut -d= -f2)" \
-  -H "Content-Type: application/json" | jq .
-
-# Trigger for a specific date
-curl -s -X POST https://app.fibreflow.app/api/fibertime/oes-sync \
-  -H "Authorization: Bearer $(sudo -u velo grep CRON_SECRET /home/velo/fibreflow-production/.env.local | cut -d= -f2)" \
-  -H "Content-Type: application/json" \
-  -d '{"date":"20260410"}' | jq .
-```
-
-Expected success response:
-```json
-{
-  "success": true,
-  "data": {
-    "date": "20260411",
-    "sites": [
-      {"site":"LAW","status":"imported","rows":5832,"inserted":12,"updated":5820,...},
-      {"site":"MAM","status":"imported",...},
-      {"site":"MOA","status":"imported",...},
-      {"site":"TEM","status":"imported",...}
-    ],
-    "durationMs": 12450
-  }
-}
-```
-
-Site statuses: `imported` | `skipped` (already done) | `not_available` (file not on SP yet) | `error`
-
----
-
 ## PP Data (Pre-Provisioned)
 
-Each per-site file may contain a **"Pre-Provisioned Data"** sheet alongside OLT Data.
+Each OES per-site file may contain a PP DATA sheet. Imported automatically during OES sync.
 
-- Imported automatically during the nightly sync when found
-- Sheet names matched: `PP DATA`, `PRE-PROV*`, `PREPROVISIONED`, `PRE PROV`, `PROVISIONED`
-- Tables: `oes_pp_data` + `oes_pp_import_batches`
-- TEM files typically have no PP sheet
-
-### PP Backfill (missed files)
-
-If PP data was missed for previously-imported files:
+### PP Backfill
 
 ```bash
-# Backfill for a specific date — run from the main workspace
 cd /home/hein/Workspace/FF_Next.js
 FIBERTIME_SP_COOKIE_FILE=/home/velo/.fibertime-sp-cookies.json \
   npx tsx backfill-pp.ts 20260410
 ```
-
-The script downloads each site's file, parses the PP sheet, skips files already in
-`oes_pp_import_batches`, and upserts into `oes_pp_data`.
-
-**Note**: `backfill-pp.ts` lives in the worktree root (not committed — a one-time utility).
 
 ---
 
 ## Database Queries
 
 ```sql
--- Recent OES syncs (per-site files)
+-- Recent OES syncs
 SELECT filename, report_date, total_rows, matched_drops, imported_at
-FROM oes_import_batches
-ORDER BY imported_at DESC LIMIT 10;
+FROM oes_import_batches ORDER BY imported_at DESC LIMIT 10;
+
+-- Recent Offline ONT syncs
+SELECT filename, report_date, total_rows, imported_by, imported_at
+FROM offline_import_batches ORDER BY imported_at DESC LIMIT 20;
+
+-- Offline devices by site and recovery status
+SELECT area_code, COUNT(*) FILTER (WHERE recovered_at IS NULL) AS still_offline,
+       COUNT(*) FILTER (WHERE recovered_at IS NOT NULL) AS recovered
+FROM offline_devices GROUP BY area_code;
+
+-- Note 5 dispute candidates for latest billing week
+SELECT dr_number, od_note5_reason, recovered_at
+FROM v_offline_billing_crossref
+WHERE dispute_flag = 'dispute_candidate' LIMIT 20;
 
 -- PP import history
 SELECT filename, total_rows, created_at
-FROM oes_pp_import_batches
-ORDER BY created_at DESC LIMIT 10;
-
--- PP data counts by project and resolution status
-SELECT project, resolution_status, COUNT(*)
-FROM oes_pp_data
-GROUP BY project, resolution_status
-ORDER BY project, resolution_status;
+FROM oes_pp_import_batches ORDER BY created_at DESC LIMIT 10;
 ```
+
+---
+
+## Cron Configuration
+
+```bash
+sudo -u velo crontab -l | grep -E "oes-sync|offline-sync"
+```
+
+Current schedule:
+```
+30 20 * * *   /api/fibertime/oes-sync         # 22:30 SAST
+45 20 * * *   /api/fibertime/offline-sync      # 22:45 SAST
+```
+
+Logs: `/home/velo/logs/fibertime-offline-sync.log`
 
 ---
 
 ## Troubleshooting
 
 ### Auth expired (503 response)
-→ Run cookie refresh — see **Cookie Refresh** section above.
+→ Run cookie refresh (see above).
 
-### File not available (`not_available` status)
-Nokia uploads final files in the evening. If sync runs at 22:30 and the file isn't there yet,
-re-trigger manually the next morning with the correct date.
+### File not available
+Nokia uploads files in the evening. Re-trigger manually next morning with the correct date.
 
-### File already imported (`skipped` status)
-Normal — the sync is idempotent. Skipping is correct behaviour.
+### File already imported (`skipped`)
+Normal — both syncs are idempotent via batch check.
 
 ### `channel_binding` error in tsx scripts
-The `DATABASE_URL` has `channel_binding=require` which breaks `pg` in tsx context
-(not in the Next.js app itself). The backfill script strips it automatically.
-Do not manually add `channel_binding=require` in any standalone scripts.
+`DATABASE_URL` has `channel_binding=require` which breaks `pg` in tsx context. Standalone scripts must strip it. The backfill scripts do this automatically.
 
 ### Cookies saved but still 401
-The `FedAuth` and `rtFa` HttpOnly cookies are critical:
+Check `FedAuth`/`rtFa` cookies:
 ```bash
 python3 -c "
 import json
@@ -199,28 +239,12 @@ key = [c for c in cookies if c['name'] in ('FedAuth', 'rtFa')]
 for c in key: print(c['name'], 'expires:', c['expires'])
 "
 ```
-If `FedAuth`/`rtFa` are missing, login didn't complete. Re-run the login script and
-wait until you can see SharePoint content in the browser before it auto-saves.
-
----
-
-## Cron Configuration
-
-```bash
-# View current cron (Velocity, as hein)
-sudo -u velo crontab -l | grep oes-sync
-```
-
-Expected entry (22:30 SAST = 20:30 UTC):
-```
-30 20 * * * curl -s -X POST https://app.fibreflow.app/api/fibertime/oes-sync \
-  -H "Authorization: Bearer $CRON_SECRET" >> /var/log/fibertime-oes-sync.log 2>&1
-```
 
 ---
 
 ## Related
 
 - `/oes` — manual OES Excel import via UI
-- `src/lib/sharepoint/fibertime-sp-client.ts` — SP REST client (cookie loading, list/download)
+- `/activate/data-sync?group=non_invoiceables` — billing crossref with dispute flags
+- `src/lib/sharepoint/fibertime-sp-client.ts` — SP REST client
 - `.env.local` keys: `FIBERTIME_SP_COOKIE_FILE`, `CRON_SECRET`
