@@ -35,6 +35,7 @@ import {
   type ProjectBundleResult,
 } from '@/modules/billing/services/bundleProcessor';
 import { fetchBillableProjects } from '@/modules/billing/services/resolveProjectName';
+import { reconcileBillingWeek } from '@/modules/billing/services/reconcileBillingWeek';
 
 const logger = createLogger('api/billing/upload-weekly-bundle');
 
@@ -452,6 +453,30 @@ async function importProjectResult(
       zones: r.zoneUptake?.zones.length ?? 0,
       pons: r.zonePonUptake?.pons.length ?? 0,
     });
+
+    // Auto-reconcile the row we just upserted so the status flips from
+    // 'pending' to 'reconciled' without needing a separate button click.
+    // Failures here are logged but do not fail the import — the row is
+    // already persisted and can be reconciled manually later.
+    try {
+      const client = await pool.connect();
+      try {
+        const outcome = await reconcileBillingWeek(client, billingWeekId, uploadedBy);
+        logger.info('Auto-reconcile complete', {
+          project: canonicalName,
+          weekEnding: summary.weekEnding,
+          ...outcome,
+        });
+      } finally {
+        client.release();
+      }
+    } catch (err) {
+      logger.warn('Auto-reconcile failed (row still imported)', {
+        project: canonicalName,
+        weekEnding: summary.weekEnding,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     return {
       ...base,

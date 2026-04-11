@@ -164,15 +164,18 @@ export function WeeklySummaryTab() {
     return anyValue ? total : null;
   };
 
-  // "Currently Excluded" KPI — derived from the latest week's rows so it
-  // matches the week-totals row in the table below. Excludes pre-provisions
-  // (those are a separate withhold category, not a deduction).
+  // KPI cards derived from the latest week's rows so they match the
+  // week-totals row in the table below. "Currently Excluded" excludes
+  // pre-provisions — those are a separate withhold category, not a
+  // deduction — and the per-note cards below break the total down.
   const latestWeekRows = weekGroups[0]?.[1] ?? [];
-  const currentlyExcludedFromRows =
-    sumField(latestWeekRows, 'ft_note1_count') +
-    sumField(latestWeekRows, 'ft_note2_count') +
-    sumField(latestWeekRows, 'ft_note4_count') +
-    sumField(latestWeekRows, 'ft_note5_count');
+  const latestWeekEnding = weekGroups[0]?.[0] ?? null;
+  const note1Total = sumField(latestWeekRows, 'ft_note1_count');
+  const note2Total = sumField(latestWeekRows, 'ft_note2_count');
+  const note4Total = sumField(latestWeekRows, 'ft_note4_count');
+  const note5Total = sumField(latestWeekRows, 'ft_note5_count');
+  const preProvTotal = sumField(latestWeekRows, 'ft_pre_provisions_count');
+  const currentlyExcludedFromRows = note1Total + note2Total + note4Total + note5Total;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -233,6 +236,57 @@ export function WeeklySummaryTab() {
           <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">Deductions reversed in current month</p>
         </div>
       </div>
+
+      {/* Per-note-type breakdown — latest week */}
+      {latestWeekEnding && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-[var(--ff-text-secondary)]">
+              Non-invoiceables breakdown
+            </h3>
+            <span className="text-xs text-[var(--ff-text-tertiary)]">
+              Week ending {formatDate(latestWeekEnding)}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+            <NoteCard
+              label="Note 1"
+              sublabel="Lower than -26 dB"
+              count={note1Total}
+              colour="orange"
+              loading={loading}
+            />
+            <NoteCard
+              label="Note 2"
+              sublabel="No Field App entry"
+              count={note2Total}
+              colour="blue"
+              loading={loading}
+            />
+            <NoteCard
+              label="Note 4"
+              sublabel="SN ≠ Drop on OLT"
+              count={note4Total}
+              colour="red"
+              loading={loading}
+            />
+            <NoteCard
+              label="Note 5"
+              sublabel="Fibre break / offline"
+              count={note5Total}
+              colour="purple"
+              loading={loading}
+            />
+            <NoteCard
+              label="Pre-Prov"
+              sublabel="20% withhold"
+              count={preProvTotal}
+              colour="cyan"
+              loading={loading}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Project filter */}
       <div className="flex items-center gap-3">
@@ -424,6 +478,49 @@ export function WeeklySummaryTab() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Per-note-type card ────────────────────────────────────────────────────
+
+type NoteCardColour = 'orange' | 'blue' | 'red' | 'purple' | 'cyan';
+
+const NOTE_CARD_THEMES: Record<NoteCardColour, { bg: string; border: string; text: string }> = {
+  orange: { bg: 'bg-orange-500/10', border: 'border-orange-500/20', text: 'text-orange-400' },
+  blue:   { bg: 'bg-blue-500/10',   border: 'border-blue-500/20',   text: 'text-blue-400' },
+  red:    { bg: 'bg-red-500/10',    border: 'border-red-500/20',    text: 'text-red-400' },
+  purple: { bg: 'bg-purple-500/10', border: 'border-purple-500/20', text: 'text-purple-400' },
+  cyan:   { bg: 'bg-cyan-500/10',   border: 'border-cyan-500/20',   text: 'text-cyan-400' },
+};
+
+function NoteCard({
+  label,
+  sublabel,
+  count,
+  colour,
+  loading,
+}: {
+  label: string;
+  sublabel: string;
+  count: number;
+  colour: NoteCardColour;
+  loading: boolean;
+}) {
+  const theme = NOTE_CARD_THEMES[colour];
+  return (
+    <div className={`${theme.bg} border ${theme.border} rounded-lg p-3`}>
+      <div className="flex items-center justify-between mb-0.5">
+        <span className={`text-xs font-medium ${theme.text} uppercase tracking-wide`}>
+          {label}
+        </span>
+      </div>
+      <p className="text-2xl font-bold text-[var(--ff-text-primary)] tabular-nums">
+        {loading ? <InlineSpinner size="sm" /> : count.toLocaleString()}
+      </p>
+      <p className="text-[11px] text-[var(--ff-text-tertiary)] mt-0.5">
+        {sublabel}
+      </p>
     </div>
   );
 }
