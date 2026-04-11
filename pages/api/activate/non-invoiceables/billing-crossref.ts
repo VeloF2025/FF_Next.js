@@ -42,9 +42,16 @@ interface CrossRefRow {
   offline_ticket_id: string | null; offline_ticket_uid: string | null;
   offline_ticket_status: string | null; offline_ticket_created_at: string | null;
   has_dr_record: boolean; dr_review_status: string | null;
+  // Note 5 offline evidence columns (from nightly offline sync)
+  od_note5_id: string | null;
+  od_note5_reason: string | null;
+  od_note5_recovered_at: string | null;
 }
 
 // ─── Response types ───────────────────────────────────────────────────────────
+
+/** Dispute flag derived from Note 5 offline evidence. */
+type DisputeFlag = 'none' | 'dispute_candidate' | 'recovered' | 'dying_gasp';
 
 interface CrossRefItem {
   dr_number: string; note_type: string;
@@ -52,10 +59,17 @@ interface CrossRefItem {
   action_status: 'actioned' | 'missed' | 'actioned_late';
   ticket_uid: string | null; ticket_status: string | null; ticket_created_at: string | null;
   oes_status: string | null; signal_dbm: number | null; has_dr: boolean;
+  // Note 5 offline evidence
+  offline_confirmed: boolean;
+  offline_reason: string | null;
+  offline_recovered_at: string | null;
+  dispute_flag: DisputeFlag;
 }
 
 // ─── SQL ──────────────────────────────────────────────────────────────────────
 
+// ⚪ NOTE: Two explicit query branches used below (by billing_week_id only, no
+// conditional fragments). The $1 parameter is always the billing_week_id UUID.
 const CROSSREF_SQL = `
 SELECT d.id, d.dr_number, d.deduction_note, d.serial_number, d.team, d.deduction_reason,
   oa.status AS oes_status, oa.activation_date AS oes_activation_date, oa.ont_rx_sig_dbm AS oes_signal_dbm,
@@ -69,7 +83,10 @@ SELECT d.id, d.dr_number, d.deduction_note, d.serial_number, d.team, d.deduction
   od.mismatch_ticket_id AS offline_ticket_id, od_mt.ticket_uid AS offline_ticket_uid,
   od_mt.status AS offline_ticket_status, od_mt.created_at AS offline_ticket_created_at,
   CASE WHEN dr.id IS NOT NULL THEN true ELSE false END AS has_dr_record,
-  dr.human_review_status AS dr_review_status
+  dr.human_review_status AS dr_review_status,
+  od_note5.id          AS od_note5_id,
+  od_note5.reason      AS od_note5_reason,
+  od_note5.recovered_at AS od_note5_recovered_at
 FROM ft_billing_deductions d
 LEFT JOIN oes_activations oa ON oa.drop_number = d.dr_number
 LEFT JOIN olt_mismatch_records olt ON olt.drop_number = d.dr_number
@@ -79,6 +96,17 @@ LEFT JOIN maintenance_tickets pp_mt ON pp_mt.id = pp.maintenance_ticket_id
 LEFT JOIN offline_devices od ON od.drop_number = d.dr_number AND od.serial_mismatch = true
 LEFT JOIN maintenance_tickets od_mt ON od_mt.id = od.mismatch_ticket_id
 LEFT JOIN dr_photo_unified_reviews dr ON dr.drop_number = d.dr_number
+LEFT JOIN LATERAL (
+  SELECT od2.id, od2.last_down_reason AS reason, od2.last_inform_date,
+         od2.recovered_at, od2.offline_ticket_id, od2.offline_ticket_created_at
+  FROM offline_devices od2
+  INNER JOIN ft_weekly_billing wb ON wb.id = d.billing_week_id
+  WHERE od2.drop_number = d.dr_number
+    AND od2.report_date BETWEEN wb.week_ending::date - 14 AND wb.week_ending::date
+    AND od2.recovered_at IS NULL
+  ORDER BY od2.report_date DESC
+  LIMIT 1
+) od_note5 ON true
 WHERE d.billing_week_id = $1
 ORDER BY d.deduction_note, d.dr_number`;
 
@@ -94,6 +122,21 @@ function computeActionStatus(
   const createdAt = row.olt_ticket_created_at ?? row.pp_ticket_created_at ?? row.offline_ticket_created_at;
   if (!createdAt) return 'missed';
   return new Date(createdAt) <= new Date(weekEnding) ? 'actioned' : 'actioned_late';
+}
+
+/**
+ * Derive dispute_flag for Note 5 deductions:
+ *   dispute_candidate — no offline evidence found in the 14-day window
+ *   recovered         — offline record found but device already recovered
+ *   dying_gasp        — offline reason is 'Dying Gasp' (transient signal loss)
+ *   none              — not a Note 5 deduction, or evidence confirms offline state
+ */
+function computeDisputeFlag(row: CrossRefRow): DisputeFlag {
+  if (row.deduction_note !== 'note5') return 'none';
+  if (!row.od_note5_id) return 'dispute_candidate';
+  if (row.od_note5_recovered_at) return 'recovered';
+  if (row.od_note5_reason === 'Dying Gasp') return 'dying_gasp';
+  return 'none';
 }
 
 async function loadWeekById(id: string): Promise<BillingWeekRow | null> {
@@ -187,6 +230,12 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
         oes_status: row.oes_status,
         signal_dbm: row.oes_signal_dbm,
         has_dr: row.has_dr_record,
+        offline_confirmed: row.od_note5_id !== null,
+        offline_reason: row.od_note5_reason ?? null,
+        offline_recovered_at: row.od_note5_recovered_at
+          ? String(row.od_note5_recovered_at)
+          : null,
+        dispute_flag: computeDisputeFlag(row),
       };
     });
 
@@ -199,6 +248,8 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
     const coverage_rate = total_deductions > 0
       ? Math.round(((actioned + actioned_late) / total_deductions) * 10000) / 100
       : 0;
+    const dispute_candidates     = items.filter((i) => i.dispute_flag === 'dispute_candidate').length;
+    const recovered_since_deduction = items.filter((i) => i.dispute_flag === 'recovered').length;
 
     const payload = {
       week: {
@@ -207,7 +258,10 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
         project: week.project,
       },
       rows: items,
-      summary: { total_deductions, actioned, missed, actioned_late, coverage_rate },
+      summary: {
+        total_deductions, actioned, missed, actioned_late, coverage_rate,
+        dispute_candidates, recovered_since_deduction,
+      },
       prev_week_id: prev,
       next_week_id: next,
     };

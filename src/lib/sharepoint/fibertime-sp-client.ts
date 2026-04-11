@@ -178,6 +178,54 @@ export async function listFolderFiles(folderPath: string): Promise<SpFileItem[]>
 }
 
 // ============================================================================
+// FILE LISTING (ALT — uses GetFolderByServerRelativeUrl)
+// ============================================================================
+
+/**
+ * Lists files using `GetFolderByServerRelativeUrl` instead of
+ * `GetFolderByServerRelativePath`. Required for the Offline ONT Report folder
+ * which returns 403 with the Path API variant.
+ *
+ * @param folderPath - Relative to "Shared Documents", e.g. "Offline ONT Report/Sites/LAW"
+ * @returns Array of SpFileItem (empty array if folder not found / no files)
+ */
+export async function listFolderFilesAlt(folderPath: string): Promise<SpFileItem[]> {
+  const serverRelativeFolder = `/sites/FibertimeReports/Shared Documents/${folderPath}`;
+  const encodedFolder = encodeURIComponent(serverRelativeFolder);
+  const url =
+    `${SP_BASE}/_api/web/GetFolderByServerRelativeUrl('${encodedFolder}')/Files` +
+    `?$select=Name,Length,TimeLastModified,ServerRelativeUrl`;
+
+  const response = await spFetch(url);
+
+  if (response.status === 404) {
+    logger.warn('Fibertime folder not found (alt)', { folderPath });
+    return [];
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to list Fibertime folder (alt) "${folderPath}": ${response.status} ${errorText}`);
+  }
+
+  const data = (await response.json()) as {
+    value: Array<{
+      Name: string;
+      Length: string;
+      TimeLastModified: string;
+      ServerRelativeUrl: string;
+    }>;
+  };
+
+  return (data.value ?? []).map(f => ({
+    id: f.ServerRelativeUrl,
+    name: f.Name,
+    size: parseInt(f.Length, 10),
+    lastModifiedDateTime: f.TimeLastModified,
+  }));
+}
+
+// ============================================================================
 // FILE DOWNLOAD
 // ============================================================================
 
