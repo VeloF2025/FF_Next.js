@@ -520,11 +520,11 @@ if (require.main === module) {
   
   switch (command) {
     case 'smoke':
-      runner.runSmokeTests().catch(console.error);
+      runner.runSmokeTests().catch((err: unknown) => log.error('Smoke tests failed', { data: err }, 'test-coverage-runner'));
       break;
     case 'full':
     default:
-      runner.runAllTests().catch(console.error);
+      runner.runAllTests().catch((err: unknown) => log.error('Full test run failed', { data: err }, 'test-coverage-runner'));
       break;
   }
 }

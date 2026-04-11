@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeAll } from 'vitest';
 import axios, { AxiosInstance } from 'axios';
+import { log } from '@/lib/logger';
 
 interface BenchmarkResult {
   endpoint: string;
@@ -112,13 +113,13 @@ describe('API Performance Benchmarks', () => {
       test(`${endpoint} performance`, async () => {
         const result = await benchmarkEndpoint('GET', endpoint);
         
-        console.log(`\n${endpoint} Performance:`);
-        console.log(`  Average: ${result.averageTime}ms`);
-        console.log(`  Min: ${result.minTime}ms`);
-        console.log(`  Max: ${result.maxTime}ms`);
-        console.log(`  P95: ${result.p95Time}ms`);
-        console.log(`  P99: ${result.p99Time}ms`);
-        console.log(`  Errors: ${result.errors}/${result.requests}`);
+        log.info(`${endpoint} Performance:`, undefined, 'api-benchmarks');
+        log.info(`  Average: ${result.averageTime}ms`, undefined, 'api-benchmarks');
+        log.info(`  Min: ${result.minTime}ms`, undefined, 'api-benchmarks');
+        log.info(`  Max: ${result.maxTime}ms`, undefined, 'api-benchmarks');
+        log.info(`  P95: ${result.p95Time}ms`, undefined, 'api-benchmarks');
+        log.info(`  P99: ${result.p99Time}ms`, undefined, 'api-benchmarks');
+        log.info(`  Errors: ${result.errors}/${result.requests}`, undefined, 'api-benchmarks');
 
         expect(result.averageTime).toBeLessThan(PERFORMANCE_THRESHOLDS.health);
         expect(result.errors).toBe(0);
@@ -137,10 +138,10 @@ describe('API Performance Benchmarks', () => {
       test(`${name} performance`, async () => {
         const result = await benchmarkEndpoint('GET', path);
         
-        console.log(`\n${name} Performance:`);
-        console.log(`  Average: ${result.averageTime}ms`);
-        console.log(`  P95: ${result.p95Time}ms`);
-        console.log(`  Errors: ${result.errors}/${result.requests}`);
+        log.info(`${name} Performance:`, undefined, 'api-benchmarks');
+        log.info(`  Average: ${result.averageTime}ms`, undefined, 'api-benchmarks');
+        log.info(`  P95: ${result.p95Time}ms`, undefined, 'api-benchmarks');
+        log.info(`  Errors: ${result.errors}/${result.requests}`, undefined, 'api-benchmarks');
 
         expect(result.averageTime).toBeLessThan(PERFORMANCE_THRESHOLDS.list);
         expect(result.p95Time).toBeLessThan(PERFORMANCE_THRESHOLDS.list * 1.5);
@@ -172,9 +173,9 @@ describe('API Performance Benchmarks', () => {
     test('SOW data with all relationships', async () => {
       const result = await benchmarkEndpoint('GET', '/sow/data/test-project-001');
       
-      console.log('\nSOW Complex Query Performance:');
-      console.log(`  Average: ${result.averageTime}ms`);
-      console.log(`  P95: ${result.p95Time}ms`);
+      log.info('SOW Complex Query Performance:', undefined, 'api-benchmarks');
+      log.info(`  Average: ${result.averageTime}ms`, undefined, 'api-benchmarks');
+      log.info(`  P95: ${result.p95Time}ms`, undefined, 'api-benchmarks');
 
       expect(result.averageTime).toBeLessThan(PERFORMANCE_THRESHOLDS.complex);
     });
@@ -213,8 +214,8 @@ describe('API Performance Benchmarks', () => {
       ]);
 
       results.forEach(result => {
-        console.log(`\n${result.endpoint} Create Performance:`);
-        console.log(`  Average: ${result.averageTime}ms`);
+        log.info(`${result.endpoint} Create Performance:`, undefined, 'api-benchmarks');
+        log.info(`  Average: ${result.averageTime}ms`, undefined, 'api-benchmarks');
         
         expect(result.averageTime).toBeLessThan(PERFORMANCE_THRESHOLDS.create);
       });
@@ -238,9 +239,9 @@ describe('API Performance Benchmarks', () => {
       
       const totalTime = performance.now() - start;
       
-      console.log(`\nParallel Requests (${endpoints.length} requests):`);
-      console.log(`  Total time: ${Math.round(totalTime)}ms`);
-      console.log(`  Average per request: ${Math.round(totalTime / endpoints.length)}ms`);
+      log.info(`Parallel Requests (${endpoints.length} requests):`, undefined, 'api-benchmarks');
+      log.info(`  Total time: ${Math.round(totalTime)}ms`, undefined, 'api-benchmarks');
+      log.info(`  Average per request: ${Math.round(totalTime / endpoints.length)}ms`, undefined, 'api-benchmarks');
 
       // Should complete faster than sequential
       expect(totalTime).toBeLessThan(PERFORMANCE_THRESHOLDS.list * endpoints.length * 0.5);
@@ -254,11 +255,11 @@ describe('API Performance Benchmarks', () => {
       
       const result = await benchmarkEndpoint('GET', endpoint, undefined, rapidIterations);
       
-      console.log('\nConnection Pool Performance (50 rapid requests):');
-      console.log(`  Average: ${result.averageTime}ms`);
-      console.log(`  Min: ${result.minTime}ms`);
-      console.log(`  Max: ${result.maxTime}ms`);
-      console.log(`  Errors: ${result.errors}`);
+      log.info('Connection Pool Performance (50 rapid requests):', undefined, 'api-benchmarks');
+      log.info(`  Average: ${result.averageTime}ms`, undefined, 'api-benchmarks');
+      log.info(`  Min: ${result.minTime}ms`, undefined, 'api-benchmarks');
+      log.info(`  Max: ${result.maxTime}ms`, undefined, 'api-benchmarks');
+      log.info(`  Errors: ${result.errors}`, undefined, 'api-benchmarks');
 
       // Connection pool should handle rapid requests efficiently
       expect(result.errors).toBe(0);
@@ -288,7 +289,7 @@ describe('API Performance Benchmarks', () => {
         const baseline = baselineMetrics[key as keyof typeof baselineMetrics].averageTime;
         const regression = ((current - baseline) / baseline) * 100;
         
-        console.log(`\n${key} regression: ${regression.toFixed(1)}%`);
+        log.info(`${key} regression: ${regression.toFixed(1)}%`, undefined, 'api-benchmarks');
         
         expect(regression).toBeLessThan(20);
       });
@@ -334,11 +335,11 @@ describe('API Performance Benchmarks', () => {
       const avgResponseTime = results.reduce((a, b) => a + b, 0) / results.length;
       const errorRate = (errors / (results.length + errors)) * 100;
 
-      console.log('\nLoad Test Results:');
-      console.log(`  Total requests: ${results.length + errors}`);
-      console.log(`  Successful: ${results.length}`);
-      console.log(`  Errors: ${errors} (${errorRate.toFixed(1)}%)`);
-      console.log(`  Average response time: ${Math.round(avgResponseTime)}ms`);
+      log.info('Load Test Results:', undefined, 'api-benchmarks');
+      log.info(`  Total requests: ${results.length + errors}`, undefined, 'api-benchmarks');
+      log.info(`  Successful: ${results.length}`, undefined, 'api-benchmarks');
+      log.info(`  Errors: ${errors} (${errorRate.toFixed(1)}%)`, undefined, 'api-benchmarks');
+      log.info(`  Average response time: ${Math.round(avgResponseTime)}ms`, undefined, 'api-benchmarks');
 
       expect(errorRate).toBeLessThan(1); // Less than 1% error rate
       expect(avgResponseTime).toBeLessThan(500); // Average under 500ms under load

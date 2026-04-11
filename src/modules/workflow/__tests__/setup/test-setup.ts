@@ -243,10 +243,12 @@ global.restoreConsole = () => {
 };
 
 // Mock console methods to reduce noise in tests
+/* eslint-disable no-console */
 console.warn = jest.fn();
 console.error = jest.fn();
 console.info = jest.fn();
 console.debug = jest.fn();
+/* eslint-enable no-console */
 
 // Mock environment variables
 process.env.NODE_ENV = 'test';
@@ -304,10 +306,12 @@ global.cleanup = () => {
   window.sessionStorage.clear();
   
   // Reset console
+  /* eslint-disable no-console */
   console.warn = jest.fn();
   console.error = jest.fn();
   console.info = jest.fn();
   console.debug = jest.fn();
+  /* eslint-enable no-console */
   
   // Clear performance marks
   performance.clearMarks();
@@ -318,6 +322,7 @@ global.cleanup = () => {
 jest.setTimeout(10000);
 
 // Suppress specific warnings in tests
+/* eslint-disable no-console */
 const originalError = console.error;
 beforeAll(() => {
   console.error = (...args) => {
@@ -334,5 +339,6 @@ beforeAll(() => {
 afterAll(() => {
   console.error = originalError;
 });
+/* eslint-enable no-console */
 
 export {};
