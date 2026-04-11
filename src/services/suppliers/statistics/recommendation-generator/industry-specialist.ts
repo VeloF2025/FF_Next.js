@@ -4,10 +4,13 @@
  */
 
 import { Supplier } from '@/types/supplier/base.types';
-import type { 
-  RecommendationItem, 
-  INDUSTRY_CATEGORIES 
+import type {
+  RecommendationItem,
+  INDUSTRY_CATEGORIES
 } from './recommendation-types';
+
+/** Opaque industry benchmarks passed from external callers — shape varies by sector */
+type IndustryBenchmarks = Record<string, unknown>;
 
 export class RecommendationIndustrySpecialist {
   /**
@@ -15,7 +18,7 @@ export class RecommendationIndustrySpecialist {
    */
   static generateIndustryRecommendations(
     supplier: Supplier,
-    industryBenchmarks?: any
+    industryBenchmarks?: IndustryBenchmarks
   ): string[] {
     const recommendations: string[] = [];
     const categories = supplier.categories || [];
@@ -56,123 +59,130 @@ export class RecommendationIndustrySpecialist {
   /**
    * Get technology sector recommendations
    */
-  private static getTechnologyRecommendations(supplier: Supplier, _benchmarks?: any): string[] {
+  private static getTechnologyRecommendations(supplier: Supplier, _benchmarks?: IndustryBenchmarks): string[] {
     const recommendations: string[] = [];
 
     recommendations.push('Consider obtaining cybersecurity certifications (ISO 27001, SOC 2)');
     recommendations.push('Implement agile project management methodologies');
     recommendations.push('Establish continuous integration/continuous deployment (CI/CD) practices');
-    
-    if (!(supplier as any).certifications?.some((cert: string) => cert.toLowerCase().includes('security'))) {
+
+    const certNames = supplier.certifications?.map(c => c.name) ?? [];
+    if (!certNames.some(name => name.toLowerCase().includes('security'))) {
       recommendations.push('Pursue cybersecurity framework compliance (NIST, GDPR)');
     }
 
-    if (!(supplier as any).website || !(supplier as any).onlinePortal) {
+    if (!supplier.website) {
       recommendations.push('Develop customer self-service portals and APIs');
     }
 
     recommendations.push('Invest in cloud infrastructure and scalability capabilities');
-    
+
     return recommendations;
   }
 
   /**
    * Get construction sector recommendations
    */
-  private static getConstructionRecommendations(supplier: Supplier, _benchmarks?: any): string[] {
+  private static getConstructionRecommendations(supplier: Supplier, _benchmarks?: IndustryBenchmarks): string[] {
     const recommendations: string[] = [];
 
     recommendations.push('Ensure safety certifications are up to date (OSHA, local safety standards)');
     recommendations.push('Implement environmental sustainability practices (LEED, green building)');
     recommendations.push('Obtain bonding and insurance certifications');
-    
-    if (!(supplier as any).licenses?.some((license: string) => license.toLowerCase().includes('contractor'))) {
+
+    const certNames = supplier.certifications?.map(c => c.name) ?? [];
+    if (!certNames.some(name => name.toLowerCase().includes('contractor'))) {
       recommendations.push('Verify all contractor licenses and permits are current');
     }
 
     recommendations.push('Implement project management software for better tracking');
     recommendations.push('Develop specialized expertise in sustainable construction methods');
-    
+
     return recommendations;
   }
 
   /**
    * Get manufacturing sector recommendations
    */
-  private static getManufacturingRecommendations(supplier: Supplier, _benchmarks?: any): string[] {
+  private static getManufacturingRecommendations(supplier: Supplier, _benchmarks?: IndustryBenchmarks): string[] {
     const recommendations: string[] = [];
 
     recommendations.push('Consider lean manufacturing principles implementation');
     recommendations.push('Implement quality management systems (ISO 9001)');
     recommendations.push('Pursue environmental management certification (ISO 14001)');
-    
-    if (!(supplier as any).certifications?.some((cert: string) => cert.toLowerCase().includes('iso'))) {
+
+    const certNames = supplier.certifications?.map(c => c.name) ?? [];
+    if (!certNames.some(name => name.toLowerCase().includes('iso'))) {
       recommendations.push('Obtain relevant ISO certifications for credibility');
     }
 
     recommendations.push('Implement predictive maintenance and Industry 4.0 technologies');
     recommendations.push('Develop supply chain transparency and traceability capabilities');
-    
+
     return recommendations;
   }
 
   /**
    * Get professional services recommendations
    */
-  private static getProfessionalServicesRecommendations(supplier: Supplier, _benchmarks?: any): string[] {
+  private static getProfessionalServicesRecommendations(supplier: Supplier, _benchmarks?: IndustryBenchmarks): string[] {
     const recommendations: string[] = [];
 
     recommendations.push('Develop specialized expertise in niche areas');
     recommendations.push('Establish thought leadership through content marketing');
     recommendations.push('Pursue relevant professional certifications and continuing education');
-    
-    if (!(supplier as any).testimonials || (supplier as any).testimonials?.length < 3) {
+
+    // Check tags as a proxy for client testimonials/case studies documented
+    if (!supplier.tags || supplier.tags.length < 3) {
       recommendations.push('Collect and showcase client testimonials and case studies');
     }
 
     recommendations.push('Implement client relationship management (CRM) systems');
     recommendations.push('Develop proprietary methodologies and frameworks');
-    
+
     return recommendations;
   }
 
   /**
    * Get logistics sector recommendations
    */
-  private static getLogisticsRecommendations(supplier: Supplier, _benchmarks?: any): string[] {
+  private static getLogisticsRecommendations(supplier: Supplier, _benchmarks?: IndustryBenchmarks): string[] {
     const recommendations: string[] = [];
 
     recommendations.push('Implement real-time tracking and visibility systems');
     recommendations.push('Obtain transportation and logistics certifications');
     recommendations.push('Develop multi-modal transportation capabilities');
-    
-    if (!(supplier as any).technologyStack?.includes('tracking')) {
+
+    // Check tags for tracking capability indicator
+    const hasTrackingTag = supplier.tags?.some(t => t.toLowerCase().includes('tracking')) ?? false;
+    if (!hasTrackingTag) {
       recommendations.push('Invest in GPS tracking and fleet management systems');
     }
 
     recommendations.push('Implement sustainable logistics practices (carbon footprint reduction)');
     recommendations.push('Develop emergency response and contingency planning capabilities');
-    
+
     return recommendations;
   }
 
   /**
    * Get healthcare sector recommendations
    */
-  private static getHealthcareRecommendations(supplier: Supplier, _benchmarks?: any): string[] {
+  private static getHealthcareRecommendations(supplier: Supplier, _benchmarks?: IndustryBenchmarks): string[] {
     const recommendations: string[] = [];
 
     recommendations.push('Ensure HIPAA compliance and data security measures');
     recommendations.push('Obtain healthcare-specific quality certifications');
     recommendations.push('Implement strict quality assurance and validation processes');
-    
-    if (!(supplier as any).certifications?.some((cert: string) => cert.toLowerCase().includes('fda'))) {
+
+    const certNames = supplier.certifications?.map(c => c.name) ?? [];
+    if (!certNames.some(name => name.toLowerCase().includes('fda'))) {
       recommendations.push('Pursue FDA or relevant regulatory compliance certifications');
     }
 
     recommendations.push('Develop expertise in healthcare regulations and compliance');
     recommendations.push('Implement patient safety and risk management protocols');
-    
+
     return recommendations;
   }
 
@@ -190,7 +200,7 @@ export class RecommendationIndustrySpecialist {
     };
 
     const targetCategories = industryCategories[industry] || [];
-    return categories.some(cat => 
+    return categories.some(cat =>
       targetCategories.some(target => cat.toLowerCase().includes(target))
     );
   }
@@ -207,7 +217,8 @@ export class RecommendationIndustrySpecialist {
 
     // High-priority industry-specific recommendations
     if (this.isInIndustry(categories, 'TECHNOLOGY')) {
-      if (!(supplier as any).certifications?.some((cert: string) => cert.toLowerCase().includes('security'))) {
+      const certNames = supplier.certifications?.map(c => c.name) ?? [];
+      if (!certNames.some(name => name.toLowerCase().includes('security'))) {
         recommendations.push({
           recommendation: 'Obtain cybersecurity certifications for technology services',
           priority: 'high',
@@ -233,7 +244,8 @@ export class RecommendationIndustrySpecialist {
     }
 
     if (this.isInIndustry(categories, 'HEALTHCARE')) {
-      if (!(supplier as any).certifications?.some((cert: string) => cert.toLowerCase().includes('hipaa'))) {
+      const certNames = supplier.certifications?.map(c => c.name) ?? [];
+      if (!certNames.some(name => name.toLowerCase().includes('hipaa'))) {
         recommendations.push({
           recommendation: 'Implement HIPAA compliance and data security measures',
           priority: 'critical',

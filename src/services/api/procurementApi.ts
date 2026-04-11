@@ -2,6 +2,20 @@
 
 const API_BASE = '/api/procurement';
 
+/**
+ * Build a URLSearchParams from a flat object with primitive values.
+ * Undefined values are omitted; all others are coerced to strings.
+ */
+function buildQuery(params: Record<string, string | number | boolean | undefined>): URLSearchParams {
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) {
+      qs.set(key, String(value));
+    }
+  }
+  return qs;
+}
+
 // Helper function to handle API responses
 async function handleResponse<T>(response: Response): Promise<T> {
   const data = await response.json();
@@ -49,8 +63,8 @@ export interface StockPosition {
   leadTimeDays?: number;
   minimumOrderQuantity?: number;
   maximumStockLevel?: number;
-  hazmatInfo?: Record<string, any>;
-  storageConditions?: Record<string, any>;
+  hazmatInfo?: Record<string, unknown>;
+  storageConditions?: Record<string, unknown>;
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -116,7 +130,7 @@ export interface PurchaseOrder {
   currency: string;
   notes?: string;
   internalNotes?: string;
-  items?: any[];
+  items?: Record<string, unknown>[];
   createdBy: string;
   approvedBy?: string;
   approvalDate?: Date;
@@ -136,14 +150,14 @@ export interface RFQ {
   validityPeriod?: number;
   deliveryTerms?: string;
   paymentTerms?: string;
-  evaluationCriteria?: Record<string, any>;
+  evaluationCriteria?: Record<string, unknown>;
   termsConditions?: string;
   contactPerson?: string;
   contactEmail?: string;
   contactPhone?: string;
   attachments?: string[];
-  items?: any[];
-  suppliers?: any[];
+  items?: Record<string, unknown>[];
+  suppliers?: Record<string, unknown>[];
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;
@@ -163,10 +177,40 @@ export interface BOQ {
   createdBy: string;
   approvedBy?: string;
   approvalDate?: Date;
-  items?: any[];
+  items?: Record<string, unknown>[];
   createdAt: Date;
   updatedAt: Date;
 }
+
+/** A single line item within a Bill of Quantities */
+export interface BOQItem {
+  id: string;
+  boqId: string;
+  itemCode?: string;
+  description: string;
+  unit: string;
+  quantity: number;
+  unitRate: number;
+  totalAmount: number;
+  category?: string;
+  notes?: string;
+}
+
+/** A BOQ import exception requiring manual resolution */
+export interface BOQException {
+  id: string;
+  boqId: string;
+  rowNumber?: number;
+  field?: string;
+  value?: string;
+  reason: string;
+  status: 'pending' | 'resolved' | 'ignored';
+  resolvedBy?: string;
+  resolvedAt?: Date;
+}
+
+/** Raw row data from an uploaded BOQ spreadsheet (shape unknown until mapped) */
+export type BOQRawRow = Record<string, string | number | boolean | null | undefined>;
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -208,16 +252,11 @@ export const stockApi = {
     itemCode?: string;
     lowStock?: boolean;
   }): Promise<PaginatedResponse<StockPosition>> {
-    const queryParams = new URLSearchParams({
-      resource: 'stock',
-      projectId,
-      ...params
-    } as any);
-    
+    const queryParams = buildQuery({ resource: 'stock', projectId, ...params });
     const response = await fetch(`${API_BASE}?${queryParams}`, {
       method: 'GET'
     });
-    
+
     return handleResponse<PaginatedResponse<StockPosition>>(response);
   },
 
@@ -277,13 +316,7 @@ export const stockApi = {
     toDate?: string;
     referenceNumber?: string;
   }): Promise<PaginatedResponse<StockMovement>> {
-    const queryParams = new URLSearchParams({
-      resource: 'stock',
-      action: 'movements',
-      projectId,
-      ...params
-    } as any);
-    
+    const queryParams = buildQuery({ resource: 'stock', action: 'movements', projectId, ...params });
     const response = await fetch(`${API_BASE}?${queryParams}`, {
       method: 'GET'
     });
@@ -358,16 +391,11 @@ export const purchaseOrderApi = {
     fromDate?: string;
     toDate?: string;
   }): Promise<PaginatedResponse<PurchaseOrder>> {
-    const queryParams = new URLSearchParams({
-      resource: 'purchase-orders',
-      projectId,
-      ...params
-    } as any);
-    
+    const queryParams = buildQuery({ resource: 'purchase-orders', projectId, ...params });
     const response = await fetch(`${API_BASE}?${queryParams}`, {
       method: 'GET'
     });
-    
+
     return handleResponse<PaginatedResponse<PurchaseOrder>>(response);
   },
 
@@ -426,16 +454,11 @@ export const rfqApi = {
     fromDate?: string;
     toDate?: string;
   }): Promise<PaginatedResponse<RFQ>> {
-    const queryParams = new URLSearchParams({
-      resource: 'rfq',
-      projectId,
-      ...params
-    } as any);
-    
+    const queryParams = buildQuery({ resource: 'rfq', projectId, ...params });
     const response = await fetch(`${API_BASE}?${queryParams}`, {
       method: 'GET'
     });
-    
+
     return handleResponse<PaginatedResponse<RFQ>>(response);
   },
 
@@ -602,27 +625,27 @@ export const boqApi = {
   },
 
   // Get BOQ items
-  async getItems(projectId: string, boqId: string): Promise<any[]> {
+  async getItems(projectId: string, boqId: string): Promise<BOQItem[]> {
     const response = await fetch(`${API_BASE}/boq/${boqId}/items?projectId=${projectId}`, {
       method: 'GET'
     });
 
-    return handleResponse<any[]>(response);
+    return handleResponse<BOQItem[]>(response);
   },
 
   // Get BOQ exceptions
-  async getExceptions(projectId: string, boqId: string): Promise<any[]> {
+  async getExceptions(projectId: string, boqId: string): Promise<BOQException[]> {
     const response = await fetch(`${API_BASE}/boq/${boqId}/exceptions?projectId=${projectId}`, {
       method: 'GET'
     });
 
-    return handleResponse<any[]>(response);
+    return handleResponse<BOQException[]>(response);
   },
 
   // Import BOQ
   async importBOQ(projectId: string, data: {
     name: string;
-    data: any[];
+    data: BOQRawRow[];
     mappings?: Record<string, string>;
   }): Promise<BOQ> {
     const response = await fetch(`${API_BASE}/boq/import?projectId=${projectId}`, {
@@ -637,7 +660,7 @@ export const boqApi = {
   },
 
   // Perform BOQ mapping
-  async performMapping(projectId: string, boqId: string, mappings: Record<string, any>): Promise<void> {
+  async performMapping(projectId: string, boqId: string, mappings: Record<string, string>): Promise<void> {
     const response = await fetch(`${API_BASE}/boq/${boqId}/map?projectId=${projectId}`, {
       method: 'POST',
       headers: {
@@ -653,7 +676,7 @@ export const boqApi = {
   async resolveException(projectId: string, exceptionId: string, resolution: {
     action: 'map' | 'create' | 'ignore';
     mappingId?: string;
-    newItemData?: any;
+    newItemData?: BOQItem;
   }): Promise<void> {
     const response = await fetch(`${API_BASE}/boq/exception/${exceptionId}/resolve?projectId=${projectId}`, {
       method: 'POST',
