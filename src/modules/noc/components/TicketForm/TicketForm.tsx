@@ -19,8 +19,9 @@ import { useEffect, useRef } from 'react';
 import { AlertCircle, Save, X, RotateCcw } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useTicketForm, type TicketFormData } from '../../hooks/useTicketForm';
+import { TicketCategory } from '../../types/ticket';
 import {
-  SourceSection,
+  CategorySection,
   DetailsSection,
   LocationSection,
   EquipmentSection,
@@ -36,7 +37,7 @@ interface TicketFormProps {
   initialValues?: Partial<TicketFormData>;
 }
 
-/** Section visibility configuration per ticket type */
+/** Section visibility configuration per category */
 interface SectionVisibility {
   location: boolean;
   equipment: boolean;
@@ -45,26 +46,24 @@ interface SectionVisibility {
   devops: boolean;
 }
 
-const SECTIONS_BY_TYPE: Record<string, SectionVisibility> = {
-  fault_repair:      { location: true,  equipment: true,  client: true,  fault: true,  devops: false },
-  new_installation:  { location: true,  equipment: true,  client: true,  fault: false, devops: false },
-  modification:      { location: true,  equipment: true,  client: true,  fault: false, devops: false },
-  ont_swap:          { location: true,  equipment: true,  client: false, fault: false, devops: false },
-  incident:          { location: true,  equipment: false, client: true,  fault: false, devops: false },
-  hse_incident:      { location: true,  equipment: false, client: false, fault: false, devops: false },
-  hse_near_miss:     { location: true,  equipment: false, client: false, fault: false, devops: false },
-  serial_mismatch:   { location: true,  equipment: true,  client: false, fault: false, devops: false },
-  olt_investigation: { location: true,  equipment: true,  client: false, fault: false, devops: false },
-  pre_provision:     { location: true,  equipment: true,  client: false, fault: false, devops: false },
-  dev_ops:           { location: false, equipment: false, client: false, fault: false, devops: true  },
-  snag:              { location: true,  equipment: false, client: false, fault: false, devops: false },
-  internal_snag:     { location: true,  equipment: false, client: false, fault: false, devops: false },
-  sales_lead:        { location: false, equipment: false, client: true,  fault: false, devops: false },
-  unspecified:       { location: true,  equipment: false, client: true,  fault: false, devops: false },
+/**
+ * Section visibility keyed by the new T1 category. Fault attribution is
+ * required for Maintenance tickets (per April-11 decision). DevOps owns
+ * its own screenshot-first flow. Sales Lead is contact-focused, HSE is
+ * location-focused, Snag is location + no client.
+ */
+const SECTIONS_BY_CATEGORY: Record<TicketCategory, SectionVisibility> = {
+  [TicketCategory.MAINTENANCE]:  { location: true,  equipment: true,  client: true,  fault: true,  devops: false },
+  [TicketCategory.SNAG]:         { location: true,  equipment: false, client: false, fault: false, devops: false },
+  [TicketCategory.HSE_INCIDENT]: { location: true,  equipment: false, client: false, fault: false, devops: false },
+  [TicketCategory.DEV_OPS]:      { location: false, equipment: false, client: false, fault: false, devops: true  },
+  [TicketCategory.SALES_LEAD]:   { location: false, equipment: false, client: true,  fault: false, devops: false },
+  [TicketCategory.UNSPECIFIED]:  { location: true,  equipment: false, client: true,  fault: false, devops: false },
 };
 
-const DEFAULT_SECTIONS: SectionVisibility = {
-  location: true, equipment: true, client: true, fault: false, devops: false,
+/** Shown before the user picks a category — collapsed layout. */
+const EMPTY_SECTIONS: SectionVisibility = {
+  location: false, equipment: false, client: false, fault: false, devops: false,
 };
 
 export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
@@ -72,8 +71,12 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
   const form = useTicketForm();
   const initializedRef = useRef(false);
 
-  // Determine which sections to show based on the selected ticket type
-  const sections = SECTIONS_BY_TYPE[form.formData.ticket_type] ?? DEFAULT_SECTIONS;
+  // Determine which sections to show based on the selected category.
+  // Before a category is picked (initial state), only CategorySection + the
+  // minimal Details section render, so the form doesn't overwhelm the user
+  // with empty fields for sections they might not need.
+  const category = form.formData.category as TicketCategory | '';
+  const sections = category ? SECTIONS_BY_CATEGORY[category] : EMPTY_SECTIONS;
 
   // Pre-populate form with initial values on mount
   useEffect(() => {
@@ -121,12 +124,13 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
         </div>
       )}
 
-      {/* Section 1: Source & Classification */}
+      {/* Section 1: Category & Discipline */}
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 sm:p-6 border border-[var(--ff-border-light)]">
-        <SourceSection
+        <CategorySection
           formData={form.formData}
           errors={form.errors}
           setField={form.setField}
+          setFields={form.setFields}
           disabled={form.isSubmitting}
         />
       </div>
@@ -144,15 +148,17 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
         </div>
       )}
 
-      {/* Section 2b: Ticket Details */}
-      <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 sm:p-6 border border-[var(--ff-border-light)]">
-        <DetailsSection
-          formData={form.formData}
-          errors={form.errors}
-          setField={form.setField}
-          disabled={form.isSubmitting}
-        />
-      </div>
+      {/* Section 2b: Ticket Details — hidden until category is picked */}
+      {category && (
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 sm:p-6 border border-[var(--ff-border-light)]">
+          <DetailsSection
+            formData={form.formData}
+            errors={form.errors}
+            setField={form.setField}
+            disabled={form.isSubmitting}
+          />
+        </div>
+      )}
 
       {/* Section 3: Location (DR Lookup) — hidden for DevOps tickets */}
       {sections.location && (
@@ -193,16 +199,18 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
         </div>
       )}
 
-      {/* Section 6: Assignment — always shown */}
-      <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 sm:p-6 border border-[var(--ff-border-light)]">
-        <AssignmentSection
-          formData={form.formData}
-          errors={form.errors}
-          setField={form.setField}
-          setFields={form.setFields}
-          disabled={form.isSubmitting}
-        />
-      </div>
+      {/* Section 6: Assignment — hidden until category is picked */}
+      {category && (
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 sm:p-6 border border-[var(--ff-border-light)]">
+          <AssignmentSection
+            formData={form.formData}
+            errors={form.errors}
+            setField={form.setField}
+            setFields={form.setFields}
+            disabled={form.isSubmitting}
+          />
+        </div>
+      )}
 
       {/* Section 7: Fault Attribution — only for fault_repair tickets */}
       {sections.fault && (

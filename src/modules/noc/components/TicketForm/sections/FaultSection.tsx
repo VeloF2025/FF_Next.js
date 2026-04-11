@@ -27,8 +27,13 @@ const FAULT_CAUSE_DESCRIPTIONS: Record<FaultCause, string> = {
 };
 
 export function FaultSection({ formData, errors, setField, disabled }: FaultSectionProps) {
-  // Only show for maintenance tickets
-  if (formData.ticket_type !== TicketType.FAULT_REPAIR) {
+  // Show for legacy fault_repair auto-ingest AND the new Maintenance
+  // category from the April-11 two-axis taxonomy. TicketForm.tsx now guards
+  // the outer render by category, so this internal guard is belt-and-braces
+  // for any future caller that renders FaultSection directly.
+  const isMaintenanceCategory = formData.category === 'maintenance';
+  const isLegacyFaultRepair = formData.ticket_type === TicketType.FAULT_REPAIR;
+  if (!isMaintenanceCategory && !isLegacyFaultRepair) {
     return null;
   }
 

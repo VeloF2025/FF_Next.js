@@ -129,6 +129,35 @@ export const TICKET_TYPE_DEFINITIONS: Record<TicketType, TicketTypeMetadata> = {
     icon: 'HelpOutline',
     requiresDR: false,
   },
+  // ---- Discipline vocabulary (April-11 two-axis taxonomy) ----
+  [TicketType.CIVILS]: {
+    value: TicketType.CIVILS,
+    label: 'Civils',
+    description: 'Civil work — trenching, poles, conduits, chambers',
+    icon: 'Construction',
+    requiresDR: true,
+  },
+  [TicketType.OPTICAL]: {
+    value: TicketType.OPTICAL,
+    label: 'Optical',
+    description: 'Fibre work — splicing, cable, OLT/ONT optical issues',
+    icon: 'LineAxis',
+    requiresDR: true,
+  },
+  [TicketType.ACTIVATIONS]: {
+    value: TicketType.ACTIVATIONS,
+    label: 'Activations',
+    description: 'Service turn-up, provisioning, ONT activation',
+    icon: 'PowerSettingsNew',
+    requiresDR: true,
+  },
+  [TicketType.MAINTENANCE]: {
+    value: TicketType.MAINTENANCE,
+    label: 'Maintenance',
+    description: 'Generic maintenance / catch-all for non-discipline-specific work',
+    icon: 'Build',
+    requiresDR: false,
+  },
 };
 
 /**

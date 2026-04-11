@@ -21,8 +21,18 @@ export type T1Category =
   | 'fibertime'
   | 'unspecified';
 
-/** Map ticket types to their T1 display category */
+/**
+ * Map ticket types to their T1 display category.
+ *
+ * The new April-11 taxonomy stores the real T1 in the `category` column,
+ * but this map is used as a fallback whenever a renderer only has the
+ * legacy `ticket_type`. Discipline values (civils/optical/activations/
+ * maintenance) don't map cleanly to the old T1 axes because their real T1
+ * lives on ticket.category — they fall through to 'unspecified' here and
+ * callers should prefer reading ticket.category when available.
+ */
 export const T1_CATEGORY_MAP: Record<string, T1Category> = {
+  // Legacy vocabulary
   [TicketType.SNAG]: 'snags',
   [TicketType.INTERNAL_SNAG]: 'snags',
   [TicketType.PRE_PROVISION]: 'non_invoiceable',
@@ -38,6 +48,11 @@ export const T1_CATEGORY_MAP: Record<string, T1Category> = {
   [TicketType.ONT_SWAP]: 'fibertime',
   [TicketType.INCIDENT]: 'fibertime',
   [TicketType.UNSPECIFIED]: 'unspecified',
+  // Disciplines (April-11 taxonomy) — real T1 is on ticket.category
+  [TicketType.CIVILS]: 'unspecified',
+  [TicketType.OPTICAL]: 'unspecified',
+  [TicketType.ACTIVATIONS]: 'unspecified',
+  [TicketType.MAINTENANCE]: 'unspecified',
 };
 
 /** Display labels for T1 categories */

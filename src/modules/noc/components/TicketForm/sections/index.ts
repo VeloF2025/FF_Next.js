@@ -3,7 +3,7 @@
  * 🟢 WORKING: Export all form sections
  */
 
-export { SourceSection } from './SourceSection';
+export { CategorySection } from './CategorySection';
 export { DetailsSection } from './DetailsSection';
 export { LocationSection } from './LocationSection';
 export { EquipmentSection } from './EquipmentSection';

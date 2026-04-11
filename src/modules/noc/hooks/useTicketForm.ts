@@ -21,18 +21,34 @@ import { useCreateTicket } from './useTickets';
 import {
   TicketSource,
   TicketType,
+  TicketCategory,
   TicketPriority,
   FaultCause,
   type CreateTicketPayload,
   type DRLookupData,
 } from '../types/ticket';
+import { isValidManualTaxonomy } from '../constants/manualTicketTaxonomy';
 
 // ==================== Types ====================
 
 export interface TicketFormData {
-  // Section 1: Source & Classification
+  // Section 1: Category & Discipline
+  /**
+   * Always 'manual' for form-created tickets. Kept in state so auto-ingest
+   * consumers of this hook (rare) can override, but the UI never exposes it.
+   */
   source: TicketSource;
-  ticket_type: TicketType;
+  /**
+   * T1 — what kind of ticket this is. Drives section visibility and
+   * constrains which ticket_type disciplines are pickable. Empty string
+   * represents "not yet picked" and fails validation.
+   */
+  category: TicketCategory | '';
+  /**
+   * T2 — discipline / team-type. Drives auto-assignment. Empty string until
+   * the user picks one (or the category only has one discipline).
+   */
+  ticket_type: TicketType | '';
   priority: TicketPriority;
 
   // Section 2: Ticket Details
@@ -114,7 +130,8 @@ export interface UseTicketFormResult {
 
 const initialFormData: TicketFormData = {
   source: TicketSource.MANUAL,
-  ticket_type: TicketType.FAULT_REPAIR,
+  category: '',
+  ticket_type: '',
   priority: TicketPriority.NORMAL,
   title: '',
   description: '',
@@ -162,12 +179,24 @@ function validateFormData(data: TicketFormData): TicketFormErrors {
     errors.title = 'Title must be less than 255 characters';
   }
 
-  if (!data.source) {
-    errors.source = 'Source is required';
+  if (!data.category) {
+    errors.category = 'Category is required';
   }
 
   if (!data.ticket_type) {
-    errors.ticket_type = 'Ticket type is required';
+    errors.ticket_type = 'Discipline is required';
+  }
+
+  // Manual submissions must match an allowed (category, discipline) row.
+  // Auto-ingest flows (other callers of createTicket) don't go through this
+  // hook, so this check only gates the manual form.
+  if (
+    data.source === TicketSource.MANUAL &&
+    data.category &&
+    data.ticket_type &&
+    !isValidManualTaxonomy(data.category, data.ticket_type)
+  ) {
+    errors.ticket_type = 'Invalid category / discipline combination';
   }
 
   // Optional field validation
@@ -202,8 +231,12 @@ function validateFormData(data: TicketFormData): TicketFormErrors {
     }
   }
 
-  // Fault cause required for fault_repair tickets only (not DevOps or others)
-  if (data.ticket_type === TicketType.FAULT_REPAIR && !data.fault_cause) {
+  // Fault cause required for Maintenance (new two-axis) and fault_repair
+  // (legacy auto-ingest). Snag/HSE/DevOps/Sales/Unspecified do not need one.
+  const needsFaultCause =
+    data.category === TicketCategory.MAINTENANCE ||
+    data.ticket_type === TicketType.FAULT_REPAIR;
+  if (needsFaultCause && !data.fault_cause) {
     errors.fault_cause = 'Fault cause is required for maintenance tickets';
   }
 
@@ -321,11 +354,13 @@ export function useTicketForm(): UseTicketFormResult {
       return;
     }
 
-    // Build payload
+    // Build payload. category + ticket_type are validated above, so the
+    // cast is safe — an empty string never reaches this line.
     const payload: CreateTicketPayload = {
       source: formData.source,
       title: formData.title.trim(),
-      ticket_type: formData.ticket_type,
+      ticket_type: formData.ticket_type as TicketType,
+      category: formData.category || undefined,
       priority: formData.priority,
     };
 
@@ -442,6 +477,7 @@ export const TICKET_SOURCE_LABELS: Record<TicketSource, string> = {
 };
 
 export const TICKET_TYPE_LABELS: Record<TicketType, string> = {
+  // Legacy (pre-April-11 vocabulary) — kept until PR 4
   [TicketType.FAULT_REPAIR]: 'Maintenance',
   [TicketType.NEW_INSTALLATION]: 'New Installation',
   [TicketType.MODIFICATION]: 'Modification',
@@ -452,10 +488,15 @@ export const TICKET_TYPE_LABELS: Record<TicketType, string> = {
   [TicketType.SERIAL_MISMATCH]: 'Serial Mismatch',
   [TicketType.OLT_INVESTIGATION]: 'OLT Investigation',
   [TicketType.PRE_PROVISION]: 'Pre-Provision',
-  [TicketType.DEV_OPS]: 'DevOps',
   [TicketType.SNAG]: 'Snag',
   [TicketType.INTERNAL_SNAG]: 'Internal Snag',
   [TicketType.SALES_LEAD]: 'Sales Lead',
+  // Disciplines (April-11 taxonomy)
+  [TicketType.CIVILS]: 'Civils',
+  [TicketType.OPTICAL]: 'Optical',
+  [TicketType.ACTIVATIONS]: 'Activations',
+  [TicketType.MAINTENANCE]: 'Maintenance',
+  [TicketType.DEV_OPS]: 'DevOps',
   [TicketType.UNSPECIFIED]: 'Unspecified',
 };
 

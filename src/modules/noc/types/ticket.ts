@@ -58,8 +58,19 @@ export enum TicketSource {
 
 /**
  * Ticket Type - Classification of ticket
+ *
+ * Two vocabularies coexist during the April-11 two-axis taxonomy transition:
+ *
+ *   Legacy values (from migration 274, still used by auto-ingest paths and
+ *   existing rows) — kept here until PR 4 ships the one-shot data migration.
+ *
+ *   Discipline values (added by PR 2 / migration 278) — the new vocabulary
+ *   that manual form creation writes. Each one represents which team type
+ *   resolves the ticket (civils crew, splicing team, activations team, etc.)
+ *   and is the auto-assign key for the team.discipline column.
  */
 export enum TicketType {
+  // --- Legacy values (kept until PR 4) ---
   // Fibertime (QContact)
   FAULT_REPAIR = 'fault_repair',
   NEW_INSTALLATION = 'new_installation',
@@ -73,19 +84,49 @@ export enum TicketType {
   // HSE
   HSE_INCIDENT = 'hse_incident',
   HSE_NEAR_MISS = 'hse_near_miss',
-  // DevOps
-  DEV_OPS = 'dev_ops',
   // Snags (Construction QA)
   SNAG = 'snag',
   INTERNAL_SNAG = 'internal_snag',
   // Sales
   SALES_LEAD = 'sales_lead',
+
+  // --- Discipline values (PR 2 / April-11 taxonomy) ---
+  CIVILS = 'civils',
+  OPTICAL = 'optical',
+  ACTIVATIONS = 'activations',
+  MAINTENANCE = 'maintenance',
+  DEV_OPS = 'dev_ops',
+
   // Catch-all
   UNSPECIFIED = 'unspecified',
 }
 
 /**
+ * Ticket Category — the "what kind of ticket" axis of the two-axis taxonomy.
+ *
+ * Persisted to maintenance_tickets.category (renamed from sub_type in
+ * migration 277). Manual form creation and auto-ingest pipelines both write
+ * one of these values. The other axis, ticket_type, represents which
+ * discipline resolves the ticket.
+ *
+ * Legacy T2 values from TicketSubType stay valid in the DB during the
+ * transition (migration 277 allows them in the category CHECK constraint)
+ * but new code should prefer these category values.
+ */
+export enum TicketCategory {
+  MAINTENANCE = 'maintenance',
+  SNAG = 'snag',
+  HSE_INCIDENT = 'hse_incident',
+  DEV_OPS = 'dev_ops',
+  SALES_LEAD = 'sales_lead',
+  UNSPECIFIED = 'unspecified',
+}
+
+/**
  * Ticket Sub-Type (T2 category within a T1 group)
+ *
+ * @deprecated Legacy vocabulary kept for backwards compat with rows written
+ *             before migration 277. New code should use TicketCategory.
  */
 export enum TicketSubType {
   // Snags
@@ -197,8 +238,10 @@ export interface Ticket {
    * maintenance_tickets already has a legacy `category` column holding
    * QContact's category hierarchy (Connectivity, Maintenance, ...) for
    * QContact-ingested tickets.
+   * New code writes TicketCategory values; legacy TicketSubType values
+   * stay valid until PR 4 (see migration 277).
    */
-  ticket_category: TicketSubType | null;
+  ticket_category: TicketCategory | TicketSubType | null;
   priority: TicketPriority;
   status: TicketStatus;
 
@@ -306,8 +349,10 @@ export interface CreateTicketPayload {
    * T1 category — what kind of ticket. Added by migration 277 as a new
    * column (maintenance_tickets.ticket_category) since the `category`
    * column is already used by QContact's inbound category hierarchy.
+   * New code writes TicketCategory values; legacy TicketSubType values
+   * stay valid during the transition.
    */
-  ticket_category?: TicketSubType | string;
+  ticket_category?: TicketCategory | TicketSubType | string;
 }
 
 /**
