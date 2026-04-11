@@ -19,7 +19,8 @@ import { neon } from '@/lib/db-neon';
 
 // Mock the Neon connection
 vi.mock('@neondatabase/serverless', () => ({
-  neon: vi.fn()
+  neon: vi.fn(),
+  neonConfig: { fetchConnectionCache: false },
 }));
 
 // Mock the logger

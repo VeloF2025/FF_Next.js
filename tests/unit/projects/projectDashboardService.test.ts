@@ -18,6 +18,7 @@ import {
 // Mock the database
 vi.mock('@neondatabase/serverless', () => ({
   neon: vi.fn(() => vi.fn()),
+  neonConfig: { fetchConnectionCache: false },
 }));
 
 describe('ProjectDashboardService', () => {

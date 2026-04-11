@@ -24,6 +24,7 @@ vi.mock('@/lib/logger', () => ({
 
 vi.mock('@neondatabase/serverless', () => ({
   neon: vi.fn(() => vi.fn().mockResolvedValue([])),
+  neonConfig: { fetchConnectionCache: false },
 }));
 
 vi.mock('@/lib/db', () => ({

@@ -14,6 +14,7 @@ const { mockSql } = vi.hoisted(() => {
 // Mock dependencies before any imports
 vi.mock('@neondatabase/serverless', () => ({
   neon: () => mockSql,
+  neonConfig: { fetchConnectionCache: false },
 }));
 
 vi.mock('@/lib/arcjet', () => ({

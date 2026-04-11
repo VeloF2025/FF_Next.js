@@ -11,6 +11,7 @@ vi.mock('@neondatabase/serverless', () => ({
     const sqlFunction = vi.fn().mockResolvedValue([]);
     return sqlFunction;
   }),
+  neonConfig: { fetchConnectionCache: false },
 }));
 
 // Mock AuthContext to prevent "useAuth must be used within an AuthProvider" errors
