@@ -7,6 +7,9 @@ node_modules/
 /dist
 /build
 
+# Generated PDFs (regenerable from scripts/)
+public/snag-workflow-manual.pdf
+
 # Testing
 /coverage
 *.lcov
