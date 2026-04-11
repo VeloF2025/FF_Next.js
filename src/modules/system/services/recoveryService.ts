@@ -688,6 +688,7 @@ async function recordExecution(
  * Update action success/failure stats
  */
 async function updateActionStats(actionId: string, success: boolean): Promise<void> {
+  const db = await getDb();
   if (success) {
     await db.query(
       `
@@ -736,6 +737,7 @@ export async function triggerRecovery(
   serviceId: string,
   incidentId: string
 ): Promise<{ success: boolean; result?: ActionExecutionResult; queued?: boolean; queueId?: string }> {
+  const db = await getDb();
   // Get next action to try
   const attemptedResult = await db.query(
     `SELECT action_id FROM incident_actions WHERE incident_id = $1`,

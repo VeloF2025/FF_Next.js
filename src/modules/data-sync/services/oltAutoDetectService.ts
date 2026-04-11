@@ -9,6 +9,7 @@
  * NLNH Confidence: HIGH
  */
 
+import type { Pool } from 'pg';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { logActivity } from '@/modules/activate/services/activityLogService';

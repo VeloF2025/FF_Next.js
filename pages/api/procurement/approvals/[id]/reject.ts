@@ -105,7 +105,7 @@ export default withAuth(withErrorHandler(async (
         source_id: request.document_id,
         recipient_user_ids: [request.requested_by],
       }).catch((err) => {
-        logger.warn('Failed to send rejection notification', { error: err, documentId: request.document_id }, 'procurement-reject');
+        log.warn('Failed to send rejection notification', { error: err, documentId: request.document_id }, 'procurement-reject');
       });
 
       // Send inbox message to requester

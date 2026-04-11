@@ -334,6 +334,7 @@ export function getChannelForLevel(level: EscalationLevel): EscalationChannel {
  * Send WhatsApp alert
  */
 export async function sendWhatsAppAlert(details: AlertDetails): Promise<AlertResult> {
+  const db = await getDb();
   // Get service details
   let serviceName = details.serviceName;
   let serviceId: string | undefined;

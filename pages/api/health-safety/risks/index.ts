@@ -141,8 +141,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       ${userId}
     )
     RETURNING *
-  const risk = riskRows[0]!;
   `;
+  const risk = riskRows[0]!;
 
   await sql`
     INSERT INTO hs_activity_log (entity_type, entity_id, action, actor_id, details)
