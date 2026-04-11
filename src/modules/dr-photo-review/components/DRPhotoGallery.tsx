@@ -193,9 +193,9 @@ export function DRPhotoGallery({ steps, drNumber, isLoading }: DRPhotoGalleryPro
                                             Score: {steps[selectedIndex]!.evaluation.score}/10
                                         </span>
                                     </div>
-                                    {steps[selectedIndex]!.evaluation.findings.length > 0 && (
+                                    {(steps[selectedIndex]!.evaluation?.findings?.length ?? 0) > 0 && (
                                         <ul className="text-sm text-[var(--ff-text-tertiary)] text-left list-disc list-inside">
-                                            {steps[selectedIndex]!.evaluation.findings.map((f, i) => (
+                                            {steps[selectedIndex]!.evaluation!.findings!.map((f, i) => (
                                                 <li key={i}>{f}</li>
                                             ))}
                                         </ul>

@@ -120,7 +120,7 @@ async function handlePut(projectId: string, req: NextApiRequest, res: NextApiRes
   nextAuditDue.setDate(nextAuditDue.getDate() + frequencyDays);
 
   // Upsert config
-  const [config] = await sql`
+  const configRows = await sql`
     INSERT INTO hs_project_config (
       project_id, template_id, audit_frequency, custom_frequency_days,
       next_audit_due, min_score_threshold, requires_daily_briefing,
@@ -148,6 +148,7 @@ async function handlePut(projectId: string, req: NextApiRequest, res: NextApiRes
       updated_at = NOW()
     RETURNING *
   `;
+  const config = configRows[0]!;
 
   // Log activity
   await sql`

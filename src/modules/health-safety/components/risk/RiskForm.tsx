@@ -215,13 +215,13 @@ export function RiskForm({ projectId, onSuccess, onCancel }: RiskFormProps) {
               <div>
                 <label className={labelClass}>Likelihood (1-5) *</label>
                 <select value={form.likelihood} onChange={(e) => set('likelihood', parseInt(e.target.value))} className={inputClass}>
-                  {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n} - {LIKELIHOOD_SCALE[n].label}</option>)}
+                  {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n} - {LIKELIHOOD_SCALE[n]!.label}</option>)}
                 </select>
               </div>
               <div>
                 <label className={labelClass}>Severity (1-5) *</label>
                 <select value={form.severity} onChange={(e) => set('severity', parseInt(e.target.value))} className={inputClass}>
-                  {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n} - {SEVERITY_SCALE[n].label}</option>)}
+                  {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n} - {SEVERITY_SCALE[n]!.label}</option>)}
                 </select>
               </div>
               <div>
@@ -252,14 +252,14 @@ export function RiskForm({ projectId, onSuccess, onCancel }: RiskFormProps) {
                 <label className={labelClass}>Likelihood</label>
                 <select value={form.residual_likelihood} onChange={(e) => set('residual_likelihood', parseInt(e.target.value))} className={inputClass}>
                   <option value="0">— Same —</option>
-                  {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n} - {LIKELIHOOD_SCALE[n].label}</option>)}
+                  {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n} - {LIKELIHOOD_SCALE[n]!.label}</option>)}
                 </select>
               </div>
               <div>
                 <label className={labelClass}>Severity</label>
                 <select value={form.residual_severity} onChange={(e) => set('residual_severity', parseInt(e.target.value))} className={inputClass}>
                   <option value="0">— Same —</option>
-                  {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n} - {SEVERITY_SCALE[n].label}</option>)}
+                  {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n} - {SEVERITY_SCALE[n]!.label}</option>)}
                 </select>
               </div>
               <div>

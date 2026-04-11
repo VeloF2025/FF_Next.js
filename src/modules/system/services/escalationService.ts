@@ -368,7 +368,7 @@ export async function sendWhatsAppAlert(details: AlertDetails): Promise<AlertRes
     );
 
     if (incidentResult.rows.length > 0) {
-      const incident = incidentResult.rows[0];
+      const incident = incidentResult.rows[0]!;
       details.issueType = incident.issue_type;
       details.symptoms = incident.symptoms;
       serviceId = serviceId || incident.service_id;

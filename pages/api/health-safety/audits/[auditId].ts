@@ -180,10 +180,11 @@ async function handlePut(auditId: string, req: NextApiRequest, res: NextApiRespo
   }
 
   const newStatus = complete ? 'completed' : status || existing.status;
-  const [failCount] = await sql`
+  const failCountRows = await sql`
     SELECT COUNT(*)::int as count FROM hs_audit_responses
     WHERE audit_id = ${auditId} AND response = 'fail'
   `;
+  const failCount = failCountRows[0]!;
   const hasFailures = failCount.count > 0;
   const finalStatus = newStatus === 'completed' && hasFailures ? 'requires_action' : newStatus;
 

@@ -313,8 +313,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
             stepsApproved: Object.entries(stepCounts)
               .filter(([_, count]) => count > 0)
               .map(([step]) => `step_${step.padStart(2, '0')}`),
-            approved: Object.keys(stepCounts).filter(k => stepCounts[parseInt(k)] > 0).length,
-            rejected: 10 - Object.keys(stepCounts).filter(k => stepCounts[parseInt(k)] > 0).length,
+            approved: Object.keys(stepCounts).filter(k => (stepCounts[parseInt(k)] ?? 0) > 0).length,
+            rejected: 10 - Object.keys(stepCounts).filter(k => (stepCounts[parseInt(k)] ?? 0) > 0).length,
           },
           userId || 'system'
         );

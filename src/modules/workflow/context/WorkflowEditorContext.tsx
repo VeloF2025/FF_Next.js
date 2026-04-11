@@ -497,8 +497,8 @@ export function WorkflowEditorProvider({ children }: WorkflowEditorProviderProps
 
       // Convert phases to nodes
       for (let i = 0; i < phases.length; i++) {
-        const phase = phases[i];
-        
+        const phase = phases[i]!;
+
         const phaseNode: EditorNode = {
           id: phase.id,
           type: 'phase',
@@ -514,8 +514,8 @@ export function WorkflowEditorProvider({ children }: WorkflowEditorProviderProps
         let stepXOffset = 500;
         
         for (let j = 0; j < steps.length; j++) {
-          const step = steps[j];
-          
+          const step = steps[j]!;
+
           const stepNode: EditorNode = {
             id: step.id,
             type: 'step',
@@ -530,8 +530,8 @@ export function WorkflowEditorProvider({ children }: WorkflowEditorProviderProps
           const tasks = await workflowManagementService.getTasks(step.id);
           
           for (let k = 0; k < tasks.length; k++) {
-            const task = tasks[k];
-            
+            const task = tasks[k]!;
+
             const taskNode: EditorNode = {
               id: task.id,
               type: 'task',

@@ -84,7 +84,7 @@ async function handlePut(id: string, req: NextApiRequest, res: NextApiResponse) 
   }
 
   // Update template
-  const [template] = await sql`
+  const templateRows = await sql`
     UPDATE hs_checklist_templates
     SET
       name = COALESCE(${name}, name),
@@ -95,6 +95,7 @@ async function handlePut(id: string, req: NextApiRequest, res: NextApiResponse) 
     WHERE id = ${id}
     RETURNING *
   `;
+  const template = templateRows[0]!;
 
   // Update items if provided
   if (items && Array.isArray(items)) {

@@ -187,7 +187,7 @@ async function handlePut(contractorId: string, req: NextApiRequest, res: NextApi
   }
 
   // Upsert compliance record
-  const [compliance] = await sql`
+  const complianceRows = await sql`
     INSERT INTO hs_contractor_compliance (contractor_id, training_records, notes, next_audit_due)
     VALUES (
       ${contractorId},
@@ -204,6 +204,7 @@ async function handlePut(contractorId: string, req: NextApiRequest, res: NextApi
     RETURNING id, contractor_id, overall_score, rag_status, training_records,
               last_audit_date, next_audit_due, notes, created_at, updated_at
   `;
+  const compliance = complianceRows[0]!;
 
   // Recalculate score
   await recalculateComplianceScore(contractorId);

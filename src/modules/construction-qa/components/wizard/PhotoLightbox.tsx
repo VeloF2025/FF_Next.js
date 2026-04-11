@@ -43,9 +43,6 @@ export function PhotoLightbox({ photos, initialIndex, onClose }: Props) {
   const [imgFailed, setImgFailed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const photo = photos[currentIndex];
-  if (!photo) return null;
-
   const resetView = () => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
@@ -102,6 +99,9 @@ export function PhotoLightbox({ photos, initialIndex, onClose }: Props) {
       });
     }
   }, []);
+
+  const photo = photos[currentIndex];
+  if (!photo) return null;
 
   // Pan with drag
   const handleMouseDown = (e: React.MouseEvent) => {

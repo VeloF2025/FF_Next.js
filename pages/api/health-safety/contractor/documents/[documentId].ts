@@ -96,7 +96,7 @@ async function handlePut(documentId: string, req: NextApiRequest, res: NextApiRe
   const verifier = status === 'valid' && verified_by ? verified_by : existing.verified_by;
 
   // Update document
-  const [document] = await sql`
+  const documentRows = await sql`
     UPDATE hs_contractor_documents
     SET
       document_number = COALESCE(${document_number}, document_number),
@@ -112,6 +112,7 @@ async function handlePut(documentId: string, req: NextApiRequest, res: NextApiRe
     WHERE id = ${documentId}
     RETURNING *
   `;
+  const document = documentRows[0]!;
 
   // Log activity
   const action = status === 'valid' ? 'verified' : status === 'rejected' ? 'rejected' : 'updated';

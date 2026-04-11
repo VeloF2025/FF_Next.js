@@ -654,7 +654,7 @@ async function recordExecution(
     `SELECT COUNT(*) as count FROM incident_actions WHERE incident_id = $1`,
     [incidentId]
   );
-  const attemptNumber = (parseInt(countResult.rows[0].count, 10) || 0) + 1;
+  const attemptNumber = (parseInt(countResult.rows[0]!.count, 10) || 0) + 1;
 
   await db.query(
     `

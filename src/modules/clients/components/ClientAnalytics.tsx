@@ -58,15 +58,15 @@ export function ClientAnalytics() {
             <div className="p-3 bg-blue-500/20 rounded-lg">
               <Building2 className="w-6 h-6 text-blue-400" />
             </div>
-            {summary.monthlyGrowth > 0 ? (
+            {(summary.monthlyGrowth ?? 0) > 0 ? (
               <span className="flex items-center text-sm font-medium text-green-400">
                 <ArrowUpRight className="w-4 h-4 mr-1" />
-                {formatPercentage(summary.monthlyGrowth)}
+                {formatPercentage((summary.monthlyGrowth ?? 0))}
               </span>
             ) : (
               <span className="flex items-center text-sm font-medium text-red-400">
                 <ArrowDownRight className="w-4 h-4 mr-1" />
-                {formatPercentage(Math.abs(summary.monthlyGrowth))}
+                {formatPercentage(Math.abs((summary.monthlyGrowth ?? 0)))}
               </span>
             )}
           </div>

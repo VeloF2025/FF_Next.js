@@ -39,15 +39,15 @@ function parseWebVTT(transcript: string, keywords: string[]): TranscriptCue[] {
 
   let i = 0;
   while (i < lines.length) {
-    const line = lines[i].trim();
+    const line = lines[i]!.trim();
 
     // Check if this looks like a timestamp line
     if (line.includes('-->')) {
-      const timestamp = line.split('-->')[0].trim();
+      const timestamp = line.split('-->')[0]!.trim();
 
       // Next line should have the speaker tag
       if (i + 1 < lines.length) {
-        const nextLine = lines[i + 1].trim();
+        const nextLine = lines[i + 1]!.trim();
         const speakerMatch = nextLine.match(/<v\s+([^>]+)>/);
         let speaker = '';
         let text = '';
