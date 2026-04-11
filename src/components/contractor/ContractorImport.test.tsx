@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { describe, it, expect, beforeEach, vi, type MockedObject } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ContractorImport } from './ContractorImport';
@@ -11,24 +12,24 @@ import { contractorImportService } from '@/services/contractor/import/contractor
 import { contractorService } from '@/services/contractorService';
 
 // Mock the services
-jest.mock('@/services/contractor/import/contractorImportService');
-jest.mock('@/services/contractorService');
+vi.mock('@/services/contractor/import/contractorImportService');
+vi.mock('@/services/contractorService');
 
-const mockContractorImportService = contractorImportService as jest.Mocked<typeof contractorImportService>;
-const mockContractorService = contractorService as jest.Mocked<typeof contractorService>;
+const mockContractorImportService = contractorImportService as MockedObject<typeof contractorImportService>;
+const mockContractorService = contractorService as MockedObject<typeof contractorService>;
 
 // Mock URL.createObjectURL and revokeObjectURL
-global.URL.createObjectURL = jest.fn(() => 'mock-url');
-global.URL.revokeObjectURL = jest.fn();
+global.URL.createObjectURL = vi.fn(() => 'mock-url');
+global.URL.revokeObjectURL = vi.fn();
 
 // Mock document.createElement for download links
 const mockLink = {
   href: '',
   download: '',
-  click: jest.fn(),
+  click: vi.fn(),
   style: { display: '' }
 };
-jest.spyOn(document, 'createElement').mockImplementation((tagName) => {
+vi.spyOn(document, 'createElement').mockImplementation((tagName) => {
   if (tagName === 'a') {
     return mockLink as any;
   }
@@ -36,10 +37,10 @@ jest.spyOn(document, 'createElement').mockImplementation((tagName) => {
 });
 
 describe('ContractorImport Component', () => {
-  const mockOnComplete = jest.fn();
+  const mockOnComplete = vi.fn();
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     
     // Setup default mock implementations
     mockContractorImportService.validateFile.mockReturnValue({ valid: true });
@@ -114,7 +115,7 @@ describe('ContractorImport Component', () => {
       const fileInput = screen.getByLabelText(/choose contractor file/i);
 
       // Mock window.alert
-      const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
       await userEvent.upload(fileInput, file);
 
@@ -327,7 +328,7 @@ describe('ContractorImport Component', () => {
 
       render(<ContractorImport />);
 
-      const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
       
       const exportButton = screen.getByText('Export All Contractors');
       fireEvent.click(exportButton);

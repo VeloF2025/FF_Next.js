@@ -1,5 +1,6 @@
 // Unit tests for WorkflowEditorContext
 import React from 'react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { WorkflowEditorProvider, useWorkflowEditor } from '../../context/WorkflowEditorContext';
 import { workflowManagementService } from '../../services/WorkflowManagementService';
@@ -14,18 +15,18 @@ import {
 } from '../__mocks__/workflow.mocks';
 
 // Mock services
-jest.mock('../../services/WorkflowManagementService', () => ({
+vi.mock('../../services/WorkflowManagementService', () => ({
   workflowManagementService: {
-    getTemplateById: jest.fn(),
-    getPhases: jest.fn(),
-    getSteps: jest.fn(),
-    getTasks: jest.fn(),
-    validateTemplate: jest.fn()
+    getTemplateById: vi.fn(),
+    getPhases: vi.fn(),
+    getSteps: vi.fn(),
+    getTasks: vi.fn(),
+    validateTemplate: vi.fn()
   }
 }));
 
 // Mock timers for auto-save
-jest.useFakeTimers();
+vi.useFakeTimers();
 
 describe('WorkflowEditorContext', () => {
   // Helper function to create wrapper with context
@@ -34,21 +35,21 @@ describe('WorkflowEditorContext', () => {
   );
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    jest.clearAllTimers();
+    vi.clearAllMocks();
+    vi.clearAllTimers();
     
     // Setup default service mock responses
-    (workflowManagementService.getTemplateById as jest.Mock).mockResolvedValue(mockWorkflowTemplates[0]);
-    (workflowManagementService.getPhases as jest.Mock).mockResolvedValue(mockWorkflowPhases);
-    (workflowManagementService.getSteps as jest.Mock).mockResolvedValue(mockWorkflowSteps);
-    (workflowManagementService.getTasks as jest.Mock).mockResolvedValue(mockWorkflowTasks);
-    (workflowManagementService.validateTemplate as jest.Mock).mockResolvedValue(mockWorkflowValidationResult);
+    (workflowManagementService.getTemplateById as any).mockResolvedValue(mockWorkflowTemplates[0]);
+    (workflowManagementService.getPhases as any).mockResolvedValue(mockWorkflowPhases);
+    (workflowManagementService.getSteps as any).mockResolvedValue(mockWorkflowSteps);
+    (workflowManagementService.getTasks as any).mockResolvedValue(mockWorkflowTasks);
+    (workflowManagementService.validateTemplate as any).mockResolvedValue(mockWorkflowValidationResult);
   });
 
   afterEach(() => {
-    jest.runOnlyPendingTimers();
-    jest.useRealTimers();
-    jest.useFakeTimers();
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+    vi.useFakeTimers();
   });
 
   describe('Initial State', () => {
@@ -100,7 +101,7 @@ describe('WorkflowEditorContext', () => {
     });
 
     it('should handle template loading error', async () => {
-      (workflowManagementService.getTemplateById as jest.Mock).mockRejectedValue(
+      (workflowManagementService.getTemplateById as any).mockRejectedValue(
         new Error('Template not found')
       );
 
@@ -119,7 +120,7 @@ describe('WorkflowEditorContext', () => {
     });
 
     it('should handle template not found scenario', async () => {
-      (workflowManagementService.getTemplateById as jest.Mock).mockResolvedValue(null);
+      (workflowManagementService.getTemplateById as any).mockResolvedValue(null);
 
       const { result } = renderHook(() => useWorkflowEditor(), {
         wrapper: createWrapper
@@ -271,7 +272,7 @@ describe('WorkflowEditorContext', () => {
 
       // Fast-forward time to trigger auto-save
       act(() => {
-        jest.advanceTimersByTime(30000);
+        vi.advanceTimersByTime(30000);
       });
 
       await waitFor(() => {
@@ -302,7 +303,7 @@ describe('WorkflowEditorContext', () => {
 
       // Fast-forward time
       act(() => {
-        jest.advanceTimersByTime(30000);
+        vi.advanceTimersByTime(30000);
       });
 
       // Should still have unsaved changes
@@ -670,7 +671,7 @@ describe('WorkflowEditorContext', () => {
     });
 
     it('should handle validation error', async () => {
-      (workflowManagementService.validateTemplate as jest.Mock).mockRejectedValue(
+      (workflowManagementService.validateTemplate as any).mockRejectedValue(
         new Error('Validation service error')
       );
 
@@ -763,7 +764,7 @@ describe('WorkflowEditorContext', () => {
   describe('Hook Error Handling', () => {
     it('should throw error when used outside provider', () => {
       const originalError = console.error;
-      console.error = jest.fn();
+      console.error = vi.fn();
 
       expect(() => {
         renderHook(() => useWorkflowEditor());

@@ -208,7 +208,7 @@ describe('WorkflowPortalContext', () => {
     });
 
     it('should handle template statistics loading error', async () => {
-      (workflowManagementService.getTemplates as jest.Mock).mockRejectedValue(
+      (workflowManagementService.getTemplates as any).mockRejectedValue(
         new Error('Failed to load templates')
       );
 
@@ -324,7 +324,7 @@ describe('WorkflowPortalContext', () => {
     });
 
     it('should handle templates loading error', async () => {
-      (workflowManagementService.getTemplates as jest.Mock).mockRejectedValue(
+      (workflowManagementService.getTemplates as any).mockRejectedValue(
         new Error('Network error')
       );
 
@@ -387,7 +387,7 @@ describe('WorkflowPortalContext', () => {
 
       // Mock console.error to throw an error
       const originalError = console.error;
-      console.error = jest.fn().mockImplementation(() => {
+      console.error = vi.fn().mockImplementation(() => {
         throw new Error('Creation failed');
       });
 
@@ -446,7 +446,7 @@ describe('WorkflowPortalContext', () => {
     it('should throw error when used outside provider', () => {
       // Mock console.error to suppress test output
       const originalError = console.error;
-      console.error = jest.fn();
+      console.error = vi.fn();
 
       expect(() => {
         renderHook(() => useWorkflowPortal());
@@ -469,7 +469,7 @@ describe('WorkflowPortalContext', () => {
     });
 
     it('should handle service rejection gracefully', async () => {
-      (workflowManagementService.getTemplates as jest.Mock).mockRejectedValue(
+      (workflowManagementService.getTemplates as any).mockRejectedValue(
         new Error('Service unavailable')
       );
 
