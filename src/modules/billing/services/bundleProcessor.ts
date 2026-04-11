@@ -63,7 +63,11 @@ export function classifyFile(file: BundleFile): ClassifiedFile {
   if (lower.endsWith('.pdf') && /per\s+pon/i.test(name)) {
     return { ...file, kind: 'zone-pon-uptake-pdf', projectHint: extractHint(name, 'uptake') };
   }
-  if (lower.endsWith('.pdf') && /installation\s+uptake\s+per\s+zone/i.test(name)) {
+  // Tolerate the WE251005/WE251012 typo where "zone" is missing the trailing
+  // 'e' (e.g. "Lawley_installation uptake per zon_251005.pdf"). The trailing
+  // [\s_] anchors the match to a real word boundary so we don't accept
+  // "zoning" or other prefixes by accident.
+  if (lower.endsWith('.pdf') && /installation\s+uptake\s+per\s+zone?[\s_]/i.test(name)) {
     return { ...file, kind: 'zone-uptake-pdf', projectHint: extractHint(name, 'uptake') };
   }
   if (lower.endsWith('.pdf')) {
