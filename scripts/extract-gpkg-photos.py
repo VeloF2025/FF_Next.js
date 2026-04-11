@@ -244,17 +244,85 @@ def sync_pon_zone(cur, conn, ff_project_id, rows, columns, label_col):
     return updated
 
 
-# ── MinIO helpers ─────────────────────────────────────────────────────────────
+# ── QFieldCloud API + MinIO helpers ──────────────────────────────────────────
+
+QFIELD_API_URL = os.environ.get('QFIELD_API_URL', 'https://qfield.fibreflow.app/api/v1/')
+QFIELD_USERNAME = os.environ.get('QFIELD_USERNAME')
+QFIELD_PASSWORD = os.environ.get('QFIELD_PASSWORD')
+
+_qfc_session = None
+
+def _get_qfc_session():
+    """Get authenticated QFieldCloud API session (cached)."""
+    global _qfc_session
+    if _qfc_session is not None:
+        return _qfc_session
+    if not QFIELD_USERNAME or not QFIELD_PASSWORD:
+        print("    WARN: QFIELD_USERNAME / QFIELD_PASSWORD env vars not set, skipping QFC API")
+        return None
+    import requests as _requests
+    _qfc_session = _requests.Session()
+    resp = _qfc_session.post(f'{QFIELD_API_URL}auth/login/', json={
+        'username': QFIELD_USERNAME,
+        'password': QFIELD_PASSWORD,
+    })
+    if resp.status_code != 200:
+        print(f"    WARN: QFieldCloud auth failed: {resp.status_code}")
+        _qfc_session = None
+        return None
+    token = resp.json().get('token')
+    _qfc_session.headers['Authorization'] = f'Token {token}'
+    return _qfc_session
+
+
+def qfc_list_dcim_files(qf_project_id):
+    """List DCIM photos via QFieldCloud REST API.
+
+    Returns a dict mapping filename → API download path.
+    The API sees all files including those stored in deltas/packages
+    that are invisible to direct MinIO mc ls.
+    """
+    session = _get_qfc_session()
+    if not session:
+        return {}
+    try:
+        resp = session.get(f'{QFIELD_API_URL}files/{qf_project_id}/')
+        if resp.status_code != 200:
+            print(f"    WARN: QFieldCloud files list failed: {resp.status_code}")
+            return {}
+        files = resp.json()
+        dcim_files = {}
+        for f in files:
+            name = f.get('name', '')
+            if not name.startswith('DCIM/'):
+                continue
+            lower = name.lower()
+            if not any(lower.endswith(ext) for ext in ('.jpg', '.jpeg', '.png', '.heic')):
+                continue
+            filename = name[len('DCIM/'):]
+            # Build a storage key compatible with existing DB records
+            dcim_files[filename] = f"projects/{qf_project_id}/files/{name}"
+        return dcim_files
+    except Exception as e:
+        print(f"    WARN: qfc_list_dcim_files error: {e}")
+        return {}
+
 
 def minio_list_dcim_directory(qf_project_id):
     """Batch-list the entire DCIM directory for a QFieldCloud project.
 
-    Returns a dict mapping filename → versioned storage key (or None if unversioned).
-    An empty dict means the DCIM directory does not exist or is inaccessible.
+    First tries the QFieldCloud REST API (sees all files including deltas).
+    Falls back to direct MinIO mc ls if the API is unavailable.
 
-    By listing once per project we avoid one docker exec call per photo (which
-    would be ~1 s per call for a project with 500 photos).
+    Returns a dict mapping filename → storage key.
     """
+    # Try API first — it sees delta-merged files that mc ls misses
+    api_files = qfc_list_dcim_files(qf_project_id)
+    if api_files:
+        return api_files
+
+    # Fallback: direct MinIO listing (only sees flat files/ directory)
+    print(f"    Falling back to direct MinIO ls...")
     dcim_prefix = f"local/{MINIO_BUCKET}/projects/{qf_project_id}/files/DCIM/"
     try:
         result = subprocess.run(
@@ -265,30 +333,22 @@ def minio_list_dcim_directory(qf_project_id):
             print(f"    WARN: mc ls DCIM failed for {qf_project_id}: {result.stderr.strip()[:120]}")
             return {}
 
-        # mc ls --recursive output lines look like:
-        #   [2026-03-09 12:09:23 UTC] 209KiB STANDARD civil-audit_20260309140815592.13.27 PM (1).jpeg/v20260309120923-5349f4c6
-        # Filenames can contain spaces and parentheses, so we can't split on whitespace.
-        # Instead, find "STANDARD " marker and take everything after it as the path.
-        dcim_files = {}  # filename.jpg -> versioned storage key
+        dcim_files = {}
         for line in result.stdout.strip().split("\n"):
             line = line.strip()
             if not line:
                 continue
-            # Extract path after "STANDARD " marker
             std_idx = line.find(" STANDARD ")
             if std_idx == -1:
                 continue
             rel_path = line[std_idx + len(" STANDARD "):].rstrip("/")
-            # Normalize: strip leading DCIM/ if mc includes it
             if rel_path.startswith("DCIM/"):
                 rel_path = rel_path[len("DCIM/"):]
-            # Expected format: filename.jpg/v{version}  — find version segment from end
             ver_match = re.search(r'/v(\d{14}-[a-fA-F0-9]+)$', rel_path)
             if not ver_match:
                 continue
             version_seg = "v" + ver_match.group(1)
-            filename = rel_path[:ver_match.start()]  # everything before /v...
-            # Store: keep latest version (sorted lexicographically — timestamps are ISO-like)
+            filename = rel_path[:ver_match.start()]
             existing_ver = dcim_files.get(filename)
             if existing_ver is None or version_seg > existing_ver.rsplit("/", 1)[-1]:
                 dcim_files[filename] = (
@@ -467,6 +527,22 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
             (qf_id,),
         )
         existing_keys = set(r["photo_key"] for r in cur.fetchall())
+        # Build filename-based index for dedup across versioned/unversioned keys
+        # e.g. "projects/.../DCIM/file.jpg/v2026..." → "file.jpg"
+        existing_filenames = set()
+        for k in existing_keys:
+            # Strip version suffix if present: .../filename.jpg/v20260408... → filename.jpg
+            parts = k.split("/")
+            for i, part in enumerate(parts):
+                if re.match(r'v\d{14}-', part):
+                    # Previous part is the filename
+                    if i > 0:
+                        existing_filenames.add(parts[i - 1])
+                    break
+            else:
+                # No version suffix — last part is the filename
+                if parts:
+                    existing_filenames.add(parts[-1])
 
         # Also get existing photo storage_keys in construction_qa_photos
         cur.execute(
@@ -524,10 +600,13 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                     continue
 
                 # Skip if already in DB (either validations or photos table)
+                base_fn = dcim_path.replace("DCIM/", "").lstrip("/")
                 if full_key in existing_keys:
                     continue
-                # Check by filename match in existing photos
-                base_fn = dcim_path.replace("DCIM/", "")
+                # Filename-based dedup: catches versioned vs unversioned key mismatches
+                if base_fn in existing_filenames:
+                    continue
+                # Check by filename match in existing construction_qa_photos
                 if any(base_fn in k for k in existing_photo_keys):
                     continue
 
@@ -548,6 +627,7 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                     step, step_label,
                 ))
                 existing_keys.add(full_key)
+                existing_filenames.add(base_fn)
                 photos_upserted += 1
 
             # Extra photo columns (no step)
@@ -568,9 +648,11 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                     photos_skipped_missing += 1
                     continue
 
+                base_fn = dcim_path.replace("DCIM/", "").lstrip("/")
                 if full_key in existing_keys:
                     continue
-                base_fn = dcim_path.replace("DCIM/", "")
+                if base_fn in existing_filenames:
+                    continue
                 if any(base_fn in k for k in existing_photo_keys):
                     continue
 
@@ -590,6 +672,7 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                     None, None,
                 ))
                 existing_keys.add(full_key)
+                existing_filenames.add(base_fn)
                 photos_upserted += 1
 
         if photos_skipped_missing:
