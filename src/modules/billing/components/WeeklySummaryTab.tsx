@@ -7,14 +7,15 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart3, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { FtWeeklyBilling } from '@/modules/data-sync/types';
 
-type Project = 'All' | 'Lawley' | 'Mohadin' | 'Mamelodi';
-
-const PROJECTS: Project[] = ['All', 'Lawley', 'Mohadin', 'Mamelodi'];
+interface BillableProjectOption {
+  id: string;
+  name: string;
+}
 
 interface BillingStatusMetrics {
   currentlyExcluded: number;    // DISTINCT dr_number from latest week's ft_billing_deductions
@@ -30,11 +31,31 @@ const STATUS_BADGE: Record<FtWeeklyBilling['reconciliation_status'], string> = {
 
 // 🟢 WORKING: Weekly summary with metric cards + filterable table
 export function WeeklySummaryTab() {
-  const [projectFilter, setProjectFilter] = useState<Project>('All');
+  const [projectFilter, setProjectFilter] = useState<string>('All');
   const [rows, setRows] = useState<FtWeeklyBilling[]>([]);
   const [metrics, setMetrics] = useState<BillingStatusMetrics | null>(null);
+  const [projectOptions, setProjectOptions] = useState<BillableProjectOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Lazy-load billable project list for the filter dropdown.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/billing/projects');
+        if (!res.ok) return;
+        const data: Record<string, unknown> = await res.json();
+        const payload = (data.data ?? data) as { projects?: BillableProjectOption[] };
+        if (!cancelled && Array.isArray(payload.projects)) {
+          setProjectOptions(payload.projects);
+        }
+      } catch {
+        /* silent — dropdown just won't list extras */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // ── Fetch data ────────────────────────────────────────────────────────────
 
@@ -98,6 +119,36 @@ export function WeeklySummaryTab() {
       month: 'short',
       year: 'numeric',
     });
+
+  // Group rows by week_ending so we can render per-week totals underneath
+  // the per-project rows for that week.
+  const weekGroups = useMemo(() => {
+    const map = new Map<string, FtWeeklyBilling[]>();
+    for (const r of rows) {
+      const arr = map.get(r.week_ending) ?? [];
+      arr.push(r);
+      map.set(r.week_ending, arr);
+    }
+    // Sort weeks descending so newest appears first
+    return [...map.entries()].sort((a, b) =>
+      a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0,
+    );
+  }, [rows]);
+
+  const sumField = (items: FtWeeklyBilling[], key: keyof FtWeeklyBilling): number =>
+    items.reduce((acc, r) => acc + (Number(r[key] ?? 0) || 0), 0);
+
+  const sumInvoice = (items: FtWeeklyBilling[]): number | null => {
+    let total = 0;
+    let anyValue = false;
+    for (const r of items) {
+      if (r.invoice_total != null) {
+        total += Number(r.invoice_total);
+        anyValue = true;
+      }
+    }
+    return anyValue ? total : null;
+  };
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -164,12 +215,13 @@ export function WeeklySummaryTab() {
         <label className="text-sm text-[var(--ff-text-secondary)]">Project:</label>
         <select
           value={projectFilter}
-          onChange={(e) => setProjectFilter(e.target.value as Project)}
+          onChange={(e) => setProjectFilter(e.target.value)}
           className="px-3 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-md text-sm text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-transparent"
         >
-          {PROJECTS.map((p) => (
-            <option key={p} value={p}>
-              {p}
+          <option value="All">All</option>
+          {projectOptions.map((p) => (
+            <option key={p.id} value={p.name}>
+              {p.name}
             </option>
           ))}
         </select>
@@ -199,61 +251,133 @@ export function WeeklySummaryTab() {
             <table className="w-full text-sm">
               <thead className="bg-[var(--ff-bg-tertiary)] border-b border-[var(--ff-border-light)]">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">
-                    Week Ending
+                  <th className="px-3 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">Week Ending</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">Project</th>
+                  <th className="px-3 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">FT ONTs</th>
+                  <th className="px-3 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">Claimable</th>
+                  <th
+                    className="px-3 py-3 text-right text-xs font-medium text-orange-300 uppercase tracking-wide"
+                    title="Note 1: Lower than -26dB threshold"
+                  >
+                    N1 -26dB
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">
-                    Project
+                  <th
+                    className="px-3 py-3 text-right text-xs font-medium text-blue-300 uppercase tracking-wide"
+                    title="Note 2: No entry/submission on Field App"
+                  >
+                    N2 NoApp
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">
-                    FT ONTs
+                  <th
+                    className="px-3 py-3 text-right text-xs font-medium text-red-300 uppercase tracking-wide"
+                    title="Note 4: Inaccurate — Drop# & ONT SN does not match to OLT"
+                  >
+                    N4 SN≠Drop
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">
-                    FT Claimable
+                  <th
+                    className="px-3 py-3 text-right text-xs font-medium text-purple-300 uppercase tracking-wide"
+                    title="Note 5: Fiber Break / Device Not Active"
+                  >
+                    N5 Offline
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">
-                    FT Paid
+                  <th
+                    className="px-3 py-3 text-right text-xs font-medium text-cyan-300 uppercase tracking-wide"
+                    title="Pre-provisioned ONTs (20% withheld)"
+                  >
+                    Pre-Prov
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">
-                    Invoice Total
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">
-                    Status
-                  </th>
+                  <th className="px-3 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">FT Paid</th>
+                  <th className="px-3 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">Invoice Total</th>
+                  <th className="px-3 py-3 text-center text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--ff-border-light)]">
-                {rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="hover:bg-[var(--ff-bg-tertiary)] transition-colors"
-                  >
-                    <td className="px-4 py-3 text-[var(--ff-text-primary)] font-medium">
-                      {formatDate(row.week_ending)}
-                    </td>
-                    <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
-                      {row.project}
-                    </td>
-                    <td className="px-4 py-3 text-right text-[var(--ff-text-primary)] tabular-nums">
-                      {row.ft_total_onts.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-right text-[var(--ff-text-primary)] tabular-nums">
-                      {row.ft_claimable.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-right text-[var(--ff-text-secondary)] tabular-nums">
-                      {row.ft_total_claimable.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-right text-[var(--ff-text-primary)] tabular-nums">
-                      {formatCurrency(row.invoice_total)}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${STATUS_BADGE[row.reconciliation_status]}`}
+                {weekGroups.map(([weekEnding, weekRows]) => (
+                  <React.Fragment key={weekEnding}>
+                    {weekRows.map((row) => (
+                      <tr
+                        key={row.id}
+                        className="hover:bg-[var(--ff-bg-tertiary)] transition-colors"
                       >
-                        {row.reconciliation_status}
-                      </span>
-                    </td>
-                  </tr>
+                        <td className="px-3 py-3 text-[var(--ff-text-primary)] font-medium whitespace-nowrap">
+                          {formatDate(row.week_ending)}
+                        </td>
+                        <td className="px-3 py-3 text-[var(--ff-text-secondary)] whitespace-nowrap">
+                          {row.project}
+                        </td>
+                        <td className="px-3 py-3 text-right text-[var(--ff-text-primary)] tabular-nums">
+                          {row.ft_total_onts.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-3 text-right text-[var(--ff-text-primary)] tabular-nums">
+                          {row.ft_claimable.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-3 text-right text-orange-300 tabular-nums">
+                          {row.ft_note1_count.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-3 text-right text-blue-300 tabular-nums">
+                          {row.ft_note2_count.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-3 text-right text-red-300 tabular-nums">
+                          {row.ft_note4_count.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-3 text-right text-purple-300 tabular-nums">
+                          {row.ft_note5_count.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-3 text-right text-cyan-300 tabular-nums">
+                          {row.ft_pre_provisions_count.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-3 text-right text-[var(--ff-text-secondary)] tabular-nums">
+                          {row.ft_total_claimable.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-3 text-right text-[var(--ff-text-primary)] tabular-nums">
+                          {formatCurrency(row.invoice_total)}
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${STATUS_BADGE[row.reconciliation_status]}`}
+                          >
+                            {row.reconciliation_status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                    {/* Per-week totals row */}
+                    <tr className="bg-[var(--ff-bg-tertiary)] font-semibold border-t-2 border-[var(--ff-accent)]/30">
+                      <td className="px-3 py-2.5 text-[var(--ff-text-primary)] whitespace-nowrap">
+                        {formatDate(weekEnding)}
+                      </td>
+                      <td className="px-3 py-2.5 text-[var(--ff-text-secondary)] italic">
+                        Week total ({weekRows.length})
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-[var(--ff-text-primary)] tabular-nums">
+                        {sumField(weekRows, 'ft_total_onts').toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-[var(--ff-text-primary)] tabular-nums">
+                        {sumField(weekRows, 'ft_claimable').toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-orange-300 tabular-nums">
+                        {sumField(weekRows, 'ft_note1_count').toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-blue-300 tabular-nums">
+                        {sumField(weekRows, 'ft_note2_count').toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-red-300 tabular-nums">
+                        {sumField(weekRows, 'ft_note4_count').toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-purple-300 tabular-nums">
+                        {sumField(weekRows, 'ft_note5_count').toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-cyan-300 tabular-nums">
+                        {sumField(weekRows, 'ft_pre_provisions_count').toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-[var(--ff-text-secondary)] tabular-nums">
+                        {sumField(weekRows, 'ft_total_claimable').toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-[var(--ff-text-primary)] tabular-nums">
+                        {formatCurrency(sumInvoice(weekRows))}
+                      </td>
+                      <td className="px-3 py-2.5" />
+                    </tr>
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
