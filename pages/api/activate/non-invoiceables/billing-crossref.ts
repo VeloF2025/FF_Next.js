@@ -47,21 +47,11 @@ interface CrossRefRow {
 // ─── Response types ───────────────────────────────────────────────────────────
 
 interface CrossRefItem {
-  dr_number: string; deduction_note: string;
-  category: NonInvoiceableCategory | null;
-  serial_number: string | null; team: string | null;
+  dr_number: string; note_type: string;
+  category: NonInvoiceableCategory;
   action_status: 'actioned' | 'missed' | 'actioned_late';
   ticket_uid: string | null; ticket_status: string | null; ticket_created_at: string | null;
-  oes_status: string | null; oes_signal_dbm: number | null; has_dr_record: boolean;
-}
-
-interface CrossRefResponse {
-  week: {
-    id: string; week_ending: string; project: string; ft_total_claimable: number | null;
-    note_counts: { note1: number; note2: number; note3: number; note4: number; note5: number };
-  };
-  items: CrossRefItem[];
-  summary: { total_deductions: number; actioned: number; missed: number; actioned_late: number; coverage_rate: number };
+  oes_status: string | null; signal_dbm: number | null; has_dr: boolean;
 }
 
 // ─── SQL ──────────────────────────────────────────────────────────────────────
@@ -121,27 +111,55 @@ async function loadWeekByDateProject(weekEnding: string, project: string): Promi
   return r.rows[0] ?? null;
 }
 
+async function loadLatestWeek(project?: string): Promise<BillingWeekRow | null> {
+  const q = project
+    ? `SELECT ${WEEK_COLS} FROM ft_weekly_billing WHERE project ILIKE $1 ORDER BY week_ending DESC LIMIT 1`
+    : `SELECT ${WEEK_COLS} FROM ft_weekly_billing ORDER BY week_ending DESC LIMIT 1`;
+  const r = await pool.query<BillingWeekRow>(q, project ? [project] : []);
+  return r.rows[0] ?? null;
+}
+
+async function loadAdjacentWeekIds(week: BillingWeekRow): Promise<{ prev: string | null; next: string | null }> {
+  const [prev, next] = await Promise.all([
+    pool.query<{ id: string }>(
+      `SELECT id FROM ft_weekly_billing WHERE project = $1 AND week_ending < $2 ORDER BY week_ending DESC LIMIT 1`,
+      [week.project, week.week_ending],
+    ),
+    pool.query<{ id: string }>(
+      `SELECT id FROM ft_weekly_billing WHERE project = $1 AND week_ending > $2 ORDER BY week_ending ASC LIMIT 1`,
+      [week.project, week.week_ending],
+    ),
+  ]);
+  return { prev: prev.rows[0]?.id ?? null, next: next.rows[0]?.id ?? null };
+}
+
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
 
   const { billing_week_id, week_ending, project } = req.query;
+  const projectStr = typeof project === 'string' && project.trim() ? project.trim() : undefined;
   let week: BillingWeekRow | null = null;
 
   if (typeof billing_week_id === 'string' && billing_week_id.trim()) {
     week = await loadWeekById(billing_week_id.trim());
-  } else if (
-    typeof week_ending === 'string' && week_ending.trim() &&
-    typeof project === 'string' && project.trim()
-  ) {
-    week = await loadWeekByDateProject(week_ending.trim(), project.trim());
+  } else if (typeof week_ending === 'string' && week_ending.trim() && projectStr) {
+    week = await loadWeekByDateProject(week_ending.trim(), projectStr);
   } else {
-    return apiResponse.badRequest(res, 'Provide either billing_week_id or both week_ending and project');
+    // Fallback: latest week (optionally filtered by project)
+    week = await loadLatestWeek(projectStr);
   }
 
   if (!week) {
-    return apiResponse.notFound(res, 'Billing week', String(billing_week_id ?? `${week_ending}/${project}`));
+    // No billing weeks exist — return empty-state response rather than 404
+    return apiResponse.success(res, {
+      week: null,
+      rows: [],
+      summary: { actioned: 0, missed: 0, actioned_late: 0, coverage_rate: 0 },
+      prev_week_id: null,
+      next_week_id: null,
+    });
   }
 
   try {
@@ -160,19 +178,19 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
 
       return {
         dr_number: row.dr_number,
-        deduction_note: row.deduction_note,
-        category: NOTE_TO_CATEGORY[row.deduction_note] ?? null,
-        serial_number: row.serial_number,
-        team: row.team,
+        note_type: row.deduction_note,
+        category: NOTE_TO_CATEGORY[row.deduction_note] ?? 'serial_mismatch',
         action_status,
         ticket_uid,
         ticket_status,
         ticket_created_at: ticket_created_at ? String(ticket_created_at) : null,
         oes_status: row.oes_status,
-        oes_signal_dbm: row.oes_signal_dbm,
-        has_dr_record: row.has_dr_record,
+        signal_dbm: row.oes_signal_dbm,
+        has_dr: row.has_dr_record,
       };
     });
+
+    const { prev, next } = await loadAdjacentWeekIds(week);
 
     const total_deductions = items.length;
     const actioned      = items.filter((i) => i.action_status === 'actioned').length;
@@ -182,22 +200,16 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
       ? Math.round(((actioned + actioned_late) / total_deductions) * 10000) / 100
       : 0;
 
-    const payload: CrossRefResponse = {
+    const payload = {
       week: {
         id: week.id,
         week_ending: String(week.week_ending),
         project: week.project,
-        ft_total_claimable: week.ft_total_claimable,
-        note_counts: {
-          note1: Number(week.ft_note1_count ?? 0),
-          note2: Number(week.ft_note2_count ?? 0),
-          note3: Number(week.ft_note3_count ?? 0),
-          note4: Number(week.ft_note4_count ?? 0),
-          note5: Number(week.ft_note5_count ?? 0),
-        },
       },
-      items,
+      rows: items,
       summary: { total_deductions, actioned, missed, actioned_late, coverage_rate },
+      prev_week_id: prev,
+      next_week_id: next,
     };
 
     logger.info('billing crossref loaded', {

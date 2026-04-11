@@ -15,7 +15,7 @@ import {
 type ActionFilter = 'all' | 'actioned' | 'missed' | 'actioned_late';
 
 interface BillingWeek {
-  id: number;
+  id: string;
   week_ending: string;
   project: string;
 }
@@ -41,8 +41,8 @@ interface CrossRefResponse {
   week: BillingWeek | null;
   summary: CrossRefSummary;
   rows: CrossRefRow[];
-  prev_week_id: number | null;
-  next_week_id: number | null;
+  prev_week_id: string | null;
+  next_week_id: string | null;
 }
 
 interface BillingCrossRefTabProps {
@@ -115,10 +115,10 @@ export function BillingCrossRefTab({ project }: BillingCrossRefTabProps) {
   const [data, setData] = useState<CrossRefResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [weekId, setWeekId] = useState<number | null>(null);
+  const [weekId, setWeekId] = useState<string | null>(null);
   const [filter, setFilter] = useState<ActionFilter>('all');
 
-  const fetchData = useCallback(async (id: number | null, controller: AbortController) => {
+  const fetchData = useCallback(async (id: string | null, controller: AbortController) => {
     setLoading(true);
     setError(null);
     try {
@@ -134,8 +134,8 @@ export function BillingCrossRefTab({ project }: BillingCrossRefTabProps) {
         const body = await res.json().catch(() => ({})) as { message?: string };
         throw new Error(body.message ?? `HTTP ${res.status}`);
       }
-      const json = await res.json() as CrossRefResponse;
-      setData(json);
+      const envelope = await res.json() as { success: boolean; data: CrossRefResponse };
+      setData(envelope.data);
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
       const msg = err instanceof Error ? err.message : 'Failed to load billing cross-reference';
