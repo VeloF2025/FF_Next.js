@@ -3,7 +3,7 @@
  * Provides consistent card configurations across different dashboard types
  */
 
-import { 
+import {
   FolderOpen, Users, CheckCircle, AlertTriangle, TrendingUp, Calendar,
   MapPin, Wifi, Activity, DollarSign, FileText,
   BarChart3, PieChart, Target, Clock, Truck, ShoppingCart,
@@ -11,8 +11,21 @@ import {
 } from 'lucide-react';
 import { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';
 
+/** Numeric dashboard stats keyed by metric name */
+export type DashboardStats = Record<string, number>;
+
+/** Trend direction data keyed by metric name */
+export type DashboardTrends = Record<string, EnhancedStatCardProps['trend']>;
+
+/** Value formatter functions used across dashboard cards */
+export interface DashboardFormatters {
+  formatNumber: (value: number | string) => string;
+  formatCurrency: (value: number | string) => string;
+  formatPercentage: (value: number | string) => string;
+}
+
 // 🟢 WORKING: Main Dashboard card configurations
-export const getMainDashboardCards = (stats: any, trends: any, formatters: any): EnhancedStatCardProps[] => [
+export const getMainDashboardCards = (stats: DashboardStats, trends: DashboardTrends, formatters: DashboardFormatters): EnhancedStatCardProps[] => [
   {
     title: 'Active Projects',
     value: stats.activeProjects,
@@ -88,7 +101,7 @@ export const getMainDashboardCards = (stats: any, trends: any, formatters: any):
 ];
 
 // 🟢 WORKING: Contractors Dashboard card configurations
-export const getContractorsDashboardCards = (stats: any, trends: any, formatters: any): EnhancedStatCardProps[] => [
+export const getContractorsDashboardCards = (stats: DashboardStats, trends: DashboardTrends, formatters: DashboardFormatters): EnhancedStatCardProps[] => [
   {
     title: 'Active Contractors',
     value: stats.contractorsActive,
@@ -163,8 +176,8 @@ export const getContractorsDashboardCards = (stats: any, trends: any, formatters
   },
 ];
 
-// 🟢 WORKING: Procurement Dashboard card configurations  
-export const getProcurementDashboardCards = (stats: any, trends: any, formatters: any): EnhancedStatCardProps[] => [
+// 🟢 WORKING: Procurement Dashboard card configurations
+export const getProcurementDashboardCards = (stats: DashboardStats, trends: DashboardTrends, formatters: DashboardFormatters): EnhancedStatCardProps[] => [
   {
     title: 'Active BOQs',
     value: stats.boqsActive,
@@ -240,7 +253,7 @@ export const getProcurementDashboardCards = (stats: any, trends: any, formatters
 ];
 
 // 🟢 WORKING: Analytics Dashboard card configurations (enhanced)
-export const getAnalyticsDashboardCards = (stats: any, trends: any, formatters: any): EnhancedStatCardProps[] => [
+export const getAnalyticsDashboardCards = (stats: DashboardStats, trends: DashboardTrends, formatters: DashboardFormatters): EnhancedStatCardProps[] => [
   {
     title: 'Total Poles',
     value: stats.polesInstalled,
@@ -304,7 +317,7 @@ export const getAnalyticsDashboardCards = (stats: any, trends: any, formatters: 
 ];
 
 // 🟢 WORKING: Reports Dashboard card configurations
-export const getReportsDashboardCards = (stats: any, trends: any, formatters: any): EnhancedStatCardProps[] => [
+export const getReportsDashboardCards = (stats: DashboardStats, trends: DashboardTrends, formatters: DashboardFormatters): EnhancedStatCardProps[] => [
   {
     title: 'Reports Generated',
     value: stats.reportsGenerated,
@@ -380,7 +393,7 @@ export const getReportsDashboardCards = (stats: any, trends: any, formatters: an
 ];
 
 // 🟢 WORKING: KPI Dashboard card configurations
-export const getKPIDashboardCards = (stats: any, trends: any, formatters: any): EnhancedStatCardProps[] => [
+export const getKPIDashboardCards = (stats: DashboardStats, trends: DashboardTrends, formatters: DashboardFormatters): EnhancedStatCardProps[] => [
   {
     title: 'Performance Score',
     value: stats.performanceScore,
@@ -458,9 +471,9 @@ export const getKPIDashboardCards = (stats: any, trends: any, formatters: any): 
 // 🟢 WORKING: Dashboard type mapping
 export const getDashboardCards = (
   dashboardType: 'main' | 'contractors' | 'procurement' | 'analytics' | 'reports' | 'kpi',
-  stats: any,
-  trends: any,
-  formatters: any
+  stats: DashboardStats,
+  trends: DashboardTrends,
+  formatters: DashboardFormatters
 ): EnhancedStatCardProps[] => {
   switch (dashboardType) {
     case 'main':

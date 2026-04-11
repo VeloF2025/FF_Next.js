@@ -9,9 +9,39 @@ import { formatDisplayMonthYear } from '@/utils/dateFormat';
 
 // PARTIAL: Drizzle ORM stubs — staffPerformance table not yet migrated to drizzle
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const neonDb: any = null;
+const neonDb: unknown = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const staffPerformance: any = {};
+const staffPerformance: unknown = {};
+
+/** Shape of a single team member returned from the analytics API */
+interface TeamMember {
+  name: string;
+  performance: {
+    productivity: number;
+  };
+}
+
+/** Shape of a team record returned from the analytics API */
+interface TeamRecord {
+  size: number;
+  periodStart?: string;
+  performance: {
+    avgProductivity: number;
+    avgQuality: number;
+  };
+  members?: TeamMember[];
+}
+
+/** Shape of a staff performance DB record (Drizzle stub, not yet migrated) */
+interface StaffPerformanceRecord {
+  staffName: string;
+  periodStart: string;
+  productivityScore: string;
+  qualityScore: string;
+  attendanceRate: string;
+  role?: string;
+  productivity?: string;
+}
 
 /**
  * Team performance analytics service
@@ -31,22 +61,22 @@ export class TeamAnalyticsService {
     try {
       // Get team analytics from API
       const teamData = await analyticsApi.getTeamAnalytics();
-      const teams = teamData.teams || [];
-      
+      const teams: TeamRecord[] = teamData.teams || [];
+
       // Aggregate data from all teams
       let totalStaff = 0;
       let totalProductivity = 0;
       let totalQuality = 0;
       const topPerformers: string[] = [];
       const improvementNeeded: string[] = [];
-      
-      teams.forEach((team: any) => {
+
+      teams.forEach((team) => {
         totalStaff += team.size;
         totalProductivity += team.performance.avgProductivity * team.size;
         totalQuality += team.performance.avgQuality * team.size;
-        
+
         // Find top performers from team members
-        team.members?.forEach((member: any) => {
+        team.members?.forEach((member) => {
           if (member.performance.productivity >= 90) {
             topPerformers.push(member.name);
           }
@@ -72,10 +102,10 @@ export class TeamAnalyticsService {
   /**
    * Filter records to get latest period data
    */
-  private static filterLatestPeriodRecords(records: any[]): any[] {
+  private static filterLatestPeriodRecords(records: StaffPerformanceRecord[]): StaffPerformanceRecord[] {
     const now = new Date();
     const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
+
     return records.filter(record => {
       const recordDate = new Date(record.periodStart);
       return recordDate >= currentMonth;
@@ -85,7 +115,7 @@ export class TeamAnalyticsService {
   /**
    * Calculate team metrics from current period records
    */
-  private static calculateTeamMetrics(records: any[]): {
+  private static calculateTeamMetrics(records: StaffPerformanceRecord[]): {
     totalStaff: number;
     averageProductivity: number;
     averageQuality: number;
@@ -94,12 +124,12 @@ export class TeamAnalyticsService {
     improvementNeeded: string[];
   } {
     const totalStaff = records.length;
-    
-    const averageProductivity = records.reduce((sum, r) => 
+
+    const averageProductivity = records.reduce((sum, r) =>
       sum + parseFloat(r.productivityScore), 0) / totalStaff;
-    const averageQuality = records.reduce((sum, r) => 
+    const averageQuality = records.reduce((sum, r) =>
       sum + parseFloat(r.qualityScore), 0) / totalStaff;
-    const averageAttendance = records.reduce((sum, r) => 
+    const averageAttendance = records.reduce((sum, r) =>
       sum + parseFloat(r.attendanceRate), 0) / totalStaff;
 
     // Identify top performers and improvement needed
@@ -146,7 +176,7 @@ export class TeamAnalyticsService {
     belowAverage: number; // <70%
   }> {
     try {
-      const records = await neonDb
+      const records = await (neonDb as { select: () => { from: (t: unknown) => Promise<StaffPerformanceRecord[]> } })
         .select()
         .from(staffPerformance);
 
@@ -182,35 +212,32 @@ export class TeamAnalyticsService {
     staffCount: number;
   }[]> {
     try {
-      const records = await neonDb
+      const records = await (neonDb as { select: () => { from: (t: unknown) => Promise<StaffPerformanceRecord[]> } })
         .select()
         .from(staffPerformance);
 
       const latestRecords = this.filterLatestPeriodRecords(records);
 
       // Group by role (department)
-      const departmentGroups = latestRecords.reduce((groups, record) => {
-        const dept = record.role || 'Unknown';
+      const departmentGroups = latestRecords.reduce<Record<string, StaffPerformanceRecord[]>>((groups, record) => {
+        const dept = record.role ?? 'Unknown';
         if (!groups[dept]) {
           groups[dept] = [];
         }
         groups[dept].push(record);
         return groups;
-      }, {} as Record<string, any[]>);
+      }, {});
 
-      return Object.entries(departmentGroups).map(([department, records]) => {
-        const typedRecords = records as any[];
-        return {
-          department,
-          averageProductivity: Math.round(
-            (typedRecords.reduce((sum: number, r: any) => sum + parseFloat(r.productivity || '0.75') * 100, 0) / typedRecords.length) * 10
-          ) / 10,
-          averageQuality: Math.round(
-            (typedRecords.reduce((sum: number, r: any) => sum + parseFloat(r.qualityScore || '80'), 0) / typedRecords.length) * 10
-          ) / 10,
-          staffCount: typedRecords.length
-        };
-      });
+      return Object.entries(departmentGroups).map(([department, deptRecords]) => ({
+        department,
+        averageProductivity: Math.round(
+          (deptRecords.reduce((sum, r) => sum + parseFloat(r.productivity ?? '0.75') * 100, 0) / deptRecords.length) * 10
+        ) / 10,
+        averageQuality: Math.round(
+          (deptRecords.reduce((sum, r) => sum + parseFloat(r.qualityScore ?? '80'), 0) / deptRecords.length) * 10
+        ) / 10,
+        staffCount: deptRecords.length
+      }));
     } catch (error) {
       log.error('Failed to get department comparison:', { data: error }, 'teamAnalyticsService');
       return [];
@@ -227,20 +254,26 @@ export class TeamAnalyticsService {
     averageAttendance: number;
   }[]> {
     try {
-      const records = await neonDb
+      const records = await (neonDb as {
+        select: () => {
+          from: (t: unknown) => {
+            orderBy: (col: unknown) => Promise<StaffPerformanceRecord[]>
+          }
+        }
+      })
         .select()
         .from(staffPerformance)
-        .orderBy(staffPerformance.periodStart);
+        .orderBy((staffPerformance as { periodStart: unknown }).periodStart);
 
       // Group by month
-      const monthlyData = records.reduce((groups: Record<string, any[]>, record: any) => {
+      const monthlyData = records.reduce<Record<string, StaffPerformanceRecord[]>>((groups, record) => {
         const monthKey = new Date(record.periodStart).toISOString().substring(0, 7); // YYYY-MM
         if (!groups[monthKey]) {
           groups[monthKey] = [];
         }
         groups[monthKey].push(record);
         return groups;
-      }, {} as Record<string, any[]>);
+      }, {});
 
       // Calculate monthly averages
       const trends = Object.entries(monthlyData)
@@ -249,13 +282,13 @@ export class TeamAnalyticsService {
         .map(([month, recs]) => ({
           month: formatDisplayMonthYear(month + '-01'),
           averageProductivity: Math.round(
-            ((recs as any[]).reduce((sum: number, r: any) => sum + parseFloat(r.productivityScore), 0) / (recs as any[]).length) * 10
+            (recs.reduce((sum, r) => sum + parseFloat(r.productivityScore), 0) / recs.length) * 10
           ) / 10,
           averageQuality: Math.round(
-            ((recs as any[]).reduce((sum: number, r: any) => sum + parseFloat(r.qualityScore), 0) / (recs as any[]).length) * 10
+            (recs.reduce((sum, r) => sum + parseFloat(r.qualityScore), 0) / recs.length) * 10
           ) / 10,
           averageAttendance: Math.round(
-            ((recs as any[]).reduce((sum: number, r: any) => sum + parseFloat(r.attendanceRate), 0) / (recs as any[]).length) * 10
+            (recs.reduce((sum, r) => sum + parseFloat(r.attendanceRate), 0) / recs.length) * 10
           ) / 10
         }));
 
