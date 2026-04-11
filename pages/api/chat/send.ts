@@ -142,7 +142,7 @@ async function getSchema(tables: string[]): Promise<string> {
       .map(([table, cols]) => `${table}:\n${cols.join('\n')}`)
       .join('\n\n');
   } catch (err: any) {
-    log.error('chat-send', { error: err instanceof Error ? err.message : String(err) });
+    logger.error('chat-send', { error: err instanceof Error ? err.message : String(err) });
     return `Schema lookup error: ${err.message}`;
   }
 }

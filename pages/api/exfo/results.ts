@@ -31,7 +31,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return handleList(req, res);
   } catch (err) {
-    log.error('exfo-results', { error: error instanceof Error ? error.message : String(error) });
+    log.error('exfo-results', { error: err instanceof Error ? err.message : String(err) });
     return apiResponse.internalError(res, err);
   }
 }

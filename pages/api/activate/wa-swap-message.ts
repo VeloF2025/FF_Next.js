@@ -58,7 +58,7 @@ async function handler(
     // --- Auth ---
     if (!BRIDGE_SECRET) {
       logger.error('WA_BRIDGE_SECRET env var not set');
-      return apiResponse.internalError(res, error);
+      return apiResponse.internalError(res, new Error('WA_BRIDGE_SECRET env var not set'));
     }
     if (body.secret !== BRIDGE_SECRET) {
       logger.warn('Invalid or missing bridge secret');
@@ -242,7 +242,7 @@ async function handler(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error(`Failed to process swap message: ${errorMessage}`);
-    return apiResponse.internalError(res, error);
+    return apiResponse.internalError(res, new Error('WA_BRIDGE_SECRET env var not set'));
   }
 }
 
