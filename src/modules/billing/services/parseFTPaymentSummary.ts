@@ -36,6 +36,17 @@ export interface ParsedPaymentSummary {
   note5Count: number;
   preProvisionsCount: number;
   totalClaimableForPayment: number;
+  /** Site label from PDF header (e.g. "Lawley", "Tembisa"). Null if not found. */
+  site: string | null;
+  /** Contractor label from PDF header (e.g. "Velocity Fibre"). Null if not found. */
+  contractor: string | null;
+  /** Area manager name from PDF header. Null if not found. */
+  areaManager: string | null;
+  /**
+   * "Lower than Link Budget threshold" count — a distinct metric from Note 1
+   * (which is "Lower than -26 dB threshold"). 0 if not present.
+   */
+  lowerThanLinkBudgetCount: number;
   parseWarnings: string[];
 }
 
@@ -96,8 +107,11 @@ function parseNaturalDate(raw: string): string | null {
  */
 function extractProjectFromFilename(filename: string): string {
   const base = filename.replace(/\.pdf$/i, '').trim();
-  // Everything before the first "WE" (case-insensitive, word boundary)
-  const match = base.match(/^(.*?)\s+WE\b/i);
+  // Match "<project> WE<digits>" — the "WE" week marker is followed by the
+  // week-ending date as digits (e.g. WE260405) OR a space then a date.
+  // \b after WE doesn't fire when the next char is also a word char, so we
+  // explicitly require that the next non-WE char is a digit or whitespace.
+  const match = base.match(/^(.*?)\s+WE(?:\d|\s)/i);
   if (match && match[1] && match[1].trim().length > 0) {
     return match[1].trim();
   }
@@ -126,6 +140,30 @@ function extractNumberAfterLabel(line: string): number | null {
   const match = line.match(/-?\d+/);
   if (!match) return null;
   return parseInt(match[0], 10);
+}
+
+/**
+ * Find the first line starting with `label` (case-insensitive) and return
+ * everything after the label, trimmed. Handles the layout:
+ *   "Site                  Lawley"
+ *   "Area Manager          Johannes von Stade"
+ *
+ * Returns null when the label is not found or the value is empty.
+ */
+function findLabelValue(lines: string[], label: string): string | null {
+  const labelLower = label.toLowerCase();
+  for (const line of lines) {
+    const lower = line.toLowerCase();
+    // Label must start the line (allow leading whitespace) and be followed
+    // by at least one space before the value.
+    const idx = lower.indexOf(labelLower);
+    if (idx === -1) continue;
+    // Require the label to be at/near the start (allow ≤4 leading spaces)
+    if (idx > 4) continue;
+    const after = line.slice(idx + labelLower.length).trim();
+    if (after.length > 0) return after;
+  }
+  return null;
 }
 
 /**
@@ -341,6 +379,24 @@ export async function parseFTPaymentPdf(
     'totalClaimableForPayment',
   );
 
+  // ── Header metadata (Site / Contractor / Area Manager) ──────────────────
+  const site = findLabelValue(lines, 'Site');
+  const contractor = findLabelValue(lines, 'Contractor');
+  const areaManager = findLabelValue(lines, 'Area Manager');
+  if (!site) warnings.push('Could not find "Site" header in PDF');
+
+  // ── "Lower than Link Budget threshold" (distinct from Note 1) ───────────
+  // The line looks like: "Lower than Link Budget threshold                 15    6%"
+  // We want the first integer on that line.
+  let lowerThanLinkBudgetCount = 0;
+  for (const line of lines) {
+    if (/lower\s+than\s+link\s+budget\s+threshold/i.test(line)) {
+      const match = line.match(/-?\d+/);
+      if (match) lowerThanLinkBudgetCount = Math.abs(parseInt(match[0]!, 10));
+      break;
+    }
+  }
+
   // ── Validation ───────────────────────────────────────────────────────────
   const derivedTotal = claimable - (note1Count + note2Count + note4Count + note5Count) - preProvisionsCount;
   const tolerance = 5; // Allow small rounding/counting differences
@@ -367,6 +423,10 @@ export async function parseFTPaymentPdf(
     note5Count,
     preProvisionsCount,
     totalClaimableForPayment,
+    site,
+    contractor,
+    areaManager,
+    lowerThanLinkBudgetCount,
     parseWarnings: warnings,
   };
 

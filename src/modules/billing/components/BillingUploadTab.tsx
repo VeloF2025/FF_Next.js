@@ -1,13 +1,21 @@
 /**
  * BillingUploadTab
- * Drag-drop upload for FiberTime payment summary PDF + optional notes XLSX.
- * Calls POST /api/billing/upload-weekly (action=preview then action=import),
- * then POST /api/billing/reconcile to run reconciliation.
+ *
+ * Bulk weekly billing upload: drop a whole WE<date>/ folder (or multi-select
+ * files) and the system auto-routes them per project. Handles:
+ *   - FT payment summary PDF (<Project> WE<code>.pdf)
+ *   - Deduction notes XLSX (<Project> WE<code> notes.xlsx) [optional]
+ *   - Zone uptake PDF (<Project>_installation uptake per zone_<code>.pdf)
+ *   - Zone+PON uptake PDF (<Project>_installation uptake per zone per pon_<code>.pdf)
+ *
+ * Flow: drop → Preview → review per-project cards → Import. All four projects
+ * in one pass; each row shows detected project, file count, week ending,
+ * ONT count, reconcile status, and invoice total.
  */
 
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   Upload,
   FileText,
@@ -15,28 +23,29 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  AlertTriangle,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { log } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
 
-interface BillableProject {
-  id: string;
-  name: string;
-}
+// ─── Types mirroring upload-weekly-bundle.ts response shape ────────────────
 
 interface ResolvedProject {
   matched: boolean;
-  project: BillableProject | null;
-  candidates: BillableProject[];
-  rawInput: string;
+  projectId: string | null;
+  projectName: string | null;
+  candidates: { id: string; name: string }[];
 }
 
-interface BillingPreview {
+interface BundleSummary {
   weekEnding: string;
-  project: string;
+  site: string | null;
+  contractor: string | null;
+  areaManager: string | null;
   totalOnts: number;
   claimable: number;
   note1Count: number;
@@ -44,177 +53,148 @@ interface BillingPreview {
   note3Count: number;
   note4Count: number;
   note5Count: number;
-  preProviCount: number;
-  totalClaimable: number;
+  preProvisionsCount: number;
+  totalClaimableForPayment: number;
+  lowerThanLinkBudgetCount: number;
+}
+
+interface ReconcileResult {
+  ftTotalOnts: number;
+  uptakeInstalled: number;
+  delta: number;
+  ok: boolean;
+}
+
+interface ProjectBundlePreview {
+  projectHint: string;
+  resolved: ResolvedProject;
+  files: { name: string; kind: string }[];
+  summary: BundleSummary | null;
+  deductionCount: number;
+  zoneRowCount: number;
+  ponRowCount: number;
+  reconcile: ReconcileResult | null;
+  parseWarnings: string[];
+  fatalError: string | null;
+}
+
+interface ProjectBundleImport extends ProjectBundlePreview {
+  billingWeekId: string | null;
   pricePerDrop: number | null;
-  taxRate: number;
   invoiceSubtotal: number | null;
   invoiceTotal: number | null;
+  status: 'imported' | 'skipped' | 'error';
+  statusReason: string | null;
 }
 
-interface ImportResult {
-  id: string;
-  weekEnding: string;
-  project: string;
-  totalClaimable: number;
-  invoiceTotal: number | null;
-}
+type UploadState = 'idle' | 'previewing' | 'previewed' | 'importing' | 'imported';
 
-type UploadState = 'idle' | 'previewing' | 'previewed' | 'importing' | 'imported' | 'reconciling' | 'done';
+// ─── Component ─────────────────────────────────────────────────────────────
 
-// 🟢 WORKING: Full upload + preview + import + reconcile flow
 export function BillingUploadTab() {
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [xlsxFile, setXlsxFile] = useState<File | null>(null);
-  const [isDraggingPdf, setIsDraggingPdf] = useState(false);
-  const [preview, setPreview] = useState<BillingPreview | null>(null);
-  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [previewRows, setPreviewRows] = useState<ProjectBundlePreview[]>([]);
+  const [importRows, setImportRows] = useState<ProjectBundleImport[]>([]);
   const [uploadState, setUploadState] = useState<UploadState>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [parseWarnings, setParseWarnings] = useState<string[]>([]);
-  const [resolvedProject, setResolvedProject] = useState<ResolvedProject | null>(null);
-  const [billableProjects, setBillableProjects] = useState<BillableProject[]>([]);
-  /** User override for when auto-detection fails/ambiguous. Empty = use resolvedProject. */
-  const [projectOverride, setProjectOverride] = useState<string>('');
 
-  // Lazy-load billable projects once — used to populate the override dropdown.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/billing/projects');
-        if (!res.ok) return;
-        const data: Record<string, unknown> = await res.json();
-        const payload = (data.data ?? data) as { projects?: BillableProject[] };
-        if (!cancelled && Array.isArray(payload.projects)) {
-          setBillableProjects(payload.projects);
+  const isLoading = uploadState === 'previewing' || uploadState === 'importing';
+  const isLocked = uploadState === 'imported';
+
+  // ── File handling ────────────────────────────────────────────────────────
+
+  const addFiles = useCallback((incoming: FileList | File[]) => {
+    const arr = Array.from(incoming);
+    setFiles((existing) => {
+      const merged = [...existing];
+      for (const f of arr) {
+        // Dedupe by name
+        if (!merged.some((m) => m.name === f.name && m.size === f.size)) {
+          merged.push(f);
         }
-      } catch (err) {
-        log.warn('Failed to load billable projects list', {
-          error: err instanceof Error ? err.message : String(err),
-        });
       }
-    })();
-    return () => { cancelled = true; };
+      return merged;
+    });
+    setPreviewRows([]);
+    setImportRows([]);
+    setError(null);
   }, []);
 
-  // ── Drag & Drop handlers ──────────────────────────────────────────────────
-
-  const handlePdfDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    setIsDraggingPdf(false);
-    const file = e.dataTransfer.files[0];
-    if (file && file.name.toLowerCase().endsWith('.pdf')) {
-      setPdfFile(file);
-      setPreview(null);
-      setError(null);
-    } else {
-      setError('Please drop a PDF file for the payment summary');
+    setIsDragging(false);
+    const items = e.dataTransfer.items;
+    if (items && items.length > 0) {
+      // Try to walk directories when a folder is dropped
+      const collected: File[] = [];
+      const promises: Promise<void>[] = [];
+      for (let i = 0; i < items.length; i++) {
+        const entry = items[i]!.webkitGetAsEntry?.();
+        if (entry) promises.push(walkEntry(entry, collected));
+        else {
+          const f = items[i]!.getAsFile();
+          if (f) collected.push(f);
+        }
+      }
+      void Promise.all(promises).then(() => {
+        if (collected.length > 0) addFiles(collected);
+      });
+    } else if (e.dataTransfer.files.length > 0) {
+      addFiles(e.dataTransfer.files);
     }
-  }, []);
+  }, [addFiles]);
 
-  const handlePdfDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDraggingPdf(true);
+  const handleSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) addFiles(e.target.files);
   };
 
-  const handlePdfDragLeave = () => setIsDraggingPdf(false);
-
-  const handlePdfSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setPdfFile(file);
-      setPreview(null);
-      setError(null);
-    }
+  const removeFile = (name: string) => {
+    setFiles((existing) => existing.filter((f) => f.name !== name));
+    setPreviewRows([]);
+    setImportRows([]);
   };
 
-  const handleXlsxSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) setXlsxFile(file);
+  const handleReset = () => {
+    setFiles([]);
+    setPreviewRows([]);
+    setImportRows([]);
+    setUploadState('idle');
+    setError(null);
   };
 
-  // ── Preview ───────────────────────────────────────────────────────────────
+  // ── Preview ──────────────────────────────────────────────────────────────
 
   const handlePreview = async () => {
-    if (!pdfFile) {
-      setError('Please select a payment summary PDF first');
+    if (files.length === 0) {
+      setError('Drop at least one file first');
       return;
     }
     setUploadState('previewing');
     setError(null);
-    setParseWarnings([]);
 
     try {
       const formData = new FormData();
       formData.append('action', 'preview');
-      // Only send an explicit override when the user picked one from the
-      // fallback dropdown; otherwise let the backend auto-detect from the PDF.
-      if (projectOverride) formData.append('project', projectOverride);
-      formData.append('pdfFile', pdfFile);
-      if (xlsxFile) formData.append('notesFile', xlsxFile);
+      for (const f of files) formData.append('files', f);
 
-      const res = await fetch('/api/billing/upload-weekly', {
+      const res = await fetch('/api/billing/upload-weekly-bundle', {
         method: 'POST',
         body: formData,
       });
-
-      // Parse JSON first so we can read error body on non-2xx responses
       const data: Record<string, unknown> = await res.json();
 
       if (!res.ok) {
-        const errMsg =
-          typeof data.error === 'string'
-            ? data.error
-            : data.error != null
-              ? JSON.stringify(data.error)
-              : 'Preview failed';
-        throw new Error(errMsg);
+        throw new Error(typeof data.error === 'string' ? data.error : 'Preview failed');
       }
 
-      // API returns { success: true, action: 'preview', summary: ParsedPaymentSummary, ... }
-      const s = data.summary as Record<string, unknown>;
-      if (!s || typeof s !== 'object') {
-        log.error('upload-weekly preview: unexpected response shape', { data });
-        throw new Error('Unexpected response from server — no summary returned');
+      const projects = data.projects as ProjectBundlePreview[] | undefined;
+      if (!Array.isArray(projects)) {
+        log.error('bundle preview: unexpected shape', { data });
+        throw new Error('Unexpected response from server');
       }
 
-      const totalClaimable = Number(s.totalClaimableForPayment ?? 0);
-
-      setPreview({
-        weekEnding:    String(s.weekEnding ?? ''),
-        project:       String(s.project ?? ''),
-        totalOnts:     Number(s.totalOnts ?? 0),
-        claimable:     Number(s.claimable ?? 0),
-        note1Count:    Number(s.note1Count ?? 0),
-        note2Count:    Number(s.note2Count ?? 0),
-        note3Count:    Number(s.note3Count ?? 0),
-        note4Count:    Number(s.note4Count ?? 0),
-        note5Count:    Number(s.note5Count ?? 0),
-        preProviCount: Number(s.preProvisionsCount ?? 0),
-        totalClaimable,
-        // Price is only known at import time (needs DB lookup); show null until then
-        pricePerDrop:    null,
-        taxRate:         15,
-        invoiceSubtotal: null,
-        invoiceTotal:    null,
-      });
-
-      const warnings = Array.isArray(data.parseWarnings) ? (data.parseWarnings as string[]) : [];
-      setParseWarnings(warnings);
-
-      // Capture auto-resolution result so the UI can show detected project
-      // or prompt for a fallback override.
-      const rp = data.resolvedProject as Record<string, unknown> | undefined;
-      if (rp && typeof rp === 'object') {
-        setResolvedProject({
-          matched: Boolean(rp.matched),
-          project: (rp.project as BillableProject | null) ?? null,
-          candidates: Array.isArray(rp.candidates) ? (rp.candidates as BillableProject[]) : [],
-          rawInput: String(rp.rawInput ?? ''),
-        });
-      }
-
+      setPreviewRows(projects);
       setUploadState('previewed');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Preview failed');
@@ -222,305 +202,143 @@ export function BillingUploadTab() {
     }
   };
 
-  // ── Import ────────────────────────────────────────────────────────────────
+  // ── Import ───────────────────────────────────────────────────────────────
 
   const handleImport = async () => {
-    if (!pdfFile || !preview) return;
+    if (files.length === 0 || previewRows.length === 0) return;
     setUploadState('importing');
     setError(null);
-    setParseWarnings([]);
 
     try {
       const formData = new FormData();
       formData.append('action', 'import');
-      if (projectOverride) formData.append('project', projectOverride);
-      formData.append('pdfFile', pdfFile);
-      if (xlsxFile) formData.append('notesFile', xlsxFile);
+      for (const f of files) formData.append('files', f);
 
-      const res = await fetch('/api/billing/upload-weekly', {
+      const res = await fetch('/api/billing/upload-weekly-bundle', {
         method: 'POST',
         body: formData,
       });
-
-      // Parse JSON first so we can read error body on non-2xx responses
       const data: Record<string, unknown> = await res.json();
 
       if (!res.ok) {
-        const errMsg =
-          typeof data.error === 'string'
-            ? data.error
-            : data.error != null
-              ? JSON.stringify(data.error)
-              : 'Import failed';
-        throw new Error(errMsg);
+        throw new Error(typeof data.error === 'string' ? data.error : 'Import failed');
       }
 
-      // API returns { success: true, action: 'import', billingWeekId, weekEnding,
-      //               project, deductionCount, invoiceSubtotal, invoiceTotal, parseWarnings }
-      if (!data.billingWeekId || typeof data.billingWeekId !== 'string') {
-        log.error('upload-weekly import: unexpected response shape', { data });
-        throw new Error('Unexpected response from server — no billingWeekId returned');
+      const projects = data.projects as ProjectBundleImport[] | undefined;
+      if (!Array.isArray(projects)) {
+        throw new Error('Unexpected response from server');
       }
 
-      const result: ImportResult = {
-        id:             String(data.billingWeekId),
-        weekEnding:     String(data.weekEnding ?? preview.weekEnding),
-        project:        String(data.project ?? preview.project),
-        totalClaimable: preview.totalClaimable,
-        invoiceTotal:   data.invoiceTotal != null ? Number(data.invoiceTotal) : null,
-      };
-
-      // Update preview with real invoice figures from DB-backed price_per_drop
-      setPreview((prev) =>
-        prev
-          ? {
-              ...prev,
-              invoiceSubtotal: data.invoiceSubtotal != null ? Number(data.invoiceSubtotal) : null,
-              invoiceTotal:    data.invoiceTotal != null ? Number(data.invoiceTotal) : null,
-            }
-          : prev
-      );
-
-      const warnings = Array.isArray(data.parseWarnings) ? (data.parseWarnings as string[]) : [];
-      setParseWarnings(warnings);
-
-      setImportResult(result);
+      setImportRows(projects);
       setUploadState('imported');
-      toast.success(`Week ending ${result.weekEnding} imported successfully`);
+
+      const importedCount = projects.filter((p) => p.status === 'imported').length;
+      const skippedCount = projects.filter((p) => p.status === 'skipped').length;
+      const errorCount = projects.filter((p) => p.status === 'error').length;
+
+      if (errorCount === 0 && skippedCount === 0) {
+        toast.success(`Imported ${importedCount} project(s) successfully`);
+      } else {
+        toast(
+          `Imported ${importedCount} · skipped ${skippedCount} · errors ${errorCount}`,
+          { icon: errorCount > 0 ? '⚠️' : 'ℹ️' },
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
       setUploadState('previewed');
     }
   };
 
-  // ── Reconcile ────────────────────────────────────────────────────────────
+  // ── Derived ───────────────────────────────────────────────────────────────
 
-  const handleReconcile = async () => {
-    if (!importResult) return;
-    setUploadState('reconciling');
-    setError(null);
+  const canImport = useMemo(
+    () =>
+      uploadState === 'previewed' &&
+      previewRows.length > 0 &&
+      previewRows.every((r) => r.resolved.matched && r.summary && !r.fatalError),
+    [uploadState, previewRows],
+  );
 
-    try {
-      const res = await fetch('/api/billing/reconcile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: importResult.id }),
-      });
-
-      // Parse JSON first so we can read error body on non-2xx responses
-      const data: Record<string, unknown> = await res.json();
-
-      if (!res.ok) {
-        const errMsg =
-          typeof data.error === 'string'
-            ? data.error
-            : data.error != null
-              ? JSON.stringify(data.error)
-              : 'Reconciliation failed';
-        throw new Error(errMsg);
-      }
-
-      setUploadState('done');
-      toast.success('Reconciliation complete');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Reconciliation failed');
-      setUploadState('imported');
-    }
-  };
-
-  // ── Reset ────────────────────────────────────────────────────────────────
-
-  const handleReset = () => {
-    setPdfFile(null);
-    setXlsxFile(null);
-    setPreview(null);
-    setImportResult(null);
-    setUploadState('idle');
-    setError(null);
-    setParseWarnings([]);
-    setResolvedProject(null);
-    setProjectOverride('');
-  };
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
-
-  const formatCurrency = (val: number | null) =>
-    val == null
-      ? '—'
-      : `R ${val.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`;
-
-  const isLoading =
-    uploadState === 'previewing' ||
-    uploadState === 'importing' ||
-    uploadState === 'reconciling';
-
-  const isLocked =
-    uploadState === 'imported' || uploadState === 'done';
+  const displayRows: (ProjectBundlePreview | ProjectBundleImport)[] =
+    importRows.length > 0 ? importRows : previewRows;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const needsOverride =
-    resolvedProject !== null && !resolvedProject.matched;
-
   return (
     <div className="space-y-6">
-      {/* Auto-detection status — only rendered once a preview has run */}
-      {resolvedProject && resolvedProject.matched && resolvedProject.project && (
-        <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 flex items-center gap-3">
-          <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-          <div className="text-sm">
-            <span className="text-[var(--ff-text-secondary)]">Detected project: </span>
-            <span className="font-semibold text-[var(--ff-text-primary)]">
-              {resolvedProject.project.name}
-            </span>
-            <span className="text-[var(--ff-text-tertiary)]"> (from filename)</span>
-          </div>
-        </div>
-      )}
-
-      {/* Override dropdown — shown only when auto-detection failed or is ambiguous */}
-      {needsOverride && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 space-y-3">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-            <div className="text-sm">
-              <p className="font-medium text-amber-400">
-                Could not auto-detect project from filename
-              </p>
-              <p className="text-[var(--ff-text-secondary)] mt-1">
-                Parsed: <span className="font-mono">{resolvedProject?.rawInput || '(empty)'}</span>
-                {resolvedProject && resolvedProject.candidates.length > 0 && (
-                  <> — {resolvedProject.candidates.length} candidate(s) matched.</>
-                )}
-              </p>
-            </div>
-          </div>
-          <div className="max-w-sm">
-            <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
-              Pick project manually
-            </label>
-            <select
-              value={projectOverride}
-              onChange={(e) => setProjectOverride(e.target.value)}
-              disabled={isLoading || isLocked}
-              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-md bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-transparent disabled:opacity-50"
-            >
-              <option value="">— Select a project —</option>
-              {billableProjects.map((p) => (
-                <option key={p.id} value={p.name}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-            {projectOverride && (
-              <div className="mt-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => { void handlePreview(); }}
-                  disabled={isLoading}
-                >
-                  Re-preview with {projectOverride}
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* PDF Drop Zone */}
-      {!pdfFile ? (
+      {/* Drop zone */}
+      {!isLocked && (
         <div
-          onDrop={handlePdfDrop}
-          onDragOver={handlePdfDragOver}
-          onDragLeave={handlePdfDragLeave}
-          onClick={() => document.getElementById('billing-pdf-input')?.click()}
+          onDrop={handleDrop}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onClick={() => document.getElementById('billing-bundle-input')?.click()}
           className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-            isDraggingPdf
+            isDragging
               ? 'border-[var(--ff-accent)] bg-[var(--ff-accent)]/5'
               : 'border-[var(--ff-border-light)] hover:border-[var(--ff-accent)]'
           }`}
         >
           <input
-            id="billing-pdf-input"
+            id="billing-bundle-input"
             type="file"
-            accept=".pdf"
-            onChange={handlePdfSelect}
+            multiple
+            accept=".pdf,.xlsx,.xls"
+            onChange={handleSelect}
             className="hidden"
           />
           <Upload className="w-12 h-12 mx-auto text-[var(--ff-text-tertiary)] mb-3" />
           <p className="text-[var(--ff-text-secondary)]">
-            Drag and drop payment summary PDF, or click to browse
+            Drop the whole <span className="font-mono">WE&lt;date&gt;/</span> folder
+            — or select multiple files
           </p>
-          <p className="text-sm text-[var(--ff-text-tertiary)] mt-1">Accepts .pdf files</p>
-        </div>
-      ) : (
-        <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <FileText className="w-8 h-8 text-red-400" />
-              <div>
-                <p className="font-medium text-[var(--ff-text-primary)]">{pdfFile.name}</p>
-                <p className="text-sm text-[var(--ff-text-secondary)]">
-                  {(pdfFile.size / 1024).toFixed(1)} KB
-                </p>
-              </div>
-            </div>
-            {uploadState === 'idle' && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => { setPdfFile(null); setPreview(null); }}
-                className="text-sm text-red-400"
-              >
-                Remove
-              </Button>
-            )}
-          </div>
+          <p className="text-sm text-[var(--ff-text-tertiary)] mt-1">
+            Payment PDFs, notes XLSX, and zone uptake PDFs are all routed automatically
+          </p>
         </div>
       )}
 
-      {/* Optional XLSX input */}
-      <div>
-        <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-          Notes XLSX{' '}
-          <span className="text-[var(--ff-text-tertiary)]">(optional)</span>
-        </label>
-        <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => document.getElementById('billing-xlsx-input')?.click()}
-            disabled={isLoading || isLocked}
-          >
-            <FileSpreadsheet className="w-4 h-4 text-green-400" />
-            {xlsxFile ? xlsxFile.name : 'Choose file…'}
-          </Button>
-          {xlsxFile && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setXlsxFile(null)}
-              disabled={isLoading}
-              className="text-sm text-red-400"
-            >
-              Remove
-            </Button>
-          )}
+      {/* Selected files list */}
+      {files.length > 0 && !isLocked && (
+        <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
+          <p className="text-sm font-medium text-[var(--ff-text-secondary)] mb-2">
+            Selected files ({files.length})
+          </p>
+          <ul className="space-y-1 max-h-48 overflow-auto">
+            {files.map((f) => (
+              <li key={f.name} className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2 text-[var(--ff-text-primary)] truncate">
+                  {f.name.endsWith('.pdf') ? (
+                    <FileText className="w-4 h-4 text-red-400 flex-shrink-0" />
+                  ) : (
+                    <FileSpreadsheet className="w-4 h-4 text-green-400 flex-shrink-0" />
+                  )}
+                  <span className="truncate">{f.name}</span>
+                  <span className="text-[var(--ff-text-tertiary)] flex-shrink-0">
+                    ({(f.size / 1024).toFixed(0)} KB)
+                  </span>
+                </span>
+                {uploadState === 'idle' && (
+                  <button
+                    type="button"
+                    onClick={() => removeFile(f.name)}
+                    className="text-[var(--ff-text-tertiary)] hover:text-red-400 ml-2 flex-shrink-0"
+                    aria-label={`Remove ${f.name}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
         </div>
-        <input
-          id="billing-xlsx-input"
-          type="file"
-          accept=".xlsx,.xls"
-          onChange={handleXlsxSelect}
-          className="hidden"
-        />
-      </div>
+      )}
 
-      {/* Error Display */}
+      {/* Error */}
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex items-start gap-3">
           <XCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
@@ -531,23 +349,8 @@ export function BillingUploadTab() {
         </div>
       )}
 
-      {/* Parse Warnings */}
-      {parseWarnings.length > 0 && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="font-medium text-amber-400">Parse warnings ({parseWarnings.length})</p>
-            <ul className="mt-1 space-y-0.5">
-              {parseWarnings.map((w, i) => (
-                <li key={i} className="text-sm text-amber-300">{w}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-
-      {/* Preview Button */}
-      {pdfFile && uploadState === 'idle' && (
+      {/* Preview button */}
+      {uploadState === 'idle' && files.length > 0 && (
         <div className="flex justify-end">
           <Button
             type="button"
@@ -555,168 +358,261 @@ export function BillingUploadTab() {
             onClick={() => { void handlePreview(); }}
           >
             <Upload className="w-4 h-4" />
-            Preview
+            Preview {files.length} file{files.length === 1 ? '' : 's'}
           </Button>
         </div>
       )}
 
-      {/* Loading Indicator */}
+      {/* Loading */}
       {isLoading && (
         <div className="flex items-center justify-center gap-3 py-4">
           <InlineSpinner size="sm" />
           <span className="text-[var(--ff-text-secondary)]">
-            {uploadState === 'previewing' && 'Parsing PDF…'}
+            {uploadState === 'previewing' && 'Parsing bundle…'}
             {uploadState === 'importing' && 'Importing…'}
-            {uploadState === 'reconciling' && 'Running reconciliation…'}
           </span>
         </div>
       )}
 
-      {/* Preview Card */}
-      {preview &&
-        (uploadState === 'previewed' ||
-          uploadState === 'imported' ||
-          uploadState === 'done') && (
-          <div className="bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg p-5 space-y-4">
-            <h3 className="font-semibold text-[var(--ff-text-primary)] flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-400" />
-              Preview — Week ending {preview.weekEnding}
-            </h3>
+      {/* Per-project result cards */}
+      {displayRows.length > 0 && (
+        <div className="space-y-3">
+          {displayRows.map((row, idx) => (
+            <ProjectResultCard key={`${row.projectHint}-${idx}`} row={row} />
+          ))}
+        </div>
+      )}
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                { label: 'Project', value: preview.project },
-                { label: 'Total ONTs', value: preview.totalOnts.toLocaleString() },
-                { label: 'FT Claimable', value: preview.claimable.toLocaleString() },
-                { label: 'Invoice Total', value: formatCurrency(preview.invoiceTotal) },
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  className="bg-[var(--ff-bg-secondary)] rounded p-3 text-center"
-                >
-                  <p className="text-lg font-bold text-[var(--ff-text-primary)]">
-                    {item.value}
-                  </p>
-                  <p className="text-xs text-[var(--ff-text-tertiary)] mt-0.5">{item.label}</p>
-                </div>
-              ))}
-            </div>
+      {/* Import / reset actions */}
+      {uploadState === 'previewed' && (
+        <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={handleReset}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => { void handleImport(); }}
+            disabled={!canImport}
+            title={canImport ? undefined : 'Resolve all projects first'}
+          >
+            <Upload className="w-4 h-4" />
+            Import all
+          </Button>
+        </div>
+      )}
 
-            {/* Note breakdown */}
-            <div className="border-t border-[var(--ff-border-light)] pt-3">
-              <p className="text-xs font-medium text-[var(--ff-text-secondary)] mb-2">
-                Note Breakdown
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { label: 'Low Signal', count: preview.note1Count, cls: 'text-orange-400 bg-orange-500/10', tip: 'FT Note 1: Below -26dB' },
-                  { label: 'No Field App', count: preview.note2Count, cls: 'text-blue-400 bg-blue-500/10', tip: 'FT Note 2: No DR submission' },
-                  { label: 'Degraded', count: preview.note3Count, cls: 'text-yellow-400 bg-yellow-500/10', tip: 'FT Note 3: >2dB degradation' },
-                  { label: 'Serial Mismatch', count: preview.note4Count, cls: 'text-red-400 bg-red-500/10', tip: 'FT Note 4: Drop/ONT serial mismatch' },
-                  { label: 'Offline', count: preview.note5Count, cls: 'text-purple-400 bg-purple-500/10', tip: 'FT Note 5: Device not active' },
-                  { label: 'Pre-Provision', count: preview.preProviCount, cls: 'text-cyan-400 bg-cyan-500/10', tip: 'Pre-provisioned, not yet activated' },
-                ].map((n) => (
-                  <span
-                    key={n.label}
-                    title={n.tip}
-                    className={`px-2 py-1 rounded text-xs font-medium ${n.cls} cursor-help`}
-                  >
-                    {n.label}: {n.count}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="border-t border-[var(--ff-border-light)] pt-3 flex items-center justify-between text-sm">
-              <span className="text-[var(--ff-text-secondary)]">
-                Total Claimable:{' '}
-                <span className="font-semibold text-[var(--ff-text-primary)]">
-                  {preview.totalClaimable.toLocaleString()}
-                </span>
-              </span>
-              <span className="text-[var(--ff-text-secondary)]">
-                Invoice Total:{' '}
-                <span className="font-semibold text-[var(--ff-text-primary)]">
-                  {formatCurrency(preview.invoiceTotal)}
-                </span>
-              </span>
-            </div>
-
-            {/* Import Button (only when still in previewed state) */}
-            {uploadState === 'previewed' && (
-              <div className="flex justify-end gap-3">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={handleReset}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  variant="primary"
-                  onClick={() => { void handleImport(); }}
-                  disabled={needsOverride}
-                  title={needsOverride ? 'Resolve the project first' : undefined}
-                >
-                  <Upload className="w-4 h-4" />
-                  Import
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
-
-      {/* Success State + Reconcile Button */}
-      {(uploadState === 'imported' || uploadState === 'done') && importResult && (
-        <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-5">
-          <div className="flex items-start gap-3">
-            <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="font-semibold text-green-400">
-                {uploadState === 'done'
-                  ? 'Import + Reconciliation complete'
-                  : 'Import successful'}
-              </p>
-              <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
-                Week {importResult.weekEnding} · {importResult.project} ·{' '}
-                {formatCurrency(importResult.invoiceTotal)}
-              </p>
-
-              {uploadState === 'imported' && (
-                <div className="mt-4 flex gap-3">
-                  <Button
-                    type="button"
-                    variant="primary"
-                    onClick={() => { void handleReconcile(); }}
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    Run Reconciliation
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={handleReset}
-                  >
-                    Upload Another
-                  </Button>
-                </div>
-              )}
-
-              {uploadState === 'done' && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleReset}
-                  className="mt-4"
-                >
-                  Upload Another Week
-                </Button>
-              )}
-            </div>
-          </div>
+      {isLocked && (
+        <div className="flex justify-end">
+          <Button type="button" variant="secondary" onClick={handleReset}>
+            <RefreshCw className="w-4 h-4" />
+            Upload another week
+          </Button>
         </div>
       )}
     </div>
   );
+}
+
+// ─── Per-project card ─────────────────────────────────────────────────────
+
+function ProjectResultCard({
+  row,
+}: {
+  row: ProjectBundlePreview | ProjectBundleImport;
+}) {
+  const isImport = 'status' in row;
+  const importRow = isImport ? (row as ProjectBundleImport) : null;
+
+  const headerColour =
+    importRow?.status === 'imported'
+      ? 'border-green-500/30 bg-green-500/5'
+      : importRow?.status === 'error'
+        ? 'border-red-500/30 bg-red-500/5'
+        : importRow?.status === 'skipped'
+          ? 'border-amber-500/30 bg-amber-500/5'
+          : row.resolved.matched
+            ? 'border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]'
+            : 'border-amber-500/30 bg-amber-500/5';
+
+  return (
+    <div className={`rounded-lg p-4 border space-y-3 ${headerColour}`}>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            {row.resolved.matched ? (
+              <CheckCircle className="w-5 h-5 text-green-400" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-amber-400" />
+            )}
+            <span className="font-semibold text-[var(--ff-text-primary)]">
+              {row.resolved.projectName ?? row.projectHint}
+            </span>
+            {!row.resolved.matched && (
+              <span className="text-xs text-amber-400">
+                (could not resolve — parsed &quot;{row.projectHint}&quot;)
+              </span>
+            )}
+          </div>
+          {row.summary && (
+            <p className="text-xs text-[var(--ff-text-tertiary)] mt-0.5">
+              Week ending {row.summary.weekEnding}
+              {row.summary.areaManager && ` · ${row.summary.areaManager}`}
+            </p>
+          )}
+        </div>
+        {importRow && (
+          <StatusBadge status={importRow.status} />
+        )}
+      </div>
+
+      {/* Files detected */}
+      <div className="flex flex-wrap gap-1.5">
+        {row.files.map((f) => (
+          <FileKindBadge key={f.name} kind={f.kind} />
+        ))}
+      </div>
+
+      {/* Metrics */}
+      {row.summary && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          <Metric label="Total ONTs" value={row.summary.totalOnts.toLocaleString()} />
+          <Metric label="Claimable" value={row.summary.totalClaimableForPayment.toLocaleString()} />
+          <Metric label="Deductions" value={String(row.deductionCount)} />
+          <Metric label="Zones / PONs" value={`${row.zoneRowCount} / ${row.ponRowCount}`} />
+        </div>
+      )}
+
+      {/* Invoice total (only after import) */}
+      {importRow?.invoiceTotal != null && (
+        <div className="text-sm text-[var(--ff-text-secondary)] border-t border-[var(--ff-border-light)] pt-2">
+          Invoice total:{' '}
+          <span className="font-semibold text-[var(--ff-text-primary)]">
+            R {importRow.invoiceTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+          </span>
+        </div>
+      )}
+
+      {/* Reconcile */}
+      {row.reconcile && (
+        <div className={`text-xs flex items-center gap-2 ${row.reconcile.ok ? 'text-green-400' : 'text-amber-400'}`}>
+          {row.reconcile.ok ? (
+            <CheckCircle className="w-3.5 h-3.5" />
+          ) : (
+            <AlertTriangle className="w-3.5 h-3.5" />
+          )}
+          Reconcile: FT ONTs {row.reconcile.ftTotalOnts} vs zone installed{' '}
+          {row.reconcile.uptakeInstalled}
+          {row.reconcile.delta !== 0 && ` (Δ${row.reconcile.delta})`}
+        </div>
+      )}
+
+      {/* Fatal error */}
+      {row.fatalError && (
+        <div className="text-xs text-red-400 flex items-start gap-2">
+          <XCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+          <span>{row.fatalError}</span>
+        </div>
+      )}
+
+      {/* Status reason (skip/error) */}
+      {importRow?.statusReason && (
+        <div className="text-xs text-amber-400 flex items-start gap-2">
+          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+          <span>{importRow.statusReason}</span>
+        </div>
+      )}
+
+      {/* Parse warnings */}
+      {row.parseWarnings.length > 0 && (
+        <details className="text-xs">
+          <summary className="text-[var(--ff-text-tertiary)] cursor-pointer hover:text-[var(--ff-text-secondary)]">
+            {row.parseWarnings.length} parse warning(s)
+          </summary>
+          <ul className="mt-1 space-y-0.5 pl-4">
+            {row.parseWarnings.map((w, i) => (
+              <li key={i} className="text-[var(--ff-text-tertiary)]">{w}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-[var(--ff-bg-secondary)] rounded p-2 text-center">
+      <p className="text-base font-bold text-[var(--ff-text-primary)]">{value}</p>
+      <p className="text-[var(--ff-text-tertiary)]">{label}</p>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: ProjectBundleImport['status'] }) {
+  const styles: Record<typeof status, string> = {
+    imported: 'bg-green-500/10 text-green-400 border-green-500/30',
+    skipped: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+    error: 'bg-red-500/10 text-red-400 border-red-500/30',
+  };
+  return (
+    <span
+      className={`px-2 py-0.5 rounded text-xs font-medium border ${styles[status]}`}
+    >
+      {status}
+    </span>
+  );
+}
+
+function FileKindBadge({ kind }: { kind: string }) {
+  const map: Record<string, { label: string; cls: string }> = {
+    'ft-payment-pdf': { label: 'Payment PDF', cls: 'text-red-300 bg-red-500/10' },
+    'notes-xlsx': { label: 'Notes XLSX', cls: 'text-green-300 bg-green-500/10' },
+    'zone-uptake-pdf': { label: 'Zone uptake', cls: 'text-blue-300 bg-blue-500/10' },
+    'zone-pon-uptake-pdf': { label: 'Zone+PON uptake', cls: 'text-purple-300 bg-purple-500/10' },
+    unknown: { label: 'Unknown', cls: 'text-amber-300 bg-amber-500/10' },
+  };
+  const entry = map[kind] ?? map['unknown']!;
+  return (
+    <span className={`px-2 py-0.5 rounded text-xs ${entry.cls}`}>
+      {entry.label}
+    </span>
+  );
+}
+
+// ─── webkit directory walker ──────────────────────────────────────────────
+// Browsers expose `DataTransferItem.webkitGetAsEntry()` which lets us walk
+// dropped directories. This walker collects every regular file into `out`.
+
+interface FileSystemEntryLike {
+  isFile: boolean;
+  isDirectory: boolean;
+  file?: (cb: (f: File) => void, err?: (e: Error) => void) => void;
+  createReader?: () => {
+    readEntries: (cb: (entries: FileSystemEntryLike[]) => void) => void;
+  };
+}
+
+async function walkEntry(
+  entry: FileSystemEntryLike,
+  out: File[],
+): Promise<void> {
+  if (entry.isFile && entry.file) {
+    return new Promise<void>((resolve) => {
+      entry.file!((f) => {
+        out.push(f);
+        resolve();
+      });
+    });
+  }
+  if (entry.isDirectory && entry.createReader) {
+    const reader = entry.createReader();
+    return new Promise<void>((resolve) => {
+      reader.readEntries(async (entries) => {
+        for (const e of entries) await walkEntry(e, out);
+        resolve();
+      });
+    });
+  }
 }

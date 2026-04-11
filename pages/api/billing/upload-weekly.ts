@@ -126,8 +126,16 @@ async function handler(
     const summary = await parseFTPaymentPdf(pdfBuffer, pdfFilename);
 
     // ── Resolve project against the DB ──────────────────────────────────────
-    // Priority: explicit override (user picked from dropdown) > filename-extracted.
-    const rawProjectInput = projectOverride?.trim() || summary.project || '';
+    // Priority:
+    //   1. Explicit override (user picked from fallback dropdown)
+    //   2. PDF body "Site" field (more reliable than filename — e.g. "Tembisa"
+    //      vs filename "Tembisa POP01")
+    //   3. Filename-extracted project name
+    const rawProjectInput =
+      projectOverride?.trim() ||
+      summary.site?.trim() ||
+      summary.project ||
+      '';
     const resolution = await resolveProjectName(rawProjectInput);
 
     // When resolved, stamp the canonical name on the summary so downstream
