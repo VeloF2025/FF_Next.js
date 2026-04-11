@@ -386,59 +386,63 @@ async function importProjectResult(
       );
     }
 
-    // ── Upsert zone uptake ───────────────────────────────────────────────
+    // ── Upsert zone uptake (bulk via UNNEST) ─────────────────────────────
+    // Single-row INSERTs in a loop were costing ~50ms × N zones and blowing
+    // through the Cloudflare 100s edge timeout on full-bundle uploads.
     if (r.zoneUptake && r.zoneUptake.zones.length > 0) {
       await pool.query(
         `DELETE FROM project_weekly_zone_uptake
           WHERE week_ending = $1 AND project_id = $2`,
         [summary.weekEnding, projectId],
       );
-      for (const z of r.zoneUptake.zones) {
-        await pool.query(
-          `INSERT INTO project_weekly_zone_uptake
-             (week_ending, project_id, project_name, zone_no,
-              planned_drops, installed, pct_installed, uploaded_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [
-            summary.weekEnding,
-            projectId,
-            canonicalName,
-            z.zoneNo,
-            z.plannedDrops,
-            z.installed,
-            z.pctInstalled,
-            uploadedBy,
-          ],
-        );
-      }
+      const zones = r.zoneUptake.zones;
+      await pool.query(
+        `INSERT INTO project_weekly_zone_uptake
+           (week_ending, project_id, project_name, zone_no,
+            planned_drops, installed, pct_installed, uploaded_by)
+         SELECT
+           $1::date, $2::uuid, $3::varchar, UNNEST($4::int[]),
+           UNNEST($5::int[]), UNNEST($6::int[]), UNNEST($7::numeric[]), $8::varchar`,
+        [
+          summary.weekEnding,
+          projectId,
+          canonicalName,
+          zones.map((z) => z.zoneNo),
+          zones.map((z) => z.plannedDrops),
+          zones.map((z) => z.installed),
+          zones.map((z) => z.pctInstalled),
+          uploadedBy,
+        ],
+      );
     }
 
-    // ── Upsert zone+PON uptake ───────────────────────────────────────────
+    // ── Upsert zone+PON uptake (bulk via UNNEST) ─────────────────────────
     if (r.zonePonUptake && r.zonePonUptake.pons.length > 0) {
       await pool.query(
         `DELETE FROM project_weekly_zone_pon_uptake
           WHERE week_ending = $1 AND project_id = $2`,
         [summary.weekEnding, projectId],
       );
-      for (const p of r.zonePonUptake.pons) {
-        await pool.query(
-          `INSERT INTO project_weekly_zone_pon_uptake
-             (week_ending, project_id, project_name, zone_no, pon_no,
-              planned_drops, installed, pct_installed, uploaded_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-          [
-            summary.weekEnding,
-            projectId,
-            canonicalName,
-            p.zoneNo,
-            p.ponNo,
-            p.plannedDrops,
-            p.installed,
-            p.pctInstalled,
-            uploadedBy,
-          ],
-        );
-      }
+      const pons = r.zonePonUptake.pons;
+      await pool.query(
+        `INSERT INTO project_weekly_zone_pon_uptake
+           (week_ending, project_id, project_name, zone_no, pon_no,
+            planned_drops, installed, pct_installed, uploaded_by)
+         SELECT
+           $1::date, $2::uuid, $3::varchar, UNNEST($4::int[]), UNNEST($5::int[]),
+           UNNEST($6::int[]), UNNEST($7::int[]), UNNEST($8::numeric[]), $9::varchar`,
+        [
+          summary.weekEnding,
+          projectId,
+          canonicalName,
+          pons.map((p) => p.zoneNo),
+          pons.map((p) => p.ponNo),
+          pons.map((p) => p.plannedDrops),
+          pons.map((p) => p.installed),
+          pons.map((p) => p.pctInstalled),
+          uploadedBy,
+        ],
+      );
     }
 
     logger.info('Bundle imported', {
