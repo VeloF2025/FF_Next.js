@@ -5,15 +5,11 @@
 
 import { log } from '@/lib/logger';
 import {
-  QFieldProject,
   QFieldFiberCable,
   SyncJob,
-  SyncStatus,
   SyncDirection,
-  SyncError,
   SyncConflict,
   SyncStats,
-  DataTransformer,
   ValidationResult,
 } from '../types/qfield-sync.types';
 import {

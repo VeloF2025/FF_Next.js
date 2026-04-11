@@ -85,8 +85,8 @@ export class BOQClient {
   }
 
   static async getBOQItem(
-    context: ProcurementApiContext,
-    itemId: string
+    _context: ProcurementApiContext,
+    _itemId: string
   ): Promise<BOQItem> {
     // Since there's no direct endpoint for single item, we'll need to fetch all and filter
     // This should be improved with a proper API endpoint
@@ -94,26 +94,26 @@ export class BOQClient {
   }
 
   static async createBOQItem(
-    context: ProcurementApiContext,
-    boqId: string,
-    itemData: Partial<BOQItem>
+    _context: ProcurementApiContext,
+    _boqId: string,
+    _itemData: Partial<BOQItem>
   ): Promise<BOQItem> {
     // This needs a proper API endpoint
     throw new Error('createBOQItem not implemented - API endpoint needed');
   }
 
   static async updateBOQItem(
-    context: ProcurementApiContext,
-    itemId: string,
-    updateData: Partial<BOQItem>
+    _context: ProcurementApiContext,
+    _itemId: string,
+    _updateData: Partial<BOQItem>
   ): Promise<BOQItem> {
     // This needs a proper API endpoint
     throw new Error('updateBOQItem not implemented - API endpoint needed');
   }
 
   static async deleteBOQItem(
-    context: ProcurementApiContext,
-    itemId: string
+    _context: ProcurementApiContext,
+    _itemId: string
   ): Promise<void> {
     // This needs a proper API endpoint
     throw new Error('deleteBOQItem not implemented - API endpoint needed');
@@ -129,34 +129,34 @@ export class BOQClient {
   }
 
   static async getBOQException(
-    context: ProcurementApiContext,
-    exceptionId: string
+    _context: ProcurementApiContext,
+    _exceptionId: string
   ): Promise<BOQException> {
     // This needs a proper API endpoint
     throw new Error('getBOQException not implemented - API endpoint needed');
   }
 
   static async createBOQException(
-    context: ProcurementApiContext,
-    boqId: string,
-    exceptionData: Partial<BOQException>
+    _context: ProcurementApiContext,
+    _boqId: string,
+    _exceptionData: Partial<BOQException>
   ): Promise<BOQException> {
     // This needs a proper API endpoint
     throw new Error('createBOQException not implemented - API endpoint needed');
   }
 
   static async updateBOQException(
-    context: ProcurementApiContext,
-    exceptionId: string,
-    updateData: Partial<BOQException>
+    _context: ProcurementApiContext,
+    _exceptionId: string,
+    _updateData: Partial<BOQException>
   ): Promise<BOQException> {
     // This needs a proper API endpoint
     throw new Error('updateBOQException not implemented - API endpoint needed');
   }
 
   static async deleteException(
-    context: ProcurementApiContext,
-    exceptionId: string
+    _context: ProcurementApiContext,
+    _exceptionId: string
   ): Promise<void> {
     // This needs a proper API endpoint
     throw new Error('deleteException not implemented - API endpoint needed');

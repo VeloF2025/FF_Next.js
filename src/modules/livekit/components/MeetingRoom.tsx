@@ -3,33 +3,21 @@
 
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import {
     LiveKitRoom,
     VideoConference,
     RoomAudioRenderer,
-    ControlBar,
-    useTracks,
-    useRoomContext,
     useParticipants,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
-import { Track } from 'livekit-client';
 import {
-    Video,
-    VideoOff,
-    Mic,
-    MicOff,
-    PhoneOff,
     Users,
-    Settings,
     Circle,
     Square,
-    Bot,
     Link2,
     Share2,
     Check,
-    Copy,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
 
