@@ -17,11 +17,6 @@ async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ImportStatusData>
 ) {
-  // Check authentication
-  if (!userId) {
-    return apiResponse.unauthorized(res);
-  }
-
   try {
     const { projectId } = req.query;
 

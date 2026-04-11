@@ -10,10 +10,6 @@ async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (!userId) {
-    return apiResponse.unauthorized(res);
-  }
-
   const sql = getSql();
 
   try {

@@ -25,6 +25,12 @@ interface ProcurementPortalPageProps {
 export function ProcurementPortalPage({ children }: ProcurementPortalPageProps) {
   const router = useRouter();
   const searchParams = new URLSearchParams(router.query as Record<string, string>);
+
+  // Shim for react-router's setSearchParams in Next.js Pages Router
+  const setSearchParams = (updater: (prev: URLSearchParams) => URLSearchParams) => {
+    const next = updater(new URLSearchParams(router.query as Record<string, string>));
+    router.replace({ pathname: router.pathname, query: Object.fromEntries(next.entries()) }, undefined, { shallow: true });
+  };
   
   // State management
   const [selectedProject, setSelectedProject] = useState<Project | undefined>(() => {

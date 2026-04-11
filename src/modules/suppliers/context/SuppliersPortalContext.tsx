@@ -218,6 +218,12 @@ const mockPermissions: SupplierPermissions = {
 export function SuppliersPortalProvider({ children }: SuppliersPortalProviderProps) {
   const router = useRouter();
   const searchParams = new URLSearchParams(router.query as Record<string, string>);
+
+  // Shim for react-router's setSearchParams in Next.js Pages Router
+  const setSearchParams = (next: URLSearchParams) => {
+    router.replace({ pathname: router.pathname, query: Object.fromEntries(next.entries()) }, undefined, { shallow: true });
+  };
+
   const [state, dispatch] = useReducer(suppliersPortalReducer, initialState);
   
   const permissions = mockPermissions;

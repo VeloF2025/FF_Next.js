@@ -16,9 +16,20 @@ export default defineConfig({
     // otherwise '@' → './src' will greedily match '@/lib/...' before
     // the '@/lib' → './lib' alias gets a chance to apply.
     alias: [
+      // Specific @/lib/* paths that live in src/lib/ (mirrors tsconfig.json paths).
+      // tsconfig maps @/lib/* to BOTH ./src/lib/* and ./lib/* (src first),
+      // but Vitest alias only supports single-target matching, so each module
+      // that lives in src/lib needs an explicit override before the generic
+      // @/lib → ./lib fallback at the end.
       { find: '@/lib/utils', replacement: path.resolve(__dirname, './src/lib/utils') },
       { find: '@/lib/db-neon', replacement: path.resolve(__dirname, './src/lib/db-neon') },
       { find: '@/lib/neon', replacement: path.resolve(__dirname, './src/lib/neon') },
+      { find: '@/lib/db-pool', replacement: path.resolve(__dirname, './src/lib/db-pool') },
+      { find: '@/lib/vlm', replacement: path.resolve(__dirname, './src/lib/vlm') },
+      { find: '@/lib/arcjet', replacement: path.resolve(__dirname, './src/lib/arcjet') },
+      { find: '@/lib/auth', replacement: path.resolve(__dirname, './src/lib/auth') },
+      { find: '@/lib/permissions', replacement: path.resolve(__dirname, './src/lib/permissions') },
+      { find: '@/lib/logger', replacement: path.resolve(__dirname, './src/lib/logger') },
       { find: '@/lib', replacement: path.resolve(__dirname, './lib') },
       { find: '@/components', replacement: path.resolve(__dirname, './src/components') },
       { find: '@/hooks', replacement: path.resolve(__dirname, './src/hooks') },

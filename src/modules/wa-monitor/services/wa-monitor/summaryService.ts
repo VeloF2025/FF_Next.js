@@ -96,6 +96,7 @@ export async function calculateSummary(): Promise<WaMonitorSummary> {
       ORDER BY date DESC, project ASC
     `;
 
+    const stats = (statsRows as any[])[0]!;
     return {
       total: parseInt(stats.total, 10),
       incomplete: parseInt(stats.incomplete, 10),

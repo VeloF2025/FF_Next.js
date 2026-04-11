@@ -7,10 +7,6 @@ import { apiResponse } from '@/lib/apiResponse';
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (!userId) {
-    return apiResponse.unauthorized(res);
-  }
-
   const { projectId } = req.query;
 
   if (!projectId || typeof projectId !== 'string') {

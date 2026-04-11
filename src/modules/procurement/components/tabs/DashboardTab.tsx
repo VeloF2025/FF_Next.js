@@ -34,7 +34,7 @@ export function DashboardTab() {
         <AllProjectsOverview 
           aggregateMetrics={aggregateMetrics}
           projectSummaries={projectSummaries}
-          navigate={navigate}
+          navigate={(path: string) => router.push(path)}
         />
       );
     } else if (selectedProject) {

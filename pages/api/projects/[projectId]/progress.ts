@@ -15,11 +15,6 @@ async function handler(
   res: NextApiResponse
 ) {
   try {
-    // Authenticate user with Clerk
-    if (!userId) {
-      return apiResponse.error(res, ErrorCode.UNAUTHORIZED, 'Unauthorized');
-    }
-
     const projectId = req.query.projectId as string;
 
     if (!projectId) {

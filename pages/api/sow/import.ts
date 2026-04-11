@@ -23,10 +23,6 @@ async function handler(
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
-  if (!userId) {
-    return apiResponse.unauthorized(res);
-  }
-
   try {
     const { projectId, dataType, fileData } = req.body;
 

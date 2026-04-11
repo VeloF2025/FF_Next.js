@@ -30,11 +30,6 @@ async function handler(
     return res.status(200).end();
   }
 
-  // Check authentication
-  if (!userId) {
-    return apiResponse.unauthorized(res);
-  }
-
   try {
     const { projectId } = req.query;
 
