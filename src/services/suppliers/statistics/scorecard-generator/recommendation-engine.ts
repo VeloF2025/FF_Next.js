@@ -4,6 +4,8 @@
  */
 
 import { Supplier } from '@/types/supplier/base.types';
+import { ProductCategory } from '@/types/supplier/common.types';
+import type { SupplierPerformance } from '@/types/supplier/performance.types';
 import { ScorecardScoreCalculator } from './score-calculator';
 import type { ComplianceData } from './scorecard-types';
 
@@ -86,17 +88,19 @@ export class ScorecardRecommendationEngine {
     }
 
     // Performance-specific recommendations
-    const performance = supplier.performance as any;
-    if (performance?.onTimeDelivery < 90) {
+    const performance: SupplierPerformance | undefined = supplier.performance;
+    const deliveryScore = performance?.deliveryScore;
+    if (deliveryScore !== undefined && deliveryScore < 90) {
       recommendations.push('Improve delivery time consistency');
-      if (performance.onTimeDelivery < 70) {
+      if (deliveryScore < 70) {
         recommendations.push('Implement delivery performance improvement plan');
       }
     }
 
-    if (performance?.qualityScore < 85) {
+    const qualityScore = performance?.qualityScore;
+    if (qualityScore !== undefined && qualityScore < 85) {
       recommendations.push('Enhance quality control processes');
-      if (performance.qualityScore < 70) {
+      if (qualityScore < 70) {
         recommendations.push('Conduct quality audit and implement corrective actions');
       }
     }
@@ -144,22 +148,22 @@ export class ScorecardRecommendationEngine {
   private static addCategorySpecificRecommendations(supplier: Supplier, recommendations: string[]): void {
     const categories = supplier.categories || [];
     
-    if (categories.includes('software' as any)) {
-      const techPerformance = (supplier.performance as any)?.technologyScore || 0;
-      if (techPerformance < 80) {
+    if (categories.includes(ProductCategory.SOFTWARE)) {
+      const techScore = supplier.performance?.serviceScore || 0;
+      if (techScore < 80) {
         recommendations.push('Upgrade technology capabilities and infrastructure');
       }
     }
 
-    if (categories.includes('hardware' as any)) {
-      const qualityScore = (supplier.performance as any)?.qualityScore || 0;
+    if (categories.includes(ProductCategory.HARDWARE)) {
+      const qualityScore = supplier.performance?.qualityScore || 0;
       if (qualityScore < 85) {
         recommendations.push('Implement lean manufacturing and quality management systems');
       }
     }
 
-    if (categories.includes('services' as any)) {
-      const deliveryScore = (supplier.performance as any)?.onTimeDelivery || 0;
+    if (categories.includes(ProductCategory.SERVICES)) {
+      const deliveryScore = supplier.performance?.deliveryScore || 0;
       if (deliveryScore < 90) {
         recommendations.push('Optimize supply chain and logistics processes');
       }
@@ -174,8 +178,9 @@ export class ScorecardRecommendationEngine {
     overallScore: number, 
     recommendations: string[]
   ): void {
-    // Pricing recommendations
-    const hasCompetitivePricing = (supplier.performance as any)?.competitivePricing !== false;
+    // Pricing recommendations — use priceScore as proxy for competitive pricing
+    const priceScore = supplier.performance?.priceScore;
+    const hasCompetitivePricing = priceScore === undefined || priceScore >= 70;
     if (!hasCompetitivePricing && overallScore > 75) {
       recommendations.push('Negotiate pricing improvements given strong performance');
     }

@@ -9,7 +9,10 @@ import type {
   WorkflowTemplateExport,
   TemplateImportResult,
   WorkflowAnalytics,
-  WorkflowTemplateQuery
+  WorkflowTemplateQuery,
+  WorkflowStep,
+  WorkflowTask,
+  WorkflowCategory
 } from '../types/workflow.types';
 
 export class WorkflowTemplateService {
@@ -123,7 +126,7 @@ export class WorkflowTemplateService {
 
   async getTemplatesByCategory(category: string): Promise<WorkflowTemplate[]> {
     const query: WorkflowTemplateQuery = {
-      category: category as any,
+      category: category as WorkflowCategory,
       status: 'active'
     };
 
@@ -143,8 +146,8 @@ export class WorkflowTemplateService {
     }
 
     const phases = await workflowManagementService.getPhases(templateId);
-    const steps: any[] = [];
-    const tasks: any[] = [];
+    const steps: WorkflowStep[] = [];
+    const tasks: WorkflowTask[] = [];
 
     // Get all steps and tasks for each phase
     for (const phase of phases) {
@@ -488,10 +491,10 @@ export class WorkflowTemplateService {
     ]);
 
     // Get steps and tasks for calculation
-    const steps1: any[] = [];
-    const tasks1: any[] = [];
-    const steps2: any[] = [];
-    const tasks2: any[] = [];
+    const steps1: WorkflowStep[] = [];
+    const tasks1: WorkflowTask[] = [];
+    const steps2: WorkflowStep[] = [];
+    const tasks2: WorkflowTask[] = [];
 
     for (const phase of phases1) {
       const phaseSteps = await workflowManagementService.getSteps(phase.id);
@@ -580,7 +583,13 @@ export class WorkflowTemplateService {
     const phases = await workflowManagementService.getPhases(templateId);
     const validation = await workflowManagementService.validateTemplate(templateId);
     
-    const suggestions: any[] = [];
+    const suggestions: Array<{
+      type: 'performance' | 'structure' | 'best_practice';
+      priority: 'low' | 'medium' | 'high';
+      title: string;
+      description: string;
+      impact: string;
+    }> = [];
 
     // Performance suggestions
     if (phases.length > 8) {

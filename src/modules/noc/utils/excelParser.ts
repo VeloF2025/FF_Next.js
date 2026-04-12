@@ -65,7 +65,7 @@ export interface ValidationResult {
 export interface DuplicateResult {
   row_number: number;
   duplicate_field: string;
-  duplicate_value: any;
+  duplicate_value: string | number;
 }
 
 /**
@@ -129,7 +129,7 @@ export async function parseExcelFile(
     const hasAnyRows = range.e.r >= range.s.r; // End row >= start row means at least one row
 
     // Convert sheet to JSON
-    const rawData: any[] = XLSX.utils.sheet_to_json(sheet, {
+    const rawData: Record<string, string | number>[] = XLSX.utils.sheet_to_json(sheet, {
       header: hasHeaders ? undefined : 'A', // Use column letters if no headers
       defval: '', // Default value for empty cells
       raw: false // Return formatted strings
@@ -252,7 +252,7 @@ export function detectDuplicates(
   field: keyof ImportRow
 ): DuplicateResult[] {
   const duplicates: DuplicateResult[] = [];
-  const valueMap = new Map<any, number[]>();
+  const valueMap = new Map<string | number, number[]>();
 
   // Build map of values to row numbers
   for (const row of rows) {
@@ -432,7 +432,7 @@ export function createDefaultColumnMapping(headers: string[]): ExcelColumnMappin
  * @returns Mapped import row
  */
 export function mapRowToTicket(
-  excelRow: any,
+  excelRow: Record<string, string | number>,
   columnMapping: ExcelColumnMapping[],
   rowNumber: number
 ): ImportRow {
@@ -451,7 +451,7 @@ export function mapRowToTicket(
     }
 
     // Assign to import row
-    (importRow as any)[mapping.ticket_field] = value;
+    (importRow as Record<string, unknown>)[mapping.ticket_field] = value;
   }
 
   return importRow;
@@ -463,7 +463,7 @@ export function mapRowToTicket(
  * @param row - Row to check
  * @returns True if row is empty
  */
-function isEmptyRow(row: any): boolean {
+function isEmptyRow(row: Record<string, unknown>): boolean {
   const values = Object.values(row);
   return values.every(value => value === '' || value === null || value === undefined);
 }
@@ -477,7 +477,7 @@ function trimRowValues(row: ImportRow): void {
   for (const key of Object.keys(row) as (keyof ImportRow)[]) {
     const value = row[key];
     if (typeof value === 'string') {
-      (row as any)[key] = value.trim();
+      (row as Record<string, unknown>)[key] = value.trim();
     }
   }
 }
