@@ -54,7 +54,7 @@ export interface AutoApprovalRule {
 export interface ApprovalCondition {
   field: string;
   operator: 'equals' | 'greater' | 'less' | 'contains';
-  value: any;
+  value: string | number | boolean;
 }
 
 export enum ProjectStatus {
@@ -76,9 +76,9 @@ export enum ApprovalLevel {
 export interface ProcurementContextState {
   currentProject: Project | null;
   permissions: ProcurementPermissions;
-  boqs: any[]; // Will be properly typed
-  rfqs: any[]; // Will be properly typed
-  stockPositions: any[]; // Will be properly typed
+  boqs: Record<string, unknown>[];
+  rfqs: Record<string, unknown>[];
+  stockPositions: Record<string, unknown>[];
   loading: {
     boqs: boolean;
     rfqs: boolean;
@@ -113,17 +113,17 @@ export interface ProcurementPermissions {
   approvalLimit: number;
 }
 
-export type ProcurementAction = 
+export type ProcurementAction =
   | { type: 'SET_PROJECT'; payload: Project }
   | { type: 'SET_PERMISSIONS'; payload: ProcurementPermissions }
   | { type: 'LOAD_BOQS_START' }
-  | { type: 'LOAD_BOQS_SUCCESS'; payload: any[] }
+  | { type: 'LOAD_BOQS_SUCCESS'; payload: Record<string, unknown>[] }
   | { type: 'LOAD_BOQS_ERROR'; payload: string }
   | { type: 'LOAD_RFQS_START' }
-  | { type: 'LOAD_RFQS_SUCCESS'; payload: any[] }
+  | { type: 'LOAD_RFQS_SUCCESS'; payload: Record<string, unknown>[] }
   | { type: 'LOAD_RFQS_ERROR'; payload: string }
   | { type: 'LOAD_STOCK_START' }
-  | { type: 'LOAD_STOCK_SUCCESS'; payload: any[] }
+  | { type: 'LOAD_STOCK_SUCCESS'; payload: Record<string, unknown>[] }
   | { type: 'LOAD_STOCK_ERROR'; payload: string };
 
 // Navigation and routing types

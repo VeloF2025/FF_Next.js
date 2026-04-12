@@ -16,7 +16,7 @@ export interface ValidationResult {
   level: ValidationLevel;
   message: string;
   code?: string;
-  value?: any;
+  value?: unknown;
 }
 
 export interface ValidationResults {
@@ -46,7 +46,7 @@ export interface ImportValidation {
   errors: ValidationResult[];
   warnings: ValidationResult[];
   summary: ImportSummary;
-  data?: any[];
+  data?: Record<string, unknown>[];
 }
 
 export interface ColumnMapping {
@@ -54,8 +54,8 @@ export interface ColumnMapping {
   targetField: string;
   required: boolean;
   dataType: 'string' | 'number' | 'date' | 'boolean';
-  transform?: (value: any) => any;
-  validate?: (value: any) => ValidationResult | null;
+  transform?: (value: unknown) => unknown;
+  validate?: (value: unknown) => ValidationResult | null;
 }
 
 export interface DataQualityReport {
@@ -72,8 +72,8 @@ export interface DataQualityReport {
 export interface ValidationRule {
   field: string;
   rule: 'required' | 'format' | 'range' | 'custom';
-  parameters?: any;
+  parameters?: Record<string, unknown>;
   message: string;
   severity: ValidationCriticality;
-  validator?: (value: any) => boolean;
+  validator?: (value: unknown) => boolean;
 }

@@ -4,18 +4,27 @@
  * Fully migrated to use Neon PostgreSQL
  */
 
-import { neon } from '@/lib/db-neon';
+import { neon, NeonQueryFunction } from '@/lib/db-neon';
 import { RFQStatus } from '@/types/procurement.types';
 import { RFQCrud } from './rfqCrud';
 import { EmailNotificationService } from './notifications/emailNotificationService';
 import { log } from '@/lib/logger';
 
-const sql: any = neon(process.env.DATABASE_URL!);
+const sql: NeonQueryFunction<false, false> = neon(process.env.DATABASE_URL!);
+
+interface RFQResponseData {
+  id: string;
+  supplierId: string;
+  totalAmount: number;
+  deliveryLeadTime: number;
+  paymentTerms: string;
+  [key: string]: unknown;
+}
 
 /**
  * Utility to convert various date formats to Date object
  */
-function toDate(timestampOrDate: Date | string | number | any): Date {
+function toDate(timestampOrDate: Date | string | number): Date {
   if (!timestampOrDate) {
     return new Date();
   }
@@ -69,7 +78,7 @@ export class RFQLifecycle {
   /**
    * Submit a supplier response to an RFQ
    */
-  static async submitResponse(rfqId: string, response: any): Promise<string> {
+  static async submitResponse(rfqId: string, response: Record<string, unknown>): Promise<string> {
     try {
       // Submit response using CRUD service
       const responseId = await RFQCrud.submitResponse(rfqId, response);
@@ -91,7 +100,7 @@ export class RFQLifecycle {
   /**
    * Get all responses for an RFQ
    */
-  static async getResponses(rfqId: string): Promise<any[]> {
+  static async getResponses(rfqId: string): Promise<RFQResponseData[]> {
     try {
       return await RFQCrud.getResponses(rfqId);
     } catch (error) {
@@ -149,10 +158,10 @@ export class RFQLifecycle {
    * Compare responses for an RFQ
    */
   static async compareResponses(rfqId: string): Promise<{
-    responses: any[];
-    lowestPrice: any;
-    fastestDelivery: any;
-    bestPaymentTerms: any;
+    responses: RFQResponseData[];
+    lowestPrice: RFQResponseData;
+    fastestDelivery: RFQResponseData;
+    bestPaymentTerms: RFQResponseData;
   }> {
     try {
       const responses = await RFQLifecycle.getResponses(rfqId);
