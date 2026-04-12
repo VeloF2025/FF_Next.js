@@ -11,7 +11,7 @@
 
 import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
-import { OdooClient } from '../odooClient';
+import { OdooClient, SearchReadOptions } from '../odooClient';
 
 const logger = createLogger('odooStockReceiptSync');
 
@@ -60,46 +60,46 @@ const STATE_MAPPING: Record<string, string> = {
  * Get supplier ID by Odoo partner ID
  */
 async function getSupplierByOdooId(
-  sql: any,
+  sql: NeonQueryFunction<false, false>,
   odooPartnerId: number
 ): Promise<number | null> {
   const rows = await sql`
     SELECT id FROM suppliers WHERE odoo_partner_id = ${odooPartnerId} LIMIT 1
   `;
-  return rows.length > 0 ? rows[0].id : null;
+  return rows.length > 0 ? rows[0]!.id : null;
 }
 
 /**
  * Get PO ID by Odoo PO ID
  */
 async function getPurchaseOrderByOdooId(
-  sql: any,
+  sql: NeonQueryFunction<false, false>,
   odooPOId: number
 ): Promise<string | null> {
   const rows = await sql`
     SELECT id FROM purchase_orders WHERE odoo_po_id = ${odooPOId} LIMIT 1
   `;
-  return rows.length > 0 ? rows[0].id : null;
+  return rows.length > 0 ? rows[0]!.id : null;
 }
 
 /**
  * Get stock item ID by Odoo product ID
  */
 async function getStockItemByOdooId(
-  sql: any,
+  sql: NeonQueryFunction<false, false>,
   odooProductId: number
 ): Promise<string | null> {
   const rows = await sql`
     SELECT id FROM stock_items WHERE odoo_product_id = ${odooProductId} LIMIT 1
   `;
-  return rows.length > 0 ? rows[0].id : null;
+  return rows.length > 0 ? rows[0]!.id : null;
 }
 
 /**
  * Get warehouse ID (default or first available)
  */
 async function getDefaultWarehouseId(
-  sql: any
+  sql: NeonQueryFunction<false, false>
 ): Promise<string | null> {
   const rows = await sql`
     SELECT id FROM stock_locations
@@ -107,14 +107,14 @@ async function getDefaultWarehouseId(
     ORDER BY name ASC
     LIMIT 1
   `;
-  return rows.length > 0 ? rows[0].id : null;
+  return rows.length > 0 ? rows[0]!.id : null;
 }
 
 /**
  * Get existing GRN by Odoo picking ID
  */
 async function getExistingGRN(
-  sql: any,
+  sql: NeonQueryFunction<false, false>,
   odooPickingId: number
 ): Promise<{ id: string; grn_number: string } | null> {
   const rows = await sql`
@@ -122,7 +122,7 @@ async function getExistingGRN(
     WHERE odoo_picking_id = ${odooPickingId}
     LIMIT 1
   `;
-  return rows.length > 0 ? rows[0] : null;
+  return rows.length > 0 ? (rows[0] as { id: string; grn_number: string }) : null;
 }
 
 /**
@@ -130,7 +130,7 @@ async function getExistingGRN(
  * Origin format: "PO00001" or sometimes "purchase.order:123"
  */
 async function extractPOFromOrigin(
-  sql: any,
+  sql: NeonQueryFunction<false, false>,
   client: OdooClient,
   origin: string | null | false
 ): Promise<string | null> {
@@ -186,7 +186,7 @@ export async function syncStockReceipts(
     const odooReceipts = await client.getCompletedReceipts({
       sinceDate,
       limit,
-    } as any);
+    } as SearchReadOptions);
 
     logger.info(`Found ${odooReceipts.length} receipts in Odoo`);
 
@@ -222,7 +222,7 @@ export async function syncStockReceipts(
           : null;
 
         if (!supplierId && !dryRun) {
-          result.errors.push(`${receipt.name}: Supplier not found in FF (Odoo partner: ${(receipt.partner_id as any)?.[1] || 'unknown'})`);
+          result.errors.push(`${receipt.name}: Supplier not found in FF (Odoo partner: ${(receipt.partner_id as [number, string])?.[1] || 'unknown'})`);
           result.details.push({
             odooId: receipt.id,
             odooName: receipt.name,
@@ -313,7 +313,7 @@ export async function syncStockReceipts(
               ${receipt.id},
               NOW(),
               ${'Synced from Odoo: ' + receipt.name},
-              ${(receipt as any).create_date ? new Date((receipt as any).create_date) : new Date()}
+              ${(receipt as unknown as Record<string, unknown>).create_date ? new Date((receipt as unknown as Record<string, unknown>).create_date as string) : new Date()}
             )
             RETURNING id, grn_number
           `;
@@ -353,6 +353,8 @@ export async function syncStockReceipts(
               `;
             } else {
               // Create new item
+              const productName = move.product_id !== false ? ((move.product_id as [number, string]).at(1) as string | undefined) ?? 'Unknown Product' : 'Unknown Product';
+              const productCode = productName.split(']')[0]?.replace('[', '') ?? '';
               await sql`
                 INSERT INTO goods_receipt_items (
                   grn_id,
@@ -370,15 +372,15 @@ export async function syncStockReceipts(
                 ) VALUES (
                   ${grnId},
                   ${stockItemId},
-                  ${move.product_id ? (move.product_id as any)[1].split(']')[0].replace('[', '') : null},
-                  ${move.product_id ? (move.product_id as any)[1] : 'Unknown Product'},
+                  ${productCode},
+                  ${productName},
                   ${move.product_uom_qty},
                   ${move.quantity},
                   0,
-                  ${move.product_uom ? (move.product_uom as any)[1] : 'unit'},
-                  ${move.lot_ids ? (move.lot_ids as any)[1] : null},
+                  ${move.product_uom ? (move.product_uom as [number, string]).at(1) ?? 'unit' : 'unit'},
+                  ${move.lot_ids ? (move.lot_ids as [number, string]).at(1) ?? null : null},
                   ${move.id},
-                  ${move.lot_ids ? (move.lot_ids as any)[0] : null},
+                  ${move.lot_ids ? (move.lot_ids as [number, string]).at(0) ?? null : null},
                   NOW()
                 )
               `;

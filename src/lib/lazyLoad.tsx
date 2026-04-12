@@ -6,8 +6,11 @@
  */
 
 import dynamic from 'next/dynamic';
-import { ComponentType, lazy, Suspense } from 'react';
+import { ComponentType, Suspense } from 'react';
 import { log } from '@/lib/logger';
+
+/** Shared props constraint for lazily-loaded components. */
+type AnyProps = Record<string, unknown>;
 
 /**
  * Loading fallback component
@@ -34,7 +37,7 @@ export function LoadingFallback({ message = 'Loading...' }: { message?: string }
  * @example
  * const HeavyChart = lazyLoad(() => import('./HeavyChart'));
  */
-export function lazyLoad<T extends ComponentType<any>>(
+export function lazyLoad<T extends ComponentType<AnyProps>>(
   importFunc: () => Promise<{ default: T }>,
   options?: {
     loading?: ComponentType;
@@ -51,7 +54,7 @@ export function lazyLoad<T extends ComponentType<any>>(
 /**
  * Lazy load with custom loading component
  */
-export function lazyLoadWithLoader<T extends ComponentType<any>>(
+export function lazyLoadWithLoader<T extends ComponentType<AnyProps>>(
   importFunc: () => Promise<{ default: T }>,
   LoadingComponent: ComponentType
 ) {
@@ -65,7 +68,7 @@ export function lazyLoadWithLoader<T extends ComponentType<any>>(
  * Lazy load without SSR (client-side only)
  * Use for components that rely on browser APIs
  */
-export function lazyLoadClient<T extends ComponentType<any>>(
+export function lazyLoadClient<T extends ComponentType<AnyProps>>(
   importFunc: () => Promise<{ default: T }>,
   loadingMessage?: string
 ) {
@@ -99,13 +102,14 @@ export async function preload<T>(
  * Lazy load multiple components at once
  * Returns an object with all components
  */
-export function lazyLoadMultiple<T extends Record<string, () => Promise<{ default: any }>>>(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function lazyLoadMultiple<T extends Record<string, () => Promise<{ default: ComponentType<any> }>>>(
   imports: T
 ): Record<keyof T, ReturnType<typeof dynamic>> {
   const components = {} as Record<keyof T, ReturnType<typeof dynamic>>;
 
   for (const [key, importFunc] of Object.entries(imports)) {
-    components[key as keyof T] = lazyLoad(importFunc);
+    components[key as keyof T] = lazyLoad(importFunc) as ReturnType<typeof dynamic>;
   }
 
   return components;
@@ -134,7 +138,7 @@ export function SuspenseWithLoading({
  * Route-based code splitting helper
  * For lazy loading entire pages/routes
  */
-export function lazyRoute<T extends ComponentType<any>>(
+export function lazyRoute<T extends ComponentType<AnyProps>>(
   importFunc: () => Promise<{ default: T }>
 ) {
   return lazyLoad(importFunc, {
@@ -146,7 +150,7 @@ export function lazyRoute<T extends ComponentType<any>>(
  * Module-based code splitting
  * For lazy loading feature modules
  */
-export function lazyModule<T extends ComponentType<any>>(
+export function lazyModule<T extends ComponentType<AnyProps>>(
   importFunc: () => Promise<{ default: T }>,
   moduleName: string
 ) {
@@ -165,7 +169,7 @@ export function lazyModule<T extends ComponentType<any>>(
  *   userHasPermission
  * );
  */
-export function conditionalLazy<T extends ComponentType<any>>(
+export function conditionalLazy<T extends ComponentType<AnyProps>>(
   importFunc: () => Promise<{ default: T }>,
   condition: boolean
 ) {
@@ -179,7 +183,7 @@ export function conditionalLazy<T extends ComponentType<any>>(
  * Retry lazy loading on failure
  * Useful for handling network errors
  */
-export function lazyLoadWithRetry<T extends ComponentType<any>>(
+export function lazyLoadWithRetry<T extends ComponentType<AnyProps>>(
   importFunc: () => Promise<{ default: T }>,
   retries: number = 3
 ) {
@@ -205,7 +209,7 @@ export function lazyLoadWithRetry<T extends ComponentType<any>>(
  * Useful for prefetching related components
  */
 export async function prefetchComponents(
-  imports: Array<() => Promise<any>>
+  imports: Array<() => Promise<{ default: unknown }>>
 ): Promise<void> {
   await Promise.all(imports.map((importFunc) => preload(importFunc)));
 }
@@ -245,7 +249,7 @@ export class LazyLoadMonitor {
  * Monitored lazy load
  * Tracks loading time for performance analysis
  */
-export function lazyLoadMonitored<T extends ComponentType<any>>(
+export function lazyLoadMonitored<T extends ComponentType<AnyProps>>(
   importFunc: () => Promise<{ default: T }>,
   name: string
 ) {

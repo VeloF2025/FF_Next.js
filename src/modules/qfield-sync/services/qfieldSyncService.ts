@@ -236,8 +236,8 @@ export class QFieldSyncService {
   /**
    * Transform QField data to FibreFlow format
    */
-  private transformQFieldToFibreFlow(cable: QFieldFiberCable): any {
-    const statusMap = STATUS_MAPPING.qfieldToFibreflow as any;
+  private transformQFieldToFibreFlow(cable: QFieldFiberCable): Record<string, unknown> {
+    const statusMap = STATUS_MAPPING.qfieldToFibreflow as Record<string, string>;
 
     return {
       cable_id: cable.cableId,
@@ -271,13 +271,13 @@ export class QFieldSyncService {
    */
   private detectConflicts(
     qfieldData: QFieldFiberCable,
-    fibreflowData: any
+    fibreflowData: Record<string, unknown>
   ): SyncConflict[] {
     const conflicts: SyncConflict[] = [];
     const fieldsToCheck = ['cableType', 'status', 'installedBy', 'installationDate'];
 
     for (const field of fieldsToCheck) {
-      const qfieldValue = (qfieldData as any)[field];
+      const qfieldValue = (qfieldData as unknown as Record<string, unknown>)[field];
       const fibreflowValue = fibreflowData[this.mapFieldName(field)];
 
       if (qfieldValue !== undefined && fibreflowValue !== undefined &&
@@ -338,7 +338,7 @@ export class QFieldSyncService {
   }
 
   private mapFieldName(field: string): string {
-    const mapping: any = {
+    const mapping: Record<string, string> = {
       cableType: 'cable_type',
       cableSize: 'cable_size',
       fiberCount: 'fiber_count',
@@ -361,18 +361,18 @@ export class QFieldSyncService {
     return [];
   }
 
-  private async fetchFibreFlowRecord(cableId: string): Promise<any | null> {
+  private async fetchFibreFlowRecord(cableId: string): Promise<Record<string, unknown> | null> {
     // TODO: Implement actual database query
     log.debug('qfieldSyncService', { message: 'Fetching FibreFlow record for cable', cableId });
     return null;
   }
 
-  private async updateFibreFlowRecord(cableId: string, _data: any): Promise<void> {
+  private async updateFibreFlowRecord(cableId: string, _data: Record<string, unknown>): Promise<void> {
     // TODO: Implement actual database update
     log.debug('qfieldSyncService', { message: 'Updating FibreFlow record for cable', cableId });
   }
 
-  private async createFibreFlowRecord(_data: any): Promise<void> {
+  private async createFibreFlowRecord(_data: Record<string, unknown>): Promise<void> {
     // TODO: Implement actual database insert
     log.debug('qfieldSyncService', { message: 'Creating new FibreFlow record' });
   }
