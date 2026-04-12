@@ -11,6 +11,15 @@ export type { RecoveryOption, RetryStrategy, HandlerResult, ErrorSeverity } from
 // Import these directly to avoid circular references
 import { InsufficientStockError, StockReservationError } from './inventory';
 import { StockMovementError } from './tracking';
+import type {
+  MovementType,
+  AdjustmentType,
+  MovementOptions,
+  TransferOptions,
+  AdjustmentOptions,
+  InsufficientStockOptions,
+  ExistingReservation
+} from './types';
 
 /**
  * Tracking handlers placeholder (to avoid circular import)
@@ -50,6 +59,13 @@ export class MovementHandlers {
 // Import additional error classes for factory methods
 import { StockTransferError, StockAdjustmentError } from './tracking';
 
+/** Minimal error shape for legacy formatErrorForUser */
+interface LegacyStockError {
+  constructor?: { name?: string };
+  message?: string;
+  itemCode?: string;
+}
+
 /**
  * Legacy StockErrorFactory class for backward compatibility
  * @deprecated Use StockErrorFactory from './factory' instead
@@ -59,19 +75,19 @@ export class StockErrorFactory {
     itemCode: string,
     requestedQuantity: number,
     availableQuantity: number,
-    options?: any,
-    context?: Record<string, any>
+    options?: InsufficientStockOptions,
+    context?: Record<string, unknown>
   ): InsufficientStockError => {
     return new InsufficientStockError(itemCode, requestedQuantity, availableQuantity, options, context);
   };
 
   static createMovementError = (
     message: string,
-    movementType: any,
+    movementType: MovementType,
     itemCode: string,
     quantity: number,
-    options?: any,
-    context?: Record<string, any>
+    options?: MovementOptions,
+    context?: Record<string, unknown>
   ): StockMovementError => {
     return new StockMovementError(message, movementType, itemCode, quantity, options, context);
   };
@@ -80,8 +96,8 @@ export class StockErrorFactory {
     itemCode: string,
     requestedQuantity: number,
     availableQuantity: number,
-    existingReservations: any[],
-    context?: Record<string, any>
+    existingReservations: ExistingReservation[],
+    context?: Record<string, unknown>
   ): StockReservationError => {
     return new StockReservationError(itemCode, requestedQuantity, availableQuantity, existingReservations, context);
   };
@@ -92,8 +108,8 @@ export class StockErrorFactory {
     toLocation: string,
     quantity: number,
     reason: string,
-    options?: any,
-    context?: Record<string, any>
+    options?: TransferOptions,
+    context?: Record<string, unknown>
   ): StockTransferError => {
     return new StockTransferError(itemCode, fromLocation, toLocation, quantity, reason, options, context);
   };
@@ -101,12 +117,12 @@ export class StockErrorFactory {
   static createAdjustmentError = (
     itemCode: string,
     location: string,
-    adjustmentType: any,
+    adjustmentType: AdjustmentType,
     adjustmentQuantity: number,
     currentQuantity: number,
     message: string,
-    options?: any,
-    context?: Record<string, any>
+    options?: AdjustmentOptions,
+    context?: Record<string, unknown>
   ): StockAdjustmentError => {
     return new StockAdjustmentError(
       itemCode,
@@ -179,7 +195,7 @@ export class StockErrorHandler {
     };
   }
 
-  static formatErrorForUser(error: any) {
+  static formatErrorForUser(error: LegacyStockError) {
     // Legacy compatibility implementation
     return {
       title: error.constructor?.name || 'Stock Error',

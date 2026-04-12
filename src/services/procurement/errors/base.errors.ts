@@ -10,13 +10,13 @@ export class ProcurementError extends Error {
   public readonly code: string;
   public readonly statusCode: number;
   public readonly timestamp: Date;
-  public readonly context?: Record<string, any>;
+  public readonly context?: Record<string, unknown>;
 
   constructor(
     message: string,
     code: string,
     statusCode: number = 400,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     super(message);
     this.name = 'ProcurementError';
@@ -39,8 +39,8 @@ export class ProcurementError extends Error {
       code: string;
       statusCode: number;
       timestamp: string;
-      context?: Record<string, any>;
-      [key: string]: any;
+      context?: Record<string, unknown>;
+      [key: string]: unknown;
     } = {
       name: this.name,
       message: this.message,
@@ -86,7 +86,7 @@ export class ProcurementError extends Error {
  * Quote-specific errors
  */
 export class QuoteError extends ProcurementError {
-  constructor(message: string, code: string, statusCode: number = 400, context?: Record<string, any>) {
+  constructor(message: string, code: string, statusCode: number = 400, context?: Record<string, unknown>) {
     super(message, code, statusCode, context);
     this.name = 'QuoteError';
     Object.setPrototypeOf(this, QuoteError.prototype);
@@ -100,13 +100,13 @@ export class ProcurementValidationError extends ProcurementError {
   public readonly validationErrors: Array<{
     field: string;
     message: string;
-    value?: any;
+    value?: unknown;
   }>;
 
   constructor(
     message: string,
-    validationErrors: Array<{ field: string; message: string; value?: any }>,
-    context?: Record<string, any>
+    validationErrors: Array<{ field: string; message: string; value?: unknown }>,
+    context?: Record<string, unknown>
   ) {
     super(message, 'VALIDATION_ERROR', 422, context);
     this.name = 'ProcurementValidationError';
@@ -149,7 +149,7 @@ export class ProcurementNotFoundError extends ProcurementError {
   constructor(
     resourceType: string,
     resourceId: string,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     const message = `${resourceType} with ID '${resourceId}' not found`;
     super(message, 'NOT_FOUND', 404, context);
@@ -173,13 +173,13 @@ export class ProcurementNotFoundError extends ProcurementError {
  */
 export class ProcurementConflictError extends ProcurementError {
   public readonly conflictType: 'duplicate' | 'invalid_state' | 'version_mismatch';
-  public readonly conflictDetails: Record<string, any> | undefined;
+  public readonly conflictDetails: Record<string, unknown> | undefined;
 
   constructor(
     message: string,
     conflictType: 'duplicate' | 'invalid_state' | 'version_mismatch',
-    conflictDetails: Record<string, any> | undefined,
-    context?: Record<string, any>
+    conflictDetails: Record<string, unknown> | undefined,
+    context?: Record<string, unknown>
   ) {
     const code = conflictType === 'duplicate' ? 'DUPLICATE_ENTRY' : 
                  conflictType === 'version_mismatch' ? 'VERSION_CONFLICT' : 
