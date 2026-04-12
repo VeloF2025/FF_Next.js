@@ -37,7 +37,7 @@ export class DataTransformUtils {
   /**
    * Sanitize string for database storage
    */
-  static sanitizeString(value: any): string {
+  static sanitizeString(value: unknown): string {
     if (value === null || value === undefined) return '';
     
     return String(value)
@@ -50,9 +50,9 @@ export class DataTransformUtils {
   /**
    * Convert Firebase data to safe number
    */
-  static toSafeNumber(value: any, defaultValue: number = 0): number {
+  static toSafeNumber(value: unknown, defaultValue: number = 0): number {
     if (value === null || value === undefined) return defaultValue;
-    
+
     const num = typeof value === 'string' ? parseFloat(value) : Number(value);
     return isNaN(num) || !isFinite(num) ? defaultValue : num;
   }
@@ -60,7 +60,7 @@ export class DataTransformUtils {
   /**
    * Convert Firebase data to safe integer
    */
-  static toSafeInteger(value: any, defaultValue: number = 0): number {
+  static toSafeInteger(value: unknown, defaultValue: number = 0): number {
     const num = this.toSafeNumber(value, defaultValue);
     return Math.round(num);
   }
@@ -68,7 +68,7 @@ export class DataTransformUtils {
   /**
    * Convert Firebase data to safe string
    */
-  static toSafeString(value: any, defaultValue: string = ''): string {
+  static toSafeString(value: unknown, defaultValue: string = ''): string {
     if (value === null || value === undefined) return defaultValue;
     return this.sanitizeString(value);
   }
@@ -76,7 +76,7 @@ export class DataTransformUtils {
   /**
    * Check if a value represents a valid percentage (0-100)
    */
-  static isValidPercentage(value: any): boolean {
+  static isValidPercentage(value: unknown): boolean {
     const num = this.toSafeNumber(value, -1);
     return num >= 0 && num <= 100;
   }
@@ -94,8 +94,10 @@ export class DataTransformUtils {
     }
     
     const cloned = {} as T;
-    Object.keys(obj).forEach(key => {
-      (cloned as any)[key] = this.deepClone((obj as any)[key]);
+    const srcObj = obj as Record<string, unknown>;
+    const dstObj = cloned as Record<string, unknown>;
+    Object.keys(srcObj).forEach(key => {
+      dstObj[key] = this.deepClone(srcObj[key]);
     });
     
     return cloned;

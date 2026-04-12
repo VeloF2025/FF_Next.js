@@ -5,6 +5,17 @@
 
 import type { ParsedDate } from '../types';
 
+/** Shape of a Firebase Timestamp-like object */
+interface FirebaseTimestampLike {
+  toDate?: () => Date;
+  seconds?: number;
+}
+
+/** Narrow unknown to FirebaseTimestampLike when it is a plain object */
+function isFirebaseTimestampLike(value: unknown): value is FirebaseTimestampLike {
+  return typeof value === 'object' && value !== null && !(value instanceof Date);
+}
+
 /**
  * Date parsing and manipulation utilities
  */
@@ -12,37 +23,37 @@ export class DateParsingUtils {
   /**
    * Parse Firebase date/timestamp to JavaScript Date
    */
-  static parseFirebaseDate(firebaseDate: any): Date | null {
+  static parseFirebaseDate(firebaseDate: unknown): Date | null {
     if (!firebaseDate) return null;
-    
-    // Firebase Timestamp with toDate method
-    if (firebaseDate.toDate && typeof firebaseDate.toDate === 'function') {
-      return firebaseDate.toDate();
+
+    // Already a Date object
+    if (firebaseDate instanceof Date) {
+      return firebaseDate;
     }
-    
-    // Firebase Timestamp with seconds property
-    if (firebaseDate.seconds && typeof firebaseDate.seconds === 'number') {
-      return new Date(firebaseDate.seconds * 1000);
-    }
-    
+
     // String or number date
     if (typeof firebaseDate === 'string' || typeof firebaseDate === 'number') {
       const date = new Date(firebaseDate);
       return isNaN(date.getTime()) ? null : date;
     }
-    
-    // Already a Date object
-    if (firebaseDate instanceof Date) {
-      return firebaseDate;
+
+    // Firebase Timestamp-like object
+    if (isFirebaseTimestampLike(firebaseDate)) {
+      if (typeof firebaseDate.toDate === 'function') {
+        return firebaseDate.toDate();
+      }
+      if (typeof firebaseDate.seconds === 'number') {
+        return new Date(firebaseDate.seconds * 1000);
+      }
     }
-    
+
     return null;
   }
 
   /**
    * Parse Firebase date with detailed result information
    */
-  static parseFirebaseDateDetailed(firebaseDate: any): ParsedDate {
+  static parseFirebaseDateDetailed(firebaseDate: unknown): ParsedDate {
     if (!firebaseDate) {
       return {
         success: false,
@@ -51,36 +62,17 @@ export class DateParsingUtils {
         parseMethod: 'null'
       };
     }
-    
-    // Firebase Timestamp with toDate method
-    if (firebaseDate.toDate && typeof firebaseDate.toDate === 'function') {
-      try {
-        return {
-          success: true,
-          date: firebaseDate.toDate(),
-          originalValue: firebaseDate,
-          parseMethod: 'toDate'
-        };
-      } catch (error) {
-        return {
-          success: false,
-          date: null,
-          originalValue: firebaseDate,
-          parseMethod: 'toDate'
-        };
-      }
-    }
-    
-    // Firebase Timestamp with seconds property
-    if (firebaseDate.seconds && typeof firebaseDate.seconds === 'number') {
+
+    // Already a Date object
+    if (firebaseDate instanceof Date) {
       return {
         success: true,
-        date: new Date(firebaseDate.seconds * 1000),
+        date: firebaseDate,
         originalValue: firebaseDate,
-        parseMethod: 'seconds'
+        parseMethod: 'string'
       };
     }
-    
+
     // String or number date
     if (typeof firebaseDate === 'string' || typeof firebaseDate === 'number') {
       const date = new Date(firebaseDate);
@@ -92,17 +84,36 @@ export class DateParsingUtils {
         parseMethod: typeof firebaseDate === 'string' ? 'string' : 'number'
       };
     }
-    
-    // Already a Date object
-    if (firebaseDate instanceof Date) {
-      return {
-        success: true,
-        date: firebaseDate,
-        originalValue: firebaseDate,
-        parseMethod: 'string'
-      };
+
+    // Firebase Timestamp-like object
+    if (isFirebaseTimestampLike(firebaseDate)) {
+      if (typeof firebaseDate.toDate === 'function') {
+        try {
+          return {
+            success: true,
+            date: firebaseDate.toDate(),
+            originalValue: firebaseDate,
+            parseMethod: 'toDate'
+          };
+        } catch {
+          return {
+            success: false,
+            date: null,
+            originalValue: firebaseDate,
+            parseMethod: 'toDate'
+          };
+        }
+      }
+      if (typeof firebaseDate.seconds === 'number') {
+        return {
+          success: true,
+          date: new Date(firebaseDate.seconds * 1000),
+          originalValue: firebaseDate,
+          parseMethod: 'seconds'
+        };
+      }
     }
-    
+
     return {
       success: false,
       date: null,

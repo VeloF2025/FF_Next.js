@@ -6,13 +6,26 @@
 import { analyticsApi } from '@/services/api/analyticsApi';
 import { log } from '@/lib/logger';
 
+/** Minimal shape expected from staffPerformance DB rows */
+interface StaffPerformanceRow {
+  productivity?: string | number;
+  qualityScore?: string | number;
+  attendanceRate?: string | number;
+  productivityScore?: string | number;
+}
+
+/** Drizzle ORM query builder stub — staffPerformance not yet migrated */
+interface DrizzleQueryBuilder {
+  select: () => DrizzleQueryBuilder;
+  from: (table: unknown) => DrizzleQueryBuilder;
+  where: (condition: unknown) => DrizzleQueryBuilder;
+  orderBy: (field: unknown) => Promise<StaffPerformanceRow[]>;
+}
+
 // PARTIAL: Drizzle ORM stubs — staffPerformance table not yet migrated to drizzle
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const neonDb: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const staffPerformance: any = {};
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const eq: any = () => {};
+const neonDb: DrizzleQueryBuilder | null = null;
+const staffPerformance: Record<string, unknown> = {};
+const eq = (_field: unknown, _value: unknown): unknown => ({});
 
 /**
  * Staff performance trend analysis service
@@ -33,7 +46,8 @@ export class StaffTrendAnalyzer {
         type: 'monthly'
       });
       
-      const records = performance.history || [];
+      const rawHistory = performance['history'];
+      const records: StaffPerformanceRow[] = Array.isArray(rawHistory) ? (rawHistory as StaffPerformanceRow[]) : [];
 
       if (records.length < 2) {
         return this.getDefaultTrends();
@@ -52,7 +66,7 @@ export class StaffTrendAnalyzer {
   /**
    * Calculate trend patterns from historical data
    */
-  private static calculateTrends(records: any[]): {
+  private static calculateTrends(records: StaffPerformanceRow[]): {
     productivityTrend: 'improving' | 'stable' | 'declining';
     qualityTrend: 'improving' | 'stable' | 'declining';
     attendanceTrend: 'improving' | 'stable' | 'declining';
@@ -61,10 +75,12 @@ export class StaffTrendAnalyzer {
     const first = records[0];
     const last = records[records.length - 1];
 
+    if (!first || !last) return this.getDefaultTrends();
+
     // Calculate trends
-    const productivityChange = parseFloat(last.productivityScore) - parseFloat(first.productivityScore);
-    const qualityChange = parseFloat(last.qualityScore) - parseFloat(first.qualityScore);
-    const attendanceChange = parseFloat(last.attendanceRate) - parseFloat(first.attendanceRate);
+    const productivityChange = parseFloat(String(last.productivityScore ?? 0)) - parseFloat(String(first.productivityScore ?? 0));
+    const qualityChange = parseFloat(String(last.qualityScore ?? 0)) - parseFloat(String(first.qualityScore ?? 0));
+    const attendanceChange = parseFloat(String(last.attendanceRate ?? 0)) - parseFloat(String(first.attendanceRate ?? 0));
 
     const productivityTrend = this.getTrendDirection(productivityChange);
     const qualityTrend = this.getTrendDirection(qualityChange);
@@ -114,18 +130,19 @@ export class StaffTrendAnalyzer {
    */
   static async getPerformanceVolatility(staffId: string, months: number = 6): Promise<number> {
     try {
-      const records = await neonDb
+      // PARTIAL: neonDb will be replaced when staffPerformance migrates to Drizzle
+      const records = await neonDb!
         .select()
         .from(staffPerformance)
-        .where(eq(staffPerformance.staffId, staffId))
-        .orderBy(staffPerformance.periodStart);
+        .where(eq(staffPerformance['staffId'], staffId))
+        .orderBy(staffPerformance['periodStart']);
 
       if (records.length < 3) return 0;
 
       const recent = records.slice(-Math.min(months, records.length));
       
       // Calculate standard deviation of productivity scores
-      const productivityScores = recent.map((r: any) => parseFloat(r.productivity || '0.75'));
+      const productivityScores = recent.map((r: StaffPerformanceRow) => parseFloat(String(r.productivity ?? '0.75')));
       const mean = productivityScores.reduce((sum: number, score: number) => sum + score, 0) / productivityScores.length;
       const variance = productivityScores.reduce((sum: number, score: number) => sum + Math.pow(score - mean, 2), 0) / productivityScores.length;
       const standardDeviation = Math.sqrt(variance);
@@ -148,11 +165,12 @@ export class StaffTrendAnalyzer {
     confidence: number;
   }> {
     try {
-      const records = await neonDb
+      // PARTIAL: neonDb will be replaced when staffPerformance migrates to Drizzle
+      const records = await neonDb!
         .select()
         .from(staffPerformance)
-        .where(eq(staffPerformance.staffId, staffId))
-        .orderBy(staffPerformance.periodStart);
+        .where(eq(staffPerformance['staffId'], staffId))
+        .orderBy(staffPerformance['periodStart']);
 
       if (records.length < 2) {
         return {
@@ -167,12 +185,12 @@ export class StaffTrendAnalyzer {
       const recent = records.slice(-3); // Use last 3 months
       const latest = recent[recent.length - 1];
       
-      const productivityTrend = this.calculateSimpleTrend(recent.map((r: any) => parseFloat(r.productivity || '0.75') * 100));
-      const qualityTrend = this.calculateSimpleTrend(recent.map((r: any) => parseFloat(r.qualityScore || '80')));
+      const productivityTrend = this.calculateSimpleTrend(recent.map((r: StaffPerformanceRow) => parseFloat(String(r.productivity ?? '0.75')) * 100));
+      const qualityTrend = this.calculateSimpleTrend(recent.map((r: StaffPerformanceRow) => parseFloat(String(r.qualityScore ?? '80'))));
       const attendanceTrend = this.calculateSimpleTrend(recent.map(() => 95)); // Default attendance rate
 
-      const predictedProductivity = Math.max(0, Math.min(100, parseFloat(latest.productivity || '0.75') * 100 + productivityTrend));
-      const predictedQuality = Math.max(0, Math.min(100, parseFloat(latest.qualityScore || '80') + qualityTrend));
+      const predictedProductivity = Math.max(0, Math.min(100, parseFloat(String(latest?.productivity ?? '0.75')) * 100 + productivityTrend));
+      const predictedQuality = Math.max(0, Math.min(100, parseFloat(String(latest?.qualityScore ?? '80')) + qualityTrend));
       const predictedAttendance = Math.max(0, Math.min(100, 95 + attendanceTrend));
 
       // Confidence based on data consistency and recency

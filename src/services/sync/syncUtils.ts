@@ -16,14 +16,14 @@ export class SyncUtils {
   /**
    * Parse Firebase date/timestamp to JavaScript Date
    */
-  static parseFirebaseDate(firebaseDate: any): Date | null {
+  static parseFirebaseDate(firebaseDate: unknown): Date | null {
     return DateParsingUtils.parseFirebaseDate(firebaseDate);
   }
 
   /**
    * Parse Firebase date with detailed result information
    */
-  static parseFirebaseDateDetailed(firebaseDate: any): ParsedDate {
+  static parseFirebaseDateDetailed(firebaseDate: unknown): ParsedDate {
     return DateParsingUtils.parseFirebaseDateDetailed(firebaseDate);
   }
 
@@ -58,35 +58,35 @@ export class SyncUtils {
   /**
    * Sanitize string for database storage
    */
-  static sanitizeString(value: any): string {
+  static sanitizeString(value: unknown): string {
     return DataTransformUtils.sanitizeString(value);
   }
 
   /**
    * Convert Firebase data to safe number
    */
-  static toSafeNumber(value: any, defaultValue: number = 0): number {
+  static toSafeNumber(value: unknown, defaultValue: number = 0): number {
     return DataTransformUtils.toSafeNumber(value, defaultValue);
   }
 
   /**
    * Convert Firebase data to safe integer
    */
-  static toSafeInteger(value: any, defaultValue: number = 0): number {
+  static toSafeInteger(value: unknown, defaultValue: number = 0): number {
     return DataTransformUtils.toSafeInteger(value, defaultValue);
   }
 
   /**
    * Convert Firebase data to safe string
    */
-  static toSafeString(value: any, defaultValue: string = ''): string {
+  static toSafeString(value: unknown, defaultValue: string = ''): string {
     return DataTransformUtils.toSafeString(value, defaultValue);
   }
 
   /**
    * Check if a value represents a valid percentage (0-100)
    */
-  static isValidPercentage(value: any): boolean {
+  static isValidPercentage(value: unknown): boolean {
     return DataTransformUtils.isValidPercentage(value);
   }
 

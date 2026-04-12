@@ -28,7 +28,7 @@ export class ScorecardDataValidator {
     ];
 
     requiredFields.forEach(({ field, weight }) => {
-      if (!this.hasValidValue((supplier as any)[field])) {
+      if (!this.hasValidValue((supplier as unknown as Record<string, unknown>)[field])) {
         missingFields.push(field);
         completeness -= weight;
         issues.push(`Missing or invalid ${field}`);
@@ -45,7 +45,7 @@ export class ScorecardDataValidator {
     ];
 
     optionalFields.forEach(({ field, weight }) => {
-      if (!this.hasValidValue((supplier as any)[field])) {
+      if (!this.hasValidValue((supplier as unknown as Record<string, unknown>)[field])) {
         completeness -= weight;
         issues.push(`Missing ${field} data`);
       }
@@ -69,11 +69,12 @@ export class ScorecardDataValidator {
 
     // Validate performance data
     if (supplier.performance) {
-      const performance = supplier.performance as any;
+      const performance = supplier.performance as unknown as Record<string, unknown>;
       const performanceFields = ['onTimeDelivery', 'qualityScore', 'responseTime'];
-      
+
       performanceFields.forEach(field => {
-        if (typeof performance[field] !== 'number' || performance[field] < 0 || performance[field] > 100) {
+        const fieldVal = performance[field];
+        if (typeof fieldVal !== 'number' || fieldVal < 0 || fieldVal > 100) {
           issues.push(`Invalid performance ${field} value`);
         }
       });
@@ -96,8 +97,8 @@ export class ScorecardDataValidator {
           issues.push('Invalid rating value (should be 0-5)');
         }
       } else if (typeof supplier.rating === 'object') {
-        const rating = supplier.rating as any;
-        if (typeof rating.overall !== 'number' || rating.overall < 0 || rating.overall > 5) {
+        const rating = supplier.rating as Record<string, unknown>;
+        if (typeof rating['overall'] !== 'number' || (rating['overall'] as number) < 0 || (rating['overall'] as number) > 5) {
           issues.push('Invalid overall rating value');
         }
       }
@@ -165,7 +166,7 @@ export class ScorecardDataValidator {
   /**
    * Check if a value is valid (not null, undefined, or empty string)
    */
-  private static hasValidValue(value: any): boolean {
+  private static hasValidValue(value: unknown): boolean {
     if (value === null || value === undefined) {
       return false;
     }
@@ -227,17 +228,18 @@ export class ScorecardDataValidator {
 
     // Check if status matches performance
     if (supplier.status === 'active' && supplier.performance) {
-      const performance = supplier.performance as any;
-      if (performance.overallScore && performance.overallScore < 40) {
+      const performance = supplier.performance as unknown as Record<string, unknown>;
+      const overallScore = performance['overallScore'];
+      if (typeof overallScore === 'number' && overallScore < 40) {
         consistencyScore -= 10; // Active supplier with poor performance
       }
     }
 
     // Check if preferred status matches rating
     if (supplier.isPreferred && supplier.rating) {
-      const rating = typeof supplier.rating === 'number' ? 
-        supplier.rating : 
-        (supplier.rating as any).overall || 0;
+      const rating = typeof supplier.rating === 'number'
+        ? supplier.rating
+        : ((supplier.rating as Record<string, unknown>)['overall'] as number | undefined) ?? 0;
       
       if (rating < 3.5) {
         consistencyScore -= 15; // Preferred supplier with low rating
