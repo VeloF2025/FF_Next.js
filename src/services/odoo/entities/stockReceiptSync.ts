@@ -9,9 +9,9 @@
  * - Odoo stock.move → FF goods_receipt_items
  */
 
-import { neon, NeonQueryFunction } from '@/lib/db-neon';
+import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
-import { OdooClient, OdooStockPicking, OdooStockMove } from '../odooClient';
+import { OdooClient } from '../odooClient';
 
 const logger = createLogger('odooStockReceiptSync');
 
@@ -465,8 +465,6 @@ export async function syncSingleReceipt(
   databaseUrl: string,
   odooPickingId: number
 ): Promise<{ success: boolean; message: string; grnId?: string }> {
-  const sql = neon(databaseUrl);
-
   try {
     // Get the specific picking
     const pickings = await client.getStockPickingsByType('incoming', { limit: 1 });

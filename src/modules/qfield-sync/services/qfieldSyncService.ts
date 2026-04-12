@@ -185,7 +185,7 @@ export class QFieldSyncService {
   /**
    * Sync from FibreFlow to QFieldCloud
    */
-  private async syncFibreFlowToQField(job: SyncJob): Promise<void> {
+  private async syncFibreFlowToQField(_job: SyncJob): Promise<void> {
     // Implementation for reverse sync
     // Similar structure to syncQFieldToFibreFlow but in reverse
     log.debug('qfieldSyncService', { message: 'Syncing from FibreFlow to QField' });
@@ -299,17 +299,17 @@ export class QFieldSyncService {
   /**
    * Placeholder sync methods for other data types
    */
-  private async syncPoles(job: SyncJob, direction: SyncDirection): Promise<void> {
+  private async syncPoles(_job: SyncJob, _direction: SyncDirection): Promise<void> {
     log.debug('qfieldSyncService', { message: 'Syncing poles' });
     // TODO: Implement pole sync logic
   }
 
-  private async syncSpliceClosures(job: SyncJob, direction: SyncDirection): Promise<void> {
+  private async syncSpliceClosures(_job: SyncJob, _direction: SyncDirection): Promise<void> {
     log.debug('qfieldSyncService', { message: 'Syncing splice closures' });
     // TODO: Implement splice closure sync logic
   }
 
-  private async syncTestPoints(job: SyncJob, direction: SyncDirection): Promise<void> {
+  private async syncTestPoints(_job: SyncJob, _direction: SyncDirection): Promise<void> {
     log.debug('qfieldSyncService', { message: 'Syncing test points' });
     // TODO: Implement test point sync logic
   }
@@ -367,12 +367,12 @@ export class QFieldSyncService {
     return null;
   }
 
-  private async updateFibreFlowRecord(cableId: string, data: any): Promise<void> {
+  private async updateFibreFlowRecord(cableId: string, _data: any): Promise<void> {
     // TODO: Implement actual database update
     log.debug('qfieldSyncService', { message: 'Updating FibreFlow record for cable', cableId });
   }
 
-  private async createFibreFlowRecord(data: any): Promise<void> {
+  private async createFibreFlowRecord(_data: any): Promise<void> {
     // TODO: Implement actual database insert
     log.debug('qfieldSyncService', { message: 'Creating new FibreFlow record' });
   }
