@@ -28,7 +28,8 @@ import {
   CreateEscalationPayload,
   ResolveEscalationPayload,
 } from '../../types/escalation';
-import { TicketSource, TicketType } from '../../types/ticket';
+import { TicketSource, TicketType, Ticket } from '../../types/ticket';
+import type { RepeatFaultEscalation } from '../../types/escalation';
 
 // Mock logger
 vi.mock('@/lib/logger', () => ({
@@ -253,7 +254,7 @@ describe('EscalationService (TDD)', () => {
         .mockResolvedValueOnce(mockEscalation) // getEscalationById
         .mockResolvedValueOnce({ ...mockEscalation, escalation_ticket_id: mockTicket.id }); // update
 
-      vi.mocked(ticketService.createTicket).mockResolvedValue(mockTicket as any);
+      vi.mocked(ticketService.createTicket).mockResolvedValue(mockTicket as unknown as Ticket);
 
       // Act
       const result = await escalationService.createInfrastructureTicket(
@@ -305,7 +306,7 @@ describe('EscalationService (TDD)', () => {
         .mockResolvedValueOnce(mockEscalation)
         .mockResolvedValueOnce({ ...mockEscalation, escalation_ticket_id: mockTicket.id });
 
-      vi.mocked(ticketService.createTicket).mockResolvedValue(mockTicket as any);
+      vi.mocked(ticketService.createTicket).mockResolvedValue(mockTicket as unknown as Ticket);
 
       // Act
       await escalationService.createInfrastructureTicket(escalationId, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
@@ -431,7 +432,7 @@ describe('EscalationService (TDD)', () => {
         },
       ];
 
-      vi.mocked(db.query).mockResolvedValue(mockEscalations as any);
+      vi.mocked(db.query).mockResolvedValue(mockEscalations as unknown as RepeatFaultEscalation[]);
 
       // Act
       const result = await escalationService.listEscalations();
@@ -452,7 +453,7 @@ describe('EscalationService (TDD)', () => {
         },
       ];
 
-      vi.mocked(db.query).mockResolvedValue(mockEscalations as any);
+      vi.mocked(db.query).mockResolvedValue(mockEscalations as unknown as RepeatFaultEscalation[]);
 
       // Act
       const result = await escalationService.listEscalations({
@@ -477,7 +478,7 @@ describe('EscalationService (TDD)', () => {
         },
       ];
 
-      vi.mocked(db.query).mockResolvedValue(mockEscalations as any);
+      vi.mocked(db.query).mockResolvedValue(mockEscalations as unknown as RepeatFaultEscalation[]);
 
       // Act
       const result = await escalationService.listEscalations({

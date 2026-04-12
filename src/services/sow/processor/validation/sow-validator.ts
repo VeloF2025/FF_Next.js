@@ -137,7 +137,7 @@ export class SOWValidator {
   /**
    * Validate data based on type
    */
-  static validateData(data: unknown[], type: 'poles' | 'drops' | 'fibre'): ValidationResult<unknown> {
+  static validateData(data: NeonPoleData[] | NeonDropData[] | NeonFibreData[], type: 'poles' | 'drops' | 'fibre'): ValidationResult<NeonPoleData | NeonDropData | NeonFibreData> {
     switch (type) {
       case 'poles':
         return this.validatePoles(data as NeonPoleData[]);

@@ -27,6 +27,60 @@ import type {
 } from '../types/handover';
 import type { GuaranteeStatus } from '../types/ticket';
 
+/** Raw DB row from maintenance_tickets */
+interface TicketRow {
+  id: string;
+  ticket_uid: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  ticket_type: string;
+  dr_number: string | null;
+  project_id: string | null;
+  zone_id: string | null;
+  pole_number: string | null;
+  pon_number: string | null;
+  address: string | null;
+  ont_serial: string | null;
+  ont_rx_level: number | null;
+  ont_model: string | null;
+  assigned_to: string | null;
+  assigned_contractor_id: string | null;
+  assigned_team: string | null;
+  guarantee_status: GuaranteeStatus | null;
+  qa_ready: boolean | null;
+  qa_readiness_check_at: string | null;
+  fault_cause: string | null;
+  fault_cause_details: string | null;
+}
+
+/** Raw DB row from maintenance_attachments */
+interface AttachmentRow {
+  file_type: string;
+  verification_step_id: string | null;
+  storage_url: string;
+  filename: string;
+  uploaded_at: string;
+  uploaded_by: string;
+}
+
+/** Aggregated counts from maintenance_verification_steps */
+interface VerificationProgressRow {
+  total: string;
+  completed: string;
+}
+
+/** Raw DB row from maintenance_risk_acceptances */
+interface RiskAcceptanceRow {
+  risk_type: string;
+  risk_description: string;
+  conditions: string | null;
+  accepted_by: string;
+  accepted_at: string;
+  status: string;
+}
+
 /**
  * Input for generating a handover snapshot
  */
@@ -121,8 +175,8 @@ export async function generateHandoverSnapshot(
       assigned_team: ticket.assigned_team,
 
       // QA readiness
-      qa_ready: ticket.qa_ready,
-      qa_readiness_check_at: ticket.qa_readiness_check_at,
+      qa_ready: ticket.qa_ready ?? false,
+      qa_readiness_check_at: ticket.qa_readiness_check_at ? new Date(ticket.qa_readiness_check_at) : null,
 
       // Fault attribution
       fault_cause: ticket.fault_cause,
@@ -159,7 +213,7 @@ export async function generateHandoverSnapshot(
  * Fetch ticket data from database
  * 🟢 WORKING: Retrieves all relevant ticket fields
  */
-async function fetchTicketData(ticket_id: string): Promise<any> {
+async function fetchTicketData(ticket_id: string): Promise<TicketRow | null> {
   const queryText = `
     SELECT
       id,
@@ -190,7 +244,7 @@ async function fetchTicketData(ticket_id: string): Promise<any> {
     WHERE id = $1
   `;
 
-  const ticket = await queryOne<any>(queryText, [ticket_id]);
+  const ticket = await queryOne<TicketRow>(queryText, [ticket_id]);
 
   return ticket;
 }
@@ -213,7 +267,7 @@ async function fetchEvidenceLinks(ticket_id: string): Promise<EvidenceLink[]> {
     ORDER BY uploaded_at ASC
   `;
 
-  const attachments = await query<any>(queryText, [ticket_id]);
+  const attachments = await query<AttachmentRow>(queryText, [ticket_id]);
 
   return attachments.map((attachment) => ({
     type: attachment.file_type === 'photo' ? 'photo' : 'document',
@@ -240,15 +294,16 @@ async function fetchVerificationProgress(
     WHERE ticket_id = $1
   `;
 
-  const result = await query<any>(queryText, [ticket_id]);
+  const result = await query<VerificationProgressRow>(queryText, [ticket_id]);
 
-  if (result.length === 0) {
+  const row = result[0];
+  if (!row) {
     return { total: 0, completed: 0 };
   }
 
   return {
-    total: parseInt(result[0].total) || 0,
-    completed: parseInt(result[0].completed) || 0,
+    total: parseInt(row.total) || 0,
+    completed: parseInt(row.completed) || 0,
   };
 }
 
@@ -273,7 +328,7 @@ async function fetchDecisions(ticket_id: string): Promise<HandoverDecision[]> {
     ORDER BY accepted_at ASC
   `;
 
-  const riskAcceptances = await query<any>(riskAcceptancesQuery, [ticket_id]);
+  const riskAcceptances = await query<RiskAcceptanceRow>(riskAcceptancesQuery, [ticket_id]);
 
   // Map risk acceptances to decisions
   for (const risk of riskAcceptances) {
