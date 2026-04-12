@@ -5,12 +5,23 @@
 
 import { SupplierCrudService } from '../../supplier.crud';
 import { log } from '@/lib/logger';
-import { 
-  PerformanceMetrics, 
-  BenchmarkData, 
-  CategoryStats, 
+import { Supplier } from '@/types/supplier/base.types';
+import { SupplierPerformance } from '@/types/supplier/performance.types';
+import {
+  PerformanceMetrics,
+  BenchmarkData,
+  CategoryStats,
   BenchmarkCalculationParams
 } from './benchmark-types';
+
+/** Accumulator shape used in performance-score reduce calls */
+interface PerformanceTotals {
+  overallScore: number;
+  deliveryScore: number;
+  qualityScore: number;
+  priceScore: number;
+  serviceScore: number;
+}
 
 /**
  * Core benchmark calculation engine
@@ -46,7 +57,7 @@ export class BenchmarkCalculator {
   /**
    * Filter suppliers based on calculation parameters
    */
-  private static filterSuppliers(suppliers: any[], params: BenchmarkCalculationParams): any[] {
+  private static filterSuppliers(suppliers: Supplier[], params: BenchmarkCalculationParams): Supplier[] {
     return suppliers.filter(supplier => {
       // Status filter
       if (!params.includeInactive && supplier.status !== 'active') {
@@ -74,11 +85,11 @@ export class BenchmarkCalculator {
   }
 
   /**
-   * Calculate industry-wide average performance metrics
+   * Accumulate performance score totals from a supplier list
    */
-  private static calculateIndustryAverages(suppliers: any[]): PerformanceMetrics {
-    const totals = suppliers.reduce((acc, supplier) => {
-      const perf = supplier.performance as any;
+  private static accumulateScores(suppliers: Supplier[]): PerformanceTotals {
+    return suppliers.reduce<PerformanceTotals>((acc, supplier) => {
+      const perf = supplier.performance as SupplierPerformance | undefined;
       if (perf) {
         acc.overallScore += perf.overallScore || 0;
         acc.deliveryScore += perf.deliveryScore || 0;
@@ -88,6 +99,13 @@ export class BenchmarkCalculator {
       }
       return acc;
     }, { overallScore: 0, deliveryScore: 0, qualityScore: 0, priceScore: 0, serviceScore: 0 });
+  }
+
+  /**
+   * Calculate industry-wide average performance metrics
+   */
+  private static calculateIndustryAverages(suppliers: Supplier[]): PerformanceMetrics {
+    const totals = this.accumulateScores(suppliers);
 
     return {
       overallScore: Math.round(totals.overallScore / suppliers.length),
@@ -101,26 +119,16 @@ export class BenchmarkCalculator {
   /**
    * Calculate top performers average metrics
    */
-  private static calculateTopPerformers(suppliers: any[], topPercentile: number): PerformanceMetrics {
+  private static calculateTopPerformers(suppliers: Supplier[], topPercentile: number): PerformanceMetrics {
     const topCount = Math.max(1, Math.floor(suppliers.length * topPercentile));
     const sortedSuppliers = [...suppliers].sort((a, b) => {
-      const aScore = (a.performance as any)?.overallScore || 0;
-      const bScore = (b.performance as any)?.overallScore || 0;
+      const aScore = (a.performance as SupplierPerformance | undefined)?.overallScore ?? 0;
+      const bScore = (b.performance as SupplierPerformance | undefined)?.overallScore ?? 0;
       return bScore - aScore;
     });
 
     const topPerformersData = sortedSuppliers.slice(0, topCount);
-    const topTotals = topPerformersData.reduce((acc, supplier) => {
-      const perf = supplier.performance as any;
-      if (perf) {
-        acc.overallScore += perf.overallScore || 0;
-        acc.deliveryScore += perf.deliveryScore || 0;
-        acc.qualityScore += perf.qualityScore || 0;
-        acc.priceScore += perf.priceScore || 0;
-        acc.serviceScore += perf.serviceScore || 0;
-      }
-      return acc;
-    }, { overallScore: 0, deliveryScore: 0, qualityScore: 0, priceScore: 0, serviceScore: 0 });
+    const topTotals = this.accumulateScores(topPerformersData);
 
     return {
       overallScore: Math.round(topTotals.overallScore / topPerformersData.length),
@@ -134,8 +142,8 @@ export class BenchmarkCalculator {
   /**
    * Calculate benchmark metrics for each category
    */
-  private static calculateCategoryBenchmarks(suppliers: any[]): Record<string, { overallScore: number; sampleSize: number }> {
-    const categoryGroups: Record<string, any[]> = {};
+  private static calculateCategoryBenchmarks(suppliers: Supplier[]): Record<string, { overallScore: number; sampleSize: number }> {
+    const categoryGroups: Record<string, Supplier[]> = {};
 
     // Group suppliers by category
     suppliers.forEach(supplier => {
@@ -151,7 +159,7 @@ export class BenchmarkCalculator {
     const categoryBenchmarks: Record<string, { overallScore: number; sampleSize: number }> = {};
     Object.entries(categoryGroups).forEach(([category, categorySuppliers]) => {
       const totalScore = categorySuppliers.reduce((sum, supplier) => {
-        return sum + ((supplier.performance as any)?.overallScore || 0);
+        return sum + ((supplier.performance as SupplierPerformance | undefined)?.overallScore ?? 0);
       }, 0);
 
       categoryBenchmarks[category] = {
@@ -169,14 +177,14 @@ export class BenchmarkCalculator {
   static async getCategoryStatistics(category: string): Promise<CategoryStats> {
     try {
       const allSuppliers = await SupplierCrudService.getAll();
-      const categorySuppliers = allSuppliers.filter(supplier => 
-        supplier.status === 'active' && 
+      const categorySuppliers = allSuppliers.filter(supplier =>
+        supplier.status === 'active' &&
         supplier.categories?.some(cat => cat.toString() === category.toString()) &&
         supplier.performance
       );
 
       const totalScore = categorySuppliers.reduce((sum, supplier) => {
-        return sum + ((supplier.performance as any)?.overallScore || 0);
+        return sum + ((supplier.performance as SupplierPerformance | undefined)?.overallScore ?? 0);
       }, 0);
 
       return {
@@ -201,7 +209,7 @@ export class BenchmarkCalculator {
    */
   static calculatePercentile(score: number, allScores: number[]): number {
     if (allScores.length === 0) return 0;
-    
+
     const sortedScores = [...allScores].sort((a, b) => a - b);
     const rank = sortedScores.filter(s => s < score).length;
     return Math.round((rank / sortedScores.length) * 100);
@@ -221,17 +229,24 @@ export class BenchmarkCalculator {
   }
 
   /**
-   * Validate supplier performance data
+   * Validate supplier performance data.
+   * Accepts `unknown` so callers are not forced to cast to `any`.
    */
-  static validatePerformanceData(supplier: any): {
+  static validatePerformanceData(supplier: unknown): {
     isValid: boolean;
     missingFields: string[];
     invalidValues: string[];
   } {
     const missingFields: string[] = [];
     const invalidValues: string[] = [];
-    
-    if (!supplier.performance) {
+
+    // Type-guard: must be a non-null object with a truthy `performance` field
+    if (
+      typeof supplier !== 'object' ||
+      supplier === null ||
+      !('performance' in supplier) ||
+      !(supplier as Record<string, unknown>).performance
+    ) {
       return {
         isValid: false,
         missingFields: ['performance'],
@@ -239,14 +254,14 @@ export class BenchmarkCalculator {
       };
     }
 
-    const perf = supplier.performance;
+    const perf = (supplier as Record<string, unknown>).performance as Record<string, unknown>;
     const requiredFields = ['overallScore', 'deliveryScore', 'qualityScore', 'priceScore', 'serviceScore'];
-    
+
     requiredFields.forEach(field => {
       if (perf[field] === undefined || perf[field] === null) {
         missingFields.push(field);
-      } else if (typeof perf[field] !== 'number' || perf[field] < 0 || perf[field] > 100) {
-        invalidValues.push(`${field}: ${perf[field]} (should be 0-100)`);
+      } else if (typeof perf[field] !== 'number' || (perf[field] as number) < 0 || (perf[field] as number) > 100) {
+        invalidValues.push(`${field}: ${String(perf[field])} (should be 0-100)`);
       }
     });
 
