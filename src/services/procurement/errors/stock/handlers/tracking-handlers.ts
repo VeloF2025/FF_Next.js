@@ -10,7 +10,7 @@ export interface RetryStrategy {
   type: string;
   description: string;
   action: string;
-  data: any;
+  data: Record<string, unknown>;
   maxAttempts?: number;
   backoffMs?: number;
   estimatedTime?: string;
@@ -40,8 +40,8 @@ export class TrackingHandlers {
       backoffMs: 5000,
       estimatedTime: '2-5 minutes',
       data: {
-        itemCode: (error as any).itemCode || 'unknown',
-        location: (error as any).location || 'unknown',
+        itemCode: error.itemCode || 'unknown',
+        location: (error.details['location'] as string) || 'unknown',
         syncScope: 'full',
         includeHistory: true
       }
@@ -71,8 +71,8 @@ export class TrackingHandlers {
       maxAttempts: 1,
       estimatedTime: '30-60 minutes',
       data: {
-        itemCode: (error as any).itemCode,
-        location: (error as any).location,
+        itemCode: error.itemCode,
+        location: (error.details['location'] as string) || 'unknown',
         discrepancyType: 'tracking_mismatch',
         priority: 'high'
       }
@@ -245,7 +245,7 @@ export class TrackingHandlers {
    */
   static async executeRetry(retryStrategy: RetryStrategy): Promise<{
     success: boolean;
-    result: any | undefined;
+    result: Record<string, unknown> | undefined;
     error: string | undefined;
     shouldRetry: boolean | undefined;
   }> {
@@ -280,15 +280,16 @@ export class TrackingHandlers {
 
         case 'initiate_physical_recount': {
           // Simulate recount process
-          const actualCount = retryStrategy.data.currentSystemQuantity + Math.floor(Math.random() * 10 - 5);
+          const sysQty = retryStrategy.data['currentSystemQuantity'] as number;
+          const actualCount = sysQty + Math.floor(Math.random() * 10 - 5);
           return {
             success: true,
             result: {
               recountId: `RC-${Date.now()}`,
-              systemQuantity: retryStrategy.data.currentSystemQuantity,
+              systemQuantity: sysQty,
               actualQuantity: actualCount,
-              discrepancy: actualCount - retryStrategy.data.currentSystemQuantity,
-              countMethod: retryStrategy.data.countMethod,
+              discrepancy: actualCount - sysQty,
+              countMethod: retryStrategy.data['countMethod'],
               countedBy: 'warehouse-staff',
               countTimestamp: new Date().toISOString()
             },
@@ -302,7 +303,7 @@ export class TrackingHandlers {
             success: true,
             result: {
               approvalRequestId: `APR-${Date.now()}`,
-              approvalLevel: retryStrategy.data.approvalLevel,
+              approvalLevel: retryStrategy.data['approvalLevel'],
               estimatedApprovalTime: retryStrategy.estimatedTime,
               autoNotificationSent: true,
               status: 'pending_approval'
@@ -316,12 +317,12 @@ export class TrackingHandlers {
             success: true,
             result: {
               incrementPlan: {
-                totalIncrements: retryStrategy.data.numberOfIncrements,
-                incrementSize: retryStrategy.data.incrementSize,
+                totalIncrements: retryStrategy.data['numberOfIncrements'],
+                incrementSize: retryStrategy.data['incrementSize'],
                 estimatedDuration: retryStrategy.estimatedTime
               },
               scheduledExecution: new Date(Date.now() + 60000).toISOString(), // 1 minute from now
-              verificationEnabled: retryStrategy.data.verifyBetweenIncrements
+              verificationEnabled: retryStrategy.data['verifyBetweenIncrements']
             },
             error: undefined,
             shouldRetry: undefined
@@ -333,8 +334,8 @@ export class TrackingHandlers {
             result: {
               auditId: `AUD-${Date.now()}`,
               documentationComplete: true,
-              photographicEvidence: retryStrategy.data.requiresPhotographic,
-              witnessRequired: retryStrategy.data.requiresWitnessSignature,
+              photographicEvidence: retryStrategy.data['requiresPhotographic'],
+              witnessRequired: retryStrategy.data['requiresWitnessSignature'],
               complianceScore: 95
             },
             error: undefined,
@@ -349,7 +350,7 @@ export class TrackingHandlers {
             result: success ? {
               validationPassed: true,
               adjustmentProcessed: true,
-              newQuantity: retryStrategy.data.adjustmentQuantity + (retryStrategy.data as any).currentQuantity
+              newQuantity: (retryStrategy.data['adjustmentQuantity'] as number) + (retryStrategy.data['currentQuantity'] as number)
             } : undefined,
             error: success ? undefined : 'Validation failed - data integrity issues detected',
             shouldRetry: !success && (retryStrategy.maxAttempts || 1) > 1

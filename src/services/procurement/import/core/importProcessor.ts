@@ -4,16 +4,25 @@
  */
 
 import { parseFile, validateFile } from '../../../../lib/utils/excelParser';
+import { ParsedBOQItem } from '../../../../lib/utils/excelParser';
 import { ProcurementContext } from '../../../../types/procurement/base.types';
-import { 
+import {
   ImportJob,
-  ImportConfig, 
+  ImportConfig,
   ProgressCallback,
-  IImportProcessor
+  IImportProcessor,
+  MappingResults
 } from './types';
 import { BOQImportJobManager } from './jobManager';
 import { BOQImportDataProcessor } from './dataProcessor';
 import { BOQImportDatabaseSaver } from './databaseSaver';
+
+/** Extends ImportJob with temporary pipeline-stage data (never persisted) */
+interface ProcessingJob extends ImportJob {
+  parsedItems: ParsedBOQItem[];
+  validItems: ParsedBOQItem[];
+  mappingResults: MappingResults;
+}
 
 export class BOQImportProcessor implements IImportProcessor {
   private jobManager: BOQImportJobManager;
@@ -84,7 +93,7 @@ export class BOQImportProcessor implements IImportProcessor {
     job.metadata.totalRows = parseResult.items.length;
 
     // Store parsed data in job for next stage
-    (job as any).parsedItems = parseResult.items;
+    (job as ProcessingJob).parsedItems = parseResult.items;
 
     this.updateProgress(job, 'parsing', 20, `Parsed ${parseResult.items.length} items`, onProgress);
   }
@@ -99,14 +108,14 @@ export class BOQImportProcessor implements IImportProcessor {
     this.jobManager.updateProgress(job.id, 'validating', 30);
     this.updateProgress(job, 'validating', 30, 'Validating data...', onProgress);
 
-    const parsedItems = (job as any).parsedItems;
+    const parsedItems = (job as ProcessingJob).parsedItems;
     const validItems = this.dataProcessor.validateParsedItems(parsedItems);
     
     job.metadata.validRows = validItems.length;
     job.metadata.skippedRows = parsedItems.length - validItems.length;
 
     // Store validated data for next stage
-    (job as any).validItems = validItems;
+    (job as ProcessingJob).validItems = validItems;
 
     this.updateProgress(job, 'validating', 50, `Validated ${validItems.length} items`, onProgress);
   }
@@ -122,7 +131,7 @@ export class BOQImportProcessor implements IImportProcessor {
     this.jobManager.updateProgress(job.id, 'mapping', 60);
     this.updateProgress(job, 'mapping', 60, 'Mapping to catalog...', onProgress);
 
-    const validItems = (job as any).validItems;
+    const validItems = (job as ProcessingJob).validItems;
     const mappingStart = Date.now();
     
     const mappingResults = await this.dataProcessor.mapToCatalog(validItems, config);
@@ -132,7 +141,7 @@ export class BOQImportProcessor implements IImportProcessor {
     job.metadata.exceptionsCount = mappingResults.exceptions.length;
 
     // Store mapping results for next stage
-    (job as any).mappingResults = mappingResults;
+    (job as ProcessingJob).mappingResults = mappingResults;
 
     this.updateProgress(job, 'mapping', 80, `Mapped ${mappingResults.mapped.length} items`, onProgress);
   }
@@ -149,7 +158,7 @@ export class BOQImportProcessor implements IImportProcessor {
     this.jobManager.updateProgress(job.id, 'saving', 90);
     this.updateProgress(job, 'saving', 90, 'Saving to database...', onProgress);
 
-    const mappingResults = (job as any).mappingResults;
+    const mappingResults = (job as ProcessingJob).mappingResults;
     const saveStart = Date.now();
     
     const saveResult = await this.databaseSaver.saveBOQData(mappingResults, context, config);
@@ -170,7 +179,7 @@ export class BOQImportProcessor implements IImportProcessor {
   /**
    * Handle job error
    */
-  private handleJobError(job: ImportJob, error: any, onProgress?: ProgressCallback): void {
+  private handleJobError(job: ImportJob, error: unknown, onProgress?: ProgressCallback): void {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     this.jobManager.updateProgress(job.id, 'failed', job.progress, errorMessage);
     this.updateProgress(job, 'failed', 100, errorMessage, onProgress);

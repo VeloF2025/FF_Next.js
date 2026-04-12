@@ -113,16 +113,16 @@ export function FieldInstallationsViewer() {
 
           // Combine all poles
           const allPoles: PoleData[] = [];
-          result.data.synchronized_poles?.forEach((pole: any) => {
+          result.data.synchronized_poles?.forEach((pole: PoleData) => {
             allPoles.push({ ...pole, sync_status: 'synced', source: 'both' });
           });
-          result.data.qfieldcloud_only?.forEach((pole: any) => {
+          result.data.qfieldcloud_only?.forEach((pole: PoleData) => {
             allPoles.push({ ...pole, sync_status: 'pending', source: 'qfieldcloud' });
           });
-          result.data.fibreflow_only?.forEach((pole: any) => {
+          result.data.fibreflow_only?.forEach((pole: PoleData) => {
             allPoles.push({ ...pole, sync_status: 'pending', source: 'fibreflow' });
           });
-          result.data.needs_sync?.forEach((pole: any) => {
+          result.data.needs_sync?.forEach((pole: PoleData) => {
             allPoles.push({ ...pole, sync_status: 'conflict', source: 'both' });
           });
           setPoles(allPoles);
@@ -133,16 +133,16 @@ export function FieldInstallationsViewer() {
 
           // Combine all drops
           const allDrops: DropData[] = [];
-          result.data.synchronized_drops?.forEach((drop: any) => {
+          result.data.synchronized_drops?.forEach((drop: DropData) => {
             allDrops.push({ ...drop, sync_status: 'synced', source: 'both' });
           });
-          result.data.qfieldcloud_only?.forEach((drop: any) => {
+          result.data.qfieldcloud_only?.forEach((drop: DropData) => {
             allDrops.push({ ...drop, sync_status: 'pending', source: 'qfieldcloud' });
           });
-          result.data.fibreflow_only?.forEach((drop: any) => {
+          result.data.fibreflow_only?.forEach((drop: DropData) => {
             allDrops.push({ ...drop, sync_status: 'pending', source: 'fibreflow' });
           });
-          result.data.needs_sync?.forEach((drop: any) => {
+          result.data.needs_sync?.forEach((drop: DropData) => {
             allDrops.push({ ...drop, sync_status: 'conflict', source: 'both' });
           });
           setDrops(allDrops);
