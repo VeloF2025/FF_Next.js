@@ -11,6 +11,7 @@ export * from './parser';
 
 // Import specific functions for backward compatibility
 import { readString } from './parser/data-reader';
+import type { ImportError, ImportWarning } from './parser/parser-types';
 import { isEmailFormat, isPhoneFormat } from './parser/format-detector';
 
 export { 
@@ -41,11 +42,11 @@ export {
 
 // Legacy functions for backward compatibility
 export function validateString(
-  value: any,
+  value: unknown,
   row: number,
   field: string,
-  errors: any[],
-  warnings: any[],
+  errors: ImportError[],
+  warnings: ImportWarning[],
   maxLength?: number,
   _required: boolean = false
 ): string | undefined {
@@ -56,10 +57,10 @@ export function validateString(
   // Apply maxLength validation if specified
   if (result && maxLength && result.length > maxLength) {
     errors.push({
+      type: 'validation',
       row,
-      field,
-      error: `String length exceeds maximum of ${maxLength} characters`,
-      value: result
+      column: field,
+      message: `String length exceeds maximum of ${maxLength} characters`
     });
     return result.substring(0, maxLength);
   }

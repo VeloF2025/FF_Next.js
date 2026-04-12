@@ -146,7 +146,7 @@ export function validatePriceCalculation(
  * Validate quantity values
  */
 export function validateQuantity(
-  quantity: any,
+  quantity: unknown,
   rowNumber: number,
   minValue: number = 0,
   maxValue: number = 1000000
@@ -203,7 +203,7 @@ export function validateQuantity(
  * Validate description field
  */
 export function validateDescription(
-  description: any,
+  description: unknown,
   rowNumber: number,
   minLength: number = 1,
   maxLength: number = 500

@@ -11,7 +11,7 @@ import { ImportError, ImportWarning } from './validation/modules/validation-type
  * Map raw row data to BOQ item structure using column mapping configuration
  */
 export function mapRowToBoqItem(
-  row: Record<string, any>,
+  row: Record<string, unknown>,
   rowIndex: number,
   columnMapping: ColumnMapping,
   errors: ImportError[],
@@ -75,7 +75,7 @@ export function mapRowToBoqItem(
 /**
  * Find the best matching column value from available options
  */
-function findColumnValue(row: Record<string, any>, possibleColumns: string[]): any {
+function findColumnValue(row: Record<string, unknown>, possibleColumns: string[]): unknown {
   const rowKeys = Object.keys(row).map(key => key.toLowerCase().trim());
   
   for (const column of possibleColumns) {
