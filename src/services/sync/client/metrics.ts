@@ -6,11 +6,20 @@
 import { SyncUtils } from '../syncUtils';
 import type { ClientMetrics, FirebaseClientData } from './types';
 
+interface FirebaseProject {
+  status?: string;
+  budget?: number;
+  startDate?: unknown;
+  endDate?: unknown;
+  actualEndDate?: unknown;
+  createdAt?: unknown;
+}
+
 export class ClientMetricsCalculator {
   /**
    * Calculate comprehensive client metrics from projects
    */
-  static calculateMetrics(projects: any[]): ClientMetrics {
+  static calculateMetrics(projects: FirebaseProject[]): ClientMetrics {
     const totalProjects = projects.length;
     const activeProjects = projects.filter(p => p.status === 'active' || p.status === 'in_progress').length;
     const completedProjects = projects.filter(p => p.status === 'completed').length;
@@ -48,7 +57,7 @@ export class ClientMetricsCalculator {
   /**
    * Calculate average project duration
    */
-  private static calculateAverageDuration(projects: any[]): number {
+  private static calculateAverageDuration(projects: FirebaseProject[]): number {
     const completedWithDates = projects.filter(p => 
       p.status === 'completed' && p.startDate && p.endDate
     );
@@ -70,7 +79,7 @@ export class ClientMetricsCalculator {
   /**
    * Get last project date
    */
-  private static getLastProjectDate(projects: any[]): Date | null {
+  private static getLastProjectDate(projects: FirebaseProject[]): Date | null {
     const dates = projects
       .map(p => SyncUtils.parseFirebaseDate(p.createdAt))
       .filter(d => d)
@@ -82,7 +91,7 @@ export class ClientMetricsCalculator {
   /**
    * Calculate on-time delivery for a project
    */
-  static calculateOnTimeDelivery(project: any): boolean {
+  static calculateOnTimeDelivery(project: FirebaseProject): boolean {
     const endDate = SyncUtils.parseFirebaseDate(project.endDate);
     const actualEndDate = SyncUtils.parseFirebaseDate(project.actualEndDate);
     

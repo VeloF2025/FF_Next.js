@@ -5,10 +5,24 @@
 
 import { SyncStatistics, FullSyncResult } from './types';
 
+interface SyncTypeStats {
+  totalSyncs: number;
+  successCount: number;
+  failureCount: number;
+  lastSyncTime: Date | null;
+  totalDuration: number;
+}
+
+interface SyncTypeResult {
+  synced: number;
+  failed: number;
+  errors: unknown[];
+}
+
 export class SyncStatisticsManager {
   private syncHistory: FullSyncResult[] = [];
   private startTime: number = Date.now();
-  private syncTypeStats: Map<string, any> = new Map();
+  private syncTypeStats: Map<string, SyncTypeStats> = new Map();
 
   constructor() {
     this.initializeSyncTypeStats();
@@ -84,8 +98,8 @@ export class SyncStatisticsManager {
   /**
    * Get statistics for each sync type
    */
-  private getSyncTypeStatistics(): { [key: string]: any } {
-    const stats: { [key: string]: any } = {};
+  private getSyncTypeStatistics(): SyncStatistics['syncTypes'] {
+    const stats: SyncStatistics['syncTypes'] = {};
 
     this.syncTypeStats.forEach((typeStats, type) => {
       stats[type] = {
@@ -122,7 +136,7 @@ export class SyncStatisticsManager {
   /**
    * Update statistics for a specific sync type
    */
-  private updateSyncTypeStats(type: string, typeResult: any, duration: number): void {
+  private updateSyncTypeStats(type: string, typeResult: SyncTypeResult, duration: number): void {
     const stats = this.syncTypeStats.get(type) || {
       totalSyncs: 0,
       successCount: 0,
@@ -156,7 +170,7 @@ export class SyncStatisticsManager {
   /**
    * Export statistics for analysis
    */
-  exportStatistics(): any {
+  exportStatistics(): { syncHistory: FullSyncResult[]; syncTypeStats: Record<string, SyncTypeStats>; startTime: number; exportTime: number } {
     return {
       syncHistory: this.syncHistory,
       syncTypeStats: Object.fromEntries(this.syncTypeStats),

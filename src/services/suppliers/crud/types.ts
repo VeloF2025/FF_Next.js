@@ -11,18 +11,18 @@ export interface SupplierFilter {
 }
 
 export interface SupplierUpdateData {
-  updatedAt: any;
+  updatedAt: Date | string;
   lastModifiedBy: string;
-  [key: string]: any;
+  [key: string]: Date | string | number | boolean | null | undefined;
 }
 
 export interface SupplierSoftDeleteData {
   status: string;
   isActive: boolean;
-  updatedAt: any;
+  updatedAt: Date | string;
   lastModifiedBy: string;
   inactiveReason?: string;
-  inactivatedAt?: any;
+  inactivatedAt?: Date | string;
 }
 
 export interface SupplierBatchOptions {
