@@ -293,23 +293,6 @@ export default function TicketsListPageClient() {
           {/* Filter Dropdowns — horizontally scrollable on mobile */}
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible">
             <select
-              value={filterType}
-              onChange={(e) => setFilter('type', e.target.value)}
-              className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
-                ${filterType
-                  ? 'bg-blue-500/10 border-blue-500/30 text-blue-300'
-                  : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
-                }`}
-            >
-              <option value="">All Disciplines</option>
-              <option value="activations">Activations</option>
-              <option value="civils">Civils</option>
-              <option value="dev_ops">DevOps</option>
-              <option value="maintenance">Maintenance</option>
-              <option value="optical">Optical</option>
-              <option value="unspecified">Unspecified</option>
-            </select>
-            <select
               value={filterCategory}
               onChange={(e) => setFilter('category', e.target.value)}
               className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
@@ -324,6 +307,23 @@ export default function TicketsListPageClient() {
               <option value="maintenance">Maintenance</option>
               <option value="sales_lead">Sales Lead</option>
               <option value="snag">Snag</option>
+              <option value="unspecified">Unspecified</option>
+            </select>
+            <select
+              value={filterType}
+              onChange={(e) => setFilter('type', e.target.value)}
+              className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
+                ${filterType
+                  ? 'bg-blue-500/10 border-blue-500/30 text-blue-300'
+                  : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
+                }`}
+            >
+              <option value="">All Types</option>
+              <option value="activations">Activations</option>
+              <option value="civils">Civils</option>
+              <option value="dev_ops">DevOps</option>
+              <option value="maintenance">Maintenance</option>
+              <option value="optical">Optical</option>
               <option value="unspecified">Unspecified</option>
             </select>
             <select
