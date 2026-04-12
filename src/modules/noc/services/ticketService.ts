@@ -78,7 +78,7 @@ export async function logTicketActivity(params: {
   ticketId: string;
   activityType: 'update' | 'note' | 'assignment' | 'status_change' | 'created' | 'cancelled';
   description: string;
-  fieldChanges?: Record<string, { from: any; to: any }>;
+  fieldChanges?: Record<string, { from: unknown; to: unknown }>;
   userId?: string;
   userName?: string;
   userEmail?: string;
@@ -107,16 +107,16 @@ export async function logTicketActivity(params: {
  */
 export async function logTicketChanges(params: {
   ticketId: string;
-  oldTicket: Record<string, any>;
-  newTicket: Record<string, any>;
-  payload: Record<string, any>;
+  oldTicket: Record<string, unknown>;
+  newTicket: Record<string, unknown>;
+  payload: Record<string, unknown>;
   userId?: string;
   userName?: string;
   userEmail?: string;
 }): Promise<void> {
   const { ticketId, oldTicket, newTicket, payload, userId, userName, userEmail } = params;
   const trackedFields = Object.keys(FIELD_LABELS);
-  const fieldChanges: Record<string, { from: any; to: any }> = {};
+  const fieldChanges: Record<string, { from: unknown; to: unknown }> = {};
 
   for (const field of trackedFields) {
     if (!(field in payload)) continue;
@@ -141,7 +141,7 @@ export async function logTicketChanges(params: {
       ticketId,
       activityType: 'status_change',
       description: `Status changed from ${from} to ${to}`,
-      fieldChanges: { status: fieldChanges.status },
+      fieldChanges: { status: fieldChanges.status! },
       userId, userName, userEmail,
     });
   }
@@ -557,7 +557,7 @@ export async function updateTicket(
 
     // 🟢 WORKING: Build dynamic UPDATE query based on provided fields
     const updateFields: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
     let paramCounter = 1;
 
     // Map of payload keys to database columns
@@ -694,7 +694,7 @@ export async function listTickets(
   try {
     // 🟢 WORKING: Build WHERE clause based on filters
     const whereClauses: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
     let paramCounter = 1;
 
     if (filters.status) {

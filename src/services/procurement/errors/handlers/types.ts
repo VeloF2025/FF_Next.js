@@ -3,6 +3,8 @@
  * Type definitions for error handling and logging
  */
 
+import type React from 'react';
+
 /**
  * Standard error response format for API operations
  */
@@ -14,9 +16,9 @@ export interface ErrorResponse {
     code: string;
     statusCode: number;
     timestamp: string;
-    context?: Record<string, any>;
+    context?: Record<string, unknown>;
     userMessage?: string;
-    [key: string]: any; // Allow for specific error properties
+    [key: string]: unknown; // Allow for specific error properties
   };
   statusCode: number;
 }
@@ -31,7 +33,7 @@ export interface ErrorLogContext {
   requestId?: string;
   userAgent?: string;
   ipAddress?: string;
-  additionalInfo?: Record<string, any>;
+  additionalInfo?: Record<string, unknown>;
 }
 
 /**
@@ -45,7 +47,7 @@ export interface ErrorAggregationResult {
     bySeverity: Record<string, number>;
   };
   detailedErrors: Array<{
-    item: any;
+    item: unknown;
     error: ErrorResponse['error'];
   }>;
 }
@@ -54,7 +56,7 @@ export interface ErrorAggregationResult {
  * Batch operation error item
  */
 export interface BatchErrorItem {
-  item: any;
+  item: unknown;
   error: unknown;
 }
 
@@ -73,8 +75,8 @@ export interface RetryConfig {
  * Error boundary configuration
  */
 export interface ErrorBoundaryConfig {
-  fallbackComponent: any;
-  onError?: (error: Error, errorInfo: any) => void;
+  fallbackComponent: React.ComponentType<unknown>;
+  onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
   displayName?: string;
 }
 
@@ -107,8 +109,8 @@ export interface IErrorLogger {
 export interface IErrorHandler {
   handleError(error: unknown): ErrorResponse;
   handleErrorWithContext(error: unknown, context: ErrorLogContext): ErrorResponse;
-  createValidationError(field: string, message: string, value?: any): unknown;
-  createNotFoundError(resourceType: string, resourceId: string, context?: Record<string, any>): unknown;
+  createValidationError(field: string, message: string, value?: unknown): unknown;
+  createNotFoundError(resourceType: string, resourceId: string, context?: Record<string, unknown>): unknown;
 }
 
 /**

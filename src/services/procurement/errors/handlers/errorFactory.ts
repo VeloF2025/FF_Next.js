@@ -14,7 +14,7 @@ export class ProcurementErrorFactory {
   static createProcurementError(
     code: keyof typeof ProcurementErrorCodes,
     message?: string,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ): ProcurementError {
     const statusCode = ErrorStatusCodes[code] || 400;
     const errorMessage = message || `Procurement error: ${code}`;
@@ -28,7 +28,7 @@ export class ProcurementErrorFactory {
   static createValidationError(
     field: string,
     message: string,
-    value?: any
+    value?: unknown
   ): RFQValidationError {
     return new RFQValidationError(
       `Validation failed for field: ${field}`,
@@ -48,7 +48,7 @@ export class ProcurementErrorFactory {
   static createNotFoundError(
     resourceType: string,
     resourceId: string,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ): ProcurementNotFoundError {
     return new ProcurementNotFoundError(resourceType, resourceId, context);
   }
@@ -59,7 +59,7 @@ export class ProcurementErrorFactory {
   static createConstraintError(
     constraintType: 'unique' | 'foreign_key' | 'check' | 'not_null',
     originalMessage: string,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ): ProcurementError {
     switch (constraintType) {
       case 'unique':
@@ -102,7 +102,7 @@ export class ProcurementErrorFactory {
   /**
    * Create network/service error
    */
-  static createNetworkError(originalMessage: string, context?: Record<string, any>): ProcurementError {
+  static createNetworkError(originalMessage: string, context?: Record<string, unknown>): ProcurementError {
     if (originalMessage.includes('ECONNREFUSED') || originalMessage.includes('timeout')) {
       return this.createProcurementError(
         'EXTERNAL_SERVICE_ERROR',
@@ -132,7 +132,7 @@ export class ProcurementErrorFactory {
   static createPermissionError(
     operation: string,
     resource?: string,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ): ProcurementError {
     const message = resource 
       ? `Insufficient permissions to ${operation} ${resource}`
@@ -152,7 +152,7 @@ export class ProcurementErrorFactory {
     type: 'exceeds_budget' | 'exceeds_limit' | 'insufficient_funds',
     amount?: number,
     limit?: number,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ): ProcurementError {
     let code: keyof typeof ProcurementErrorCodes;
     let message: string;
@@ -191,7 +191,7 @@ export class ProcurementErrorFactory {
   static createBusinessRuleError(
     rule: string,
     description?: string,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ): ProcurementError {
     return this.createProcurementError(
       'VALIDATION_ERROR',
@@ -206,7 +206,7 @@ export class ProcurementErrorFactory {
   static createDeadlineError(
     type: 'expired' | 'deadline_passed' | 'too_late',
     deadline?: Date,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ): ProcurementError {
     let code: keyof typeof ProcurementErrorCodes;
     let message: string;
