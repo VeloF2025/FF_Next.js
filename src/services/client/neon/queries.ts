@@ -1,6 +1,6 @@
 import { getSql } from '@/lib/neon-sql';
 import { Client, ClientFilter, ClientSummary } from '@/types/client.types';
-import { mapDbToClient } from './mappers';
+import { mapDbToClient, ClientDbRow } from './mappers';
 import { log } from '@/lib/logger';
 
 /**
@@ -47,7 +47,7 @@ export async function getAllClients(filter?: ClientFilter): Promise<Client[]> {
       `;
     }
 
-    const rows = result as any[];
+    const rows = result as ClientDbRow[];
     return rows.map(mapDbToClient);
     
   } catch (error) {
@@ -67,12 +67,12 @@ export async function getClientById(id: string): Promise<Client | null> {
       LIMIT 1
     `;
     
-    const rows = result as any[];
+    const rows = result as ClientDbRow[];
     if (!rows || rows.length === 0) {
       return null;
     }
     
-    return mapDbToClient(rows[0]);
+    return rows[0] ? mapDbToClient(rows[0]) : null;
   } catch (error) {
     log.error('Error fetching client by ID:', { data: error }, 'queries');
     return null;
@@ -90,7 +90,7 @@ export async function getActiveClients(): Promise<Client[]> {
       ORDER BY name ASC
     `;
     
-    const rows = result as any[];
+    const rows = result as ClientDbRow[];
     return rows.map(mapDbToClient);
   } catch (error) {
     log.error('Error fetching active clients:', { data: error }, 'queries');
@@ -113,11 +113,11 @@ export async function getClientSummary(): Promise<ClientSummary> {
       FROM clients
     `;
     
-    const rows = result as any[];
+    const rows = result as Array<{ total_clients: string; active_clients: string; inactive_clients: string }>;
     return {
-      totalClients: parseInt(rows[0].total_clients),
-      activeClients: parseInt(rows[0].active_clients),
-      inactiveClients: parseInt(rows[0].inactive_clients),
+      totalClients: parseInt(rows[0]?.total_clients ?? '0'),
+      activeClients: parseInt(rows[0]?.active_clients ?? '0'),
+      inactiveClients: parseInt(rows[0]?.inactive_clients ?? '0'),
       prospectClients: 0,
       totalProjectValue: 0,
       averageProjectValue: 0,

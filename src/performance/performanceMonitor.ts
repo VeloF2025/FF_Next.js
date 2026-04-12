@@ -84,7 +84,7 @@ class PerformanceMonitor {
     const observer = new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
         // Type assertion for first-input performance entry
-        const firstInputEntry = entry as any;
+        const firstInputEntry = entry as PerformanceEntry & { processingStart?: number };
         this.updateMetric('FID', firstInputEntry.processingStart || entry.startTime - entry.startTime);
       }
     });
@@ -145,7 +145,7 @@ class PerformanceMonitor {
   private initializeMemoryTracking() {
     if (typeof window !== 'undefined' && 'performance' in window && 'memory' in window.performance) {
       setInterval(() => {
-        const memInfo = (window.performance as any).memory;
+        const memInfo = (window.performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
         if (memInfo) {
           const memoryUsage = memInfo.usedJSHeapSize / (1024 * 1024); // MB
           this.updateMemoryUsage(memoryUsage);
@@ -382,7 +382,7 @@ export function usePerformanceMonitor(componentName: string) {
     // log.debug(`${componentName} mount time: ${(endTime - startTime, undefined, 'performanceMonitor');.toFixed(2)}ms`);
   }, [componentName, _startTime]);
 
-  const measureRender = React.useCallback((renderFn: () => any) => {
+  const measureRender = React.useCallback(<T>(renderFn: () => T): T => {
     return performanceMonitor.measureRender(componentName, renderFn);
   }, [componentName]);
 
@@ -415,7 +415,7 @@ export function withPerformanceMonitoring<P extends Record<string, unknown>>(
 // Type augmentation for gtag
 declare global {
   interface Window {
-    gtag?: (command: string, targetId: string, config?: any) => void;
+    gtag?: (command: string, targetId: string, config?: Record<string, unknown>) => void;
   }
 }
 

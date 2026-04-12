@@ -1,60 +1,109 @@
 import { Client } from '@/types/client.types';
 
+export interface ClientMetadata {
+  alternate_phone?: string;
+  website?: string;
+  category?: string;
+  priority?: string;
+  account_manager_id?: string;
+  notes?: string;
+  tags?: string[];
+  last_contact_date?: string;
+  created_by?: string;
+  last_modified_by?: string;
+  credit_limit?: number;
+  current_balance?: number;
+  credit_rating?: string;
+  total_projects?: number;
+  active_projects?: number;
+  completed_projects?: number;
+  total_project_value?: number;
+  average_project_value?: number;
+  preferred_contact_method?: string;
+  communication_language?: string;
+  timezone?: string;
+  service_types?: string[];
+  registration_number?: string;
+  vat_number?: string;
+}
+
+export interface ClientDbRow {
+  id: string;
+  name: string;
+  contact_person?: string;
+  contact_email?: string;
+  email?: string;
+  phone?: string;
+  contact_phone?: string;
+  type?: string;
+  status?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+  payment_terms?: number;
+  created_at?: string;
+  updated_at?: string;
+  metadata?: ClientMetadata;
+}
+
 /**
  * Maps database row to Client interface
  */
-export function mapDbToClient(dbClient: any): Client {
+export function mapDbToClient(dbClient: ClientDbRow): Client {
+  const meta = dbClient.metadata ?? {};
   return {
     id: dbClient.id,
     name: dbClient.name,
     contactPerson: dbClient.contact_person || dbClient.contact_email?.split('@')[0] || '',
     email: dbClient.email || dbClient.contact_email || '',
     phone: dbClient.phone || dbClient.contact_phone || '',
-    alternativePhone: dbClient.metadata?.alternate_phone || '',
-    website: dbClient.metadata?.website || '',
+    alternativePhone: meta.alternate_phone || '',
+    website: meta.website || '',
     industry: dbClient.type || 'Other',
-    category: dbClient.metadata?.category || 'STANDARD',
+    category: meta.category || 'STANDARD',
     status: dbClient.status || 'ACTIVE',
-    priority: dbClient.metadata?.priority || 'MEDIUM',
-    accountManagerId: dbClient.metadata?.account_manager_id || '',
+    priority: meta.priority || 'MEDIUM',
+    accountManagerId: meta.account_manager_id || '',
     accountManagerName: '',
     address: dbClient.address || '',
     city: dbClient.city || '',
     province: dbClient.state || '',
     postalCode: dbClient.postal_code || '',
     country: dbClient.country || 'South Africa',
-    notes: dbClient.metadata?.notes || '',
-    tags: dbClient.metadata?.tags || [],
-    lastContactDate: dbClient.metadata?.last_contact_date,
+    notes: meta.notes || '',
+    tags: meta.tags || [],
+    lastContactDate: meta.last_contact_date,
     paymentTerms: dbClient.payment_terms ? `Net ${dbClient.payment_terms}` : 'Net 30',
     createdAt: dbClient.created_at,
     updatedAt: dbClient.updated_at,
-    createdBy: dbClient.metadata?.created_by || '',
-    lastModifiedBy: dbClient.metadata?.last_modified_by || '',
+    createdBy: meta.created_by || '',
+    lastModifiedBy: meta.last_modified_by || '',
     // Required fields with defaults
-    creditLimit: dbClient.metadata?.credit_limit || 0,
-    currentBalance: dbClient.metadata?.current_balance || 0,
-    creditRating: dbClient.metadata?.credit_rating || 'UNRATED',
-    totalProjects: dbClient.metadata?.total_projects || 0,
-    activeProjects: dbClient.metadata?.active_projects || 0,
-    completedProjects: dbClient.metadata?.completed_projects || 0,
-    totalProjectValue: dbClient.metadata?.total_project_value || 0,
-    averageProjectValue: dbClient.metadata?.average_project_value || 0,
-    preferredContactMethod: dbClient.metadata?.preferred_contact_method || 'EMAIL',
-    communicationLanguage: dbClient.metadata?.communication_language || 'English',
-    timezone: dbClient.metadata?.timezone || 'Africa/Johannesburg',
-    serviceTypes: dbClient.metadata?.service_types || [],
-    registrationNumber: dbClient.metadata?.registration_number || '',
-    vatNumber: dbClient.metadata?.vat_number || ''
+    creditLimit: meta.credit_limit || 0,
+    currentBalance: meta.current_balance || 0,
+    creditRating: meta.credit_rating || 'UNRATED',
+    totalProjects: meta.total_projects || 0,
+    activeProjects: meta.active_projects || 0,
+    completedProjects: meta.completed_projects || 0,
+    totalProjectValue: meta.total_project_value || 0,
+    averageProjectValue: meta.average_project_value || 0,
+    preferredContactMethod: meta.preferred_contact_method || 'EMAIL',
+    communicationLanguage: meta.communication_language || 'English',
+    timezone: meta.timezone || 'Africa/Johannesburg',
+    serviceTypes: meta.service_types || [],
+    registrationNumber: meta.registration_number || '',
+    vatNumber: meta.vat_number || ''
   } as unknown as Client;
 }
 
 /**
  * Build metadata object from client form data
  */
-export function buildMetadata(data: any): Record<string, any> {
-  const metadata: any = {};
-  
+export function buildMetadata(data: Record<string, unknown>): Record<string, unknown> {
+  const metadata: Record<string, unknown> = {};
+
   if (data.website !== undefined) metadata.website = data.website;
   if (data.category !== undefined) metadata.category = data.category;
   if (data.priority !== undefined) metadata.priority = data.priority;
@@ -62,7 +111,7 @@ export function buildMetadata(data: any): Record<string, any> {
   if (data.notes !== undefined) metadata.notes = data.notes;
   if (data.tags !== undefined) metadata.tags = data.tags;
   if (data.contractValue !== undefined) metadata.contract_value = data.contractValue;
-  
+
   return metadata;
 }
 

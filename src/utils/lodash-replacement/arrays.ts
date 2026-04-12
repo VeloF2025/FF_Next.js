@@ -23,8 +23,8 @@ export function flatten<T>(array: (T | T[])[]): T[] {
  * FlattenDeep function with performance optimization
  * Replaces lodash.flattenDeep with better performance
  */
-export function flattenDeep(array: any[]): any[] {
-  const result: any[] = [];
+export function flattenDeep(array: unknown[]): unknown[] {
+  const result: unknown[] = [];
   const stack = [...array];
 
   while (stack.length) {
@@ -51,7 +51,7 @@ export function uniq<T>(array: T[]): T[] {
  * UniqueBy function with performance optimization
  * Replaces lodash.uniqBy with better performance
  */
-export function uniqBy<T>(array: T[], iteratee: (item: T) => any): T[] {
+export function uniqBy<T>(array: T[], iteratee: (item: T) => unknown): T[] {
   const seen = new Set();
   const result: T[] = [];
 
