@@ -364,3 +364,131 @@ export async function extractSerialsFromWaPhoto(
     };
   }
 }
+
+// ============================================================================
+// RECHECK-MODE EXTRACTION (targeted second-pass prompts)
+// ============================================================================
+
+const UPS_RECHECK_PROMPT = `Second look at a Gizzu UPS sticker photo.
+
+A previous read may have misidentified the UPS serial. Look very carefully.
+
+The REAL serial is the long string printed BELOW the barcode on the Gizzu sticker.
+Format: GU18W12V + exactly 10 numeric digits = 18 characters total.
+
+Rules:
+- The small "GU18W12V" text ABOVE the barcode is the MODEL CODE, not the serial.
+- The sticker is OFTEN ROTATED — rotate mentally before reading.
+- Do NOT pad with zeros. Do NOT invent digits. null is correct when uncertain.
+- If a digit is ambiguous, describe what you see (e.g. "looks like 2 or Z").
+
+Respond ONLY in JSON:
+{"upsSerial":{"found":true,"serial":"GU18W12V##########","confidence":0.95}}
+or
+{"upsSerial":{"found":false,"serial":null,"confidence":0.0}}`;
+
+const ONT_RECHECK_PROMPT = `Second look at an ONT barcode/sticker photo.
+
+A previous read may have misidentified the ONT serial. Look very carefully.
+
+Format: ALCLB4 + 6 hex characters = exactly 12 characters.
+- Only hex digits after ALCLB4 (0-9, A-F only — no M, N, P, R, S, Y, Z).
+- Never read an SSID (starts with ALHN-) or model number (starts with STN).
+
+Respond ONLY in JSON:
+{"ontSerial":{"found":true,"serial":"ALCLB4######","confidence":0.95}}
+or
+{"ontSerial":{"found":false,"serial":null,"confidence":0.0}}`;
+
+export interface RecheckExtractionResult {
+  success: boolean;
+  serial: string | null;
+  confidence: number;
+  error?: string;
+}
+
+/**
+ * Run a targeted second-pass VLM extraction for UPS serial specifically.
+ * Used by the serial recheck system when a mismatch is detected.
+ */
+export async function extractUpsSerialRecheck(
+  photoUrl: string
+): Promise<RecheckExtractionResult> {
+  try {
+    let base64 = await fetchPhotoAsBase64(photoUrl);
+    const preprocessed = await preprocessForVlm(base64, 'UPS recheck');
+    base64 = preprocessed.base64;
+
+    const result = await callVlmExtraction<{
+      upsSerial: { found: boolean; serial: string | null; confidence: number };
+    }>(base64, UPS_RECHECK_PROMPT, 'UPS serial recheck');
+
+    if (!result.success || !result.data) {
+      return { success: false, serial: null, confidence: 0, error: result.error };
+    }
+
+    const { upsSerial } = result.data;
+    if (!upsSerial.found || !upsSerial.serial) {
+      return { success: false, serial: null, confidence: upsSerial.confidence };
+    }
+
+    if (upsSerial.confidence < VLM_CONFIDENCE_FLOOR) {
+      vlmLogger.warn(`UPS recheck below floor (${upsSerial.confidence.toFixed(2)}): ${upsSerial.serial}`);
+      return { success: false, serial: null, confidence: upsSerial.confidence };
+    }
+
+    const normalized = upsSerial.serial.trim().toUpperCase().replace(/[\s-]/g, '');
+    if (!isValidUpsSerial(normalized)) {
+      vlmLogger.warn(`UPS recheck invalid serial: ${upsSerial.serial}`);
+      return { success: false, serial: null, confidence: upsSerial.confidence };
+    }
+
+    return { success: true, serial: normalized, confidence: upsSerial.confidence };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return { success: false, serial: null, confidence: 0, error: msg };
+  }
+}
+
+/**
+ * Run a targeted second-pass VLM extraction for ONT serial specifically.
+ * Used by the serial recheck system when a mismatch is detected.
+ */
+export async function extractOntSerialRecheck(
+  photoUrl: string
+): Promise<RecheckExtractionResult> {
+  try {
+    let base64 = await fetchPhotoAsBase64(photoUrl);
+    const preprocessed = await preprocessForVlm(base64, 'ONT recheck');
+    base64 = preprocessed.base64;
+
+    const result = await callVlmExtraction<{
+      ontSerial: { found: boolean; serial: string | null; confidence: number };
+    }>(base64, ONT_RECHECK_PROMPT, 'ONT serial recheck');
+
+    if (!result.success || !result.data) {
+      return { success: false, serial: null, confidence: 0, error: result.error };
+    }
+
+    const { ontSerial } = result.data;
+    if (!ontSerial.found || !ontSerial.serial) {
+      return { success: false, serial: null, confidence: ontSerial.confidence };
+    }
+
+    if (ontSerial.confidence < VLM_CONFIDENCE_FLOOR) {
+      vlmLogger.warn(`ONT recheck below floor (${ontSerial.confidence.toFixed(2)}): ${ontSerial.serial}`);
+      return { success: false, serial: null, confidence: ontSerial.confidence };
+    }
+
+    const normalized = normalizeSerial(ontSerial.serial);
+    if (!isValidOntSerial(normalized)) {
+      vlmLogger.warn(`ONT recheck invalid serial: ${ontSerial.serial}`);
+      return { success: false, serial: null, confidence: ontSerial.confidence };
+    }
+
+    return { success: true, serial: normalized, confidence: ontSerial.confidence };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return { success: false, serial: null, confidence: 0, error: msg };
+  }
+}
