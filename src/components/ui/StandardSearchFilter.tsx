@@ -11,7 +11,7 @@ interface FilterOption {
 interface StandardSearchFilterProps {
   placeholder?: string;
   onSearch: (searchTerm: string) => void;
-  onFilter?: (filters: Record<string, any>) => void;
+  onFilter?: (filters: Record<string, unknown>) => void;
   filterOptions?: FilterOption[];
   searchValue?: string;
   showFilters?: boolean;
@@ -27,14 +27,14 @@ export function StandardSearchFilter({
 }: StandardSearchFilterProps) {
   const [searchTerm, setSearchTerm] = useState(initialSearchValue);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const [activeFilters, setActiveFilters] = useState<Record<string, any>>({});
+  const [activeFilters, setActiveFilters] = useState<Record<string, unknown>>({});
 
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();
     onSearch(searchTerm);
   };
 
-  const handleFilterChange = (key: string, value: any) => {
+  const handleFilterChange = (key: string, value: unknown) => {
     const newFilters = { ...activeFilters, [key]: value };
     setActiveFilters(newFilters);
     if (onFilter) {
@@ -108,7 +108,7 @@ export function StandardSearchFilter({
 
                 {filter.type === 'select' && (
                   <select
-                    value={activeFilters[filter.value] || ''}
+                    value={(activeFilters[filter.value] as string) || ''}
                     onChange={(e) => handleFilterChange(filter.value, e.target.value)}
                     className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   >
@@ -124,7 +124,7 @@ export function StandardSearchFilter({
                 {filter.type === 'date' && (
                   <input
                     type="date"
-                    value={activeFilters[filter.value] || ''}
+                    value={(activeFilters[filter.value] as string) || ''}
                     onChange={(e) => handleFilterChange(filter.value, e.target.value)}
                     className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   />
@@ -136,9 +136,9 @@ export function StandardSearchFilter({
                       <label key={option.value} className="flex items-center gap-2">
                         <input
                           type="checkbox"
-                          checked={activeFilters[filter.value]?.includes(option.value) || false}
+                          checked={(Array.isArray(activeFilters[filter.value]) ? (activeFilters[filter.value] as string[]).includes(option.value) : false)}
                           onChange={(e) => {
-                            const current = activeFilters[filter.value] || [];
+                            const current = Array.isArray(activeFilters[filter.value]) ? (activeFilters[filter.value] as string[]) : [];
                             const newValue = e.target.checked
                               ? [...current, option.value]
                               : current.filter((v: string) => v !== option.value);

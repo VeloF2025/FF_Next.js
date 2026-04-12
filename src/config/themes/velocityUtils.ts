@@ -286,11 +286,11 @@ export const velocityUtils = {
     // Reduce elevation on mobile for performance
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
     const adjustedLevel = isMobile && level > 4 ? 4 : level;
-    return velocityUtils.getElevation(adjustedLevel as any);
+    return velocityUtils.getElevation(adjustedLevel as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8);
   },
 
   // Performance utilities
-  getPerformanceOptimizedStyle: (style: any) => {
+  getPerformanceOptimizedStyle: (style: Record<string, unknown>) => {
     // Disable expensive effects on older/slower devices
     const supportsBackdropFilter = typeof CSS !== 'undefined' && CSS.supports && CSS.supports('backdrop-filter', 'blur(1px)');
     
@@ -338,10 +338,11 @@ export const velocityThemeHelpers = {
   getThemeValue: (path: string) => {
     // Helper to get nested theme values
     const pathArray = path.split('.');
-    let value: any = velocityTheme;
-    
+    let value: Record<string, unknown> | unknown = velocityTheme;
+
     for (const key of pathArray) {
-      value = value?.[key];
+      if (value === null || typeof value !== 'object') { value = undefined; break; }
+      value = (value as Record<string, unknown>)[key];
       if (value === undefined) break;
     }
     

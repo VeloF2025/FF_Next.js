@@ -80,7 +80,7 @@ export function SidebarCustomization() {
         setOriginalItems(items);
       }
     } catch (error) {
-      log.error('Failed to fetch sidebar preferences', error as any, 'SidebarCustomization');
+      log.error('Failed to fetch sidebar preferences', { error: String(error) }, 'SidebarCustomization');
     } finally {
       setLoading(false);
     }
@@ -100,7 +100,7 @@ export function SidebarCustomization() {
         setHasChanges(false);
       }
     } catch (error) {
-      log.error('Failed to save sidebar preferences', error as any, 'SidebarCustomization');
+      log.error('Failed to save sidebar preferences', { error: String(error) }, 'SidebarCustomization');
     } finally {
       setSaving(false);
     }
@@ -120,7 +120,7 @@ export function SidebarCustomization() {
         setHasChanges(false);
       }
     } catch (error) {
-      log.error('Failed to reset sidebar preferences', error as any, 'SidebarCustomization');
+      log.error('Failed to reset sidebar preferences', { error: String(error) }, 'SidebarCustomization');
     } finally {
       setSaving(false);
     }
