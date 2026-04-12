@@ -23,10 +23,23 @@ interface Attendee {
     name?: string;
 }
 
+interface CalendarLinks {
+    googleCalUrl: string;
+    outlookUrl: string;
+    icsUrl?: string;
+}
+
+interface ScheduledMeeting {
+    id: string;
+    title: string;
+    scheduledAt: string;
+    meetingUrl: string;
+}
+
 interface ScheduleMeetingModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSuccess?: (meeting: any) => void;
+    onSuccess?: (meeting: ScheduledMeeting) => void;
 }
 
 export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMeetingModalProps) {
@@ -41,7 +54,7 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<{ meetingUrl: string; calendarLinks: any } | null>(null);
+    const [success, setSuccess] = useState<{ meetingUrl: string; calendarLinks: CalendarLinks } | null>(null);
 
     const handleAddAttendee = () => {
         if (!newEmail.trim()) return;
@@ -95,8 +108,8 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
 
             setSuccess({ meetingUrl: data.meetingUrl, calendarLinks: data.calendarLinks });
             if (onSuccess) onSuccess(data.meeting);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'An unexpected error occurred');
         } finally {
             setLoading(false);
         }

@@ -31,7 +31,7 @@ import {
   EscalationType,
 } from '../types/escalation';
 import { createTicket } from './ticketService';
-import { TicketSource, TicketType, TicketPriority } from '../types/ticket';
+import { TicketSource, TicketType, TicketPriority, Ticket, CreateTicketPayload } from '../types/ticket';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('maintenance:escalation-service');
@@ -132,7 +132,7 @@ export async function createEscalation(
 export async function createInfrastructureTicket(
   escalationId: string,
   createdBy: string
-): Promise<{ escalation: RepeatFaultEscalation; infrastructure_ticket: any }> {
+): Promise<{ escalation: RepeatFaultEscalation; infrastructure_ticket: Ticket }> {
   // 🟢 WORKING: Validate UUID format
   if (!isValidUUID(escalationId)) {
     throw new Error('Invalid escalation ID format');
@@ -157,7 +157,7 @@ export async function createInfrastructureTicket(
     const { title, description, scopeField } = generateTicketContent(escalation);
 
     // Create infrastructure ticket
-    const ticketPayload: any = {
+    const ticketPayload: CreateTicketPayload = {
       source: TicketSource.CONSTRUCTION,
       title,
       description,
@@ -211,16 +211,18 @@ export async function createInfrastructureTicket(
  * Generate ticket content based on escalation scope
  * 🟢 WORKING: Creates appropriate title/description for each scope type
  */
+type ScopeField = 'pole_number' | 'pon_number' | 'zone_id' | 'dr_number';
+
 function generateTicketContent(escalation: RepeatFaultEscalation): {
   title: string;
   description: string;
-  scopeField: string | null;
+  scopeField: ScopeField | null;
 } {
   const { scope_type, scope_value, fault_count, escalation_type } = escalation;
 
   let title: string;
   let description: string;
-  let scopeField: string | null = null;
+  let scopeField: ScopeField | null = null;
   const actionType = escalation_type || EscalationType.INVESTIGATION;
 
   // Capitalize action type for title
@@ -305,7 +307,7 @@ export async function listEscalations(
 ): Promise<RepeatFaultEscalation[]> {
   try {
     const whereClauses: string[] = [];
-    const params: any[] = [];
+    const params: (string | string[])[] = [];
     let paramIndex = 1;
 
     // 🟢 WORKING: Build WHERE clause based on filters

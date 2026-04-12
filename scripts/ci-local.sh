@@ -10,7 +10,7 @@
 #   bash scripts/ci-local.sh --pre-deploy # Lint gates only (deploy uses this)
 #
 # Baselines (ratchet down over time, never up):
-#   Lint warnings: 1589   (no-explicit-any, no-unused-vars, etc.)
+#   Lint warnings: 1580   (no-explicit-any, no-unused-vars, etc.)
 #   Lint errors:   77     (ts-ignore, prefer-const — pre-existing)
 #   Silent catches: 94    (catch blocks without logging)
 # =============================================================================

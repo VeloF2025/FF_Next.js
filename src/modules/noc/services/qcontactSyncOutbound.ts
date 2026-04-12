@@ -58,8 +58,8 @@ async function createSyncLog(
   qcontactTicketId: string | null,
   syncType: SyncType,
   status: SyncStatus,
-  requestPayload: Record<string, any> | null,
-  responsePayload: Record<string, any> | null,
+  requestPayload: Record<string, unknown> | null,
+  responsePayload: Record<string, unknown> | null,
   errorMessage: string | null
 ): Promise<string> {
   const sql = `
@@ -758,7 +758,7 @@ export async function syncOutboundUpdate(
     }
 
     // Build QContact update payload
-    const qcontactPayload: Record<string, any> = {};
+    const qcontactPayload: Record<string, string | null> = {};
 
     if (changes.status !== undefined) {
       qcontactPayload.status = mapStatusToQContact(changes.status);
@@ -830,7 +830,7 @@ export async function syncOutboundUpdate(
       ticket?.external_id || null,
       SyncType.STATUS_UPDATE,
       SyncStatus.FAILED,
-      changes,
+      changes as Record<string, unknown>,
       null,
       errorMessage
     );
