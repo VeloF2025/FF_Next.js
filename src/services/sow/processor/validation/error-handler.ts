@@ -14,7 +14,7 @@ export class SOWErrorHandler {
   /**
    * Get validation summary from result
    */
-  static getValidationSummary(result: ValidationResult<any>): ValidationSummary {
+  static getValidationSummary(result: ValidationResult<unknown>): ValidationSummary {
     const totalRecords = result.valid.length + result.invalid.length;
     const validRecords = result.valid.length;
     const invalidRecords = result.invalid.length;
@@ -70,7 +70,7 @@ export class SOWErrorHandler {
   /**
    * Batch validate multiple datasets
    */
-  static batchValidate(datasets: { data: any[]; type: 'poles' | 'drops' | 'fibre' }[]): BatchValidationResult {
+  static batchValidate(datasets: { data: unknown[]; type: 'poles' | 'drops' | 'fibre' }[]): BatchValidationResult {
     const results = datasets.map(dataset => SOWValidator.validateData(dataset.data, dataset.type));
     
     const totalDatasets = datasets.length;
@@ -143,7 +143,7 @@ export class SOWErrorHandler {
   /**
    * Generate error report
    */
-  static generateErrorReport(result: ValidationResult<any>, dataType: string): {
+  static generateErrorReport(result: ValidationResult<unknown>, dataType: string): {
     title: string;
     summary: ValidationSummary;
     errorBreakdown: {
@@ -158,8 +158,9 @@ export class SOWErrorHandler {
     // Extract errors from invalid records
     const allErrors: ValidationError[] = [];
     result.invalid.forEach(record => {
-      if (record.errors && Array.isArray(record.errors)) {
-        allErrors.push(...record.errors);
+      const rec = record as Record<string, unknown>;
+      if (rec.errors && Array.isArray(rec.errors)) {
+        allErrors.push(...(rec.errors as ValidationError[]));
       }
     });
     
@@ -207,7 +208,7 @@ export class SOWErrorHandler {
   /**
    * Export validation results to different formats
    */
-  static exportResults(result: ValidationResult<any>, format: 'json' | 'csv' | 'text' = 'json'): string {
+  static exportResults(result: ValidationResult<unknown>, format: 'json' | 'csv' | 'text' = 'json'): string {
     const summary = this.getValidationSummary(result);
     
     switch (format) {
@@ -222,8 +223,9 @@ export class SOWErrorHandler {
       case 'csv': {
         const csvLines = ['Type,Field,Value,Message,Severity,Code'];
         result.invalid.forEach(record => {
-          if (record.errors && Array.isArray(record.errors)) {
-            record.errors.forEach((error: ValidationError) => {
+          const rec = record as Record<string, unknown>;
+          if (rec.errors && Array.isArray(rec.errors)) {
+            rec.errors.forEach((error: ValidationError) => {
               const value = typeof error.value === 'object' ? 
                 JSON.stringify(error.value).replace(/"/g, '""') : 
                 String(error.value).replace(/"/g, '""');
@@ -265,7 +267,7 @@ export class SOWErrorHandler {
   /**
    * Check if validation result meets quality threshold
    */
-  static meetsQualityThreshold(result: ValidationResult<any>, threshold: number = 90): {
+  static meetsQualityThreshold(result: ValidationResult<unknown>, threshold: number = 90): {
     passes: boolean;
     currentRate: number;
     threshold: number;

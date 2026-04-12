@@ -56,8 +56,8 @@ export const neonUtils = {
       const firstRow = Array.isArray(result) && result.length > 0 ? result[0] : null;
       return {
         success: true,
-        timestamp: firstRow && typeof firstRow === 'object' && 'timestamp' in firstRow 
-          ? (firstRow as any).timestamp 
+        timestamp: firstRow && typeof firstRow === 'object' && 'timestamp' in firstRow
+          ? String((firstRow as Record<string, unknown>).timestamp)
           : new Date().toISOString(),
       };
     } catch (error) {
@@ -71,24 +71,24 @@ export const neonUtils = {
   /**
    * Get database version and info
    */
-  async getInfo(): Promise<any> {
+  async getInfo(): Promise<Record<string, unknown> | null> {
     try {
       const versionResult = await getSql()`SELECT VERSION() as version`;
       const sizeResult = await getSql()`
-        SELECT 
+        SELECT
           pg_size_pretty(pg_database_size(current_database())) as database_size,
           current_database() as database_name,
           current_user as user_name
       `;
-      
+
       const versionRow = Array.isArray(versionResult) && versionResult.length > 0 ? versionResult[0] : null;
       const sizeRow = Array.isArray(sizeResult) && sizeResult.length > 0 ? sizeResult[0] : null;
-      
+
       return {
         version: versionRow && typeof versionRow === 'object' && 'version' in versionRow
-          ? (versionRow as any).version || 'Unknown'
+          ? ((versionRow as Record<string, unknown>).version ?? 'Unknown')
           : 'Unknown',
-        ...(sizeRow && typeof sizeRow === 'object' ? sizeRow : {}),
+        ...(sizeRow && typeof sizeRow === 'object' ? (sizeRow as Record<string, unknown>) : {}),
       };
     } catch (error) {
       log.error('Failed to get database info:', { data: error }, 'connection');
@@ -99,10 +99,10 @@ export const neonUtils = {
   /**
    * Get table information
    */
-  async getTableStats(): Promise<any> {
+  async getTableStats(): Promise<unknown[]> {
     try {
       const result = await getSql()`
-        SELECT 
+        SELECT
           schemaname,
           tablename,
           n_tup_ins as inserts,
@@ -113,8 +113,8 @@ export const neonUtils = {
         FROM pg_stat_user_tables
         ORDER BY tablename;
       `;
-      
-      return result;
+
+      return result as unknown[];
     } catch (error) {
       log.error('Failed to get table stats:', { data: error }, 'connection');
       return [];
@@ -124,10 +124,10 @@ export const neonUtils = {
   /**
    * Execute raw SQL (use with caution)
    */
-  async rawQuery(query: string): Promise<any> {
+  async rawQuery(query: string): Promise<unknown> {
     try {
       // Use template literal format for Neon
-      return await getSql()([query] as any as TemplateStringsArray);
+      return await getSql()([query] as unknown as TemplateStringsArray);
     } catch (error) {
       log.error('Raw query failed:', { data: error }, 'connection');
       throw error;

@@ -4,6 +4,7 @@
  */
 
 import { StaffMember, StaffDropdownOption, TimestampLike } from '@/types/staff.types';
+import { StaffStatus, Department } from '@/types/staff/enums.types';
 import {
   SAContractType,
   UIFStatus,
@@ -170,8 +171,8 @@ export function mapToStaffMember(staff: any): StaffMember {
 /**
  * Map database results to StaffMember array with manager info
  */
-export function mapToStaffMembers(results: any[]): StaffMember[] {
-  return results.map((staff: any) => ({
+export function mapToStaffMembers(results: Record<string, unknown>[]): StaffMember[] {
+  return results.map((staff) => ({
     ...staff,
     managerName: staff.manager_name,
     managerPosition: staff.manager_position
@@ -181,14 +182,15 @@ export function mapToStaffMembers(results: any[]): StaffMember[] {
 /**
  * Map database result to StaffDropdownOption
  */
-export function mapToDropdownOption(staff: any, isManager: boolean = false): StaffDropdownOption {
+export function mapToDropdownOption(staff: Record<string, unknown>, isManager: boolean = false): StaffDropdownOption {
+  const dept = (staff.department as string) || (isManager ? Department.MANAGEMENT : Department.ADMINISTRATION);
   return {
-    id: staff.id,
-    name: staff.name,
-    position: staff.position,
-    department: staff.department || (isManager ? 'Management' : undefined),
-    email: staff.email,
-    status: 'ACTIVE' as any, // Type will be fixed when we properly implement enums
+    id: staff.id as string,
+    name: staff.name as string,
+    position: staff.position as string,
+    department: dept as Department,
+    email: staff.email as string,
+    status: StaffStatus.ACTIVE,
     currentProjectCount: 0, // TODO: Calculate from projects
     maxProjectCount: isManager ? 10 : 5 // Managers can handle more projects
   };
