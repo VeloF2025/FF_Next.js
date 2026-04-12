@@ -24,6 +24,37 @@ interface RecentActivity {
   value?: number;
 }
 
+interface PurchaseOrderRecord {
+  id: string;
+  status?: string;
+  po_number?: string;
+  poNumber?: string;
+  supplier_name?: string;
+  supplierName?: string;
+  created_at?: string;
+  createdAt?: string;
+  total_amount?: number | string;
+  totalAmount?: number | string;
+}
+
+interface RfqRecord {
+  id: string;
+  status?: string;
+  rfqNumber?: string;
+  title?: string;
+  createdDate?: string;
+  createdAt?: string;
+  totalValue?: number;
+}
+
+interface BoqRecord {
+  id: string;
+  title?: string;
+  file_name?: string;
+  created_at?: string;
+  createdAt?: string;
+}
+
 export function ProcurementDashboard() {
   const [activeView, setActiveView] = useState<'overview' | 'detailed'>('overview');
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
@@ -56,7 +87,7 @@ export function ProcurementDashboard() {
 
         if (posRes.ok) {
           const posData = await posRes.json();
-          (posData.data || posData.purchaseOrders || []).slice(0, 3).forEach((po: any) => {
+          (posData.data || posData.purchaseOrders || []).slice(0, 3).forEach((po: PurchaseOrderRecord) => {
             activities.push({
               id: `po-${po.id}`,
               type: 'PO',
@@ -71,7 +102,7 @@ export function ProcurementDashboard() {
         if (rfqsRes.ok) {
           const rfqsData = await rfqsRes.json();
           const rfqsList = rfqsData.data?.rfqs || rfqsData.rfqs || [];
-          rfqsList.slice(0, 2).forEach((rfq: any) => {
+          rfqsList.slice(0, 2).forEach((rfq: RfqRecord) => {
             activities.push({
               id: `rfq-${rfq.id}`,
               type: 'RFQ',
@@ -85,7 +116,7 @@ export function ProcurementDashboard() {
 
         if (boqsRes.ok) {
           const boqsData = await boqsRes.json();
-          (boqsData.boqs || []).slice(0, 2).forEach((boq: any) => {
+          (boqsData.boqs || []).slice(0, 2).forEach((boq: BoqRecord) => {
             activities.push({
               id: `boq-${boq.id}`,
               type: 'BOQ',
@@ -109,7 +140,7 @@ export function ProcurementDashboard() {
   }, []);
 
   // Helper to format time ago
-  const formatTimeAgo = (dateStr: string): string => {
+  const formatTimeAgo = (dateStr: string | undefined): string => {
     if (!dateStr) return 'Recently';
     const date = new Date(dateStr);
     const now = new Date();

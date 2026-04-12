@@ -89,27 +89,31 @@ export function useDashboardData() {
   }, [loadDashboardData]);
 
   // 🟢 WORKING: Utility functions
-  const formatNumber = useCallback((num: number): string => {
-    if (num >= 1000000) {
-      return `${(num / 1000000).toFixed(1)}M`;
+  const formatNumber = useCallback((num: number | string): string => {
+    const n = typeof num === 'string' ? parseFloat(num) : num;
+    if (isNaN(n)) return String(num);
+    if (n >= 1000000) {
+      return `${(n / 1000000).toFixed(1)}M`;
     }
-    if (num >= 1000) {
-      return `${(num / 1000).toFixed(1)}K`;
+    if (n >= 1000) {
+      return `${(n / 1000).toFixed(1)}K`;
     }
-    return num.toString();
+    return n.toString();
   }, []);
 
-  const formatCurrency = useCallback((amount: number): string => {
+  const formatCurrency = useCallback((amount: number | string): string => {
+    const n = typeof amount === 'string' ? parseFloat(amount) : amount;
     return new Intl.NumberFormat('en-ZA', {
       style: 'currency',
       currency: 'ZAR',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(amount);
+    }).format(isNaN(n) ? 0 : n);
   }, []);
 
-  const formatPercentage = useCallback((value: number): string => {
-    return `${value.toFixed(1)}%`;
+  const formatPercentage = useCallback((value: number | string): string => {
+    const n = typeof value === 'string' ? parseFloat(value) : value;
+    return `${(isNaN(n) ? 0 : n).toFixed(1)}%`;
   }, []);
 
   const getTrendColor = useCallback((direction: 'up' | 'down' | 'stable'): string => {

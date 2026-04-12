@@ -41,7 +41,9 @@ import type {
   SpendAnalysisReport as SpendAnalysisReportData,
   CycleTimeReport,
   BudgetVarianceReport,
-  ReportFilters
+  ReportFilters,
+  CategorySpend,
+  SupplierMetric
 } from '@/services/procurement/reports/procurementReportsService';
 
 // 🟢 WORKING: Chart color palette
@@ -180,23 +182,23 @@ const ReportsAnalyticsPage: React.FC = () => {
   // 🟢 WORKING: Export handler
   const handleExport = async (format: 'pdf' | 'excel' | 'csv') => {
     try {
-      let data: any;
-      
+      let data: Record<string, unknown> | null;
+
       switch (activeTab) {
         case 'cost-savings':
-          data = costSavingsData;
+          data = costSavingsData as Record<string, unknown> | null;
           break;
         case 'suppliers':
-          data = supplierPerformanceData;
+          data = supplierPerformanceData as Record<string, unknown> | null;
           break;
         case 'spend-analysis':
-          data = spendAnalysisData;
+          data = spendAnalysisData as Record<string, unknown> | null;
           break;
         default:
-          data = { costSavingsData, supplierPerformanceData, spendAnalysisData };
+          data = { costSavingsData, supplierPerformanceData, spendAnalysisData } as Record<string, unknown>;
       }
-      
-      await exportReport(activeTab, data, { format });
+
+      await exportReport(activeTab, data ?? {}, { format });
     } catch (error) {
       log.error('Export error:', { data: error }, 'ReportsAnalyticsPage');
       notificationService.error('Export failed. Please try again.');
@@ -326,7 +328,7 @@ const ReportsAnalyticsPage: React.FC = () => {
                     fill="#8884d8"
                     label={({ category, actual }: { category: string; actual: number }) => `${category}: ${formatCurrency(actual)}`}
                   >
-                    {(spendAnalysisData?.categoryBreakdown || []).map((_: any, index: number) => (
+                    {(spendAnalysisData?.categoryBreakdown || []).map((_: CategorySpend, index: number) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
@@ -357,7 +359,7 @@ const ReportsAnalyticsPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-card divide-y divide-gray-200">
-                  {(supplierPerformanceData?.topPerformers || []).slice(0, 5).map((supplier: any) => (
+                  {(supplierPerformanceData?.topPerformers || []).slice(0, 5).map((supplier: SupplierMetric) => (
                     <tr key={supplier.supplierId}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                         {supplier.name}

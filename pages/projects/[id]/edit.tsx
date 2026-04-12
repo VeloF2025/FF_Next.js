@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { log } from '@/lib/logger';
 
 const ProjectForm = dynamic(() => import('@/modules/projects/components/ProjectForm').then(mod => mod.ProjectForm || mod.default), {
   ssr: false,
@@ -12,7 +13,7 @@ const ProjectForm = dynamic(() => import('@/modules/projects/components/ProjectF
 export default function EditProjectPage() {
   const router = useRouter();
   const { id } = router.query;
-  const [project, setProject] = useState(null);
+  const [project, setProject] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,11 +25,11 @@ export default function EditProjectPage() {
           if (data.success) {
             setProject(data.data);
           } else {
-            console.error('Failed to fetch project:', data.error);
+            log.error('Failed to fetch project:', { data: data.error }, 'EditProjectPage');
           }
         })
         .catch(err => {
-          console.error('Error fetching project:', err);
+          log.error('Error fetching project:', { data: err }, 'EditProjectPage');
         })
         .finally(() => {
           setLoading(false);
@@ -63,11 +64,11 @@ export default function EditProjectPage() {
         if (data.success) {
           router.push('/projects');
         } else {
-          console.error('Failed to update project:', data.error);
+          log.error('Failed to update project:', { data: data.error }, 'EditProjectPage');
         }
       })
       .catch(err => {
-        console.error('Error updating project:', err);
+        log.error('Error updating project:', { data: err }, 'EditProjectPage');
       });
   };
 

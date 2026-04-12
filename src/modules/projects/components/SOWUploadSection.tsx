@@ -3,28 +3,25 @@ import { useSOWUpload } from './SOWUploadSection/hooks/useSOWUpload';
 import { FileUploadCard } from './SOWUploadSection/components/FileUploadCard';
 import { UploadSummary } from './SOWUploadSection/components/UploadSummary';
 import { FILE_TYPE_CONFIGS } from './SOWUploadSection/types/sowUpload.types';
+import type { SOWUploadSectionProps } from './SOWUploadSection/types/sowUpload.types';
+import type { NeonPoleData, NeonDropData, NeonFibreData } from '@/services/neonSOWService';
 
-interface SOWUploadSectionProps {
-  projectId: string;
-  projectName: string;
-  onComplete?: () => void;
-  onDataUpdate?: (data: { poles?: any[]; drops?: any[]; fibre?: any[] }) => void;
-  showActions?: boolean;
-}
-
-export function SOWUploadSection({ 
-  projectId, 
+export function SOWUploadSection({
+  projectId,
   onComplete,
   onDataUpdate,
-  showActions = true 
+  showActions = true
 }: SOWUploadSectionProps) {
+  // Cast the onDataUpdate callback to the hook's internal type; both shapes describe the same data
+  type SOWDataUpdate = { poles?: NeonPoleData[]; drops?: NeonDropData[]; fibre?: NeonFibreData[] };
+  const typedOnDataUpdate = onDataUpdate as ((data: SOWDataUpdate) => void) | undefined;
   const {
     files,
     isProcessing,
     handleFileUpload,
     removeFile,
     downloadTemplate
-  } = useSOWUpload(projectId, onDataUpdate);
+  } = useSOWUpload(projectId, typedOnDataUpdate);
 
   // Add icons to file type configs
   const fileTypes = FILE_TYPE_CONFIGS.map(config => ({

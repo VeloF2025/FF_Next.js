@@ -20,6 +20,41 @@ import { useActiveClients } from '@/hooks/useClients';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { useProjectManagers } from '@/hooks/useStaff';
 import { notificationService } from '@/services/core/NotificationService';
+import type { StaffDropdownOption } from '@/types/staff.types';
+
+/** Client record as returned by useActiveClients (may include DB snake_case fields) */
+interface ClientRecord {
+  id: string;
+  name?: string;
+  company_name?: string;
+  companyName?: string;
+}
+
+/** Raw project record — may contain either camelCase or snake_case keys from the DB */
+interface ProjectInput {
+  id?: string;
+  name?: string;
+  project_name?: string;
+  description?: string;
+  clientId?: string;
+  client_id?: string;
+  projectManager?: string;
+  project_manager?: string;
+  status?: string;
+  priority?: string;
+  startDate?: string;
+  start_date?: string;
+  endDate?: string;
+  end_date?: string;
+  budget?: number;
+  location?: {
+    province?: string;
+    city?: string;
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+  };
+}
 
 interface ProjectFormData {
   id?: string;
@@ -42,7 +77,7 @@ interface ProjectFormData {
 }
 
 interface ProjectFormProps {
-  project?: any;
+  project?: ProjectInput | null;
   onSubmit: (data: ProjectFormData) => void;
   onCancel: () => void;
 }
@@ -82,7 +117,7 @@ const formatDateForInput = (date: string | Date | null | undefined): string => {
   try {
     const d = typeof date === 'string' ? new Date(date) : date;
     if (isNaN(d.getTime())) return '';
-    return d.toISOString().split('T')[0];
+    return d.toISOString().split('T')[0] ?? '';
   } catch {
     return '';
   }
@@ -207,7 +242,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ project, onSubmit, onC
                   }`}
                 >
                   <option value="">Select client...</option>
-                  {clients.map((client: any) => (
+                  {(clients as ClientRecord[]).map((client) => (
                     <option key={client.id} value={client.id}>
                       {client.company_name || client.companyName}
                     </option>
@@ -233,7 +268,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ project, onSubmit, onC
                   className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select manager...</option>
-                  {projectManagers.map((pm: any) => (
+                  {(projectManagers as StaffDropdownOption[]).map((pm) => (
                     <option key={pm.id} value={pm.id}>
                       {pm.name}
                     </option>

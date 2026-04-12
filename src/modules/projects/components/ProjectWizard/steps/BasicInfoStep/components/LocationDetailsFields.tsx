@@ -1,12 +1,15 @@
+import type { UseFormRegister, FieldErrors, FieldValues, Path } from 'react-hook-form';
 
-
-interface LocationDetailsFieldsProps {
-  register: any;
-  errors: any;
+interface LocationDetailsFieldsProps<T extends FieldValues> {
+  register: UseFormRegister<T>;
+  errors: FieldErrors<T>;
   isGeocoding: boolean;
 }
 
-export function LocationDetailsFields({ register, errors, isGeocoding }: LocationDetailsFieldsProps) {
+export function LocationDetailsFields<T extends FieldValues>({ register, errors, isGeocoding }: LocationDetailsFieldsProps<T>) {
+  // Narrow the errors to the location sub-object if present
+  const locationErrors = (errors as Record<string, Record<string, { message?: string }>>).location;
+
   return (
     <div className="pt-4 border-t border-[var(--ff-border-light)]">
       <p className="text-sm text-[var(--ff-text-secondary)] mb-3">
@@ -17,28 +20,28 @@ export function LocationDetailsFields({ register, errors, isGeocoding }: Locatio
         <div>
           <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">City/Town</label>
           <input
-            {...register('location.city', { required: 'City/Town is required' })}
+            {...register('location.city' as Path<T>, { required: 'City/Town is required' })}
             type="text"
             className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]"
             placeholder="Will be auto-populated"
             readOnly={isGeocoding}
           />
-          {errors.location?.city && (
-            <p className="mt-1 text-sm text-red-600">{errors.location.city.message}</p>
+          {locationErrors?.city && (
+            <p className="mt-1 text-sm text-red-600">{locationErrors.city.message}</p>
           )}
         </div>
 
         <div>
           <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">Municipal District</label>
           <input
-            {...register('location.region' as any, { required: 'Region is required' })}
+            {...register('location.region' as Path<T>, { required: 'Region is required' })}
             type="text"
             className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]"
             placeholder="Will be auto-populated"
             readOnly={isGeocoding}
           />
-          {errors.location?.region && (
-            <p className="mt-1 text-sm text-red-600">{errors.location.region.message}</p>
+          {locationErrors?.region && (
+            <p className="mt-1 text-sm text-red-600">{locationErrors.region.message}</p>
           )}
         </div>
       </div>
@@ -46,14 +49,14 @@ export function LocationDetailsFields({ register, errors, isGeocoding }: Locatio
       <div className="mt-4">
         <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">Province</label>
         <input
-          {...register('location.province', { required: 'Province is required' })}
+          {...register('location.province' as Path<T>, { required: 'Province is required' })}
           type="text"
           className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]"
           placeholder="Will be auto-populated"
           readOnly={isGeocoding}
         />
-        {errors.location?.province && (
-          <p className="mt-1 text-sm text-red-600">{errors.location.province.message}</p>
+        {locationErrors?.province && (
+          <p className="mt-1 text-sm text-red-600">{locationErrors.province.message}</p>
         )}
       </div>
     </div>
