@@ -4,8 +4,9 @@
  */
 
 import { StockError } from '../inventory';
-import { 
-  PredictiveInsights
+import {
+  PredictiveInsights,
+  ErrorAnalysisResult
 } from './analytics-types';
 import { ErrorTracker } from './error-tracker';
 
@@ -212,11 +213,11 @@ export class AnalyticsEngine {
   /**
    * Analyze item risk factors
    */
-  private static analyzeItemRiskFactors(analysis: any): Array<{ factor: string; impact: number; description: string }> {
+  private static analyzeItemRiskFactors(analysis: ErrorAnalysisResult): Array<{ factor: string; impact: number; description: string }> {
     const factors = [];
 
     if (analysis.mostCommonItems.length > 0) {
-      const topItem = analysis.mostCommonItems[0];
+      const topItem = analysis.mostCommonItems[0]!;
       factors.push({
         factor: 'High-frequency item errors',
         impact: topItem.count,
@@ -225,7 +226,7 @@ export class AnalyticsEngine {
     }
 
     // Check for items with multiple error types
-    const complexItems = analysis.mostCommonItems.filter((item: any) => item.errorTypes.length > 2);
+    const complexItems = analysis.mostCommonItems.filter((item: { itemCode: string; count: number; errorTypes: string[] }) => item.errorTypes.length > 2);
     if (complexItems.length > 0) {
       factors.push({
         factor: 'Complex item error patterns',
@@ -240,11 +241,11 @@ export class AnalyticsEngine {
   /**
    * Analyze location risk factors
    */
-  private static analyzeLocationRiskFactors(analysis: any): Array<{ factor: string; impact: number; description: string }> {
+  private static analyzeLocationRiskFactors(analysis: ErrorAnalysisResult): Array<{ factor: string; impact: number; description: string }> {
     const factors = [];
 
     if (analysis.locations.length > 0) {
-      const topLocation = analysis.locations[0];
+      const topLocation = analysis.locations[0]!;
       factors.push({
         factor: 'High-error location',
         impact: topLocation.count,
@@ -284,7 +285,7 @@ export class AnalyticsEngine {
   /**
    * Calculate overall risk level
    */
-  private static calculateOverallRiskLevel(errors: StockError[], analysis: any): 'low' | 'moderate' | 'high' | 'critical' {
+  private static calculateOverallRiskLevel(errors: StockError[], analysis: ErrorAnalysisResult): 'low' | 'moderate' | 'high' | 'critical' {
     let riskScore = 0;
 
     // Factor in error count
@@ -292,13 +293,13 @@ export class AnalyticsEngine {
 
     // Factor in item concentration
     if (analysis.mostCommonItems.length > 0) {
-      const topItem = analysis.mostCommonItems[0];
+      const topItem = analysis.mostCommonItems[0]!;
       riskScore += topItem.count * 0.5;
     }
 
     // Factor in location concentration
     if (analysis.locations.length > 0) {
-      const topLocation = analysis.locations[0];
+      const topLocation = analysis.locations[0]!;
       riskScore += topLocation.count * 0.3;
     }
 
@@ -311,7 +312,7 @@ export class AnalyticsEngine {
   /**
    * Generate immediate actions
    */
-  private static generateImmediateActions(_analysis: any) {
+  private static generateImmediateActions(_analysis: ErrorAnalysisResult) {
     return [
       { action: 'Review top problematic items', priority: 1, effort: 'low' as const },
       { action: 'Check stock levels for frequent shortage items', priority: 2, effort: 'low' as const },
@@ -322,7 +323,7 @@ export class AnalyticsEngine {
   /**
    * Generate short-term actions
    */
-  private static generateShortTermActions(_analysis: any) {
+  private static generateShortTermActions(_analysis: ErrorAnalysisResult) {
     return [
       { action: 'Implement monitoring for top 10 items', timeline: '1-2 weeks', expectedImpact: 'Reduce item-specific errors by 40%' },
       { action: 'Audit high-error locations', timeline: '2-3 weeks', expectedImpact: 'Identify root causes of location issues' }
@@ -332,7 +333,7 @@ export class AnalyticsEngine {
   /**
    * Generate long-term actions
    */
-  private static generateLongTermActions(_analysis: any) {
+  private static generateLongTermActions(_analysis: ErrorAnalysisResult) {
     return [
       { action: 'Implement predictive inventory system', timeline: '2-3 months', expectedImpact: 'Reduce overall errors by 60%' },
       { action: 'Redesign inventory processes', timeline: '3-6 months', expectedImpact: 'Systematic improvement in error rates' }

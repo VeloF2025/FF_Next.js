@@ -10,8 +10,11 @@ export interface LocationData {
   coordinates: GpsCoordinates;
 }
 
+import type { UseFormReturn } from 'react-hook-form';
+import type { FormData } from '../../../types';
+
 export interface BasicInfoStepProps {
-  form: any; // UseFormReturn<FormData>
+  form: UseFormReturn<FormData>;
   clients: Array<{ id: string; name: string }>;
   isClientsLoading: boolean;
 }

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import type { UseFormReturn, Path } from 'react-hook-form';
+import type { FormData } from '../../../types';
 import { reverseGeocode, getCurrentLocation, validateSouthAfricanGPS, parseGPSCoordinates } from '@/utils/geoLocation';
 import type { GpsState } from '../types/basicInfo.types';
 import { log } from '@/lib/logger';
 
-export function useBasicInfoForm(form: any) {
+export function useBasicInfoForm(form: UseFormReturn<FormData>) {
   const { watch, setValue } = form;
   const [gpsState, setGpsState] = useState<GpsState>({
     isGeocoding: false,
@@ -16,8 +18,8 @@ export function useBasicInfoForm(form: any) {
   const durationMonths = watch('durationMonths');
   
   // Watch for GPS coordinate changes
-  const gpsLatitude = watch('location.coordinates.latitude' as any);
-  const gpsLongitude = watch('location.coordinates.longitude' as any);
+  const gpsLatitude = watch('location.coordinates.latitude' as Path<FormData>);
+  const gpsLongitude = watch('location.coordinates.longitude' as Path<FormData>);
 
   // Calculate end date when start date or duration changes
   useEffect(() => {
@@ -27,7 +29,7 @@ export function useBasicInfoForm(form: any) {
       end.setMonth(start.getMonth() + durationMonths);
       
       // Format to YYYY-MM-DD for the date input
-      const formattedEndDate = end.toISOString().split('T')[0];
+      const formattedEndDate = end.toISOString().split('T')[0] ?? '';
       setValue('endDate', formattedEndDate);
     }
   }, [startDate, durationMonths, setValue]);
@@ -76,8 +78,8 @@ export function useBasicInfoForm(form: any) {
 
     try {
       const position = await getCurrentLocation();
-      setValue('location.coordinates.latitude' as any, position.lat);
-      setValue('location.coordinates.longitude' as any, position.lng);
+      setValue('location.coordinates.latitude' as Path<FormData>, position.lat);
+      setValue('location.coordinates.longitude' as Path<FormData>, position.lng);
     } catch (error) {
       setGpsState(prev => ({ ...prev, geocodingError: 'Could not get current location' }));
       log.error('Geolocation error:', { data: error }, 'useBasicInfoForm');
@@ -92,8 +94,8 @@ export function useBasicInfoForm(form: any) {
 
     const coords = parseGPSCoordinates(gpsState.gpsInput.trim());
     if (coords) {
-      setValue('location.coordinates.latitude' as any, coords.lat);
-      setValue('location.coordinates.longitude' as any, coords.lng);
+      setValue('location.coordinates.latitude' as Path<FormData>, coords.lat);
+      setValue('location.coordinates.longitude' as Path<FormData>, coords.lng);
       setGpsState(prev => ({ ...prev, gpsInput: '', geocodingError: null }));
     } else {
       setGpsState(prev => ({ 

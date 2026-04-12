@@ -5,6 +5,15 @@
 
 import { RetryStrategy } from '../index';
 
+type MovementExecutionResult = Record<string, unknown>;
+
+interface MovementRetryOutcome {
+  success: boolean;
+  result: MovementExecutionResult | undefined;
+  error: string | undefined;
+  shouldRetry: boolean | undefined;
+}
+
 /**
  * Executor for movement retry strategies
  */
@@ -12,12 +21,7 @@ export class MovementExecutor {
   /**
    * Execute movement retry strategy
    */
-  static async executeRetry(retryStrategy: RetryStrategy): Promise<{
-    success: boolean;
-    result: any | undefined;
-    error: string | undefined;
-    shouldRetry: boolean | undefined;
-  }> {
+  static async executeRetry(retryStrategy: RetryStrategy): Promise<MovementRetryOutcome> {
     try {
 
       switch (retryStrategy.action) {
@@ -57,12 +61,7 @@ export class MovementExecutor {
     }
   }
 
-  private static executeValidationRetry(retryStrategy: RetryStrategy): {
-    success: boolean;
-    result: any | undefined;
-    error: string | undefined;
-    shouldRetry: boolean | undefined;
-  } {
+  private static executeValidationRetry(retryStrategy: RetryStrategy): MovementRetryOutcome {
     const validationSuccess = Math.random() > 0.3; // 70% success rate
     return {
       success: validationSuccess,
@@ -76,12 +75,7 @@ export class MovementExecutor {
     };
   }
 
-  private static executeBatchSplit(retryStrategy: RetryStrategy): {
-    success: boolean;
-    result: any | undefined;
-    error: string | undefined;
-    shouldRetry: boolean | undefined;
-  } {
+  private static executeBatchSplit(retryStrategy: RetryStrategy): MovementRetryOutcome {
     return {
       success: true,
       result: {
@@ -100,12 +94,7 @@ export class MovementExecutor {
     };
   }
 
-  private static executeOptimalScheduling(_retryStrategy: RetryStrategy): {
-    success: boolean;
-    result: any | undefined;
-    error: string | undefined;
-    shouldRetry: boolean | undefined;
-  } {
+  private static executeOptimalScheduling(_retryStrategy: RetryStrategy): MovementRetryOutcome {
     const nextOptimalTime = new Date();
     nextOptimalTime.setHours(nextOptimalTime.getHours() + Math.floor(Math.random() * 4) + 1);
     
@@ -122,12 +111,7 @@ export class MovementExecutor {
     };
   }
 
-  private static executeDirectTransferRetry(retryStrategy: RetryStrategy): {
-    success: boolean;
-    result: any | undefined;
-    error: string | undefined;
-    shouldRetry: boolean | undefined;
-  } {
+  private static executeDirectTransferRetry(retryStrategy: RetryStrategy): MovementRetryOutcome {
     const transferSuccess = Math.random() > 0.25; // 75% success rate
     return {
       success: transferSuccess,
@@ -141,12 +125,7 @@ export class MovementExecutor {
     };
   }
 
-  private static executeMultiHopTransfer(retryStrategy: RetryStrategy): {
-    success: boolean;
-    result: any | undefined;
-    error: string | undefined;
-    shouldRetry: boolean | undefined;
-  } {
+  private static executeMultiHopTransfer(retryStrategy: RetryStrategy): MovementRetryOutcome {
     return {
       success: true,
       result: {
@@ -164,12 +143,7 @@ export class MovementExecutor {
     };
   }
 
-  private static executeBatchTransfer(retryStrategy: RetryStrategy): {
-    success: boolean;
-    result: any | undefined;
-    error: string | undefined;
-    shouldRetry: boolean | undefined;
-  } {
+  private static executeBatchTransfer(retryStrategy: RetryStrategy): MovementRetryOutcome {
     return {
       success: true,
       result: {
