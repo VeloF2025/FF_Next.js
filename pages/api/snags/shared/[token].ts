@@ -37,7 +37,7 @@ async function resolveToken(token: string) {
     JOIN maintenance_tickets mt ON mt.id = st.ticket_id
     LEFT JOIN users u ON u.id = mt.assigned_to
     LEFT JOIN snags s ON s.noc_ticket_id = mt.id
-    LEFT JOIN projects p ON p.id = s.project_id
+    LEFT JOIN projects p ON p.id = COALESCE(s.project_id, mt.project_id)
     WHERE st.token = ${token}
     LIMIT 1
   ` as Array<Record<string, unknown>>;
@@ -209,7 +209,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           return apiResponse.error(res, 400 as never, 'Ticket must be in Assigned status to start work');
         }
         await sql`UPDATE maintenance_tickets SET status = 'in_progress', updated_at = NOW() WHERE id = ${ticketId}`;
-        // Also update linked snag
+        // Mirror status on linked snag row (civils tickets). No-op for other discipline types.
         await sql`UPDATE snags SET status = 'in_progress', updated_at = NOW() WHERE noc_ticket_id = ${ticketId}`;
         log.info('Shared ticket: start work', { ticketId, token: token.substring(0, 8) });
         return apiResponse.success(res, { newStatus: 'in_progress' });
@@ -220,6 +220,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           return apiResponse.error(res, 400 as never, 'Ticket must be In Progress to submit for QA');
         }
         await sql`UPDATE maintenance_tickets SET status = 'pending_qa', updated_at = NOW() WHERE id = ${ticketId}`;
+        // Mirror status on linked snag row (civils tickets). No-op for other discipline types.
         await sql`UPDATE snags SET status = 'pending_qa', updated_at = NOW(), fixed_at = NOW() WHERE noc_ticket_id = ${ticketId}`;
         log.info('Shared ticket: submitted for QA', { ticketId, token: token.substring(0, 8) });
         return apiResponse.success(res, { newStatus: 'pending_qa' });

@@ -49,17 +49,17 @@ function isValidUUID(id: string): boolean {
  * Initialize type-specific verification steps for a new ticket.
  *
  * Selects the correct step checklist based on the ticket type and creates all
- * steps in a single transaction. Defaults to the 12-step new_installation
+ * steps in a single transaction. Defaults to the 12-step activations
  * checklist when no ticket type is provided.
  *
  * @param ticketId - UUID of the ticket
- * @param ticketType - Value of the `type` column from maintenance_tickets (optional, defaults to 'new_installation')
+ * @param ticketType - Value of the `type` column from maintenance_tickets (optional, defaults to 'activations')
  * @returns Array of created verification steps
  * @throws {Error} If ticket doesn't exist or steps already initialized
  */
 export async function initializeVerificationSteps(
   ticketId: string,
-  ticketType: string = 'new_installation'
+  ticketType: string = 'activations'
 ): Promise<VerificationStep[]> {
   // WORKING: Validate ticket ID format
   if (!isValidUUID(ticketId)) {

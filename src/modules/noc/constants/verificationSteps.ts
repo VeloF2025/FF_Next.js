@@ -639,11 +639,114 @@ const DEV_OPS_STEPS: VerificationStepTemplate[] = [
 ];
 
 /**
+ * Verification steps for optical (fiber splicing) discipline tickets.
+ */
+const OPTICAL_STEPS: VerificationStepTemplate[] = [
+  {
+    step_number: 1,
+    step_name: 'Site Assessment & Safety Check',
+    step_description: 'Assess the site. Confirm cable route, identify splice point, and complete safety checks before opening any cabinet or enclosure.',
+    photo_required: true,
+    required_for_qa: true,
+    category: 'preparation',
+  },
+  {
+    step_number: 2,
+    step_name: 'OTDR Baseline Test',
+    step_description: 'Run an OTDR test before any splicing. Record baseline values for the affected fibre span. Upload OTDR trace or screenshot.',
+    photo_required: true,
+    required_for_qa: true,
+    category: 'investigation',
+  },
+  {
+    step_number: 3,
+    step_name: 'Splice Preparation & Fusion',
+    step_description: 'Prepare the fibre ends (strip, clean, cleave). Perform fusion splice. Inspect splice under the splicer microscope.',
+    photo_required: true,
+    required_for_qa: true,
+    category: 'installation',
+  },
+  {
+    step_number: 4,
+    step_name: 'Splice Loss Measurement',
+    step_description: 'Measure insertion loss for each splice. Must be within acceptable thresholds (≤0.1 dB per IEC 61753). Record values.',
+    photo_required: false,
+    required_for_qa: true,
+    category: 'testing',
+  },
+  {
+    step_number: 5,
+    step_name: 'Final OTDR & Closeout',
+    step_description: 'Run final OTDR test after splicing. Compare to baseline. Upload final trace. Close enclosure and photograph the sealed joint.',
+    photo_required: true,
+    required_for_qa: true,
+    category: 'documentation',
+  },
+];
+
+/**
  * Map of ticket types to their verification step arrays.
- * new_installation uses the default 12-step template.
+ *
+ * Primary keys are the 6 discipline values from the April-11 taxonomy
+ * (civils / optical / activations / maintenance / dev_ops / unspecified).
+ * Legacy keys are retained for any historical rows or edge-cases during
+ * the transition window.
+ *
  * // WORKING: Type-specific step checklists
  */
 export const VERIFICATION_STEPS_BY_TICKET_TYPE: Record<string, VerificationStepTemplate[]> = {
+  // ── Discipline values (April-11 taxonomy — primary keys) ───────────────
+  civils: [
+    {
+      step_number: 1,
+      step_name: 'Assess Snag',
+      step_description: 'Visit site and assess the reported snag. Confirm the issue matches the description and before photo.',
+      photo_required: false,
+      required_for_qa: true,
+      category: 'preparation',
+    },
+    {
+      step_number: 2,
+      step_name: 'Perform Rectification',
+      step_description: 'Complete the repair or corrective work as required. Follow quality standards.',
+      photo_required: false,
+      required_for_qa: true,
+      category: 'installation',
+    },
+    {
+      step_number: 3,
+      step_name: 'After Photo (Proof of Fix)',
+      step_description: 'Upload an after photo showing the completed rectification. This photo will be used in the closeout report to the client. Take from the same angle as the before photo.',
+      photo_required: true,
+      required_for_qa: true,
+      category: 'documentation',
+    },
+    {
+      step_number: 4,
+      step_name: 'Quality Check',
+      step_description: 'Verify the fix meets quality standards. Ensure no new issues were introduced.',
+      photo_required: false,
+      required_for_qa: true,
+      category: 'testing',
+    },
+    {
+      step_number: 5,
+      step_name: 'Documentation & Sign-off',
+      step_description: 'Add notes describing the work done. Record materials used if applicable.',
+      photo_required: false,
+      required_for_qa: true,
+      category: 'documentation',
+    },
+  ],
+  optical: OPTICAL_STEPS,
+  activations: VERIFICATION_STEPS,
+  maintenance: FAULT_REPAIR_STEPS,
+  dev_ops: DEV_OPS_STEPS,
+
+  // ── Legacy keys (pre-April-11 discipline migration) ────────────────────
+  // Kept so that any rows that were not caught by migration 279 still get
+  // correct steps (defence-in-depth). New tickets will always carry a
+  // discipline value and hit the primary keys above.
   new_installation: VERIFICATION_STEPS,
   fault_repair: FAULT_REPAIR_STEPS,
   ont_swap: ONT_SWAP_STEPS,
@@ -654,7 +757,6 @@ export const VERIFICATION_STEPS_BY_TICKET_TYPE: Record<string, VerificationStepT
   pre_provision: PRE_PROVISION_STEPS,
   hse_incident: HSE_INCIDENT_STEPS,
   hse_near_miss: HSE_NEAR_MISS_STEPS,
-  dev_ops: DEV_OPS_STEPS,
   snag: [
     {
       step_number: 1,
