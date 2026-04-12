@@ -22,7 +22,7 @@ export interface WorkflowTemplate {
   isDefault: boolean;
   isSystem: boolean;
   tags: string[];
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   createdBy?: string;
   updatedBy?: string;
   createdAt: string;
@@ -48,7 +48,7 @@ export interface WorkflowPhase {
   completionCriteria: string[];
   isOptional: boolean;
   isParallel: boolean;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
   
@@ -76,8 +76,8 @@ export interface WorkflowStep {
   validation: string[];
   isRequired: boolean;
   isAutomated: boolean;
-  automationConfig?: Record<string, any>;
-  metadata: Record<string, any>;
+  automationConfig?: Record<string, unknown>;
+  metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
   
@@ -103,7 +103,7 @@ export interface WorkflowTask {
   isOptional: boolean;
   canBeParallel: boolean;
   tags: string[];
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
   
@@ -125,7 +125,7 @@ export interface ProjectWorkflow {
   actualEndDate?: string;
   assignedTo?: string;
   teamMembers: string[];
-  metrics: Record<string, any>;
+  metrics: Record<string, unknown>;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -152,7 +152,7 @@ export interface WorkflowExecutionLog {
   duration?: number; // minutes
   notes?: string;
   attachments: string[];
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   timestamp: string;
   
   // Related data
@@ -191,7 +191,7 @@ export interface CreateWorkflowTemplateRequest {
   category: WorkflowCategory;
   type?: WorkflowType;
   tags?: string[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface UpdateWorkflowTemplateRequest extends Partial<CreateWorkflowTemplateRequest> {
@@ -212,7 +212,7 @@ export interface CreateWorkflowPhaseRequest {
   completionCriteria?: string[];
   isOptional?: boolean;
   isParallel?: boolean;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface UpdateWorkflowPhaseRequest extends Partial<CreateWorkflowPhaseRequest> {}
@@ -234,8 +234,8 @@ export interface CreateWorkflowStepRequest {
   validation?: string[];
   isRequired?: boolean;
   isAutomated?: boolean;
-  automationConfig?: Record<string, any>;
-  metadata?: Record<string, any>;
+  automationConfig?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface UpdateWorkflowStepRequest extends Partial<CreateWorkflowStepRequest> {}
@@ -254,7 +254,7 @@ export interface CreateWorkflowTaskRequest {
   isOptional?: boolean;
   canBeParallel?: boolean;
   tags?: string[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface UpdateWorkflowTaskRequest extends Partial<CreateWorkflowTaskRequest> {}
@@ -275,7 +275,7 @@ export interface UpdateProjectWorkflowRequest extends Partial<CreateProjectWorkf
   currentPhaseId?: string;
   progressPercentage?: number;
   actualEndDate?: string;
-  metrics?: Record<string, any>;
+  metrics?: Record<string, unknown>;
 }
 
 // Bulk operations

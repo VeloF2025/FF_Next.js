@@ -4,14 +4,14 @@ import { log } from '@/lib/logger';
 /**
  * Standard API Response Types
  */
-export interface ApiSuccessResponse<T = any> {
+export interface ApiSuccessResponse<T = unknown> {
   success: true;
   data: T;
   message?: string;
   meta?: {
     timestamp?: string;
     requestId?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -20,16 +20,16 @@ export interface ApiErrorResponse {
   error: {
     code: string;
     message: string;
-    details?: any;
+    details?: unknown;
   };
   meta?: {
     timestamp?: string;
     requestId?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
-export interface ApiPaginatedResponse<T = any> extends ApiSuccessResponse<T[]> {
+export interface ApiPaginatedResponse<T = unknown> extends ApiSuccessResponse<T[]> {
   pagination: {
     page: number;
     pageSize: number;
@@ -38,7 +38,7 @@ export interface ApiPaginatedResponse<T = any> extends ApiSuccessResponse<T[]> {
   };
 }
 
-export type ApiResponse<T = any> = ApiSuccessResponse<T> | ApiErrorResponse;
+export type ApiResponse<T = unknown> = ApiSuccessResponse<T> | ApiErrorResponse;
 
 /**
  * Standard error codes
@@ -100,7 +100,7 @@ const STATUS_CODE_MAP: Record<ErrorCode, number> = {
  * API Response Helper Class
  */
 export class ApiResponseHelper {
-  private static generateMeta(additionalMeta?: Record<string, any>) {
+  private static generateMeta(additionalMeta?: Record<string, unknown>) {
     return {
       timestamp: new Date().toISOString(),
       ...additionalMeta,
@@ -115,7 +115,7 @@ export class ApiResponseHelper {
     data: T,
     message?: string,
     statusCode = 200,
-    meta?: Record<string, any>
+    meta?: Record<string, unknown>
   ): void {
     const response: ApiSuccessResponse<T> = {
       success: true,
@@ -134,7 +134,7 @@ export class ApiResponseHelper {
     res: NextApiResponse,
     data: T,
     message = 'Resource created successfully',
-    meta?: Record<string, any>
+    meta?: Record<string, unknown>
   ): void {
     this.success(res, data, message, 201, meta);
   }
@@ -158,7 +158,7 @@ export class ApiResponseHelper {
       total: number;
     },
     message?: string,
-    meta?: Record<string, any>
+    meta?: Record<string, unknown>
   ): void {
     const totalPages = Math.ceil(pagination.total / pagination.pageSize);
     
@@ -183,8 +183,8 @@ export class ApiResponseHelper {
     res: NextApiResponse,
     code: ErrorCode,
     message: string,
-    details?: any,
-    meta?: Record<string, any>
+    details?: unknown,
+    meta?: Record<string, unknown>
   ): void {
     const statusCode = STATUS_CODE_MAP[code] || 500;
     
@@ -207,7 +207,7 @@ export class ApiResponseHelper {
   static badRequest(
     res: NextApiResponse,
     message: string,
-    details?: any
+    details?: unknown
   ): void {
     this.error(res, ErrorCode.BAD_REQUEST, message, details);
   }
