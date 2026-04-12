@@ -5,7 +5,7 @@
 - **Framework**: Next.js 14+ with App Router
 - **Auth**: PostgreSQL-based authentication (role-based)
 - **Database**: Neon PostgreSQL (direct SQL)
-- **Storage**: VF Storage (self-hosted on 100.96.203.105:8091, served via vf.fibreflow.app/storage/)
+- **Storage**: VF Storage (self-hosted on 100.96.203.105:8091, served via app.fibreflow.app/storage/)
 
 ## Essential Directory Structure
 ```
