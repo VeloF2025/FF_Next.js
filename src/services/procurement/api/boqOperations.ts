@@ -31,9 +31,11 @@ export class BOQOperations {
       const queryConditions = [eq(boqs.projectId, context.projectId)];
       
       if (filters.status) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         queryConditions.push(eq(boqs.status, filters.status as any));
       }
       if (filters.mappingStatus) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         queryConditions.push(eq(boqs.mappingStatus, filters.mappingStatus as any));
       }
       if (filters.uploadedBy) {
@@ -125,7 +127,7 @@ export class BOQOperations {
   /**
    * POST /api/v1/projects/{projectId}/boqs/import
    */
-  async importBOQ(context: ApiContext, importData: any): Promise<ServiceResponse<{ boqId: string, itemCount: number, exceptionsCount: number }>> {
+  async importBOQ(context: ApiContext, importData: unknown): Promise<ServiceResponse<{ boqId: string, itemCount: number, exceptionsCount: number }>> {
     try {
       // Validate import data
       const validation = validateSchema(ProcurementSchemas.BOQImport, importData);
@@ -214,7 +216,7 @@ export class BOQOperations {
     try {
       // Get current BOQ for audit trail
       const currentBOQ = await this.getBOQById(context, boqId);
-      if (!currentBOQ.success) return currentBOQ as any;
+      if (!currentBOQ.success) return currentBOQ as ServiceResponse<BOQ>;
 
       // Validate update data
       const allowedFields = ['title', 'description', 'status'];

@@ -189,8 +189,8 @@ export class StockCommandService extends BaseService {
         throw new StockError('Stock position not found', 'NOT_FOUND');
       }
 
-      // Prepare update data
-      const updateFields: any = {
+      // Prepare update data — Record<string, unknown> allows delete + string coercion
+      const updateFields: Record<string, unknown> = {
         ...updateData,
         updatedAt: new Date(),
       };
@@ -202,22 +202,22 @@ export class StockCommandService extends BaseService {
 
       // Convert numeric fields to strings for database
       if (updateFields.onHandQuantity !== undefined) {
-        updateFields.onHandQuantity = updateFields.onHandQuantity.toString();
+        updateFields.onHandQuantity = String(updateFields.onHandQuantity);
       }
       if (updateFields.reservedQuantity !== undefined) {
-        updateFields.reservedQuantity = updateFields.reservedQuantity.toString();
+        updateFields.reservedQuantity = String(updateFields.reservedQuantity);
       }
       if (updateFields.availableQuantity !== undefined) {
-        updateFields.availableQuantity = updateFields.availableQuantity.toString();
+        updateFields.availableQuantity = String(updateFields.availableQuantity);
       }
       if (updateFields.inTransitQuantity !== undefined) {
-        updateFields.inTransitQuantity = updateFields.inTransitQuantity.toString();
+        updateFields.inTransitQuantity = String(updateFields.inTransitQuantity);
       }
       if (updateFields.averageUnitCost !== undefined) {
-        updateFields.averageUnitCost = updateFields.averageUnitCost.toString();
+        updateFields.averageUnitCost = String(updateFields.averageUnitCost);
       }
       if (updateFields.totalValue !== undefined) {
-        updateFields.totalValue = updateFields.totalValue.toString();
+        updateFields.totalValue = String(updateFields.totalValue);
       }
 
       // Update the position
@@ -296,6 +296,7 @@ export class StockCommandService extends BaseService {
     userId: string
   ): Promise<ServiceResponse<StockPosition>> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return await db.transaction(async (tx: any) => {
         // Get current stock position
         const [currentPosition] = await tx
@@ -439,6 +440,7 @@ export class StockCommandService extends BaseService {
     reservationData: StockReservationData
   ): Promise<ServiceResponse<StockPosition>> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return await db.transaction(async (tx: any) => {
         // Get current stock position
         const [currentPosition] = await tx
@@ -510,6 +512,7 @@ export class StockCommandService extends BaseService {
     releaseQuantity: number
   ): Promise<ServiceResponse<StockPosition>> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return await db.transaction(async (tx: any) => {
         // Get current stock position
         const [currentPosition] = await tx
@@ -655,8 +658,8 @@ export class StockCommandService extends BaseService {
         throw new StockError('Cable drum not found', 'NOT_FOUND');
       }
 
-      // Prepare update data
-      const updateFields: any = {
+      // Prepare update data — Record<string, unknown> allows delete + string coercion
+      const updateFields: Record<string, unknown> = {
         ...updateData,
         updatedAt: new Date(),
       };
@@ -668,22 +671,22 @@ export class StockCommandService extends BaseService {
 
       // Convert numeric fields to strings for database
       if (updateFields.originalLength !== undefined) {
-        updateFields.originalLength = updateFields.originalLength.toString();
+        updateFields.originalLength = String(updateFields.originalLength);
       }
       if (updateFields.currentLength !== undefined) {
-        updateFields.currentLength = updateFields.currentLength.toString();
+        updateFields.currentLength = String(updateFields.currentLength);
       }
       if (updateFields.usedLength !== undefined) {
-        updateFields.usedLength = updateFields.usedLength.toString();
+        updateFields.usedLength = String(updateFields.usedLength);
       }
       if (updateFields.drumWeight !== undefined) {
-        updateFields.drumWeight = updateFields.drumWeight.toString();
+        updateFields.drumWeight = String(updateFields.drumWeight);
       }
       if (updateFields.cableWeight !== undefined) {
-        updateFields.cableWeight = updateFields.cableWeight.toString();
+        updateFields.cableWeight = String(updateFields.cableWeight);
       }
       if (updateFields.drumDiameter !== undefined) {
-        updateFields.drumDiameter = updateFields.drumDiameter.toString();
+        updateFields.drumDiameter = String(updateFields.drumDiameter);
       }
 
       // Update the drum
@@ -717,6 +720,7 @@ export class StockCommandService extends BaseService {
     return 'normal';
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private mapStockPosition(position: any): StockPosition {
     const result: StockPosition = {
       id: position.id,
@@ -751,6 +755,7 @@ export class StockCommandService extends BaseService {
     return result;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private mapCableDrum(drum: any): CableDrum {
     const result: CableDrum = {
       id: drum.id,

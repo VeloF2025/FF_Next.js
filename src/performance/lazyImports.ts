@@ -5,20 +5,27 @@
 
 import React, { lazy } from 'react';
 
+/** Minimal typed stub for lazy service placeholders */
+type ServiceStub = Record<string, unknown>;
+
+/** Typed props for fallback button/input elements */
+type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement>;
+type InputProps = React.InputHTMLAttributes<HTMLInputElement>;
+
 // Heavy UI Libraries - Load on demand
 export const lazyUIComponents = {
   // Charts (load when analytics is accessed) - Basic fallback
-  RechartsComponents: lazy(() => 
-    Promise.resolve({ default: () => null as any })
+  RechartsComponents: lazy(() =>
+    Promise.resolve({ default: (): null => null })
   ),
 };
 
 // Excel Processing - Load only when import/export is needed
 export const lazyExcelUtils = {
-  processLargeDataset: lazy(() => 
+  processLargeDataset: lazy(() =>
     Promise.resolve({ default: () => null })
   ),
-  optimizedXLSXReader: lazy(() => 
+  optimizedXLSXReader: lazy(() =>
     Promise.resolve({ default: () => null })
   ),
 };
@@ -26,45 +33,45 @@ export const lazyExcelUtils = {
 // Service Workers and Background Processing
 export const lazyServices = {
   // Analytics service - safe import with fallback
-  AnalyticsService: lazy(() => 
-    Promise.resolve({ default: {} as any })
+  AnalyticsService: lazy(() =>
+    Promise.resolve({ default: {} as ServiceStub })
   ),
-  
+
   // Supplier service - safe import with fallback
-  SupplierService: lazy(() => 
-    Promise.resolve({ default: {} as any })
+  SupplierService: lazy(() =>
+    Promise.resolve({ default: {} as ServiceStub })
   ),
 };
 
 // Animation Libraries - Load only when animations are needed
 export const lazyAnimations = {
   // Fallback for missing lottie-react
-  LottiePlayer: lazy(() => 
-    Promise.resolve({ default: () => null as any })
+  LottiePlayer: lazy(() =>
+    Promise.resolve({ default: (): null => null })
   ),
 };
 
 // Database Connections - Load only when specific DB operations needed
 export const lazyDatabaseUtils = {
   // Fallback for database client
-  DatabaseClient: lazy(() => 
-    Promise.resolve({ default: {} as any })
+  DatabaseClient: lazy(() =>
+    Promise.resolve({ default: {} as ServiceStub })
   ),
 };
 
 // Common lazy components with built-in fallbacks
 export const commonLazyComponents = {
   // Fallback implementations for missing modules
-  AuthService: lazy(() => 
-    Promise.resolve({ default: {} as any })
+  AuthService: lazy(() =>
+    Promise.resolve({ default: {} as ServiceStub })
   ),
-  
-  Button: lazy(() => 
-    Promise.resolve({ default: (props: any) => React.createElement("button", props) })
+
+  Button: lazy(() =>
+    Promise.resolve({ default: (props: ButtonProps) => React.createElement("button", props) })
   ),
-  
-  Input: lazy(() => 
-    Promise.resolve({ default: (props: any) => React.createElement("input", props) })
+
+  Input: lazy(() =>
+    Promise.resolve({ default: (props: InputProps) => React.createElement("input", props) })
   ),
 };
 
