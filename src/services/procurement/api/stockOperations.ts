@@ -5,34 +5,40 @@
 
 import { BaseService, type ServiceResponse } from '../../core/BaseService';
 import StockService from '../stock/StockService';
-import type { 
-  StockPosition, 
-  StockMovement, 
-  StockMovementItem, 
+import { StockQueryService } from '../stock/core/StockQueryService';
+import { StockCommandService } from '../stock/core/StockCommandService';
+import { StockMovementService } from '../stock/core/StockMovementService';
+import type {
+  StockPosition,
+  StockMovement,
+  StockMovementItem,
   CableDrum,
-  DrumUsageHistory 
+  DrumUsageHistory
 } from '@/types/procurement/stock';
-import type { 
-  StockFilters, 
-  MovementFilters, 
+import type {
+  StockFilters,
+  MovementFilters,
   StockDashboardData,
-  BulkMovementRequest 
+  BulkMovementRequest
 } from '../stock/StockService';
-import type { 
+import type {
   GRNData,
   IssueData,
   TransferData,
-  ReturnData 
+  ReturnData
 } from '../stock/core/StockMovementService';
-import type { 
+import type {
   CreateStockPositionData,
   StockAdjustmentData,
-  StockReservationData 
+  StockReservationData
 } from '../stock/core/StockCommandService';
 import type { ProcurementApiContext } from '../index';
 
 export class StockOperations extends BaseService {
   private stockService: StockService;
+  private queryService: StockQueryService;
+  private commandService: StockCommandService;
+  private movementService: StockMovementService;
 
   constructor() {
     super('StockOperations', {
@@ -40,8 +46,11 @@ export class StockOperations extends BaseService {
       retries: 2,
       cache: false,
     });
-    
+
     this.stockService = new StockService();
+    this.queryService = new StockQueryService();
+    this.commandService = new StockCommandService();
+    this.movementService = new StockMovementService();
   }
 
   /**
@@ -164,7 +173,7 @@ export class StockOperations extends BaseService {
   ): Promise<ServiceResponse<StockMovement & { items: StockMovementItem[] }>> {
     try {
       // This would need to be implemented in the query service
-      const queryService = (this.stockService as any).queryService;
+      const queryService = this.queryService;
       return await queryService.getStockMovementById(movementId, context.projectId);
     } catch (error) {
       return this.handleError(error, 'getStockMovementById');
@@ -210,7 +219,7 @@ export class StockOperations extends BaseService {
     grnData: GRNData
   ): Promise<ServiceResponse<{ movement: StockMovement, items: StockMovementItem[] }>> {
     try {
-      const movementService = (this.stockService as any).movementService;
+      const movementService = this.movementService;
       return await movementService.processGRN(context.projectId, grnData);
     } catch (error) {
       return this.handleError(error, 'processGRN');
@@ -226,7 +235,7 @@ export class StockOperations extends BaseService {
     issueData: IssueData
   ): Promise<ServiceResponse<{ movement: StockMovement, items: StockMovementItem[] }>> {
     try {
-      const movementService = (this.stockService as any).movementService;
+      const movementService = this.movementService;
       return await movementService.processIssue(context.projectId, issueData);
     } catch (error) {
       return this.handleError(error, 'processIssue');
@@ -242,7 +251,7 @@ export class StockOperations extends BaseService {
     transferData: TransferData
   ): Promise<ServiceResponse<{ movement: StockMovement, items: StockMovementItem[] }>> {
     try {
-      const movementService = (this.stockService as any).movementService;
+      const movementService = this.movementService;
       return await movementService.processTransfer(transferData, context.projectId, context.userId);
     } catch (error) {
       return this.handleError(error, 'processTransfer');
@@ -276,7 +285,7 @@ export class StockOperations extends BaseService {
         })),
       };
 
-      const movementService = (this.stockService as any).movementService;
+      const movementService = this.movementService;
       return await movementService.processGRN(context.projectId, grnData);
     } catch (error) {
       return this.handleError(error, 'processReturn');
@@ -294,7 +303,7 @@ export class StockOperations extends BaseService {
     adjustmentData: StockAdjustmentData
   ): Promise<ServiceResponse<StockPosition>> {
     try {
-      const commandService = (this.stockService as any).commandService;
+      const commandService = this.commandService;
       return await commandService.adjustStockLevel(context.projectId, adjustmentData, context.userId);
     } catch (error) {
       return this.handleError(error, 'adjustStockLevel');
@@ -310,7 +319,7 @@ export class StockOperations extends BaseService {
     reservationData: StockReservationData
   ): Promise<ServiceResponse<StockPosition>> {
     try {
-      const commandService = (this.stockService as any).commandService;
+      const commandService = this.commandService;
       return await commandService.reserveStock(context.projectId, reservationData);
     } catch (error) {
       return this.handleError(error, 'reserveStock');
@@ -327,7 +336,7 @@ export class StockOperations extends BaseService {
     releaseQuantity: number
   ): Promise<ServiceResponse<StockPosition>> {
     try {
-      const commandService = (this.stockService as any).commandService;
+      const commandService = this.commandService;
       return await commandService.releaseReservation(context.projectId, itemCode, releaseQuantity);
     } catch (error) {
       return this.handleError(error, 'releaseReservation');
@@ -361,7 +370,7 @@ export class StockOperations extends BaseService {
         projectId: context.projectId,
       };
       
-      const commandService = (this.stockService as any).commandService;
+      const commandService = this.commandService;
       return await commandService.createCableDrum(dataWithProject);
     } catch (error) {
       return this.handleError(error, 'createCableDrum');
@@ -378,7 +387,7 @@ export class StockOperations extends BaseService {
     updateData: Partial<CableDrum>
   ): Promise<ServiceResponse<CableDrum>> {
     try {
-      const commandService = (this.stockService as any).commandService;
+      const commandService = this.commandService;
       return await commandService.updateCableDrum(drumId, updateData, context.projectId);
     } catch (error) {
       return this.handleError(error, 'updateCableDrum');
@@ -412,7 +421,7 @@ export class StockOperations extends BaseService {
     drumId: string
   ): Promise<ServiceResponse<DrumUsageHistory[]>> {
     try {
-      const queryService = (this.stockService as any).queryService;
+      const queryService = this.queryService;
       return await queryService.getDrumUsageHistory(drumId);
     } catch (error) {
       return this.handleError(error, 'getDrumUsageHistory');
