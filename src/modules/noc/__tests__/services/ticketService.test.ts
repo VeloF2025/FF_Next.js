@@ -115,14 +115,14 @@ describe('Ticket Service - CRUD Operations', () => {
         closed_by: null
       };
 
-      (queryOne as any).mockResolvedValue(mockCreatedTicket);
+      vi.mocked(queryOne).mockResolvedValue(mockCreatedTicket);
 
       const result = await createTicket(payload);
 
       expect(queryOne).toHaveBeenCalled();
       // Test verifies that queryOne was called (mock handles sequence generation + insert)
       // The actual SQL includes INSERT INTO maintenance_tickets with all fields + sequence generation
-      const callArgs = (queryOne as any).mock.calls[0];
+      const callArgs = vi.mocked(queryOne).mock.calls[0];
       // Check that the call included the payload data in the values array
       expect(callArgs[1]).toContain(payload.source);
       expect(callArgs[1]).toContain(payload.title);
@@ -182,7 +182,7 @@ describe('Ticket Service - CRUD Operations', () => {
         closed_by: null
       };
 
-      (queryOne as any).mockResolvedValue(mockCreatedTicket);
+      vi.mocked(queryOne).mockResolvedValue(mockCreatedTicket);
 
       const result = await createTicket(payload);
 
@@ -287,7 +287,7 @@ describe('Ticket Service - CRUD Operations', () => {
         closed_by: null
       };
 
-      (queryOne as any).mockResolvedValue(mockCreatedTicket);
+      vi.mocked(queryOne).mockResolvedValue(mockCreatedTicket);
 
       const result = await createTicket(payload);
 
@@ -343,13 +343,13 @@ describe('Ticket Service - CRUD Operations', () => {
         closed_by: null
       };
 
-      (queryOne as any).mockResolvedValue(mockTicket);
+      vi.mocked(queryOne).mockResolvedValue(mockTicket);
 
       const result = await getTicketById(ticketId);
 
       expect(queryOne).toHaveBeenCalled();
       // Verify the call includes the ticket ID and queries maintenance_tickets
-      const callArgs = (queryOne as any).mock.calls[0];
+      const callArgs = vi.mocked(queryOne).mock.calls[0];
       expect(callArgs[0]).toContain('FROM maintenance_tickets');
       expect(callArgs[0]).toContain('LEFT JOIN users u ON t.assigned_to = u.id');
       expect(callArgs[1]).toContain(ticketId);
@@ -360,7 +360,7 @@ describe('Ticket Service - CRUD Operations', () => {
       // 🟢 WORKING: Test error handling for non-existent ticket
       const ticketId = '999e4567-e89b-12d3-a456-426614174999';
 
-      (queryOne as any).mockResolvedValue(null);
+      vi.mocked(queryOne).mockResolvedValue(null);
 
       await expect(getTicketById(ticketId)).rejects.toThrow(
         `Ticket with ID ${ticketId} not found`
@@ -368,7 +368,7 @@ describe('Ticket Service - CRUD Operations', () => {
 
       expect(queryOne).toHaveBeenCalled();
       // Verify the call includes the ticket ID
-      const callArgs = (queryOne as any).mock.calls[0];
+      const callArgs = vi.mocked(queryOne).mock.calls[0];
       expect(callArgs[0]).toContain('FROM maintenance_tickets');
       expect(callArgs[1]).toContain(ticketId);
     });
@@ -430,7 +430,7 @@ describe('Ticket Service - CRUD Operations', () => {
         closed_by: null
       };
 
-      (queryOne as any).mockResolvedValue(mockTicket);
+      vi.mocked(queryOne).mockResolvedValue(mockTicket);
 
       const result = await getTicketById(ticketId);
 
@@ -493,12 +493,12 @@ describe('Ticket Service - CRUD Operations', () => {
         closed_by: null
       };
 
-      (queryOne as any).mockResolvedValue(mockUpdatedTicket);
+      vi.mocked(queryOne).mockResolvedValue(mockUpdatedTicket);
 
       const result = await updateTicket(ticketId, updatePayload);
 
       expect(queryOne).toHaveBeenCalled();
-      const callArgs = (queryOne as any).mock.calls[0];
+      const callArgs = vi.mocked(queryOne).mock.calls[0];
       expect(callArgs[0]).toContain('UPDATE maintenance_tickets');
       expect(callArgs[1]).toContain(TicketStatus.IN_PROGRESS);
       expect(callArgs[1]).toContain('user-uuid-123');
@@ -557,7 +557,7 @@ describe('Ticket Service - CRUD Operations', () => {
         closed_by: null
       };
 
-      (queryOne as any).mockResolvedValue(mockUpdatedTicket);
+      vi.mocked(queryOne).mockResolvedValue(mockUpdatedTicket);
 
       const result = await updateTicket(ticketId, updatePayload);
 
@@ -571,7 +571,7 @@ describe('Ticket Service - CRUD Operations', () => {
         status: TicketStatus.CLOSED
       };
 
-      (queryOne as any).mockResolvedValue(null);
+      vi.mocked(queryOne).mockResolvedValue(null);
 
       await expect(updateTicket(ticketId, updatePayload)).rejects.toThrow(
         `Ticket with ID ${ticketId} not found`
@@ -646,7 +646,7 @@ describe('Ticket Service - CRUD Operations', () => {
         closed_by: null
       };
 
-      (queryOne as any).mockResolvedValue(mockUpdatedTicket);
+      vi.mocked(queryOne).mockResolvedValue(mockUpdatedTicket);
 
       const result = await updateTicket(ticketId, updatePayload);
 
@@ -708,12 +708,12 @@ describe('Ticket Service - CRUD Operations', () => {
         closed_by: null
       };
 
-      (queryOne as any).mockResolvedValue(mockUpdatedTicket);
+      vi.mocked(queryOne).mockResolvedValue(mockUpdatedTicket);
 
       const result = await updateTicket(ticketId, updatePayload);
 
       expect(queryOne).toHaveBeenCalled();
-      const callArgs = (queryOne as any).mock.calls[0];
+      const callArgs = vi.mocked(queryOne).mock.calls[0];
       expect(callArgs[0]).toContain('updated_at = NOW()');
       expect(result.updated_at).toBeDefined();
     });
@@ -767,12 +767,12 @@ describe('Ticket Service - CRUD Operations', () => {
         closed_by: null
       };
 
-      (queryOne as any).mockResolvedValue(mockDeletedTicket);
+      vi.mocked(queryOne).mockResolvedValue(mockDeletedTicket);
 
       const result = await deleteTicket(ticketId);
 
       expect(queryOne).toHaveBeenCalled();
-      const callArgs = (queryOne as any).mock.calls[0];
+      const callArgs = vi.mocked(queryOne).mock.calls[0];
       expect(callArgs[0]).toContain('UPDATE maintenance_tickets');
       expect(callArgs[0]).toContain('SET status = $1');
       expect(callArgs[1]).toEqual([TicketStatus.CANCELLED, ticketId]);
@@ -783,7 +783,7 @@ describe('Ticket Service - CRUD Operations', () => {
       // 🟢 WORKING: Test error handling for non-existent ticket
       const ticketId = '999e4567-e89b-12d3-a456-426614174999';
 
-      (queryOne as any).mockResolvedValue(null);
+      vi.mocked(queryOne).mockResolvedValue(null);
 
       await expect(deleteTicket(ticketId)).rejects.toThrow(
         `Ticket with ID ${ticketId} not found`
@@ -837,13 +837,13 @@ describe('Ticket Service - CRUD Operations', () => {
         closed_by: null
       };
 
-      (queryOne as any).mockResolvedValue(mockDeletedTicket);
+      vi.mocked(queryOne).mockResolvedValue(mockDeletedTicket);
 
       await deleteTicket(ticketId);
 
       // Verify it's an UPDATE, not DELETE
       expect(queryOne).toHaveBeenCalled();
-      const callArgs = (queryOne as any).mock.calls[0];
+      const callArgs = vi.mocked(queryOne).mock.calls[0];
       expect(callArgs[0]).toContain('UPDATE maintenance_tickets');
       expect(callArgs[0]).not.toContain('DELETE FROM maintenance_tickets');
     });
@@ -939,12 +939,12 @@ describe('Ticket Service - CRUD Operations', () => {
         }
       ];
 
-      (query as any).mockResolvedValue(mockTickets);
+      vi.mocked(query).mockResolvedValue(mockTickets);
 
       const result = await listTickets({});
 
       expect(query).toHaveBeenCalled();
-      const callArgs = (query as any).mock.calls[0];
+      const callArgs = vi.mocked(query).mock.calls[0];
       expect(callArgs[0]).toContain('FROM maintenance_tickets t');
       expect(result.tickets).toEqual(mockTickets);
       expect(result.total).toBe(2);
@@ -999,12 +999,12 @@ describe('Ticket Service - CRUD Operations', () => {
         }
       ];
 
-      (query as any).mockResolvedValue(mockTickets);
+      vi.mocked(query).mockResolvedValue(mockTickets);
 
       const result = await listTickets({ status: TicketStatus.OPEN });
 
       expect(query).toHaveBeenCalled();
-      const callArgs = (query as any).mock.calls[0];
+      const callArgs = vi.mocked(query).mock.calls[0];
       expect(callArgs[0]).toContain('WHERE');
       expect(callArgs[0]).toContain('status');
       expect(callArgs[1]).toContain(TicketStatus.OPEN);
@@ -1058,12 +1058,12 @@ describe('Ticket Service - CRUD Operations', () => {
         }
       ];
 
-      (query as any).mockResolvedValue(mockTickets);
+      vi.mocked(query).mockResolvedValue(mockTickets);
 
       const result = await listTickets({ ticket_type: TicketType.MAINTENANCE });
 
       expect(query).toHaveBeenCalled();
-      const callArgs = (query as any).mock.calls[0];
+      const callArgs = vi.mocked(query).mock.calls[0];
       expect(callArgs[0]).toContain('ticket_type');
       expect(callArgs[1]).toContain(TicketType.MAINTENANCE);
       expect(result.tickets).toEqual(mockTickets);
@@ -1117,12 +1117,12 @@ describe('Ticket Service - CRUD Operations', () => {
         }
       ];
 
-      (query as any).mockResolvedValue(mockTickets);
+      vi.mocked(query).mockResolvedValue(mockTickets);
 
       const result = await listTickets({ assigned_to: assigneeId });
 
       expect(query).toHaveBeenCalled();
-      const callArgs = (query as any).mock.calls[0];
+      const callArgs = vi.mocked(query).mock.calls[0];
       expect(callArgs[0]).toContain('assigned_to');
       expect(callArgs[1]).toContain(assigneeId);
       expect(result.tickets).toEqual(mockTickets);
@@ -1175,7 +1175,7 @@ describe('Ticket Service - CRUD Operations', () => {
         }
       ];
 
-      (query as any).mockResolvedValue(mockTickets);
+      vi.mocked(query).mockResolvedValue(mockTickets);
 
       const result = await listTickets({
         status: TicketStatus.IN_PROGRESS,
@@ -1184,7 +1184,7 @@ describe('Ticket Service - CRUD Operations', () => {
       });
 
       expect(query).toHaveBeenCalled();
-      const callArgs = (query as any).mock.calls[0];
+      const callArgs = vi.mocked(query).mock.calls[0];
       expect(callArgs[0]).toContain('WHERE');
       expect(callArgs[1]).toContain(TicketStatus.IN_PROGRESS);
       expect(callArgs[1]).toContain(TicketType.MAINTENANCE);
@@ -1239,12 +1239,12 @@ describe('Ticket Service - CRUD Operations', () => {
         }
       ];
 
-      (query as any).mockResolvedValue(mockTickets);
+      vi.mocked(query).mockResolvedValue(mockTickets);
 
       const result = await listTickets({ page: 2, pageSize: 10 });
 
       expect(query).toHaveBeenCalled();
-      const callArgs = (query as any).mock.calls[0];
+      const callArgs = vi.mocked(query).mock.calls[0];
       expect(callArgs[0]).toContain('LIMIT');
       expect(callArgs[0]).toContain('OFFSET');
       // Page 2 with pageSize 10 = OFFSET 10
@@ -1257,14 +1257,14 @@ describe('Ticket Service - CRUD Operations', () => {
       // 🟢 WORKING: Test default pagination values
       const mockTickets = [];
 
-      (query as any).mockResolvedValue(mockTickets);
+      vi.mocked(query).mockResolvedValue(mockTickets);
 
       const result = await listTickets({});
 
       expect(result.page).toBe(1);
       expect(result.limit).toBe(50);
       expect(query).toHaveBeenCalled();
-      const callArgs = (query as any).mock.calls[0];
+      const callArgs = vi.mocked(query).mock.calls[0];
       expect(callArgs[0]).toContain('LIMIT');
       expect(callArgs[0]).toContain('OFFSET');
       expect(callArgs[1]).toContain(50); // Default page size
@@ -1275,18 +1275,18 @@ describe('Ticket Service - CRUD Operations', () => {
       // 🟢 WORKING: Test default ordering (newest first)
       const mockTickets = [];
 
-      (query as any).mockResolvedValue(mockTickets);
+      vi.mocked(query).mockResolvedValue(mockTickets);
 
       await listTickets({});
 
       expect(query).toHaveBeenCalled();
-      const callArgs = (query as any).mock.calls[0];
+      const callArgs = vi.mocked(query).mock.calls[0];
       expect(callArgs[0]).toContain('ORDER BY t.created_at DESC');
     });
 
     it('should return empty array when no tickets found', async () => {
       // 🟢 WORKING: Test empty result set
-      (query as any).mockResolvedValue([]);
+      vi.mocked(query).mockResolvedValue([]);
 
       const result = await listTickets({});
 
