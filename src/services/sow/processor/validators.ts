@@ -1,12 +1,14 @@
 import { NeonPoleData, NeonDropData, NeonFibreData } from '../../neonSOWService';
 import { log } from '@/lib/logger';
 
+type InvalidRecord<T> = T & { errors: string[] };
+
 /**
  * Validate poles data
  */
-export function validatePoles(poles: NeonPoleData[]): { valid: NeonPoleData[], invalid: any[], errors: string[] } {
+export function validatePoles(poles: NeonPoleData[]): { valid: NeonPoleData[], invalid: InvalidRecord<NeonPoleData>[], errors: string[] } {
   const valid: NeonPoleData[] = [];
-  const invalid: any[] = [];
+  const invalid: InvalidRecord<NeonPoleData>[] = [];
   const errors: string[] = [];
   const seenPoleNumbers = new Set<string>();
   
@@ -44,9 +46,9 @@ export function validatePoles(poles: NeonPoleData[]): { valid: NeonPoleData[], i
 /**
  * Validate drops data
  */
-export function validateDrops(drops: NeonDropData[]): { valid: NeonDropData[], invalid: any[], errors: string[] } {
+export function validateDrops(drops: NeonDropData[]): { valid: NeonDropData[], invalid: InvalidRecord<NeonDropData>[], errors: string[] } {
   const valid: NeonDropData[] = [];
-  const invalid: any[] = [];
+  const invalid: InvalidRecord<NeonDropData>[] = [];
   const errors: string[] = [];
   const seenDropNumbers = new Set<string>();
   
@@ -81,9 +83,9 @@ export function validateDrops(drops: NeonDropData[]): { valid: NeonDropData[], i
 /**
  * Validate fibre data
  */
-export function validateFibre(fibres: NeonFibreData[]): { valid: NeonFibreData[], invalid: any[], errors: string[] } {
+export function validateFibre(fibres: NeonFibreData[]): { valid: NeonFibreData[], invalid: InvalidRecord<NeonFibreData>[], errors: string[] } {
   const valid: NeonFibreData[] = [];
-  const invalid: any[] = [];
+  const invalid: InvalidRecord<NeonFibreData>[] = [];
   const errors: string[] = [];
   const seenSegmentIds = new Set<string>();
   

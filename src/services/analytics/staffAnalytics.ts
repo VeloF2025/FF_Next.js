@@ -4,8 +4,12 @@
  */
 
 import { analyticsApi } from '@/services/api/analyticsApi';
+import type { TimePeriod } from '@/services/api/analyticsApi';
 import type { StaffPerformanceSummary } from './types';
 import { log } from '@/lib/logger';
+
+type PeriodType = TimePeriod['type'];
+type PerformanceRecord = Record<string, unknown>;
 
 export class StaffAnalyticsService {
   /**
@@ -17,23 +21,23 @@ export class StaffAnalyticsService {
   ): Promise<StaffPerformanceSummary[]> {
     try {
       const performance = await analyticsApi.getStaffPerformance(undefined, {
-        type: periodType as any
+        type: periodType as PeriodType
       });
       
       // Filter by projectId if provided (API doesn't support project-level filtering yet)
-      const summaryData = performance.summary || [];
-      
+      const summaryData = (performance.summary as PerformanceRecord[]) || [];
+
       // Transform API response to match StaffPerformanceSummary interface
-      return summaryData.map((result: any) => ({
-        staffName: result.staffName,
-        role: result.role || 'Staff',
-        avgProductivity: result.avgProductivity,
-        avgQuality: result.avgQuality,
-        totalHours: result.totalHours,
-        totalTasks: result.totalTasks,
-        attendanceRate: result.attendanceRate || 100,
-        avgSafety: result.avgSafety,
-        avgEfficiency: result.avgEfficiency,
+      return summaryData.map((result) => ({
+        staffName: result.staffName as string,
+        role: (result.role as string) || 'Staff',
+        avgProductivity: result.avgProductivity as number,
+        avgQuality: result.avgQuality as number,
+        totalHours: result.totalHours as number,
+        totalTasks: result.totalTasks as number,
+        attendanceRate: (result.attendanceRate as number) || 100,
+        avgSafety: result.avgSafety as number,
+        avgEfficiency: result.avgEfficiency as number,
       }));
     } catch (error) {
       log.error('Failed to get staff performance:', { data: error }, 'staffAnalytics');
@@ -51,11 +55,11 @@ export class StaffAnalyticsService {
   ) {
     try {
       const performance = await analyticsApi.getStaffPerformance(staffId, {
-        type: periodType as any
+        type: periodType as PeriodType
       });
       
       // Return the history data from API response
-      return (performance.history || []).slice(0, limit).map((item: any) => ({
+      return ((performance.history as PerformanceRecord[]) || []).slice(0, limit).map((item) => ({
         periodStart: item.periodStart,
         periodEnd: item.periodEnd,
         productivity: item.productivity,
@@ -82,14 +86,16 @@ export class StaffAnalyticsService {
   ) {
     try {
       const performance = await analyticsApi.getStaffPerformance(undefined, {
-        type: periodType as any
+        type: periodType as PeriodType
       });
       
       // Get top performers from API response
-      const topPerformers = performance.topPerformers?.[metric] || [];
+      type TopPerformersMap = Record<string, PerformanceRecord[]>;
+      const topPerformersMap = (performance.topPerformers as TopPerformersMap) ?? {};
+      const topPerformers: PerformanceRecord[] = topPerformersMap[metric] ?? [];
       
       // Transform to expected format
-      return topPerformers.slice(0, limit).map((performer: any) => ({
+      return topPerformers.slice(0, limit).map((performer) => ({
         staffId: performer.id,
         staffName: performer.name,
         avgMetricValue: performer.score,

@@ -24,23 +24,25 @@ export async function getStaffSummary(): Promise<StaffSummary> {
       GROUP BY department
     `;
     
-    const totalRows = totalResult as any[];
-    const activeRows = activeResult as any[];
-    const inactiveRows = inactiveResult as any[];
-    const onLeaveRows = onLeaveResult as any[];
+    type CountRow = { count: string };
+    const totalRows = totalResult as CountRow[];
+    const activeRows = activeResult as CountRow[];
+    const inactiveRows = inactiveResult as CountRow[];
+    const onLeaveRows = onLeaveResult as CountRow[];
     
-    const totalStaff = parseInt(totalRows[0].count);
-    const activeStaff = parseInt(activeRows[0].count);
-    const inactiveStaff = parseInt(inactiveRows[0].count);
-    const onLeaveStaff = parseInt(onLeaveRows[0].count);
+    const totalStaff = parseInt(totalRows[0]?.count ?? '0');
+    const activeStaff = parseInt(activeRows[0]?.count ?? '0');
+    const inactiveStaff = parseInt(inactiveRows[0]?.count ?? '0');
+    const onLeaveStaff = parseInt(onLeaveRows[0]?.count ?? '0');
     
     // Calculate utilization rate (assuming active staff are utilized)
     const utilizationRate = totalStaff > 0 ? (activeStaff / totalStaff) * 100 : 0;
     
     // Build department breakdown
     const staffByDepartment: { [key: string]: number } = {};
-    const deptRows = departmentResult as any[];
-    deptRows.forEach((dept: any) => {
+    type DeptRow = { department: string; count: string };
+    const deptRows = departmentResult as DeptRow[];
+    deptRows.forEach((dept) => {
       staffByDepartment[dept.department] = parseInt(dept.count);
     });
     

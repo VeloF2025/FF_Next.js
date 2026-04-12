@@ -22,7 +22,7 @@ export interface NeonPoleData {
   created_by?: string | undefined;
   comments?: string | undefined;
   installation_date?: string | undefined;
-  raw_data?: any;
+  raw_data?: Record<string, unknown>;
 }
 
 export interface NeonDropData {
@@ -44,7 +44,7 @@ export interface NeonDropData {
   created_date?: string | undefined;
   created_by?: string | undefined;
   service_type?: string | undefined;
-  raw_data?: any;
+  raw_data?: Record<string, unknown>;
 }
 
 export interface NeonFibreData {
@@ -59,7 +59,7 @@ export interface NeonFibreData {
   contractor?: string | undefined;
   is_complete?: boolean | undefined;
   fibre_type?: string | undefined;
-  raw_data?: any;
+  raw_data?: Record<string, unknown>;
 }
 
 export interface SOWProjectSummary {
@@ -74,9 +74,9 @@ export interface SOWProjectSummary {
 }
 
 export interface SOWData {
-  poles: any[];
-  drops: any[];
-  fibre: any[];
+  poles: NeonPoleData[];
+  drops: NeonDropData[];
+  fibre: NeonFibreData[];
   summary: SOWProjectSummary | null;
 }
 
