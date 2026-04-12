@@ -7,7 +7,43 @@ import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { RFQ, RFQStatus } from '@/types/procurement.types';
 
-const sql: any = neon(process.env.DATABASE_URL!);
+const sql = neon(process.env.DATABASE_URL!);
+
+/** Raw RFQ row as returned by the database */
+interface RfqRow {
+  id: string;
+  project_id: string;
+  rfq_number: string;
+  title: string;
+  description: string;
+  status: string;
+  issue_date: string;
+  response_deadline: string;
+  closing_date: string;
+  invited_suppliers: string;
+  item_count: string;
+  response_count: string;
+  payment_terms: string;
+  delivery_terms: string;
+  validity_period: number;
+  currency: string;
+  technical_requirements: string;
+  total_budget_estimate: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  total?: string;
+  total_rfqs?: string;
+  draft_count?: string;
+  issued_count?: string;
+  responses_received_count?: string;
+  evaluated_count?: string;
+  awarded_count?: string;
+  closed_count?: string;
+  cancelled_count?: string;
+  total_budget?: string;
+  average_budget?: string;
+}
 
 export class RfqQueryService {
   /**
@@ -22,7 +58,7 @@ export class RfqQueryService {
   }): Promise<{ rfqs: RFQ[], total: number }> {
     try {
       const conditions = [];
-      const params: any[] = [];
+      const params: unknown[] = [];
 
       if (filter?.projectId) {
         conditions.push(`project_id = $${params.length + 1}`);
@@ -42,16 +78,16 @@ export class RfqQueryService {
       const offset = ((filter?.page || 1) - 1) * limit;
 
       // Get total count
-      const countResult = await sql(
+      const countResult = await sql.query(
         `SELECT COUNT(*) as total FROM rfqs ${whereClause}`,
-        params
+        params as unknown[]
       );
 
       // Get paginated results
       params.push(limit);
       params.push(offset);
 
-      const result = await sql(
+      const result = await sql.query(
         `SELECT
           r.*,
           COUNT(DISTINCT ri.id) as item_count,
@@ -63,10 +99,10 @@ export class RfqQueryService {
         GROUP BY r.id
         ORDER BY r.created_at DESC
         LIMIT $${params.length - 1} OFFSET $${params.length}`,
-        params
+        params as unknown[]
       );
 
-      const rfqs = result.map((row: any) => ({
+      const rfqs = (result as unknown as RfqRow[]).map((row) => ({
         id: row.id,
         projectId: row.project_id,
         rfqNumber: row.rfq_number,
@@ -88,11 +124,11 @@ export class RfqQueryService {
         createdBy: row.created_by,
         createdAt: row.created_at,
         updatedAt: row.updated_at
-      } as RFQ));
+      } as unknown as RFQ));
 
       return {
         rfqs,
-        total: parseInt(countResult[0].total)
+        total: parseInt((countResult as unknown as RfqRow[])[0]?.total ?? '0')
       };
     } catch (error) {
       log.error('Error fetching RFQs:', { data: error }, 'RfqQueryService');
@@ -103,17 +139,22 @@ export class RfqQueryService {
   /**
    * Get RFQ statistics
    */
-  static async getStatistics(projectId?: string): Promise<any> {
+  static async getStatistics(projectId?: string): Promise<{
+    totalRFQs: number;
+    byStatus: Record<string, number>;
+    totalBudget: number;
+    averageBudget: number;
+  }> {
     try {
       let whereClause = '';
-      const params: any[] = [];
+      const params: unknown[] = [];
 
       if (projectId) {
         whereClause = 'WHERE project_id = $1';
         params.push(projectId);
       }
 
-      const stats = await sql(
+      const stats = await sql.query(
         `SELECT
           COUNT(*) as total_rfqs,
           COUNT(CASE WHEN status = 'draft' THEN 1 END) as draft_count,
@@ -126,22 +167,23 @@ export class RfqQueryService {
           SUM(total_budget_estimate) as total_budget,
           AVG(total_budget_estimate) as average_budget
         FROM rfqs ${whereClause}`,
-        params
+        params as unknown[]
       );
 
+      const row: RfqRow = (stats as unknown as RfqRow[])[0] ?? ({} as RfqRow);
       return {
-        totalRFQs: parseInt(stats[0].total_rfqs),
+        totalRFQs: parseInt(row.total_rfqs ?? '0'),
         byStatus: {
-          draft: parseInt(stats[0].draft_count),
-          issued: parseInt(stats[0].issued_count),
-          responsesReceived: parseInt(stats[0].responses_received_count),
-          evaluated: parseInt(stats[0].evaluated_count),
-          awarded: parseInt(stats[0].awarded_count),
-          closed: parseInt(stats[0].closed_count),
-          cancelled: parseInt(stats[0].cancelled_count)
+          draft: parseInt(row.draft_count ?? '0'),
+          issued: parseInt(row.issued_count ?? '0'),
+          responsesReceived: parseInt(row.responses_received_count ?? '0'),
+          evaluated: parseInt(row.evaluated_count ?? '0'),
+          awarded: parseInt(row.awarded_count ?? '0'),
+          closed: parseInt(row.closed_count ?? '0'),
+          cancelled: parseInt(row.cancelled_count ?? '0')
         },
-        totalBudget: parseFloat(stats[0].total_budget || 0),
-        averageBudget: parseFloat(stats[0].average_budget || 0)
+        totalBudget: parseFloat(row.total_budget ?? '0'),
+        averageBudget: parseFloat(row.average_budget ?? '0')
       };
     } catch (error) {
       log.error('Error fetching RFQ statistics:', { data: error }, 'RfqQueryService');
@@ -155,14 +197,14 @@ export class RfqQueryService {
   static async search(keyword: string, projectId?: string): Promise<RFQ[]> {
     try {
       let whereClause = `WHERE (title ILIKE $1 OR rfq_number ILIKE $1 OR description ILIKE $1)`;
-      const params: any[] = [`%${keyword}%`];
+      const params: unknown[] = [`%${keyword}%`];
 
       if (projectId) {
         whereClause += ` AND project_id = $2`;
         params.push(projectId);
       }
 
-      const result = await sql(
+      const result = await sql.query(
         `SELECT
           r.*,
           COUNT(DISTINCT ri.id) as item_count,
@@ -174,10 +216,10 @@ export class RfqQueryService {
         GROUP BY r.id
         ORDER BY r.created_at DESC
         LIMIT 50`,
-        params
+        params as unknown[]
       );
 
-      return result.map((row: any) => ({
+      return (result as unknown as RfqRow[]).map((row) => ({
         id: row.id,
         projectId: row.project_id,
         rfqNumber: row.rfq_number,

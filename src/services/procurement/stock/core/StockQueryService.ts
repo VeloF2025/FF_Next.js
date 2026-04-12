@@ -20,6 +20,14 @@ import type {
 } from '@/types/procurement/stock';
 import type { StockFilters, MovementFilters, StockDashboardData } from '../StockService';
 
+/** Raw database row returned by drizzle-orm queries (values are typed at DB level) */
+type DbRow = Record<string, unknown>;
+
+/** Stock level row from groupBy query */
+interface StockLevelRow { stockStatus: unknown; count: number }
+/** Top category row from groupBy query */
+interface TopCategoryRow { category: unknown; itemCount: number; totalValue: unknown }
+
 export class StockQueryService extends BaseService {
   constructor() {
     super('StockQueryService', {
@@ -449,10 +457,10 @@ export class StockQueryService extends BaseService {
 
       // Calculate percentages for stock levels
       const totalItemsForPercentage = stockStats?.totalItems || 0;
-      const stockLevelsWithPercentage = stockLevels.map((level: any) => ({
+      const stockLevelsWithPercentage = (stockLevels as StockLevelRow[]).map((level) => ({
         status: level.stockStatus as StockStatusType,
         count: level.count,
-        percentage: totalItemsForPercentage > 0 
+        percentage: totalItemsForPercentage > 0
           ? Math.round((level.count / totalItemsForPercentage) * 100)
           : 0,
       }));
@@ -463,8 +471,8 @@ export class StockQueryService extends BaseService {
         lowStockItems: lowStockStats?.lowStockItems || 0,
         criticalStockItems: criticalStockStats?.criticalStockItems || 0,
         recentMovements: recentMovements.map(this.mapStockMovement),
-        topCategories: topCategories.map((cat: any) => ({
-          category: cat.category || 'Uncategorized',
+        topCategories: (topCategories as TopCategoryRow[]).map((cat) => ({
+          category: (cat.category as string) || 'Uncategorized',
           itemCount: cat.itemCount,
           totalValue: Number(cat.totalValue) || 0,
         })),
@@ -523,8 +531,8 @@ export class StockQueryService extends BaseService {
   }
 
   // 🔵 HELPER: Mapping Functions
-  private mapStockPosition(position: any): StockPosition {
-    return {
+  private mapStockPosition(position: DbRow): StockPosition {
+    return ({
       id: position.id,
       projectId: position.projectId,
       itemCode: position.itemCode,
@@ -536,13 +544,13 @@ export class StockQueryService extends BaseService {
       reservedQuantity: Number(position.reservedQuantity),
       availableQuantity: Number(position.availableQuantity),
       inTransitQuantity: Number(position.inTransitQuantity),
-      ...(position.averageUnitCost && { averageUnitCost: Number(position.averageUnitCost) }),
-      ...(position.totalValue && { totalValue: Number(position.totalValue) }),
+      ...(position.averageUnitCost != null ? { averageUnitCost: Number(position.averageUnitCost) } : {}),
+      ...(position.totalValue != null ? { totalValue: Number(position.totalValue) } : {}),
       warehouseLocation: position.warehouseLocation,
       binLocation: position.binLocation,
-      ...(position.reorderLevel && { reorderLevel: Number(position.reorderLevel) }),
-      ...(position.maxStockLevel && { maxStockLevel: Number(position.maxStockLevel) }),
-      ...(position.economicOrderQuantity && { economicOrderQuantity: Number(position.economicOrderQuantity) }),
+      ...(position.reorderLevel != null ? { reorderLevel: Number(position.reorderLevel) } : {}),
+      ...(position.maxStockLevel != null ? { maxStockLevel: Number(position.maxStockLevel) } : {}),
+      ...(position.economicOrderQuantity != null ? { economicOrderQuantity: Number(position.economicOrderQuantity) } : {}),
       lastMovementDate: position.lastMovementDate,
       lastCountDate: position.lastCountDate,
       nextCountDue: position.nextCountDue,
@@ -550,11 +558,11 @@ export class StockQueryService extends BaseService {
       stockStatus: position.stockStatus as StockStatusType,
       createdAt: position.createdAt,
       updatedAt: position.updatedAt,
-    };
+    }) as unknown as StockPosition;
   }
 
-  private mapStockMovement(movement: any): StockMovement {
-    return {
+  private mapStockMovement(movement: DbRow): StockMovement {
+    return ({
       id: movement.id,
       projectId: movement.projectId,
       movementType: movement.movementType as MovementTypeType,
@@ -575,11 +583,11 @@ export class StockQueryService extends BaseService {
       reason: movement.reason,
       createdAt: movement.createdAt,
       updatedAt: movement.updatedAt,
-    };
+    }) as unknown as StockMovement;
   }
 
-  private mapStockMovementItem(item: any): StockMovementItem {
-    return {
+  private mapStockMovementItem(item: DbRow): StockMovementItem {
+    return ({
       id: item.id,
       movementId: item.stockMovementId,
       stockPositionId: item.stockPositionId,
@@ -589,10 +597,10 @@ export class StockQueryService extends BaseService {
       description: item.description,
       uom: item.uom,
       plannedQuantity: Number(item.plannedQuantity),
-      ...(item.actualQuantity && { actualQuantity: Number(item.actualQuantity) }),
-      ...(item.actualQuantity && { receivedQuantity: Number(item.actualQuantity) }), // Alias
-      ...(item.unitCost && { unitCost: Number(item.unitCost) }),
-      ...(item.totalCost && { totalCost: Number(item.totalCost) }),
+      ...(item.actualQuantity != null ? { actualQuantity: Number(item.actualQuantity) } : {}),
+      ...(item.actualQuantity != null ? { receivedQuantity: Number(item.actualQuantity) } : {}),
+      ...(item.unitCost != null ? { unitCost: Number(item.unitCost) } : {}),
+      ...(item.totalCost != null ? { totalCost: Number(item.totalCost) } : {}),
       lotNumbers: item.lotNumbers || [],
       serialNumbers: item.serialNumbers || [],
       itemStatus: item.itemStatus,
@@ -601,11 +609,11 @@ export class StockQueryService extends BaseService {
       qualityNotes: item.qualityCheckNotes,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
-    };
+    }) as unknown as StockMovementItem;
   }
 
-  private mapCableDrum(drum: any): CableDrum {
-    return {
+  private mapCableDrum(drum: DbRow): CableDrum {
+    return ({
       id: drum.id,
       projectId: drum.projectId,
       stockPositionId: drum.stockPositionId,
@@ -619,24 +627,24 @@ export class StockQueryService extends BaseService {
       originalLength: Number(drum.originalLength),
       currentLength: Number(drum.currentLength),
       usedLength: Number(drum.usedLength),
-      ...(drum.drumWeight && { drumWeight: Number(drum.drumWeight) }),
-      ...(drum.cableWeight && { cableWeight: Number(drum.cableWeight) }),
-      ...(drum.drumDiameter && { drumDiameter: Number(drum.drumDiameter) }),
+      ...(drum.drumWeight != null ? { drumWeight: Number(drum.drumWeight) } : {}),
+      ...(drum.cableWeight != null ? { cableWeight: Number(drum.cableWeight) } : {}),
+      ...(drum.drumDiameter != null ? { drumDiameter: Number(drum.drumDiameter) } : {}),
       currentLocation: drum.currentLocation,
       drumCondition: drum.drumCondition,
       installationStatus: drum.installationStatus,
-      ...(drum.lastMeterReading && { lastMeterReading: Number(drum.lastMeterReading) }),
+      ...(drum.lastMeterReading != null ? { lastMeterReading: Number(drum.lastMeterReading) } : {}),
       lastReadingDate: drum.lastReadingDate,
       lastUsedDate: drum.lastUsedDate,
       testCertificate: drum.testCertificate,
       installationNotes: drum.installationNotes,
       createdAt: drum.createdAt,
       updatedAt: drum.updatedAt,
-    };
+    }) as unknown as CableDrum;
   }
 
-  private mapDrumUsageHistory(usage: any): DrumUsageHistory {
-    return {
+  private mapDrumUsageHistory(usage: DbRow): DrumUsageHistory {
+    return ({
       id: usage.id,
       drumId: usage.drumId,
       projectId: usage.projectId,
@@ -654,11 +662,11 @@ export class StockQueryService extends BaseService {
       installationNotes: usage.installationNotes,
       qualityNotes: usage.qualityNotes,
       createdAt: usage.createdAt,
-    };
+    }) as unknown as DrumUsageHistory;
   }
 
   private getSortColumn(sortBy: string) {
-    const sortMap: Record<string, any> = {
+    const sortMap: Record<string, unknown> = {
       itemCode: stockPositions.itemCode,
       itemName: stockPositions.itemName,
       category: stockPositions.category,
@@ -672,7 +680,7 @@ export class StockQueryService extends BaseService {
   }
 
   private getMovementSortColumn(sortBy: string) {
-    const sortMap: Record<string, any> = {
+    const sortMap: Record<string, unknown> = {
       movementDate: stockMovements.movementDate,
       referenceNumber: stockMovements.referenceNumber,
       movementType: stockMovements.movementType,
