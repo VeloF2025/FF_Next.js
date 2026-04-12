@@ -28,7 +28,7 @@ export interface AuditTrail {
   action: string;
   timestamp: Date;
   userId: string;
-  changes?: Record<string, any>;
+  changes?: Record<string, unknown>;
   reason?: string;
 }
 
@@ -134,11 +134,11 @@ export interface AsyncState<T> extends LoadingState {
 export interface ListState<T> extends LoadingState {
   items: T[];
   total: number;
-  filters: Record<string, any>;
+  filters: Record<string, unknown>;
 }
 
 // Action patterns for reducers
-export interface Action<T = any> {
+export interface Action<T = unknown> {
   type: string;
   payload?: T;
 }

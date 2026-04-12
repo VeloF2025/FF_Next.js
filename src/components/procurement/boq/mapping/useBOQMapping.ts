@@ -100,7 +100,7 @@ export function useBOQMapping(boqId: string, onMappingComplete?: (count: number)
 
     // Sort
     filtered.sort((a, b) => {
-      let aVal: any, bVal: any;
+      let aVal: number | string | Date | undefined, bVal: number | string | Date | undefined;
       
       switch (sortField) {
         case 'lineNumber':
