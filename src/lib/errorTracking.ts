@@ -267,10 +267,16 @@ async function sendErrorEvent(event: TrackingErrorEvent): Promise<void> {
 /**
  * Set user context
  */
+/** Typed window extension for error tracking globals */
+interface ErrorTrackingWindow extends Window {
+  __errorTrackingUser?: ErrorContext['user'] | null;
+  __errorTrackingContext?: Record<string, unknown>;
+}
+
 export function setUser(user: ErrorContext['user'] | null): void {
   if (typeof window === 'undefined') return;
 
-  (window as Window & { __errorTrackingUser?: ErrorContext['user'] | null }).__errorTrackingUser = user;
+  (window as ErrorTrackingWindow).__errorTrackingUser = user;
 }
 
 /**
@@ -279,14 +285,12 @@ export function setUser(user: ErrorContext['user'] | null): void {
 export function setContext(key: string, value: unknown): void {
   if (typeof window === 'undefined') return;
 
-  type TrackingWindow = Window & { __errorTrackingContext?: Record<string, unknown> };
-  const trackingWindow = window as TrackingWindow;
-
-  if (!trackingWindow.__errorTrackingContext) {
-    trackingWindow.__errorTrackingContext = {};
+  const w = window as ErrorTrackingWindow;
+  if (!w.__errorTrackingContext) {
+    w.__errorTrackingContext = {};
   }
 
-  trackingWindow.__errorTrackingContext[key] = value;
+  w.__errorTrackingContext[key] = value;
 }
 
 /**
