@@ -8,9 +8,11 @@ import { log } from '@/lib/logger';
 
 const BATCH_SIZE = 1000;
 
+type GpkgFeature = Record<string, unknown>;
+
 /** Deduplicate features by key field — keeps last occurrence (latest wins) */
-function dedup(features: any[], keyField: string): any[] {
-  const map = new Map<string, any>();
+function dedup(features: GpkgFeature[], keyField: string): GpkgFeature[] {
+  const map = new Map<string, GpkgFeature>();
   for (const f of features) {
     const key = String(f[keyField]);
     map.set(key, f);
@@ -36,12 +38,12 @@ type ImportMode = 'merge' | 'replace';
 
 /** Accept any neon sql tagged-template function */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type SqlFn = (strings: TemplateStringsArray, ...values: any[]) => Promise<any[]>;
+type SqlFn = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<Record<string, unknown>[]>;
 
 // ---------------------------------------------------------------------------
 // Cable Spans
 // ---------------------------------------------------------------------------
-export async function importCableSpans(sql: SqlFn, features: any[], projectId: string, mode: ImportMode): Promise<LayerResult> {
+export async function importCableSpans(sql: SqlFn, features: GpkgFeature[], projectId: string, mode: ImportMode): Promise<LayerResult> {
   if (mode === 'replace') {
     await sql`DELETE FROM cable_spans WHERE project_id = ${projectId}::uuid`;
   }
@@ -105,7 +107,7 @@ export async function importCableSpans(sql: SqlFn, features: any[], projectId: s
 // ---------------------------------------------------------------------------
 // Zone Boundaries
 // ---------------------------------------------------------------------------
-export async function importZoneBoundaries(sql: SqlFn, features: any[], projectId: string, mode: ImportMode): Promise<LayerResult> {
+export async function importZoneBoundaries(sql: SqlFn, features: GpkgFeature[], projectId: string, mode: ImportMode): Promise<LayerResult> {
   if (mode === 'replace') {
     await sql`DELETE FROM zone_boundaries WHERE project_id = ${projectId}::uuid`;
   }
@@ -150,7 +152,7 @@ export async function importZoneBoundaries(sql: SqlFn, features: any[], projectI
 // ---------------------------------------------------------------------------
 // PON Boundaries
 // ---------------------------------------------------------------------------
-export async function importPonBoundaries(sql: SqlFn, features: any[], projectId: string, mode: ImportMode): Promise<LayerResult> {
+export async function importPonBoundaries(sql: SqlFn, features: GpkgFeature[], projectId: string, mode: ImportMode): Promise<LayerResult> {
   if (mode === 'replace') {
     await sql`DELETE FROM pon_boundaries WHERE project_id = ${projectId}::uuid`;
   }
@@ -205,7 +207,7 @@ export async function importPonBoundaries(sql: SqlFn, features: any[], projectId
 // ---------------------------------------------------------------------------
 // POPs
 // ---------------------------------------------------------------------------
-export async function importPops(sql: SqlFn, features: any[], projectId: string, mode: ImportMode): Promise<LayerResult> {
+export async function importPops(sql: SqlFn, features: GpkgFeature[], projectId: string, mode: ImportMode): Promise<LayerResult> {
   if (mode === 'replace') {
     await sql`DELETE FROM pops WHERE project_id = ${projectId}::uuid`;
   }

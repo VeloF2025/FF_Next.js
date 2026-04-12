@@ -9,7 +9,7 @@ import { ProcurementError } from './base.errors';
  * RFQ-specific base error class
  */
 export class RFQError extends ProcurementError {
-  constructor(message: string, code: string, statusCode: number = 400, context?: Record<string, any>) {
+  constructor(message: string, code: string, statusCode: number = 400, context?: Record<string, unknown>) {
     super(message, code, statusCode, context);
     this.name = 'RFQError';
     Object.setPrototypeOf(this, RFQError.prototype);
@@ -25,7 +25,7 @@ export class RFQValidationError extends RFQError {
     message: string;
     code: string;
     expectedType?: string;
-    actualValue?: any;
+    actualValue?: unknown;
   }>;
 
   constructor(
@@ -35,9 +35,9 @@ export class RFQValidationError extends RFQError {
       message: string; 
       code: string;
       expectedType?: string;
-      actualValue?: any;
+      actualValue?: unknown;
     }>,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     super(message, 'RFQ_VALIDATION_ERROR', 422, context);
     this.name = 'RFQValidationError';
@@ -92,7 +92,7 @@ export class RFQStateError extends RFQError {
     requestedOperation: string,
     allowedOperations: string[],
     stateTransitions?: Record<string, string[]>,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     const message = `Cannot perform '${requestedOperation}' on RFQ in '${currentState}' state. Allowed operations: ${allowedOperations.join(', ')}`;
     super(message, 'RFQ_INVALID_STATE', 409, context);
@@ -134,7 +134,7 @@ export class RFQDeadlineError extends RFQError {
   constructor(
     deadline: Date,
     operation: string,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     const currentTime = new Date();
     const timeRemaining = deadline.getTime() - currentTime.getTime();
@@ -220,7 +220,7 @@ export class RFQSupplierError extends RFQError {
       category: string;
       rating?: number;
     }> | undefined,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     const code = issueType === 'no_suppliers' ? 'RFQ_NO_SUPPLIERS' : 'RFQ_SUPPLIER_ERROR';
     super(message, code, 400, context);

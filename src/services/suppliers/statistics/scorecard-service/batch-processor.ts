@@ -5,10 +5,11 @@ import { log } from '@/lib/logger';
  * Handles batch processing of multiple supplier scorecards
  */
 
-import type { 
-  BatchScorecardOptions, 
-  ScorecardSummary, 
-  ScorecardGenerationResult 
+import type {
+  BatchScorecardOptions,
+  ScorecardData,
+  ScorecardSummary,
+  ScorecardGenerationResult
 } from './service-types';
 
 export class ScorecardBatchProcessor {
@@ -19,7 +20,7 @@ export class ScorecardBatchProcessor {
     supplierIds: string[],
     options: BatchScorecardOptions = {},
     generateSingleScorecard: (supplierId: string) => Promise<ScorecardGenerationResult>
-  ): Promise<any[]> { // SupplierScorecard[]
+  ): Promise<ScorecardData[]> {
     const {
       batchSize = 10,
       includeFailures = false,
@@ -30,7 +31,7 @@ export class ScorecardBatchProcessor {
     // Acknowledge unused variable
     void includeFailures;
 
-    const scorecards: any[] = [];
+    const scorecards: ScorecardData[] = [];
     const failures: Array<{ supplierId: string; error: string }> = [];
     
     // Process suppliers in batches to avoid overwhelming the system
@@ -50,7 +51,7 @@ export class ScorecardBatchProcessor {
 
       const batchResults = await Promise.all(batchPromises);
       const validScorecards = batchResults.filter(
-        (scorecard): scorecard is any => scorecard !== null
+        (scorecard): scorecard is ScorecardData => scorecard !== null
       );
 
       scorecards.push(...validScorecards);
@@ -74,7 +75,7 @@ export class ScorecardBatchProcessor {
    */
   static async getScorecardSummary(
     supplierIds: string[],
-    generateMultiple: (ids: string[]) => Promise<any[]>
+    generateMultiple: (ids: string[]) => Promise<ScorecardData[]>
   ): Promise<ScorecardSummary> {
     const scorecards = await generateMultiple(supplierIds);
 
@@ -118,9 +119,9 @@ export class ScorecardBatchProcessor {
    * Apply filters to scorecard results
    */
   static applyFilters(
-    scorecards: any[],
+    scorecards: ScorecardData[],
     filters: BatchScorecardOptions['filters'] = {}
-  ): any[] {
+  ): ScorecardData[] {
     let filtered = scorecards;
 
     if (filters.minScore !== undefined) {
@@ -144,9 +145,9 @@ export class ScorecardBatchProcessor {
    * Sort scorecard results
    */
   static sortScorecards(
-    scorecards: any[],
+    scorecards: ScorecardData[],
     sortBy: 'score' | 'name' | 'category'
-  ): any[] {
+  ): ScorecardData[] {
     switch (sortBy) {
       case 'score':
         return scorecards.sort((a, b) => b.overallScore - a.overallScore);

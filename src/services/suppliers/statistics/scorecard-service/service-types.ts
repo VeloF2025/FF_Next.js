@@ -10,8 +10,15 @@ export interface ScorecardConfig {
   includeRecommendations?: boolean;
 }
 
+export interface ScorecardData {
+  supplierId: string;
+  supplierName: string;
+  overallScore: number;
+  [key: string]: unknown;
+}
+
 export interface ScorecardGenerationResult {
-  scorecard: any; // SupplierScorecard
+  scorecard: ScorecardData;
   warnings: string[];
   dataQuality: {
     completeness: number;
@@ -39,9 +46,9 @@ export interface ScorecardSummary {
 }
 
 export interface EnhancedScorecardResult extends ScorecardGenerationResult {
-  regionalBenchmarks?: any;
-  categoryBenchmarks?: any;
-  priorityRecommendations?: any;
+  regionalBenchmarks?: Record<string, unknown>;
+  categoryBenchmarks?: Record<string, unknown>;
+  priorityRecommendations?: Record<string, unknown>;
 }
 
 export const DEFAULT_SCORE_WEIGHTS = {
