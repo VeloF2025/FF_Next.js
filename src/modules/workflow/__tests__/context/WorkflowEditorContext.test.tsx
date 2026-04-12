@@ -39,11 +39,11 @@ describe('WorkflowEditorContext', () => {
     vi.clearAllTimers();
     
     // Setup default service mock responses
-    (workflowManagementService.getTemplateById as any).mockResolvedValue(mockWorkflowTemplates[0]);
-    (workflowManagementService.getPhases as any).mockResolvedValue(mockWorkflowPhases);
-    (workflowManagementService.getSteps as any).mockResolvedValue(mockWorkflowSteps);
-    (workflowManagementService.getTasks as any).mockResolvedValue(mockWorkflowTasks);
-    (workflowManagementService.validateTemplate as any).mockResolvedValue(mockWorkflowValidationResult);
+    vi.mocked(workflowManagementService.getTemplateById).mockResolvedValue(mockWorkflowTemplates[0]);
+    vi.mocked(workflowManagementService.getPhases).mockResolvedValue(mockWorkflowPhases);
+    vi.mocked(workflowManagementService.getSteps).mockResolvedValue(mockWorkflowSteps);
+    vi.mocked(workflowManagementService.getTasks).mockResolvedValue(mockWorkflowTasks);
+    vi.mocked(workflowManagementService.validateTemplate).mockResolvedValue(mockWorkflowValidationResult);
   });
 
   afterEach(() => {
@@ -101,7 +101,7 @@ describe('WorkflowEditorContext', () => {
     });
 
     it('should handle template loading error', async () => {
-      (workflowManagementService.getTemplateById as any).mockRejectedValue(
+      vi.mocked(workflowManagementService.getTemplateById).mockRejectedValue(
         new Error('Template not found')
       );
 
@@ -120,7 +120,7 @@ describe('WorkflowEditorContext', () => {
     });
 
     it('should handle template not found scenario', async () => {
-      (workflowManagementService.getTemplateById as any).mockResolvedValue(null);
+      vi.mocked(workflowManagementService.getTemplateById).mockResolvedValue(null);
 
       const { result } = renderHook(() => useWorkflowEditor(), {
         wrapper: createWrapper
@@ -671,7 +671,7 @@ describe('WorkflowEditorContext', () => {
     });
 
     it('should handle validation error', async () => {
-      (workflowManagementService.validateTemplate as any).mockRejectedValue(
+      vi.mocked(workflowManagementService.validateTemplate).mockRejectedValue(
         new Error('Validation service error')
       );
 

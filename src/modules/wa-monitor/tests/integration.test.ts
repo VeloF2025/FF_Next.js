@@ -16,10 +16,23 @@ interface TestResult {
 const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3005';
 const results: TestResult[] = [];
 
+interface ApiData {
+  success?: boolean;
+  error?: { code?: string; message?: string };
+  data?: ApiData & { drops?: unknown[]; total?: number; date?: string; stats?: ApiData };
+  summary?: { total?: number; byProject?: unknown[]; overallStats?: unknown; trends?: unknown };
+}
+
+interface ApiResult {
+  response: Response;
+  data: ApiData;
+  duration: number;
+}
+
 /**
  * Helper: Make API request
  */
-async function apiRequest(endpoint: string, options?: RequestInit): Promise<any> {
+async function apiRequest(endpoint: string, options?: RequestInit): Promise<ApiResult> {
   const url = `${BASE_URL}${endpoint}`;
   const startTime = Date.now();
 
@@ -29,9 +42,16 @@ async function apiRequest(endpoint: string, options?: RequestInit): Promise<any>
     const data = await response.json();
 
     return { response, data, duration };
-  } catch (error: any) {
-    throw new Error(`Request failed: ${error.message}`);
+  } catch (error: unknown) {
+    throw new Error(`Request failed: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+/**
+ * Helper: Extract error message
+ */
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 /**
@@ -75,8 +95,8 @@ async function testGetAllDrops() {
     }
 
     addResult('GET /api/wa-monitor-drops', true, undefined, duration);
-  } catch (error: any) {
-    addResult('GET /api/wa-monitor-drops', false, error.message);
+  } catch (error: unknown) {
+    addResult('GET /api/wa-monitor-drops', false, errorMessage(error));
   }
 }
 
@@ -108,8 +128,8 @@ async function testGetDailyDrops() {
     }
 
     addResult('GET /api/wa-monitor-daily-drops', true, undefined, duration);
-  } catch (error: any) {
-    addResult('GET /api/wa-monitor-daily-drops', false, error.message);
+  } catch (error: unknown) {
+    addResult('GET /api/wa-monitor-daily-drops', false, errorMessage(error));
   }
 }
 
@@ -140,8 +160,8 @@ async function testGetProjectStats() {
     }
 
     addResult('GET /api/wa-monitor-project-stats', true, undefined, duration);
-  } catch (error: any) {
-    addResult('GET /api/wa-monitor-project-stats', false, error.message);
+  } catch (error: unknown) {
+    addResult('GET /api/wa-monitor-project-stats', false, errorMessage(error));
   }
 }
 
@@ -182,8 +202,8 @@ async function testGetProjectsSummary() {
     }
 
     addResult('GET /api/wa-monitor-projects-summary', true, undefined, duration);
-  } catch (error: any) {
-    addResult('GET /api/wa-monitor-projects-summary', false, error.message);
+  } catch (error: unknown) {
+    addResult('GET /api/wa-monitor-projects-summary', false, errorMessage(error));
   }
 }
 
@@ -209,8 +229,8 @@ async function testMethodNotAllowed() {
     }
 
     addResult('Method Not Allowed (405)', true, undefined, duration);
-  } catch (error: any) {
-    addResult('Method Not Allowed (405)', false, error.message);
+  } catch (error: unknown) {
+    addResult('Method Not Allowed (405)', false, errorMessage(error));
   }
 }
 
@@ -236,8 +256,8 @@ async function testNotFound() {
     }
 
     addResult('Not Found (404)', true, undefined, duration);
-  } catch (error: any) {
-    addResult('Not Found (404)', false, error.message);
+  } catch (error: unknown) {
+    addResult('Not Found (404)', false, errorMessage(error));
   }
 }
 
@@ -261,8 +281,8 @@ async function testValidationError() {
     }
 
     addResult('Validation Error (422)', true, undefined, duration);
-  } catch (error: any) {
-    addResult('Validation Error (422)', false, error.message);
+  } catch (error: unknown) {
+    addResult('Validation Error (422)', false, errorMessage(error));
   }
 }
 

@@ -144,7 +144,7 @@ describe('QContact Webhook API', () => {
         body: payloadString,
       });
 
-      const response = await POST(request as any);
+      const response = await POST(request);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -192,7 +192,7 @@ describe('QContact Webhook API', () => {
         body: payloadString,
       });
 
-      const response = await POST(request as any);
+      const response = await POST(request);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -238,7 +238,7 @@ describe('QContact Webhook API', () => {
         body: payloadString,
       });
 
-      const response = await POST(request as any);
+      const response = await POST(request);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -265,7 +265,7 @@ describe('QContact Webhook API', () => {
         body: payloadString,
       });
 
-      const response = await POST(request as any);
+      const response = await POST(request);
       const data = await response.json();
 
       expect(response.status).toBe(401);
@@ -290,7 +290,7 @@ describe('QContact Webhook API', () => {
         body: payloadString,
       });
 
-      const response = await POST(request as any);
+      const response = await POST(request);
       const data = await response.json();
 
       expect(response.status).toBe(401);
@@ -316,7 +316,7 @@ describe('QContact Webhook API', () => {
         body: invalidPayload,
       });
 
-      const response = await POST(request as any);
+      const response = await POST(request);
       const data = await response.json();
 
       expect(response.status).toBe(400);
@@ -359,7 +359,7 @@ describe('QContact Webhook API', () => {
         body: payloadString,
       });
 
-      const response = await POST(request as any);
+      const response = await POST(request);
       const data = await response.json();
 
       // Webhook should still return 200 to prevent retries for non-recoverable errors
@@ -406,7 +406,7 @@ describe('QContact Webhook API', () => {
         body: payloadString,
       });
 
-      const response = await POST(request as any);
+      const response = await POST(request);
 
       expect(response.status).toBe(200);
       // Verify webhook receipt was logged
@@ -455,7 +455,7 @@ describe('QContact Webhook API', () => {
         body: payloadString,
       });
 
-      const response = await POST(request as any);
+      const response = await POST(request);
       const data = await response.json();
 
       expect(response.status).toBe(200);
