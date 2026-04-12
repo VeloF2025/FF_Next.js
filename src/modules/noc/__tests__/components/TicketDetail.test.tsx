@@ -13,6 +13,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { Mock } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TicketDetail } from '../../components/TicketDetail/TicketDetail';
@@ -98,7 +99,7 @@ describe('TicketDetail', () => {
 
   // 🟢 WORKING: Test ticket detail display
   it('should display ticket detail', async () => {
-    (global.fetch as any).mockImplementation((url: string) => {
+    (global.fetch as Mock).mockImplementation((url: string) => {
       if (url.includes('/api/noc/tickets/test-id-123')) {
         return Promise.resolve({
           ok: true,
@@ -126,7 +127,7 @@ describe('TicketDetail', () => {
 
   // 🟢 WORKING: Test loading state
   it('should display loading state', () => {
-    (global.fetch as any).mockImplementation(
+    (global.fetch as Mock).mockImplementation(
       () => new Promise((resolve) => setTimeout(resolve, 1000))
     );
 
@@ -137,7 +138,7 @@ describe('TicketDetail', () => {
 
   // 🟢 WORKING: Test error state
   it('should display error state', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as Mock).mockResolvedValueOnce({
       ok: false,
       json: async () => ({
         success: false,
@@ -155,7 +156,7 @@ describe('TicketDetail', () => {
 
   // 🟢 WORKING: Test status badge display
   it('should display ticket status badge', async () => {
-    (global.fetch as any).mockImplementation((url: string) => {
+    (global.fetch as Mock).mockImplementation((url: string) => {
       if (url.includes('/api/noc/tickets/test-id-123')) {
         return Promise.resolve({
           ok: true,
@@ -180,7 +181,7 @@ describe('TicketDetail', () => {
 
   // 🟢 WORKING: Test priority display
   it('should display ticket priority', async () => {
-    (global.fetch as any).mockImplementation((url: string) => {
+    (global.fetch as Mock).mockImplementation((url: string) => {
       if (url.includes('/api/noc/tickets/test-id-123')) {
         return Promise.resolve({
           ok: true,
@@ -205,7 +206,7 @@ describe('TicketDetail', () => {
 
   // 🟢 WORKING: Test QA ready indicator
   it('should display QA ready indicator', async () => {
-    (global.fetch as any).mockImplementation((url: string) => {
+    (global.fetch as Mock).mockImplementation((url: string) => {
       if (url.includes('/api/noc/tickets/test-id-123')) {
         return Promise.resolve({
           ok: true,
@@ -231,7 +232,7 @@ describe('TicketDetail', () => {
 
   // 🟢 WORKING: Test additional details display
   it('should display additional ticket details', async () => {
-    (global.fetch as any).mockImplementation((url: string) => {
+    (global.fetch as Mock).mockImplementation((url: string) => {
       if (url.includes('/api/noc/tickets/test-id-123')) {
         return Promise.resolve({
           ok: true,
@@ -260,7 +261,7 @@ describe('TicketDetail', () => {
 
   // 🟢 WORKING: Test actions section
   it('should display actions section', async () => {
-    (global.fetch as any).mockImplementation((url: string) => {
+    (global.fetch as Mock).mockImplementation((url: string) => {
       if (url.includes('/api/noc/tickets/test-id-123')) {
         return Promise.resolve({
           ok: true,
@@ -285,7 +286,7 @@ describe('TicketDetail', () => {
 
   // 🟢 WORKING: Test back link
   it('should display back link when provided', async () => {
-    (global.fetch as any).mockImplementation((url: string) => {
+    (global.fetch as Mock).mockImplementation((url: string) => {
       if (url.includes('/api/noc/tickets/test-id-123')) {
         return Promise.resolve({
           ok: true,
@@ -315,7 +316,7 @@ describe('TicketDetail', () => {
 
   // 🟢 WORKING: Test retry button on error
   it('should have retry button on error', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as Mock).mockResolvedValueOnce({
       ok: false,
       json: async () => ({
         success: false,

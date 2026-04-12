@@ -13,6 +13,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { Mock } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -131,7 +132,7 @@ describe('TicketList', () => {
 
   // 🟢 WORKING: Test ticket list display
   it('should display ticket list', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         success: true,
@@ -157,7 +158,7 @@ describe('TicketList', () => {
 
   // 🟢 WORKING: Test loading state
   it('should display loading state', () => {
-    (global.fetch as any).mockImplementation(
+    (global.fetch as Mock).mockImplementation(
       () => new Promise((resolve) => setTimeout(resolve, 1000))
     );
 
@@ -168,7 +169,7 @@ describe('TicketList', () => {
 
   // 🟢 WORKING: Test error state
   it('should display error state', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as Mock).mockResolvedValueOnce({
       ok: false,
       json: async () => ({
         success: false,
@@ -186,7 +187,7 @@ describe('TicketList', () => {
 
   // 🟢 WORKING: Test empty state
   it('should display empty state when no tickets', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         success: true,
@@ -209,7 +210,7 @@ describe('TicketList', () => {
 
   // 🟢 WORKING: Test pagination display
   it('should display pagination when multiple pages', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         success: true,
@@ -233,7 +234,7 @@ describe('TicketList', () => {
 
   // 🟢 WORKING: Test status badge display
   it('should display ticket status badges', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         success: true,
@@ -257,7 +258,7 @@ describe('TicketList', () => {
 
   // 🟢 WORKING: Test priority display
   it('should display ticket priorities', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         success: true,
@@ -281,7 +282,7 @@ describe('TicketList', () => {
 
   // 🟢 WORKING: Test QA ready indicator
   it('should display QA ready indicator', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         success: true,
@@ -305,7 +306,7 @@ describe('TicketList', () => {
 
   // 🟢 WORKING: Test SLA breach indicator
   it('should display SLA breach indicator', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         success: true,
@@ -329,7 +330,7 @@ describe('TicketList', () => {
 
   // 🟢 WORKING: Test refresh button
   it('should have refresh button', async () => {
-    (global.fetch as any).mockResolvedValue({
+    (global.fetch as Mock).mockResolvedValue({
       ok: true,
       json: async () => ({
         success: true,
