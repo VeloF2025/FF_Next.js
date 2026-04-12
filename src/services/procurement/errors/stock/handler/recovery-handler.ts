@@ -107,8 +107,8 @@ export class RecoveryHandler {
     return {
       success: true,
       result: {
-        fulfilledQuantity: option.data.availableQuantity,
-        backorderedQuantity: option.data.shortfall,
+        fulfilledQuantity: option.data?.['availableQuantity'] as number,
+        backorderedQuantity: option.data?.['shortfall'] as number,
         estimatedBackorderDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
       },
       nextSteps: ['Monitor backorder status', 'Notify customer of partial fulfillment']
@@ -180,12 +180,12 @@ export class RecoveryHandler {
 
   private static async executeSplitMovement(option: RecoveryOption): Promise<any> {
     // Mock implementation - would split into batches
-    const batchCount = Math.ceil(option.data.totalQuantity / option.data.batchSize);
+    const batchCount = Math.ceil((option.data?.['totalQuantity'] as number) / (option.data?.['batchSize'] as number));
     return {
       success: true,
       result: {
         batchesCreated: batchCount,
-        batchSize: option.data.batchSize,
+        batchSize: option.data?.['batchSize'] as number,
         estimatedCompletion: new Date(Date.now() + 15 * 60 * 1000)
       },
       nextSteps: ['Monitor batch progress', 'Consolidate movement records']

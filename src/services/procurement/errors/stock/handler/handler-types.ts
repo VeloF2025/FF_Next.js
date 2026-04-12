@@ -7,7 +7,8 @@ export interface RecoveryOption {
   type: string;
   description: string;
   action: string;
-  data: any;
+  /** Arbitrary payload for this recovery option — access with type narrowing or assertion */
+  data?: Record<string, unknown>;
   priority?: number;
   estimatedTime?: string;
   cost?: number;
@@ -17,12 +18,13 @@ export interface RetryStrategy {
   type: string;
   description: string;
   action: string;
-  data: any;
+  /** Arbitrary payload for this retry strategy — access with type narrowing or assertion */
+  data?: Record<string, unknown>;
   maxAttempts?: number;
   backoffMs?: number;
 }
 
-export interface HandlerResult<T = any> {
+export interface HandlerResult<T = unknown> {
   error: T;
   recoveryOptions: RecoveryOption[];
   retryStrategy?: RetryStrategy;

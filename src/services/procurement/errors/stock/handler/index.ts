@@ -19,7 +19,7 @@ export { NotificationHandler } from './notification-handler';
 export { CoreErrorHandler as StockErrorHandler } from './error-handler';
 
 // Combined handler result type for convenience
-export interface StockHandlerResult<T = any> {
+export interface StockHandlerResult<T = unknown> {
   error: T;
   recoveryOptions: import('./handler-types').RecoveryOption[];
   retryStrategies?: import('./handler-types').RetryStrategy[];

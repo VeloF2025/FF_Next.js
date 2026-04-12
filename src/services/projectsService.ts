@@ -4,6 +4,7 @@
  */
 
 import { log } from '@/lib/logger';
+import type { ProjectStats } from '@/lib/schemas/domains/projects';
 
 /**
  * Project record as returned by the /api/projects endpoint.
@@ -25,7 +26,7 @@ export interface ProjectRecord {
   progress?: number;
   teamMembers?: string[];
   tags?: string[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
   createdBy?: string;
@@ -61,7 +62,7 @@ class ProjectsService {
       const data = await response.json();
       return data.data || [];
     } catch (error) {
-      log.error('Error fetching projects:', { data: error } as any, 'ProjectsService');
+      log.error('Error fetching projects:', { data: error instanceof Error ? error.message : String(error) }, 'ProjectsService');
       throw error;
     }
   }
@@ -76,7 +77,7 @@ class ProjectsService {
       const data = await response.json();
       return data.data;
     } catch (error) {
-      log.error('Error fetching project by ID:', { data: error } as any, 'ProjectsService');
+      log.error('Error fetching project by ID:', { data: error instanceof Error ? error.message : String(error) }, 'ProjectsService');
       throw error;
     }
   }
@@ -96,7 +97,7 @@ class ProjectsService {
       const data = await response.json();
       return data.data;
     } catch (error) {
-      log.error('Error creating project:', { data: error } as any, 'ProjectsService');
+      log.error('Error creating project:', { data: error instanceof Error ? error.message : String(error) }, 'ProjectsService');
       throw error;
     }
   }
@@ -116,7 +117,7 @@ class ProjectsService {
       const data = await response.json();
       return data.data;
     } catch (error) {
-      log.error('Error updating project:', { data: error } as any, 'ProjectsService');
+      log.error('Error updating project:', { data: error instanceof Error ? error.message : String(error) }, 'ProjectsService');
       throw error;
     }
   }
@@ -130,7 +131,7 @@ class ProjectsService {
         throw new Error(`Failed to delete project: ${response.statusText}`);
       }
     } catch (error) {
-      log.error('Error deleting project:', { data: error } as any, 'ProjectsService');
+      log.error('Error deleting project:', { data: error instanceof Error ? error.message : String(error) }, 'ProjectsService');
       throw error;
     }
   }
@@ -144,12 +145,12 @@ class ProjectsService {
       const data = await response.json();
       return data.data || [];
     } catch (error) {
-      log.error('Error fetching projects by client:', { data: error } as any, 'ProjectsService');
+      log.error('Error fetching projects by client:', { data: error instanceof Error ? error.message : String(error) }, 'ProjectsService');
       throw error;
     }
   }
 
-  async getStats(): Promise<any> {
+  async getStats(): Promise<ProjectStats> {
     try {
       const response = await fetch(`${this.baseUrl}/stats`);
       if (!response.ok) {
@@ -158,7 +159,7 @@ class ProjectsService {
       const data = await response.json();
       return data.data;
     } catch (error) {
-      log.error('Error fetching project stats:', { data: error } as any, 'ProjectsService');
+      log.error('Error fetching project stats:', { data: error instanceof Error ? error.message : String(error) }, 'ProjectsService');
       throw error;
     }
   }
@@ -172,7 +173,7 @@ class ProjectsService {
       const data = await response.json();
       return data.data || [];
     } catch (error) {
-      log.error('Error searching projects:', { data: error } as any, 'ProjectsService');
+      log.error('Error searching projects:', { data: error instanceof Error ? error.message : String(error) }, 'ProjectsService');
       throw error;
     }
   }
