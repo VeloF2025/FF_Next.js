@@ -1,10 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supplierService } from '@/services/suppliers/supplierService';
-import { 
-  SupplierFormData, 
+import {
+  Supplier,
+  SupplierFormData,
   SupplierStatus,
   SupplierRating,
-  PerformancePeriod
+  PerformancePeriod,
+  ComplianceStatus,
+  SupplierDocument,
 } from '@/types/supplier.types';
 import { toast } from 'react-hot-toast';
 
@@ -204,7 +207,7 @@ export function useUpdateSupplierCompliance() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, compliance }: { id: string; compliance: any }) =>
+    mutationFn: ({ id, compliance }: { id: string; compliance: Partial<ComplianceStatus> }) =>
       supplierService.updateCompliance(id, compliance),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
@@ -222,7 +225,7 @@ export function useAddSupplierDocument() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, document }: { id: string; document: any }) =>
+    mutationFn: ({ id, document }: { id: string; document: Omit<SupplierDocument, 'id'> }) =>
       supplierService.addDocument(id, document),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['suppliers', variables.id] });
@@ -235,7 +238,7 @@ export function useAddSupplierDocument() {
 }
 
 // Subscribe to supplier updates
-export function useSupplierSubscription(supplierId: string, callback: (supplier: any) => void) {
+export function useSupplierSubscription(supplierId: string, callback: (supplier: Supplier) => void) {
   const queryClient = useQueryClient();
 
   useQuery({

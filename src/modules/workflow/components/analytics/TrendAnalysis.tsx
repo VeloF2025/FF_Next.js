@@ -1,5 +1,5 @@
 // 🟢 WORKING: Advanced trend analysis with forecasting and predictive insights
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Line,
   XAxis,
@@ -253,17 +253,32 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
 
   const metricInfo = getMetricData(selectedMetric);
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
+  interface TooltipEntry {
+    color: string;
+    name: string;
+    value: number;
+    payload: TrendDataPoint;
+  }
+
+  interface CustomTooltipProps {
+    active?: boolean;
+    payload?: TooltipEntry[];
+    label?: string;
+  }
+
+  const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
+    if (active && payload && payload.length > 0) {
+      const firstEntry = payload[0];
+      if (!firstEntry) return null;
+      const data = firstEntry.payload;
       const isPredicted = data.predicted;
-      
+
       return (
         <div className="bg-card p-3 border rounded-lg shadow-lg">
           <p className="font-medium text-foreground">
             {label} {isPredicted && <Badge variant="outline" className="ml-2 text-xs">Forecast</Badge>}
           </p>
-          {payload.map((entry: any, index: number) => (
+          {payload.map((entry: TooltipEntry, index: number) => (
             <p key={index} style={{ color: entry.color }} className="text-sm">
               {`${entry.name}: ${entry.value}${metricInfo.unit}`}
             </p>
@@ -343,15 +358,15 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
                 stroke={metricInfo.color}
                 strokeWidth={2}
                 strokeDasharray="0"
-                dot={(props: any) => {
-                  const { payload } = props;
+                dot={(props: React.SVGProps<SVGCircleElement> & { payload?: TrendDataPoint }) => {
+                  const { payload, ...svgProps } = props;
                   return (
                     <circle
-                      {...props}
-                      r={payload.predicted ? 4 : 3}
-                      fill={payload.predicted ? 'white' : metricInfo.color}
+                      {...svgProps}
+                      r={payload?.predicted ? 4 : 3}
+                      fill={payload?.predicted ? 'white' : metricInfo.color}
                       stroke={metricInfo.color}
-                      strokeWidth={payload.predicted ? 2 : 0}
+                      strokeWidth={payload?.predicted ? 2 : 0}
                     />
                   );
                 }}

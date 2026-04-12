@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { log } from '@/lib/logger';
 import {
   Card,
@@ -37,7 +37,7 @@ import {
 
 interface HealthCheck {
   status: 'up' | 'down' | 'degraded' | 'stale';
-  details: Record<string, any>;
+  details: Record<string, unknown>;
   latency_ms?: number;
   error?: string;
 }
@@ -94,7 +94,7 @@ export function SystemHealthPanel({
       setHealthData(data.data);
       setLastCheck(new Date());
     } catch (err) {
-      log.error('Health check error', err, 'SystemHealthPanel');
+      log.error('Health check error', { error: err instanceof Error ? err.message : String(err) }, 'SystemHealthPanel');
       setError(err instanceof Error ? err.message : 'Failed to fetch health data');
     } finally {
       setLoading(false);
@@ -130,7 +130,7 @@ export function SystemHealthPanel({
     }
   };
 
-  const getOverallStatusIndicator = (status: HealthData['overall_status']) => {
+  const getOverallStatusIndicator = (status: HealthData['overall_status']): { emoji: string; text: string; color: 'success' | 'warning' | 'error' } => {
     switch (status) {
       case 'healthy':
         return { emoji: '🟢', text: 'ALL SYSTEMS OPERATIONAL', color: 'success' };
@@ -202,7 +202,7 @@ export function SystemHealthPanel({
 
       <CardContent>
         {/* Overall Status */}
-        <Alert severity={overallIndicator.color as any} icon={<span style={{ fontSize: '24px' }}>{overallIndicator.emoji}</span>} sx={{ mb: 3, fontWeight: 'bold' }}>
+        <Alert severity={overallIndicator.color} icon={<span style={{ fontSize: '24px' }}>{overallIndicator.emoji}</span>} sx={{ mb: 3, fontWeight: 'bold' }}>
           <Typography variant="h6">{overallIndicator.text}</Typography>
         </Alert>
 
@@ -310,7 +310,7 @@ function ServiceCheckItem({ name, check }: { name: string; check: HealthCheck })
               {check.latency_ms}ms
             </Typography>
           )}
-          <Chip label={indicator.label} size="small" color={indicator.color as any} />
+          <Chip label={indicator.label} size="small" color={indicator.color} />
         </Box>
       </Box>
 
@@ -335,7 +335,9 @@ function ServiceCheckItem({ name, check }: { name: string; check: HealthCheck })
   );
 }
 
-function getStatusIndicator(status: HealthCheck['status']) {
+type ChipColor = 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning';
+
+function getStatusIndicator(status: HealthCheck['status']): { icon: React.ReactNode; color: ChipColor; label: string } {
   switch (status) {
     case 'up':
       return { icon: <CheckCircle2 size={16} />, color: 'success', label: 'UP' };
