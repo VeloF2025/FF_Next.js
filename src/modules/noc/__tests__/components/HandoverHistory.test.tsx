@@ -17,6 +17,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { Mock } from 'vitest';
 import { HandoverHistory } from '../../components/Handover/HandoverHistory';
 import { HandoverType, OwnerType } from '../../types/handover';
 import type { TicketHandoverHistory } from '../../types/handover';
@@ -156,14 +157,14 @@ describe('HandoverHistory Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (global.fetch as any).mockReset();
+    (global.fetch as Mock).mockReset();
   });
 
   describe('Initial Rendering', () => {
     it('should display handover history timeline', async () => {
       // Arrange
       const history = createMockHistory();
-      (global.fetch as any).mockResolvedValueOnce({
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           success: true,
@@ -184,7 +185,7 @@ describe('HandoverHistory Component', () => {
 
     it('should show loading state while fetching', () => {
       // Arrange
-      (global.fetch as any).mockImplementation(() => new Promise(() => {}));
+      (global.fetch as Mock).mockImplementation(() => new Promise(() => {}));
 
       // Act
       renderWithQueryClient(<HandoverHistory ticketId={mockTicketId} />);
@@ -195,7 +196,7 @@ describe('HandoverHistory Component', () => {
 
     it('should show error state on fetch failure', async () => {
       // Arrange
-      (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
+      (global.fetch as Mock).mockRejectedValueOnce(new Error('Network error'));
 
       // Act
       renderWithQueryClient(<HandoverHistory ticketId={mockTicketId} />);
@@ -211,7 +212,7 @@ describe('HandoverHistory Component', () => {
     it('should display handovers in chronological order', async () => {
       // Arrange
       const history = createMockHistory();
-      (global.fetch as any).mockResolvedValueOnce({
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           success: true,
@@ -234,7 +235,7 @@ describe('HandoverHistory Component', () => {
     it('should display handover type for each entry', async () => {
       // Arrange
       const history = createMockHistory();
-      (global.fetch as any).mockResolvedValueOnce({
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           success: true,
@@ -255,7 +256,7 @@ describe('HandoverHistory Component', () => {
     it('should display ownership transfer details', async () => {
       // Arrange
       const history = createMockHistory();
-      (global.fetch as any).mockResolvedValueOnce({
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           success: true,
@@ -283,7 +284,7 @@ describe('HandoverHistory Component', () => {
     it('should display handover timestamps', async () => {
       // Arrange
       const history = createMockHistory();
-      (global.fetch as any).mockResolvedValueOnce({
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           success: true,
@@ -308,7 +309,7 @@ describe('HandoverHistory Component', () => {
   describe('Empty State', () => {
     it('should handle empty history', async () => {
       // Arrange
-      (global.fetch as any).mockResolvedValueOnce({
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           success: true,
@@ -337,7 +338,7 @@ describe('HandoverHistory Component', () => {
     it('should allow expanding snapshot details', async () => {
       // Arrange
       const history = createMockHistory();
-      (global.fetch as any).mockResolvedValueOnce({
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           success: true,
@@ -370,7 +371,7 @@ describe('HandoverHistory Component', () => {
     it('should highlight current owner', async () => {
       // Arrange
       const history = createMockHistory();
-      (global.fetch as any).mockResolvedValueOnce({
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           success: true,
@@ -400,7 +401,7 @@ describe('HandoverHistory Component', () => {
     it('should display total handover count', async () => {
       // Arrange
       const history = createMockHistory();
-      (global.fetch as any).mockResolvedValueOnce({
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           success: true,

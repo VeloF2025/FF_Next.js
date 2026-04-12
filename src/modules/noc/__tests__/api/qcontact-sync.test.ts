@@ -16,6 +16,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import type { NextRequest } from 'next/server';
 import type { FullSyncResult } from '../../types/qcontact';
 import { SyncDirection, SyncStatus } from '../../types/qcontact';
 
@@ -105,7 +106,7 @@ describe('QContact Sync API', () => {
         body: JSON.stringify({}),
       });
 
-      const response = await POST(request as any);
+      const response = await POST(request as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -148,7 +149,7 @@ describe('QContact Sync API', () => {
         }),
       });
 
-      const response = await POST(request as any);
+      const response = await POST(request as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -183,7 +184,7 @@ describe('QContact Sync API', () => {
         }),
       });
 
-      const response = await POST(request as any);
+      const response = await POST(request as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -207,7 +208,7 @@ describe('QContact Sync API', () => {
         }),
       });
 
-      const response = await POST(request as any);
+      const response = await POST(request as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -230,7 +231,7 @@ describe('QContact Sync API', () => {
         }),
       });
 
-      const response = await POST(request as any);
+      const response = await POST(request as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(422);
@@ -250,7 +251,7 @@ describe('QContact Sync API', () => {
         }),
       });
 
-      const response = await POST(request as any);
+      const response = await POST(request as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(422);
@@ -271,7 +272,7 @@ describe('QContact Sync API', () => {
         body: JSON.stringify({}),
       });
 
-      const response = await POST(request as any);
+      const response = await POST(request as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -329,7 +330,7 @@ describe('QContact Sync API', () => {
         }
       );
 
-      const response = await GET(request as any);
+      const response = await GET(request as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -369,7 +370,7 @@ describe('QContact Sync API', () => {
         }
       );
 
-      const response = await GET(request as any);
+      const response = await GET(request as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -398,7 +399,7 @@ describe('QContact Sync API', () => {
         }
       );
 
-      const response = await GET(request as any);
+      const response = await GET(request as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -452,7 +453,7 @@ describe('QContact Sync API', () => {
         }
       );
 
-      const response = await GET(request as any);
+      const response = await GET(request as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -471,7 +472,7 @@ describe('QContact Sync API', () => {
         }
       );
 
-      const response = await GET(request as any);
+      const response = await GET(request as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(422);
@@ -492,7 +493,7 @@ describe('QContact Sync API', () => {
         }
       );
 
-      const response = await GET(request as any);
+      const response = await GET(request as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(500);

@@ -18,6 +18,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { Mock } from 'vitest';
 import { HandoverWizard } from '../../components/Handover/HandoverWizard';
 import { HandoverType, OwnerType } from '../../types/handover';
 import type { HandoverGateValidation } from '../../types/handover';
@@ -89,7 +90,7 @@ describe('HandoverWizard Component', () => {
     it('should display handover gate checklist', async () => {
       // Arrange
       const validation = createMockGateValidation(true);
-      (global.fetch as any).mockResolvedValue({
+      (global.fetch as Mock).mockResolvedValue({
         ok: true,
         json: async () => ({
           success: true,
@@ -113,7 +114,7 @@ describe('HandoverWizard Component', () => {
 
     it('should show loading state while fetching gates', () => {
       // Arrange
-      (global.fetch as any).mockImplementation(() => new Promise(() => {}));
+      (global.fetch as Mock).mockImplementation(() => new Promise(() => {}));
 
       // Act
       renderWithQueryClient(
@@ -129,7 +130,7 @@ describe('HandoverWizard Component', () => {
 
     it('should show error state on fetch failure', async () => {
       // Arrange
-      (global.fetch as any).mockRejectedValue(new Error('Network error'));
+      (global.fetch as Mock).mockRejectedValue(new Error('Network error'));
 
       // Act
       renderWithQueryClient(
@@ -150,7 +151,7 @@ describe('HandoverWizard Component', () => {
     it('should display gates passed with success indicator', async () => {
       // Arrange
       const validation = createMockGateValidation(true);
-      (global.fetch as any).mockResolvedValue({
+      (global.fetch as Mock).mockResolvedValue({
         ok: true,
         json: async () => ({
           success: true,
@@ -175,7 +176,7 @@ describe('HandoverWizard Component', () => {
     it('should display gates failed with error indicator', async () => {
       // Arrange
       const validation = createMockGateValidation(false);
-      (global.fetch as any).mockResolvedValue({
+      (global.fetch as Mock).mockResolvedValue({
         ok: true,
         json: async () => ({
           success: true,
@@ -200,7 +201,7 @@ describe('HandoverWizard Component', () => {
     it('should show blocking issues when gates fail', async () => {
       // Arrange
       const validation = createMockGateValidation(false);
-      (global.fetch as any).mockResolvedValue({
+      (global.fetch as Mock).mockResolvedValue({
         ok: true,
         json: async () => ({
           success: true,
@@ -226,7 +227,7 @@ describe('HandoverWizard Component', () => {
     it('should show warnings when present', async () => {
       // Arrange
       const validation = createMockGateValidation(false);
-      (global.fetch as any).mockResolvedValue({
+      (global.fetch as Mock).mockResolvedValue({
         ok: true,
         json: async () => ({
           success: true,
@@ -253,7 +254,7 @@ describe('HandoverWizard Component', () => {
     it('should enable submit button when all gates pass', async () => {
       // Arrange
       const validation = createMockGateValidation(true);
-      (global.fetch as any).mockResolvedValue({
+      (global.fetch as Mock).mockResolvedValue({
         ok: true,
         json: async () => ({
           success: true,
@@ -279,7 +280,7 @@ describe('HandoverWizard Component', () => {
     it('should disable submit button when gates fail', async () => {
       // Arrange
       const validation = createMockGateValidation(false);
-      (global.fetch as any).mockResolvedValue({
+      (global.fetch as Mock).mockResolvedValue({
         ok: true,
         json: async () => ({
           success: true,
@@ -306,7 +307,7 @@ describe('HandoverWizard Component', () => {
       // Arrange
       const validation = createMockGateValidation(true);
       let fetchCallCount = 0;
-      (global.fetch as any).mockImplementation((url: string) => {
+      (global.fetch as Mock).mockImplementation((url: string) => {
         fetchCallCount++;
         // First call: gate validation
         if (fetchCallCount === 1) {
@@ -366,7 +367,7 @@ describe('HandoverWizard Component', () => {
       // Arrange
       const validation = createMockGateValidation(true);
       let fetchCallCount = 0;
-      (global.fetch as any).mockImplementation(() => {
+      (global.fetch as Mock).mockImplementation(() => {
         fetchCallCount++;
         // First call: gate validation succeeds
         if (fetchCallCount === 1) {
@@ -416,7 +417,7 @@ describe('HandoverWizard Component', () => {
     it('should display ownership transfer fields for QA to Maintenance', async () => {
       // Arrange
       const validation = createMockGateValidation(true);
-      (global.fetch as any).mockResolvedValue({
+      (global.fetch as Mock).mockResolvedValue({
         ok: true,
         json: async () => ({
           success: true,
