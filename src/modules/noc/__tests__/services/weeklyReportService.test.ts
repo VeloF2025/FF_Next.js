@@ -33,6 +33,7 @@ import {
   ImportErrorType,
   ImportProcessResult
 } from '../../types/weeklyReport';
+import type { Ticket } from '../../types/ticket';
 
 // Mock the database utility
 vi.mock('../../utils/db', () => ({
@@ -312,7 +313,7 @@ describe('Weekly Report Service - TDD', () => {
         ticket_uid: 'FT123456'
       };
 
-      vi.mocked(createTicket).mockResolvedValue(mockCreatedTicket as any);
+      vi.mocked(createTicket).mockResolvedValue(mockCreatedTicket as unknown as Ticket);
       vi.mocked(queryOne)
         .mockResolvedValueOnce({
           id: reportId,
@@ -356,9 +357,9 @@ describe('Weekly Report Service - TDD', () => {
       ];
 
       vi.mocked(createTicket)
-        .mockResolvedValueOnce({ id: 'ticket-1', ticket_uid: 'FT111111' } as any)
+        .mockResolvedValueOnce({ id: 'ticket-1', ticket_uid: 'FT111111' } as unknown as Ticket)
         .mockRejectedValueOnce(new Error('title is required'))
-        .mockResolvedValueOnce({ id: 'ticket-3', ticket_uid: 'FT333333' } as any);
+        .mockResolvedValueOnce({ id: 'ticket-3', ticket_uid: 'FT333333' } as unknown as Ticket);
 
       vi.mocked(queryOne)
         .mockResolvedValueOnce({
@@ -399,7 +400,7 @@ describe('Weekly Report Service - TDD', () => {
 
       vi.mocked(createTicket)
         .mockRejectedValueOnce(new Error('duplicate key value violates unique constraint'))
-        .mockResolvedValueOnce({ id: 'ticket-2', ticket_uid: 'FT789012' } as any);
+        .mockResolvedValueOnce({ id: 'ticket-2', ticket_uid: 'FT789012' } as unknown as Ticket);
 
       vi.mocked(queryOne)
         .mockResolvedValueOnce({
@@ -431,7 +432,7 @@ describe('Weekly Report Service - TDD', () => {
       vi.mocked(createTicket).mockResolvedValue({
         id: 'ticket-uuid',
         ticket_uid: 'FT123456'
-      } as any);
+      } as unknown as Ticket);
 
       vi.mocked(queryOne)
         .mockResolvedValueOnce({
@@ -467,7 +468,7 @@ describe('Weekly Report Service - TDD', () => {
       vi.mocked(createTicket).mockResolvedValue({
         id: 'ticket-uuid',
         ticket_uid: 'FT123456'
-      } as any);
+      } as unknown as Ticket);
 
       vi.mocked(queryOne)
         .mockResolvedValueOnce({
@@ -501,7 +502,7 @@ describe('Weekly Report Service - TDD', () => {
       vi.mocked(createTicket).mockResolvedValue({
         id: 'ticket-uuid',
         ticket_uid: 'FT123456'
-      } as any);
+      } as unknown as Ticket);
 
       const batchSize = 10;
       const result = await processImportBatch(rows, batchSize, 'user-uuid-123');

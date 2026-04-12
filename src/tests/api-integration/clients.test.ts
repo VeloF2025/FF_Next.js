@@ -1,6 +1,26 @@
 import { describe, test, expect, beforeAll } from 'vitest';
 import axios, { AxiosInstance } from 'axios';
 
+interface ClientRecord {
+  id: string | number;
+  name: string;
+  contactEmail: string;
+  contactPhone?: string;
+  address?: string;
+  status: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  contactPerson?: string;
+}
+
+interface ApiErrorResponse {
+  response?: {
+    status: number;
+    data: { error: string };
+  };
+}
+
 describe('Clients Module API Integration Tests', () => {
   let api: AxiosInstance;
   const baseURL = process.env.VITE_API_URL || 'http://localhost:3000/api';
@@ -21,7 +41,7 @@ describe('Clients Module API Integration Tests', () => {
         const response = await api.get('/health');
         expect(response.status).toBe(200);
         expect(response.data.status).toMatch(/ok|healthy/);
-      } catch (error) {
+      } catch {
         console.warn('Clients API not running - skipping health check');
       }
     });
@@ -33,7 +53,7 @@ describe('Clients Module API Integration Tests', () => {
         const response = await api.get('/');
         expect(response.status).toBe(200);
         expect(Array.isArray(response.data)).toBe(true);
-        
+
         if (response.data.length > 0) {
           const client = response.data[0];
           expect(client).toHaveProperty('id');
@@ -41,7 +61,7 @@ describe('Clients Module API Integration Tests', () => {
           expect(client).toHaveProperty('contactEmail');
           expect(client).toHaveProperty('status');
         }
-      } catch (error) {
+      } catch {
         console.warn('Clients list test skipped - API not available');
       }
     });
@@ -50,7 +70,7 @@ describe('Clients Module API Integration Tests', () => {
       try {
         const testClientId = '1';
         const response = await api.get(`/${testClientId}`);
-        
+
         if (response.status === 200) {
           expect(response.data).toHaveProperty('id');
           expect(response.data).toHaveProperty('name');
@@ -59,9 +79,10 @@ describe('Clients Module API Integration Tests', () => {
           expect(response.data).toHaveProperty('address');
           expect(response.data).toHaveProperty('status');
         }
-      } catch (error: any) {
-        if (error.response?.status === 404) {
-          expect(error.response.data).toHaveProperty('error');
+      } catch (error: unknown) {
+        const apiError = error as ApiErrorResponse;
+        if (apiError.response?.status === 404) {
+          expect(apiError.response.data).toHaveProperty('error');
         }
       }
     });
@@ -81,15 +102,16 @@ describe('Clients Module API Integration Tests', () => {
         };
 
         const response = await api.post('/', newClient);
-        
+
         if (response.status === 201 || response.status === 200) {
           expect(response.data).toHaveProperty('id');
           expect(response.data.name).toBe(newClient.name);
           expect(response.data.contactEmail).toBe(newClient.contactEmail);
         }
-      } catch (error: any) {
-        if (error.response?.status === 400) {
-          expect(error.response.data).toHaveProperty('error');
+      } catch (error: unknown) {
+        const apiError = error as ApiErrorResponse;
+        if (apiError.response?.status === 400) {
+          expect(apiError.response.data).toHaveProperty('error');
         }
       }
     });
@@ -100,9 +122,10 @@ describe('Clients Module API Integration Tests', () => {
         await api.post('/', {
           contactEmail: 'test@example.com'
         });
-      } catch (error: any) {
-        expect([400, 422]).toContain(error.response.status);
-        expect(error.response.data).toHaveProperty('error');
+      } catch (error: unknown) {
+        const apiError = error as ApiErrorResponse;
+        expect([400, 422]).toContain(apiError.response?.status);
+        expect(apiError.response?.data).toHaveProperty('error');
       }
     });
 
@@ -113,9 +136,10 @@ describe('Clients Module API Integration Tests', () => {
           contactEmail: 'invalid-email',
           contactPerson: 'Test Person'
         });
-      } catch (error: any) {
-        expect([400, 422]).toContain(error.response.status);
-        expect(error.response.data).toHaveProperty('error');
+      } catch (error: unknown) {
+        const apiError = error as ApiErrorResponse;
+        expect([400, 422]).toContain(apiError.response?.status);
+        expect(apiError.response?.data).toHaveProperty('error');
       }
     });
 
@@ -127,14 +151,15 @@ describe('Clients Module API Integration Tests', () => {
         };
 
         const response = await api.put('/1', update);
-        
+
         if (response.status === 200) {
           expect(response.data).toHaveProperty('id');
           expect(response.data.status).toBe(update.status);
           expect(response.data.contactPhone).toBe(update.contactPhone);
         }
-      } catch (error: any) {
-        if (error.response?.status !== 404) {
+      } catch (error: unknown) {
+        const apiError = error as ApiErrorResponse;
+        if (apiError.response?.status !== 404) {
           console.warn('Client update test failed unexpectedly');
         }
       }
@@ -143,14 +168,15 @@ describe('Clients Module API Integration Tests', () => {
     test('Can delete client', async () => {
       try {
         const response = await api.delete('/999'); // Test ID
-        
+
         if (response.status === 200) {
           expect(response.data).toHaveProperty('success');
           expect(response.data.success).toBe(true);
         }
-      } catch (error: any) {
-        if (error.response?.status === 404) {
-          expect(error.response.data).toHaveProperty('error');
+      } catch (error: unknown) {
+        const apiError = error as ApiErrorResponse;
+        if (apiError.response?.status === 404) {
+          expect(apiError.response.data).toHaveProperty('error');
         }
       }
     });
@@ -160,11 +186,11 @@ describe('Clients Module API Integration Tests', () => {
     test('Can fetch client with projects', async () => {
       try {
         const response = await api.get('/1?include=projects');
-        
+
         if (response.status === 200) {
           expect(response.data).toHaveProperty('projects');
           expect(Array.isArray(response.data.projects)).toBe(true);
-          
+
           if (response.data.projects.length > 0) {
             const project = response.data.projects[0];
             expect(project).toHaveProperty('id');
@@ -172,7 +198,7 @@ describe('Clients Module API Integration Tests', () => {
             expect(project).toHaveProperty('status');
           }
         }
-      } catch (error) {
+      } catch {
         console.warn('Client projects test skipped');
       }
     });
@@ -180,12 +206,12 @@ describe('Clients Module API Integration Tests', () => {
     test('Can fetch client project count', async () => {
       try {
         const response = await api.get('/1/project-count');
-        
+
         if (response.status === 200) {
           expect(response.data).toHaveProperty('count');
           expect(typeof response.data.count).toBe('number');
         }
-      } catch (error) {
+      } catch {
         console.warn('Client project count test skipped');
       }
     });
@@ -195,10 +221,10 @@ describe('Clients Module API Integration Tests', () => {
     test('Can search clients by name', async () => {
       try {
         const response = await api.get('/?search=test');
-        
+
         expect(response.status).toBe(200);
         expect(Array.isArray(response.data)).toBe(true);
-      } catch (error) {
+      } catch {
         console.warn('Client search test skipped');
       }
     });
@@ -206,14 +232,14 @@ describe('Clients Module API Integration Tests', () => {
     test('Can filter clients by status', async () => {
       try {
         const response = await api.get('/?status=active');
-        
+
         expect(response.status).toBe(200);
         expect(Array.isArray(response.data)).toBe(true);
-        
-        response.data.forEach((client: any) => {
+
+        response.data.forEach((client: ClientRecord) => {
           expect(client.status).toBe('active');
         });
-      } catch (error) {
+      } catch {
         console.warn('Client status filter test skipped');
       }
     });
@@ -221,10 +247,10 @@ describe('Clients Module API Integration Tests', () => {
     test('Can filter clients by city', async () => {
       try {
         const response = await api.get('/?city=New York');
-        
+
         expect(response.status).toBe(200);
         expect(Array.isArray(response.data)).toBe(true);
-      } catch (error) {
+      } catch {
         console.warn('Client city filter test skipped');
       }
     });
@@ -234,14 +260,14 @@ describe('Clients Module API Integration Tests', () => {
     test('Can fetch client statistics', async () => {
       try {
         const response = await api.get('/stats');
-        
+
         if (response.status === 200) {
           expect(response.data).toHaveProperty('total');
           expect(response.data).toHaveProperty('active');
           expect(response.data).toHaveProperty('inactive');
           expect(response.data).toHaveProperty('byCity');
         }
-      } catch (error) {
+      } catch {
         console.warn('Client statistics test skipped');
       }
     });
@@ -249,13 +275,13 @@ describe('Clients Module API Integration Tests', () => {
     test('Can fetch client revenue summary', async () => {
       try {
         const response = await api.get('/stats/revenue');
-        
+
         if (response.status === 200) {
           expect(response.data).toHaveProperty('totalRevenue');
           expect(response.data).toHaveProperty('averageRevenue');
           expect(response.data).toHaveProperty('topClients');
         }
-      } catch (error) {
+      } catch {
         console.warn('Client revenue test skipped');
       }
     });
@@ -270,14 +296,15 @@ describe('Clients Module API Integration Tests', () => {
           contactEmail: 'unique@example.com',
           contactPerson: 'Test Person'
         };
-        
+
         await api.post('/', client);
-        
+
         // Try to create another with same name
         await api.post('/', client);
-      } catch (error: any) {
-        expect([400, 409]).toContain(error.response.status);
-        expect(error.response.data).toHaveProperty('error');
+      } catch (error: unknown) {
+        const apiError = error as ApiErrorResponse;
+        expect([400, 409]).toContain(apiError.response?.status);
+        expect(apiError.response?.data).toHaveProperty('error');
       }
     });
   });
@@ -288,9 +315,9 @@ describe('Clients Module API Integration Tests', () => {
         const start = Date.now();
         await api.get('/');
         const duration = Date.now() - start;
-        
+
         expect(duration).toBeLessThan(1000);
-      } catch (error) {
+      } catch {
         console.warn('Performance test skipped');
       }
     });
@@ -300,9 +327,9 @@ describe('Clients Module API Integration Tests', () => {
         const start = Date.now();
         await api.get('/?search=test&status=active');
         const duration = Date.now() - start;
-        
+
         expect(duration).toBeLessThan(1500);
-      } catch (error) {
+      } catch {
         console.warn('Search performance test skipped');
       }
     });

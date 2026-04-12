@@ -1,6 +1,23 @@
 import { describe, test, expect, beforeAll } from 'vitest';
 import axios, { AxiosInstance } from 'axios';
 
+interface StaffRecord {
+  id: string | number;
+  name: string;
+  email: string;
+  phone?: string;
+  role: string;
+  department?: string;
+  startDate?: string;
+}
+
+interface ApiErrorResponse {
+  response?: {
+    status: number;
+    data: { error: string };
+  };
+}
+
 describe('Staff Module API Integration Tests', () => {
   let api: AxiosInstance;
   const baseURL = process.env.VITE_API_URL || 'http://localhost:3000/api';
@@ -21,7 +38,7 @@ describe('Staff Module API Integration Tests', () => {
         const response = await api.get('/health');
         expect(response.status).toBe(200);
         expect(response.data.status).toMatch(/ok|healthy/);
-      } catch (error) {
+      } catch {
         console.warn('Staff API not running - skipping health check');
       }
     });
@@ -33,7 +50,7 @@ describe('Staff Module API Integration Tests', () => {
         const response = await api.get('/');
         expect(response.status).toBe(200);
         expect(Array.isArray(response.data)).toBe(true);
-        
+
         if (response.data.length > 0) {
           const staff = response.data[0];
           expect(staff).toHaveProperty('id');
@@ -41,7 +58,7 @@ describe('Staff Module API Integration Tests', () => {
           expect(staff).toHaveProperty('email');
           expect(staff).toHaveProperty('role');
         }
-      } catch (error) {
+      } catch {
         console.warn('Staff list test skipped - API not available');
       }
     });
@@ -50,7 +67,7 @@ describe('Staff Module API Integration Tests', () => {
       try {
         const testStaffId = '1';
         const response = await api.get(`/${testStaffId}`);
-        
+
         if (response.status === 200) {
           expect(response.data).toHaveProperty('id');
           expect(response.data).toHaveProperty('name');
@@ -59,9 +76,10 @@ describe('Staff Module API Integration Tests', () => {
           expect(response.data).toHaveProperty('role');
           expect(response.data).toHaveProperty('department');
         }
-      } catch (error: any) {
-        if (error.response?.status === 404) {
-          expect(error.response.data).toHaveProperty('error');
+      } catch (error: unknown) {
+        const apiError = error as ApiErrorResponse;
+        if (apiError.response?.status === 404) {
+          expect(apiError.response.data).toHaveProperty('error');
         }
       }
     });
@@ -78,15 +96,16 @@ describe('Staff Module API Integration Tests', () => {
         };
 
         const response = await api.post('/', newStaff);
-        
+
         if (response.status === 201 || response.status === 200) {
           expect(response.data).toHaveProperty('id');
           expect(response.data.name).toBe(newStaff.name);
           expect(response.data.email).toBe(newStaff.email);
         }
-      } catch (error: any) {
-        if (error.response?.status === 400) {
-          expect(error.response.data).toHaveProperty('error');
+      } catch (error: unknown) {
+        const apiError = error as ApiErrorResponse;
+        if (apiError.response?.status === 400) {
+          expect(apiError.response.data).toHaveProperty('error');
         }
       }
     });
@@ -98,9 +117,10 @@ describe('Staff Module API Integration Tests', () => {
           email: 'invalid-email',
           role: 'Tester'
         });
-      } catch (error: any) {
-        expect([400, 422]).toContain(error.response.status);
-        expect(error.response.data).toHaveProperty('error');
+      } catch (error: unknown) {
+        const apiError = error as ApiErrorResponse;
+        expect([400, 422]).toContain(apiError.response?.status);
+        expect(apiError.response?.data).toHaveProperty('error');
       }
     });
 
@@ -112,14 +132,15 @@ describe('Staff Module API Integration Tests', () => {
         };
 
         const response = await api.put('/1', update);
-        
+
         if (response.status === 200) {
           expect(response.data).toHaveProperty('id');
           expect(response.data.role).toBe(update.role);
           expect(response.data.department).toBe(update.department);
         }
-      } catch (error: any) {
-        if (error.response?.status !== 404) {
+      } catch (error: unknown) {
+        const apiError = error as ApiErrorResponse;
+        if (apiError.response?.status !== 404) {
           console.warn('Staff update test failed unexpectedly');
         }
       }
@@ -128,14 +149,15 @@ describe('Staff Module API Integration Tests', () => {
     test('Can soft delete staff member', async () => {
       try {
         const response = await api.delete('/999'); // Test ID
-        
+
         if (response.status === 200) {
           expect(response.data).toHaveProperty('success');
           expect(response.data.success).toBe(true);
         }
-      } catch (error: any) {
-        if (error.response?.status === 404) {
-          expect(error.response.data).toHaveProperty('error');
+      } catch (error: unknown) {
+        const apiError = error as ApiErrorResponse;
+        if (apiError.response?.status === 404) {
+          expect(apiError.response.data).toHaveProperty('error');
         }
       }
     });
@@ -145,10 +167,10 @@ describe('Staff Module API Integration Tests', () => {
     test('Can search staff by name', async () => {
       try {
         const response = await api.get('/?search=john');
-        
+
         expect(response.status).toBe(200);
         expect(Array.isArray(response.data)).toBe(true);
-      } catch (error) {
+      } catch {
         console.warn('Staff search test skipped');
       }
     });
@@ -156,14 +178,14 @@ describe('Staff Module API Integration Tests', () => {
     test('Can filter staff by department', async () => {
       try {
         const response = await api.get('/?department=Engineering');
-        
+
         expect(response.status).toBe(200);
         expect(Array.isArray(response.data)).toBe(true);
-        
-        response.data.forEach((staff: any) => {
+
+        response.data.forEach((staff: StaffRecord) => {
           expect(staff.department).toBe('Engineering');
         });
-      } catch (error) {
+      } catch {
         console.warn('Staff department filter test skipped');
       }
     });
@@ -171,10 +193,10 @@ describe('Staff Module API Integration Tests', () => {
     test('Can filter staff by role', async () => {
       try {
         const response = await api.get('/?role=Developer');
-        
+
         expect(response.status).toBe(200);
         expect(Array.isArray(response.data)).toBe(true);
-      } catch (error) {
+      } catch {
         console.warn('Staff role filter test skipped');
       }
     });
@@ -184,14 +206,14 @@ describe('Staff Module API Integration Tests', () => {
     test('Can fetch staff statistics', async () => {
       try {
         const response = await api.get('/stats');
-        
+
         if (response.status === 200) {
           expect(response.data).toHaveProperty('total');
           expect(response.data).toHaveProperty('byDepartment');
           expect(response.data).toHaveProperty('byRole');
           expect(response.data).toHaveProperty('activeCount');
         }
-      } catch (error) {
+      } catch {
         console.warn('Staff statistics test skipped');
       }
     });
@@ -199,17 +221,17 @@ describe('Staff Module API Integration Tests', () => {
     test('Can fetch department summary', async () => {
       try {
         const response = await api.get('/stats/departments');
-        
+
         if (response.status === 200) {
           expect(Array.isArray(response.data)).toBe(true);
-          
+
           if (response.data.length > 0) {
             const dept = response.data[0];
             expect(dept).toHaveProperty('department');
             expect(dept).toHaveProperty('count');
           }
         }
-      } catch (error) {
+      } catch {
         console.warn('Department summary test skipped');
       }
     });
@@ -219,12 +241,12 @@ describe('Staff Module API Integration Tests', () => {
     test('Can check staff availability', async () => {
       try {
         const response = await api.get('/1/availability');
-        
+
         if (response.status === 200) {
           expect(response.data).toHaveProperty('available');
           expect(response.data).toHaveProperty('currentProjects');
         }
-      } catch (error) {
+      } catch {
         console.warn('Staff availability test skipped');
       }
     });
@@ -236,9 +258,9 @@ describe('Staff Module API Integration Tests', () => {
         const start = Date.now();
         await api.get('/');
         const duration = Date.now() - start;
-        
+
         expect(duration).toBeLessThan(1000);
-      } catch (error) {
+      } catch {
         console.warn('Performance test skipped');
       }
     });
@@ -248,9 +270,9 @@ describe('Staff Module API Integration Tests', () => {
         const start = Date.now();
         await api.get('/?search=test&department=Engineering');
         const duration = Date.now() - start;
-        
+
         expect(duration).toBeLessThan(1500);
-      } catch (error) {
+      } catch {
         console.warn('Search performance test skipped');
       }
     });
