@@ -25,13 +25,13 @@ export async function parseCSVFile(file: File): Promise<ClientImportRow[]> {
         
         for (let i = 1; i < lines.length; i++) {
           const values = lines[i]!.split(',').map(v => v.trim());
-          const row: any = {};
-          
+          const row: Record<string, string> = {};
+
           headers.forEach((header, index) => {
             row[header] = values[index] || '';
           });
-          
-          rows.push(row as ClientImportRow);
+
+          rows.push(row as unknown as ClientImportRow);
         }
         
         resolve(rows);
@@ -78,10 +78,10 @@ export async function parseExcelFile(file: File): Promise<ClientImportRow[]> {
 /**
  * Parse service types from comma-separated string
  */
-export function parseServiceTypes(servicesString: string | undefined, ServiceType: any): any[] {
+export function parseServiceTypes<T>(servicesString: string | undefined, ServiceType: Record<string, T>): T[] {
   if (!servicesString) return [];
-  
-  const services: any[] = [];
+
+  const services: T[] = [];
   const servicesList = servicesString.split(',').map(s => s.trim());
   
   for (const service of servicesList) {
@@ -114,7 +114,7 @@ export function parseNumber(value: string | number | undefined, defaultValue: nu
 /**
  * Helper to parse enum values
  */
-export function parseEnumValue<T>(value: string | undefined, enumType: any, defaultValue: T): T {
+export function parseEnumValue<T>(value: string | undefined, enumType: Record<string, T>, defaultValue: T): T {
   if (!value) return defaultValue;
   
   const upperValue = value.toUpperCase().replace(/\s+/g, '_');

@@ -66,7 +66,7 @@ export class NeonSupplierService {
         WHERE 1=1
       `;
 
-      const params: any[] = [];
+      const params: (string | boolean | number)[] = [];
       let paramCount = 0;
 
       if (filter?.status) {
@@ -208,7 +208,7 @@ export class NeonSupplierService {
   static async update(id: string, data: Partial<SupplierFormData>, userId: string): Promise<void> {
     try {
       const updateFields: string[] = [];
-      const params: any[] = [];
+      const params: unknown[] = [];
       let paramCount = 0;
 
       // Support both camelCase and snake_case field names
@@ -655,7 +655,7 @@ export class NeonSupplierService {
   /**
    * Map database results to Supplier type
    */
-  private static mapSupplier(row: any): Supplier {
+  private static mapSupplier(row: any): Supplier { // eslint-disable-line @typescript-eslint/no-explicit-any
     return {
       id: row.id.toString(),
       code: row.code,
@@ -714,7 +714,7 @@ export class NeonSupplierService {
     };
   }
 
-  private static mapSuppliers(rows: any[]): Supplier[] {
+  private static mapSuppliers(rows: any[]): Supplier[] { // eslint-disable-line @typescript-eslint/no-explicit-any
     return rows.map(row => this.mapSupplier(row));
   }
 }

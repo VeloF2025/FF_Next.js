@@ -27,7 +27,7 @@ const qfieldPool = new Pool({
 });
 
 // Generic API request helper
-export async function qfieldApiRequest(endpoint: string, method = 'GET', data: any = null): Promise<any> {
+export async function qfieldApiRequest(endpoint: string, method = 'GET', data: unknown = null): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const url = new URL(endpoint, QFIELD_API_URL);
     const options: https.RequestOptions = {
@@ -181,7 +181,7 @@ export async function getQFieldPoles(projectId?: string) {
       WHERE l.name IN ('poles', 'Poles', 'POLES')
     `;
 
-    const params: any[] = [];
+    const params: string[] = [];
     if (projectId) {
       query += ' AND l.project_id = $1';
       params.push(projectId);
@@ -230,7 +230,7 @@ export async function getQFieldDrops(projectId?: string) {
       WHERE l.name IN ('drops', 'Drops', 'DROPS', 'service_drops', 'Service Drops')
     `;
 
-    const params: any[] = [];
+    const params: string[] = [];
     if (projectId) {
       query += ' AND l.project_id = $1';
       params.push(projectId);
@@ -286,7 +286,7 @@ export async function getQFieldCables(projectId?: string) {
       WHERE l.name IN ('fiber_cables', 'Fiber Cables', 'FIBER_CABLES', 'fibre_segments', 'Fibre Segments')
     `;
 
-    const params: any[] = [];
+    const params: string[] = [];
     if (projectId) {
       query += ' AND l.project_id = $1';
       params.push(projectId);
