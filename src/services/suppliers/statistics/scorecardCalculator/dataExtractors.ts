@@ -4,15 +4,27 @@
  */
 
 import { Supplier } from '@/types/supplier/base.types';
-import { 
-  SupplierRatings, 
-  SupplierPerformance, 
+import {
+  SupplierRatings,
+  SupplierPerformance,
   SupplierCompliance,
   COMPLIANCE_STATUS_THRESHOLDS,
   isValidPerformance,
   isValidCompliance
 } from '../scorecardTypes';
 import { ValidationUtils } from './validationUtils';
+
+/** Extended rating shape that may include a breakdown object */
+interface RatingWithBreakdown {
+  overall?: number;
+  breakdown?: {
+    quality?: number;
+    delivery?: number;
+    communication?: number;
+    pricing?: number;
+    reliability?: number;
+  };
+}
 
 export class DataExtractors {
   /**
@@ -22,7 +34,7 @@ export class DataExtractors {
     const rating = supplier.rating;
     
     if (rating && typeof rating === 'object' && 'breakdown' in rating) {
-      const breakdown = (rating as any).breakdown || {};
+      const breakdown = (rating as RatingWithBreakdown).breakdown ?? {};
       return {
         quality: ValidationUtils.validateRatingValue(breakdown.quality),
         delivery: ValidationUtils.validateRatingValue(breakdown.delivery),
@@ -47,9 +59,9 @@ export class DataExtractors {
    * Extract performance metrics with validation
    */
   static extractPerformance(supplier: Supplier): SupplierPerformance {
-    const performance = supplier.performance as any;
-    
-    if (!isValidPerformance(performance)) {
+    const raw = supplier.performance;
+
+    if (!isValidPerformance(raw)) {
       return {
         onTimeDelivery: 0,
         qualityScore: 0,
@@ -57,7 +69,9 @@ export class DataExtractors {
         issueResolution: 0
       };
     }
-    
+
+    // Cast to the scorecard SupplierPerformance shape (validated above)
+    const performance = raw as unknown as SupplierPerformance;
     return {
       onTimeDelivery: ValidationUtils.validatePercentageValue(performance.onTimeDelivery),
       qualityScore: ValidationUtils.validatePercentageValue(performance.qualityScore),
@@ -121,12 +135,14 @@ export class DataExtractors {
    * Extract performance score from supplier data
    */
   static extractPerformanceScore(supplier: Supplier): number {
-    const performance = supplier.performance as any;
-    
-    if (!isValidPerformance(performance)) {
+    const raw = supplier.performance;
+
+    if (!isValidPerformance(raw)) {
       return 0;
     }
-    
+
+    // Cast to scorecard shape; isValidPerformance guards 'overallScore' presence
+    const performance = raw as unknown as { overallScore: number };
     return ValidationUtils.validatePercentageValue(performance.overallScore);
   }
 

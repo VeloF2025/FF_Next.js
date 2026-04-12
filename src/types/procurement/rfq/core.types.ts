@@ -31,7 +31,7 @@ export interface RFQ {
   currency: string; // Default 'ZAR'
   
   // Evaluation Criteria
-  evaluationCriteria?: Record<string, any>; // Weighted criteria object
+  evaluationCriteria?: Record<string, unknown>; // Weighted criteria object
   technicalRequirements?: string;
   
   // Supplier Management
@@ -74,9 +74,9 @@ export interface RFQItem {
   budgetPrice?: number;
   
   // Technical Requirements
-  specifications?: Record<string, any>;
+  specifications?: Record<string, unknown>;
   technicalRequirements?: string;
-  acceptableAlternatives?: any[];
+  acceptableAlternatives?: string[];
   
   // Evaluation
   evaluationWeight: number; // Default 1.0

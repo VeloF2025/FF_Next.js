@@ -6,6 +6,31 @@
 import { Supplier } from '@/types/supplier/base.types';
 import type { ScorecardMetrics } from './scorecard-types';
 
+/**
+ * Extended performance shape used by scorecard (subset of fields queried from supplier data).
+ * Supplier.performance is typed as SupplierPerformance but may carry additional runtime fields.
+ */
+interface PerformanceExtended {
+  overallScore?: number;
+  qualityScore?: number;
+  onTimeDelivery?: number;
+  responseTime?: number;
+  issueResolution?: number;
+}
+
+/** Extended rating shape that may include a breakdown object */
+interface RatingWithBreakdown {
+  overall?: number;
+  totalReviews?: number;
+  breakdown?: {
+    quality?: number;
+    delivery?: number;
+    communication?: number;
+    pricing?: number;
+    reliability?: number;
+  };
+}
+
 export class ScorecardScoreCalculator {
   /**
    * Calculate overall supplier score
@@ -22,7 +47,7 @@ export class ScorecardScoreCalculator {
     }
 
     // Performance score (25% weight)
-    const performanceScore = (supplier.performance as any)?.overallScore || 0;
+    const performanceScore = (supplier.performance as PerformanceExtended | undefined)?.overallScore ?? 0;
     if (performanceScore > 0) {
       totalScore += (performanceScore / 100) * 25;
       weightedSum += 25;
@@ -88,7 +113,7 @@ export class ScorecardScoreCalculator {
     const rating = supplier.rating;
     
     if (rating && typeof rating === 'object' && 'breakdown' in rating) {
-      const breakdown = (rating as any).breakdown || {};
+      const breakdown = (rating as RatingWithBreakdown).breakdown ?? {};
       return {
         quality: breakdown.quality || 0,
         delivery: breakdown.delivery || 0,
@@ -118,13 +143,13 @@ export class ScorecardScoreCalculator {
     responseTime: number;
     issueResolution: number;
   } {
-    const performance = supplier.performance as any;
-    
+    const performance = supplier.performance as PerformanceExtended | undefined;
+
     return {
-      onTimeDelivery: performance?.onTimeDelivery || 0,
-      qualityScore: performance?.qualityScore || 0,
-      responseTime: performance?.responseTime || 0,
-      issueResolution: performance?.issueResolution || 0
+      onTimeDelivery: performance?.onTimeDelivery ?? 0,
+      qualityScore: performance?.qualityScore ?? 0,
+      responseTime: performance?.responseTime ?? 0,
+      issueResolution: performance?.issueResolution ?? 0
     };
   }
 

@@ -16,6 +16,18 @@ import type { NewProjectAnalytics } from '@/lib/neon/schema';
 // @ts-ignore — drizzle-orm not in project dependencies
 import { eq } from 'drizzle-orm';
 import { FirebaseProjectData, SyncResult } from './types';
+
+/** Minimal shape of a Firestore QueryDocumentSnapshot (firebase not in deps) */
+interface FirestoreDoc {
+  id: string;
+  data(): Omit<FirebaseProjectData, 'id'>;
+}
+
+/** Minimal shape of a Firestore Analytics record from neonDb select */
+interface ProjectAnalyticsRecord {
+  lastSyncedAt?: Date | null;
+  updatedAt?: Date | null;
+}
 import { SyncUtils } from './syncUtils';
 import { log } from '@/lib/logger';
 
@@ -34,9 +46,9 @@ export class ProjectSync {
 
     try {
       const snapshot = await getDocs(collection(db, 'projects'));
-      const projects = snapshot.docs.map((doc: any) => ({
-        id: doc.id, 
-        ...doc.data() 
+      const projects = (snapshot.docs as FirestoreDoc[]).map((doc) => ({
+        id: doc.id,
+        ...doc.data()
       })) as FirebaseProjectData[];
 
       for (const project of projects) {
@@ -164,9 +176,9 @@ export class ProjectSync {
     try {
       const q = query(collection(db, 'projects'), where('clientId', '==', clientId));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map((doc: any) => ({
-        id: doc.id, 
-        ...doc.data() 
+      return (snapshot.docs as FirestoreDoc[]).map((doc) => ({
+        id: doc.id,
+        ...doc.data()
       })) as FirebaseProjectData[];
     } catch (error) {
       log.error('Failed to get client projects:', { data: error }, 'projectSync');
@@ -280,8 +292,8 @@ export class ProjectSync {
       const totalProjects = records.length;
       
       const lastSyncTime = records.length > 0
-        ? records.reduce((latest: Date | null, record: any) => {
-            const syncTime = record.lastSyncedAt || record.updatedAt;
+        ? (records as ProjectAnalyticsRecord[]).reduce((latest: Date | null, record) => {
+            const syncTime = record.lastSyncedAt ?? record.updatedAt ?? null;
             return syncTime && (!latest || syncTime > latest) ? syncTime : latest;
           }, null as Date | null)
         : null;

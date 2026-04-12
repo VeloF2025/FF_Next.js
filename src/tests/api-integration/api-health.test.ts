@@ -58,7 +58,7 @@ describe('API Health & Integration Tests', () => {
           if (response.data.status) {
             expect(['ok', 'healthy', 'success']).toContain(response.data.status);
           }
-        } catch (error: any) {
+        } catch {
           // API might not be running in test environment
           console.warn(`Skipping ${endpoint} - API not reachable`);
         }
@@ -70,9 +70,10 @@ describe('API Health & Integration Tests', () => {
     test('404 errors return proper format', async () => {
       try {
         await api.get('/non-existent-endpoint');
-      } catch (error: any) {
-        expect(error.response.status).toBe(404);
-        expect(error.response.data).toBeDefined();
+      } catch (error: unknown) {
+        const axiosError = error as { response?: { status: number; data: unknown } };
+        expect(axiosError.response?.status).toBe(404);
+        expect(axiosError.response?.data).toBeDefined();
       }
     });
 
@@ -81,8 +82,9 @@ describe('API Health & Integration Tests', () => {
         await api.post('/sow/create', 'invalid json', {
           headers: { 'Content-Type': 'application/json' }
         });
-      } catch (error: any) {
-        expect([400, 422]).toContain(error.response.status);
+      } catch (error: unknown) {
+        const axiosError = error as { response?: { status: number } };
+        expect([400, 422]).toContain(axiosError.response?.status);
       }
     });
   });
