@@ -4,7 +4,13 @@
  */
 
 import { Supplier } from '@/types/supplier/base.types';
+import { ProductCategory } from '@/types/supplier/common.types';
 import { TrendData, BenchmarkData } from './types';
+
+interface HistoricalDataPoint {
+  date: Date | string;
+  score: number;
+}
 import { ScoreCalculator } from './scoreCalculator';
 import { SupplierUtils } from './utils';
 import { log } from '@/lib/logger';
@@ -33,7 +39,7 @@ export class BenchmarkCalculator {
    */
   static async calculateHistoricalTrends(
     supplier: Supplier,
-    historicalData: any[] // TODO: Define proper historical data type
+    historicalData: HistoricalDataPoint[]
   ): Promise<TrendData> {
     if (!historicalData || historicalData.length === 0) {
       return this.calculateTrends(supplier);
@@ -135,8 +141,8 @@ export class BenchmarkCalculator {
       const supplierCrudService = await import('../../supplier.crud');
       const allSuppliers = await supplierCrudService.SupplierCrudService.getAll();
       
-      const categorySuppliers = allSuppliers.filter(s => 
-        s.categories?.includes(category as any)
+      const categorySuppliers = allSuppliers.filter(s =>
+        s.categories?.includes(category as ProductCategory)
       );
 
       if (categorySuppliers.length === 0) {
@@ -262,7 +268,7 @@ export class BenchmarkCalculator {
   /**
    * Helper method to calculate average score from historical data
    */
-  private static calculateAverageScore(data: any[]): number {
+  private static calculateAverageScore(data: HistoricalDataPoint[]): number {
     if (!data || data.length === 0) return 0;
     
     const sum = data.reduce((acc, item) => acc + (item.score || 0), 0);

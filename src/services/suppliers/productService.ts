@@ -23,7 +23,7 @@
  */
 
 import { ProductService } from '../products/productService';
-import { ProductAvailability, ProductCategory, PriceListItem } from '../products/types';
+import { ProductAvailability, ProductCategory, PriceListItem, Product, ProductFormData, ProductCallback } from '../products/types';
 
 // Create a service instance
 const service = new ProductService();
@@ -55,14 +55,14 @@ export const productService = {
   /**
    * @deprecated Use ProductCrudService.createProduct() instead
    */
-  async createProduct(data: any) {
+  async createProduct(data: ProductFormData) {
     return service.createProduct(data);
   },
 
   /**
    * @deprecated Use ProductCrudService.updateProduct() instead
    */
-  async updateProduct(id: string, data: any) {
+  async updateProduct(id: string, data: Partial<ProductFormData>) {
     return service.updateProduct(id, data);
   },
 
@@ -156,7 +156,7 @@ export const productService = {
   /**
    * @deprecated Use ProductSubscriptionService.subscribeToProducts() instead
    */
-  subscribeToProducts(supplierId: string, callback: (products: any[]) => void) {
+  subscribeToProducts(supplierId: string, callback: ProductCallback) {
     return service.subscribeToProducts(supplierId, callback);
   }
 };

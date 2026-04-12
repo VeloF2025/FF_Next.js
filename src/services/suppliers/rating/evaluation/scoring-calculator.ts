@@ -58,8 +58,7 @@ export class ScoringCalculator {
     }
 
     // Compliance recommendations
-    const performanceAny = performance as any;
-    if (performanceAny.complianceScore && performanceAny.complianceScore < 95) {
+    if (performance.complianceScore && performance.complianceScore < 95) {
       recommendations.push('Strengthen compliance processes and documentation');
       recommendations.push('Conduct regular compliance audits and corrective action follow-ups');
     }
@@ -93,7 +92,6 @@ export class ScoringCalculator {
     _supplierId: string
   ): EvaluationActionItem[] {
     const actionItems: EvaluationActionItem[] = [];
-    const performanceAny = performance as any;
 
     // Delivery action items
     if (performance.deliveryScore < 80) {
@@ -185,9 +183,9 @@ export class ScoringCalculator {
     }
 
     // Compliance action items
-    if (performanceAny.complianceScore && performanceAny.complianceScore < 95) {
+    if (performance.complianceScore && performance.complianceScore < 95) {
       actionItems.push({
-        priority: performanceAny.complianceScore < 85 ? 'critical' : 'high',
+        priority: performance.complianceScore < 85 ? 'critical' : 'high',
         description: 'Schedule compliance audit and documentation review',
         dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 2 weeks
         category: 'compliance',
@@ -223,20 +221,19 @@ export class ScoringCalculator {
   ): number {
     let weightedScore = 0;
     let totalWeight = 0;
-    const performanceAny = performance as any;
 
     // Standard criteria
     weightedScore += performance.deliveryScore * criteria.deliveryWeight;
     weightedScore += performance.qualityScore * criteria.qualityWeight;
     weightedScore += performance.priceScore * criteria.priceWeight;
     weightedScore += performance.serviceScore * criteria.serviceWeight;
-    
-    totalWeight += criteria.deliveryWeight + criteria.qualityWeight + 
+
+    totalWeight += criteria.deliveryWeight + criteria.qualityWeight +
                    criteria.priceWeight + criteria.serviceWeight;
 
     // Optional criteria
-    if (criteria.complianceWeight && performanceAny.complianceScore) {
-      weightedScore += performanceAny.complianceScore * criteria.complianceWeight;
+    if (criteria.complianceWeight && performance.complianceScore) {
+      weightedScore += performance.complianceScore * criteria.complianceWeight;
       totalWeight += criteria.complianceWeight;
     }
 
