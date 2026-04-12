@@ -9,7 +9,7 @@
 export * from './handlers';
 
 // Import services for legacy function compatibility
-import { 
+import {
   ProcurementErrorFactory,
   ProcurementErrorProcessor,
   ProcurementErrorLogger,
@@ -19,6 +19,7 @@ import {
   ErrorLogContext,
   BatchErrorItem
 } from './handlers';
+import { ProcurementErrorCodes } from './error.constants';
 
 // Legacy function implementations using new modular services
 const errorProcessor = new ProcurementErrorProcessor();
@@ -31,9 +32,9 @@ const retryService = new ProcurementRetryService();
  * @deprecated Use ProcurementErrorFactory.createProcurementError() instead
  */
 export function createProcurementError(
-  code: any,
+  code: keyof typeof ProcurementErrorCodes,
   message?: string,
-  context?: Record<string, any>
+  context?: Record<string, unknown>
 ) {
   return ProcurementErrorFactory.createProcurementError(code, message, context);
 }
@@ -45,7 +46,7 @@ export function createProcurementError(
 export function createValidationError(
   field: string,
   message: string,
-  value?: any
+  value?: unknown
 ) {
   return ProcurementErrorFactory.createValidationError(field, message, value);
 }
@@ -57,7 +58,7 @@ export function createValidationError(
 export function createNotFoundError(
   resourceType: string,
   resourceId: string,
-  context?: Record<string, any>
+  context?: Record<string, unknown>
 ) {
   return ProcurementErrorFactory.createNotFoundError(resourceType, resourceId, context);
 }
@@ -104,7 +105,7 @@ export function aggregateErrors(errors: BatchErrorItem[]) {
  * Validate and sanitize error context
  * @deprecated Use ProcurementErrorLogger sanitization methods instead
  */
-export function sanitizeErrorContext(context: Record<string, any>): Record<string, any> {
+export function sanitizeErrorContext(context: Record<string, unknown>): Record<string, unknown> {
   // Simple implementation for backward compatibility
   const sensitiveKeys = ['password', 'token', 'apiKey', 'secret', 'credentials'];
   const sanitized = { ...context };
@@ -115,7 +116,7 @@ export function sanitizeErrorContext(context: Record<string, any>): Record<strin
     }
   });
 
-  return JSON.parse(JSON.stringify(sanitized, null, 0).substring(0, 1000));
+  return JSON.parse(JSON.stringify(sanitized, null, 0).substring(0, 1000)) as Record<string, unknown>;
 }
 
 /**
@@ -123,8 +124,8 @@ export function sanitizeErrorContext(context: Record<string, any>): Record<strin
  * @deprecated Use proper React error boundary component instead
  */
 export function createErrorBoundary(
-  fallbackComponent: any,
-  onError?: (error: Error, errorInfo: any) => void
+  fallbackComponent: React.ComponentType<unknown>,
+  onError?: (error: Error, errorInfo: React.ErrorInfo) => void
 ) {
   return {
     displayName: 'ProcurementErrorBoundary',

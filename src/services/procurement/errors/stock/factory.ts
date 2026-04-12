@@ -5,7 +5,7 @@
 
 import { InsufficientStockError, StockReservationError } from './inventory';
 import { StockMovementError, StockTransferError, StockAdjustmentError, StockTrackingError } from './tracking';
-import type { 
+import type {
   MovementType,
   AdjustmentType,
   InsufficientStockOptions,
@@ -28,7 +28,7 @@ export class StockErrorFactory {
     requestedQuantity: number,
     availableQuantity: number,
     options?: InsufficientStockOptions,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ): InsufficientStockError {
     return new InsufficientStockError(itemCode, requestedQuantity, availableQuantity, options, context);
   }
@@ -42,7 +42,7 @@ export class StockErrorFactory {
     itemCode: string,
     quantity: number,
     options?: MovementOptions,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ): StockMovementError {
     return new StockMovementError(message, movementType, itemCode, quantity, options, context);
   }
@@ -55,7 +55,7 @@ export class StockErrorFactory {
     requestedQuantity: number,
     availableQuantity: number,
     existingReservations: ExistingReservation[],
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ): StockReservationError {
     return new StockReservationError(itemCode, requestedQuantity, availableQuantity, existingReservations, context);
   }
@@ -70,7 +70,7 @@ export class StockErrorFactory {
     quantity: number,
     reason: string,
     options?: TransferOptions,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ): StockTransferError {
     return new StockTransferError(itemCode, fromLocation, toLocation, quantity, reason, options, context);
   }
@@ -86,7 +86,7 @@ export class StockErrorFactory {
     currentQuantity: number,
     message: string,
     options?: AdjustmentOptions,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ): StockAdjustmentError {
     return new StockAdjustmentError(
       itemCode,
@@ -107,9 +107,9 @@ export class StockErrorFactory {
     message: string,
     itemCode: string,
     operationType: string,
-    details: Record<string, any> = {},
+    details: Record<string, unknown> = {},
     options?: TrackingOptions,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ): StockTrackingError {
     return new StockTrackingError(message, itemCode, operationType, details, options, context);
   }
@@ -119,68 +119,68 @@ export class StockErrorFactory {
    */
   static createFromType(
     errorType: string,
-    parameters: Record<string, any>
+    parameters: Record<string, unknown>
   ): InsufficientStockError | StockMovementError | StockReservationError | StockTransferError | StockAdjustmentError | StockTrackingError {
     switch (errorType) {
       case 'InsufficientStockError':
         return this.createInsufficientStockError(
-          parameters.itemCode,
-          parameters.requestedQuantity,
-          parameters.availableQuantity,
-          parameters.options,
-          parameters.context
+          parameters.itemCode as string,
+          parameters.requestedQuantity as number,
+          parameters.availableQuantity as number,
+          parameters.options as InsufficientStockOptions | undefined,
+          parameters.context as Record<string, unknown> | undefined
         );
 
       case 'StockMovementError':
         return this.createMovementError(
-          parameters.message,
-          parameters.movementType,
-          parameters.itemCode,
-          parameters.quantity,
-          parameters.options,
-          parameters.context
+          parameters.message as string,
+          parameters.movementType as MovementType,
+          parameters.itemCode as string,
+          parameters.quantity as number,
+          parameters.options as MovementOptions | undefined,
+          parameters.context as Record<string, unknown> | undefined
         );
 
       case 'StockReservationError':
         return this.createReservationError(
-          parameters.itemCode,
-          parameters.requestedQuantity,
-          parameters.availableQuantity,
-          parameters.existingReservations,
-          parameters.context
+          parameters.itemCode as string,
+          parameters.requestedQuantity as number,
+          parameters.availableQuantity as number,
+          parameters.existingReservations as ExistingReservation[],
+          parameters.context as Record<string, unknown> | undefined
         );
 
       case 'StockTransferError':
         return this.createTransferError(
-          parameters.itemCode,
-          parameters.fromLocation,
-          parameters.toLocation,
-          parameters.quantity,
-          parameters.reason,
-          parameters.options,
-          parameters.context
+          parameters.itemCode as string,
+          parameters.fromLocation as string,
+          parameters.toLocation as string,
+          parameters.quantity as number,
+          parameters.reason as string,
+          parameters.options as TransferOptions | undefined,
+          parameters.context as Record<string, unknown> | undefined
         );
 
       case 'StockAdjustmentError':
         return this.createAdjustmentError(
-          parameters.itemCode,
-          parameters.location,
-          parameters.adjustmentType,
-          parameters.adjustmentQuantity,
-          parameters.currentQuantity,
-          parameters.message,
-          parameters.options,
-          parameters.context
+          parameters.itemCode as string,
+          parameters.location as string,
+          parameters.adjustmentType as AdjustmentType,
+          parameters.adjustmentQuantity as number,
+          parameters.currentQuantity as number,
+          parameters.message as string,
+          parameters.options as AdjustmentOptions | undefined,
+          parameters.context as Record<string, unknown> | undefined
         );
 
       case 'StockTrackingError':
         return this.createTrackingError(
-          parameters.message,
-          parameters.itemCode,
-          parameters.operationType,
-          parameters.details || {},
-          parameters.options,
-          parameters.context
+          parameters.message as string,
+          parameters.itemCode as string,
+          parameters.operationType as string,
+          (parameters.details as Record<string, unknown>) || {},
+          parameters.options as TrackingOptions | undefined,
+          parameters.context as Record<string, unknown> | undefined
         );
 
       default:
@@ -191,7 +191,7 @@ export class StockErrorFactory {
   /**
    * Validate error creation parameters
    */
-  static validateParameters(errorType: string, parameters: Record<string, any>): boolean {
+  static validateParameters(errorType: string, parameters: Record<string, unknown>): boolean {
     const requiredFields = {
       InsufficientStockError: ['itemCode', 'requestedQuantity', 'availableQuantity'],
       StockMovementError: ['message', 'movementType', 'itemCode', 'quantity'],
@@ -214,7 +214,7 @@ export class StockErrorFactory {
    */
   static createValidated(
     errorType: string,
-    parameters: Record<string, any>
+    parameters: Record<string, unknown>
   ): InsufficientStockError | StockMovementError | StockReservationError | StockTransferError | StockAdjustmentError | StockTrackingError {
     if (!this.validateParameters(errorType, parameters)) {
       throw new Error(`Invalid parameters for error type: ${errorType}`);
