@@ -10,7 +10,10 @@ import { useRef, useEffect, useCallback } from 'react';
  * Creates a callback that never changes reference
  * but always has access to latest values
  */
-export function useStableCallback<T extends (...args: any[]) => any>(
+// `any` in the generic constraint is intentional — it's the TypeScript-idiomatic
+// way to express "a callable of any signature" for higher-order function wrappers.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function useStableCallback<T extends (...args: any[]) => unknown>(
   callback: T
 ): T {
   const callbackRef = useRef(callback);
@@ -19,7 +22,7 @@ export function useStableCallback<T extends (...args: any[]) => any>(
     callbackRef.current = callback;
   }, [callback]);
 
-  return useCallback(((...args) => {
+  return useCallback(((...args: Parameters<T>) => {
     return callbackRef.current(...args);
   }) as T, []);
 }
@@ -28,14 +31,15 @@ export function useStableCallback<T extends (...args: any[]) => any>(
  * Debounced callback
  * Delays execution until after wait milliseconds have elapsed
  */
-export function useDebouncedCallback<T extends (...args: any[]) => any>(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function useDebouncedCallback<T extends (...args: any[]) => unknown>(
   callback: T,
   delay: number
 ): T {
   const timeoutRef = useRef<NodeJS.Timeout>();
 
   return useCallback(
-    ((...args: any[]) => {
+    ((...args: Parameters<T>) => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
@@ -52,14 +56,15 @@ export function useDebouncedCallback<T extends (...args: any[]) => any>(
  * Throttled callback
  * Limits execution to at most once per wait milliseconds
  */
-export function useThrottledCallback<T extends (...args: any[]) => any>(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function useThrottledCallback<T extends (...args: any[]) => unknown>(
   callback: T,
   delay: number
 ): T {
   const lastRun = useRef(Date.now());
 
   return useCallback(
-    ((...args: any[]) => {
+    ((...args: Parameters<T>) => {
       const now = Date.now();
 
       if (now - lastRun.current >= delay) {

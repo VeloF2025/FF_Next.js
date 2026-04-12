@@ -32,7 +32,7 @@ export function cloneDeep<T>(value: T): T {
     const cloned = {} as T;
     for (const key in value) {
       if (value.hasOwnProperty(key)) {
-        (cloned as any)[key] = cloneDeep((value as any)[key]);
+        (cloned as Record<string, unknown>)[key] = cloneDeep((value as Record<string, unknown>)[key]);
       }
     }
     return cloned;
@@ -46,7 +46,7 @@ export function cloneDeep<T>(value: T): T {
  * IsEqual function with performance optimization
  * Replaces lodash.isEqual with better performance
  */
-export function isEqual(a: any, b: any): boolean {
+export function isEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
 
   if (a == null || b == null) return a === b;
@@ -55,24 +55,28 @@ export function isEqual(a: any, b: any): boolean {
 
   if (typeof a !== 'object') return a === b;
 
+  const aArr = a as unknown[];
+  const bArr = b as unknown[];
   if (Array.isArray(a) !== Array.isArray(b)) return false;
 
   if (Array.isArray(a)) {
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) {
-      if (!isEqual(a[i], b[i])) return false;
+    if (aArr.length !== bArr.length) return false;
+    for (let i = 0; i < aArr.length; i++) {
+      if (!isEqual(aArr[i], bArr[i])) return false;
     }
     return true;
   }
 
-  const keysA = Object.keys(a);
-  const keysB = Object.keys(b);
+  const aObj = a as Record<string, unknown>;
+  const bObj = b as Record<string, unknown>;
+  const keysA = Object.keys(aObj);
+  const keysB = Object.keys(bObj);
 
   if (keysA.length !== keysB.length) return false;
 
   for (const key of keysA) {
     if (!keysB.includes(key)) return false;
-    if (!isEqual(a[key], b[key])) return false;
+    if (!isEqual(aObj[key], bObj[key])) return false;
   }
 
   return true;
@@ -82,7 +86,7 @@ export function isEqual(a: any, b: any): boolean {
  * Pick function with performance optimization
  * Replaces lodash.pick with better performance and type safety
  */
-export function pick<T extends Record<string, any>, K extends keyof T>(
+export function pick<T extends Record<string, unknown>, K extends keyof T>(
   object: T,
   keys: K[]
 ): Pick<T, K> {
@@ -99,22 +103,22 @@ export function pick<T extends Record<string, any>, K extends keyof T>(
  * Omit function with performance optimization
  * Replaces lodash.omit with better performance and type safety
  */
-export function omit<T extends Record<string, any>, K extends keyof T>(
+export function omit<T extends Record<string, unknown>, K extends keyof T>(
   object: T,
   keys: K[]
 ): Omit<T, K> {
-  const result = { ...object } as any;
+  const result = { ...object } as Record<string, unknown>;
   for (const key of keys) {
-    delete result[key];
+    delete result[key as string];
   }
-  return result;
+  return result as Omit<T, K>;
 }
 
 /**
  * Merge function with performance optimization
  * Replaces lodash.merge with better performance
  */
-export function merge<T extends Record<string, any>>(...sources: Partial<T>[]): T {
+export function merge<T extends Record<string, unknown>>(...sources: Partial<T>[]): T {
   const result = {} as T;
 
   for (const source of sources) {
@@ -133,9 +137,9 @@ export function merge<T extends Record<string, any>>(...sources: Partial<T>[]): 
           !Array.isArray(sourceValue) &&
           !Array.isArray(currentValue)
         ) {
-          result[key] = merge(currentValue, sourceValue);
+          result[key] = merge(currentValue, sourceValue) as T[Extract<keyof T, string>];
         } else {
-          result[key] = sourceValue as any;
+          result[key] = sourceValue as T[Extract<keyof T, string>];
         }
       }
     }

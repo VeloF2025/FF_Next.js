@@ -49,8 +49,8 @@ export interface QContactSyncLog {
   sync_type: SyncType;
 
   // Payload data (JSONB)
-  request_payload: Record<string, any> | null;
-  response_payload: Record<string, any> | null;
+  request_payload: Record<string, unknown> | null;
+  response_payload: Record<string, unknown> | null;
 
   // Result tracking
   status: SyncStatus;
@@ -68,8 +68,8 @@ export interface CreateSyncLogPayload {
   qcontact_ticket_id?: string;
   sync_direction: SyncDirection;
   sync_type: SyncType;
-  request_payload?: Record<string, any>;
-  response_payload?: Record<string, any>;
+  request_payload?: Record<string, unknown>;
+  response_payload?: Record<string, unknown>;
   status: SyncStatus;
   error_message?: string;
 }
@@ -93,7 +93,7 @@ export interface QContactTicket {
   assigned_to: string | null;
   category: string | null;
   subcategory: string | null;
-  custom_fields: Record<string, any> | null;
+  custom_fields: Record<string, unknown> | null;
 }
 
 /**
@@ -113,7 +113,7 @@ export interface QContactAPIConfig {
 export interface QContactFieldMapping {
   fibreflow_field: string;
   qcontact_field: string;
-  transform?: (value: any) => any;
+  transform?: (value: unknown) => unknown;
   bidirectional: boolean;
 }
 
@@ -124,7 +124,7 @@ export interface SyncOperationRequest {
   ticket_id?: string;
   qcontact_ticket_id?: string;
   sync_type: SyncType;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
 }
 
 /**
