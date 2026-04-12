@@ -17,7 +17,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { VerificationChecklist } from '../../components/Verification/VerificationChecklist';
-import { VerificationStep } from '../../types/verification';
+import { VerificationStep, VerificationStepNumber } from '../../types/verification';
 import * as useVerificationHook from '../../hooks/useVerification';
 
 // Mock the useVerification hook
@@ -39,7 +39,7 @@ const createMockSteps = (completedCount: number): VerificationStep[] => {
   return Array.from({ length: 12 }, (_, index) => ({
     id: `step-${index + 1}`,
     ticket_id: 'test-ticket-id',
-    step_number: (index + 1) as any,
+    step_number: (index + 1) as VerificationStepNumber,
     step_name: `Step ${index + 1}`,
     step_description: `Description for step ${index + 1}`,
     is_complete: index < completedCount,
@@ -88,12 +88,12 @@ describe('VerificationChecklist Component', () => {
     vi.clearAllMocks();
 
     // Default mock for useUpdateVerificationStep
-    (useVerificationHook.useUpdateVerificationStep as any) = vi.fn(() => ({
+    vi.mocked(useVerificationHook.useUpdateVerificationStep).mockReturnValue({
       mutate: mockMutate,
       isPending: false,
       isError: false,
       error: null,
-    }));
+    });
   });
 
   describe('Initial Rendering', () => {
@@ -102,13 +102,13 @@ describe('VerificationChecklist Component', () => {
       const mockSteps = createMockSteps(0);
       const mockProgress = createMockProgress(0);
 
-      (useVerificationHook.useVerification as any) = vi.fn(() => ({
+      vi.mocked(useVerificationHook.useVerification).mockReturnValue({
         steps: mockSteps,
         progress: mockProgress,
         isLoading: false,
         isError: false,
         error: null,
-      }));
+      });
 
       // Act
       renderWithQueryClient(<VerificationChecklist ticketId="test-ticket-id" />);
@@ -123,13 +123,13 @@ describe('VerificationChecklist Component', () => {
       const mockSteps = createMockSteps(0);
       const mockProgress = createMockProgress(0);
 
-      (useVerificationHook.useVerification as any) = vi.fn(() => ({
+      vi.mocked(useVerificationHook.useVerification).mockReturnValue({
         steps: mockSteps,
         progress: mockProgress,
         isLoading: false,
         isError: false,
         error: null,
-      }));
+      });
 
       // Act
       renderWithQueryClient(<VerificationChecklist ticketId="test-ticket-id" />);
@@ -144,13 +144,13 @@ describe('VerificationChecklist Component', () => {
       const mockSteps = createMockSteps(7);
       const mockProgress = createMockProgress(7);
 
-      (useVerificationHook.useVerification as any) = vi.fn(() => ({
+      vi.mocked(useVerificationHook.useVerification).mockReturnValue({
         steps: mockSteps,
         progress: mockProgress,
         isLoading: false,
         isError: false,
         error: null,
-      }));
+      });
 
       // Act
       renderWithQueryClient(<VerificationChecklist ticketId="test-ticket-id" />);
@@ -162,13 +162,13 @@ describe('VerificationChecklist Component', () => {
 
     it('should show loading state', () => {
       // Arrange
-      (useVerificationHook.useVerification as any) = vi.fn(() => ({
+      vi.mocked(useVerificationHook.useVerification).mockReturnValue({
         steps: undefined,
         progress: undefined,
         isLoading: true,
         isError: false,
         error: null,
-      }));
+      });
 
       // Act
       renderWithQueryClient(<VerificationChecklist ticketId="test-ticket-id" />);
@@ -179,13 +179,13 @@ describe('VerificationChecklist Component', () => {
 
     it('should show error state', () => {
       // Arrange
-      (useVerificationHook.useVerification as any) = vi.fn(() => ({
+      vi.mocked(useVerificationHook.useVerification).mockReturnValue({
         steps: undefined,
         progress: undefined,
         isLoading: false,
         isError: true,
         error: new Error('Failed to load verification steps'),
-      }));
+      });
 
       // Act
       renderWithQueryClient(<VerificationChecklist ticketId="test-ticket-id" />);
@@ -201,13 +201,13 @@ describe('VerificationChecklist Component', () => {
       const mockSteps = createMockSteps(0);
       const mockProgress = createMockProgress(0);
 
-      (useVerificationHook.useVerification as any) = vi.fn(() => ({
+      vi.mocked(useVerificationHook.useVerification).mockReturnValue({
         steps: mockSteps,
         progress: mockProgress,
         isLoading: false,
         isError: false,
         error: null,
-      }));
+      });
 
       // Act
       renderWithQueryClient(<VerificationChecklist ticketId="test-ticket-id" editable={true} />);
@@ -233,13 +233,13 @@ describe('VerificationChecklist Component', () => {
       const mockSteps = createMockSteps(3);
       const mockProgress = createMockProgress(3);
 
-      (useVerificationHook.useVerification as any) = vi.fn(() => ({
+      vi.mocked(useVerificationHook.useVerification).mockReturnValue({
         steps: mockSteps,
         progress: mockProgress,
         isLoading: false,
         isError: false,
         error: null,
-      }));
+      });
 
       // Act
       renderWithQueryClient(<VerificationChecklist ticketId="test-ticket-id" editable={true} />);
@@ -264,13 +264,13 @@ describe('VerificationChecklist Component', () => {
       const mockSteps = createMockSteps(0);
       const mockProgress = createMockProgress(0);
 
-      (useVerificationHook.useVerification as any) = vi.fn(() => ({
+      vi.mocked(useVerificationHook.useVerification).mockReturnValue({
         steps: mockSteps,
         progress: mockProgress,
         isLoading: false,
         isError: false,
         error: null,
-      }));
+      });
 
       // Act
       renderWithQueryClient(<VerificationChecklist ticketId="test-ticket-id" editable={false} />);
@@ -289,13 +289,13 @@ describe('VerificationChecklist Component', () => {
       const mockSteps = createMockSteps(0);
       const mockProgress = createMockProgress(0);
 
-      (useVerificationHook.useVerification as any) = vi.fn(() => ({
+      vi.mocked(useVerificationHook.useVerification).mockReturnValue({
         steps: mockSteps,
         progress: mockProgress,
         isLoading: false,
         isError: false,
         error: null,
-      }));
+      });
 
       // Act
       renderWithQueryClient(<VerificationChecklist ticketId="test-ticket-id" editable={true} />);
@@ -310,13 +310,13 @@ describe('VerificationChecklist Component', () => {
       const mockSteps = createMockSteps(0);
       const mockProgress = createMockProgress(0);
 
-      (useVerificationHook.useVerification as any) = vi.fn(() => ({
+      vi.mocked(useVerificationHook.useVerification).mockReturnValue({
         steps: mockSteps,
         progress: mockProgress,
         isLoading: false,
         isError: false,
         error: null,
-      }));
+      });
 
       // Act
       renderWithQueryClient(<VerificationChecklist ticketId="test-ticket-id" editable={true} />);
@@ -334,13 +334,13 @@ describe('VerificationChecklist Component', () => {
       const mockSteps = createMockSteps(3);
       const mockProgress = createMockProgress(3);
 
-      (useVerificationHook.useVerification as any) = vi.fn(() => ({
+      vi.mocked(useVerificationHook.useVerification).mockReturnValue({
         steps: mockSteps,
         progress: mockProgress,
         isLoading: false,
         isError: false,
         error: null,
-      }));
+      });
 
       // Act
       renderWithQueryClient(<VerificationChecklist ticketId="test-ticket-id" />);
@@ -355,13 +355,13 @@ describe('VerificationChecklist Component', () => {
       const mockSteps = createMockSteps(0);
       const mockProgress = createMockProgress(0);
 
-      (useVerificationHook.useVerification as any) = vi.fn(() => ({
+      vi.mocked(useVerificationHook.useVerification).mockReturnValue({
         steps: mockSteps,
         progress: mockProgress,
         isLoading: false,
         isError: false,
         error: null,
-      }));
+      });
 
       // Act
       renderWithQueryClient(<VerificationChecklist ticketId="test-ticket-id" editable={false} />);
@@ -381,13 +381,13 @@ describe('VerificationChecklist Component', () => {
       const mockSteps = createMockSteps(6);
       const mockProgress = createMockProgress(6);
 
-      (useVerificationHook.useVerification as any) = vi.fn(() => ({
+      vi.mocked(useVerificationHook.useVerification).mockReturnValue({
         steps: mockSteps,
         progress: mockProgress,
         isLoading: false,
         isError: false,
         error: null,
-      }));
+      });
 
       // Act
       renderWithQueryClient(<VerificationChecklist ticketId="test-ticket-id" />);
@@ -402,13 +402,13 @@ describe('VerificationChecklist Component', () => {
       const mockSteps = createMockSteps(12);
       const mockProgress = createMockProgress(12);
 
-      (useVerificationHook.useVerification as any) = vi.fn(() => ({
+      vi.mocked(useVerificationHook.useVerification).mockReturnValue({
         steps: mockSteps,
         progress: mockProgress,
         isLoading: false,
         isError: false,
         error: null,
-      }));
+      });
 
       // Act
       renderWithQueryClient(<VerificationChecklist ticketId="test-ticket-id" />);
@@ -425,13 +425,13 @@ describe('VerificationChecklist Component', () => {
       const mockSteps = createMockSteps(0);
       const mockProgress = createMockProgress(0);
 
-      (useVerificationHook.useVerification as any) = vi.fn(() => ({
+      vi.mocked(useVerificationHook.useVerification).mockReturnValue({
         steps: mockSteps,
         progress: mockProgress,
         isLoading: false,
         isError: false,
         error: null,
-      }));
+      });
 
       // Act
       renderWithQueryClient(<VerificationChecklist ticketId="test-ticket-id" groupByCategory={true} />);
@@ -451,13 +451,13 @@ describe('VerificationChecklist Component', () => {
       const mockSteps = createMockSteps(0);
       const mockProgress = createMockProgress(0);
 
-      (useVerificationHook.useVerification as any) = vi.fn(() => ({
+      vi.mocked(useVerificationHook.useVerification).mockReturnValue({
         steps: mockSteps,
         progress: mockProgress,
         isLoading: false,
         isError: false,
         error: null,
-      }));
+      });
 
       // Act
       renderWithQueryClient(<VerificationChecklist ticketId="test-ticket-id" groupByCategory={false} />);

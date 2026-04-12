@@ -56,6 +56,13 @@ export interface ReportParams {
   format?: 'json' | 'pdf' | 'excel';
 }
 
+/**
+ * Generic analytics response payload — the actual shape varies by endpoint.
+ * Using a structured unknown map rather than `any` satisfies strict typing
+ * while acknowledging the endpoint-specific variability.
+ */
+export type AnalyticsData = Record<string, unknown>;
+
 // API client class
 class AnalyticsApiClient {
   private async fetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
@@ -93,17 +100,17 @@ class AnalyticsApiClient {
     // Add timestamp to bypass cache
     params.append('t', Date.now().toString());
 
-    return this.fetch<any>(`/analytics/dashboard/stats?${params}`);
+    return this.fetch<AnalyticsData>(`/analytics/dashboard/stats?${params}`);
   }
 
   async getDashboardSummary(period: TimePeriod) {
     const params = new URLSearchParams({ period: period.type });
-    return this.fetch<any>(`/analytics/dashboard/summary?${params}`);
+    return this.fetch<AnalyticsData>(`/analytics/dashboard/summary?${params}`);
   }
 
   async getDashboardTrends(startDate: string, endDate: string, groupBy: string = 'month') {
     const params = new URLSearchParams({ startDate, endDate, groupBy });
-    return this.fetch<any>(`/analytics/dashboard/trends?${params}`);
+    return this.fetch<AnalyticsData>(`/analytics/dashboard/trends?${params}`);
   }
 
   // Project Analytics
@@ -111,7 +118,7 @@ class AnalyticsApiClient {
     const params = new URLSearchParams();
     if (projectId) params.append('projectId', projectId);
     
-    return this.fetch<any>(`/analytics/projects/summary?${params}`);
+    return this.fetch<AnalyticsData>(`/analytics/projects/summary?${params}`);
   }
 
   async getProjectPerformance(projectId: string, metrics: string[]) {
@@ -120,7 +127,7 @@ class AnalyticsApiClient {
       metrics: metrics.join(',')
     });
     
-    return this.fetch<any>(`/analytics/projects/performance?${params}`);
+    return this.fetch<AnalyticsData>(`/analytics/projects/performance?${params}`);
   }
 
   async getProjectTrends(projectId: string, period: TimePeriod) {
@@ -131,11 +138,11 @@ class AnalyticsApiClient {
       ...(period.endDate && { endDate: period.endDate })
     });
     
-    return this.fetch<any>(`/analytics/projects/trends?${params}`);
+    return this.fetch<AnalyticsData>(`/analytics/projects/trends?${params}`);
   }
 
   async compareProjects(projectIds: string[], metrics: string[]) {
-    return this.fetch<any>('/analytics/projects/comparison', {
+    return this.fetch<AnalyticsData>('/analytics/projects/comparison', {
       method: 'POST',
       body: JSON.stringify({ projectIds, metrics })
     });
@@ -146,11 +153,11 @@ class AnalyticsApiClient {
     const params = new URLSearchParams();
     if (category) params.append('category', category);
     
-    return this.fetch<any[]>(`/analytics/kpis?${params}`);
+    return this.fetch<AnalyticsData[]>(`/analytics/kpis?${params}`);
   }
 
   async calculateKPIs(kpiIds: string[], parameters: KPIParams) {
-    return this.fetch<any>('/analytics/kpis/calculate', {
+    return this.fetch<AnalyticsData>('/analytics/kpis/calculate', {
       method: 'POST',
       body: JSON.stringify({ kpiIds, parameters })
     });
@@ -172,7 +179,7 @@ class AnalyticsApiClient {
     const params = new URLSearchParams();
     if (filters) params.append('filters', JSON.stringify(filters));
     
-    return this.fetch<any>(`/analytics/staff/statistics?${params}`);
+    return this.fetch<AnalyticsData>(`/analytics/staff/statistics?${params}`);
   }
 
   async getStaffPerformance(staffId?: string, period?: TimePeriod) {
@@ -180,21 +187,21 @@ class AnalyticsApiClient {
     if (staffId) params.append('staffId', staffId);
     if (period) params.append('period', period.type);
     
-    return this.fetch<any>(`/analytics/staff/performance?${params}`);
+    return this.fetch<AnalyticsData>(`/analytics/staff/performance?${params}`);
   }
 
   async getStaffTrends(department?: string, months: number = 12) {
     const params = new URLSearchParams({ months: months.toString() });
     if (department) params.append('department', department);
     
-    return this.fetch<any>(`/analytics/staff/trends?${params}`);
+    return this.fetch<AnalyticsData>(`/analytics/staff/trends?${params}`);
   }
 
   async getTeamAnalytics(teamId?: string) {
     const params = new URLSearchParams();
     if (teamId) params.append('teamId', teamId);
     
-    return this.fetch<any>(`/analytics/staff/teams?${params}`);
+    return this.fetch<AnalyticsData>(`/analytics/staff/teams?${params}`);
   }
 
   async getUtilizationRates(period: TimePeriod, department?: string) {
@@ -203,7 +210,7 @@ class AnalyticsApiClient {
     if (period.startDate) params.append('startDate', period.startDate);
     if (period.endDate) params.append('endDate', period.endDate);
     
-    return this.fetch<any>(`/analytics/staff/utilization?${params}`);
+    return this.fetch<AnalyticsData>(`/analytics/staff/utilization?${params}`);
   }
 
   // Financial Analytics
@@ -212,7 +219,7 @@ class AnalyticsApiClient {
     if (projectId) params.append('projectId', projectId);
     if (clientId) params.append('clientId', clientId);
     
-    return this.fetch<any>(`/analytics/financial/summary?${params}`);
+    return this.fetch<AnalyticsData>(`/analytics/financial/summary?${params}`);
   }
 
   async getBudgetAnalysis(projectId?: string, clientId?: string, department?: string) {
@@ -221,12 +228,12 @@ class AnalyticsApiClient {
     if (clientId) params.append('clientId', clientId);
     if (department) params.append('department', department);
     
-    return this.fetch<any>(`/analytics/financial/budgets?${params}`);
+    return this.fetch<AnalyticsData>(`/analytics/financial/budgets?${params}`);
   }
 
   // Reports
   async generateReport(reportType: string, parameters: ReportParams) {
-    return this.fetch<any>('/analytics/reports/generate', {
+    return this.fetch<AnalyticsData>('/analytics/reports/generate', {
       method: 'POST',
       body: JSON.stringify({ reportType, parameters })
     });
