@@ -18,15 +18,15 @@ import { detectDataType } from './format-detector';
  * Validate data against schema
  */
 export function validateAgainstSchema(
-  data: any[],
+  data: Record<string, unknown>[],
   schema: DataSchema
 ): {
-  validData: any[];
+  validData: Record<string, unknown>[];
   errors: ImportError[];
   warnings: ImportWarning[];
   fieldMapping: Record<string, string>;
 } {
-  const validData: any[] = [];
+  const validData: Record<string, unknown>[] = [];
   const errors: ImportError[] = [];
   const warnings: ImportWarning[] = [];
   const fieldMapping: Record<string, string> = {};
@@ -50,7 +50,7 @@ export function validateAgainstSchema(
   data.forEach((row, index) => {
     const rowErrors: ImportError[] = [];
     const rowWarnings: ImportWarning[] = [];
-    const validatedRow: any = {};
+    const validatedRow: Record<string, unknown> = {};
 
     schema.fields.forEach(field => {
       const context: ValidationContext = {
@@ -99,7 +99,7 @@ export function validateAgainstSchema(
  * Validate a single field against its schema
  */
 export function validateField(
-  value: any,
+  value: unknown,
   field: SchemaField,
   context: ValidationContext,
   errors: ImportError[],
@@ -166,7 +166,7 @@ export function validateField(
  * Validate field constraints
  */
 function validateConstraints(
-  value: any,
+  value: unknown,
   field: SchemaField,
   context: ValidationContext,
   errors: ImportError[],
@@ -284,7 +284,7 @@ function createFieldMapping(
  * Auto-generate schema from data sample
  */
 export function generateSchemaFromData(
-  data: any[],
+  data: Record<string, unknown>[],
   options: {
     sampleSize?: number;
     strictMode?: boolean;

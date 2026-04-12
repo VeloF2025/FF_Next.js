@@ -9,7 +9,7 @@ export interface ImportError {
   column?: string;
   message: string;
   severity?: 'error' | 'warning';
-  details?: any;
+  details?: unknown;
 }
 
 export interface ImportWarning {
@@ -18,7 +18,7 @@ export interface ImportWarning {
   column?: string;
   message: string;
   severity?: 'warning' | 'info';
-  details?: any;
+  details?: unknown;
 }
 
 export interface ValidationOptions {
@@ -26,16 +26,16 @@ export interface ValidationOptions {
   maxLength?: number;
   minLength?: number;
   pattern?: RegExp;
-  customValidator?: (value: any) => boolean;
+  customValidator?: (value: unknown) => boolean;
 }
 
 export interface ParseOptions {
   allowEmpty?: boolean;
-  defaultValue?: any;
-  transformValue?: (value: any) => any;
+  defaultValue?: unknown;
+  transformValue?: (value: unknown) => unknown;
 }
 
-export interface ValidationResult<T = any> {
+export interface ValidationResult<T = unknown> {
   value: T | undefined;
   isValid: boolean;
   errors: ImportError[];
