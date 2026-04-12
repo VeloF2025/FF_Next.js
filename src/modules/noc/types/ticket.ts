@@ -239,6 +239,12 @@ export interface Ticket {
   assigned_user?: { id: string; name: string; email: string } | null;
   created_user?: { id: string; name: string } | null;
   assigned_team_name?: string | null;
+
+  // Extended fields populated by some queries
+  asset_id?: string | null;
+  status_changed_at?: Date | string | null;
+  /** QContact legacy category hierarchy (distinct from ticket_category) */
+  category?: string | null;
 }
 
 /**

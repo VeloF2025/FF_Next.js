@@ -14,6 +14,20 @@
 import type { NextWebVitalsMetric } from 'next/app';
 import { log } from '@/lib/logger';
 
+// Non-standard browser APIs (Chrome-specific)
+interface PerformanceMemory {
+  jsHeapSizeLimit: number;
+  totalJSHeapSize: number;
+  usedJSHeapSize: number;
+}
+
+interface NetworkInformation {
+  effectiveType?: string;
+  downlink?: number;
+  rtt?: number;
+  saveData?: boolean;
+}
+
 // Performance thresholds (in milliseconds or score)
 export const THRESHOLDS = {
   // Core Web Vitals
@@ -50,7 +64,7 @@ async function sendToAnalytics(metric: WebVitalsMetric): Promise<void> {
   try {
     // Send to Vercel Analytics (if available)
     if (typeof window !== 'undefined' && 'va' in window) {
-      (window as any).va?.('track', 'web-vitals', metric);
+      (window as unknown as { va?: (event: string, name: string, data: WebVitalsMetric) => void }).va?.('track', 'web-vitals', metric);
     }
 
     // Send to custom analytics endpoint
@@ -265,8 +279,8 @@ export const performanceMetrics = {
  */
 export function getPerformanceSnapshot(): {
   navigation: PerformanceNavigationTiming | null;
-  memory?: any;
-  connectionInfo?: any;
+  memory?: PerformanceMemory;
+  connectionInfo?: NetworkInformation;
 } {
   if (typeof window === 'undefined') {
     return { navigation: null };
@@ -276,8 +290,8 @@ export function getPerformanceSnapshot(): {
 
   return {
     navigation,
-    memory: (performance as any).memory,
-    connectionInfo: (navigator as any).connection,
+    memory: (performance as unknown as { memory?: PerformanceMemory }).memory,
+    connectionInfo: (navigator as unknown as { connection?: NetworkInformation }).connection,
   };
 }
 
