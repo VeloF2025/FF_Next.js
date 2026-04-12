@@ -8,6 +8,7 @@ import { neon } from '@/lib/db-neon';
 import type {
   ContractorDocumentReport,
   DocumentInfo,
+  DocumentType,
   TeamMemberDocuments,
   ContractorBasicInfo,
   DocumentVerificationStatus,
@@ -24,6 +25,20 @@ import { calculateContractorSummary, calculateOverallStatistics } from '../utils
 import { generateDocumentAlerts, hasUrgentAlerts } from '../utils/alertGenerator';
 
 const sql = neon(process.env.DATABASE_URL!);
+
+/** Shape of a row returned from contractor_documents */
+interface ContractorDocumentRow {
+  id: string;
+  document_type: string;
+  file_name: string | null;
+  file_url: string | null;
+  verification_status: string | null;
+  expiry_date: string | null;
+  created_at: string | null;
+  verified_at: string | null;
+  verified_by: string | null;
+  rejection_reason: string | null;
+}
 
 /**
  * Fetch contractor basic info
@@ -48,7 +63,7 @@ async function fetchContractorInfo(contractorId: string): Promise<ContractorBasi
 /**
  * Fetch company documents from database
  */
-async function fetchCompanyDocuments(contractorId: string): Promise<Map<string, any>> {
+async function fetchCompanyDocuments(contractorId: string): Promise<Map<string, ContractorDocumentRow>> {
   const result = await sql`
     SELECT
       id,
@@ -67,13 +82,13 @@ async function fetchCompanyDocuments(contractorId: string): Promise<Map<string, 
   `;
 
   // Create a map of document type -> document data (most recent)
-  const docMap = new Map<string, any>();
+  const docMap = new Map<string, ContractorDocumentRow>();
 
   result.forEach((row) => {
-    const docType = row.document_type;
+    const docType = row.document_type as string;
     // Only store if we haven't seen this type yet (most recent due to ORDER BY)
     if (!docMap.has(docType)) {
-      docMap.set(docType, row);
+      docMap.set(docType, row as unknown as ContractorDocumentRow);
     }
   });
 
@@ -117,12 +132,12 @@ async function fetchTeamMemberDocuments(contractorId: string): Promise<TeamMembe
 /**
  * Build complete document info from database row
  */
-function buildDocumentInfo(docType: string, dbRow: any | null): DocumentInfo {
+function buildDocumentInfo(docType: string, dbRow: ContractorDocumentRow | null): DocumentInfo {
   if (!dbRow) {
     // Document doesn't exist in database - it's missing
     return {
       id: `missing-${docType}`,
-      type: docType as any,
+      type: docType as DocumentType,
       category: 'company',
       verificationStatus: 'missing',
       urgencyLevel: 'ok',
@@ -130,7 +145,7 @@ function buildDocumentInfo(docType: string, dbRow: any | null): DocumentInfo {
     };
   }
 
-  const verificationStatus: DocumentVerificationStatus = dbRow.verification_status || 'pending';
+  const verificationStatus: DocumentVerificationStatus = (dbRow.verification_status as DocumentVerificationStatus) || 'pending';
   const expiryDate = dbRow.expiry_date;
   const daysUntilExpiry = calculateDaysUntilExpiry(expiryDate);
   const urgencyLevel = calculateUrgencyLevel(expiryDate, docType);
@@ -138,19 +153,19 @@ function buildDocumentInfo(docType: string, dbRow: any | null): DocumentInfo {
 
   return {
     id: dbRow.id,
-    type: docType as any,
+    type: docType as DocumentType,
     category: 'company',
     verificationStatus,
-    fileName: dbRow.file_name,
-    fileUrl: dbRow.file_url,
-    expiryDate,
+    fileName: dbRow.file_name ?? undefined,
+    fileUrl: dbRow.file_url ?? undefined,
+    expiryDate: expiryDate ?? undefined,
     daysUntilExpiry: daysUntilExpiry || undefined,
     urgencyLevel,
     displayStatus,
-    uploadedAt: dbRow.created_at,
-    verifiedAt: dbRow.verified_at,
-    verifiedBy: dbRow.verified_by,
-    rejectionReason: dbRow.rejection_reason,
+    uploadedAt: dbRow.created_at ?? undefined,
+    verifiedAt: dbRow.verified_at ?? undefined,
+    verifiedBy: dbRow.verified_by ?? undefined,
+    rejectionReason: dbRow.rejection_reason ?? undefined,
   };
 }
 

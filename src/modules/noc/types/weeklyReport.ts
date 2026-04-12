@@ -60,7 +60,7 @@ export interface ImportError {
   error_type: ImportErrorType;
   error_message: string;
   field_name: string | null;
-  row_data: Record<string, any> | null;
+  row_data: Record<string, unknown> | null;
 }
 
 /**
@@ -121,7 +121,7 @@ export interface ImportRow {
   fault_description?: string;
   fault_cause?: string;
   created_date?: string;
-  [key: string]: any; // Allow additional columns
+  [key: string]: string | number | boolean | undefined; // Allow additional columns
 }
 
 /**
@@ -132,8 +132,8 @@ export interface ExcelColumnMapping {
   excel_column: string;
   ticket_field: string;
   required: boolean;
-  transform?: (value: any) => any;
-  validate?: (value: any) => boolean;
+  transform?: (value: string | number | boolean | null) => string | number | boolean | null;
+  validate?: (value: string | number | boolean | null) => boolean;
 }
 
 /**

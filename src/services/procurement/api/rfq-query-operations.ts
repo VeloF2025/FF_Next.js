@@ -29,7 +29,7 @@ export class RFQQueryOperations {
       const queryConditions = [eq(rfqs.projectId, context.projectId)];
       
       if (filters.status) {
-        queryConditions.push(eq(rfqs.status, filters.status as any));
+        queryConditions.push(eq(rfqs.status, filters.status));
       }
       if (filters.createdBy) {
         queryConditions.push(eq(rfqs.createdBy, filters.createdBy));
@@ -96,8 +96,8 @@ export class RFQQueryOperations {
         .offset(offset);
 
       // Filter RFQs that include the supplier (since we can't use array contains in basic SQL)
-      const supplierRFQs = rfqList.filter((rfq: typeof rfqList[0]) => 
-        rfq.invitedSuppliers && (rfq.invitedSuppliers as any).includes && (rfq.invitedSuppliers as any).includes(supplierId)
+      const supplierRFQs = rfqList.filter((rfq: typeof rfqList[0]) =>
+        Array.isArray(rfq.invitedSuppliers) && rfq.invitedSuppliers.includes(supplierId)
       );
 
       // Get total count for pagination
@@ -106,8 +106,8 @@ export class RFQQueryOperations {
         .from(rfqs)
         .where(and(...queryConditions));
       
-      const totalSupplierRFQs = allRFQs.filter((rfq: typeof allRFQs[0]) => 
-        rfq.invitedSuppliers && (rfq.invitedSuppliers as any).includes && (rfq.invitedSuppliers as any).includes(supplierId)
+      const totalSupplierRFQs = allRFQs.filter((rfq: typeof allRFQs[0]) =>
+        Array.isArray(rfq.invitedSuppliers) && rfq.invitedSuppliers.includes(supplierId)
       ).length;
 
       return this.service.success({

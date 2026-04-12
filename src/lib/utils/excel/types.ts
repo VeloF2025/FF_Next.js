@@ -67,11 +67,14 @@ export interface ParseResult {
   };
 }
 
+/** Raw cell value from Excel/CSV parsing */
+export type CellValue = string | number | boolean | null | undefined;
+
 // Parse error
 export interface ParseError {
   row: number;
   column: string;
-  value: any;
+  value: CellValue;
   message: string;
   type: 'validation' | 'parsing' | 'format' | 'required';
 }
@@ -80,7 +83,7 @@ export interface ParseError {
 export interface ParseWarning {
   row: number;
   column: string;
-  value: any;
+  value: CellValue;
   message: string;
   type: 'format' | 'range' | 'suggestion';
 }
@@ -90,8 +93,8 @@ export interface ColumnMapping {
   source: string; // Source column name in file
   target: keyof ParsedBOQItem; // Target field name
   required: boolean; // Is this column required
-  transform?: (value: any) => any; // Optional transform function
-  validate?: (value: any) => boolean; // Optional validation function
+  transform?: (value: CellValue) => CellValue; // Optional transform function
+  validate?: (value: CellValue) => boolean; // Optional validation function
 }
 
 // Sheet information
