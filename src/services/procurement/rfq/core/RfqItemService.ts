@@ -3,11 +3,22 @@
  * Manages RFQ line items
  */
 
-import { neon } from '@/lib/db-neon';
+import { neon, NeonQueryFunction } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { RFQItem } from '@/types/procurement.types';
 
-const sql: any = neon(process.env.DATABASE_URL!);
+interface RfqItemInput {
+  itemCode?: string;
+  description: string;
+  specifications?: string;
+  quantity: number;
+  unit?: string;
+  category?: string;
+  estimatedUnitPrice?: number;
+  estimatedTotalPrice?: number;
+}
+
+const sql: NeonQueryFunction<false, false> = neon(process.env.DATABASE_URL!);
 
 export class RfqItemService {
   /**
@@ -20,7 +31,7 @@ export class RfqItemService {
         WHERE rfq_id = ${rfqId}
         ORDER BY line_number`;
 
-      return items.map((item: any) => ({
+      return items.map((item: Record<string, unknown>) => ({
         id: item.id,
         lineNumber: item.line_number,
         itemCode: item.item_code,
@@ -31,7 +42,7 @@ export class RfqItemService {
         category: item.category,
         estimatedUnitPrice: item.estimated_unit_price,
         estimatedTotalPrice: item.estimated_total_price
-      }));
+      })) as unknown as RFQItem[];
     } catch (error) {
       log.error('Error fetching RFQ items:', { data: error }, 'RfqItemService');
       return [];
@@ -41,10 +52,10 @@ export class RfqItemService {
   /**
    * Add RFQ items
    */
-  static async addItems(rfqId: string, items: any[]): Promise<void> {
+  static async addItems(rfqId: string, items: RfqItemInput[]): Promise<void> {
     try {
       for (let i = 0; i < items.length; i++) {
-        const item = items[i];
+        const item = items[i]!;
         await sql`
           INSERT INTO rfq_items (
             rfq_id, line_number, item_code, description,
@@ -75,7 +86,7 @@ export class RfqItemService {
   static async updateItem(itemId: string, data: Partial<RFQItem>): Promise<void> {
     try {
       const updates: string[] = [];
-      const values: any[] = [];
+      const values: unknown[] = [];
 
       if (data.description !== undefined) {
         updates.push(`description = $${values.length + 1}`);
@@ -85,14 +96,15 @@ export class RfqItemService {
         updates.push(`quantity = $${values.length + 1}`);
         values.push(data.quantity);
       }
-      if ((data as any).estimatedUnitPrice !== undefined) {
+      const extData = data as Partial<RFQItem> & { estimatedUnitPrice?: number };
+      if (extData.estimatedUnitPrice !== undefined) {
         updates.push(`estimated_unit_price = $${values.length + 1}`);
-        values.push((data as any).estimatedUnitPrice);
+        values.push(extData.estimatedUnitPrice);
       }
 
       if (updates.length > 0) {
         values.push(itemId);
-        await sql(`UPDATE rfq_items SET ${updates.join(', ')} WHERE id = $${values.length}`, values);
+        await sql.query(`UPDATE rfq_items SET ${updates.join(', ')} WHERE id = $${values.length}`, values as unknown[]);
       }
     } catch (error) {
       log.error('Error updating RFQ item:', { data: error }, 'RfqItemService');

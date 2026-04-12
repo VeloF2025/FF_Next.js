@@ -3,6 +3,14 @@
  * Manages garbage collection suggestions and memory pressure
  */
 
+interface GCGlobal {
+  gc?: () => void;
+}
+
+/**
+ * Suggest garbage collection
+ * Attempts to trigger GC in environments where it's exposed
+ */
 export class GarbageCollector {
   /**
    * Suggest garbage collection
@@ -10,14 +18,14 @@ export class GarbageCollector {
    */
   public suggest(): void {
     // In Node.js environments with --expose-gc flag
-    if (typeof global !== 'undefined' && (global as any).gc) {
-      (global as any).gc();
+    if (typeof global !== 'undefined' && (global as typeof global & GCGlobal).gc) {
+      (global as typeof global & GCGlobal).gc!();
       return;
     }
 
     // In browsers with gc exposed (development mode)
-    if (typeof window !== 'undefined' && (window as any).gc) {
-      (window as any).gc();
+    if (typeof window !== 'undefined' && (window as typeof window & GCGlobal).gc) {
+      (window as typeof window & GCGlobal).gc!();
       return;
     }
 
@@ -54,8 +62,8 @@ export class GarbageCollector {
    */
   public isManualGCAvailable(): boolean {
     return (
-      (typeof global !== 'undefined' && !!(global as any).gc) ||
-      (typeof window !== 'undefined' && !!(window as any).gc)
+      (typeof global !== 'undefined' && !!(global as typeof global & GCGlobal).gc) ||
+      (typeof window !== 'undefined' && !!(window as typeof window & GCGlobal).gc)
     );
   }
 }

@@ -9,7 +9,8 @@
  * - Odoo stock.move → individual movement records
  */
 
-import { neon, NeonQueryFunction } from '@/lib/db-neon';
+import { neon } from '@/lib/db-neon';
+import type { NeonQueryFunction } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { OdooClient, OdooStockPicking, OdooStockMove } from '../odooClient';
 
@@ -48,20 +49,20 @@ export interface StockTransferSyncOptions {
  * Get stock item ID by Odoo product ID
  */
 async function getStockItemByOdooId(
-  sql: any,
+  sql: NeonQueryFunction<false, false>,
   odooProductId: number
 ): Promise<string | null> {
   const rows = await sql`
     SELECT id FROM stock_items WHERE odoo_product_id = ${odooProductId} LIMIT 1
   `;
-  return rows.length > 0 ? rows[0].id : null;
+  return rows.length > 0 ? String(rows[0]?.id ?? '') || null : null;
 }
 
 /**
  * Get FF location ID by Odoo location ID
  */
 async function getLocationByOdooId(
-  sql: any,
+  sql: NeonQueryFunction<false, false>,
   odooLocationId: number
 ): Promise<string | null> {
   // First check odoo_location_mappings
@@ -72,7 +73,7 @@ async function getLocationByOdooId(
     LIMIT 1
   `;
   if (mappingRows.length > 0) {
-    return mappingRows[0].ff_location_id;
+    return String(mappingRows[0]?.ff_location_id ?? '') || null;
   }
 
   // Fallback: check stock_locations directly (if odoo_location_id column exists)
@@ -82,7 +83,7 @@ async function getLocationByOdooId(
       WHERE odoo_location_id = ${odooLocationId}
       LIMIT 1
     `;
-    return directRows.length > 0 ? directRows[0].id : null;
+    return directRows.length > 0 ? String(directRows[0]?.id ?? '') || null : null;
   } catch {
     return null;
   }
@@ -92,7 +93,7 @@ async function getLocationByOdooId(
  * Get default location (warehouse)
  */
 async function getDefaultLocation(
-  sql: any
+  sql: NeonQueryFunction<false, false>
 ): Promise<string | null> {
   const rows = await sql`
     SELECT id FROM stock_locations
@@ -100,20 +101,20 @@ async function getDefaultLocation(
     ORDER BY name ASC
     LIMIT 1
   `;
-  return rows.length > 0 ? rows[0].id : null;
+  return rows.length > 0 ? String(rows[0]?.id ?? '') || null : null;
 }
 
 /**
  * Check if a movement with this odoo_move_id exists
  */
 async function getExistingMovement(
-  sql: any,
+  sql: NeonQueryFunction<false, false>,
   odooMoveId: number
 ): Promise<string | null> {
   const rows = await sql`
     SELECT id FROM stock_movements WHERE odoo_move_id = ${odooMoveId} LIMIT 1
   `;
-  return rows.length > 0 ? rows[0].id : null;
+  return rows.length > 0 ? String(rows[0]?.id ?? '') || null : null;
 }
 
 // ============================================================================
@@ -148,9 +149,9 @@ export async function syncStockTransfers(
 
     // Fetch completed internal transfers from Odoo
     const odooTransfers = await client.getCompletedTransfers({
-      sinceDate,
       limit,
-    } as any);
+      ...(sinceDate ? { domain: [['write_date', '>=', sinceDate.toISOString()]] } : {}),
+    });
 
     logger.info(`Found ${odooTransfers.length} internal transfers in Odoo`);
 
@@ -225,7 +226,8 @@ export async function syncStockTransfers(
               : null;
 
             if (!stockItemId) {
-              logger.warn(`Stock item not found for product ${(move.product_id as any)?.[1] || 'unknown'}`);
+              const productName = Array.isArray(move.product_id) ? String(move.product_id[1] ?? 'unknown') : 'unknown';
+            logger.warn(`Stock item not found for product ${productName}`);
               continue;
             }
 
