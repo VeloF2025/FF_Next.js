@@ -35,7 +35,7 @@ import {
   WeeklyReportStats,
   ImportProgressUpdate
 } from '../types/weeklyReport';
-import { TicketSource, TicketType, CreateTicketPayload } from '../types/ticket';
+import { TicketSource, TicketType, TicketPriority, TicketStatus, FaultCause, CreateTicketPayload } from '../types/ticket';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('maintenance:weekly-report');
@@ -228,7 +228,7 @@ export async function updateWeeklyReport(
 
   // 🟢 WORKING: Build dynamic update query
   const updates: string[] = [];
-  const values: any[] = [];
+  const values: unknown[] = [];
   let paramIndex = 1;
 
   if (payload.status !== undefined) {
@@ -470,7 +470,7 @@ export async function processImportBatch(
     try {
       // Get identifiers for matching (prefer dr_number, fallback to ft_ref/external_id)
       const drNumber = row.dr_number?.trim();
-      const ftRef = (row as any).ft_ref?.trim() || row.ticket_uid?.trim();
+      const ftRef = (row.ft_ref as string | undefined)?.trim() || row.ticket_uid?.trim();
 
       if (!drNumber && !ftRef) {
         // No identifier to match on - skip
@@ -496,25 +496,25 @@ export async function processImportBatch(
       if (existingTicket) {
         // 🟢 WORKING: UPDATE existing ticket with new info
         const updateFields: string[] = [];
-        const updateValues: any[] = [];
+        const updateValues: unknown[] = [];
         let paramIndex = 1;
 
         // Update status if provided and different
-        const newStatus = (row as any).status?.toLowerCase();
+        const newStatus = row.status?.toLowerCase();
         if (newStatus && newStatus !== existingTicket.status) {
           updateFields.push(`status = $${paramIndex++}`);
           updateValues.push(newStatus);
         }
 
         // Update description/issue if provided
-        const issue = (row as any).issue || row.description || row.fault_description;
+        const issue = (row.issue as string | undefined) || row.description || row.fault_description;
         if (issue) {
           updateFields.push(`description = $${paramIndex++}`);
           updateValues.push(issue);
         }
 
         // Update title if provided
-        const title = row.title || (row as any).issue;
+        const title = row.title || (row.issue as string | undefined);
         if (title) {
           updateFields.push(`title = $${paramIndex++}`);
           updateValues.push(title);
@@ -563,16 +563,16 @@ export async function processImportBatch(
         const ticketPayload: CreateTicketPayload = {
           source: TicketSource.WEEKLY_REPORT,
           external_id: ftRef || `row-${row.row_number}`,
-          title: row.title || (row as any).issue || 'Imported Ticket',
-          description: row.description || row.fault_description || (row as any).issue,
-          ticket_type: row.ticket_type as any || TicketType.MAINTENANCE,
-          priority: (row.priority as any) || 'normal',
-          status: (row as any).status?.toLowerCase() as any || 'open',
+          title: row.title || (row.issue as string | undefined) || 'Imported Ticket',
+          description: row.description || row.fault_description || (row.issue as string | undefined),
+          ticket_type: (row.ticket_type as TicketType) || TicketType.MAINTENANCE,
+          priority: (row.priority as TicketPriority) || TicketPriority.NORMAL,
+          status: (row.status?.toLowerCase() as TicketStatus) || TicketStatus.OPEN,
           dr_number: drNumber,
           pole_number: row.pole_number,
           pon_number: row.pon_number,
           address: row.address,
-          fault_cause: row.fault_cause as any,
+          fault_cause: row.fault_cause as FaultCause | undefined,
           // Use the userId from the import request - required by maintenance_tickets.created_by NOT NULL constraint
           created_by: effectiveUserId
         };
@@ -700,7 +700,7 @@ export async function listWeeklyReports(
 ): Promise<WeeklyReportListResponse> {
   // 🟢 WORKING: Build query with filters
   const conditions: string[] = [];
-  const values: any[] = [];
+  const values: unknown[] = [];
   let paramIndex = 1;
 
   if (filters.status) {
@@ -787,9 +787,19 @@ export async function listWeeklyReports(
  *
  * @returns Aggregate statistics
  */
+/** Aggregate row returned by the stats query */
+interface WeeklyReportStatsRow {
+  total_imports: string;
+  successful_imports: string;
+  failed_imports: string;
+  total_tickets_imported: string;
+  avg_tickets_per_import: string;
+  last_import_date: string | null;
+}
+
 export async function getWeeklyReportStats(): Promise<WeeklyReportStats> {
   // 🟢 WORKING: Calculate aggregate statistics
-  const result = await queryOne<any>(
+  const result = await queryOne<WeeklyReportStatsRow>(
     `SELECT
       COUNT(*) as total_imports,
       COUNT(*) FILTER (WHERE status = 'completed') as successful_imports,
