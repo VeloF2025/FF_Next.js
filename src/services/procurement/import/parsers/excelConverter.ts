@@ -15,6 +15,14 @@ export interface ConversionOptions {
   normalizeHeaders?: boolean;
 }
 
+interface XlsxSheetOptions {
+  header: number;
+  defval: string;
+  blankrows: boolean;
+  raw: boolean;
+  range?: string;
+}
+
 /**
  * Excel data conversion utilities
  */
@@ -22,9 +30,9 @@ export class ExcelConverter {
   /**
    * Parse Excel file with default settings
    */
-  static async parseExcelFile(file: File): Promise<any[]> {
+  static async parseExcelFile(file: File): Promise<Record<string, unknown>[]> {
     const workbook = await ExcelReader.readFile(file);
-    
+
     // Use first sheet by default
     const sheetName = workbook.SheetNames[0];
     if (!sheetName) {
@@ -32,7 +40,7 @@ export class ExcelConverter {
     }
 
     const worksheet = workbook.Sheets[sheetName];
-    
+
     // Convert to JSON with header row as keys
     const jsonData = XLSX.utils.sheet_to_json(worksheet!, {
       header: 1,
@@ -45,15 +53,15 @@ export class ExcelConverter {
       return [];
     }
 
-    return ExcelFormatter.convertArrayToObjects(jsonData as any[][]);
+    return ExcelFormatter.convertArrayToObjects(jsonData as unknown[][]);
   }
 
   /**
    * Parse specific worksheet from Excel file
    */
-  static async parseSpecificWorksheet(file: File, worksheetName: string): Promise<any[]> {
+  static async parseSpecificWorksheet(file: File, worksheetName: string): Promise<Record<string, unknown>[]> {
     const workbook = await ExcelReader.readFile(file);
-    
+
     if (!workbook.SheetNames.includes(worksheetName)) {
       throw new Error(`Worksheet "${worksheetName}" not found`);
     }
@@ -70,26 +78,26 @@ export class ExcelConverter {
       return [];
     }
 
-    return ExcelFormatter.convertArrayToObjects(jsonData as any[][]);
+    return ExcelFormatter.convertArrayToObjects(jsonData as unknown[][]);
   }
 
   /**
    * Parse Excel file with custom options
    */
   static async parseExcelWithOptions(
-    file: File, 
+    file: File,
     options: ConversionOptions = {}
-  ): Promise<any[]> {
+  ): Promise<Record<string, unknown>[]> {
     const workbook = await ExcelReader.readFile(file);
-    
+
     const sheetName = options.worksheet || workbook.SheetNames[0];
     if (!sheetName) {
       return [];
     }
 
     const worksheet = workbook.Sheets[sheetName];
-    
-    const xlsxOptions: any = {
+
+    const xlsxOptions: XlsxSheetOptions = {
       header: options.headerRow || 1,
       defval: '',
       blankrows: !options.skipEmptyRows,
@@ -101,24 +109,24 @@ export class ExcelConverter {
     }
 
     const jsonData = XLSX.utils.sheet_to_json(worksheet!, xlsxOptions);
-    
+
     // Handle header normalization if requested
     if (options.normalizeHeaders && Array.isArray(jsonData) && jsonData.length > 0) {
       const firstRow = jsonData[0];
       if (typeof firstRow === 'object' && firstRow !== null) {
-        const headers = Object.keys(firstRow);
+        const headers = Object.keys(firstRow as Record<string, unknown>);
         const normalizedHeaders = ExcelFormatter.normalizeHeaders(headers);
-        
+
         // Create mapping from old to new headers
         const headerMap = new Map<string, string>();
         headers.forEach((header, index) => {
           headerMap.set(header, normalizedHeaders[index]!);
         });
-        
+
         // Transform all rows to use normalized headers
-        return jsonData.map((row: any) => {
-          const normalizedRow: any = {};
-          Object.entries(row).forEach(([key, value]) => {
+        return jsonData.map((row) => {
+          const normalizedRow: Record<string, unknown> = {};
+          Object.entries(row as Record<string, unknown>).forEach(([key, value]) => {
             const normalizedKey = headerMap.get(key) || key;
             normalizedRow[normalizedKey] = ExcelFormatter.formatCellValue(value);
           });
@@ -126,8 +134,8 @@ export class ExcelConverter {
         });
       }
     }
-    
-    return jsonData;
+
+    return jsonData as Record<string, unknown>[];
   }
 
   /**
@@ -135,14 +143,14 @@ export class ExcelConverter {
    */
   static async parseExcelWithSchema<T>(
     file: File,
-    schema: (row: any) => T | null,
+    schema: (row: Record<string, unknown>) => T | null,
     options: ConversionOptions = {}
   ): Promise<{ data: T[]; errors: string[] }> {
     try {
       const rawData = await this.parseExcelWithOptions(file, options);
       const data: T[] = [];
       const errors: string[] = [];
-      
+
       rawData.forEach((row, index) => {
         try {
           const typedRow = schema(row);
@@ -155,7 +163,7 @@ export class ExcelConverter {
           errors.push(`Row ${index + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       });
-      
+
       return { data, errors };
     } catch (error) {
       return {
@@ -172,16 +180,16 @@ export class ExcelConverter {
     file: File,
     columnNames: string[],
     options: ConversionOptions = {}
-  ): Promise<Record<string, any[]>> {
+  ): Promise<Record<string, unknown[]>> {
     const data = await this.parseExcelWithOptions(file, options);
-    const result: Record<string, any[]> = {};
-    
+    const result: Record<string, unknown[]> = {};
+
     columnNames.forEach(columnName => {
       result[columnName] = data
         .map(row => row[columnName])
         .filter(value => value !== undefined && value !== null && value !== '');
     });
-    
+
     return result;
   }
 }
