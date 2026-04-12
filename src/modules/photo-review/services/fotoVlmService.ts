@@ -16,6 +16,59 @@ import { log } from '@/lib/logger';
 import fs from 'fs';
 import path from 'path';
 
+/** Shape of a single DR entry returned by the BOSS API */
+interface BossDrEntry {
+  dr_number: string;
+  photos?: BossPhoto[];
+}
+
+/** Shape of a photo record from the BOSS API */
+interface BossPhoto {
+  filename: string;
+}
+
+/** OpenAI-compatible chat-completion response from the VLM */
+interface VlmApiResponse {
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
+  }>;
+  data?: Array<{ id: string }>;
+}
+
+/** A single step evaluation produced by the VLM */
+interface VlmStepEvaluation {
+  step_number: number;
+  step_name: string;
+  step_label: string;
+  passed: boolean;
+  score: number;
+  comment: string;
+  photo_index?: number;
+  identified_as?: string;
+}
+
+/** Per-photo evaluation block in the VLM batch response */
+interface VlmPhotoEvaluation {
+  photo_index: number;
+  identified_as?: string;
+  matched_steps?: number[];
+  evaluations?: Array<{
+    step_number: number;
+    step_name: string;
+    step_label: string;
+    passed: boolean;
+    score: number;
+    comment: string;
+  }>;
+}
+
+/** Top-level structure of the VLM batch JSON response */
+interface VlmBatchData {
+  photo_evaluations: VlmPhotoEvaluation[];
+}
+
 /**
  * VLM API configuration
  * Uses MiniCPM-V-2_6 via vLLM with OpenAI-compatible API
@@ -121,7 +174,7 @@ export class VlmEvaluationError extends Error {
   constructor(
     message: string,
     public readonly code?: string,
-    public readonly details?: any
+    public readonly details?: unknown
   ) {
     super(message);
     this.name = 'VlmEvaluationError';
@@ -151,17 +204,17 @@ export async function fetchDrPhotos(drNumber: string): Promise<string[]> {
       throw new Error(`BOSS API returned ${response.status}: ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as { drs?: BossDrEntry[] };
 
     // Find the specific DR
-    const drData = data.drs?.find((dr: any) => dr.dr_number === drNumber);
+    const drData = data.drs?.find((dr: BossDrEntry) => dr.dr_number === drNumber);
 
     if (!drData || !drData.photos || drData.photos.length === 0) {
       throw new Error(`No photos found for DR ${drNumber} in BOSS API`);
     }
 
     // Return direct BOSS API URLs (Ollama can access these directly)
-    const photoUrls = drData.photos.map((photo: any) =>
+    const photoUrls = drData.photos.map((photo: BossPhoto) =>
       `${BOSS_API_URL}/api/photo/${drNumber}/${photo.filename}`
     );
 
@@ -259,7 +312,7 @@ async function fetchImageAsBase64(imageUrl: string): Promise<string> {
  * @param photoUrls - Array of photo URLs from BOSS API
  * @returns VLM evaluation response with photo classifications
  */
-async function callVlmApiBatch(drNumber: string, photoUrls: string[]): Promise<any> {
+async function callVlmApiBatch(drNumber: string, photoUrls: string[]): Promise<VlmApiResponse> {
   const prompt = buildSmartBatchEvaluationPrompt(drNumber);
 
   log.info('VlmService', `Fetching and encoding ${photoUrls.length} photos for ${drNumber}...`);
@@ -340,12 +393,12 @@ async function callVlmApiBatch(drNumber: string, photoUrls: string[]): Promise<a
       );
     }
 
-    const data = await response.json();
+    const data = await response.json() as VlmApiResponse;
     log.info('VlmService', `VLM API response received for ${drNumber}`);
 
     return data;
-  } catch (error: any) {
-    if (error.name === 'AbortError') {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === 'AbortError') {
       throw new VlmEvaluationError(
         'VLM API request timed out after 3 minutes',
         'VLM_TIMEOUT'
@@ -357,7 +410,7 @@ async function callVlmApiBatch(drNumber: string, photoUrls: string[]): Promise<a
     }
 
     throw new VlmEvaluationError(
-      `Failed to call VLM API: ${error.message}`,
+      `Failed to call VLM API: ${error instanceof Error ? error.message : 'Unknown error'}`,
       'VLM_API_ERROR',
       error
     );
@@ -369,7 +422,7 @@ async function callVlmApiBatch(drNumber: string, photoUrls: string[]): Promise<a
  * VLM identifies each photo and provides evaluations for matched steps
  * Returns array of step results (best result for each step)
  */
-function parseSmartBatchResponse(vlmResponse: any): any[] {
+function parseSmartBatchResponse(vlmResponse: VlmApiResponse): VlmStepEvaluation[] {
   try {
     // Extract content from OpenAI-compatible response format
     const content = vlmResponse.choices?.[0]?.message?.content;
@@ -381,7 +434,7 @@ function parseSmartBatchResponse(vlmResponse: any): any[] {
     log.debug('VlmService', `Raw VLM batch response: ${content.substring(0, 200)}...`);
 
     // Parse JSON from content
-    let batchData: any;
+    let batchData: VlmBatchData;
 
     // Try to extract JSON from markdown code blocks if present
     const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/) ||
@@ -389,7 +442,7 @@ function parseSmartBatchResponse(vlmResponse: any): any[] {
                       [null, content];
 
     try {
-      batchData = JSON.parse(jsonMatch[1] || content);
+      batchData = JSON.parse(jsonMatch[1] || content) as VlmBatchData;
     } catch (parseError) {
       log.error('VlmService', `Failed to parse VLM batch JSON: ${content}`);
       throw new Error('VLM response is not valid JSON');
@@ -401,7 +454,7 @@ function parseSmartBatchResponse(vlmResponse: any): any[] {
     }
 
     // Extract all evaluations from all photos
-    const allEvaluations: any[] = [];
+    const allEvaluations: VlmStepEvaluation[] = [];
 
     for (const photoEval of batchData.photo_evaluations) {
       if (photoEval.evaluations && Array.isArray(photoEval.evaluations)) {
@@ -465,7 +518,7 @@ export async function executeVlmEvaluation(
 
     // Step 3: Evaluate ALL batches in parallel (VLM identifies and evaluates all photos at once!)
     const totalStartTime = Date.now();
-    const allEvaluations: any[] = [];
+    const allEvaluations: VlmStepEvaluation[] = [];
 
     const batchPromises = batches.map(async (batch, batchIndex) => {
       const batchNum = batchIndex + 1;
@@ -499,7 +552,7 @@ export async function executeVlmEvaluation(
     log.info('VlmService', `All ${batches.length} batches completed in ${totalTime}ms - Total ${allEvaluations.length} evaluations`);
 
     // Step 4: Group evaluations by step and take BEST score for each step
-    const stepResultsMap = new Map<number, any>();
+    const stepResultsMap = new Map<number, VlmStepEvaluation>();
 
     for (const evaluation of allEvaluations) {
       const stepNum = evaluation.step_number;
@@ -590,8 +643,8 @@ export async function checkVlmHealth(): Promise<boolean> {
       return false;
     }
 
-    const data = await response.json();
-    const hasModel = data.data?.some((m: any) => m.id === 'openbmb/MiniCPM-V-2_6');
+    const data = await response.json() as VlmApiResponse;
+    const hasModel = data.data?.some((m: { id: string }) => m.id === 'openbmb/MiniCPM-V-2_6');
 
     if (!hasModel) {
       log.warn('VlmService', `MiniCPM-V-2_6 model not found in vLLM`);
