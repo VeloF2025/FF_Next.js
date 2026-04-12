@@ -280,6 +280,53 @@ async function handlePost(
       }
     }
 
+    // 8d. Fire-and-forget serial recheck if mismatch exists in this drop
+    try {
+      const mismatchCheck = await pool.query(
+        `SELECT 1 FROM wa_photos p
+         JOIN dr_photo_unified_reviews r ON r.drop_number = p.drop_number
+         WHERE p.drop_number = $1
+           AND p.vlm_processed = true
+           AND (
+             (p.vlm_ups_serial IS NOT NULL AND r.ups_serial_scanned IS NOT NULL
+               AND UPPER(p.vlm_ups_serial) != UPPER(r.ups_serial_scanned))
+             OR
+             (p.vlm_ont_serial IS NOT NULL AND r.ont_serial_scanned IS NOT NULL
+               AND UPPER(p.vlm_ont_serial) != UPPER(r.ont_serial_scanned))
+           )
+         LIMIT 1`,
+        [dropNumber]
+      );
+
+      if (mismatchCheck.rows.length > 0) {
+        log.info(
+          `Serial mismatch detected for ${dropNumber} — triggering recheck`,
+          undefined,
+          'SendFeedback'
+        );
+        // Fire-and-forget: do NOT await, does not affect send-feedback response
+        const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3004';
+        fetch(`${baseUrl}/api/activate/recheck-serial-mismatch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dropNumber, source: 'auto' }),
+        }).catch((err: unknown) => {
+          log.warn(
+            `Recheck fire-and-forget failed for ${dropNumber} (non-fatal)`,
+            { dropNumber, err },
+            'SendFeedback'
+          );
+        });
+      }
+    } catch (recheckTriggerError) {
+      // Non-fatal: do not disrupt send-feedback response
+      log.warn(
+        `Failed to check for serial mismatch for ${dropNumber} (non-fatal)`,
+        { dropNumber, recheckTriggerError },
+        'SendFeedback'
+      );
+    }
+
     // 9. Create follow-up task if requested or if decision is FAIL/REWORK_NEEDED
     let taskId: string | null = null;
     const shouldCreateTask = createTask || decision === 'FAIL' || decision === 'REWORK_NEEDED';
