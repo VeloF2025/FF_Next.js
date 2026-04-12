@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { devQueueService } from '../services/devQueueService';
 import { notificationService } from '@/services/core/NotificationService';
-import type { DevQueueBoard, CreateDevQueueItemInput } from '../types/devQueue';
+import type { DevQueueBoard, DevQueueColumn, DevQueueItem, DevQueueStats, DevQueueStatus, CreateDevQueueItemInput } from '../types/devQueue';
 
 export function useDevQueue() {
   const [board, setBoard] = useState<DevQueueBoard>({
@@ -16,7 +16,7 @@ export function useDevQueue() {
       inProgress: 0,
       completed: 0,
       byPriority: { low: 0, medium: 0, high: 0 },
-      byStatus: {},
+      byStatus: {} as DevQueueStats['byStatus'],
     },
   });
   const [loading, setLoading] = useState(true);
@@ -28,7 +28,7 @@ export function useDevQueue() {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Calculate stats from columns
-  const calculateStats = (columns: any[]) => {
+  const calculateStats = (columns: DevQueueColumn[]) => {
     let total = 0;
     let totalVotes = 0;
     let inProgress = 0;
@@ -41,7 +41,7 @@ export function useDevQueue() {
       byStatus[column.name] = itemCount;
       total += itemCount;
 
-      column.items?.forEach((item: any) => {
+      column.items?.forEach((item: DevQueueItem) => {
         totalVotes += item.votes || 0;
 
         if (item.priority) {
@@ -63,7 +63,7 @@ export function useDevQueue() {
       inProgress,
       completed,
       byPriority,
-      byStatus,
+      byStatus: byStatus as DevQueueStats['byStatus'],
     };
   };
 
@@ -139,13 +139,13 @@ export function useDevQueue() {
     // Optimistically update the UI
     setBoard(prevBoard => {
       const newColumns = [...prevBoard.columns];
-      let movedItem: any = null;
+      let movedItem: DevQueueItem | null = null;
 
       // Find and remove the item from its current column
       for (const column of newColumns) {
         const itemIndex = column.items.findIndex(item => item.id === itemId);
         if (itemIndex !== -1) {
-          movedItem = column.items[itemIndex];
+          movedItem = column.items[itemIndex] ?? null;
           column.items.splice(itemIndex, 1);
           break;
         }
@@ -155,7 +155,7 @@ export function useDevQueue() {
       if (movedItem) {
         const targetCol = newColumns.find(col => col.name === targetColumn);
         if (targetCol) {
-          movedItem.status = targetColumn;
+          movedItem.status = targetColumn as DevQueueStatus;
           targetCol.items.splice(position, 0, movedItem);
         }
       }

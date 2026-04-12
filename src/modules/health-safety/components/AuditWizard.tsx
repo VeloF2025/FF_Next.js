@@ -264,9 +264,9 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
         <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
           {categories.map((cat, idx) => {
             const catData = byCategory[cat];
-            const catResponses = catData?.items?.map((i: any) => mergedResponses[i.id]) || [];
-            const hasFailures = catResponses.some((r: any) => r?.response === 'fail');
-            const isComplete = catResponses.every((r: any) => r?.response && r.response !== 'not_checked');
+            const catResponses = catData?.items?.map((i: AuditResponse) => mergedResponses[i.id]) || [];
+            const hasFailures = catResponses.some((r: Partial<AuditResponse> | undefined) => r?.response === 'fail');
+            const isComplete = catResponses.every((r: Partial<AuditResponse> | undefined) => r?.response && r.response !== 'not_checked');
 
             return (
               <button

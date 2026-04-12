@@ -15,7 +15,7 @@
  */
 
 import pool from '@/lib/db';
-import { Pool } from 'pg';
+import type { Pool, QueryResultRow } from 'pg';
 import { log } from '@/lib/logger';
 import type { UnifiedReview, UpdateUnifiedReviewPayload } from '../types/unified.types';
 
@@ -298,9 +298,9 @@ export async function getProjectStatistics(project: string): Promise<{
 function buildUpdateQuery(
   dropNumber: string,
   payload: UpdateUnifiedReviewPayload
-): { query: string; values: any[] } {
+): { query: string; values: unknown[] } {
   const setClauses: string[] = [];
-  const values: any[] = [];
+  const values: unknown[] = [];
   let paramIndex = 1;
 
   // Add each field from payload to SET clause
@@ -329,7 +329,7 @@ function buildUpdateQuery(
 /**
  * Map database row to UnifiedReview type
  */
-function mapRowToUnifiedReview(row: any): UnifiedReview {
+function mapRowToUnifiedReview(row: QueryResultRow): UnifiedReview {
   return {
     id: row.id,
     drop_number: row.drop_number,
@@ -376,6 +376,11 @@ function mapRowToUnifiedReview(row: any): UnifiedReview {
     feedback_sent: row.feedback_sent,
     feedback_message: row.feedback_message,
     feedback_sent_at: row.feedback_sent_at,
+
+    // Auto-QA
+    auto_qa_processed: row.auto_qa_processed ?? false,
+    auto_qa_processed_at: row.auto_qa_processed_at ?? null,
+    auto_qa_results: row.auto_qa_results ?? null,
 
     // Metadata
     reviewed_by: row.reviewed_by,
