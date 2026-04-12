@@ -7,8 +7,9 @@ import { analyticsApi } from '@/services/api/analyticsApi';
 import { getSql } from '@/lib/neon-sql';
 import { log } from '@/lib/logger';
 
+type SqlRow = Record<string, unknown>;
 const rawSql = getSql();
-const sql = async (...args: Parameters<typeof rawSql>) => (await rawSql(...args)) as Record<string, any>[];
+const sql = async (...args: Parameters<typeof rawSql>) => (await rawSql(...args)) as SqlRow[];
 import type { 
   ProjectSummary, 
   ProjectStatusStats, 
@@ -76,9 +77,9 @@ export class ProjectSummaryAnalytics {
         ORDER BY count DESC
       `;
       
-      return result.map((row: any) => ({
-        status: row.status,
-        count: parseInt(row.count)
+      return result.map((row) => ({
+        status: row.status as string,
+        count: parseInt(String(row.count))
       }));
     } catch (error) {
       log.error('Error fetching projects by status:', { data: error }, 'summary-analytics');
@@ -123,11 +124,11 @@ export class ProjectSummaryAnalytics {
         ORDER BY project_count DESC
       `;
       
-      return result.map((row: any) => ({
-        clientId: row.client_id,
-        clientName: row.client_name,
-        projectCount: parseInt(row.project_count),
-        totalBudget: parseFloat(row.total_budget) || 0
+      return result.map((row) => ({
+        clientId: row.client_id as string,
+        clientName: row.client_name as string,
+        projectCount: parseInt(String(row.project_count)),
+        totalBudget: parseFloat(String(row.total_budget)) || 0
       }));
     } catch (error) {
       log.error('Error fetching projects by client:', { data: error }, 'summary-analytics');
@@ -169,14 +170,14 @@ export class ProjectSummaryAnalytics {
         LIMIT ${limit}
       `;
       
-      return result.map((row: any) => ({
-        clientId: row.client_id,
-        clientName: row.client_name,
+      return result.map((row) => ({
+        clientId: row.client_id as string,
+        clientName: row.client_name as string,
         metrics: {
-          projectCount: parseInt(row.project_count),
-          totalBudget: parseFloat(row.total_budget),
-          avgProjectValue: parseFloat(row.avg_project_value),
-          completionRate: parseFloat(row.completion_rate)
+          projectCount: parseInt(String(row.project_count)),
+          totalBudget: parseFloat(String(row.total_budget)),
+          avgProjectValue: parseFloat(String(row.avg_project_value)),
+          completionRate: parseFloat(String(row.completion_rate))
         }
       }));
     } catch (error) {
@@ -218,13 +219,13 @@ export class ProjectSummaryAnalytics {
 
       return {
         byStatus: statusResult,
-        byType: typeResult.map((row: any) => ({
-          type: row.type,
-          count: parseInt(row.count)
+        byType: typeResult.map((row) => ({
+          type: row.type as string,
+          count: parseInt(String(row.count))
         })),
-        byPriority: priorityResult.map((row: any) => ({
-          priority: row.priority,
-          count: parseInt(row.count)
+        byPriority: priorityResult.map((row) => ({
+          priority: row.priority as string,
+          count: parseInt(String(row.count))
         }))
       };
     } catch (error) {

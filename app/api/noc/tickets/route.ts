@@ -33,6 +33,8 @@ import {
   TicketSource,
   TicketType,
   TicketPriority,
+  TicketStatus,
+  TicketCategory,
 } from '@/modules/noc/types/ticket';
 import type {
   CreateTicketPayload,
@@ -93,21 +95,21 @@ export async function GET(req: NextRequest) {
 
     // Single-value filters
     if (searchParams.has('status')) {
-      filters.status = searchParams.get('status') as any;
+      filters.status = searchParams.get('status') as TicketStatus;
     }
     if (searchParams.has('ticket_type')) {
       const types = searchParams.getAll('ticket_type');
       // Array when T1 category filter expanded multiple types; single otherwise
-      filters.ticket_type = types.length === 1 ? (types[0] as any) : (types as any);
+      filters.ticket_type = types.length === 1 ? (types[0] as TicketType) : (types as TicketType[]);
     }
     if (searchParams.has('priority')) {
-      filters.priority = searchParams.get('priority') as any;
+      filters.priority = searchParams.get('priority') as TicketPriority;
     }
     if (searchParams.has('source')) {
-      filters.source = searchParams.get('source') as any;
+      filters.source = searchParams.get('source') as TicketSource;
     }
     if (searchParams.has('ticket_category')) {
-      filters.ticket_category = searchParams.get('ticket_category') as any;
+      filters.ticket_category = searchParams.get('ticket_category') as TicketCategory;
     }
     if (searchParams.has('assigned_to')) {
       filters.assigned_to = searchParams.get('assigned_to')!;

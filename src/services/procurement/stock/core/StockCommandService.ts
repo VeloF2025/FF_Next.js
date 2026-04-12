@@ -296,8 +296,7 @@ export class StockCommandService extends BaseService {
     userId: string
   ): Promise<ServiceResponse<StockPosition>> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return await db.transaction(async (tx: any) => {
+      return await db.transaction(async (tx: typeof db) => {
         // Get current stock position
         const [currentPosition] = await tx
           .select()
@@ -440,8 +439,7 @@ export class StockCommandService extends BaseService {
     reservationData: StockReservationData
   ): Promise<ServiceResponse<StockPosition>> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return await db.transaction(async (tx: any) => {
+      return await db.transaction(async (tx: typeof db) => {
         // Get current stock position
         const [currentPosition] = await tx
           .select()
@@ -512,8 +510,7 @@ export class StockCommandService extends BaseService {
     releaseQuantity: number
   ): Promise<ServiceResponse<StockPosition>> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return await db.transaction(async (tx: any) => {
+      return await db.transaction(async (tx: typeof db) => {
         // Get current stock position
         const [currentPosition] = await tx
           .select()
@@ -720,73 +717,71 @@ export class StockCommandService extends BaseService {
     return 'normal';
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private mapStockPosition(position: any): StockPosition {
+  private mapStockPosition(position: Record<string, unknown>): StockPosition {
     const result: StockPosition = {
-      id: position.id,
-      projectId: position.projectId,
-      itemCode: position.itemCode,
-      itemName: position.itemName,
-      uom: position.uom,
+      id: String(position.id),
+      projectId: String(position.projectId),
+      itemCode: String(position.itemCode),
+      itemName: String(position.itemName),
+      uom: String(position.uom),
       onHandQuantity: Number(position.onHandQuantity || 0),
       reservedQuantity: Number(position.reservedQuantity || 0),
       availableQuantity: Number(position.availableQuantity || 0),
       inTransitQuantity: Number(position.inTransitQuantity || 0),
       isActive: Boolean(position.isActive),
-      stockStatus: position.stockStatus,
-      createdAt: position.createdAt,
-      updatedAt: position.updatedAt,
+      stockStatus: position.stockStatus as StockPosition['stockStatus'],
+      createdAt: position.createdAt as Date,
+      updatedAt: position.updatedAt as Date,
     };
 
     // Only add optional properties if they have values
-    if (position.description) result.description = position.description;
-    if (position.category) result.category = position.category;
+    if (position.description) result.description = String(position.description);
+    if (position.category) result.category = String(position.category);
     if (position.averageUnitCost) result.averageUnitCost = Number(position.averageUnitCost);
     if (position.totalValue) result.totalValue = Number(position.totalValue);
-    if (position.warehouseLocation) result.warehouseLocation = position.warehouseLocation;
-    if (position.binLocation) result.binLocation = position.binLocation;
+    if (position.warehouseLocation) result.warehouseLocation = String(position.warehouseLocation);
+    if (position.binLocation) result.binLocation = String(position.binLocation);
     if (position.reorderLevel) result.reorderLevel = Number(position.reorderLevel);
     if (position.maxStockLevel) result.maxStockLevel = Number(position.maxStockLevel);
     if (position.economicOrderQuantity) result.economicOrderQuantity = Number(position.economicOrderQuantity);
-    if (position.lastMovementDate) result.lastMovementDate = position.lastMovementDate;
-    if (position.lastCountDate) result.lastCountDate = position.lastCountDate;
-    if (position.nextCountDue) result.nextCountDue = position.nextCountDue;
+    if (position.lastMovementDate) result.lastMovementDate = position.lastMovementDate as Date;
+    if (position.lastCountDate) result.lastCountDate = position.lastCountDate as Date;
+    if (position.nextCountDue) result.nextCountDue = position.nextCountDue as Date;
 
     return result;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private mapCableDrum(drum: any): CableDrum {
+  private mapCableDrum(drum: Record<string, unknown>): CableDrum {
     const result: CableDrum = {
-      id: drum.id,
-      projectId: drum.projectId,
-      drumNumber: drum.drumNumber,
-      cableType: drum.cableType,
+      id: String(drum.id),
+      projectId: String(drum.projectId),
+      drumNumber: String(drum.drumNumber),
+      cableType: String(drum.cableType),
       originalLength: Number(drum.originalLength),
       currentLength: Number(drum.currentLength),
       usedLength: Number(drum.usedLength),
-      drumCondition: drum.drumCondition,
-      installationStatus: drum.installationStatus,
-      createdAt: drum.createdAt,
-      updatedAt: drum.updatedAt,
+      drumCondition: drum.drumCondition as CableDrum['drumCondition'],
+      installationStatus: drum.installationStatus as CableDrum['installationStatus'],
+      createdAt: drum.createdAt as Date,
+      updatedAt: drum.updatedAt as Date,
     };
 
     // Only add optional properties if they have values
-    if (drum.stockPositionId) result.stockPositionId = drum.stockPositionId;
-    if (drum.serialNumber) result.serialNumber = drum.serialNumber;
-    if (drum.supplierDrumId) result.supplierDrumId = drum.supplierDrumId;
-    if (drum.cableSpecification) result.cableSpecification = drum.cableSpecification;
-    if (drum.manufacturerName) result.manufacturerName = drum.manufacturerName;
-    if (drum.partNumber) result.partNumber = drum.partNumber;
+    if (drum.stockPositionId) result.stockPositionId = String(drum.stockPositionId);
+    if (drum.serialNumber) result.serialNumber = String(drum.serialNumber);
+    if (drum.supplierDrumId) result.supplierDrumId = String(drum.supplierDrumId);
+    if (drum.cableSpecification) result.cableSpecification = String(drum.cableSpecification);
+    if (drum.manufacturerName) result.manufacturerName = String(drum.manufacturerName);
+    if (drum.partNumber) result.partNumber = String(drum.partNumber);
     if (drum.drumWeight) result.drumWeight = Number(drum.drumWeight);
     if (drum.cableWeight) result.cableWeight = Number(drum.cableWeight);
     if (drum.drumDiameter) result.drumDiameter = Number(drum.drumDiameter);
-    if (drum.currentLocation) result.currentLocation = drum.currentLocation;
+    if (drum.currentLocation) result.currentLocation = String(drum.currentLocation);
     if (drum.lastMeterReading) result.lastMeterReading = Number(drum.lastMeterReading);
-    if (drum.lastReadingDate) result.lastReadingDate = drum.lastReadingDate;
-    if (drum.lastUsedDate) result.lastUsedDate = drum.lastUsedDate;
-    if (drum.testCertificate) result.testCertificate = drum.testCertificate;
-    if (drum.installationNotes) result.installationNotes = drum.installationNotes;
+    if (drum.lastReadingDate) result.lastReadingDate = drum.lastReadingDate as Date;
+    if (drum.lastUsedDate) result.lastUsedDate = drum.lastUsedDate as Date;
+    if (drum.testCertificate) result.testCertificate = String(drum.testCertificate);
+    if (drum.installationNotes) result.installationNotes = String(drum.installationNotes);
 
     return result;
   }
