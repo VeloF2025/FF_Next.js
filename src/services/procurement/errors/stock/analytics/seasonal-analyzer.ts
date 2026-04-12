@@ -5,6 +5,19 @@
 
 import { StockError } from '../inventory';
 
+/** Seasonal pattern data returned by identifySeasonalPatterns */
+interface SeasonalPatterns {
+  hourlyPatterns: Array<{ hour: number; averageErrors: number }>;
+  dailyPatterns: Array<{ dayOfWeek: number; averageErrors: number }>;
+  monthlyPatterns: Array<{ month: number; averageErrors: number }>;
+}
+
+/** A single identified peak period with its likelihood score */
+interface PeakPeriod {
+  period: string;
+  likelihood: number;
+}
+
 /**
  * Seasonal analysis functionality
  */
@@ -190,14 +203,14 @@ export class SeasonalAnalyzer {
   /**
    * Identify peak periods from seasonal patterns
    */
-  private static identifyPeakPeriods(seasonalPatterns: any): Array<{ period: string; likelihood: number }> {
-    const peakPeriods: Array<{ period: string; likelihood: number }> = [];
-    
+  private static identifyPeakPeriods(seasonalPatterns: SeasonalPatterns): PeakPeriod[] {
+    const peakPeriods: PeakPeriod[] = [];
+
     // Find peak hours
     if (seasonalPatterns.hourlyPatterns.length > 0) {
-      const maxHourlyErrors = Math.max(...seasonalPatterns.hourlyPatterns.map((p: any) => p.averageErrors));
+      const maxHourlyErrors = Math.max(...seasonalPatterns.hourlyPatterns.map(p => p.averageErrors));
       if (maxHourlyErrors > 0) {
-        seasonalPatterns.hourlyPatterns.forEach((pattern: any) => {
+        seasonalPatterns.hourlyPatterns.forEach(pattern => {
           if (pattern.averageErrors > maxHourlyErrors * 0.8) {
             peakPeriods.push({
               period: `Hour ${pattern.hour}`,
@@ -210,9 +223,9 @@ export class SeasonalAnalyzer {
 
     // Find peak days
     if (seasonalPatterns.dailyPatterns.length > 0) {
-      const maxDailyErrors = Math.max(...seasonalPatterns.dailyPatterns.map((p: any) => p.averageErrors));
+      const maxDailyErrors = Math.max(...seasonalPatterns.dailyPatterns.map(p => p.averageErrors));
       if (maxDailyErrors > 0) {
-        seasonalPatterns.dailyPatterns.forEach((pattern: any) => {
+        seasonalPatterns.dailyPatterns.forEach(pattern => {
           if (pattern.averageErrors > maxDailyErrors * 0.9) {
             const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
             peakPeriods.push({
@@ -230,21 +243,21 @@ export class SeasonalAnalyzer {
   /**
    * Calculate seasonal factors
    */
-  private static calculateSeasonalFactors(seasonalPatterns: any): Record<string, number> {
+  private static calculateSeasonalFactors(seasonalPatterns: SeasonalPatterns): Record<string, number> {
     const factors: Record<string, number> = {};
-    
+
     if (seasonalPatterns.hourlyPatterns.length > 0) {
-      const avgHourlyErrors = seasonalPatterns.hourlyPatterns.reduce((sum: number, p: any) => sum + p.averageErrors, 0) / seasonalPatterns.hourlyPatterns.length;
-      
-      seasonalPatterns.hourlyPatterns.forEach((pattern: any) => {
+      const avgHourlyErrors = seasonalPatterns.hourlyPatterns.reduce((sum: number, p) => sum + p.averageErrors, 0) / seasonalPatterns.hourlyPatterns.length;
+
+      seasonalPatterns.hourlyPatterns.forEach(pattern => {
         factors[`hour_${pattern.hour}`] = avgHourlyErrors > 0 ? pattern.averageErrors / avgHourlyErrors : 1;
       });
     }
 
     if (seasonalPatterns.dailyPatterns.length > 0) {
-      const avgDailyErrors = seasonalPatterns.dailyPatterns.reduce((sum: number, p: any) => sum + p.averageErrors, 0) / seasonalPatterns.dailyPatterns.length;
-      
-      seasonalPatterns.dailyPatterns.forEach((pattern: any) => {
+      const avgDailyErrors = seasonalPatterns.dailyPatterns.reduce((sum: number, p) => sum + p.averageErrors, 0) / seasonalPatterns.dailyPatterns.length;
+
+      seasonalPatterns.dailyPatterns.forEach(pattern => {
         factors[`day_${pattern.dayOfWeek}`] = avgDailyErrors > 0 ? pattern.averageErrors / avgDailyErrors : 1;
       });
     }
@@ -255,7 +268,7 @@ export class SeasonalAnalyzer {
   /**
    * Generate seasonal recommendations
    */
-  private static generateSeasonalRecommendations(peakPeriods: any[], seasonalFactors: Record<string, number>): string[] {
+  private static generateSeasonalRecommendations(peakPeriods: PeakPeriod[], seasonalFactors: Record<string, number>): string[] {
     const recommendations: string[] = [];
     
     if (peakPeriods.length > 0) {
