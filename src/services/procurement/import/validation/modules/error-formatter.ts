@@ -92,19 +92,19 @@ export function getErrorSummary(errors: ImportError[], warnings: ImportWarning[]
     hasValidationErrors: errors.some(e => e.type === 'validation'),
     hasParsingErrors: errors.some(e => e.type === 'parsing'),
     hasBusinessErrors: errors.some(e => e.type === 'business'),
-    mostCommonError: Object.keys(errorsByType).length > 0 
+    mostCommonError: Object.keys(errorsByType).length > 0
       ? Object.keys(errorsByType).reduce((a, b) =>
-          (errorsByType[a] as any[]).length > (errorsByType[b] as any[]).length ? a : b
+          (errorsByType[a]?.length ?? 0) > (errorsByType[b]?.length ?? 0) ? a : b
         )
       : null,
-    problematicColumns: Object.keys(errorsByColumn).filter(col => (errorsByColumn[col] as any[]).length > 1)
+    problematicColumns: Object.keys(errorsByColumn).filter(col => (errorsByColumn[col]?.length ?? 0) > 1)
   };
 }
 
 /**
  * Create validation result object
  */
-export function createValidationResult<T = any>(
+export function createValidationResult<T = unknown>(
   value?: T,
   errors: ImportError[] = [],
   warnings: ImportWarning[] = []
@@ -138,7 +138,7 @@ export function formatValidationSummary(results: ValidationResult[]): string {
   output += `- Warnings: ${summary.totalWarnings}\n`;
   
   if (summary.mostCommonError) {
-    output += `- Most Common Error: ${summary.mostCommonError} (${(summary.errorsByType[summary.mostCommonError] as any[]).length} occurrences)\n`;
+    output += `- Most Common Error: ${summary.mostCommonError} (${summary.errorsByType[summary.mostCommonError]?.length ?? 0} occurrences)\n`;
   }
   
   if (summary.problematicColumns.length > 0) {

@@ -30,7 +30,7 @@ export class StockMovementError extends StockError {
     itemCode: string,
     quantity: number,
     options?: MovementOptions,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     super(message, 'STOCK_MOVEMENT_FAILED', 400, context);
     this.name = 'StockMovementError';
@@ -92,7 +92,7 @@ export class StockTransferError extends StockError {
     quantity: number,
     reason: string,
     options?: TransferOptions,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     const message = `Stock transfer failed: ${reason}`;
     super(message, 'STOCK_TRANSFER_FAILED', 400, context);
@@ -146,7 +146,7 @@ export class StockAdjustmentError extends StockError {
     currentQuantity: number,
     message: string,
     options?: AdjustmentOptions,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     super(message, 'STOCK_ADJUSTMENT_FAILED', 400, context);
     this.name = 'StockAdjustmentError';
@@ -213,15 +213,15 @@ export class StockTrackingError extends StockError {
   public readonly itemCode: string;
   public readonly trackingId?: string;
   public readonly operationType: string;
-  public readonly details: Record<string, any>;
+  public readonly details: Record<string, unknown>;
 
   constructor(
     message: string,
     itemCode: string,
     operationType: string,
-    details: Record<string, any> = {},
+    details: Record<string, unknown> = {},
     options?: TrackingOptions,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     super(message, 'STOCK_TRACKING_FAILED', 400, context);
     this.name = 'StockTrackingError';

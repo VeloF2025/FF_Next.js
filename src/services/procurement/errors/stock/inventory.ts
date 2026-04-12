@@ -15,7 +15,7 @@ import type {
  * Stock management base error class
  */
 export class StockError extends ProcurementError {
-  constructor(message: string, code: string, statusCode: number = 400, context?: Record<string, any>) {
+  constructor(message: string, code: string, statusCode: number = 400, context?: Record<string, unknown>) {
     super(message, code, statusCode, context);
     this.name = 'StockError';
     Object.setPrototypeOf(this, StockError.prototype);
@@ -24,7 +24,7 @@ export class StockError extends ProcurementError {
   /**
    * Get detailed error information for logging and debugging
    */
-  getErrorDetails(): Record<string, any> {
+  getErrorDetails(): Record<string, unknown> {
     return {
       errorType: this.name,
       errorCode: this.code,
@@ -47,7 +47,7 @@ export class InsufficientStockError extends StockError {
   public readonly availableQuantity: number;
   public readonly reservedQuantity?: number;
   public readonly category?: string;
-  public readonly specifications?: Record<string, any>;
+  public readonly specifications?: Record<string, unknown>;
   public readonly unitPrice?: number;
   public readonly alternativeLocations?: AlternativeLocation[];
   public readonly alternativeItems?: AlternativeItem[];
@@ -57,7 +57,7 @@ export class InsufficientStockError extends StockError {
     requestedQuantity: number,
     availableQuantity: number,
     options?: InsufficientStockOptions,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     const message = `Insufficient stock for ${itemCode}. Requested: ${requestedQuantity}, Available: ${availableQuantity}`;
     super(message, 'INSUFFICIENT_STOCK', 409, context);
@@ -211,7 +211,7 @@ export class StockReservationError extends StockError {
     requestedQuantity: number,
     availableQuantity: number,
     existingReservations: ExistingReservation[],
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     const message = `Cannot reserve ${requestedQuantity} units of ${itemCode}. Available: ${availableQuantity}`;
     super(message, 'STOCK_RESERVATION_FAILED', 409, context);
@@ -219,9 +219,9 @@ export class StockReservationError extends StockError {
     this.itemCode = itemCode;
     this.requestedQuantity = requestedQuantity;
     this.availableQuantity = availableQuantity;
-    this.location = context?.location;
+    this.location = typeof context?.location === 'string' ? context.location : undefined;
     this.quantity = requestedQuantity;
-    this.priority = context?.priority;
+    this.priority = typeof context?.priority === 'string' ? context.priority : undefined;
     this.existingReservations = existingReservations;
     Object.setPrototypeOf(this, StockReservationError.prototype);
   }

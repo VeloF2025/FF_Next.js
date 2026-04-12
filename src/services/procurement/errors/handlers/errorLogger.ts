@@ -83,7 +83,7 @@ export class ProcurementErrorLogger implements IErrorLogger {
     error: unknown, 
     context: ErrorLogContext, 
     severity: string
-  ): Record<string, any> {
+  ): Record<string, unknown> {
     const sanitizedContext = this.sanitizeErrorContext(context);
     
     return {
@@ -104,20 +104,20 @@ export class ProcurementErrorLogger implements IErrorLogger {
   /**
    * Sanitize error context to remove sensitive information
    */
-  private sanitizeErrorContext(context: ErrorLogContext): Record<string, any> {
+  private sanitizeErrorContext(context: ErrorLogContext): Record<string, unknown> {
     const sensitiveKeys = ['password', 'token', 'apiKey', 'secret', 'credentials', 'authorization'];
-    const sanitized = { ...context };
+    const sanitized: Record<string, unknown> = { ...context };
 
     // Remove sensitive information
     Object.keys(sanitized).forEach(key => {
       if (sensitiveKeys.some(sensitive => key.toLowerCase().includes(sensitive))) {
-        sanitized[key as keyof typeof sanitized] = '[REDACTED]' as any;
+        sanitized[key] = '[REDACTED]';
       }
     });
 
     // Handle nested objects
-    if (sanitized.additionalInfo) {
-      sanitized.additionalInfo = this.sanitizeNestedObject(sanitized.additionalInfo);
+    if (sanitized.additionalInfo && typeof sanitized.additionalInfo === 'object') {
+      sanitized.additionalInfo = this.sanitizeNestedObject(sanitized.additionalInfo as Record<string, unknown>);
     }
 
     // Limit size to prevent log overflow
@@ -128,7 +128,7 @@ export class ProcurementErrorLogger implements IErrorLogger {
   /**
    * Sanitize nested object recursively
    */
-  private sanitizeNestedObject(obj: Record<string, any>): Record<string, any> {
+  private sanitizeNestedObject(obj: Record<string, unknown>): Record<string, unknown> {
     const sensitiveKeys = ['password', 'token', 'apiKey', 'secret', 'credentials', 'authorization'];
     const sanitized = { ...obj };
 
@@ -136,7 +136,7 @@ export class ProcurementErrorLogger implements IErrorLogger {
       if (sensitiveKeys.some(sensitive => key.toLowerCase().includes(sensitive))) {
         sanitized[key] = '[REDACTED]';
       } else if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
-        sanitized[key] = this.sanitizeNestedObject(sanitized[key]);
+        sanitized[key] = this.sanitizeNestedObject(sanitized[key] as Record<string, unknown>);
       }
     });
 
