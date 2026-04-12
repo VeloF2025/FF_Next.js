@@ -22,6 +22,18 @@ interface NotificationConfig {
   };
 }
 
+/** Shape of a stock error as used by this notification handler */
+interface StockError {
+  constructor: { name: string };
+  message: string;
+  itemCode?: string;
+  location?: string;
+  quantity?: number;
+}
+
+/** Severity union used across notification methods */
+type Severity = 'low' | 'medium' | 'high' | 'critical';
+
 /**
  * Error notification handler
  */
@@ -51,8 +63,8 @@ export class NotificationHandler {
     recoveryOptions,
     attemptCount = 0
   }: {
-    error: any;
-    severity: 'low' | 'medium' | 'high' | 'critical';
+    error: StockError;
+    severity: Severity;
     recoveryOptions: RecoveryOption[];
     attemptCount?: number;
   }): Promise<{
@@ -107,9 +119,9 @@ export class NotificationHandler {
     recoveryOption,
     recoveryResult
   }: {
-    originalError: any;
+    originalError: StockError;
     recoveryOption: RecoveryOption;
-    recoveryResult: any;
+    recoveryResult: unknown;
   }): Promise<boolean> {
     try {
       const message = {
@@ -151,8 +163,8 @@ export class NotificationHandler {
     attemptCount,
     timeElapsed
   }: {
-    error: any;
-    severity: 'low' | 'medium' | 'high' | 'critical';
+    error: StockError;
+    severity: Severity;
     attemptCount: number;
     timeElapsed: number; // minutes
   }): boolean {
@@ -176,12 +188,12 @@ export class NotificationHandler {
 
   // Private notification methods
   private static async sendEmailNotification(
-    error: any,
-    severity: string,
+    error: StockError,
+    severity: Severity,
     recoveryOptions: RecoveryOption[],
     attemptCount: number
   ): Promise<void> {
-    const recipients = this.shouldEscalate({ error, severity, attemptCount, timeElapsed: 0 } as any)
+    const recipients = this.shouldEscalate({ error, severity, attemptCount, timeElapsed: 0 })
       ? this.config.email.escalationRecipients
       : this.config.email.recipients;
 
@@ -195,17 +207,17 @@ export class NotificationHandler {
     log.debug('Email notification would be sent:', emailData, 'notification-handler');
   }
 
-  private static async sendSMSNotification(error: any, _severity: string): Promise<void> {
+  private static async sendSMSNotification(error: StockError, _severity: Severity): Promise<void> {
     // Mock SMS sending - would integrate with SMS service
     const smsMessage = `CRITICAL STOCK ERROR: ${error.constructor.name} - Item: ${error.itemCode || 'N/A'} - Immediate attention required`;
-    
+
     // TODO: Replace with actual SMS service integration
     log.warn('SMS notification would be sent:', { data: smsMessage }, 'notification-handler');
   }
 
   private static async sendWebhookNotification(
-    error: any,
-    severity: string,
+    error: StockError,
+    severity: Severity,
     recoveryOptions: RecoveryOption[]
   ): Promise<void> {
     // Mock webhook sending - would integrate with webhook service
@@ -231,8 +243,8 @@ export class NotificationHandler {
   }
 
   private static formatEmailBody(
-    error: any,
-    severity: string,
+    error: StockError,
+    severity: Severity,
     recoveryOptions: RecoveryOption[],
     attemptCount: number
   ): string {
@@ -243,7 +255,7 @@ export class NotificationHandler {
       <p><strong>Item Code:</strong> ${error.itemCode || 'N/A'}</p>
       <p><strong>Location:</strong> ${error.location || 'N/A'}</p>
       <p><strong>Attempt Count:</strong> ${attemptCount}</p>
-      
+
       <h3>Available Recovery Options:</h3>
       <ul>
         ${recoveryOptions.map(option => `
@@ -253,7 +265,7 @@ export class NotificationHandler {
           </li>
         `).join('')}
       </ul>
-      
+
       <p><strong>Timestamp:</strong> ${new Date().toISOString()}</p>
     `;
   }

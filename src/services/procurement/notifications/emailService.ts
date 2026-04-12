@@ -7,7 +7,7 @@
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 
-const sql: any = neon(process.env.DATABASE_URL!);
+const sql = neon(process.env.DATABASE_URL!);
 
 // Email provider configuration (can be SendGrid, AWS SES, etc.)
 interface EmailConfig {
@@ -18,9 +18,18 @@ interface EmailConfig {
   fromName: string;
 }
 
+/** Structured email payload used across all send methods */
+interface EmailData {
+  to: string | string[];
+  toName?: string;
+  subject: string;
+  templateId?: string;
+  data: Record<string, unknown>;
+}
+
 // Default email configuration
 const emailConfig: EmailConfig = {
-  provider: process.env.EMAIL_PROVIDER as any || 'webhook',
+  provider: (process.env.EMAIL_PROVIDER as EmailConfig['provider']) || 'webhook',
   apiKey: process.env.EMAIL_API_KEY,
   webhookUrl: process.env.EMAIL_WEBHOOK_URL || 'https://api.example.com/email',
   fromEmail: process.env.EMAIL_FROM || 'noreply@fibreflow.com',
@@ -271,10 +280,10 @@ export class EmailService {
     recipientEmail: string,
     subject: string,
     message: string,
-    data?: any
+    data?: Record<string, unknown>
   ): Promise<void> {
     try {
-      const emailData = {
+      const emailData: EmailData = {
         to: recipientEmail,
         subject: subject,
         templateId: 'custom',
@@ -297,7 +306,7 @@ export class EmailService {
   /**
    * Core email sending function
    */
-  private static async sendEmail(emailData: any): Promise<void> {
+  private static async sendEmail(emailData: EmailData): Promise<void> {
     try {
       switch (emailConfig.provider) {
         case 'webhook':
@@ -324,7 +333,7 @@ export class EmailService {
   /**
    * Send email via webhook
    */
-  private static async sendViaWebhook(emailData: any): Promise<void> {
+  private static async sendViaWebhook(emailData: EmailData): Promise<void> {
     if (!emailConfig.webhookUrl) {
       log.warn('Webhook URL not configured', {}, 'emailService');
       return;
@@ -358,7 +367,7 @@ export class EmailService {
   /**
    * Send email via SendGrid
    */
-  private static async sendViaSendGrid(emailData: any): Promise<void> {
+  private static async sendViaSendGrid(emailData: EmailData): Promise<void> {
     // Implement SendGrid integration
     log.info('SendGrid email integration not yet implemented', emailData, 'emailService');
   }
@@ -366,7 +375,7 @@ export class EmailService {
   /**
    * Send email via AWS SES
    */
-  private static async sendViaAWSSES(emailData: any): Promise<void> {
+  private static async sendViaAWSSES(emailData: EmailData): Promise<void> {
     // Implement AWS SES integration
     log.info('AWS SES email integration not yet implemented', emailData, 'emailService');
   }
@@ -374,7 +383,7 @@ export class EmailService {
   /**
    * Send email via SMTP
    */
-  private static async sendViaSMTP(emailData: any): Promise<void> {
+  private static async sendViaSMTP(emailData: EmailData): Promise<void> {
     // Implement SMTP integration
     log.info('SMTP email integration not yet implemented', emailData, 'emailService');
   }
@@ -386,7 +395,7 @@ export class EmailService {
     rfqId: string,
     supplierId: string | null,
     type: string,
-    emailData: any
+    emailData: EmailData
   ): Promise<void> {
     try {
       await sql`
