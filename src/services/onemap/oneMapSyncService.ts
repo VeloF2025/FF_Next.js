@@ -5,7 +5,7 @@
  * Handles full and incremental syncs with checksum-based change detection.
  */
 
-import { neon } from '@/lib/db-neon';
+import { neon, NeonQueryFunction } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { OneMapClient, OneMapRecord, createOneMapClient } from './oneMapClient';
 import crypto from 'crypto';
@@ -45,6 +45,12 @@ export interface SyncSummary {
   totalFailed: number;
 }
 
+// Row types for SQL query results
+interface ChecksumRow { dr_number: string; checksum: string }
+interface ExistingRow { id: string; checksum: string }
+interface CountRow { count: string }
+interface SiteRow { id: string; site_code: string; site_name: string; project_id: string | null }
+
 // Get SQL client
 function getSql() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -73,7 +79,7 @@ function generateChecksum(record: OneMapRecord): string {
 /**
  * Get enabled sites from database
  */
-async function getEnabledSites(sql: any, siteCode?: string) {
+async function getEnabledSites(sql: NeonQueryFunction<false, false>, siteCode?: string) {
   if (siteCode) {
     const sites = await sql`
       SELECT id, site_code, site_name, project_id
@@ -95,12 +101,12 @@ async function getEnabledSites(sql: any, siteCode?: string) {
 /**
  * Get existing installation checksums for a site
  */
-async function getExistingChecksums(sql: any, siteId: string): Promise<Map<string, string>> {
+async function getExistingChecksums(sql: NeonQueryFunction<false, false>, siteId: string): Promise<Map<string, string>> {
   const rows = await sql`
     SELECT dr_number, checksum
     FROM onemap.drops
     WHERE site_id = ${siteId}::uuid
-  ` as Record<string, any>[];
+  ` as ChecksumRow[];
 
   const checksums = new Map<string, string>();
   for (const row of rows) {
@@ -113,7 +119,7 @@ async function getExistingChecksums(sql: any, siteId: string): Promise<Map<strin
  * Upsert installation record
  */
 async function upsertInstallation(
-  sql: any,
+  sql: NeonQueryFunction<false, false>,
   siteId: string,
   record: OneMapRecord,
   checksum: string
@@ -125,7 +131,7 @@ async function upsertInstallation(
   const existing = await sql`
     SELECT id, checksum FROM onemap.drops
     WHERE site_id = ${siteId}::uuid AND dr_number = ${record.drp}
-  `;
+  ` as ExistingRow[];
 
   if (existing.length === 0) {
     // Insert new
@@ -153,7 +159,8 @@ async function upsertInstallation(
   }
 
   // Check if changed
-  if (existing[0].checksum === checksum) {
+  const firstRow = existing[0];
+  if (firstRow?.checksum === checksum) {
     return 'unchanged';
   }
 
@@ -180,7 +187,7 @@ async function upsertInstallation(
  * Log sync to sync_log table
  */
 async function logSync(
-  sql: any,
+  sql: NeonQueryFunction<false, false>,
   result: SyncResult,
   syncType: 'full' | 'incremental',
   startedAt: Date
@@ -211,7 +218,7 @@ async function logSync(
  * Update site sync timestamp
  */
 async function updateSiteSyncTime(
-  sql: any,
+  sql: NeonQueryFunction<false, false>,
   siteId: string,
   syncType: 'full' | 'incremental',
   totalInstallations: number
@@ -317,7 +324,8 @@ export async function syncSite(
     const totalInstallations = await sql`
       SELECT COUNT(*) as count FROM onemap.drops WHERE site_id = ${site.id}::uuid
     `;
-    await updateSiteSyncTime(sql, site.id, fullSync ? 'full' : 'incremental', parseInt((totalInstallations as any[])[0].count));
+    const countRows = totalInstallations as CountRow[];
+    await updateSiteSyncTime(sql, site.id, fullSync ? 'full' : 'incremental', parseInt(countRows[0]?.count ?? '0'));
 
     result.success = true;
     result.durationSeconds = (Date.now() - startedAt.getTime()) / 1000;
@@ -358,7 +366,7 @@ export async function syncAllSites(options: SyncOptions = {}): Promise<SyncSumma
   await client.authenticate();
 
   // Get sites to sync
-  const sites = await getEnabledSites(sql, options.siteCode);
+  const sites = await getEnabledSites(sql, options.siteCode) as SiteRow[];
 
   if (sites.length === 0) {
     throw new Error(options.siteCode
@@ -368,7 +376,7 @@ export async function syncAllSites(options: SyncOptions = {}): Promise<SyncSumma
   }
 
   logger.info(`Starting sync for ${sites.length} site(s)`, {
-    sites: sites.map((s: any) => s.site_code),
+    sites: sites.map(s => s.site_code),
   });
 
   const results: SyncResult[] = [];

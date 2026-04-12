@@ -10,6 +10,11 @@ import { db } from '@/config/firebase';
 import { Product, ProductAvailability } from './types';
 import { log } from '@/lib/logger';
 
+interface FirestoreDoc {
+  id: string;
+  data(): Record<string, unknown>;
+}
+
 const PRODUCTS_COLLECTION = 'products';
 
 /**
@@ -28,14 +33,14 @@ export class ProductSearchService {
       );
       
       const snapshot = await getDocs(q);
-      const products = snapshot.docs.map((doc: any) => ({
+      const products = snapshot.docs.map((doc: FirestoreDoc) => ({
         id: doc.id,
         ...doc.data()
       } as Product));
-      
+
       // Client-side filtering for search
       const term = searchTerm.toLowerCase();
-      return products.filter((product: any) =>
+      return products.filter((product: Product) =>
         product.name.toLowerCase().includes(term) ||
         product.code.toLowerCase().includes(term) ||
         product.description?.toLowerCase().includes(term) ||
@@ -60,7 +65,7 @@ export class ProductSearchService {
       );
       
       const snapshot = await getDocs(q);
-      return snapshot.docs.map((doc: any) => ({
+      return snapshot.docs.map((doc: FirestoreDoc) => ({
         id: doc.id,
         ...doc.data()
       } as Product));
@@ -86,7 +91,7 @@ export class ProductSearchService {
       );
       
       const snapshot = await getDocs(q);
-      return snapshot.docs.map((doc: any) => ({
+      return snapshot.docs.map((doc: FirestoreDoc) => ({
         id: doc.id,
         ...doc.data()
       } as Product));
@@ -109,7 +114,7 @@ export class ProductSearchService {
       );
       
       const snapshot = await getDocs(q);
-      return snapshot.docs.map((doc: any) => ({
+      return snapshot.docs.map((doc: FirestoreDoc) => ({
         id: doc.id,
         ...doc.data()
       } as Product));
@@ -132,7 +137,7 @@ export class ProductSearchService {
       );
       
       const snapshot = await getDocs(q);
-      return snapshot.docs.map((doc: any) => ({
+      return snapshot.docs.map((doc: FirestoreDoc) => ({
         id: doc.id,
         ...doc.data()
       } as Product));

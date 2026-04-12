@@ -23,7 +23,7 @@ interface DbClient {
   contact_email?: string;
   contact_phone?: string;
   payment_terms?: number;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
   project_count?: number;
   active_projects?: number;
   total_revenue?: number;
@@ -55,7 +55,16 @@ interface Client {
   projectCount?: number;
   activeProjects?: number;
   totalRevenue?: number;
-  metadata?: any;
+  creditLimit?: number;
+  creditRating?: string;
+  preferredContactMethod?: string;
+  communicationLanguage?: string;
+  timezone?: string;
+  priority?: string;
+  industry?: string;
+  serviceTypes?: string[];
+  tags?: string[];
+  metadata?: Record<string, unknown>;
   created_at?: string;
   updated_at?: string;
 }
@@ -70,7 +79,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return data.data || data;
 }
 
-function transformDbToClient(dbClient: DbClient): any {
+function transformDbToClient(dbClient: DbClient): Client {
   return {
     id: dbClient.id,
     name: dbClient.name,
@@ -134,10 +143,10 @@ function transformClientToDb(client: Partial<Client>): Partial<DbClient> {
 }
 
 export const clientApiService = {
-  async getAll(filter?: any): Promise<Client[]> {
+  async getAll(filter?: { search?: string; searchTerm?: string; status?: string; type?: string }): Promise<Client[]> {
     const params = new URLSearchParams();
     if (filter) {
-      if (filter.search || filter.searchTerm) params.append('search', filter.search || filter.searchTerm);
+      if (filter.search || filter.searchTerm) params.append('search', filter.search ?? filter.searchTerm ?? '');
       if (filter.status) params.append('status', filter.status);
       if (filter.type) params.append('type', filter.type);
     }
@@ -153,7 +162,7 @@ export const clientApiService = {
     return dbClient ? transformDbToClient(dbClient) : null;
   },
 
-  async create(clientData: any): Promise<Client> {
+  async create(clientData: Partial<Client>): Promise<Client> {
     // Transform the form data to match the database schema
     const dbData = transformClientToDb(clientData);
     
@@ -166,7 +175,7 @@ export const clientApiService = {
     return transformDbToClient(dbClient);
   },
 
-  async update(id: string, updates: any): Promise<Client> {
+  async update(id: string, updates: Partial<Client>): Promise<Client> {
     // Transform the form data to match the database schema
     const dbUpdates = transformClientToDb(updates);
     
@@ -187,7 +196,7 @@ export const clientApiService = {
   },
 
   // Compatibility methods to match existing service interface
-  async getActiveClients(): Promise<any[]> {
+  async getActiveClients(): Promise<Client[]> {
     const clients = await this.getAll();
     // Return all clients for now, regardless of status
     // Later we can filter by status when we know the exact status values

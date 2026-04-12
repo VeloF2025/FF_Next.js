@@ -9,6 +9,15 @@ import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestor
 import { db } from '@/config/firebase';
 import { Product, ProductCallback } from './types';
 
+interface FirestoreDoc {
+  id: string;
+  data(): Record<string, unknown>;
+}
+
+interface FirestoreSnapshot {
+  docs: FirestoreDoc[];
+}
+
 const PRODUCTS_COLLECTION = 'products';
 
 /**
@@ -25,8 +34,8 @@ export class ProductSubscriptionService {
       orderBy('name')
     );
     
-    return onSnapshot(q, (snapshot: any) => {
-      const products = snapshot.docs.map((doc: any) => ({
+    return onSnapshot(q, (snapshot: FirestoreSnapshot) => {
+      const products = snapshot.docs.map((doc: FirestoreDoc) => ({
         id: doc.id,
         ...doc.data()
       } as Product));
@@ -44,8 +53,8 @@ export class ProductSubscriptionService {
       orderBy('name')
     );
     
-    return onSnapshot(q, (snapshot: any) => {
-      const products = snapshot.docs.map((doc: any) => ({
+    return onSnapshot(q, (snapshot: FirestoreSnapshot) => {
+      const products = snapshot.docs.map((doc: FirestoreDoc) => ({
         id: doc.id,
         ...doc.data()
       } as Product));
@@ -64,8 +73,8 @@ export class ProductSubscriptionService {
       orderBy('name')
     );
     
-    return onSnapshot(q, (snapshot: any) => {
-      const products = snapshot.docs.map((doc: any) => ({
+    return onSnapshot(q, (snapshot: FirestoreSnapshot) => {
+      const products = snapshot.docs.map((doc: FirestoreDoc) => ({
         id: doc.id,
         ...doc.data()
       } as Product));
