@@ -6,12 +6,33 @@
 import { BenchmarkCalculator } from './benchmark-calculator';
 import { ComparisonEngine } from './comparison-engine';
 import { log } from '@/lib/logger';
-import { 
-  BenchmarkTrendPoint, 
-  TrendAnalysisConfig, 
+import {
+  BenchmarkTrendPoint,
+  TrendAnalysisConfig,
   ComparisonReportOptions,
-  BenchmarkValidationResult 
+  BenchmarkValidationResult,
+  SupplierComparison,
+  BenchmarkData,
+  CategoryRanking
 } from './benchmark-types';
+
+/**
+ * Category analysis entry used in industry reports
+ */
+interface CategoryAnalysisEntry {
+  averageScore: number;
+  supplierCount: number;
+  topPerformers: number;
+}
+
+/**
+ * Summarized comparison used when format === 'summary'
+ */
+interface SummarizedComparison {
+  overallScore: number;
+  industryDifference: number;
+  topPerformerDifference: number;
+}
 
 /**
  * Benchmark reporting and analytics engine
@@ -97,9 +118,9 @@ export class BenchmarkReports {
       keyStrengths: string[];
       improvementAreas: string[];
     };
-    detailedComparison: any;
+    detailedComparison: SupplierComparison | SummarizedComparison;
     historicalTrends?: BenchmarkTrendPoint[];
-    categoryRankings?: any[];
+    categoryRankings?: CategoryRanking[];
     recommendations: string[];
   }> {
     try {
@@ -125,16 +146,22 @@ export class BenchmarkReports {
       }
 
       // Include category rankings if requested
-      let categoryRankings: any[] | undefined;
+      let categoryRankings: CategoryRanking[] | undefined;
       if (options.includeCategoryRankings && comparison.categoryRanking) {
         categoryRankings = comparison.categoryRanking;
       }
 
       // Generate recommendations
-      const recommendations = options.includeRecommendations ? 
+      const recommendations = options.includeRecommendations ?
         this.generateRecommendations(comparison) : [];
 
-      const result: any = {
+      const result: {
+        summary: typeof summary;
+        detailedComparison: SupplierComparison | SummarizedComparison;
+        recommendations: string[];
+        historicalTrends?: BenchmarkTrendPoint[];
+        categoryRankings?: CategoryRanking[];
+      } = {
         summary,
         detailedComparison,
         recommendations
@@ -165,13 +192,9 @@ export class BenchmarkReports {
       topPerformerThreshold: number;
       categoryCount: number;
     };
-    benchmarks: any;
+    benchmarks: BenchmarkData;
     trends: BenchmarkTrendPoint[];
-    categoryAnalysis: Record<string, {
-      averageScore: number;
-      supplierCount: number;
-      topPerformers: number;
-    }>;
+    categoryAnalysis: Record<string, CategoryAnalysisEntry>;
     insights: string[];
   }> {
     try {
@@ -188,7 +211,7 @@ export class BenchmarkReports {
       };
 
       // Analyze categories
-      const categoryAnalysis: Record<string, any> = {};
+      const categoryAnalysis: Record<string, CategoryAnalysisEntry> = {};
       for (const [category, data] of Object.entries(benchmarks.categoryBenchmarks)) {
         categoryAnalysis[category] = {
           averageScore: data.overallScore,
@@ -286,14 +309,14 @@ export class BenchmarkReports {
     return 100; // Placeholder
   }
 
-  private static determineOverallRanking(comparison: any): string {
+  private static determineOverallRanking(comparison: SupplierComparison): string {
     const overallDiff = comparison.industryComparison.overallDiff;
     if (overallDiff > 10) return 'Above Average';
     if (overallDiff > -5) return 'Average';
     return 'Below Average';
   }
 
-  private static identifyKeyStrengths(comparison: any): string[] {
+  private static identifyKeyStrengths(comparison: SupplierComparison): string[] {
     const strengths: string[] = [];
     const industryComp = comparison.industryComparison;
     
@@ -305,7 +328,7 @@ export class BenchmarkReports {
     return strengths;
   }
 
-  private static identifyImprovementAreas(comparison: any): string[] {
+  private static identifyImprovementAreas(comparison: SupplierComparison): string[] {
     const areas: string[] = [];
     const industryComp = comparison.industryComparison;
     
@@ -317,7 +340,7 @@ export class BenchmarkReports {
     return areas;
   }
 
-  private static summarizeComparison(comparison: any): any {
+  private static summarizeComparison(comparison: SupplierComparison): SummarizedComparison {
     return {
       overallScore: comparison.supplierScores.overallScore,
       industryDifference: comparison.industryComparison.overallDiff,
@@ -325,7 +348,7 @@ export class BenchmarkReports {
     };
   }
 
-  private static generateRecommendations(comparison: any): string[] {
+  private static generateRecommendations(comparison: SupplierComparison): string[] {
     const recommendations: string[] = [];
     const industryComp = comparison.industryComparison;
     
@@ -344,7 +367,7 @@ export class BenchmarkReports {
     return recommendations;
   }
 
-  private static generateIndustryInsights(_benchmarks: any, trends: BenchmarkTrendPoint[], categoryAnalysis: any): string[] {
+  private static generateIndustryInsights(_benchmarks: BenchmarkData, trends: BenchmarkTrendPoint[], categoryAnalysis: Record<string, CategoryAnalysisEntry>): string[] {
     const insights: string[] = [];
     
     // Trend insights
@@ -363,7 +386,7 @@ export class BenchmarkReports {
     }
     
     // Category insights
-    const categoryScores = Object.values(categoryAnalysis).map((c: any) => c.averageScore);
+    const categoryScores = Object.values(categoryAnalysis).map((c) => c.averageScore);
     const highestCategoryScore = Math.max(...categoryScores);
     const lowestCategoryScore = Math.min(...categoryScores);
     
