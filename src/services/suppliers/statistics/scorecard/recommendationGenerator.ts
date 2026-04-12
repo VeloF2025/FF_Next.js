@@ -13,6 +13,7 @@ import {
   RecommendationIndustrySpecialist,
   type RecommendationItem
 } from '../recommendation-generator';
+import type { SupplierPerformanceInput } from '../recommendation-generator/core-recommendations';
 
 export class RecommendationGenerator {
   /**
@@ -23,7 +24,7 @@ export class RecommendationGenerator {
     supplier: Supplier,
     overallScore: number,
     compliance: ComplianceInfo,
-    performanceMetrics?: any
+    performanceMetrics?: SupplierPerformanceInput
   ): string[] {
     return CoreRecommendationEngine.generateRecommendations(
       supplier,
@@ -41,7 +42,7 @@ export class RecommendationGenerator {
     supplier: Supplier,
     overallScore: number,
     compliance: ComplianceInfo,
-    performanceMetrics?: any
+    performanceMetrics?: SupplierPerformanceInput
   ): Array<{
     recommendation: string;
     priority: 'high' | 'medium' | 'low';
@@ -72,7 +73,7 @@ export class RecommendationGenerator {
    */
   static generateIndustryRecommendations(
     supplier: Supplier,
-    industryBenchmarks?: any
+    industryBenchmarks?: Record<string, unknown>
   ): string[] {
     return RecommendationIndustrySpecialist.generateIndustryRecommendations(
       supplier,
@@ -105,7 +106,7 @@ export class RecommendationGenerator {
     const newFormatRecs: RecommendationItem[] = recommendations.map(rec => ({
       recommendation: `${rec.recommendation} ${supplierContext}`,
       priority: rec.priority === 'high' ? 'high' : rec.priority,
-      category: rec.category as any,
+      category: rec.category as 'compliance' | 'performance' | 'communication' | 'business',
       impact: rec.impact,
       timeline: rec.timeline
     }));

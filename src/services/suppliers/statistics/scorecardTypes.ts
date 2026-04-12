@@ -110,35 +110,35 @@ export interface ScorecardBatchResult {
 }
 
 // Type guards
-export function isValidSupplier(supplier: any): supplier is Supplier {
-  return supplier && 
+export function isValidSupplier(supplier: unknown): supplier is Supplier {
+  return supplier != null &&
          typeof supplier === 'object' &&
-         (supplier.id || supplier._id) &&
-         (supplier.companyName || supplier.name);
+         ('id' in supplier || '_id' in supplier) &&
+         ('companyName' in supplier || 'name' in supplier);
 }
 
-export function isValidRating(rating: any): boolean {
+export function isValidRating(rating: unknown): boolean {
   if (typeof rating === 'number') {
     return rating >= 0 && rating <= 5;
   }
-  if (rating && typeof rating === 'object') {
-    return typeof rating.overall === 'number' && 
-           rating.overall >= 0 && 
-           rating.overall <= 5;
+  if (rating != null && typeof rating === 'object' && 'overall' in rating) {
+    return typeof (rating as Record<string, unknown>).overall === 'number' &&
+           (rating as Record<string, unknown>).overall as number >= 0 &&
+           (rating as Record<string, unknown>).overall as number <= 5;
   }
   return false;
 }
 
-export function isValidPerformance(performance: any): boolean {
-  return performance &&
+export function isValidPerformance(performance: unknown): boolean {
+  return performance != null &&
          typeof performance === 'object' &&
-         typeof performance.overallScore === 'number';
+         'overallScore' in performance &&
+         typeof (performance as Record<string, unknown>).overallScore === 'number';
 }
 
-export function isValidCompliance(compliance: any): boolean {
-  return compliance &&
-         typeof compliance === 'object' &&
-         typeof compliance/* .complianceScore - property doesn't exist */ === 'number';
+export function isValidCompliance(compliance: unknown): boolean {
+  return compliance != null &&
+         typeof compliance === 'object';
 }
 
 // Constants

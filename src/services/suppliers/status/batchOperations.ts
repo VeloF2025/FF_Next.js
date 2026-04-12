@@ -3,11 +3,12 @@
  * Handles bulk status updates and preference changes
  */
 
-import { 
+import {
   SupplierStatus,
   BatchOperationResult,
   PreferenceUpdateResult,
-  PreferenceUpdate
+  PreferenceUpdate,
+  StatusUpdateData
 } from './types';
 import { StatusCore } from './statusCore';
 
@@ -24,7 +25,7 @@ export class BatchOperations {
 
     for (const id of supplierIds) {
       try {
-        const updateData: any = { status: SupplierStatus.ACTIVE };
+        const updateData: StatusUpdateData = { status: SupplierStatus.ACTIVE };
         if (userId) updateData.userId = userId;
         await StatusCore.updateStatus(id, updateData);
         success.push(id);
@@ -52,7 +53,7 @@ export class BatchOperations {
 
     for (const id of supplierIds) {
       try {
-        const updateData: any = { status: SupplierStatus.INACTIVE };
+        const updateData: StatusUpdateData = { status: SupplierStatus.INACTIVE };
         if (reason) updateData.reason = reason;
         if (userId) updateData.userId = userId;
         await StatusCore.updateStatus(id, updateData);
@@ -105,7 +106,7 @@ export class BatchOperations {
 
     for (const id of supplierIds) {
       try {
-        const updateData: any = { status: SupplierStatus.BLACKLISTED };
+        const updateData: StatusUpdateData = { status: SupplierStatus.BLACKLISTED };
         if (reason) updateData.reason = reason;
         if (userId) updateData.userId = userId;
         await StatusCore.updateStatus(id, updateData);
@@ -135,7 +136,7 @@ export class BatchOperations {
 
     for (const id of supplierIds) {
       try {
-        const updateData: any = { status };
+        const updateData: StatusUpdateData = { status };
         if (reason) updateData.reason = reason;
         if (userId) updateData.userId = userId;
         await StatusCore.updateStatus(id, updateData);

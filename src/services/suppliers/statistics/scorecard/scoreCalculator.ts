@@ -3,7 +3,7 @@
  * Handles all score calculation logic for supplier scorecards
  */
 
-import { Supplier } from '@/types/supplier/base.types';
+import { Supplier, ComplianceStatus } from '@/types/supplier/base.types';
 import {
   ScoreWeights,
   DEFAULT_SCORE_WEIGHTS,
@@ -33,7 +33,7 @@ export class ScoreCalculator {
     }
 
     // Performance score
-    const performanceScore = (supplier.performance as any)?.overallScore || 0;
+    const performanceScore = supplier.performance?.overallScore || 0;
     if (performanceScore > 0) {
       totalScore += (performanceScore / 100) * weights.performance;
       weightedSum += weights.performance;
@@ -67,7 +67,7 @@ export class ScoreCalculator {
     const rating = supplier.rating;
     
     if (rating && typeof rating === 'object' && 'breakdown' in rating) {
-      const breakdown = (rating as any).breakdown || {};
+      const breakdown = (rating as { overall: number; breakdown?: Partial<{ quality: number; delivery: number; communication: number; pricing: number; reliability: number }> }).breakdown || {};
       return {
         quality: breakdown.quality || 0,
         delivery: breakdown.delivery || 0,
@@ -92,13 +92,13 @@ export class ScoreCalculator {
    * Extract performance metrics
    */
   static extractPerformance(supplier: Supplier): PerformanceMetrics {
-    const performance = supplier.performance as any;
-    
+    const performance = supplier.performance;
+
     return {
-      onTimeDelivery: performance?.onTimeDelivery || 0,
+      onTimeDelivery: performance?.metrics?.onTimeDeliveries ?? 0,
       qualityScore: performance?.qualityScore || 0,
-      responseTime: performance?.responseTime || 0,
-      issueResolution: performance?.issueResolution || 0
+      responseTime: performance?.metrics?.averageResponseTime ?? 0,
+      issueResolution: performance?.serviceScore ?? 0
     };
   }
 
@@ -240,7 +240,7 @@ export class ScoreCalculator {
   /**
    * Calculate basic compliance score from available data
    */
-  private static calculateBasicComplianceScore(compliance: any): number {
+  private static calculateBasicComplianceScore(compliance: ComplianceStatus | undefined): number {
     if (!compliance) return 0;
     
     let score = 0;
