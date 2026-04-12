@@ -26,7 +26,7 @@ export async function importStaffFromExcelSecure(
     const buffer = await file.arrayBuffer();
     
     // Use secure Excel processor with streaming for large files
-    const result = await SecureExcelProcessor.readExcelFile<any>(buffer, {
+    const result = await SecureExcelProcessor.readExcelFile<Record<string, unknown>>(buffer, {
       maxFileSize: 50 * 1024 * 1024, // 50MB
       maxRows: 100000,
       maxColumns: 50,
@@ -44,7 +44,7 @@ export async function importStaffFromExcelSecure(
     const rows: StaffImportRow[] = [];
     const parseErrors: Array<{row: number, message: string}> = [];
     
-    result.data.forEach((row: any, index: number) => {
+    result.data.forEach((row: Record<string, unknown>, index: number) => {
       try {
         // 🟢 WORKING: Flexible field mapping supporting various header formats
         const mappedRow: StaffImportRow = {
@@ -196,7 +196,7 @@ export async function importStaffFromExcelSecure(
  * Get field value from row data using multiple possible field names
  * 🟢 WORKING: Flexible field mapping with fallbacks
  */
-function getFieldValue(row: any, fieldNames: string[]): string {
+function getFieldValue(row: Record<string, unknown>, fieldNames: string[]): string {
   for (const fieldName of fieldNames) {
     if (row[fieldName] !== undefined && row[fieldName] !== null && row[fieldName] !== '') {
       return String(row[fieldName]).trim();
@@ -278,7 +278,7 @@ export async function exportStaffToExcelSecure(staff: StaffMember[]): Promise<Bl
  */
 export async function validateStaffExcelFile(
   file: File
-): Promise<{ isValid: boolean; errors: string[]; preview?: any }> {
+): Promise<{ isValid: boolean; errors: string[]; preview?: unknown }> {
   try {
     const buffer = await file.arrayBuffer();
     

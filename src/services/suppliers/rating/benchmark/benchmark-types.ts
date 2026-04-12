@@ -3,6 +3,8 @@
  * Type definitions for supplier benchmark and comparison system
  */
 
+import type { Supplier } from '@/types/supplier/base.types';
+
 /**
  * Performance metrics structure
  */
@@ -72,7 +74,7 @@ export interface BenchmarkTrendPoint {
  */
 export interface CategoryStats {
   category: string;
-  suppliers: any[];
+  suppliers: Supplier[];
   averageScore: number;
   sampleSize: number;
 }
@@ -113,9 +115,9 @@ export interface TrendAnalysisConfig {
  * Performance scoring context
  */
 export interface PerformanceContext {
-  supplier: any;
-  allSuppliers: any[];
-  categorySuppliers: any[];
+  supplier: Supplier;
+  allSuppliers: Supplier[];
+  categorySuppliers: Supplier[];
   benchmarks: BenchmarkData;
 }
 

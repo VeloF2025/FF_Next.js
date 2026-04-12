@@ -4,13 +4,14 @@
  */
 
 import { Supplier } from '@/types/supplier/base.types';
-import { 
-  SupplierScorecard, 
-  ScorecardGenerationOptions, 
+import {
+  SupplierScorecard,
+  ScorecardGenerationOptions,
   ScorecardBatchResult,
   BatchProcessingConfig,
   DEFAULT_SCORECARD_OPTIONS,
-  isValidSupplier
+  isValidSupplier,
+  ScoreCalculationResult
 } from './scorecardTypes';
 import { ScorecardCalculator } from './scorecardCalculator';
 import { ScorecardAnalyzer } from './scorecardAnalyzer';
@@ -130,10 +131,10 @@ export class ScorecardGenerator {
    */
   static async generateAdvancedScorecard(supplierId: string): Promise<SupplierScorecard & {
     detailedAnalysis: {
-      scoreBreakdown: any;
-      marketPosition: any;
-      trendMomentum: any;
-      actionableRecommendations: any[];
+      scoreBreakdown: ScoreCalculationResult;
+      marketPosition: { marketPosition: string; strengthAreas: string[]; improvementAreas: string[]; competitiveAdvantages: string[] };
+      trendMomentum: { direction: 'improving' | 'declining' | 'stable'; strength: 'strong' | 'moderate' | 'weak'; momentum: number };
+      actionableRecommendations: Array<{ recommendation: string; actions: string[]; timeframe: string; expectedImpact: string }>;
     };
   }> {
     const baseScorecard = await this.generateSupplierScorecard(supplierId, {
