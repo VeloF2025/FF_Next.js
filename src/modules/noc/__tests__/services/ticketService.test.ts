@@ -35,8 +35,8 @@ import {
 
 // Mock the database utility
 vi.mock('../../utils/db', () => ({
-  query: vi.fn(),
-  queryOne: vi.fn(),
+  query: vi.fn<[string, unknown[]?], Promise<Record<string, unknown>[]>>(),
+  queryOne: vi.fn<[string, unknown[]?], Promise<Record<string, unknown> | null>>(),
   transaction: vi.fn()
 }));
 
