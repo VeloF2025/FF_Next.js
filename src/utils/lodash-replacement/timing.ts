@@ -7,6 +7,7 @@
  * Debounce function with performance optimization
  * Replaces lodash.debounce with zero vulnerabilities
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function debounce<T extends (...args: any[]) => any>(
   func: T,
   delay: number,
@@ -128,6 +129,7 @@ export function debounce<T extends (...args: any[]) => any>(
  * Throttle function with performance optimization
  * Replaces lodash.throttle with zero vulnerabilities
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function throttle<T extends (...args: any[]) => any>(
   func: T,
   wait: number,

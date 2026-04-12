@@ -125,9 +125,9 @@ export interface BOQItem {
   mappingStatus: BOQItemMappingStatusType;
   
   // Technical Specifications
-  specifications?: Record<string, any>;
+  specifications?: Record<string, unknown>;
   technicalNotes?: string;
-  alternativeItems?: any[]; // Array of alternative catalog items
+  alternativeItems?: AlternativeItem[]; // Array of alternative catalog items
   
   // Procurement Status
   procurementStatus: ProcurementStatusType;
@@ -151,7 +151,7 @@ export interface BOQException {
   // Issue Description
   issueDescription: string;
   suggestedAction?: string;
-  systemSuggestions?: any[]; // Array of suggested mappings
+  systemSuggestions?: MappingSuggestion[]; // Array of suggested mappings
   
   // Resolution
   status: 'open' | 'in_review' | 'resolved' | 'ignored';
@@ -177,7 +177,7 @@ export interface AlternativeItem {
   catalogItemName: string;
   matchingScore: number; // 0-100
   priceVariance?: number;
-  specifications?: Record<string, any>;
+  specifications?: Record<string, unknown>;
 }
 
 // Mapping suggestion for automated catalog matching

@@ -9,6 +9,28 @@ import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+/** OCR-extracted fields from a document. All values are strings or absent. */
+export interface OcrDocumentData {
+  employeeName?: string;
+  fullName?: string;
+  firstName?: string;
+  surname?: string;
+  employeeIdNumber?: string;
+  idNumber?: string;
+  documentNumber?: string;
+  saIdNumber?: string;
+  jobTitle?: string;
+  position?: string;
+  startDate?: string;
+  department?: string;
+  accountHolder?: string;
+  accountHolderName?: string;
+  bankName?: string;
+  accountNumber?: string;
+  branchCode?: string;
+  [key: string]: string | undefined;
+}
+
 export interface ValidationMismatch {
   field: string;
   label: string;
@@ -139,7 +161,7 @@ async function fetchStaffRecord(staffId: string) {
  */
 export async function validateEmploymentContract(
   staffId: string,
-  ocrData: Record<string, any>
+  ocrData: OcrDocumentData
 ): Promise<ValidationResult> {
   const mismatches: ValidationMismatch[] = [];
   const matches: string[] = [];
@@ -187,7 +209,7 @@ export async function validateEmploymentContract(
       mismatches.push({
         field: 'employeeIdNumber',
         label: 'SA ID Number',
-        documentValue: ocrData.employeeIdNumber || ocrData.idNumber,
+        documentValue: ocrData.employeeIdNumber ?? ocrData.idNumber ?? null,
         recordValue: staffRecord.saIdNumber,
         severity: 'critical',
         message: `ID Number mismatch: Document shows "${ocrData.employeeIdNumber || ocrData.idNumber}", record has "${staffRecord.saIdNumber}"`,
@@ -198,7 +220,7 @@ export async function validateEmploymentContract(
     mismatches.push({
       field: 'employeeIdNumber',
       label: 'SA ID Number',
-      documentValue: ocrData.employeeIdNumber || ocrData.idNumber,
+      documentValue: ocrData.employeeIdNumber ?? ocrData.idNumber ?? null,
       recordValue: null,
       severity: 'info',
       message: `ID Number "${contractIdNumber}" will be added to staff record on approval`,
@@ -221,7 +243,7 @@ export async function validateEmploymentContract(
       mismatches.push({
         field: 'jobTitle',
         label: 'Position',
-        documentValue: ocrData.jobTitle || ocrData.position,
+        documentValue: ocrData.jobTitle ?? ocrData.position ?? null,
         recordValue: staffRecord.position,
         severity: 'warning',
         message: `Position mismatch: Document shows "${ocrData.jobTitle || ocrData.position}", record has "${staffRecord.position}"`,
@@ -261,7 +283,7 @@ export async function validateEmploymentContract(
       mismatches.push({
         field: 'department',
         label: 'Department',
-        documentValue: ocrData.department,
+        documentValue: ocrData.department ?? null,
         recordValue: staffRecord.department,
         severity: 'info',
         message: `Department differs: Document shows "${ocrData.department}", record has "${staffRecord.department}"`,
@@ -305,7 +327,7 @@ export async function validateEmploymentContract(
  */
 export async function validateSaIdDocument(
   staffId: string,
-  ocrData: Record<string, any>
+  ocrData: OcrDocumentData
 ): Promise<ValidationResult> {
   const mismatches: ValidationMismatch[] = [];
   const matches: string[] = [];
@@ -335,7 +357,7 @@ export async function validateSaIdDocument(
       mismatches.push({
         field: 'saIdNumber',
         label: 'SA ID Number',
-        documentValue: ocrData.saIdNumber || ocrData.idNumber || ocrData.documentNumber,
+        documentValue: ocrData.saIdNumber ?? ocrData.idNumber ?? ocrData.documentNumber ?? null,
         recordValue: staffRecord.saIdNumber,
         severity: 'critical',
         message: `ID Number mismatch: Document shows "${docIdNumber}", record has "${recordIdNumber}"`,
@@ -392,7 +414,7 @@ export async function validateSaIdDocument(
  */
 export async function validateBankDocument(
   staffId: string,
-  ocrData: Record<string, any>
+  ocrData: OcrDocumentData
 ): Promise<ValidationResult> {
   const mismatches: ValidationMismatch[] = [];
   const matches: string[] = [];
@@ -511,7 +533,7 @@ export async function validateBankDocument(
 export async function validateDocument(
   staffId: string,
   documentType: string,
-  ocrData: Record<string, any>
+  ocrData: OcrDocumentData
 ): Promise<ValidationResult> {
   switch (documentType) {
     case 'employment_contract':
