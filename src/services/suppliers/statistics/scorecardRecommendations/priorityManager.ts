@@ -5,12 +5,14 @@
 
 import { RecommendationCriteria } from '../scorecardTypes';
 
+type CriteriaWithUrgency = RecommendationCriteria & { urgency?: 'low' | 'medium' | 'high' };
+
 export class PriorityManager {
   /**
    * Generate priority-based recommendations
    */
   static generatePriorityRecommendations(
-    criteria: RecommendationCriteria,
+    criteria: CriteriaWithUrgency,
     allRecommendations: string[]
   ): {
     critical: string[];
@@ -78,7 +80,7 @@ export class PriorityManager {
    * Get medium priority recommendations
    */
   private static getMediumPriorityRecommendations(
-    criteria: RecommendationCriteria,
+    criteria: CriteriaWithUrgency,
     allRecommendations: string[]
   ): string[] {
     // Use criteria for filtering medium priority items
@@ -86,7 +88,7 @@ export class PriorityManager {
     return allRecommendations.filter(rec => {
       const matchesKeywords = mediumKeywords.some(keyword => rec.includes(keyword));
       // Apply urgency criteria - medium priority if urgency is medium
-      const matchesUrgency = (criteria as any).urgency === 'medium' || !(criteria as any).urgency;
+      const matchesUrgency = criteria.urgency === 'medium' || !criteria.urgency;
       return matchesKeywords && matchesUrgency;
     });
   }
@@ -95,7 +97,7 @@ export class PriorityManager {
    * Get low priority recommendations
    */
   private static getLowPriorityRecommendations(
-    criteria: RecommendationCriteria,
+    criteria: CriteriaWithUrgency,
     allRecommendations: string[]
   ): string[] {
     // Use criteria for filtering low priority items
@@ -103,7 +105,7 @@ export class PriorityManager {
     return allRecommendations.filter(rec => {
       const matchesKeywords = lowKeywords.some(keyword => rec.includes(keyword));
       // Apply urgency criteria - low priority if urgency is low or none specified
-      const matchesUrgency = (criteria as any).urgency === 'low' || !(criteria as any).urgency;
+      const matchesUrgency = criteria.urgency === 'low' || !criteria.urgency;
       return matchesKeywords && matchesUrgency;
     });
   }

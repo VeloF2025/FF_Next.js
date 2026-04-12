@@ -3,7 +3,8 @@
  * Perform compliance audits across supplier base
  */
 
-import { ComplianceAuditResult, SupplierDocument } from './types';
+import { ComplianceAuditResult, SupplierDocument, ComplianceStatus } from './types';
+import { Supplier, ComplianceStatus as BaseComplianceStatus } from '@/types/supplier/base.types';
 import { log } from '@/lib/logger';
 
 export class ComplianceAuditService {
@@ -54,7 +55,7 @@ export class ComplianceAuditService {
         if (supplier.documents) {
           const pendingDocs = supplier.documents.filter(doc => {
             // Handle both compliance and base document types
-            const complianceDoc = doc as any;
+            const complianceDoc = doc as SupplierDocument;
             return !complianceDoc.verified;
           });
           result.pendingDocuments += pendingDocs.length;
@@ -100,16 +101,16 @@ export class ComplianceAuditService {
   /**
    * Check if supplier is compliant
    */
-  private static isSupplierCompliant(supplier: any): boolean {
+  private static isSupplierCompliant(supplier: Supplier): boolean {
     if (!supplier.complianceStatus) {
       return false;
     }
 
-    const compliance = supplier.complianceStatus;
+    const compliance = supplier.complianceStatus as ComplianceStatus;
     return (
-      compliance.taxCompliant &&
-      compliance.registrationValid &&
-      compliance.documentsComplete &&
+      compliance.taxCompliant === true &&
+      compliance.registrationValid === true &&
+      compliance.documentsComplete === true &&
       // Calculate basic compliance score for threshold check
       this.calculateBasicComplianceScore(compliance) >= 80
     );
@@ -294,7 +295,7 @@ export class ComplianceAuditService {
   /**
    * Calculate basic compliance score from available data
    */
-  private static calculateBasicComplianceScore(compliance: any): number {
+  private static calculateBasicComplianceScore(compliance: BaseComplianceStatus | undefined): number {
     if (!compliance) return 0;
     
     let score = 0;

@@ -43,7 +43,8 @@ export const useBOQList = (onSelectBOQ?: (boq: BOQ) => void, projectId?: string)
       const payload = data.data ?? data;
       const boqData = payload.boqs || [];
       // Transform to BOQ type
-      const transformed: BOQ[] = boqData.map((b: any) => ({
+      type RawBOQ = Record<string, unknown>;
+      const transformed: BOQ[] = boqData.map((b: RawBOQ) => ({
         id: b.id,
         projectId: b.project_id,
         name: b.name || b.title || 'Untitled BOQ',
@@ -126,7 +127,7 @@ export const useBOQList = (onSelectBOQ?: (boq: BOQ) => void, projectId?: string)
 
     // Sort BOQs
     filtered.sort((a, b) => {
-      let aVal: any, bVal: any;
+      let aVal: string | number, bVal: string | number;
 
       switch (sortField) {
         case 'createdAt':
@@ -142,8 +143,8 @@ export const useBOQList = (onSelectBOQ?: (boq: BOQ) => void, projectId?: string)
           bVal = b.itemCount || 0;
           break;
         case 'mappingProgress':
-          aVal = (a as any).mappingProgress || 0;
-          bVal = (b as any).mappingProgress || 0;
+          aVal = a.mappingConfidence || 0;
+          bVal = b.mappingConfidence || 0;
           break;
         case 'status':
           aVal = a.status;

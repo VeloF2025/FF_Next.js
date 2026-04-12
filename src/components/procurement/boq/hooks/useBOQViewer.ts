@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { BOQItem, BOQWithItems } from '@/types/procurement/boq.types';
 import { useProcurementContext } from '@/hooks/procurement/useProcurementContext';
 import { procurementApiService } from '@/services/procurement/boqApiExtensions';
+import type { ProcurementApiContext } from '@/services/procurement';
 import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 import {
@@ -57,7 +58,7 @@ export const useBOQViewer = (
 
     try {
       setIsLoading(true);
-      const data = await procurementApiService.getBOQWithItems(context as any, boqId);
+      const data = await procurementApiService.getBOQWithItems(context as unknown as ProcurementApiContext, boqId);
       setBOQData(data);
     } catch (error) {
       log.error('Failed to load BOQ data:', { data: error }, 'useBOQViewer');
@@ -112,7 +113,7 @@ export const useBOQViewer = (
 
     // Sort items
     filtered.sort((a, b) => {
-      let aVal: any, bVal: any;
+      let aVal: string | number, bVal: string | number;
 
       switch (sortField) {
         case 'lineNumber':
@@ -179,7 +180,7 @@ export const useBOQViewer = (
   };
 
   // Update editing data
-  const updateEditingItem = (itemId: string, field: keyof BOQItem, value: any) => {
+  const updateEditingItem = (itemId: string, field: keyof BOQItem, value: BOQItem[keyof BOQItem]) => {
     setEditingItems(prev => {
       const newMap = new Map(prev);
       const editing = newMap.get(itemId);
@@ -204,7 +205,7 @@ export const useBOQViewer = (
       setIsSaving(true);
       
       const updatedItem = await procurementApiService.updateBOQItem(
-        context as any,
+        context as unknown as ProcurementApiContext,
         itemId,
         editingItem.data
       );
