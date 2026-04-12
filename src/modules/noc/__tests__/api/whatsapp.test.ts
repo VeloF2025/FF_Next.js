@@ -18,6 +18,7 @@ import type {
 } from '../../types/whatsapp';
 import { RecipientType, NotificationStatus } from '../../types/whatsapp';
 import * as whatsappService from '../../services/whatsappService';
+import type { WhatsAppService } from '../../services/whatsappService';
 
 // Mock the whatsappService module
 vi.mock('../../services/whatsappService');
@@ -76,7 +77,7 @@ describe('WhatsApp API Endpoints', () => {
 
       getDefaultServiceMock.mockReturnValue({
         sendNotification: sendNotificationMock,
-      } as any);
+      } as unknown as WhatsAppService);
 
       const request: SendNotificationRequest = {
         ticket_id: 'ticket-456',
@@ -115,7 +116,7 @@ describe('WhatsApp API Endpoints', () => {
 
       getDefaultServiceMock.mockReturnValue({
         sendNotification: sendNotificationMock,
-      } as any);
+      } as unknown as WhatsAppService);
 
       const request: SendNotificationRequest = {
         recipient_type: RecipientType.TECHNICIAN,
@@ -144,13 +145,13 @@ describe('WhatsApp API Endpoints', () => {
 
       getDefaultServiceMock.mockReturnValue({
         sendNotification: sendNotificationMock,
-      } as any);
+      } as unknown as WhatsAppService);
 
-      const invalidRequest: SendNotificationRequest = {
+      const invalidRequest = {
         recipient_type: RecipientType.CONTRACTOR,
         recipient_phone: '+27821234567',
         // Missing both template_id and message_content
-      } as any;
+      } as unknown as SendNotificationRequest;
 
       // Act & Assert
       const service = whatsappService.getDefaultWhatsAppService();
@@ -168,7 +169,7 @@ describe('WhatsApp API Endpoints', () => {
 
       getDefaultServiceMock.mockReturnValue({
         sendNotification: sendNotificationMock,
-      } as any);
+      } as unknown as WhatsAppService);
 
       const request: SendNotificationRequest = {
         recipient_type: RecipientType.CONTRACTOR,
@@ -195,7 +196,7 @@ describe('WhatsApp API Endpoints', () => {
 
       getDefaultServiceMock.mockReturnValue({
         sendNotification: sendNotificationMock,
-      } as any);
+      } as unknown as WhatsAppService);
 
       const request: SendNotificationRequest = {
         ticket_id: 'ticket-789',
@@ -231,7 +232,7 @@ describe('WhatsApp API Endpoints', () => {
 
       getDefaultServiceMock.mockReturnValue({
         sendNotification: sendNotificationMock,
-      } as any);
+      } as unknown as WhatsAppService);
 
       const request: SendNotificationRequest = {
         recipient_type: RecipientType.TEAM,
@@ -263,7 +264,7 @@ describe('WhatsApp API Endpoints', () => {
 
       getDefaultServiceMock.mockReturnValue({
         getNotificationStatus: getStatusMock,
-      } as any);
+      } as unknown as WhatsAppService);
 
       const notificationId = 'notif-123';
 
@@ -290,7 +291,7 @@ describe('WhatsApp API Endpoints', () => {
 
       getDefaultServiceMock.mockReturnValue({
         getNotificationStatus: getStatusMock,
-      } as any);
+      } as unknown as WhatsAppService);
 
       // Act
       const service = whatsappService.getDefaultWhatsAppService();
@@ -315,7 +316,7 @@ describe('WhatsApp API Endpoints', () => {
 
       getDefaultServiceMock.mockReturnValue({
         getNotificationStatus: getStatusMock,
-      } as any);
+      } as unknown as WhatsAppService);
 
       // Act
       const service = whatsappService.getDefaultWhatsAppService();
@@ -341,7 +342,7 @@ describe('WhatsApp API Endpoints', () => {
 
       getDefaultServiceMock.mockReturnValue({
         getNotificationStatus: getStatusMock,
-      } as any);
+      } as unknown as WhatsAppService);
 
       // Act
       const service = whatsappService.getDefaultWhatsAppService();
@@ -361,7 +362,7 @@ describe('WhatsApp API Endpoints', () => {
 
       getDefaultServiceMock.mockReturnValue({
         getNotificationStatus: getStatusMock,
-      } as any);
+      } as unknown as WhatsAppService);
 
       // Act
       const service = whatsappService.getDefaultWhatsAppService();
@@ -382,7 +383,7 @@ describe('WhatsApp API Endpoints', () => {
 
       getDefaultServiceMock.mockReturnValue({
         getNotificationStatus: getStatusMock,
-      } as any);
+      } as unknown as WhatsAppService);
 
       // Act
       const service = whatsappService.getDefaultWhatsAppService();
@@ -402,7 +403,7 @@ describe('WhatsApp API Endpoints', () => {
 
       getDefaultServiceMock.mockReturnValue({
         getNotificationStatus: getStatusMock,
-      } as any);
+      } as unknown as WhatsAppService);
 
       // Act & Assert
       const service = whatsappService.getDefaultWhatsAppService();
@@ -438,7 +439,7 @@ describe('WhatsApp API Endpoints', () => {
 
       getDefaultServiceMock.mockReturnValue({
         listNotifications: listMock,
-      } as any);
+      } as unknown as WhatsAppService);
 
       // Act
       const service = whatsappService.getDefaultWhatsAppService();
@@ -473,7 +474,7 @@ describe('WhatsApp API Endpoints', () => {
 
       getDefaultServiceMock.mockReturnValue({
         listNotifications: listMock,
-      } as any);
+      } as unknown as WhatsAppService);
 
       // Act
       const service = whatsappService.getDefaultWhatsAppService();
@@ -511,7 +512,7 @@ describe('WhatsApp API Endpoints', () => {
 
       getDefaultServiceMock.mockReturnValue({
         listNotifications: listMock,
-      } as any);
+      } as unknown as WhatsAppService);
 
       // Act
       const service = whatsappService.getDefaultWhatsAppService();

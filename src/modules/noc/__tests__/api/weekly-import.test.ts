@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as weeklyReportService from '../../services/weeklyReportService';
 import * as excelParser from '../../utils/excelParser';
-import { WeeklyReportStatus, ImportRow } from '../../types/weeklyReport';
+import { WeeklyReportStatus, ImportRow, WeeklyReportListResponse } from '../../types/weeklyReport';
 
 // Mock services
 vi.mock('../../services/weeklyReportService');
@@ -341,7 +341,7 @@ describe('Weekly Import API', () => {
         total_imported_tickets: 182,
       };
 
-      vi.mocked(weeklyReportService.listWeeklyReports).mockResolvedValue(mockResponse as any);
+      vi.mocked(weeklyReportService.listWeeklyReports).mockResolvedValue(mockResponse as unknown as WeeklyReportListResponse);
 
       const result = await weeklyReportService.listWeeklyReports();
 
@@ -370,7 +370,7 @@ describe('Weekly Import API', () => {
         total_imported_tickets: 95,
       };
 
-      vi.mocked(weeklyReportService.listWeeklyReports).mockResolvedValue(mockResponse as any);
+      vi.mocked(weeklyReportService.listWeeklyReports).mockResolvedValue(mockResponse as unknown as WeeklyReportListResponse);
 
       const result = await weeklyReportService.listWeeklyReports({
         status: WeeklyReportStatus.COMPLETED,
@@ -401,7 +401,7 @@ describe('Weekly Import API', () => {
         total_imported_tickets: 95,
       };
 
-      vi.mocked(weeklyReportService.listWeeklyReports).mockResolvedValue(mockResponse as any);
+      vi.mocked(weeklyReportService.listWeeklyReports).mockResolvedValue(mockResponse as unknown as WeeklyReportListResponse);
 
       const result = await weeklyReportService.listWeeklyReports({
         week_number: 51,
@@ -431,7 +431,7 @@ describe('Weekly Import API', () => {
         total_imported_tickets: 95,
       };
 
-      vi.mocked(weeklyReportService.listWeeklyReports).mockResolvedValue(mockResponse as any);
+      vi.mocked(weeklyReportService.listWeeklyReports).mockResolvedValue(mockResponse as unknown as WeeklyReportListResponse);
 
       const result = await weeklyReportService.listWeeklyReports({
         year: 2024,
@@ -466,7 +466,7 @@ describe('Weekly Import API', () => {
         total_imported_tickets: 182,
       };
 
-      vi.mocked(weeklyReportService.listWeeklyReports).mockResolvedValue(mockResponse as any);
+      vi.mocked(weeklyReportService.listWeeklyReports).mockResolvedValue(mockResponse as unknown as WeeklyReportListResponse);
 
       const result = await weeklyReportService.listWeeklyReports();
 
@@ -489,7 +489,7 @@ describe('Weekly Import API', () => {
         total_imported_tickets: 500,
       };
 
-      vi.mocked(weeklyReportService.listWeeklyReports).mockResolvedValue(mockResponse as any);
+      vi.mocked(weeklyReportService.listWeeklyReports).mockResolvedValue(mockResponse as unknown as WeeklyReportListResponse);
 
       const result = await weeklyReportService.listWeeklyReports();
 
@@ -514,7 +514,7 @@ describe('Weekly Import API', () => {
         total_imported_tickets: 0,
       };
 
-      vi.mocked(weeklyReportService.listWeeklyReports).mockResolvedValue(mockResponse as any);
+      vi.mocked(weeklyReportService.listWeeklyReports).mockResolvedValue(mockResponse as unknown as WeeklyReportListResponse);
 
       const result = await weeklyReportService.listWeeklyReports();
 
