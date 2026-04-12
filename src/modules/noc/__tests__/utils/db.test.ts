@@ -14,7 +14,7 @@
  * 🟢 WORKING: Comprehensive test suite for database utility
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 import { neon } from '@/lib/db-neon';
 
 // Mock the Neon connection
@@ -51,8 +51,8 @@ import {
 } from '../../utils/db';
 
 describe('Database Connection Utility', () => {
-  let mockSqlFn: any;
-  let mockResults: any[];
+  let mockSqlFn: Mock;
+  let mockResults: unknown[];
 
   beforeEach(() => {
     // Reset mocks before each test
@@ -63,7 +63,7 @@ describe('Database Connection Utility', () => {
     mockSqlFn = vi.fn(async () => mockResults);
 
     // Make neon() return our mock SQL function
-    (neon as any).mockReturnValue(mockSqlFn);
+    (neon as unknown as Mock).mockReturnValue(mockSqlFn);
   });
 
   afterEach(async () => {
@@ -96,7 +96,7 @@ describe('Database Connection Utility', () => {
 
       // Force new connection
       vi.clearAllMocks();
-      (neon as any).mockClear();
+      (neon as unknown as Mock).mockClear();
 
       getConnection();
 

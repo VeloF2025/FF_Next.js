@@ -15,7 +15,7 @@
  * 🟢 WORKING: Comprehensive test suite for automatic WhatsApp notification triggers
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 
 // Mock the logger
 vi.mock('@/lib/logger', () => ({
@@ -63,7 +63,7 @@ import {
 
 describe('NotificationTriggerService', () => {
   let service: NotificationTriggerService;
-  let mockWhatsAppService: any;
+  let mockWhatsAppService: { sendNotification: Mock };
   const mockQuery = query as unknown as ReturnType<typeof vi.fn>;
   const mockQueryOne = queryOne as unknown as ReturnType<typeof vi.fn>;
   const mockGetDefaultWhatsAppService = getDefaultWhatsAppService as unknown as ReturnType<typeof vi.fn>;
@@ -147,12 +147,12 @@ describe('NotificationTriggerService', () => {
   });
 
   // Helper to mock user lookup
-  const mockUserLookup = (user: any) => {
+  const mockUserLookup = (user: Record<string, unknown> | null) => {
     mockQueryOne.mockResolvedValueOnce(user);
   };
 
   // Helper to mock contractor lookup
-  const mockContractorLookup = (contractor: any) => {
+  const mockContractorLookup = (contractor: Record<string, unknown> | null) => {
     mockQueryOne.mockResolvedValueOnce(contractor);
   };
 
@@ -603,7 +603,7 @@ describe('NotificationTriggerService', () => {
 
     it('should handle unknown event types gracefully', async () => {
       const event: NotificationEvent = {
-        type: 'ticket.unknown_event' as any,
+        type: 'ticket.unknown_event' as NotificationEventType,
         ticket_id: sampleTicket.id,
         ticket: sampleTicket,
         timestamp: new Date(),

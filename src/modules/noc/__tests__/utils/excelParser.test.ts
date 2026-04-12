@@ -36,7 +36,7 @@ import {
 } from '../../types/weeklyReport';
 
 // Helper function to create a test Excel file buffer
-function createTestExcelBuffer(data: any[][]): Buffer {
+function createTestExcelBuffer(data: unknown[][]): Buffer {
   const ws = XLSX.utils.aoa_to_sheet(data);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
@@ -44,7 +44,7 @@ function createTestExcelBuffer(data: any[][]): Buffer {
 }
 
 // Helper function to create a test Excel file with headers
-function createTestTicketExcel(rows: any[]): Buffer {
+function createTestTicketExcel(rows: unknown[][]): Buffer {
   const headers = [
     'Ticket ID',
     'Title',
@@ -397,9 +397,9 @@ describe('Excel Parser Utility', () => {
           excel_column: 'Type',
           ticket_field: 'ticket_type',
           required: true,
-          validate: (value: any) => {
+          validate: (value: string | number | boolean | null) => {
             const validTypes = ['fault_repair', 'new_installation', 'ont_swap', 'modification', 'incident'];
-            return validTypes.includes(value);
+            return typeof value === 'string' && validTypes.includes(value);
           }
         }
       ];
