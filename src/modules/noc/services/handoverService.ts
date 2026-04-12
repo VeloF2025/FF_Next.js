@@ -35,6 +35,91 @@ import {
 } from '../types/handover';
 import { createLogger } from '@/lib/logger';
 
+/** Row shape returned by SELECT * FROM maintenance_tickets */
+interface MaintenanceTicketRow {
+  id: string;
+  ticket_uid: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  ticket_type: string;
+  dr_number: string | null;
+  project_id: string | null;
+  zone_id: string | null;
+  zone: string | null;
+  pole_id: string | null;
+  pole_number: string | null;
+  pon: string | null;
+  pon_number: string | null;
+  address: string | null;
+  ont_serial: string | null;
+  ont_rx_level: number | null;
+  ont_model: string | null;
+  assigned_to: string | null;
+  assigned_contractor_id: string | null;
+  contractor_id: string | null;
+  assigned_team: string | null;
+  qa_ready: boolean | null;
+  qa_readiness_check_at: Date | null;
+  fault_cause: string | null;
+  fault_cause_details: string | null;
+  guarantee_status: string | null;
+  [key: string]: unknown;
+}
+
+/** Row shape returned by SELECT * FROM maintenance_attachments */
+interface MaintenanceAttachmentRow {
+  id: string;
+  filename: string;
+  file_type: string;
+  storage_url: string;
+  uploaded_at: Date;
+  uploaded_by: string | null;
+  verification_step_id: string | null;
+}
+
+/** Row shape returned by SELECT * FROM maintenance_verification_steps */
+interface VerificationStepRow {
+  id: string;
+  ticket_id: string;
+  step_number: number;
+  is_complete: boolean;
+  [key: string]: unknown;
+}
+
+/** Row shape returned by SELECT * FROM maintenance_risk_acceptances */
+interface RiskAcceptanceRow {
+  id: string;
+  risk_type: string;
+  risk_description: string | null;
+  status: string;
+  accepted_by: string | null;
+  accepted_at: Date | null;
+  resolved_at: Date | null;
+  resolved_by: string | null;
+}
+
+/** Row shape for the pending handovers join query */
+interface PendingHandoverRow {
+  ticket_id: string;
+  ticket_uid: string;
+  title: string;
+  status: string;
+  dr_number: string | null;
+  zone_id: string | null;
+  pole_number: string | null;
+  pon_number: string | null;
+  ont_serial: string | null;
+  ont_rx_level: number | null;
+  assigned_contractor_id: string | null;
+  project_name: string | null;
+  photo_count: number;
+  verification_total: number;
+  verification_complete: number;
+  current_owner: string | null;
+}
+
 const logger = createLogger('maintenance:handover');
 
 /**
@@ -78,7 +163,7 @@ export async function validateHandoverGate(
     const ticketSql = `
       SELECT * FROM maintenance_tickets WHERE id = $1
     `;
-    const ticket = await queryOne<any>(ticketSql, [ticketId]);
+    const ticket = await queryOne<MaintenanceTicketRow>(ticketSql, [ticketId]);
 
     if (!ticket) {
       throw new Error('Ticket not found');
@@ -89,7 +174,7 @@ export async function validateHandoverGate(
       SELECT * FROM maintenance_attachments
       WHERE ticket_id = $1 AND file_type = 'photo'
     `;
-    const attachments = await query<any>(attachmentsSql, [ticketId]);
+    const attachments = await query<MaintenanceAttachmentRow>(attachmentsSql, [ticketId]);
 
     // 🟢 WORKING: Fetch verification steps
     const verificationSql = `
@@ -97,7 +182,7 @@ export async function validateHandoverGate(
       WHERE ticket_id = $1
       ORDER BY step_number
     `;
-    const verificationSteps = await query<any>(verificationSql, [ticketId]);
+    const verificationSteps = await query<VerificationStepRow>(verificationSql, [ticketId]);
 
     // Determine strictness based on handover type
     const isStrict = handoverType === HandoverType.QA_TO_OPS;
@@ -230,7 +315,7 @@ export async function validateHandoverGate(
     }
 
     // 🟢 WORKING: Gate 5 - VERIFICATION_COMPLETE
-    const completedSteps = verificationSteps.filter((s: any) => s.is_complete).length;
+    const completedSteps = verificationSteps.filter((s: VerificationStepRow) => s.is_complete).length;
     const totalSteps = verificationSteps.length;
     const verificationGate: HandoverGateCheck = {
       gate_name: HandoverGateName.VERIFICATION_COMPLETE,
@@ -313,7 +398,7 @@ export async function createHandoverSnapshot(
     return await transaction(async (txn) => {
       // Fetch ticket data
       const ticketSql = `SELECT * FROM maintenance_tickets WHERE id = $1`;
-      const ticket = await txn.queryOne<any>(ticketSql, [payload.ticket_id]);
+      const ticket = await txn.queryOne<MaintenanceTicketRow>(ticketSql, [payload.ticket_id]);
 
       if (!ticket) {
         throw new Error('Ticket not found');
@@ -333,10 +418,10 @@ export async function createHandoverSnapshot(
         WHERE ticket_id = $1
         ORDER BY uploaded_at ASC
       `;
-      const attachments = await txn.query<any>(attachmentsSql, [payload.ticket_id]);
+      const attachments = await txn.query<MaintenanceAttachmentRow>(attachmentsSql, [payload.ticket_id]);
 
       // Map to evidence links
-      const evidenceLinks: EvidenceLink[] = attachments.map((att: any) => ({
+      const evidenceLinks: EvidenceLink[] = attachments.map((att: MaintenanceAttachmentRow) => ({
         type: att.file_type === 'photo' ? 'photo' : 'document',
         step_number: null, // Can be enhanced to map verification_step_id to step_number
         url: att.storage_url,
@@ -351,9 +436,9 @@ export async function createHandoverSnapshot(
         WHERE ticket_id = $1
         ORDER BY step_number
       `;
-      const verificationSteps = await txn.query<any>(verificationSql, [payload.ticket_id]);
+      const verificationSteps = await txn.query<VerificationStepRow>(verificationSql, [payload.ticket_id]);
 
-      const completedSteps = verificationSteps.filter((s: any) => s.is_complete).length;
+      const completedSteps = verificationSteps.filter((s: VerificationStepRow) => s.is_complete).length;
       const totalSteps = verificationSteps.length;
 
       // 🟢 WORKING: Fetch QA decisions (approvals, rejections, risk acceptances)
@@ -371,10 +456,10 @@ export async function createHandoverSnapshot(
         WHERE ticket_id = $1
         ORDER BY created_at ASC
       `;
-      const risks = await txn.query<any>(risksSql, [payload.ticket_id]);
+      const risks = await txn.query<RiskAcceptanceRow>(risksSql, [payload.ticket_id]);
 
       // Map to decisions
-      const decisions: HandoverDecision[] = risks.map((risk: any) => ({
+      const decisions: HandoverDecision[] = risks.map((risk: RiskAcceptanceRow) => ({
         decision_type: 'risk_acceptance' as const,
         decision_by: risk.accepted_by,
         decision_at: risk.accepted_at,
@@ -643,10 +728,10 @@ export async function getPendingHandovers(
     `;
 
     values.push(limit, offset);
-    const tickets = await query<any>(sql, values);
+    const tickets = await query<PendingHandoverRow>(sql, values);
 
     // Process each ticket to determine handover readiness
-    const pendingTickets = tickets.map((ticket: any) => {
+    const pendingTickets = tickets.map((ticket: PendingHandoverRow) => {
       // Determine pending handover type based on current state
       let pendingType: HandoverType = HandoverType.BUILD_TO_QA;
       if (ticket.current_owner === OwnerType.QA || ticket.status === 'qa_ready') {
@@ -720,7 +805,7 @@ export async function getPendingHandovers(
       returned: pendingTickets.length
     });
 
-    return { tickets: pendingTickets as any[], total };
+    return { tickets: pendingTickets.filter((t): t is NonNullable<typeof t> => t !== null), total };
   } catch (error) {
     logger.error('Failed to fetch pending handovers', {
       error: error instanceof Error ? error.message : 'Unknown error',
