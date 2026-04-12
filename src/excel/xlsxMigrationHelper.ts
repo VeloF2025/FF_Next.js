@@ -7,6 +7,31 @@
 import { SecureExcelProcessor, SecureExcelOptions } from './secureExcelProcessor';
 import { log } from '@/lib/logger';
 
+/** Minimal options accepted by XLSX.read() */
+interface XLSXReadOptions {
+  cellFormula?: boolean;
+  cellHTML?: boolean;
+  [key: string]: unknown;
+}
+
+/** Minimal cell object in xlsx workbook format */
+interface XLSXCell {
+  v?: unknown;
+  t?: string;
+}
+
+/** Worksheet in xlsx workbook format (keyed by cell address) */
+type XLSXWorksheet = Record<string, XLSXCell | string | undefined> & {
+  '!ref'?: string;
+  data?: Record<string, unknown>[];
+};
+
+/** Workbook in xlsx format */
+interface XLSXWorkbook {
+  SheetNames: string[];
+  Sheets: Record<string, XLSXWorksheet>;
+}
+
 /**
  * Legacy XLSX compatibility layer
  * Provides same interface as xlsx library but uses secure processor internally
@@ -16,12 +41,12 @@ class XLSXCompatibilityLayer {
    * Read Excel file (compatible with XLSX.read)
    */
   static async read(
-    data: ArrayBuffer | string, 
-    options: any = {}
-  ): Promise<any> {
+    data: ArrayBuffer | string,
+    options: XLSXReadOptions = {}
+  ): Promise<XLSXWorkbook> {
     try {
       let buffer: ArrayBuffer;
-      
+
       if (typeof data === 'string') {
         // Convert binary string to ArrayBuffer for compatibility
         const bytes = new Uint8Array(data.length);
@@ -32,19 +57,19 @@ class XLSXCompatibilityLayer {
       } else {
         buffer = data;
       }
-      
+
       const secureOptions: SecureExcelOptions = {
         allowFormulas: options.cellFormula || false,
         allowHTML: options.cellHTML || false,
         maxFileSize: 50 * 1024 * 1024, // 50MB default
         useStreaming: false // Maintain compatibility with sync-like behavior
       };
-      
+
       const result = await SecureExcelProcessor.readExcelFile(buffer, secureOptions);
-      
+
       // Convert to xlsx-like format for compatibility
-      const worksheetData: Record<string, any> = {};
-      
+      const worksheetData: XLSXWorksheet = {};
+
       // Create worksheet object compatible with xlsx format
       result.data.forEach((row, index) => {
         Object.keys(row).forEach((key, colIndex) => {
@@ -55,98 +80,100 @@ class XLSXCompatibilityLayer {
           };
         });
       });
-      
+
       // Add range reference
       const maxCol = Math.max(1, Object.keys(result.data[0] || {}).length - 1);
       const maxRow = result.data.length + 1; // +1 for header
       worksheetData['!ref'] = `A1:${this.encodeCell(maxRow, maxCol)}`;
-      
+
       log.info('XLSX compatibility layer processed file', {
         rows: result.data.length,
         worksheetName: result.metadata.worksheetName,
         processingTime: result.metadata.processingTime
       }, 'xlsx-compatibility');
-      
+
       return {
         SheetNames: [result.metadata.worksheetName],
         Sheets: {
           [result.metadata.worksheetName]: worksheetData
         }
       };
-      
+
     } catch (error) {
       log.error('XLSX compatibility layer failed:', { data: error }, 'xlsx-compatibility');
       throw new Error(`XLSX compatibility layer failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
-  
+
   /**
    * Convert sheet to JSON (compatible with XLSX.utils.sheet_to_json)
    */
-  static sheetToJson(worksheet: any, _options: any = {}): any[] {
+  static sheetToJson(worksheet: XLSXWorksheet, _options: XLSXReadOptions = {}): Record<string, unknown>[] {
     try {
       // If this is already from our secure processor, extract the data
       if (worksheet.data && Array.isArray(worksheet.data)) {
         return worksheet.data;
       }
-      
+
       // Parse xlsx-format worksheet
       const range = worksheet['!ref'];
       if (!range) return [];
-      
-      const data: any[] = [];
+
+      const data: Record<string, unknown>[] = [];
       const decode = this.decodeRange(range);
-      
+
       // Get headers from first row if not raw
       const headers: string[] = [];
       for (let col = decode.s.c; col <= decode.e.c; col++) {
         const cellAddress = this.encodeCell(decode.s.r, col);
-        const cell = worksheet[cellAddress];
-        headers.push(cell?.v || `Column${col + 1}`);
+        const cell = worksheet[cellAddress] as XLSXCell | undefined;
+        headers.push(String(cell?.v ?? `Column${col + 1}`));
       }
-      
+
       // Process data rows
       for (let row = decode.s.r + 1; row <= decode.e.r; row++) {
-        const rowData: any = {};
+        const rowData: Record<string, unknown> = {};
         for (let col = decode.s.c; col <= decode.e.c; col++) {
           const cellAddress = this.encodeCell(row, col);
-          const cell = worksheet[cellAddress];
+          const cell = worksheet[cellAddress] as XLSXCell | undefined;
           const header = headers[col - decode.s.c];
-          rowData[header] = cell?.v || '';
+          if (header !== undefined) {
+            rowData[header] = cell?.v ?? '';
+          }
         }
         data.push(rowData);
       }
-      
+
       return data;
-      
+
     } catch (error) {
       log.error('Sheet to JSON conversion failed:', { data: error }, 'xlsx-compatibility');
       return [];
     }
   }
-  
+
   /**
    * Write workbook to buffer (compatible with XLSX.write)
    */
-  static async write(workbook: any, _options: any = {}): Promise<ArrayBuffer> {
+  static async write(workbook: XLSXWorkbook, _options: XLSXReadOptions = {}): Promise<ArrayBuffer> {
     try {
       const sheetName = workbook.SheetNames[0]!;
       const worksheet = workbook.Sheets[sheetName]!;
-      
+
       // Convert xlsx format back to data array
       const data = this.sheetToJson(worksheet);
-      
+
       return await SecureExcelProcessor.createExcelFile(data, sheetName, {
         chunkSize: 1000,
         useStreaming: data.length > 1000
       });
-      
+
     } catch (error) {
       log.error('XLSX write failed:', { data: error }, 'xlsx-compatibility');
       throw error;
     }
   }
-  
+
   /**
    * Encode cell address (e.g., row 0, col 0 -> "A1")
    */
@@ -159,35 +186,35 @@ class XLSXCompatibilityLayer {
     }
     return colStr + (row + 1);
   }
-  
+
   /**
    * Decode range string (e.g., "A1:C10")
    */
   private static decodeRange(range: string): { s: {r: number, c: number}, e: {r: number, c: number} } {
     const parts = range.split(':');
-    const start = this.decodeCell(parts[0]);
+    const start = this.decodeCell(parts[0] ?? '');
     const end = parts[1] ? this.decodeCell(parts[1]) : start;
     return { s: start, e: end };
   }
-  
+
   /**
    * Decode cell address (e.g., "A1" -> {r: 0, c: 0})
    */
   private static decodeCell(cell: string): { r: number, c: number } {
     const match = cell.match(/([A-Z]+)(\d+)/);
     if (!match) return { r: 0, c: 0 };
-    
+
     const colStr = match[1]!;
     const rowStr = match[2]!;
-    
+
     let col = 0;
     for (let i = 0; i < colStr.length; i++) {
       col = col * 26 + (colStr.charCodeAt(i) - 64);
     }
     col -= 1; // Convert to 0-based
-    
+
     const row = parseInt(rowStr) - 1; // Convert to 0-based
-    
+
     return { r: row, c: col };
   }
 }
@@ -213,7 +240,7 @@ class XLSXMigrationUtilities {
       'Add security checks for formulas and HTML content',
       'Use structured logging for better monitoring'
     ];
-    
+
     return {
       files: [
         'src/services/contractor/import/excelProcessor.ts',
@@ -230,7 +257,7 @@ class XLSXMigrationUtilities {
       recommendations
     };
   }
-  
+
   /**
    * Create migration plan for specific file
    */
@@ -259,7 +286,7 @@ class XLSXMigrationUtilities {
       ]
     };
   }
-  
+
   /**
    * Performance comparison helper
    */
@@ -272,11 +299,11 @@ class XLSXMigrationUtilities {
     improvement: number;
   }> {
     const buffer = await file.arrayBuffer();
-    
+
     // Test secure processor
     const secureTimes: number[] = [];
     let secureErrors = 0;
-    
+
     for (let i = 0; i < iterations; i++) {
       try {
         const start = performance.now();
@@ -287,13 +314,13 @@ class XLSXMigrationUtilities {
         secureErrors++;
       }
     }
-    
+
     const secureAvg = secureTimes.reduce((a, b) => a + b, 0) / secureTimes.length;
-    
+
     // For comparison, we'll use estimated xlsx performance based on our benchmarks
     // In practice, you would run actual xlsx tests here
     const estimatedXLSXTime = secureAvg * 1.6; // xlsx is typically 60% slower
-    
+
     return {
       xlsx: { avgTime: estimatedXLSXTime, errors: 0 },
       secure: { avgTime: secureAvg, errors: secureErrors },

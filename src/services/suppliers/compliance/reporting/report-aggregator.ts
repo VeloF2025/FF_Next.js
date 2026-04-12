@@ -3,10 +3,14 @@
  * Handles aggregation and summary report generation for multiple suppliers
  */
 
-import { ComplianceSummaryReport, SupplierDocument } from './report-types';
+import { ComplianceSummaryReport, ComplianceStatus, SupplierDocument } from './report-types';
 import { ComplianceChecker } from './compliance-checker';
 import { ComplianceCalculator } from './compliance-calculator';
 import { log } from '@/lib/logger';
+
+type ComplianceBreakdown = { compliant: number; partial: number; nonCompliant: number };
+type BusinessTypeEntry = { total: number; compliant: number; averageScore: number };
+type TopIssue = { issue: string; affectedSuppliers: number; severity: 'high' | 'medium' | 'low' };
 
 export class ReportAggregator {
   /**
@@ -23,9 +27,9 @@ export class ReportAggregator {
       const totalSuppliers = validSuppliers.length;
 
       // Initialize tracking variables
-      const complianceBreakdown = { compliant: 0, partial: 0, nonCompliant: 0 };
+      const complianceBreakdown: ComplianceBreakdown = { compliant: 0, partial: 0, nonCompliant: 0 };
       let totalScore = 0;
-      const businessTypeBreakdown: Record<string, { total: number; compliant: number; averageScore: number }> = {};
+      const businessTypeBreakdown: Record<string, BusinessTypeEntry> = {};
       const issueTracker = new Map<string, number>();
       const expirationAlerts = { expiredDocuments: 0, expiringSoon: 0, expiringNextMonth: 0 };
 
@@ -33,14 +37,14 @@ export class ReportAggregator {
       for (const supplier of validSuppliers) {
         const documents = supplier.documents || [];
         const businessType = supplier.businessType || 'unknown';
-        
+
         // Calculate compliance status
-        const complianceStatus = supplier.complianceStatus || 
+        const complianceStatus: ComplianceStatus = supplier.complianceStatus ||
           ComplianceCalculator.calculateComplianceFromDocuments(documents, businessType);
 
         this.updateComplianceBreakdown(complianceStatus, complianceBreakdown);
-        totalScore += (complianceStatus as any).score || 0;
-        
+        totalScore += complianceStatus.score || 0;
+
         this.updateBusinessTypeBreakdown(businessType, complianceStatus, businessTypeBreakdown);
         this.trackIssues(businessType, documents, issueTracker);
         this.updateExpirationAlerts(documents, expirationAlerts);
@@ -52,8 +56,8 @@ export class ReportAggregator {
       // Get top issues
       const topIssues = this.getTopIssues(issueTracker, totalSuppliers);
 
-      const averageComplianceScore = totalSuppliers > 0 
-        ? Math.round((totalScore / totalSuppliers) * 100) / 100 
+      const averageComplianceScore = totalSuppliers > 0
+        ? Math.round((totalScore / totalSuppliers) * 100) / 100
         : 0;
 
       return {
@@ -75,7 +79,7 @@ export class ReportAggregator {
     }
   }
 
-  private static updateComplianceBreakdown(complianceStatus: any, breakdown: any): void {
+  private static updateComplianceBreakdown(complianceStatus: ComplianceStatus, breakdown: ComplianceBreakdown): void {
     switch (complianceStatus.overall) {
       case 'compliant':
         breakdown.compliant++;
@@ -91,15 +95,15 @@ export class ReportAggregator {
 
   private static updateBusinessTypeBreakdown(
     businessType: string,
-    complianceStatus: any,
-    breakdown: Record<string, any>
+    complianceStatus: ComplianceStatus,
+    breakdown: Record<string, BusinessTypeEntry>
   ): void {
     if (!breakdown[businessType]) {
       breakdown[businessType] = { total: 0, compliant: 0, averageScore: 0 };
     }
     breakdown[businessType].total++;
-    breakdown[businessType].averageScore += complianceStatus.score;
-    
+    breakdown[businessType].averageScore += complianceStatus.score ?? 0;
+
     if (complianceStatus.overall === 'compliant') {
       breakdown[businessType].compliant++;
     }
@@ -107,19 +111,17 @@ export class ReportAggregator {
 
   private static trackIssues(
     businessType: string,
-    documents: any[],
+    documents: SupplierDocument[],
     issueTracker: Map<string, number>
   ): void {
-    const supplierDocuments = documents as unknown as SupplierDocument[];
-    const requirements = ComplianceChecker.validateRequirements(businessType, supplierDocuments);
+    const requirements = ComplianceChecker.validateRequirements(businessType, documents);
     requirements.missingRequired.forEach(missing => {
       issueTracker.set(missing, (issueTracker.get(missing) || 0) + 1);
     });
   }
 
-  private static updateExpirationAlerts(documents: any[], alerts: any): void {
-    const supplierDocuments = documents as unknown as SupplierDocument[];
-    const expirationInfo = ComplianceChecker.checkDocumentExpiration(supplierDocuments);
+  private static updateExpirationAlerts(documents: SupplierDocument[], alerts: { expiredDocuments: number; expiringSoon: number; expiringNextMonth: number }): void {
+    const expirationInfo = ComplianceChecker.checkDocumentExpiration(documents);
     expirationInfo.forEach(info => {
       if (info.status === 'expired') {
         alerts.expiredDocuments++;
@@ -131,7 +133,7 @@ export class ReportAggregator {
     });
   }
 
-  private static calculateBusinessTypeAverages(breakdown: Record<string, any>): void {
+  private static calculateBusinessTypeAverages(breakdown: Record<string, BusinessTypeEntry>): void {
     Object.values(breakdown).forEach(typeBreakdown => {
       if (typeBreakdown.total > 0) {
         typeBreakdown.averageScore = Math.round((typeBreakdown.averageScore / typeBreakdown.total) * 100) / 100;
@@ -139,7 +141,7 @@ export class ReportAggregator {
     });
   }
 
-  private static getTopIssues(issueTracker: Map<string, number>, totalSuppliers: number): any[] {
+  private static getTopIssues(issueTracker: Map<string, number>, totalSuppliers: number): TopIssue[] {
     return Array.from(issueTracker.entries())
       .map(([issue, count]) => ({
         issue,
@@ -159,7 +161,7 @@ export class ReportAggregator {
     totalSuppliers: number
   ): 'high' | 'medium' | 'low' {
     const impactPercentage = (affectedCount / totalSuppliers) * 100;
-    
+
     // Critical documents
     const criticalDocs = ['tax_certificate', 'insurance_certificate', 'certificate_of_incorporation'];
     if (criticalDocs.includes(issue) && impactPercentage > 20) {

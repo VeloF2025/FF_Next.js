@@ -5,10 +5,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/shared/components/ui/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/Card';
 import { Checkbox } from '@/shared/components/ui/Checkbox';
-import { 
-  Download, 
-  FileText, 
-  FileSpreadsheet, 
+import {
+  Download,
+  FileText,
+  FileSpreadsheet,
   Database,
   Settings,
   Calendar,
@@ -34,12 +34,58 @@ interface ReportExporterProps {
 type ExportFormat = 'pdf' | 'excel' | 'csv';
 type ReportType = 'summary' | 'detailed' | 'analytics' | 'comparison' | 'custom';
 
+interface LucideIconProps {
+  className?: string;
+}
+
 interface ReportSection {
   id: string;
   name: string;
   description: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<LucideIconProps>;
   included: boolean;
+}
+
+interface TemplatePerformanceRow {
+  name: string;
+  projectCount: number;
+  successRate: number;
+  averageDuration: number;
+  efficiency: number;
+}
+
+interface PhaseAnalysisRow {
+  name: string;
+  completionRate: number;
+  averageDuration: number;
+  bottleneckRisk: string;
+}
+
+interface InsightRow {
+  category: string;
+  insight: string;
+  recommendation: string;
+}
+
+interface ReportData {
+  metadata: {
+    title: string;
+    subtitle: string;
+    dateRange: string;
+    generatedAt: string;
+    includedSections: string[];
+  };
+  overview: {
+    totalProjects: number;
+    averageDuration: number;
+    onTimeCompletion: number;
+    activeTemplates: number;
+    totalPhases: number;
+    averageSuccessRate: number;
+  };
+  templatePerformance: TemplatePerformanceRow[];
+  phaseAnalysis: PhaseAnalysisRow[];
+  insights: InsightRow[];
 }
 
 export function ReportExporter({ analytics, dateRange, variant = 'compact' }: ReportExporterProps) {
@@ -92,17 +138,17 @@ export function ReportExporter({ analytics, dateRange, variant = 'compact' }: Re
   ]);
 
   const toggleSection = (sectionId: string) => {
-    setSections(prev => prev.map(section => 
-      section.id === sectionId 
+    setSections(prev => prev.map(section =>
+      section.id === sectionId
         ? { ...section, included: !section.included }
         : section
     ));
   };
 
-  const generateReportData = () => {
+  const generateReportData = (): ReportData | null => {
     if (!analytics) return null;
 
-    const reportData = {
+    return {
       metadata: {
         title: `Workflow Analytics Report`,
         subtitle: `Performance Analysis for ${dateRange.label}`,
@@ -137,7 +183,7 @@ export function ReportExporter({ analytics, dateRange, variant = 'compact' }: Re
         {
           category: 'Performance',
           insight: `Overall project success rate: ${Math.round(analytics.performanceMetrics.onTimeCompletion)}%`,
-          recommendation: analytics.performanceMetrics.onTimeCompletion < 80 
+          recommendation: analytics.performanceMetrics.onTimeCompletion < 80
             ? 'Focus on identifying and resolving workflow bottlenecks'
             : 'Maintain current performance standards'
         },
@@ -153,11 +199,9 @@ export function ReportExporter({ analytics, dateRange, variant = 'compact' }: Re
         }
       ]
     };
-
-    return reportData;
   };
 
-  const exportToPDF = async (data: any) => {
+  const exportToPDF = async (data: ReportData) => {
     // Mock PDF export - in real implementation, use libraries like jsPDF or react-pdf
     const content = `
 # ${data.metadata.title}
@@ -173,7 +217,7 @@ export function ReportExporter({ analytics, dateRange, variant = 'compact' }: Re
 - Active Templates: ${data.overview.activeTemplates}
 
 ## Template Performance
-${data.templatePerformance.map((template: any) => `
+${data.templatePerformance.map((template) => `
 ### ${template.name}
 - Projects: ${template.projectCount}
 - Success Rate: ${template.successRate}%
@@ -182,7 +226,7 @@ ${data.templatePerformance.map((template: any) => `
 `).join('')}
 
 ## Phase Analysis
-${data.phaseAnalysis.map((phase: any) => `
+${data.phaseAnalysis.map((phase) => `
 ### ${phase.name}
 - Completion Rate: ${phase.completionRate}%
 - Avg Duration: ${phase.averageDuration} days
@@ -190,7 +234,7 @@ ${data.phaseAnalysis.map((phase: any) => `
 `).join('')}
 
 ## Recommendations
-${data.insights.map((insight: any) => `
+${data.insights.map((insight) => `
 **${insight.category}:** ${insight.insight}
 *Recommendation:* ${insight.recommendation}
 `).join('')}
@@ -208,7 +252,7 @@ ${data.insights.map((insight: any) => `
     URL.revokeObjectURL(url);
   };
 
-  const exportToExcel = async (data: any) => {
+  const exportToExcel = async (data: ReportData) => {
     // Mock Excel export - in real implementation, use libraries like xlsx or exceljs
     const csvContent = [
       // Overview sheet data
@@ -225,11 +269,11 @@ ${data.insights.map((insight: any) => `
       [''],
       ['Template Performance'],
       ['Template Name', 'Projects', 'Success Rate (%)', 'Avg Duration (days)', 'Efficiency'],
-      ...data.templatePerformance.map((t: any) => [t.name, t.projectCount, t.successRate, t.averageDuration, t.efficiency]),
+      ...data.templatePerformance.map((t) => [t.name, t.projectCount, t.successRate, t.averageDuration, t.efficiency]),
       [''],
       ['Phase Analysis'],
       ['Phase Name', 'Completion Rate (%)', 'Avg Duration (days)', 'Risk Level'],
-      ...data.phaseAnalysis.map((p: any) => [p.name, p.completionRate, p.averageDuration, p.bottleneckRisk])
+      ...data.phaseAnalysis.map((p) => [p.name, p.completionRate, p.averageDuration, p.bottleneckRisk])
     ];
 
     const csvString = csvContent.map(row => row.join(',')).join('\n');
@@ -244,7 +288,7 @@ ${data.insights.map((insight: any) => `
     URL.revokeObjectURL(url);
   };
 
-  const exportToCSV = async (data: any) => {
+  const exportToCSV = async (data: ReportData) => {
     // Export specific data tables as CSV
     await exportToExcel(data); // Reuse Excel logic for CSV
   };
@@ -310,8 +354,8 @@ ${data.insights.map((insight: any) => `
             <SelectItem value="csv">CSV</SelectItem>
           </SelectContent>
         </Select>
-        
-        <Button 
+
+        <Button
           onClick={handleExport}
           disabled={!analytics || isExporting}
           size="sm"
@@ -361,13 +405,13 @@ ${data.insights.map((insight: any) => `
                 {(['pdf', 'excel', 'csv'] as ExportFormat[]).map((format) => {
                   const Icon = getFormatIcon(format);
                   const isSelected = exportFormat === format;
-                  
+
                   return (
-                    <div 
+                    <div
                       key={format}
                       className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                        isSelected 
-                          ? 'border-purple-600 bg-purple-50 dark:bg-purple-900/10' 
+                        isSelected
+                          ? 'border-purple-600 bg-purple-50 dark:bg-purple-900/10'
                           : 'border-border hover:border-border'
                       }`}
                       onClick={() => setExportFormat(format)}
@@ -407,14 +451,14 @@ ${data.insights.map((insight: any) => `
                 const Icon = section.icon;
                 return (
                   <div key={section.id} className="flex items-start gap-3 p-2 rounded hover:bg-accent/50">
-                    <Checkbox 
+                    <Checkbox
                       id={section.id}
                       checked={section.included}
                       onCheckedChange={() => toggleSection(section.id)}
                     />
                     <Icon className="w-4 h-4 text-muted-foreground mt-1 flex-shrink-0" />
                     <div className="flex-1">
-                      <label 
+                      <label
                         htmlFor={section.id}
                         className="text-sm font-medium cursor-pointer"
                       >
@@ -503,8 +547,8 @@ ${data.insights.map((insight: any) => `
         <p className="text-sm text-muted-foreground">
           Report will be downloaded to your device
         </p>
-        
-        <Button 
+
+        <Button
           onClick={handleExport}
           disabled={!analytics || isExporting || sections.filter(s => s.included).length === 0}
           size="lg"
