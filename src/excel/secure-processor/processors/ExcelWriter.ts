@@ -13,7 +13,7 @@ import { calculateColumnWidth, requestGarbageCollection } from '../utils/excelUt
 /**
  * Create Excel file with optimized performance
  */
-export async function createExcelFile<T = any>(
+export async function createExcelFile<T extends Record<string, unknown> = Record<string, unknown>>(
   data: T[],
   worksheetName: string = 'Data',
   options: SecureExcelOptions = {}
@@ -29,7 +29,7 @@ export async function createExcelFile<T = any>(
     }
 
     // Get headers from first data item
-    const headers = Object.keys(data[0] as Record<string, any>);
+    const headers = Object.keys(data[0] as Record<string, unknown>);
 
     // Add header row with styling
     const headerRow = worksheet.addRow(headers);
@@ -48,7 +48,7 @@ export async function createExcelFile<T = any>(
 
       for (const item of chunk) {
         const rowData = headers.map(header => {
-          const value = (item as any)[header];
+          const value = (item as Record<string, unknown>)[header];
           return sanitizeCellValue(value, options.maxCellLength, options.allowHTML);
         });
         worksheet.addRow(rowData);
@@ -63,7 +63,9 @@ export async function createExcelFile<T = any>(
     // Auto-fit columns for better readability
     worksheet.columns.forEach((column, index) => {
       const header = headers[index];
-      column.width = calculateColumnWidth(data, header);
+      if (header !== undefined) {
+        column.width = calculateColumnWidth(data, header);
+      }
     });
 
     // Generate buffer

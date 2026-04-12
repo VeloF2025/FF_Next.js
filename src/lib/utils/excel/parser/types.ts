@@ -19,7 +19,20 @@ export interface ColumnMapping {
 }
 
 export interface RawBOQRow {
-  [key: string]: any;
+  lineNumber?: string | number;
+  itemCode?: string;
+  description?: string;
+  uom?: string;
+  quantity?: string | number;
+  phase?: string;
+  task?: string;
+  site?: string;
+  unitPrice?: string | number;
+  totalPrice?: string | number;
+  category?: string;
+  subcategory?: string;
+  vendor?: string;
+  remarks?: string;
 }
 
 export interface ParsedBOQItem {
@@ -43,7 +56,7 @@ export interface ParsedBOQItem {
 export interface ParseError {
   row: number;
   column: string;
-  value: any;
+  value: string | number | boolean | null | undefined;
   message: string;
   type: 'parsing' | 'validation' | 'format';
 }
@@ -51,7 +64,7 @@ export interface ParseError {
 export interface ParseWarning {
   row: number;
   column: string;
-  value: any;
+  value: string | number | boolean | null | undefined;
   message: string;
   type: 'format' | 'range' | 'suggestion';
 }

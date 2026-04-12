@@ -26,11 +26,11 @@ export {
  */
 export async function getSeedDataForProject(projectId: string) {
   const { SEED_BOQS, SEED_BOQ_ITEMS, SEED_BOQ_EXCEPTIONS } = await import('./boqSeed');
-  
+
   return {
-    boqs: SEED_BOQS.filter((boq: any) => boq.projectId === projectId),
-    boqItems: SEED_BOQ_ITEMS.filter((item: any) => item.projectId === projectId),
-    boqExceptions: SEED_BOQ_EXCEPTIONS.filter((ex: any) => ex.projectId === projectId)
+    boqs: SEED_BOQS.filter((boq) => boq.projectId === projectId),
+    boqItems: SEED_BOQ_ITEMS.filter((item) => item.projectId === projectId),
+    boqExceptions: SEED_BOQ_EXCEPTIONS.filter((ex) => ex.projectId === projectId)
   };
 }
 

@@ -31,11 +31,14 @@ export function getSql(): ReturnType<typeof neon> {
   if (isBrowser) {
     // In browser, return a dummy client that throws informative errors
     // This prevents DATABASE_URL access on client side
-    const dummySql = ((strings: TemplateStringsArray, ...values: any[]) => {
+    const dummySql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+      void strings;
+      void values;
       throw new Error('Database operations cannot be performed in the browser. Use API routes instead.');
-    }) as any as ReturnType<typeof neon>;
+    }) as unknown as ReturnType<typeof neon>;
 
-    dummySql.transaction = async (callback: any) => {
+    dummySql.transaction = async (callback: unknown) => {
+      void callback;
       throw new Error('Database transactions cannot be performed in the browser. Use API routes instead.');
     };
 

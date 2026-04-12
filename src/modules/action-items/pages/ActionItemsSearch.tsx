@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Filter, ArrowLeft, Search } from 'lucide-react';
 import { useRouter } from 'next/router';
-import { ActionItem, ActionItemFilters } from '@/types/action-items.types';
+import { ActionItem, ActionItemFilters, ActionItemStatus, ActionItemPriority } from '@/types/action-items.types';
 import { actionItemsService } from '@/services/action-items/actionItemsService';
 import { ActionItemsList } from '../components/ActionItemsList';
 import { Button } from '@/components/ui/button';
@@ -38,8 +38,8 @@ export function ActionItemsSearch() {
 
       const data = await actionItemsService.getActionItems(activeFilters);
       setItems(data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
@@ -112,7 +112,7 @@ export function ActionItemsSearch() {
             </label>
             <select
               value={filters.status || ''}
-              onChange={(e) => setFilters({ ...filters, status: e.target.value as any || undefined })}
+              onChange={(e) => setFilters({ ...filters, status: (e.target.value as ActionItemStatus) || undefined })}
               className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">All statuses</option>
@@ -130,7 +130,7 @@ export function ActionItemsSearch() {
             </label>
             <select
               value={filters.priority || ''}
-              onChange={(e) => setFilters({ ...filters, priority: e.target.value as any || undefined })}
+              onChange={(e) => setFilters({ ...filters, priority: (e.target.value as ActionItemPriority) || undefined })}
               className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">All priorities</option>
