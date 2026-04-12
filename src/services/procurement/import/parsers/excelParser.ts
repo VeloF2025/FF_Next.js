@@ -3,6 +3,7 @@
  * Unified interface for Excel file parsing using modular components
  */
 
+import * as XLSX from 'xlsx';
 import { ExcelReader } from './excelReader';
 import { ExcelFormatter } from './excelFormatter';
 import { ExcelConverter, ConversionOptions } from './excelConverter';
@@ -16,7 +17,7 @@ export class ExcelParser {
    * Read Excel file using XLSX library
    * @deprecated Use ExcelConverter.parseExcelFile instead
    */
-  static async parseExcelFile(file: File): Promise<any[]> {
+  static async parseExcelFile(file: File): Promise<Record<string, unknown>[]> {
     return ExcelConverter.parseExcelFile(file);
   }
 
@@ -24,7 +25,7 @@ export class ExcelParser {
    * Parse specific worksheet from Excel file
    * @deprecated Use ExcelConverter.parseSpecificWorksheet instead
    */
-  static async parseSpecificWorksheet(file: File, worksheetName: string): Promise<any[]> {
+  static async parseSpecificWorksheet(file: File, worksheetName: string): Promise<Record<string, unknown>[]> {
     return ExcelConverter.parseSpecificWorksheet(file, worksheetName);
   }
 
@@ -32,7 +33,7 @@ export class ExcelParser {
    * Format cell values from Excel to consistent types
    * @deprecated Use ExcelFormatter.formatCellValue instead
    */
-  static formatCellValue(value: any): any {
+  static formatCellValue(value: unknown): string | number {
     return ExcelFormatter.formatCellValue(value);
   }
 
@@ -68,7 +69,7 @@ export class ExcelParser {
       skipEmptyRows?: boolean;
       range?: string;
     } = {}
-  ): Promise<any[]> {
+  ): Promise<Record<string, unknown>[]> {
     return ExcelConverter.parseExcelWithOptions(file, options as ConversionOptions);
   }
 
@@ -92,8 +93,8 @@ export class ExcelParser {
    * Get cell value with type information
    * @deprecated Use ExcelFormatter.getCellInfo instead
    */
-  static getCellInfo(worksheet: any, cellAddress: string): {
-    value: any;
+  static getCellInfo(worksheet: XLSX.WorkSheet, cellAddress: string): {
+    value: unknown;
     type: string;
     formatted: string;
   } {

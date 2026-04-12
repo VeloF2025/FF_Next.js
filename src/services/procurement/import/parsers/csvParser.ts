@@ -10,10 +10,10 @@ export class CSVParser {
   /**
    * Read CSV file and return array of rows
    */
-  static async parseCSVFile(file: File): Promise<any[]> {
+  static async parseCSVFile(file: File): Promise<Record<string, string>[]> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      
+
       reader.onload = (e) => {
         try {
           const text = e.target?.result as string;
@@ -30,11 +30,11 @@ export class CSVParser {
 
           // Parse CSV lines
           const data = lines.map(line => this.parseCSVLine(line));
-          
+
           // Convert to object format using first row as headers
           const headers = data[0]!;
           const rows = data.slice(1).map(row => {
-            const obj: Record<string, any> = {};
+            const obj: Record<string, string> = {};
             headers.forEach((header, index) => {
               obj[header] = row[index] || '';
             });
@@ -101,10 +101,10 @@ export class CSVParser {
   /**
    * Parse CSV with custom delimiter
    */
-  static parseCSVWithDelimiter(file: File, delimiter: string = ','): Promise<any[]> {
+  static parseCSVWithDelimiter(file: File, delimiter: string = ','): Promise<Record<string, string>[]> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      
+
       reader.onload = (e) => {
         try {
           const text = e.target?.result as string;
@@ -121,11 +121,11 @@ export class CSVParser {
 
           // Parse lines with custom delimiter
           const data = lines.map(line => this.parseLineWithDelimiter(line, delimiter));
-          
+
           // Convert to object format
           const headers = data[0]!;
           const rows = data.slice(1).map(row => {
-            const obj: Record<string, any> = {};
+            const obj: Record<string, string> = {};
             headers.forEach((header, index) => {
               obj[header] = row[index] || '';
             });
@@ -219,19 +219,19 @@ export class CSVParser {
   /**
    * Parse CSV from text string
    */
-  static parseCSVText(text: string, delimiter?: string): any[] {
+  static parseCSVText(text: string, delimiter?: string): Record<string, string>[] {
     if (!text.trim()) return [];
-    
+
     const detectedDelimiter = delimiter || this.detectDelimiter(text);
     const lines = text.split(/\r?\n/).filter(line => line.trim());
-    
+
     if (lines.length === 0) return [];
-    
+
     const data = lines.map(line => this.parseLineWithDelimiter(line, detectedDelimiter));
     const headers = data[0]!;
 
     return data.slice(1).map(row => {
-      const obj: Record<string, any> = {};
+      const obj: Record<string, string> = {};
       headers.forEach((header, index) => {
         obj[header] = row[index] || '';
       });
@@ -242,7 +242,7 @@ export class CSVParser {
   /**
    * Validate CSV structure
    */
-  static validateCSV(data: any[][]): { isValid: boolean; errors: string[] } {
+  static validateCSV(data: string[][]): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
     
     if (data.length === 0) {
