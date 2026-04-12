@@ -6,6 +6,11 @@
 import { StockError } from './inventory';
 import type { UserErrorDisplay, SystemErrorLog } from './types';
 
+/** Narrow type for stock errors that carry an item code */
+interface StockErrorWithItemCode extends StockError {
+  readonly itemCode?: string;
+}
+
 // Re-export types for backward compatibility
 export type { UserErrorDisplay, SystemErrorLog } from './types';
 
@@ -24,20 +29,20 @@ export class StockErrorFormatter {
       case 'InsufficientStockError':
         return {
           title: 'Insufficient Stock',
-          message: `Not enough stock available for item ${(error as any).itemCode}`,
+          message: `Not enough stock available for item ${(error as StockErrorWithItemCode).itemCode}`,
           severity: 'error',
           category: 'inventory',
-          itemCode: (error as any).itemCode,
+          itemCode: (error as StockErrorWithItemCode).itemCode,
           priority: 'high'
         };
 
       case 'StockReservationError':
         return {
           title: 'Stock Reservation Failed',
-          message: `Cannot reserve stock for item ${(error as any).itemCode}`,
+          message: `Cannot reserve stock for item ${(error as StockErrorWithItemCode).itemCode}`,
           severity: 'warning',
           category: 'reservation',
-          itemCode: (error as any).itemCode,
+          itemCode: (error as StockErrorWithItemCode).itemCode,
           priority: 'medium'
         };
 
@@ -47,7 +52,7 @@ export class StockErrorFormatter {
           message: `Stock movement operation failed: ${error.message}`,
           severity: 'error',
           category: 'movement',
-          itemCode: (error as any).itemCode,
+          itemCode: (error as StockErrorWithItemCode).itemCode,
           priority: 'medium'
         };
 
@@ -57,7 +62,7 @@ export class StockErrorFormatter {
           message: `Transfer operation failed: ${error.message}`,
           severity: 'error',
           category: 'transfer',
-          itemCode: (error as any).itemCode,
+          itemCode: (error as StockErrorWithItemCode).itemCode,
           priority: 'medium'
         };
 
@@ -67,7 +72,7 @@ export class StockErrorFormatter {
           message: `Adjustment operation failed: ${error.message}`,
           severity: 'warning',
           category: 'adjustment',
-          itemCode: (error as any).itemCode,
+          itemCode: (error as StockErrorWithItemCode).itemCode,
           priority: 'low'
         };
 
@@ -77,7 +82,7 @@ export class StockErrorFormatter {
           message: `Tracking operation failed: ${error.message}`,
           severity: 'info',
           category: 'tracking',
-          itemCode: (error as any).itemCode,
+          itemCode: (error as StockErrorWithItemCode).itemCode,
           priority: 'low'
         };
 
@@ -103,13 +108,13 @@ export class StockErrorFormatter {
       errorType: error.constructor.name,
       severity: 'medium',
       message: error.message,
-      details: (error as any).getErrorDetails?.() || {
+      details: error.getErrorDetails() || {
         errorType: error.constructor.name,
         message: error.message,
         timestamp: new Date().toISOString()
       },
       stackTrace: error.stack,
-      context: (error as any).context,
+      context: error.context,
       tags: ['stock', 'error', error.constructor.name.toLowerCase()]
     };
   }

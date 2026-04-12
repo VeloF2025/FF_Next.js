@@ -3,7 +3,7 @@
  * Handles import progress tracking and callback management
  */
 
-import type { ImportProgress, ProgressCallback } from './importTypes';
+import type { ImportProgress, ImportError, ImportWarning, ProgressCallback } from './importTypes';
 import { log } from '@/lib/logger';
 
 export class ProgressTracker {
@@ -42,8 +42,8 @@ export class ProgressTracker {
     processedRows: number,
     totalRows: number,
     message: string,
-    errors: any[] = [],
-    warnings: any[] = []
+    errors: ImportError[] = [],
+    warnings: ImportWarning[] = []
   ): ImportProgress {
     return {
       phase: 'parsing',
@@ -64,8 +64,8 @@ export class ProgressTracker {
     processedRows: number,
     totalRows: number,
     message: string,
-    errors: any[] = [],
-    warnings: any[] = []
+    errors: ImportError[] = [],
+    warnings: ImportWarning[] = []
   ): ImportProgress {
     return {
       phase: 'validating',
@@ -86,8 +86,8 @@ export class ProgressTracker {
     processedRows: number,
     totalRows: number,
     message: string,
-    errors: any[] = [],
-    warnings: any[] = []
+    errors: ImportError[] = [],
+    warnings: ImportWarning[] = []
   ): ImportProgress {
     return {
       phase: 'processing',
@@ -107,8 +107,8 @@ export class ProgressTracker {
     processedRows: number,
     totalRows: number,
     message: string,
-    errors: any[] = [],
-    warnings: any[] = []
+    errors: ImportError[] = [],
+    warnings: ImportWarning[] = []
   ): ImportProgress {
     return {
       phase: 'complete',
@@ -126,8 +126,8 @@ export class ProgressTracker {
    */
   createErrorProgress(
     message: string,
-    errors: any[] = [],
-    warnings: any[] = []
+    errors: ImportError[] = [],
+    warnings: ImportWarning[] = []
   ): ImportProgress {
     return {
       phase: 'error',
