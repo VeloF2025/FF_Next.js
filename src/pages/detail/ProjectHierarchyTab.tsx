@@ -4,11 +4,12 @@
  */
 
 import { TaskStatus } from '@/types/project.types';
+import { ProjectHierarchy, PhaseHierarchy, StepHierarchy, Task } from '@/types/project/hierarchy.types';
 import { getPhaseStatusIcon } from './ProjectDetailHelpers';
 import { calculatePercentage } from './ProjectDetailUtils';
 
 interface ProjectHierarchyTabProps {
-  hierarchy: any;
+  hierarchy: ProjectHierarchy | null | undefined;
   isLoading: boolean;
 }
 
@@ -38,7 +39,7 @@ export function ProjectHierarchyTab({ hierarchy, isLoading }: ProjectHierarchyTa
 
         <div className="space-y-6">
           {hierarchy.phases && hierarchy.phases.length > 0 ? (
-            hierarchy.phases.map((phase: any) => (
+            hierarchy.phases.map((phase: PhaseHierarchy) => (
               <div key={phase.id} className="border border-[var(--ff-border-light)] rounded-lg">
                 <div className="p-4 bg-[var(--ff-bg-tertiary)] border-b border-[var(--ff-border-light)]">
                   <div className="flex items-center justify-between">
@@ -65,7 +66,7 @@ export function ProjectHierarchyTab({ hierarchy, isLoading }: ProjectHierarchyTa
                 {phase.steps && phase.steps.length > 0 && (
                   <div className="p-4">
                     <div className="space-y-4">
-                      {phase.steps.map((step: any) => (
+                      {phase.steps.map((step: StepHierarchy) => (
                         <div key={step.id} className="ml-4 border-l-2 border-[var(--ff-border-light)] pl-4">
                           <div className="flex items-center justify-between">
                             <div>
@@ -73,7 +74,7 @@ export function ProjectHierarchyTab({ hierarchy, isLoading }: ProjectHierarchyTa
                                 {step.name}
                               </h4>
                               <p className="text-xs text-[var(--ff-text-secondary)]">
-                                {step.status.replace('_', ' ')} • {step.estimatedHours}h estimated
+                                {step.status.replace('_', ' ')} • {step.plannedDuration ?? 0}h estimated
                               </p>
                             </div>
                             <div className="text-xs text-[var(--ff-text-secondary)]">
@@ -83,7 +84,7 @@ export function ProjectHierarchyTab({ hierarchy, isLoading }: ProjectHierarchyTa
 
                           {step.tasks && step.tasks.length > 0 && (
                             <div className="mt-2 ml-4 space-y-1">
-                              {step.tasks.slice(0, 3).map((task: any) => (
+                              {step.tasks.slice(0, 3).map((task: Task) => (
                                 <div key={task.id} className="flex items-center text-xs">
                                   <div className={`w-2 h-2 rounded-full mr-2 ${
                                     task.status === TaskStatus.COMPLETED

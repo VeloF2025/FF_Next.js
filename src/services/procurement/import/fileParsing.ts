@@ -11,7 +11,7 @@ import type { FileInfo } from './importTypes';
 /**
  * Read file based on its type (Excel or CSV)
  */
-export async function readFile(file: File): Promise<any[]> {
+export async function readFile(file: File): Promise<Record<string, unknown>[]> {
   const fileExtension = file.name.toLowerCase().split('.').pop();
   
   if (fileExtension === 'csv') {
@@ -26,7 +26,7 @@ export async function readFile(file: File): Promise<any[]> {
 /**
  * Read CSV file and return array of rows
  */
-export async function readCSVFile(file: File): Promise<any[]> {
+export async function readCSVFile(file: File): Promise<Record<string, unknown>[]> {
   return CSVParser.parseCSVFile(file);
 }
 
@@ -40,14 +40,14 @@ export function parseCSVLine(line: string): string[] {
 /**
  * Read Excel file using XLSX library
  */
-export async function readExcelFile(file: File): Promise<any[]> {
+export async function readExcelFile(file: File): Promise<Record<string, unknown>[]> {
   return ExcelParser.parseExcelFile(file);
 }
 
 /**
  * Read Excel file from specific worksheet
  */
-export async function readExcelWorksheet(file: File, worksheetName: string): Promise<any[]> {
+export async function readExcelWorksheet(file: File, worksheetName: string): Promise<Record<string, unknown>[]> {
   return ExcelParser.parseSpecificWorksheet(file, worksheetName);
 }
 

@@ -3,20 +3,72 @@
  * Manages supplier responses and response selection
  */
 
-import { neon } from '@/lib/db-neon';
+import { neon, NeonQueryFunction } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { RFQStatus } from '@/types/procurement.types';
 import { RfqCrudService } from '../core/RfqCrudService';
 import { RfqNotificationService } from '../notifications/RfqNotificationService';
 import { generateResponseNumber } from '../utils/rfqNumberGenerator';
 
-const sql: any = neon(process.env.DATABASE_URL!);
+const sql: NeonQueryFunction<false, false> = neon(process.env.DATABASE_URL!);
+
+interface RfqResponseSubmission {
+  supplierId: string;
+  supplierName: string;
+  totalAmount: number;
+  currency?: string;
+  validityPeriod?: number;
+  paymentTerms?: string;
+  deliveryTerms?: string;
+  deliveryDate?: string;
+  attachments?: string[];
+  technicalCompliance?: boolean;
+  commercialTerms?: Record<string, unknown>;
+  notes?: string;
+  items?: RfqResponseItem[];
+}
+
+interface RfqResponseItem {
+  rfqItemId: string;
+  unitPrice: number;
+  totalPrice?: number;
+  quantity: number;
+  discountPercent?: number;
+  deliveryDays?: number;
+  complianceStatus?: string;
+  alternativeOffered?: boolean;
+  alternativeDescription?: string;
+  notes?: string;
+}
+
+interface RfqResponseRow {
+  id: string;
+  rfq_id: string;
+  supplier_id: string;
+  supplier_name: string;
+  company_name: string;
+  supplier_email: string;
+  supplier_phone: string;
+  response_number: string;
+  submission_date: string;
+  total_amount: number;
+  currency: string;
+  validity_period: number;
+  payment_terms: string;
+  delivery_terms: string;
+  delivery_date: string;
+  delivery_days: number;
+  status: string;
+  evaluation_score: number;
+  evaluation_status: string;
+  evaluation_notes: string;
+}
 
 export class RfqResponseService {
   /**
    * Submit supplier response
    */
-  static async submitResponse(rfqId: string, response: any): Promise<string> {
+  static async submitResponse(rfqId: string, response: RfqResponseSubmission): Promise<string> {
     try {
       const responseNumber = await generateResponseNumber(rfqId);
 
@@ -46,7 +98,7 @@ export class RfqResponseService {
         )
         RETURNING id`;
 
-      const responseId = result[0].id;
+      const responseId = result[0]?.id as string;
 
       // Add response items if provided
       if (response.items && response.items.length > 0) {
@@ -75,7 +127,7 @@ export class RfqResponseService {
       const responseCount = await sql`
         SELECT COUNT(*) as count FROM rfq_responses WHERE rfq_id = ${rfqId}`;
 
-      if (responseCount[0].count === 1) {
+      if ((responseCount[0]?.count as number) === 1) {
         await RfqCrudService.updateStatus(rfqId, RFQStatus.RESPONSES_RECEIVED);
       }
 
@@ -146,7 +198,7 @@ export class RfqResponseService {
   /**
    * Get responses for an RFQ
    */
-  static async getResponses(rfqId: string): Promise<any[]> {
+  static async getResponses(rfqId: string): Promise<Record<string, unknown>[]> {
     try {
       const responses = await sql`
         SELECT
@@ -159,7 +211,7 @@ export class RfqResponseService {
         WHERE r.rfq_id = ${rfqId}
         ORDER BY r.submission_date DESC`;
 
-      return responses.map((response: any) => ({
+      return (responses as RfqResponseRow[]).map((response) => ({
         id: response.id,
         rfqId: response.rfq_id,
         supplierId: response.supplier_id,

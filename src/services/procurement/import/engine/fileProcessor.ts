@@ -85,7 +85,7 @@ export class FileProcessor {
   /**
    * Read and validate file data
    */
-  private async readAndValidateFile(file: File): Promise<Record<string, any>[]> {
+  private async readAndValidateFile(file: File): Promise<Record<string, unknown>[]> {
     this.progressManager.updateProgress(
       this.progressManager.createParsingProgress(0, 0, 0, 'Reading file...')
     );
@@ -109,7 +109,7 @@ export class FileProcessor {
    * Detect and update column mapping
    */
   private async detectAndUpdateMapping(
-    rawData: Record<string, any>[],
+    rawData: Record<string, unknown>[],
     columnMapping: ColumnMapping,
     result: ImportResult
   ): Promise<ColumnMapping> {
@@ -135,7 +135,7 @@ export class FileProcessor {
    * Process all rows at once
    */
   private async processAllRows(
-    rawData: Record<string, any>[],
+    rawData: Record<string, unknown>[],
     context: ProcessingContext
   ): Promise<void> {
     this.progressManager.updateProgress(
@@ -158,7 +158,7 @@ export class FileProcessor {
    * Process data in chunks
    */
   private async processInChunks(
-    rawData: Record<string, any>[],
+    rawData: Record<string, unknown>[],
     context: ProcessingContext,
     chunkSize: number
   ): Promise<void> {

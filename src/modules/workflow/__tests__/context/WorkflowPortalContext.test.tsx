@@ -45,7 +45,7 @@ describe('WorkflowPortalContext', () => {
     mockSessionStorageImpl.clear();
     
     // Setup default service mock responses
-    (workflowManagementService.getTemplates as any).mockResolvedValue({
+    (workflowManagementService.getTemplates as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue({
       templates: mockWorkflowTemplates,
       total: mockWorkflowTemplates.length
     });
@@ -208,7 +208,7 @@ describe('WorkflowPortalContext', () => {
     });
 
     it('should handle template statistics loading error', async () => {
-      (workflowManagementService.getTemplates as any).mockRejectedValue(
+      (workflowManagementService.getTemplates as unknown as { mockRejectedValue: (v: unknown) => void }).mockRejectedValue(
         new Error('Failed to load templates')
       );
 
@@ -324,7 +324,7 @@ describe('WorkflowPortalContext', () => {
     });
 
     it('should handle templates loading error', async () => {
-      (workflowManagementService.getTemplates as any).mockRejectedValue(
+      (workflowManagementService.getTemplates as unknown as { mockRejectedValue: (v: unknown) => void }).mockRejectedValue(
         new Error('Network error')
       );
 
@@ -469,7 +469,7 @@ describe('WorkflowPortalContext', () => {
     });
 
     it('should handle service rejection gracefully', async () => {
-      (workflowManagementService.getTemplates as any).mockRejectedValue(
+      (workflowManagementService.getTemplates as unknown as { mockRejectedValue: (v: unknown) => void }).mockRejectedValue(
         new Error('Service unavailable')
       );
 
