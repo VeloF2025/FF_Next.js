@@ -336,6 +336,8 @@ export interface TicketFilters {
    * Handled by the TicketFilters component before sending to the API.
    */
   t1_category?: string;
+  /** Filter by ticket_category (T2 subcategory: snag, hse_incident, sales_lead, etc.) */
+  ticket_category?: TicketCategory | string;
   priority?: TicketPriority | TicketPriority[];
   source?: TicketSource | TicketSource[];
   assigned_to?: string; // User ID

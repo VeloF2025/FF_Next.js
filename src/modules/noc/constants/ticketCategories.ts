@@ -1,50 +1,43 @@
 /**
- * NOC Ticket Category Mapping — T1/T2 structure
+ * NOC Ticket Category Mapping — discipline (T1) / subcategory (T2) structure
  *
- * T1 = Top-level category (Snags, Non-Invoiceable, HSE, DevOps, etc.)
- * T2 = Sub-type within the category (Tera, Internal, Offline, etc.)
- *
- * Maps ticket types to their display categories for dashboard grouping,
- * filtering, and notification routing.
+ * T1 = Discipline: which team resolves the ticket (civils/optical/activations/maintenance/devops)
+ *      Stored in maintenance_tickets.type (shrunk to 6 values by migration 279)
+ * T2 = Subcategory: what kind of ticket (snag/hse_incident/sales_lead/etc.)
+ *      Stored in maintenance_tickets.ticket_category (added by migration 277)
  */
 
 import { TicketType } from '../types/ticket';
 
-/** T1 category identifiers */
+/** T1 category identifiers — aligned with the 6-discipline type vocabulary */
 export type T1Category =
-  | 'snags'
-  | 'non_invoiceable'
-  | 'hse'
+  | 'civils'
+  | 'optical'
+  | 'activations'
+  | 'maintenance'
   | 'devops'
-  | 'sales'
-  | 'fibertime'
   | 'unspecified';
 
 /**
- * Map discipline (ticket_type) to a legacy display grouping for dashboards
- * that haven't yet adopted the two-axis ticket_category column.
- *
- * Real T1 categorisation lives in ticket.ticket_category — callers should
- * prefer that field. This map is a fallback for rendering contexts that only
- * have ticket_type available.
+ * Map discipline (ticket_type) → T1 display category.
+ * Each discipline maps to its own bucket after migration 279.
  */
 export const T1_CATEGORY_MAP: Record<string, T1Category> = {
-  [TicketType.DEV_OPS]: 'devops',
-  [TicketType.CIVILS]: 'unspecified',
-  [TicketType.OPTICAL]: 'unspecified',
-  [TicketType.ACTIVATIONS]: 'fibertime',
-  [TicketType.MAINTENANCE]: 'unspecified',
+  [TicketType.CIVILS]:      'civils',
+  [TicketType.OPTICAL]:     'optical',
+  [TicketType.ACTIVATIONS]: 'activations',
+  [TicketType.MAINTENANCE]: 'maintenance',
+  [TicketType.DEV_OPS]:     'devops',
   [TicketType.UNSPECIFIED]: 'unspecified',
 };
 
-/** Display labels for T1 categories */
+/** Display labels for T1 (discipline) categories */
 export const T1_LABELS: Record<T1Category, string> = {
-  snags: 'Snags',
-  non_invoiceable: 'Non-Invoiceable',
-  hse: 'HSE',
-  devops: 'DevOps',
-  sales: 'Sales',
-  fibertime: 'Fibertime',
+  civils:      'Civils',
+  optical:     'Optical',
+  activations: 'Activations',
+  maintenance: 'Maintenance',
+  devops:      'DevOps',
   unspecified: 'Unspecified',
 };
 

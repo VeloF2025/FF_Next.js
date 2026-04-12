@@ -733,6 +733,12 @@ export async function listTickets(
       }
     }
 
+    if (filters.ticket_category) {
+      whereClauses.push(`ticket_category = $${paramCounter}`);
+      values.push(filters.ticket_category);
+      paramCounter++;
+    }
+
     if (filters.assigned_to) {
       // assigned_to column stores staff.id, but auth provides users.id
       // Look up staff_id first, fall back to the value as-is

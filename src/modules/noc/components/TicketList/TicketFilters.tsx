@@ -278,6 +278,26 @@ export function TicketFilters({ filters, onFiltersChange, compact = false }: Tic
             </select>
           </div>
 
+          {/* Subcategory Filter (ticket_category) */}
+          <div>
+            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-2">
+              Subcategory
+            </label>
+            <select
+              value={(filters.ticket_category as string) || ''}
+              onChange={(e) => handleFilterChange('ticket_category', e.target.value)}
+              className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            >
+              <option value="">All Subcategories</option>
+              <option value="dev_ops">DevOps</option>
+              <option value="hse_incident">HSE</option>
+              <option value="maintenance">Maintenance</option>
+              <option value="sales_lead">Sales Lead</option>
+              <option value="snag">Snag</option>
+              <option value="unspecified">Unspecified</option>
+            </select>
+          </div>
+
           {/* DR Number Filter */}
           <div>
             <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-2">

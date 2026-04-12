@@ -106,6 +106,9 @@ export async function GET(req: NextRequest) {
     if (searchParams.has('source')) {
       filters.source = searchParams.get('source') as any;
     }
+    if (searchParams.has('ticket_category')) {
+      filters.ticket_category = searchParams.get('ticket_category') as any;
+    }
     if (searchParams.has('assigned_to')) {
       filters.assigned_to = searchParams.get('assigned_to')!;
     }

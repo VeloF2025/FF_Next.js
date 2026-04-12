@@ -57,6 +57,7 @@ export default function TicketsListPageClient() {
   const { filters: urlFilters, setFilter, setMultiple } = useUrlFilters({
     status: '',
     type: '',
+    category: '',
     source: '',
     date: '',
     project: '',
@@ -69,6 +70,7 @@ export default function TicketsListPageClient() {
   const ticketScope = (urlFilters.scope || 'all') as TicketScope;
   const searchTerm = urlFilters.search;
   const filterType = urlFilters.type;
+  const filterCategory = urlFilters.category;
   const filterSource = urlFilters.source;
   const filterDatePreset = urlFilters.date;
   const filterProject = urlFilters.project;
@@ -146,6 +148,7 @@ export default function TicketsListPageClient() {
       search: searchTerm || undefined,
       status: statusFilter as any,
       ticket_type: (filterType || undefined) as any,
+      ticket_category: (filterCategory || undefined) as any,
       source: (filterSource || undefined) as any,
       project_id: filterProject || undefined,
       assigned_to: ticketScope === 'my_tickets' && currentUser?.id ? currentUser.id : undefined,
@@ -154,9 +157,9 @@ export default function TicketsListPageClient() {
     if (dateRange.created_after) f.created_after = dateRange.created_after;
     if (dateRange.created_before) f.created_before = dateRange.created_before;
     return f;
-  }, [searchTerm, statusFilter, filterType, filterSource, filterProject, ticketScope, teamIds, currentUser?.id, dateRange]);
+  }, [searchTerm, statusFilter, filterType, filterCategory, filterSource, filterProject, ticketScope, teamIds, currentUser?.id, dateRange]);
 
-  const hasActiveFilters = filterType || filterSource || filterDatePreset || filterProject;
+  const hasActiveFilters = filterType || filterCategory || filterSource || filterDatePreset || filterProject;
 
   return (
     <ModulePage config={nocConfig} hideHeader>
@@ -298,19 +301,30 @@ export default function TicketsListPageClient() {
                   : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
                 }`}
             >
-              <option value="">All Types</option>
+              <option value="">All Disciplines</option>
+              <option value="activations">Activations</option>
+              <option value="civils">Civils</option>
               <option value="dev_ops">DevOps</option>
-              <option value="fault_repair">Fault Repair</option>
-              <option value="hse_incident">HSE Incident</option>
-              <option value="hse_near_miss">HSE Near Miss</option>
-              <option value="incident">Incident</option>
-              <option value="modification">Modification</option>
-              <option value="new_installation">New Installation</option>
-              <option value="olt_investigation">OLT Investigation</option>
-              <option value="ont_swap">ONT Swap</option>
-              <option value="pre_provision">Pre-Provision</option>
-              <option value="serial_mismatch">Serial Mismatch</option>
+              <option value="maintenance">Maintenance</option>
+              <option value="optical">Optical</option>
+              <option value="unspecified">Unspecified</option>
+            </select>
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilter('category', e.target.value)}
+              className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
+                ${filterCategory
+                  ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300'
+                  : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
+                }`}
+            >
+              <option value="">All Categories</option>
+              <option value="dev_ops">DevOps</option>
+              <option value="hse_incident">HSE</option>
+              <option value="maintenance">Maintenance</option>
+              <option value="sales_lead">Sales Lead</option>
               <option value="snag">Snag</option>
+              <option value="unspecified">Unspecified</option>
             </select>
             <select
               value={filterSource}
@@ -367,7 +381,7 @@ export default function TicketsListPageClient() {
             </select>
             {hasActiveFilters && (
               <button
-                onClick={() => setMultiple({ type: '', source: '', date: '', project: '' })}
+                onClick={() => setMultiple({ type: '', category: '', source: '', date: '', project: '' })}
                 className="p-1.5 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] rounded hover:bg-[var(--ff-bg-secondary)]"
                 title="Clear all filters"
               >

@@ -57,6 +57,7 @@ async function fetchTickets(filters?: TicketFilters): Promise<TicketListResult> 
         params.append('ticket_type', filters.ticket_type);
       }
     }
+    if (filters.ticket_category) params.append('ticket_category', filters.ticket_category as string);
     if (filters.priority) params.append('priority', filters.priority as string);
     if (filters.source) params.append('source', filters.source as string);
     if (filters.assigned_to) params.append('assigned_to', filters.assigned_to);

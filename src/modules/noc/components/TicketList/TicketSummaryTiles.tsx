@@ -30,16 +30,14 @@ interface Tile {
   bg: string;
 }
 
-/** T1 category tile styling */
+/** T1 category tile styling — keyed by discipline */
 const T1_STYLES: Record<T1Category, { color: string; bg: string }> = {
-  snags:           { color: 'text-orange-400',  bg: 'bg-orange-500/10 border-orange-500/20' },
-  non_invoiceable: { color: 'text-yellow-400',  bg: 'bg-yellow-500/10 border-yellow-500/20' },
-  hse:             { color: 'text-red-400',      bg: 'bg-red-500/10 border-red-500/20' },
-  devops:          { color: 'text-violet-400',   bg: 'bg-violet-500/10 border-violet-500/20' },
-  sales:           { color: 'text-emerald-400',  bg: 'bg-emerald-500/10 border-emerald-500/20' },
-  modification:    { color: 'text-cyan-400',     bg: 'bg-cyan-500/10 border-cyan-500/20' },
-  fibertime:       { color: 'text-blue-400',     bg: 'bg-blue-500/10 border-blue-500/20' },
-  unspecified:     { color: 'text-gray-400',     bg: 'bg-gray-500/10 border-gray-500/20' },
+  civils:      { color: 'text-orange-400',  bg: 'bg-orange-500/10 border-orange-500/20' },
+  optical:     { color: 'text-cyan-400',    bg: 'bg-cyan-500/10 border-cyan-500/20' },
+  activations: { color: 'text-blue-400',    bg: 'bg-blue-500/10 border-blue-500/20' },
+  maintenance: { color: 'text-yellow-400',  bg: 'bg-yellow-500/10 border-yellow-500/20' },
+  devops:      { color: 'text-violet-400',  bg: 'bg-violet-500/10 border-violet-500/20' },
+  unspecified: { color: 'text-gray-400',    bg: 'bg-gray-500/10 border-gray-500/20' },
 };
 
 /** Status groups for the tiles */
@@ -111,8 +109,7 @@ export function TicketSummaryTiles({ filters }: Props) {
   /** Aggregate typeCounts into T1 category buckets */
   const categoryTiles: Tile[] = useMemo(() => {
     const buckets: Record<T1Category, number> = {
-      snags: 0, non_invoiceable: 0, hse: 0, devops: 0,
-      sales: 0, modification: 0, fibertime: 0, unspecified: 0,
+      civils: 0, optical: 0, activations: 0, maintenance: 0, devops: 0, unspecified: 0,
     };
 
     for (const [ticketType, count] of Object.entries(typeCounts)) {
