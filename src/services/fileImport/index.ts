@@ -19,6 +19,7 @@ export { ProgressTracker } from './progress/ProgressTracker';
 
 // Types
 export type * from './types/index';
+import type { FileProcessingProgress, ProcessingError } from './types/index';
 
 // Utility functions
 export const FileImportUtils = {
@@ -39,10 +40,10 @@ export const FileImportUtils = {
     return fileImportEngine.processFile<T>(file, {
       maxFileSize: options.maxFileSize || 100 * 1024 * 1024, // 100MB
       streaming: options.useStreaming || false,
-      ...(options.onProgress ? { progressCallback: (progress: any) => {
+      ...(options.onProgress ? { progressCallback: (progress: FileProcessingProgress) => {
         options.onProgress!(progress.percentage);
       } } : {}),
-      ...(options.onError ? { onError: (error: any) => {
+      ...(options.onError ? { onError: (error: ProcessingError) => {
         options.onError!(error.message);
       } } : {}),
       validationRules: [],
@@ -215,13 +216,13 @@ export const FileImportBenchmark = {
 
   getMemoryUsage(): number {
     if (typeof window !== 'undefined' && 'performance' in window && 'memory' in performance) {
-      const memory = (performance as any).memory;
+      const memory = (performance as { memory: { usedJSHeapSize: number } }).memory;
       return memory.usedJSHeapSize;
     }
     return 0;
   },
 
-  getBenchmarkRecommendation(results: Array<any>): string {
+  getBenchmarkRecommendation(results: Array<{ strategy: string; processingTime: number; memoryPeak: number; success: boolean }>): string {
     const successful = results.filter(r => r.success);
     if (successful.length === 0) return 'No successful strategies';
 

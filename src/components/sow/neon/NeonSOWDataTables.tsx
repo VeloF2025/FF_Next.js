@@ -2,8 +2,10 @@
  * Neon SOW Data Tables for Poles, Drops, and Fibre
  */
 
+import type { SOWPoleRecord, SOWDropRecord, SOWFibreRecord } from './NeonSOWTypes';
+
 interface NeonSOWDataTablesProps {
-  data: any[];
+  data: SOWPoleRecord[] | SOWDropRecord[] | SOWFibreRecord[];
   type: 'poles' | 'drops' | 'fibre';
   title: string;
 }
@@ -21,7 +23,7 @@ export function NeonSOWDataTables({ data, type, title }: NeonSOWDataTablesProps)
     );
   }
 
-  const getStatusBadge = (status: string, statusType: 'poles' | 'drops' | 'fibre') => {
+  const getStatusBadge = (status: string | undefined, statusType: 'poles' | 'drops' | 'fibre') => {
     let colorClass = 'bg-gray-500/20 text-gray-400';
 
     if (statusType === 'poles') {
@@ -37,7 +39,7 @@ export function NeonSOWDataTables({ data, type, title }: NeonSOWDataTablesProps)
 
     return (
       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}>
-        {status || 'Unknown'}
+        {status ?? 'Unknown'}
       </span>
     );
   };
@@ -53,19 +55,19 @@ export function NeonSOWDataTables({ data, type, title }: NeonSOWDataTablesProps)
         </tr>
       </thead>
       <tbody className="divide-y divide-[var(--ff-border-light)]">
-        {displayData.map((pole: any, index: number) => (
+        {(displayData as SOWPoleRecord[]).map((pole, index: number) => (
           <tr key={index} className="hover:bg-[var(--ff-bg-hover)]">
             <td className="px-4 py-2 font-medium text-[var(--ff-text-primary)]">
-              {pole.pole_number || pole.id}
+              {pole.pole_number ?? pole.id}
             </td>
             <td className="px-4 py-2 text-[var(--ff-text-primary)]">
-              {pole.address || 'Not specified'}
+              {pole.address ?? 'Not specified'}
             </td>
             <td className="px-4 py-2">
               {getStatusBadge(pole.status, 'poles')}
             </td>
             <td className="px-4 py-2 text-[var(--ff-text-secondary)]">
-              {pole.latitude && pole.longitude 
+              {pole.latitude && pole.longitude
                 ? `${Number(pole.latitude).toFixed(6)}, ${Number(pole.longitude).toFixed(6)}`
                 : 'No GPS'
               }
@@ -87,16 +89,16 @@ export function NeonSOWDataTables({ data, type, title }: NeonSOWDataTablesProps)
         </tr>
       </thead>
       <tbody className="divide-y divide-[var(--ff-border-light)]">
-        {displayData.map((drop: any, index: number) => (
+        {(displayData as SOWDropRecord[]).map((drop, index: number) => (
           <tr key={index} className="hover:bg-[var(--ff-bg-hover)]">
             <td className="px-4 py-2 font-medium text-[var(--ff-text-primary)]">
-              {drop.drop_number || drop.id}
+              {drop.drop_number ?? drop.id}
             </td>
             <td className="px-4 py-2 text-[var(--ff-text-primary)]">
-              {drop.pole_number || 'Not assigned'}
+              {drop.pole_number ?? 'Not assigned'}
             </td>
             <td className="px-4 py-2 text-[var(--ff-text-primary)]">
-              {drop.address || 'Not specified'}
+              {drop.address ?? 'Not specified'}
             </td>
             <td className="px-4 py-2">
               {getStatusBadge(drop.status, 'drops')}
@@ -118,10 +120,10 @@ export function NeonSOWDataTables({ data, type, title }: NeonSOWDataTablesProps)
         </tr>
       </thead>
       <tbody className="divide-y divide-[var(--ff-border-light)]">
-        {displayData.map((segment: any, index: number) => (
+        {(displayData as SOWFibreRecord[]).map((segment, index: number) => (
           <tr key={index} className="hover:bg-[var(--ff-bg-hover)]">
             <td className="px-4 py-2 font-medium text-[var(--ff-text-primary)]">
-              {segment.segment_id || segment.id}
+              {segment.segment_id ?? segment.id}
             </td>
             <td className="px-4 py-2 text-[var(--ff-text-primary)]">
               {segment.from_point && segment.to_point
