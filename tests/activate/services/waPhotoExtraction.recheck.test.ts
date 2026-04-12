@@ -24,7 +24,7 @@ import { callVlmExtraction } from '@/modules/activate/services/vlmClient';
 import { extractUpsSerialRecheck, extractOntSerialRecheck } from '@/modules/activate/services/waPhotoExtraction';
 
 describe('extractUpsSerialRecheck', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('returns serial and confidence when VLM succeeds above threshold', async () => {
     vi.mocked(callVlmExtraction).mockResolvedValueOnce({
@@ -63,7 +63,7 @@ describe('extractUpsSerialRecheck', () => {
 });
 
 describe('extractOntSerialRecheck', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('returns serial when VLM reads valid ONT serial', async () => {
     vi.mocked(callVlmExtraction).mockResolvedValueOnce({
