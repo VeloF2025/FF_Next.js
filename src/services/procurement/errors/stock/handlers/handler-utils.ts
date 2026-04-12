@@ -6,6 +6,11 @@
 import { StockError } from '../inventory';
 import type { ErrorSeverity, UserErrorDisplay } from '../types';
 
+/** Narrow a StockError to one that carries an itemCode property */
+function getItemCode(error: StockError): string | undefined {
+  return 'itemCode' in error ? (error as StockError & { itemCode: string }).itemCode : undefined;
+}
+
 /**
  * Utility functions for error handlers
  */
@@ -115,8 +120,8 @@ export class HandlerUtils {
   /**
    * Extract contextual information from error
    */
-  static extractErrorContext(error: StockError): Record<string, any> {
-    const context: Record<string, any> = {
+  static extractErrorContext(error: StockError): Record<string, unknown> {
+    const context: Record<string, unknown> = {
       errorType: error.constructor.name,
       timestamp: new Date().toISOString(),
       message: error.message,
@@ -149,7 +154,7 @@ export class HandlerUtils {
   /**
    * Format error for logging
    */
-  static formatForLogging(error: StockError, additionalContext?: Record<string, any>): string {
+  static formatForLogging(error: StockError, additionalContext?: Record<string, unknown>): string {
     const context = {
       ...HandlerUtils.extractErrorContext(error),
       ...additionalContext
@@ -232,10 +237,10 @@ export class HandlerUtils {
       case 'InsufficientStockError':
         return {
           title: 'Insufficient Stock',
-          message: `Not enough stock available for item ${(error as any).itemCode}`,
+          message: `Not enough stock available for item ${getItemCode(error)}`,
           severity: 'error',
           category: 'inventory',
-          itemCode: (error as any).itemCode,
+          itemCode: getItemCode(error),
           priority: 'high',
           actions: [
             {
@@ -253,10 +258,10 @@ export class HandlerUtils {
       case 'StockReservationError':
         return {
           title: 'Stock Reservation Failed',
-          message: `Cannot reserve stock for item ${(error as any).itemCode}`,
+          message: `Cannot reserve stock for item ${getItemCode(error)}`,
           severity: 'warning',
           category: 'reservation',
-          itemCode: (error as any).itemCode,
+          itemCode: getItemCode(error),
           priority: 'medium',
           actions: [
             {
@@ -277,7 +282,7 @@ export class HandlerUtils {
           message: `Stock movement operation failed: ${error.message}`,
           severity: 'error',
           category: 'movement',
-          itemCode: (error as any).itemCode,
+          itemCode: getItemCode(error),
           priority: 'medium',
           actions: [
             {
@@ -298,7 +303,7 @@ export class HandlerUtils {
           message: `Transfer operation failed: ${error.message}`,
           severity: 'error',
           category: 'transfer',
-          itemCode: (error as any).itemCode,
+          itemCode: getItemCode(error),
           priority: 'medium',
           actions: [
             {
@@ -319,7 +324,7 @@ export class HandlerUtils {
           message: `Adjustment operation failed: ${error.message}`,
           severity: 'warning',
           category: 'adjustment',
-          itemCode: (error as any).itemCode,
+          itemCode: getItemCode(error),
           priority: 'low',
           actions: [
             {
@@ -340,7 +345,7 @@ export class HandlerUtils {
           message: `Tracking operation failed: ${error.message}`,
           severity: 'info',
           category: 'tracking',
-          itemCode: (error as any).itemCode,
+          itemCode: getItemCode(error),
           priority: 'low',
           actions: [
             {

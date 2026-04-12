@@ -5,6 +5,14 @@
 
 import { RecoveryOption, RetryStrategy, ErrorHandlerConfig } from './handler-types';
 
+/** Typed result shape returned by all recovery execution methods */
+interface RecoveryResult {
+  success: boolean;
+  result?: unknown;
+  error?: string;
+  nextSteps?: string[];
+}
+
 /**
  * Error recovery handler
  */
@@ -21,12 +29,7 @@ export class RecoveryHandler {
   /**
    * Execute recovery option
    */
-  static async executeRecovery(option: RecoveryOption): Promise<{
-    success: boolean;
-    result?: any;
-    error?: string;
-    nextSteps?: string[];
-  }> {
+  static async executeRecovery(option: RecoveryOption): Promise<RecoveryResult> {
     try {
       switch (option.type) {
         case 'partial_fulfillment':
@@ -102,7 +105,7 @@ export class RecoveryHandler {
   }
 
   // Private recovery execution methods
-  private static async executePartialFulfillment(option: RecoveryOption): Promise<any> {
+  private static async executePartialFulfillment(option: RecoveryOption): Promise<RecoveryResult> {
     // Mock implementation - would integrate with actual fulfillment system
     return {
       success: true,
@@ -115,7 +118,7 @@ export class RecoveryHandler {
     };
   }
 
-  private static async executeAlternativeItem(_option: RecoveryOption): Promise<any> {
+  private static async executeAlternativeItem(_option: RecoveryOption): Promise<RecoveryResult> {
     // Mock implementation - would query alternative items
     return {
       success: true,
@@ -129,7 +132,7 @@ export class RecoveryHandler {
     };
   }
 
-  private static async executeEmergencyProcurement(option: RecoveryOption): Promise<any> {
+  private static async executeEmergencyProcurement(option: RecoveryOption): Promise<RecoveryResult> {
     // Mock implementation - would create urgent PO
     return {
       success: true,
@@ -142,7 +145,7 @@ export class RecoveryHandler {
     };
   }
 
-  private static async executeReleaseReservations(_option: RecoveryOption): Promise<any> {
+  private static async executeReleaseReservations(_option: RecoveryOption): Promise<RecoveryResult> {
     // Mock implementation - would release expired reservations
     return {
       success: true,
@@ -154,7 +157,7 @@ export class RecoveryHandler {
     };
   }
 
-  private static async executeQueueReservation(_option: RecoveryOption): Promise<any> {
+  private static async executeQueueReservation(_option: RecoveryOption): Promise<RecoveryResult> {
     // Mock implementation - would add to queue
     return {
       success: true,
@@ -166,7 +169,7 @@ export class RecoveryHandler {
     };
   }
 
-  private static async executeRetryWithValidation(_option: RecoveryOption): Promise<any> {
+  private static async executeRetryWithValidation(_option: RecoveryOption): Promise<RecoveryResult> {
     // Mock implementation - would retry with enhanced validation
     return {
       success: true,
@@ -178,7 +181,7 @@ export class RecoveryHandler {
     };
   }
 
-  private static async executeSplitMovement(option: RecoveryOption): Promise<any> {
+  private static async executeSplitMovement(option: RecoveryOption): Promise<RecoveryResult> {
     // Mock implementation - would split into batches
     const batchCount = Math.ceil((option.data?.['totalQuantity'] as number) / (option.data?.['batchSize'] as number));
     return {

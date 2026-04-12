@@ -3,7 +3,7 @@
  * Handles progress tracking and callback notifications
  */
 
-import { ImportProgress, ProgressCallback } from './types';
+import { ImportProgress, ImportError, ImportWarning, ProgressCallback } from './types';
 import { log } from '@/lib/logger';
 
 export class ProgressManager {
@@ -53,8 +53,8 @@ export class ProgressManager {
     processedRows: number,
     totalRows: number,
     message: string,
-    errors: any[] = [],
-    warnings: any[] = []
+    errors: ImportError[] = [],
+    warnings: ImportWarning[] = []
   ): ImportProgress {
     return {
       phase: 'validating',
@@ -75,8 +75,8 @@ export class ProgressManager {
     processedRows: number,
     totalRows: number,
     message: string,
-    errors: any[] = [],
-    warnings: any[] = []
+    errors: ImportError[] = [],
+    warnings: ImportWarning[] = []
   ): ImportProgress {
     return {
       phase: 'processing',
@@ -95,8 +95,8 @@ export class ProgressManager {
   createCompleteProgress(
     totalRows: number,
     message: string,
-    errors: any[] = [],
-    warnings: any[] = []
+    errors: ImportError[] = [],
+    warnings: ImportWarning[] = []
   ): ImportProgress {
     return {
       phase: 'complete',
@@ -114,8 +114,8 @@ export class ProgressManager {
    */
   createErrorProgress(
     message: string,
-    errors: any[] = [],
-    warnings: any[] = []
+    errors: ImportError[] = [],
+    warnings: ImportWarning[] = []
   ): ImportProgress {
     return {
       phase: 'error',
