@@ -3,12 +3,13 @@
  * Advanced scorecard generation with regional and category benchmarks
  */
 
-import { Supplier } from '@/types/supplier/base.types';
+import { Supplier, ComplianceStatus } from '@/types/supplier/base.types';
 import { ProductCategory } from '@/types/supplier/common.types';
 import { log } from '@/lib/logger';
-import type { 
-  ScorecardGenerationResult, 
-  EnhancedScorecardResult 
+import type {
+  ScorecardGenerationResult,
+  EnhancedScorecardResult,
+  PriorityRecommendation,
 } from './service-types';
 
 export class ScorecardEnhancedGenerator {
@@ -74,10 +75,11 @@ export class ScorecardEnhancedGenerator {
       const supplierCrudService = await import('../../supplier.crud');
       const allSuppliers = await supplierCrudService.SupplierCrudService.getAll();
       
-      // Filter by region (if supplier has region data)
-      const supplierRegion = (supplier as any).region || 'Unknown';
-      const regionalSuppliers = allSuppliers.filter(s => 
-        (s as any).region === supplierRegion
+      // Filter by region (if supplier has region data — not in core Supplier type)
+      const supplierExt = supplier as unknown as Record<string, unknown>;
+      const supplierRegion = (supplierExt['region'] as string | undefined) ?? 'Unknown';
+      const regionalSuppliers = allSuppliers.filter(s =>
+        (s as unknown as Record<string, unknown>)['region'] === supplierRegion
       );
 
       if (regionalSuppliers.length === 0) {
@@ -202,22 +204,8 @@ export class ScorecardEnhancedGenerator {
   private static async generatePriorityRecommendations(
     supplier: Supplier,
     overallScore: number
-  ): Promise<Array<{
-    priority: 'critical' | 'high' | 'medium' | 'low';
-    category: string;
-    recommendation: string;
-    impact: 'high' | 'medium' | 'low';
-    effort: 'high' | 'medium' | 'low';
-    timeline: string;
-  }>> {
-    const recommendations: Array<{
-      priority: 'critical' | 'high' | 'medium' | 'low';
-      category: string;
-      recommendation: string;
-      impact: 'high' | 'medium' | 'low';
-      effort: 'high' | 'medium' | 'low';
-      timeline: string;
-    }> = [];
+  ): Promise<PriorityRecommendation[]> {
+    const recommendations: PriorityRecommendation[] = [];
 
     // Critical recommendations (score < 50)
     if (overallScore < 50) {
@@ -258,9 +246,12 @@ export class ScorecardEnhancedGenerator {
       });
     }
 
-    // Performance-specific recommendations
-    const performance = supplier.performance as any;
-    if (performance?.onTimeDelivery && performance.onTimeDelivery < 90) {
+    // Performance-specific recommendations — check on-time deliveries from metrics
+    const performance = supplier.performance;
+    const onTimeDeliveryRate = performance?.metrics?.onTimeDeliveries != null
+      ? (performance.metrics.onTimeDeliveries / Math.max(performance.metrics.totalOrders, 1)) * 100
+      : null;
+    if (onTimeDeliveryRate !== null && onTimeDeliveryRate < 90) {
       recommendations.push({
         priority: 'medium',
         category: 'Delivery',
@@ -290,13 +281,9 @@ export class ScorecardEnhancedGenerator {
    * Calculate ROI impact for recommendations
    */
   static calculateRecommendationROI(
-    recommendations: Array<{
-      priority: 'critical' | 'high' | 'medium' | 'low';
-      impact: 'high' | 'medium' | 'low';
-      effort: 'high' | 'medium' | 'low';
-    }>
+    recommendations: PriorityRecommendation[]
   ): Array<{
-    recommendation: any;
+    recommendation: PriorityRecommendation;
     roiScore: number;
     priorityRank: number;
   }> {
@@ -314,17 +301,18 @@ export class ScorecardEnhancedGenerator {
   /**
    * Calculate basic compliance score from available data
    */
-  private static calculateBasicComplianceScore(compliance: any): number {
+  private static calculateBasicComplianceScore(compliance: ComplianceStatus | undefined): number {
     if (!compliance) return 0;
-    
+
     let score = 0;
     let factors = 0;
-    
+
+    const ext = compliance as unknown as Record<string, unknown>;
     if (compliance.taxCompliant) { score += 30; factors++; }
     if (compliance.beeCompliant) { score += 25; factors++; }
-    if (compliance.isoCompliant) { score += 25; factors++; }
-    if (compliance.documentsVerified) { score += 20; factors++; }
-    
+    if (ext['isoCompliant']) { score += 25; factors++; }
+    if (ext['documentsVerified']) { score += 20; factors++; }
+
     return factors > 0 ? score : 0;
   }
 }

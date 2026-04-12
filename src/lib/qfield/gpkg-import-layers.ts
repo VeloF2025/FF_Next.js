@@ -13,9 +13,12 @@ export { importCableSpans, importZoneBoundaries, importPonBoundaries, importPops
 
 const BATCH_SIZE = 1000;
 
+/** Raw GPKG feature — field names vary by layer, keyed by attribute name */
+export type GpkgFeature = Record<string, unknown>;
+
 /** Deduplicate features by key field — keeps last occurrence (latest wins) */
-function dedup(features: any[], keyField: string): any[] {
-  const map = new Map<string, any>();
+function dedup(features: GpkgFeature[], keyField: string): GpkgFeature[] {
+  const map = new Map<string, GpkgFeature>();
   for (const f of features) {
     const key = String(f[keyField]);
     map.set(key, f);
@@ -53,7 +56,7 @@ type SqlFn = (strings: TemplateStringsArray, ...values: any[]) => Promise<any[]>
 // ---------------------------------------------------------------------------
 // Poles
 // ---------------------------------------------------------------------------
-export async function importPoles(sql: SqlFn, features: any[], projectId: string, mode: ImportMode): Promise<LayerResult> {
+export async function importPoles(sql: SqlFn, features: GpkgFeature[], projectId: string, mode: ImportMode): Promise<LayerResult> {
   if (mode === 'replace') {
     await sql`DELETE FROM poles WHERE project_id = ${projectId}::uuid AND source IN ('qfield', 'sow+qfield')`;
   }
@@ -137,7 +140,7 @@ export async function importPoles(sql: SqlFn, features: any[], projectId: string
 // ---------------------------------------------------------------------------
 // Joints
 // ---------------------------------------------------------------------------
-export async function importJoints(sql: SqlFn, features: any[], projectId: string, mode: ImportMode): Promise<LayerResult> {
+export async function importJoints(sql: SqlFn, features: GpkgFeature[], projectId: string, mode: ImportMode): Promise<LayerResult> {
   if (mode === 'replace') {
     await sql`DELETE FROM joints WHERE project_id = ${projectId}::uuid`;
   }
@@ -201,7 +204,7 @@ export async function importJoints(sql: SqlFn, features: any[], projectId: strin
 // ---------------------------------------------------------------------------
 // Drops
 // ---------------------------------------------------------------------------
-export async function importDrops(sql: SqlFn, features: any[], projectId: string, mode: ImportMode): Promise<LayerResult> {
+export async function importDrops(sql: SqlFn, features: GpkgFeature[], projectId: string, mode: ImportMode): Promise<LayerResult> {
   if (mode === 'replace') {
     await sql`DELETE FROM drops WHERE project_id = ${projectId}::uuid AND source IN ('qfield', 'sow+qfield')`;
   }

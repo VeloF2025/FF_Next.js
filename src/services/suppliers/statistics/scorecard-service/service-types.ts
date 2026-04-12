@@ -10,6 +10,7 @@ export interface ScorecardConfig {
   includeRecommendations?: boolean;
 }
 
+/** Minimal scorecard shape — full SupplierScorecard lives in supplier.types */
 export interface ScorecardData {
   supplierId: string;
   supplierName: string;
@@ -45,10 +46,32 @@ export interface ScorecardSummary {
   improvementCandidates: Array<{ supplierId: string; supplierName: string; score: number }>;
 }
 
+export interface RegionalBenchmarks {
+  regionalPercentile: number;
+  regionalAverage: number;
+  topRegionalSuppliers: Array<{ name: string; score: number }>;
+}
+
+export interface CategoryBenchmarks {
+  category: string;
+  categoryPercentile: number;
+  categoryAverage: number;
+  categoryLeaders: Array<{ name: string; score: number }>;
+}
+
+export interface PriorityRecommendation {
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  category: string;
+  recommendation: string;
+  impact: 'high' | 'medium' | 'low';
+  effort: 'high' | 'medium' | 'low';
+  timeline: string;
+}
+
 export interface EnhancedScorecardResult extends ScorecardGenerationResult {
-  regionalBenchmarks?: Record<string, unknown>;
-  categoryBenchmarks?: Record<string, unknown>;
-  priorityRecommendations?: Record<string, unknown>;
+  regionalBenchmarks?: RegionalBenchmarks;
+  categoryBenchmarks?: CategoryBenchmarks[];
+  priorityRecommendations?: PriorityRecommendation[];
 }
 
 export const DEFAULT_SCORE_WEIGHTS = {
