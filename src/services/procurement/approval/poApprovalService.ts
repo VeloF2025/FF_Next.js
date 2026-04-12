@@ -8,7 +8,7 @@
  * - Integration with approval_requests table
  */
 
-import { neon } from '@/lib/db-neon';
+import { neon, type NeonQueryFunction } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { postPurchaseOrderToGL } from '@/modules/accounting/services/glCrossModuleHooks';
 import { notify } from '@/modules/notifications/services';
@@ -18,7 +18,62 @@ import {
   createRejectionFollowUp,
 } from '@/lib/action-items/procurementActions';
 
-const sql: any = neon(process.env.DATABASE_URL!);
+const sql: NeonQueryFunction<false> = neon(process.env.DATABASE_URL!);
+
+// Row types for SQL query results
+interface ApprovalLevelRow {
+  id: string;
+  workflow_id: string;
+  level_number: number;
+  name: string;
+  min_amount: string;
+  max_amount: string | null;
+  approver_type: 'user' | 'role' | 'department_head' | 'project_manager' | 'any_of_group';
+  approver_user_id: string | null;
+  approver_role: string | null;
+  approver_group_ids: string[] | null;
+  auto_approve: boolean;
+  can_delegate: boolean;
+}
+
+interface UserRow {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface POItemRow {
+  id: string;
+  item_description: string;
+  quantity_ordered: string;
+  unit_price: string;
+  total_price: string;
+}
+
+interface QuoteRow {
+  id: string;
+  quote_number: string;
+  supplier_name: string;
+  total_amount: string;
+  valid_until: string | null;
+  delivery_days: number | null;
+  payment_terms: string | null;
+}
+
+interface ApprovalHistoryRow {
+  action: string;
+  performed_by_name: string | null;
+  performed_at: string;
+  notes: string | null;
+}
+
+interface VersionRow {
+  version: number;
+  rejection_reason: string | null;
+  rejected_by_name: string | null;
+  rejected_at: string | null;
+  snapshot: string | Record<string, unknown>;
+}
 
 // Types
 export interface ApprovalLevel {
@@ -132,7 +187,7 @@ class POApprovalService {
         ORDER BY al.level_number ASC
       `;
 
-      return result.map((level: any) => ({
+      return (result as ApprovalLevelRow[]).map((level) => ({
         id: level.id,
         workflowId: level.workflow_id,
         levelNumber: level.level_number,
@@ -164,13 +219,13 @@ class POApprovalService {
           SELECT id, COALESCE(first_name || ' ' || last_name, email) as name, email
           FROM users WHERE id = ${level.approverUserId}
         `;
-        approvers = result.map((r: any) => ({ id: r.id, name: r.name, email: r.email }));
+        approvers = (result as UserRow[]).map((r) => ({ id: r.id, name: r.name, email: r.email }));
       } else if (level.approverType === 'role' && level.approverRole) {
         const result = await sql`
           SELECT id, COALESCE(first_name || ' ' || last_name, email) as name, email
           FROM users WHERE role = ${level.approverRole}
         `;
-        approvers = result.map((r: any) => ({ id: r.id, name: r.name, email: r.email }));
+        approvers = (result as UserRow[]).map((r) => ({ id: r.id, name: r.name, email: r.email }));
       }
 
       return approvers;
@@ -546,7 +601,7 @@ class POApprovalService {
         status: po.status,
         supplierId: po.supplier_id,
         totalAmount: parseFloat(po.total_amount) || 0,
-        items: itemsResult.map((item: any) => ({
+        items: (itemsResult as POItemRow[]).map((item) => ({
           id: item.id,
           description: item.item_description,
           quantity: parseFloat(item.quantity_ordered) || 0,
@@ -748,7 +803,7 @@ class POApprovalService {
         ORDER BY q.total_amount ASC
       `;
 
-      const allQuotes = quotesResult.map((q: any) => ({
+      const allQuotes = (quotesResult as QuoteRow[]).map((q) => ({
         id: q.id,
         quoteNumber: q.quote_number,
         supplierName: q.supplier_name,
@@ -756,7 +811,7 @@ class POApprovalService {
         isSelected: q.id === po.quote_id,
       }));
 
-      const selectedQuoteData = quotesResult.find((q: typeof quotesResult[0]) => q.id === po.quote_id);
+      const selectedQuoteData = (quotesResult as QuoteRow[]).find((q) => q.id === po.quote_id);
       const selectedQuote = selectedQuoteData
         ? {
             id: selectedQuoteData.id,
@@ -847,7 +902,7 @@ class POApprovalService {
         ORDER BY performed_at DESC
       `;
 
-      const history = historyResult.map((h: any) => ({
+      const history = (historyResult as ApprovalHistoryRow[]).map((h) => ({
         action: h.action,
         by: h.performed_by_name || 'Unknown',
         at: new Date(h.performed_at),
@@ -889,14 +944,16 @@ class POApprovalService {
         ORDER BY version DESC
       `;
 
-      return result.map((v: any) => {
-        const snapshot = typeof v.snapshot === 'string' ? JSON.parse(v.snapshot) : v.snapshot;
+      return (result as VersionRow[]).map((v) => {
+        const snapshot = typeof v.snapshot === 'string'
+          ? (JSON.parse(v.snapshot) as Record<string, unknown>)
+          : v.snapshot;
         return {
           version: v.version,
           rejectionReason: v.rejection_reason,
           rejectedBy: v.rejected_by_name,
           rejectedAt: v.rejected_at ? new Date(v.rejected_at) : null,
-          totalAmount: snapshot.totalAmount || 0,
+          totalAmount: (snapshot as { totalAmount?: number }).totalAmount || 0,
         };
       });
     } catch (error) {

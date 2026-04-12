@@ -99,6 +99,76 @@ export interface ReturnData {
   }>;
 }
 
+/** Internal shape of a stock movement record as returned from Drizzle ORM inserts */
+interface StockMovementRecord {
+  id: string;
+  projectId: string;
+  movementType: MovementTypeType;
+  referenceNumber: string;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  fromLocation?: string | null;
+  toLocation?: string | null;
+  fromProjectId?: string | null;
+  toProjectId?: string | null;
+  status: string;
+  movementDate: Date;
+  confirmedAt?: Date | null;
+  requestedBy?: string | null;
+  authorizedBy?: string | null;
+  processedBy?: string | null;
+  notes?: string | null;
+  reason?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Internal shape of a stock movement item record as returned from Drizzle ORM inserts */
+interface StockMovementItemRecord {
+  id: string;
+  stockMovementId: string;
+  stockPositionId: string;
+  projectId: string;
+  itemCode: string;
+  description?: string | null;
+  itemName?: string | null;
+  uom: string;
+  plannedQuantity: string | number;
+  actualQuantity?: string | number;
+  unitCost?: string | number;
+  totalCost?: string | number;
+  lotNumbers?: string[] | null;
+  serialNumbers?: string[] | null;
+  itemStatus: string;
+  qualityCheckRequired: boolean;
+  qualityCheckStatus?: string | null;
+  qualityCheckNotes?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Internal shape of a drum usage history record as returned from Drizzle ORM inserts */
+interface DrumUsageRecord {
+  id: string;
+  drumId: string;
+  projectId: string;
+  usageDate: Date;
+  previousReading: string | number;
+  currentReading: string | number;
+  usedLength: string | number;
+  poleNumber?: string | null;
+  sectionId?: string | null;
+  workOrderId?: string | null;
+  technicianId?: string | null;
+  installationType?: string | null;
+  installationNotes?: string | null;
+  qualityNotes?: string | null;
+  startCoordinates?: { lat: number; lng: number } | null;
+  endCoordinates?: { lat: number; lng: number } | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export class StockMovementService extends BaseService {
   constructor() {
     super('StockMovementService', {
@@ -117,6 +187,7 @@ export class StockMovementService extends BaseService {
   }>> {
     try {
       // Test transaction capabilities
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await db.transaction(async (tx: any) => {
         await tx.select().from(stockMovements).limit(1);
       });
@@ -203,6 +274,7 @@ export class StockMovementService extends BaseService {
     grnData: GRNData
   ): Promise<ServiceResponse<{ movement: StockMovement, items: StockMovementItem[] }>> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return await db.transaction(async (tx: any) => {
         // Create GRN movement
         const movementId = uuidv4();
@@ -355,6 +427,7 @@ export class StockMovementService extends BaseService {
     issueData: IssueData
   ): Promise<ServiceResponse<{ movement: StockMovement, items: StockMovementItem[] }>> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return await db.transaction(async (tx: any) => {
         // Validate stock availability for all items first
         for (const item of issueData.items) {
@@ -498,6 +571,7 @@ export class StockMovementService extends BaseService {
     transferData: TransferData
   ): Promise<ServiceResponse<{ movement: StockMovement, items: StockMovementItem[] }>> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return await db.transaction(async (tx: any) => {
         // Validate stock availability in source project
         for (const item of transferData.items) {
@@ -799,6 +873,7 @@ export class StockMovementService extends BaseService {
     usageData: Omit<DrumUsageHistory, 'id' | 'drumId' | 'createdAt' | 'updatedAt'>
   ): Promise<ServiceResponse<DrumUsageHistory>> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return await db.transaction(async (tx: any) => {
         // Get current drum information
         const [drum] = await tx
@@ -887,7 +962,7 @@ export class StockMovementService extends BaseService {
   }
 
   // 🔵 HELPER: Mapping Functions
-  private mapStockMovement(movement: any): StockMovement {
+  private mapStockMovement(movement: StockMovementRecord): StockMovement {
     return {
       id: movement.id,
       projectId: movement.projectId,
@@ -912,35 +987,33 @@ export class StockMovementService extends BaseService {
     };
   }
 
-  private mapStockMovementItem(item: any): StockMovementItem {
-    const mappedItem: any = {
+  private mapStockMovementItem(item: StockMovementItemRecord): StockMovementItem {
+    return {
       id: item.id,
       movementId: item.stockMovementId,
       stockPositionId: item.stockPositionId,
       projectId: item.projectId,
       itemCode: item.itemCode,
-      itemName: item.description || item.itemCode,
-      description: item.description,
+      itemName: item.description ?? item.itemCode ?? '',
+      description: item.description ?? undefined,
       uom: item.uom,
       plannedQuantity: Number(item.plannedQuantity),
       ...(item.actualQuantity !== undefined && { actualQuantity: Number(item.actualQuantity) }),
       ...(item.actualQuantity !== undefined && { receivedQuantity: Number(item.actualQuantity) }),
       ...(item.unitCost !== undefined && { unitCost: Number(item.unitCost) }),
       ...(item.totalCost !== undefined && { totalCost: Number(item.totalCost) }),
-      lotNumbers: item.lotNumbers || [],
-      serialNumbers: item.serialNumbers || [],
-      itemStatus: item.itemStatus,
+      lotNumbers: item.lotNumbers ?? [],
+      serialNumbers: item.serialNumbers ?? [],
+      itemStatus: item.itemStatus as StockMovementItem['itemStatus'],
       qualityCheckRequired: item.qualityCheckRequired,
-      qualityCheckStatus: item.qualityCheckStatus,
-      qualityNotes: item.qualityCheckNotes,
+      qualityCheckStatus: item.qualityCheckStatus as StockMovementItem['qualityCheckStatus'],
+      qualityNotes: item.qualityCheckNotes ?? undefined,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
     };
-    
-    return mappedItem as StockMovementItem;
   }
 
-  private mapDrumUsageHistory(usage: any): DrumUsageHistory {
+  private mapDrumUsageHistory(usage: DrumUsageRecord): DrumUsageHistory {
     return {
       id: usage.id,
       drumId: usage.drumId,
