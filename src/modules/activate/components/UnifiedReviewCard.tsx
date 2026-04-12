@@ -28,6 +28,7 @@ import { PhotoGalleryUnified } from './PhotoGalleryUnified';
 import { WAPhotosGallery, type WAPhoto } from './WAPhotosGallery';
 import { AICategorizationTab } from './AICategorizationTab';
 import { ActivityTab } from './ActivityTab';
+import { SerialRecheckPanel } from './SerialRecheckPanel';
 import { QaWizardContainer } from './wizard/QaWizardContainer';
 import { DrSummaryPage } from './DrSummaryPage';
 import { MaintenanceTab } from '@/modules/noc/components/MaintenanceTab';
@@ -805,7 +806,7 @@ function FeedbackTab({ review, generateFeedback, sendFeedback }: FeedbackTabProp
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed to send feedback';
       setSendError(msg);
-      log.error('Failed to send feedback', error, 'UnifiedReviewCard.FeedbackTab');
+      log.error('Failed to send feedback', { error }, 'UnifiedReviewCard.FeedbackTab');
     } finally {
       setIsSending(false);
     }
@@ -815,6 +816,14 @@ function FeedbackTab({ review, generateFeedback, sendFeedback }: FeedbackTabProp
 
   return (
     <div className="space-y-6">
+      {/* Serial Recheck Panel — only shown when mismatch exists */}
+      <SerialRecheckPanel
+        dropNumber={review.drop_number}
+        hasMismatch={(review as unknown as { serial_validation_status?: string }).serial_validation_status === 'mismatch'}
+        lastRecheckAt={null}
+        lastRecheckOutcome={null}
+      />
+
       {/* Generate Button */}
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-foreground">WhatsApp Feedback</h3>
