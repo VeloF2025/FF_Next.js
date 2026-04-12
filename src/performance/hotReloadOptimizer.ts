@@ -66,7 +66,7 @@ class HotReloadOptimizer {
     }
   }
 
-  private batchCSSUpdates(modules: any[]): void {
+  private batchCSSUpdates(modules: unknown[]): void {
     if (this.debounceTimeout) {
       clearTimeout(this.debounceTimeout);
     }
@@ -107,20 +107,21 @@ class HotReloadOptimizer {
       // Listen to HMR events
       import.meta.hot.on('vite:beforeUpdate', (payload) => {
         const startTime = performance.now();
-        this.updateQueue.add((payload as any).path || 'unknown');
-        
+        const path = payload.updates?.[0]?.path || 'unknown';
+        this.updateQueue.add(path);
+
         // Record the update start
-        this.recordHMRUpdate((payload as any).path || 'unknown', {
+        this.recordHMRUpdate(path, {
           updateTime: startTime,
           moduleCount: payload.updates?.length || 1,
           dependencyChain: [],
-          updateType: this.getUpdateType((payload as any).path || '')
+          updateType: this.getUpdateType(path)
         });
       });
 
       import.meta.hot.on('vite:afterUpdate', (payload) => {
         const endTime = performance.now();
-        const path = (payload as any).path || 'unknown';
+        const path = payload.updates?.[0]?.path || 'unknown';
         
         if (this.updateQueue.has(path)) {
           const existing = this.metrics.get(path);
@@ -274,7 +275,7 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   hotReloadOptimizer = new HotReloadOptimizer();
   
   // Add to window for debugging
-  (window as any).__hotReloadOptimizer = hotReloadOptimizer;
+  (window as Record<string, unknown>).__hotReloadOptimizer = hotReloadOptimizer;
   
   // Report HMR performance every 30 seconds in development
   if (import.meta.hot) {

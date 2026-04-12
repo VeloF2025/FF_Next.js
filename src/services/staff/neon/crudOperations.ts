@@ -8,6 +8,8 @@ import { StaffMember, StaffFormData } from '@/types/staff.types';
 import { validateStaffData, processReportsToField, logDebugInfo, logError } from './validators';
 import { log } from '@/lib/logger';
 
+type DbRow = Record<string, unknown>;
+
 /**
  * Create new staff member
  */
@@ -34,8 +36,8 @@ export async function createStaff(data: Partial<StaffMember>): Promise<StaffMemb
       ) RETURNING *
     `;
 
-    const rows = result as any[];
-    return rows[0] as StaffMember;
+    const rows = result as unknown as DbRow[];
+    return rows[0] as unknown as StaffMember;
   } catch (error) {
     logError('CREATE', error, data);
     throw error;
@@ -61,7 +63,7 @@ export async function createOrUpdateStaff(data: Partial<StaffMember>): Promise<S
       SELECT id FROM staff WHERE employee_id = ${formData.employeeId}
     `;
 
-    const existingRows = existing as any[];
+    const existingRows = existing as unknown as DbRow[];
     if (existingRows.length > 0) {
       // Update existing staff member
       const result = await getSql()`
@@ -78,8 +80,8 @@ export async function createOrUpdateStaff(data: Partial<StaffMember>): Promise<S
         RETURNING *
       `;
 
-      const rows = result as any[];
-      return rows[0] as StaffMember;
+      const rows = result as unknown as DbRow[];
+      return rows[0] as unknown as StaffMember;
     } else {
       // Create new staff member
       const result = await getSql()`
@@ -94,8 +96,8 @@ export async function createOrUpdateStaff(data: Partial<StaffMember>): Promise<S
         ) RETURNING *
       `;
 
-      const rows = result as any[];
-      return rows[0] as StaffMember;
+      const rows = result as unknown as DbRow[];
+      return rows[0] as unknown as StaffMember;
     }
   } catch (error) {
     logError('CREATE_OR_UPDATE', error, data);
@@ -124,8 +126,8 @@ export async function updateStaff(id: string, data: Partial<StaffMember>): Promi
       WHERE id = ${id}
       RETURNING *
     `;
-    const rows = result as any[];
-    return rows[0] as StaffMember;
+    const rows = result as unknown as DbRow[];
+    return rows[0] as unknown as StaffMember;
   } catch (error) {
     log.error('Error updating staff member:', { data: error }, 'crudOperations');
     throw error;
