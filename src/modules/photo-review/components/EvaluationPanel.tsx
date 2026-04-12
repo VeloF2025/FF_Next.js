@@ -13,6 +13,18 @@ import type { DropRecord, EvaluationResult } from '../types';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 
+/** Unified step result shape covering both current and legacy evaluation formats */
+interface StepResultItem {
+  passed?: boolean;
+  status?: 'PASS' | 'FAIL' | string;
+  step?: string;
+  step_label?: string;
+  step_number?: number;
+  score?: number;
+  comment?: string;
+  issues?: string;
+}
+
 interface EvaluationPanelProps {
   drop: DropRecord;
   evaluation?: EvaluationResult | null;
@@ -50,8 +62,8 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
   const generateFeedbackMessage = (result: EvaluationResult) => {
     // Handle both old format (results.results) and new format (step_results)
     const stepResults = result.step_results || result.results?.results || [];
-    const passed = stepResults.filter((r: any) => r.passed === true || r.status === 'PASS');
-    const failed = stepResults.filter((r: any) => r.passed === false || r.status === 'FAIL');
+    const passed = stepResults.filter((r: StepResultItem) => r.passed === true || r.status === 'PASS');
+    const failed = stepResults.filter((r: StepResultItem) => r.passed === false || r.status === 'FAIL');
 
     let message = `${drop.dr_number}\n`;
 
@@ -64,7 +76,7 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
 
       // Show failed items with issues
       message += `Incorrect items:\n`;
-      failed.forEach((item: any) => {
+      failed.forEach((item: StepResultItem) => {
         const stepName = item.step_label || item.step || `Step ${item.step_number}`;
         const issue = item.comment || item.issues || 'Failed quality check';
         // Format similar to WA Monitor: "• Step Name - Issue description"
@@ -72,13 +84,13 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
       });
 
       // Optional: Add any missing steps if needed
-      const missingSteps = stepResults.filter((r: any) =>
+      const missingSteps = stepResults.filter((r: StepResultItem) =>
         r.score === 0 || r.comment?.toLowerCase().includes('missing') || r.comment?.toLowerCase().includes('not found')
       );
 
       if (missingSteps.length > 0 && missingSteps.length !== failed.length) {
         message += `\nMissing items:\n`;
-        missingSteps.forEach((item: any) => {
+        missingSteps.forEach((item: StepResultItem) => {
           const stepName = item.step_label || item.step || `Step ${item.step_number}`;
           message += `• ${stepName}\n`;
         });
@@ -186,7 +198,7 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
               <p className="text-sm font-medium text-[var(--ff-text-secondary)] mb-2">
                 Step-by-step Results:
               </p>
-              {evaluation.step_results.map((step: any, index: number) => {
+              {evaluation.step_results.map((step: StepResultItem, index: number) => {
                 const isPassed = step.passed === true || step.status === 'PASS';
                 const stepName = step.step_label || step.step || `Step ${step.step_number}`;
                 const comment = step.comment || step.issues || '';

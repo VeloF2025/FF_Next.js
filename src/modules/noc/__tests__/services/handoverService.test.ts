@@ -30,6 +30,7 @@ import {
   OwnerType,
   CreateHandoverSnapshotPayload,
   HandoverSnapshot,
+  HandoverSnapshotData,
   HandoverGateName
 } from '../../types/handover';
 import { TicketStatus } from '../../types/ticket';
@@ -341,7 +342,7 @@ describe('Handover Service', () => {
       };
 
       // Mock transaction execution
-      vi.mocked(transaction).mockImplementation(async (callback: any) => {
+      vi.mocked(transaction).mockImplementation(async (callback: (txn: { queryOne: ReturnType<typeof vi.fn>; query: ReturnType<typeof vi.fn> }) => Promise<HandoverSnapshot>) => {
         const txn = {
           queryOne: vi.fn()
             .mockResolvedValueOnce(mockTicket) // Get ticket
@@ -448,7 +449,7 @@ describe('Handover Service', () => {
         created_at: new Date()
       };
 
-      vi.mocked(transaction).mockImplementation(async (callback: any) => {
+      vi.mocked(transaction).mockImplementation(async (callback: (txn: { queryOne: ReturnType<typeof vi.fn>; query: ReturnType<typeof vi.fn> }) => Promise<HandoverSnapshot>) => {
         const txn = {
           queryOne: vi.fn()
             .mockResolvedValueOnce(mockTicket)
@@ -476,7 +477,7 @@ describe('Handover Service', () => {
         handover_by: 'user-uuid'
       };
 
-      vi.mocked(transaction).mockImplementation(async (callback: any) => {
+      vi.mocked(transaction).mockImplementation(async (callback: (txn: { queryOne: ReturnType<typeof vi.fn>; query: ReturnType<typeof vi.fn> }) => Promise<HandoverSnapshot>) => {
         const txn = {
           queryOne: vi.fn().mockResolvedValueOnce(null), // Ticket not found
           query: vi.fn()
@@ -509,7 +510,7 @@ describe('Handover Service', () => {
           id: 'snapshot-uuid-001',
           ticket_id: ticketId,
           handover_type: HandoverType.BUILD_TO_QA,
-          snapshot_data: {} as any,
+          snapshot_data: {} as unknown as HandoverSnapshotData,
           evidence_links: [],
           decisions: [],
           guarantee_status: null,
@@ -526,7 +527,7 @@ describe('Handover Service', () => {
           id: 'snapshot-uuid-002',
           ticket_id: ticketId,
           handover_type: HandoverType.QA_TO_OPS,
-          snapshot_data: {} as any,
+          snapshot_data: {} as unknown as HandoverSnapshotData,
           evidence_links: [],
           decisions: [],
           guarantee_status: null,
@@ -589,7 +590,7 @@ describe('Handover Service', () => {
         id: handoverId,
         ticket_id: 'ticket-uuid-001',
         handover_type: HandoverType.BUILD_TO_QA,
-        snapshot_data: {} as any,
+        snapshot_data: {} as unknown as HandoverSnapshotData,
         evidence_links: [],
         decisions: [],
         guarantee_status: null,

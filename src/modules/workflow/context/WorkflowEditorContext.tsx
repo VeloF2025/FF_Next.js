@@ -98,7 +98,7 @@ export interface WorkflowEditorState {
   // Clipboard state
   clipboard?: {
     type: 'phase' | 'step' | 'task';
-    data: any;
+    data: WorkflowPhase | WorkflowStep | WorkflowTask;
   };
 }
 
@@ -143,11 +143,11 @@ type WorkflowEditorAction =
   | { type: 'VALIDATION_ERROR'; payload: string }
   
   // Form state
-  | { type: 'START_EDITING_ITEM'; payload: { type: 'phase' | 'step' | 'task'; id?: string; data?: any; parentId?: string } }
+  | { type: 'START_EDITING_ITEM'; payload: { type: 'phase' | 'step' | 'task'; id?: string; data?: Partial<WorkflowPhase | WorkflowStep | WorkflowTask>; parentId?: string } }
   | { type: 'STOP_EDITING_ITEM' }
-  
+
   // Clipboard
-  | { type: 'COPY_TO_CLIPBOARD'; payload: { type: 'phase' | 'step' | 'task'; data: any } }
+  | { type: 'COPY_TO_CLIPBOARD'; payload: { type: 'phase' | 'step' | 'task'; data: WorkflowPhase | WorkflowStep | WorkflowTask } }
   | { type: 'CLEAR_CLIPBOARD' }
   
   // History
@@ -458,7 +458,7 @@ export interface WorkflowEditorContextType {
   updateTask: (id: string, data: UpdateWorkflowTaskRequest) => Promise<void>;
   
   // Clipboard
-  copyToClipboard: (type: 'phase' | 'step' | 'task', data: any) => void;
+  copyToClipboard: (type: 'phase' | 'step' | 'task', data: WorkflowPhase | WorkflowStep | WorkflowTask) => void;
   clearClipboard: () => void;
   
   // Utility functions
@@ -619,7 +619,7 @@ export function WorkflowEditorProvider({ children }: WorkflowEditorProviderProps
       id: `temp-${Date.now()}`,
       type,
       position,
-      data: {} as any, // Will be filled when created
+      data: {} as unknown as WorkflowPhase, // Placeholder — filled when item is created
       ...(parentId ? { parentId } : {}),
       isSelected: true,
       ...(type === 'phase' ? { isExpanded: true } : {})
@@ -764,7 +764,7 @@ export function WorkflowEditorProvider({ children }: WorkflowEditorProviderProps
   }, []); 
 
   // Clipboard functions
-  const copyToClipboard = useCallback((type: 'phase' | 'step' | 'task', data: any) => {
+  const copyToClipboard = useCallback((type: 'phase' | 'step' | 'task', data: WorkflowPhase | WorkflowStep | WorkflowTask) => {
     dispatch({ type: 'COPY_TO_CLIPBOARD', payload: { type, data } });
   }, []);
 
