@@ -27,9 +27,10 @@
 
 import { ValidationResult } from './SOWWizardTypes';
 import { sowApi } from '@/services/api/sowApi';
+import { NeonPoleData, NeonDropData, NeonFibreData } from '@/services/sow/types';
 import { log } from '@/lib/logger';
 
-export const validateStepData = (stepType: string, data: any[]): ValidationResult => {
+export const validateStepData = (stepType: string, data: Record<string, unknown>[]): ValidationResult => {
   if (!data || data.length === 0) {
     return { isValid: false, error: 'File is empty or invalid format' };
   }
@@ -46,7 +47,7 @@ export const validateStepData = (stepType: string, data: any[]): ValidationResul
   }
 };
 
-const validatePolesData = (data: any[]): ValidationResult => {
+const validatePolesData = (data: Record<string, unknown>[]): ValidationResult => {
   const requiredFields = ['pole_number', 'latitude', 'longitude'];
   const firstRow = data[0];
 
@@ -130,7 +131,7 @@ const validatePolesData = (data: any[]): ValidationResult => {
   return { isValid: true, processedData };
 };
 
-const validateDropsData = (data: any[]): ValidationResult => {
+const validateDropsData = (data: Record<string, unknown>[]): ValidationResult => {
   const firstRow = data[0];
 
   if (!firstRow) {
@@ -212,7 +213,7 @@ const validateDropsData = (data: any[]): ValidationResult => {
   return { isValid: true, processedData };
 };
 
-const validateFibreData = (data: any[]): ValidationResult => {
+const validateFibreData = (data: Record<string, unknown>[]): ValidationResult => {
   const firstRow = data[0];
 
   if (!firstRow) {
@@ -307,7 +308,7 @@ const validateFibreData = (data: any[]): ValidationResult => {
   return { isValid: true, processedData };
 };
 
-const findColumnValue = (row: any, possibleColumns: string[]): string => {
+const findColumnValue = (row: Record<string, unknown>, possibleColumns: string[]): string => {
   for (const col of possibleColumns) {
     // Create multiple variations of the column name to match
     const variations = [
@@ -336,25 +337,25 @@ const findColumnValue = (row: any, possibleColumns: string[]): string => {
   return "";
 };
 
-export const processStepData = async (projectId: string, stepType: string, data: any[]) => {
+export const processStepData = async (projectId: string, stepType: string, data: Record<string, unknown>[]) => {
   try {
     // Initialize tables first (idempotent operation)
     const initResult = await sowApi.initializeTables(projectId);
     if (!initResult.success) {
       throw new Error('Failed to initialize database tables');
     }
-    
-    // Upload data based on step type
+
+    // Upload data based on step type (data is validated and shaped by validate*Data above)
     let result;
     switch (stepType) {
       case 'poles':
-        result = await sowApi.uploadPoles(projectId, data);
+        result = await sowApi.uploadPoles(projectId, data as unknown as NeonPoleData[]);
         break;
       case 'drops':
-        result = await sowApi.uploadDrops(projectId, data);
+        result = await sowApi.uploadDrops(projectId, data as unknown as NeonDropData[]);
         break;
       case 'fibre':
-        result = await sowApi.uploadFibre(projectId, data);
+        result = await sowApi.uploadFibre(projectId, data as unknown as NeonFibreData[]);
         break;
       default:
         throw new Error(`Unknown step type: ${stepType}`);
@@ -369,6 +370,6 @@ export const processStepData = async (projectId: string, stepType: string, data:
   } catch (error) {
     log.error('Error uploading SOW data', { error, projectId, stepType, dataLength: data.length }, 'SOWDataValidator');
     // DO NOT fallback to localStorage - throw the error instead
-    throw new Error(`Failed to save ${stepType} data: ${error.message}`);
+    throw new Error(`Failed to save ${stepType} data: ${error instanceof Error ? error.message : String(error)}`);
   }
 };

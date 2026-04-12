@@ -145,7 +145,7 @@ type WorkflowEditorAction =
   // Form state
   | { type: 'START_EDITING_ITEM'; payload: { type: 'phase' | 'step' | 'task'; id?: string; data?: Partial<WorkflowPhase | WorkflowStep | WorkflowTask>; parentId?: string } }
   | { type: 'STOP_EDITING_ITEM' }
-
+  
   // Clipboard
   | { type: 'COPY_TO_CLIPBOARD'; payload: { type: 'phase' | 'step' | 'task'; data: WorkflowPhase | WorkflowStep | WorkflowTask } }
   | { type: 'CLEAR_CLIPBOARD' }
@@ -619,7 +619,7 @@ export function WorkflowEditorProvider({ children }: WorkflowEditorProviderProps
       id: `temp-${Date.now()}`,
       type,
       position,
-      data: {} as unknown as WorkflowPhase, // Placeholder — filled when item is created
+      data: {} as WorkflowPhase, // Will be filled when created
       ...(parentId ? { parentId } : {}),
       isSelected: true,
       ...(type === 'phase' ? { isExpanded: true } : {})

@@ -8,6 +8,8 @@ import { neonTables } from './schema';
 import { log } from '@/lib/logger';
 import { getNeonConnection, executeQuery } from './connectionPool';
 
+type DbRow = Record<string, unknown>;
+
 // Lazy initialization to prevent connection attempts in browser
 let sql: ReturnType<typeof getNeonConnection> | null = null;
 let _neonDb: ReturnType<typeof drizzle> | null = null;
@@ -57,7 +59,7 @@ export const neonUtils = {
       return {
         success: true,
         timestamp: firstRow && typeof firstRow === 'object' && 'timestamp' in firstRow
-          ? String((firstRow as Record<string, unknown>).timestamp)
+          ? String((firstRow as DbRow).timestamp ?? new Date().toISOString())
           : new Date().toISOString(),
       };
     } catch (error) {
@@ -71,24 +73,24 @@ export const neonUtils = {
   /**
    * Get database version and info
    */
-  async getInfo(): Promise<Record<string, unknown> | null> {
+  async getInfo(): Promise<DbRow | null> {
     try {
       const versionResult = await getSql()`SELECT VERSION() as version`;
       const sizeResult = await getSql()`
-        SELECT
+        SELECT 
           pg_size_pretty(pg_database_size(current_database())) as database_size,
           current_database() as database_name,
           current_user as user_name
       `;
-
+      
       const versionRow = Array.isArray(versionResult) && versionResult.length > 0 ? versionResult[0] : null;
       const sizeRow = Array.isArray(sizeResult) && sizeResult.length > 0 ? sizeResult[0] : null;
-
+      
       return {
         version: versionRow && typeof versionRow === 'object' && 'version' in versionRow
-          ? ((versionRow as Record<string, unknown>).version ?? 'Unknown')
+          ? String((versionRow as DbRow).version ?? 'Unknown')
           : 'Unknown',
-        ...(sizeRow && typeof sizeRow === 'object' ? (sizeRow as Record<string, unknown>) : {}),
+        ...(sizeRow && typeof sizeRow === 'object' ? sizeRow : {}),
       };
     } catch (error) {
       log.error('Failed to get database info:', { data: error }, 'connection');
@@ -114,7 +116,7 @@ export const neonUtils = {
         ORDER BY tablename;
       `;
 
-      return result as unknown[];
+      return Array.isArray(result) ? result : [];
     } catch (error) {
       log.error('Failed to get table stats:', { data: error }, 'connection');
       return [];
@@ -124,10 +126,11 @@ export const neonUtils = {
   /**
    * Execute raw SQL (use with caution)
    */
-  async rawQuery(query: string): Promise<unknown> {
+  async rawQuery(query: string): Promise<DbRow[]> {
     try {
-      // Use template literal format for Neon
-      return await getSql()([query] as unknown as TemplateStringsArray);
+      // Use template literal format for Neon (cast required by neon driver API)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return await getSql()([query] as any as TemplateStringsArray) as DbRow[];
     } catch (error) {
       log.error('Raw query failed:', { data: error }, 'connection');
       throw error;
