@@ -16,6 +16,18 @@ import type {
   DetectedFormat
 } from '../types';
 
+/** Browser performance.memory extension (Chrome/Chromium only) */
+type PerformanceWithMemory = Performance & {
+  memory?: {
+    usedJSHeapSize: number;
+    totalJSHeapSize: number;
+    jsHeapSizeLimit: number;
+  };
+};
+
+/** Window extension for optional GC access (V8 --expose-gc flag) */
+type WindowWithGC = Window & { gc?: () => void };
+
 export class EnhancedCSVProcessor {
   // private readonly CHUNK_SIZE = 8192; // 8KB chunks for streaming
   private readonly MAX_DIRECT_SIZE = 5 * 1024 * 1024; // 5MB
@@ -29,10 +41,10 @@ export class EnhancedCSVProcessor {
     context: ProcessingContext
   ): Promise<FileProcessingResult<T>> {
     const csvOptions = options as CSVProcessingOptions;
-    
+
     // Update context
     context.status = 'parsing';
-    
+
     if (file.size > this.MAX_DIRECT_SIZE || options.streaming) {
       return this.processStreaming<T>(file, csvOptions, context);
     } else {
@@ -52,8 +64,8 @@ export class EnhancedCSVProcessor {
       const startTime = performance.now();
       const errors: ProcessingError[] = [];
       const warnings: ProcessingWarning[] = [];
-      
-      Papa.parse(file as any, {
+
+      Papa.parse<T>(file, {
         header: true,
         delimiter: options.delimiter || '',
         quoteChar: options.quote || '"',
@@ -61,7 +73,7 @@ export class EnhancedCSVProcessor {
         comments: (options.comment || false) as string | false,
         skipEmptyLines: options.skipEmptyLines ?? true,
         dynamicTyping: options.dynamicTyping ?? true,
-        transform: options.transform as any,
+        transform: options.transform,
         transformHeader: (header: string) => {
           return options.trimWhitespace ? header.trim() : header;
         },
@@ -72,7 +84,7 @@ export class EnhancedCSVProcessor {
           }
           return chunk;
         },
-        step: (results: Papa.ParseResult<T>) => {
+        step: (results: Papa.ParseStepResult<T>) => {
           // Progress callback
           if (options.progressCallback) {
             const progress = {
@@ -85,7 +97,7 @@ export class EnhancedCSVProcessor {
               totalBytes: file.size,
               memoryUsage: this.getMemoryStats()
             };
-            
+
             options.progressCallback(progress);
           }
 
@@ -109,7 +121,7 @@ export class EnhancedCSVProcessor {
         },
         complete: (results: Papa.ParseResult<T>) => {
           const endTime = performance.now();
-          
+
           // Validation
           context.status = 'validating';
           const validationResults = this.validateData(results.data, options);
@@ -149,7 +161,7 @@ export class EnhancedCSVProcessor {
           const processingError = new Error(`CSV parsing failed: ${error.message}`);
           reject(processingError);
         }
-      } as any);
+      });
     });
   }
 
@@ -171,18 +183,19 @@ export class EnhancedCSVProcessor {
       let bytesProcessed = 0;
       let isFirstChunk = true;
 
-      const stream = Papa.parse(Papa.NODE_STREAM_INPUT, ({
+      // Papa.parse with NODE_STREAM_INPUT returns a Node.js Duplex stream
+      const stream = Papa.parse(Papa.NODE_STREAM_INPUT, {
         header: true,
         delimiter: options.delimiter || '',
         quoteChar: options.quote || '"',
         escapeChar: options.escape || '"',
         skipEmptyLines: options.skipEmptyLines ?? true,
         dynamicTyping: options.dynamicTyping ?? true,
-        transform: options.transform as any,
+        transform: options.transform,
         transformHeader: (header: string) => {
           return options.trimWhitespace ? header.trim() : header;
         },
-        step: (results: Papa.ParseResult<T>) => {
+        step: (results: Papa.ParseStepResult<T>) => {
           if (isFirstChunk && results.meta.fields) {
             headers = results.meta.fields;
             isFirstChunk = false;
@@ -190,8 +203,9 @@ export class EnhancedCSVProcessor {
 
           // Add valid rows to data
           if (results.data && !results.errors.length) {
-            data.push(...results.data);
-            processedRows += results.data.length;
+            const row = results.data;
+            data.push(row);
+            processedRows += 1;
           }
 
           // Handle errors
@@ -228,7 +242,7 @@ export class EnhancedCSVProcessor {
               totalBytes: file.size,
               memoryUsage: this.getMemoryStats()
             };
-            
+
             options.progressCallback(progress);
           }
 
@@ -239,7 +253,7 @@ export class EnhancedCSVProcessor {
         },
         complete: () => {
           const endTime = performance.now();
-          
+
           // Final validation
           context.status = 'validating';
           const validationResults = this.validateData(data, options);
@@ -278,26 +292,24 @@ export class EnhancedCSVProcessor {
         error: (error: Papa.ParseError) => {
           reject(new Error(`Streaming CSV parsing failed: ${error.message}`));
         }
-      }) as any);
+      });
 
-      // Start streaming
+      // Start streaming — stream is a Node.js Duplex returned by Papa with NODE_STREAM_INPUT
       const reader = file.stream().getReader();
       const decoder = new TextDecoder(options.encoding || 'utf-8');
-      
+
       const pump = async (): Promise<void> => {
         const { done, value } = await reader.read();
-        
+
         if (done) {
           // Stream processing complete
           return;
         }
 
         const chunk = decoder.decode(value, { stream: true });
-        // Process chunk through Papa.parse
-        if (typeof (stream as any).write === 'function') {
-          (stream as any).write(chunk);
-        }
-        
+        // Write chunk to PapaParse node stream (Duplex guarantees .write())
+        stream.write(chunk);
+
         return pump();
       };
 
@@ -321,10 +333,10 @@ export class EnhancedCSVProcessor {
 
     for (let i = 0; i < data.length; i++) {
       const row = data[i] as Record<string, unknown>;
-      
+
       for (const rule of options.validationRules) {
         const result = rule.validator(row[rule.field], row);
-        
+
         if (!result.isValid) {
           const error: ProcessingError = {
             type: 'validation',
@@ -358,13 +370,15 @@ export class EnhancedCSVProcessor {
 
   private getMemoryStats(): MemoryStats {
     if (typeof window !== 'undefined' && 'performance' in window && 'memory' in performance) {
-      const memory = (performance as any).memory;
-      return {
-        heapUsed: memory.usedJSHeapSize,
-        heapTotal: memory.totalJSHeapSize,
-        external: 0,
-        peakUsage: memory.totalJSHeapSize
-      };
+      const perf = performance as PerformanceWithMemory;
+      if (perf.memory) {
+        return {
+          heapUsed: perf.memory.usedJSHeapSize,
+          heapTotal: perf.memory.totalJSHeapSize,
+          external: 0,
+          peakUsage: perf.memory.totalJSHeapSize
+        };
+      }
     }
 
     // Fallback for environments without memory API
@@ -382,11 +396,11 @@ export class EnhancedCSVProcessor {
     totalBytes: number
   ): number {
     if (bytesProcessed === 0) return 0;
-    
+
     const elapsedTime = performance.now() - startTime;
     const processingRate = bytesProcessed / elapsedTime; // bytes per ms
     const remainingBytes = totalBytes - bytesProcessed;
-    
+
     return remainingBytes / processingRate;
   }
 
@@ -401,9 +415,10 @@ export class EnhancedCSVProcessor {
   }
 
   private triggerGarbageCollection(): void {
-    // Force garbage collection if available (only in some environments)
-    if (typeof window !== 'undefined' && (window as any).gc) {
-      (window as any).gc();
+    // Force garbage collection if available (V8 --expose-gc flag only)
+    if (typeof window !== 'undefined') {
+      const win = window as WindowWithGC;
+      win.gc?.();
     }
   }
 }
