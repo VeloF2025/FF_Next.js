@@ -2,6 +2,16 @@ import { useState, useEffect } from 'react';
 import { SOW, SOWFilterType } from '../types/sow.types';
 import { log } from '@/lib/logger';
 
+interface SowListItem {
+  project_id: string;
+  project_name?: string;
+  project_code?: string;
+  type: 'pole' | 'drop' | 'fibre';
+  address?: string;
+  is_spare?: boolean;
+  distance?: string | number;
+}
+
 export function useSOWData() {
   const [sows, setSOWs] = useState<SOW[]>([]);
   const [filter, setFilter] = useState<SOWFilterType>('all');
@@ -29,7 +39,7 @@ export function useSOWData() {
       // Group data by project
       const projectMap = new Map();
       
-      sowData.forEach((item: any) => {
+      sowData.forEach((item: SowListItem) => {
         const projectId = item.project_id;
         if (!projectMap.has(projectId)) {
           projectMap.set(projectId, {
@@ -60,14 +70,14 @@ export function useSOWData() {
         
         // Calculate houses vs spares from drops
         // Prefer is_spare flag from DB; fall back to address heuristic for legacy data
-        const spares = projectData.drops.filter((d: any) =>
+        const spares = projectData.drops.filter((d: SowListItem) =>
           d.is_spare === true || (d.is_spare === undefined && d.address && (d.address === 'Spare' || d.address.toLowerCase().includes('spare')))
         ).length;
         const houses = projectData.drops.length - spares;
         
         // Calculate total fibre distance
-        const totalFibreDistance = projectData.fibre.reduce((sum: number, segment: any) => 
-          sum + (parseFloat(segment.distance) || 0), 0
+        const totalFibreDistance = projectData.fibre.reduce((sum: number, segment: SowListItem) =>
+          sum + (parseFloat(String(segment.distance)) || 0), 0
         );
         
         const sow: SOW = {

@@ -2,6 +2,27 @@ import { useState, useEffect } from 'react';
 import type { Drop, DropsStats, DropsFiltersState } from '../types/drops.types';
 import { log } from '@/lib/logger';
 
+interface DbDrop {
+  id: string;
+  drop_number: string;
+  pole_number?: string;
+  end_point?: string;
+  address?: string;
+  cable_type?: string;
+  cable_length?: string | number;
+  created_date?: string;
+  updated_at?: string;
+  created_by?: string;
+  latitude?: number;
+  longitude?: number;
+  municipality?: string;
+  zone_no?: string;
+  pon_no?: string;
+  completed_date?: string;
+  technician?: string;
+  scheduled_date?: string;
+}
+
 export function useDropsManagement() {
   const [drops, setDrops] = useState<Drop[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,7 +102,7 @@ export function useDropsManagement() {
 
       if (result.success && result.data) {
         // Transform database records to Drop format
-        const transformedDrops: Drop[] = result.data.map((dbDrop: any) => ({
+        const transformedDrops: Drop[] = result.data.map((dbDrop: DbDrop) => ({
           id: dbDrop.id,
           dropNumber: dbDrop.drop_number,
           poleNumber: dbDrop.pole_number || '',
@@ -89,7 +110,7 @@ export function useDropsManagement() {
           address: dbDrop.address || dbDrop.end_point || '',
           status: determineStatus(dbDrop),
           installationType: dbDrop.cable_type || 'aerial',
-          cableLength: parseFloat(dbDrop.cable_length) || 0,
+          cableLength: parseFloat(String(dbDrop.cable_length)) || 0,
           scheduledDate: dbDrop.created_date,
           completedDate: dbDrop.updated_at,
           technician: dbDrop.created_by || 'Unassigned',
@@ -207,7 +228,7 @@ export function useDropsManagement() {
     }
   };
 
-  const determineStatus = (dbDrop: any): Drop['status'] => {
+  const determineStatus = (dbDrop: DbDrop): Drop['status'] => {
     // Simple logic to determine status based on available data
     if (dbDrop.completed_date) return 'completed';
     if (dbDrop.technician && dbDrop.scheduled_date) return 'in_progress';
@@ -305,7 +326,7 @@ export function useDropsManagement() {
 
       if (result.success && result.data) {
         // Transform database records to Drop format
-        const transformedDrops: Drop[] = result.data.map((dbDrop: any) => ({
+        const transformedDrops: Drop[] = result.data.map((dbDrop: DbDrop) => ({
           id: dbDrop.id,
           dropNumber: dbDrop.drop_number,
           poleNumber: dbDrop.pole_number || '',
@@ -313,7 +334,7 @@ export function useDropsManagement() {
           address: dbDrop.address || dbDrop.end_point || '',
           status: determineStatus(dbDrop),
           installationType: dbDrop.cable_type || 'aerial',
-          cableLength: parseFloat(dbDrop.cable_length) || 0,
+          cableLength: parseFloat(String(dbDrop.cable_length)) || 0,
           scheduledDate: dbDrop.created_date,
           completedDate: dbDrop.updated_at,
           technician: dbDrop.created_by || 'Unassigned',

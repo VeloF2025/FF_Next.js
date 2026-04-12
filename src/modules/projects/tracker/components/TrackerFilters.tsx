@@ -11,8 +11,8 @@ interface TrackerFiltersProps {
   setSelectedStatus: (value: string) => void;
   sortBy: string;
   sortOrder: string;
-  setSortBy: (value: any) => void;
-  setSortOrder: (value: any) => void;
+  setSortBy: (value: string) => void;
+  setSortOrder: (value: string) => void;
   phases: string[];
 }
 
@@ -48,7 +48,7 @@ export function TrackerFilters({
         </div>
         <select
           value={selectedType}
-          onChange={(e) => setSelectedType(e.target.value as any)}
+          onChange={(e) => setSelectedType(e.target.value as 'all' | 'pole' | 'drop' | 'fiber')}
           className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
         >
           <option value="all">All Types</option>
@@ -80,9 +80,9 @@ export function TrackerFilters({
         <select
           value={`${sortBy}-${sortOrder}`}
           onChange={(e) => {
-            const [field, order] = e.target.value.split('-');
-            setSortBy(field);
-            setSortOrder(order);
+            const parts = e.target.value.split('-');
+            setSortBy(parts[0] ?? '');
+            setSortOrder(parts[1] ?? 'asc');
           }}
           className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
         >

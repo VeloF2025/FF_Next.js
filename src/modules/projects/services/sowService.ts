@@ -17,6 +17,7 @@ import {
   SOWDataExtractor,
   SOWDataValidator,
   SOWMetadata,
+  SOWInputData,
   SOWDataExtractionResult,
   SOWValidationResult,
 } from './sow';
@@ -64,7 +65,7 @@ class SOWService {
     files: {
       file: File;
       type: SOWDocumentType;
-      metadata?: any;
+      metadata?: SOWMetadata;
     }[],
     uploadedBy: string
   ): Promise<SOWDocument[]> {
@@ -141,7 +142,7 @@ class SOWService {
   /**
    * Validate SOW data
    */
-  validateSOWData(data: any): SOWValidationResult {
+  validateSOWData(data: SOWInputData): SOWValidationResult {
     return this.dataValidator.validate(data);
   }
 
@@ -169,7 +170,7 @@ class SOWService {
   async updateDocumentMetadata(
     projectId: string,
     documentId: string,
-    metadata: any
+    metadata: SOWMetadata
   ): Promise<void> {
     log.warn('updateDocumentMetadata is deprecated. Use API endpoints for document management.',
       { projectId, documentId }, 'sowService');

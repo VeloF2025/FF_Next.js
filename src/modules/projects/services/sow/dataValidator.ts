@@ -3,10 +3,11 @@
  * Handles validation of SOW data against business rules
  */
 
-import { 
-  SOWValidationResult, 
+import {
+  SOWValidationResult,
   SOWValidationRules,
-  DEFAULT_VALIDATION_RULES 
+  SOWInputData,
+  DEFAULT_VALIDATION_RULES
 } from './types';
 
 export class SOWDataValidator {
@@ -19,7 +20,7 @@ export class SOWDataValidator {
   /**
    * Validate SOW data
    */
-  validate(data: any): SOWValidationResult {
+  validate(data: SOWInputData): SOWValidationResult {
     const errors: string[] = [];
     const warnings: string[] = [];
 
@@ -55,7 +56,7 @@ export class SOWDataValidator {
    * Validate pole count
    */
   private validatePoleCount(
-    poleCount: number,
+    poleCount: number | undefined,
     errors: string[],
     warnings: string[]
   ): void {
@@ -63,7 +64,7 @@ export class SOWDataValidator {
       errors.push(`Pole count must be at least ${this.rules.minPoleCount}`);
     }
 
-    if (poleCount > this.rules.maxPoleCount) {
+    if (poleCount && poleCount > this.rules.maxPoleCount) {
       warnings.push('Pole count exceeds typical project size');
     }
   }
@@ -72,8 +73,8 @@ export class SOWDataValidator {
    * Validate drop count
    */
   private validateDropCount(
-    dropCount: number,
-    poleCount: number,
+    dropCount: number | undefined,
+    poleCount: number | undefined,
     errors: string[],
     warnings: string[]
   ): void {
@@ -81,19 +82,21 @@ export class SOWDataValidator {
       errors.push(`Drop count must be at least ${this.rules.minDropCount}`);
     }
 
-    const maxDrops = poleCount * this.rules.maxDropsPerPole;
-    if (dropCount > maxDrops) {
-      errors.push(
-        `Drop count exceeds maximum (${this.rules.maxDropsPerPole} per pole)`
-      );
-    }
+    if (dropCount && poleCount) {
+      const maxDrops = poleCount * this.rules.maxDropsPerPole;
+      if (dropCount > maxDrops) {
+        errors.push(
+          `Drop count exceeds maximum (${this.rules.maxDropsPerPole} per pole)`
+        );
+      }
 
-    // Warning for unusual drop-to-pole ratio
-    const dropRatio = dropCount / poleCount;
-    if (dropRatio < 2) {
-      warnings.push('Low drop-to-pole ratio detected');
-    } else if (dropRatio > 10) {
-      warnings.push('High drop-to-pole ratio detected');
+      // Warning for unusual drop-to-pole ratio
+      const dropRatio = dropCount / poleCount;
+      if (dropRatio < 2) {
+        warnings.push('Low drop-to-pole ratio detected');
+      } else if (dropRatio > 10) {
+        warnings.push('High drop-to-pole ratio detected');
+      }
     }
   }
 
@@ -101,7 +104,7 @@ export class SOWDataValidator {
    * Validate cable length
    */
   private validateCableLength(
-    cableLength: number,
+    cableLength: number | undefined,
     errors: string[],
     warnings: string[]
   ): void {
@@ -109,7 +112,7 @@ export class SOWDataValidator {
       errors.push('Cable length cannot be negative');
     }
 
-    if (cableLength > 100000) {
+    if (cableLength && cableLength > 100000) {
       warnings.push('Cable length exceeds typical values');
     }
   }
@@ -118,7 +121,7 @@ export class SOWDataValidator {
    * Validate estimated cost
    */
   private validateEstimatedCost(
-    estimatedCost: number,
+    estimatedCost: number | undefined,
     warnings: string[]
   ): void {
     if (estimatedCost && estimatedCost > 10000000) {
@@ -130,7 +133,7 @@ export class SOWDataValidator {
    * Validate data completeness
    */
   private validateDataCompleteness(
-    data: any,
+    data: SOWInputData,
     errors: string[]
   ): void {
     const requiredFields = ['poleCount', 'dropCount'];
@@ -146,7 +149,7 @@ export class SOWDataValidator {
    * Validate data consistency
    */
   private validateDataConsistency(
-    data: any,
+    data: SOWInputData,
     warnings: string[]
   ): void {
     // Check for logical inconsistencies

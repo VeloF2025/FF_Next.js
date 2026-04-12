@@ -30,6 +30,14 @@ export interface SOWValidationResult {
   warnings: string[];
 }
 
+export interface SOWInputData {
+  poleCount?: number;
+  dropCount?: number;
+  cableLength?: number;
+  estimatedCost?: number;
+  [key: string]: unknown;
+}
+
 export interface SOWValidationRules {
   minPoleCount: number;
   maxPoleCount: number;
