@@ -20,7 +20,7 @@ import type { WorkflowPhase, WorkflowStep, WorkflowTask } from '../../types/work
 export function PropertiesPanel() {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['basic', 'timing', 'assignments']));
   const [isEditing, setIsEditing] = useState(false);
-  const [editValues, setEditValues] = useState<any>({});
+  const [editValues, setEditValues] = useState<Record<string, unknown>>({});
 
   const {
     getSelectedNode,
@@ -61,22 +61,22 @@ export function PropertiesPanel() {
   // Save changes
   const saveChanges = useCallback(() => {
     if (selectedNode) {
-      updateNode(selectedNode.id, { data: editValues });
+      updateNode(selectedNode.id, { data: editValues as unknown as WorkflowPhase });
       setIsEditing(false);
       setEditValues({});
     }
   }, [selectedNode, editValues, updateNode]);
 
   // Update edit values
-  const updateEditValue = useCallback((path: string, value: any) => {
-    setEditValues((prev: any) => {
-      const newValues = { ...prev };
+  const updateEditValue = useCallback((path: string, value: string | number | boolean) => {
+    setEditValues((prev) => {
+      const newValues: Record<string, unknown> = { ...prev };
       const keys = path.split('.');
-      let current = newValues;
-      
+      let current: Record<string, unknown> = newValues;
+
       for (let i = 0; i < keys.length - 1; i++) {
         if (!current[keys[i]!]) current[keys[i]!] = {};
-        current = current[keys[i]!];
+        current = current[keys[i]!] as Record<string, unknown>;
       }
 
       current[keys[keys.length - 1]!] = value;
@@ -132,14 +132,16 @@ export function PropertiesPanel() {
     readonly = false 
   }: {
     label: string;
-    value: any;
+    value: string | number | boolean | string[] | undefined;
     path: string;
     type?: 'text' | 'number' | 'select' | 'checkbox' | 'textarea';
     options?: { value: string; label: string }[];
     multiline?: boolean;
     readonly?: boolean;
   }) => {
-    const fieldValue = isEditing ? (editValues[path] ?? value) : value;
+    const fieldValue = isEditing
+      ? ((editValues[path] as typeof value) ?? value)
+      : value;
 
     if (readonly || !isEditing) {
       return (
@@ -171,14 +173,14 @@ export function PropertiesPanel() {
         </label>
         {type === 'textarea' || multiline ? (
           <textarea
-            value={fieldValue || ''}
+            value={typeof fieldValue === 'string' || typeof fieldValue === 'number' ? fieldValue : ''}
             onChange={(e) => updateEditValue(path, e.target.value)}
             rows={3}
             className={commonClasses}
           />
         ) : type === 'select' ? (
           <select
-            value={fieldValue || ''}
+            value={typeof fieldValue === 'string' || typeof fieldValue === 'number' ? fieldValue : ''}
             onChange={(e) => updateEditValue(path, e.target.value)}
             className={commonClasses}
           >
@@ -193,7 +195,7 @@ export function PropertiesPanel() {
           <label className="flex items-center">
             <input
               type="checkbox"
-              checked={fieldValue || false}
+              checked={typeof fieldValue === 'boolean' ? fieldValue : false}
               onChange={(e) => updateEditValue(path, e.target.checked)}
               className="mr-2"
             />
@@ -202,7 +204,7 @@ export function PropertiesPanel() {
         ) : (
           <input
             type={type}
-            value={fieldValue || ''}
+            value={typeof fieldValue === 'string' || typeof fieldValue === 'number' ? fieldValue : ''}
             onChange={(e) => updateEditValue(path, type === 'number' ? Number(e.target.value) : e.target.value)}
             className={commonClasses}
           />
@@ -456,11 +458,11 @@ export function PropertiesPanel() {
           </div>
           
           <h3 className="font-medium text-[var(--ff-text-primary)] truncate">
-            {(selectedNode.data as any).name || 'Unnamed'}
+            {(selectedNode.data as WorkflowPhase).name || 'Unnamed'}
           </h3>
 
           <p className="text-sm text-[var(--ff-text-secondary)] mt-1 line-clamp-2">
-            {(selectedNode.data as any).description || 'No description'}
+            {(selectedNode.data as WorkflowPhase).description || 'No description'}
           </p>
         </div>
 

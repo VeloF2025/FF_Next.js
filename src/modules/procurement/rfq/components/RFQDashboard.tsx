@@ -50,6 +50,17 @@ interface RFQListItem {
   daysRemaining: number;
 }
 
+interface RawRFQItem {
+  id: string;
+  rfqNumber: string;
+  title: string;
+  status: RFQStatusType;
+  responseDeadline: string;
+  invitedSuppliers?: string[];
+  respondedSuppliers?: string[];
+  totalBudgetEstimate?: number;
+}
+
 interface RFQDashboardProps {
   projectId: string;
   searchTerm: string;
@@ -98,7 +109,7 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
         const rfqs = response.data.rfqs || [];
         
         // Transform RFQs to list items
-        const transformedRFQs: RFQListItem[] = rfqs.map((rfq: any) => {
+        const transformedRFQs: RFQListItem[] = (rfqs as RawRFQItem[]).map((rfq) => {
           const now = new Date();
           const deadline = new Date(rfq.responseDeadline);
           const timeDiff = deadline.getTime() - now.getTime();
@@ -129,18 +140,18 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
         // Calculate stats
         const stats: RFQStatsData = {
           totalRFQs: rfqs.length,
-          activeRFQs: rfqs.filter((rfq: any) => 
-            [RFQStatus.ISSUED, RFQStatus.RESPONSES_RECEIVED].includes(rfq.status)
+          activeRFQs: (rfqs as RawRFQItem[]).filter((rfq) =>
+            [RFQStatus.ISSUED, RFQStatus.RESPONSES_RECEIVED].includes(rfq.status as RFQStatus)
           ).length,
-          awaitingResponses: rfqs.filter((rfq: any) => rfq.status === RFQStatus.ISSUED).length,
-          completedRFQs: rfqs.filter((rfq: any) => 
-            [RFQStatus.AWARDED, RFQStatus.CANCELLED].includes(rfq.status)
+          awaitingResponses: (rfqs as RawRFQItem[]).filter((rfq) => rfq.status === RFQStatus.ISSUED).length,
+          completedRFQs: (rfqs as RawRFQItem[]).filter((rfq) =>
+            [RFQStatus.AWARDED, RFQStatus.CANCELLED].includes(rfq.status as RFQStatus)
           ).length,
           overdueRFQs: transformedRFQs.filter(rfq => rfq.isOverdue).length,
           averageResponseTime: 0, // TODO: calculate from actual response times
-          totalValue: rfqs.reduce((sum: number, rfq: any) => sum + (rfq.totalBudgetEstimate || 0), 0),
+          totalValue: (rfqs as RawRFQItem[]).reduce((sum: number, rfq) => sum + (rfq.totalBudgetEstimate || 0), 0),
           suppliersEngaged: new Set(
-            rfqs.flatMap((rfq: any) => rfq.invitedSuppliers || [])
+            (rfqs as RawRFQItem[]).flatMap((rfq) => rfq.invitedSuppliers || [])
           ).size
         };
 

@@ -95,25 +95,25 @@ export function BOQListPage() {
     { key: 'version', header: 'Version' },
     { key: 'title', header: 'Title' },
     { key: 'projectId', header: 'Project' },
-    { 
-      key: 'status', 
+    {
+      key: 'status',
       header: 'Status',
-      render: (boq: any) => <StatusBadge status={boq.status} />
+      render: (boq: BOQ) => <StatusBadge status={boq.status} />
     },
-    { 
-      key: 'itemCount', 
+    {
+      key: 'itemCount',
       header: 'Items',
-      render: (boq: any) => `${boq.itemCount || 0} items`
+      render: (boq: BOQ) => `${boq.itemCount || 0} items`
     },
-    { 
-      key: 'totalEstimatedValue', 
+    {
+      key: 'totalEstimatedValue',
       header: 'Total Value',
-      render: (boq: any) => boq.totalEstimatedValue ? `R ${boq.totalEstimatedValue.toLocaleString()}` : 'TBC'
+      render: (boq: BOQ) => boq.totalEstimatedValue ? `R ${boq.totalEstimatedValue.toLocaleString()}` : 'TBC'
     },
-    { 
-      key: 'createdAt', 
+    {
+      key: 'createdAt',
       header: 'Created',
-      render: (boq: any) => formatDate(boq.createdAt)
+      render: (boq: BOQ) => formatDate(boq.createdAt)
     }
   ];
 
@@ -200,8 +200,8 @@ export function BOQListPage() {
           data={filteredBOQs || []}
           columns={tableColumns}
           isLoading={isLoading}
-          onRowClick={(boq: any) => router.push(`/procurement/boq/${boq.id}`)}
-          getRowKey={(boq: any) => boq.id}
+          onRowClick={(boq: BOQ) => router.push(`/procurement/boq/${boq.id}`)}
+          getRowKey={(boq: BOQ) => boq.id}
           emptyMessage="No BOQs found. Create your first BOQ to get started."
         />
       ) : (
