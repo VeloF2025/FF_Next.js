@@ -6,7 +6,31 @@ import Link from 'next/link';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
-import type { Meeting, MeetingAttendee, UpcomingMeeting } from './types/meeting.types';
+import type { Meeting, MeetingAttendee, MeetingSource, ProcessingStatus, UpcomingMeeting } from './types/meeting.types';
+
+interface RawMeetingData {
+  id: string;
+  title: string;
+  date: string;
+  duration: number;
+  transcript_url?: string;
+  join_url?: string;
+  organizer_name?: string;
+  organizer_email?: string;
+  source?: string;
+  processing_status?: string;
+  has_transcript?: boolean;
+  has_recording?: boolean;
+  participants?: Array<{ name?: string; email?: string; displayName?: string }>;
+  summary?: {
+    outline?: string[];
+    keywords?: string[];
+    action_items?: string[] | string;
+    overview?: string;
+    decisions?: string[];
+  };
+  fireflies_id?: string;
+}
 import { MeetingStatsCards } from './components/MeetingStatsCards';
 import { MeetingsList } from './components/MeetingsList';
 import { MeetingsSidebar } from './components/MeetingsSidebar';
@@ -45,9 +69,9 @@ export function MeetingsDashboard() {
     return p.displayName || p.name || p.email || 'Unknown';
   };
 
-  const transformMeeting = (m: any): Meeting => {
+  const transformMeeting = (m: RawMeetingData): Meeting => {
     const rawParticipants: MeetingAttendee[] = Array.isArray(m.participants)
-      ? m.participants.map((p: any) => ({
+      ? m.participants.map((p) => ({
           name: p.name || '',
           email: p.email || '',
           displayName: p.displayName || '',
@@ -69,12 +93,15 @@ export function MeetingsDashboard() {
       rawParticipants,
       agenda: m.summary?.outline || m.summary?.keywords || [],
       status: 'completed' as const,
-      notes: m.summary?.action_items || '',
+      notes: Array.isArray(m.summary?.action_items) ? m.summary.action_items.join('\n') : (m.summary?.action_items || ''),
       actionItems: [],
-      summary: m.summary,
+      summary: m.summary ? {
+        ...m.summary,
+        action_items: Array.isArray(m.summary.action_items) ? m.summary.action_items : undefined,
+      } : undefined,
       firefliesId: m.fireflies_id,
-      source: m.source || 'fireflies',
-      processingStatus: m.processing_status || 'completed',
+      source: (m.source || 'fireflies') as MeetingSource,
+      processingStatus: (m.processing_status || 'completed') as ProcessingStatus,
       hasTranscript: Boolean(m.has_transcript),
       hasRecording: Boolean(m.has_recording),
       organizerName: m.organizer_name,
@@ -153,8 +180,8 @@ export function MeetingsDashboard() {
       } else {
         setSyncMessage(`Sync failed: ${data.error}`);
       }
-    } catch (error: any) {
-      setSyncMessage(`Sync failed: ${error.message}`);
+    } catch (e: unknown) {
+      setSyncMessage(`Sync failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
     } finally {
       setIsSyncing(false);
       setTimeout(() => setSyncMessage(null), 5000);
@@ -179,8 +206,8 @@ export function MeetingsDashboard() {
         const data = await response.json();
         setSyncMessage(`Teams sync failed: ${data.error?.message || 'Unknown error'}`);
       }
-    } catch (error: any) {
-      setSyncMessage(`Teams sync failed: ${error.message}`);
+    } catch (e: unknown) {
+      setSyncMessage(`Teams sync failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
     } finally {
       setIsSyncingTeams(false);
       setTimeout(() => setSyncMessage(null), 8000);

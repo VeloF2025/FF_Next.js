@@ -4,8 +4,30 @@ import { useRouter } from 'next/router';
 import { Eye, Edit, Trash2, TrendingUp, AlertTriangle, AlertCircle } from 'lucide-react';
 import { formatDisplayDate } from '@/utils/dateFormat';
 
+interface ProjectRow {
+  id: string;
+  name: string;
+  project_code?: string;
+  code?: string;
+  status: string;
+  priority: string;
+  city?: string;
+  province?: string;
+  state?: string;
+  location?: string | { city?: string; province?: string; region?: string };
+  client_name?: string;
+  start_date: string;
+  end_date: string;
+  budget_total?: number;
+  budget_allocated?: number;
+  budget?: number;
+  budget_actual?: number;
+  budget_health?: string;
+  budget_utilization?: number;
+}
+
 interface ProjectTableProps {
-  projects: any[] | undefined;
+  projects: ProjectRow[] | undefined;
   isLoading: boolean;
   error: Error | null | undefined;
   onDelete?: (id: string) => void;
@@ -14,7 +36,7 @@ interface ProjectTableProps {
 export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTableProps) {
   const router = useRouter();
 
-  const formatLocation = (project: any) => {
+  const formatLocation = (project: ProjectRow) => {
     if (project.city) {
       return `${project.city}, ${project.province || project.state || ''}`.replace(/,\s*$/, '');
     }
@@ -25,7 +47,7 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
         if (loc?.city) return `${loc.city}, ${loc.province || loc.region || ''}`.replace(/,\s*$/, '');
       } catch {
         // Not JSON, return as-is if it's a reasonable string
-        if (project.location.length < 100) return project.location;
+        if (typeof project.location === 'string' && project.location.length < 100) return project.location;
       }
     }
     return 'N/A';
@@ -64,7 +86,7 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
   };
 
   const getPriorityBadge = (priority: string) => {
-    const priorityConfig: any = {
+    const priorityConfig: Record<string, string> = {
       LOW: 'bg-gray-500/20 text-gray-400',
       MEDIUM: 'bg-yellow-500/20 text-yellow-400',
       HIGH: 'bg-orange-500/20 text-orange-400',
@@ -80,7 +102,7 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
     );
   };
 
-  const getBudgetHealthBadge = (project: any) => {
+  const getBudgetHealthBadge = (project: ProjectRow) => {
     const health = project.budget_health || 'not_set';
     const utilization = project.budget_utilization || 0;
     const hasBudget = project.budget_total || project.budget;
@@ -228,7 +250,7 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
                   <div className="text-sm font-medium text-[var(--ff-text-primary)]">
                     {formatCurrency(Number(project.budget_total || project.budget_allocated || project.budget))}
                   </div>
-                  {project.budget_actual > 0 && (
+                  {(project.budget_actual ?? 0) > 0 && (
                     <div className="text-xs text-[var(--ff-text-secondary)]">
                       Spent: {formatCurrency(Number(project.budget_actual))}
                     </div>

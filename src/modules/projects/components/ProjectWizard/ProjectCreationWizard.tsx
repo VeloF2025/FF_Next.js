@@ -15,7 +15,15 @@ import { ProjectDetailsStep } from './steps/ProjectDetailsStep';
 // import { SOWUploadStep } from './steps/SOWUploadStep';
 import { ReviewStep } from './steps/ReviewStep';
 import type { FormData } from './types';
+import type { ProjectFormData } from '@/types/project/form.types';
 import { ProjectPriority } from '../../types/project.types';
+import type { StaffDropdownOption } from '@/types/staff/form.types';
+
+interface ActiveClient {
+  id?: string;
+  company_name?: string;
+  companyName?: string;
+}
 import { log } from '@/lib/logger';
 import { notificationService } from '@/services/core/NotificationService';
 
@@ -92,18 +100,18 @@ export function ProjectCreationWizard() {
       if (!endDate && startDate && formData.durationMonths) {
         const start = new Date(startDate);
         start.setMonth(start.getMonth() + formData.durationMonths);
-        endDate = start.toISOString().split('T')[0];
+        endDate = start.toISOString().split('T')[0] ?? '';
       }
-      
+
       // Map form data to project format (service will convert to snake_case)
-      const projectData = {
+      const projectData: Record<string, unknown> = {
         name: formData.name,
         projectName: formData.name, // Some parts expect projectName
         projectCode: `PRJ-${Date.now()}`, // Generate a simple project code
         clientId: formData.clientId,
         description: formData.description || formData.notes || '',
         projectType: 'installation', // Default type
-        status: formData.status || 'planning',
+        status: 'planning',
         priority: formData.priority,
         startDate: startDate,
         endDate: endDate || startDate, // Use start date if end date is not available
@@ -111,13 +119,13 @@ export function ProjectCreationWizard() {
         projectManager: formData.projectManagerId,
         location: formData.location || null // Don't stringify, send as object or null
       };
-      
+
       log.debug('Submitting project data', { projectData, formData }, 'ProjectCreationWizard');
-      const result = await createProject.mutateAsync(projectData as any);
+      const result = await createProject.mutateAsync(projectData as unknown as ProjectFormData);
       log.info('Project created successfully:', { data: result }, 'ProjectCreationWizard');
-      
+
       // Store the created project ID and show success
-      setCreatedProjectId(result.id || result);
+      setCreatedProjectId(result);
       setShowSuccess(true);
     } catch (error) {
       // Error logging is already handled below with proper logging
@@ -130,8 +138,8 @@ export function ProjectCreationWizard() {
     router.push('/projects');
   };
 
-  const selectedClient = clients?.find((c: any) => c.id === form.watch('clientId'));
-  const selectedProjectManager = projectManagers?.find((pm: any) => pm.id === form.watch('projectManagerId'));
+  const selectedClient = (clients as ActiveClient[])?.find((c) => c.id === form.watch('clientId'));
+  const selectedProjectManager = (projectManagers as StaffDropdownOption[])?.find((pm) => pm.id === form.watch('projectManagerId'));
 
   const renderStepContent = () => {
     switch (currentStep) {
@@ -139,7 +147,7 @@ export function ProjectCreationWizard() {
         return (
           <BasicInfoStep
             form={form}
-            clients={clients?.map((c: any) => ({ id: c.id!, name: c.company_name || c.companyName })) || []}
+            clients={(clients as ActiveClient[])?.map((c) => ({ id: c.id!, name: c.company_name || c.companyName || '' })) || []}
             isClientsLoading={isClientsLoading}
           />
         );
