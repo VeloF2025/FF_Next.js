@@ -121,21 +121,21 @@ export function SupplierForm() {
     }
   };
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleInputChange = (field: keyof SupplierFormData, value: SupplierFormData[keyof SupplierFormData]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleNestedChange = (parent: string, field: string, value: any) => {
+  const handleNestedChange = (parent: keyof SupplierFormData, field: string, value: unknown) => {
     setFormData(prev => ({
       ...prev,
       [parent]: {
-        ...(prev as any)[parent],
+        ...(prev[parent] as Record<string, unknown>),
         [field]: value
       }
     }));
   };
 
-  const handleAddressChange = (field: string, value: any) => {
+  const handleAddressChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
       addresses: {

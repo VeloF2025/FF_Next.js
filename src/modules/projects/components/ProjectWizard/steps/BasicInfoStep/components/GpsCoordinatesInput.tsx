@@ -1,10 +1,12 @@
 import { MapPin } from 'lucide-react';
+import type { UseFormRegister, FieldErrors } from 'react-hook-form';
 import type { GpsState } from '../types/basicInfo.types';
+import type { FormData } from '../../../types';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface GpsCoordinatesInputProps {
-  register: any;
-  errors: any;
+  register: UseFormRegister<FormData>;
+  errors: FieldErrors<FormData>;
   gpsState: GpsState;
   onGetCurrentLocation: () => void;
   onGpsInputParse: () => void;
@@ -72,7 +74,7 @@ export function GpsCoordinatesInput({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <input
-            {...register('location.coordinates.latitude' as any, {
+            {...register('location.coordinates.latitude', {
               required: 'Latitude is required',
               pattern: {
                 value: /^-?([1-8]?[0-9]\.{1}\d{1,6}$|90\.{1}0{1,6}$)/,
@@ -91,7 +93,7 @@ export function GpsCoordinatesInput({
 
         <div>
           <input
-            {...register('location.coordinates.longitude' as any, {
+            {...register('location.coordinates.longitude', {
               required: 'Longitude is required',
               pattern: {
                 value: /^-?(([-+]?)([\d]{1,3})((\.)(\d+))?)/,

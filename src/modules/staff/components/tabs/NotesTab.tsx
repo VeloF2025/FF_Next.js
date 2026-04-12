@@ -30,6 +30,20 @@ import type { StaffMember } from '@/types/staff';
 import { formatLabel } from '@/lib/utils';
 import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
+interface ContractMetadata {
+  employmentType?: string;
+  companyName?: string;
+  workLocation?: string;
+  salary?: string;
+  salaryPeriod?: string;
+  signatureDate?: string;
+  employeeSigned?: boolean | string;
+  employerSigned?: boolean | string;
+  witnessesSigned?: boolean | string;
+  signatureNotes?: string;
+  jobTitle?: string;
+}
+
 interface StaffNote {
   id: string;
   staffId: string;
@@ -40,7 +54,7 @@ interface StaffNote {
   createdByName?: string;
   createdAt: string;
   updatedAt?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, ContractMetadata | string | number | boolean | null>;
 }
 
 interface NotesTabProps {
@@ -77,7 +91,7 @@ const CONTRACT_SUMMARY_TEMPLATE = `## Employment Contract Summary
 *Generated on {{generatedDate}}*`;
 
 // Generate summary from staff data and contract metadata
-function generateContractSummary(staff: StaffMember, contractMetadata?: Record<string, any>): string {
+function generateContractSummary(staff: StaffMember, contractMetadata?: ContractMetadata): string {
   const variables: Record<string, string> = {
     employeeName: staff.name || 'N/A',
     saIdNumber: staff.saIdNumber || 'N/A',
@@ -117,7 +131,7 @@ export function NotesTab({ staff, staffId }: NotesTabProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [contractMetadata, setContractMetadata] = useState<Record<string, any> | null>(null);
+  const [contractMetadata, setContractMetadata] = useState<ContractMetadata | null>(null);
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
 
   // Toggle note expansion
@@ -182,8 +196,12 @@ export function NotesTab({ staff, staffId }: NotesTabProps) {
       if (response.ok) {
         const data = await response.json();
         // Find employment contract with OCR metadata
+        interface StaffDocument {
+          documentType: string;
+          ocrMetadata?: ContractMetadata;
+        }
         const contract = data.documents?.find(
-          (doc: any) => doc.documentType === 'employment_contract' && doc.ocrMetadata
+          (doc: StaffDocument) => doc.documentType === 'employment_contract' && doc.ocrMetadata
         );
         if (contract?.ocrMetadata) {
           setContractMetadata(contract.ocrMetadata);
