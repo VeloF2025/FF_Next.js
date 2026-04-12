@@ -8,6 +8,7 @@
  */
 
 import { neon } from '@/lib/db-neon';
+import type { NeonQueryFunction } from '@/lib/db-neon';
 import { TextProcessor } from '@/lib/utils/catalog/textProcessor';
 import type {
   FiberBudgetCategoryCode,
@@ -40,7 +41,7 @@ export interface CategoryMapResult {
 }
 
 export class CategoryMapper {
-  private sql: any;
+  private sql: NeonQueryFunction<false, false>;
   private mappingCache: Map<string, BOQCategoryMapping> = new Map();
   private initialized = false;
 
@@ -229,14 +230,15 @@ export class CategoryMapper {
       RETURNING *
     `;
 
+    const row0 = result[0]!;
     const mapping: BOQCategoryMapping = {
-      id: result[0].id,
-      boqCategory: result[0].boq_category,
-      budgetCategoryCode: result[0].budget_category_code,
-      keywords: result[0].keywords || [],
-      priority: result[0].priority,
-      createdAt: result[0].created_at,
-      updatedAt: result[0].updated_at,
+      id: row0.id,
+      boqCategory: row0.boq_category,
+      budgetCategoryCode: row0.budget_category_code,
+      keywords: row0.keywords || [],
+      priority: row0.priority,
+      createdAt: row0.created_at,
+      updatedAt: row0.updated_at,
     };
 
     // Update cache

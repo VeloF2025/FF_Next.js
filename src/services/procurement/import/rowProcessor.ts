@@ -18,8 +18,8 @@ export class RowProcessor {
    * Process a single row with mapping and validation
    */
   processRow(
-    row: any, 
-    index: number, 
+    row: Record<string, unknown>,
+    index: number,
     columnMapping: ColumnMapping
   ): {
     item: ParsedBOQItem | undefined;
@@ -51,8 +51,8 @@ export class RowProcessor {
    * Process multiple rows in batch
    */
   processBatch(
-    rows: any[], 
-    startIndex: number, 
+    rows: Record<string, unknown>[],
+    startIndex: number,
     columnMapping: ColumnMapping
   ): {
     validItems: ParsedBOQItem[];
@@ -73,7 +73,7 @@ export class RowProcessor {
 
     for (let i = 0; i < rows.length; i++) {
       const globalIndex = startIndex + i;
-      const result = this.processRow(rows[i], globalIndex, columnMapping);
+      const result = this.processRow(rows[i]!, globalIndex, columnMapping);
 
       if (result.item) {
         validItems.push(result.item);
