@@ -217,7 +217,7 @@ async function uploadToStorage(
   // Build public HTTPS URL from storage path
   // Public URLs need /storage/ prefix (nginx proxy routes /storage/ → port 8091)
   const storagePath = result.path || result.url?.replace(/^https?:\/\/[^/]+\//, '');
-  const url = `https://vf.fibreflow.app/storage/${storagePath}`;
+  const url = `https://app.fibreflow.app/storage/${storagePath}`;
 
   return {
     url,

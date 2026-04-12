@@ -212,7 +212,7 @@ async function uploadToVfStorage(
   const storagePath = result.path ?? `snags/tqr-photos/${actualFilename}`;
 
   return {
-    url: `https://vf.fibreflow.app/storage/${storagePath}`,
+    url: `https://app.fibreflow.app/storage/${storagePath}`,
     filename: actualFilename,
   };
 }
@@ -250,7 +250,7 @@ export async function uploadSourcePdf(
     }
     const result = (await response.json()) as { path?: string; filename?: string };
     const storagePath = result.path ?? `snags/tqr-pdfs/${result.filename ?? filename}`;
-    return `https://vf.fibreflow.app/storage/${storagePath}`;
+    return `https://app.fibreflow.app/storage/${storagePath}`;
   } catch (err) {
     log.warn('TqrImageExtractor: source PDF upload failed', { error: err });
     return '';

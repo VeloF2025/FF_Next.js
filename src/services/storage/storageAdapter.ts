@@ -93,7 +93,7 @@ export class StorageAdapter {
 
     // Always return public HTTPS URL for browser access
     // Public URLs need /storage/ prefix (nginx proxy routes /storage/ → port 8091)
-    const url = `https://vf.fibreflow.app/storage/${path}`;
+    const url = `https://app.fibreflow.app/storage/${path}`;
 
     return {
       success: true,
@@ -243,7 +243,7 @@ export class StorageAdapter {
   static getFileUrl(type: string, category: string, fileName: string): string {
     if (USE_VF_STORAGE) {
       // Return public HTTPS URL, not internal IP
-      return `https://vf.fibreflow.app/${type}/${category}/${fileName}`;
+      return `https://app.fibreflow.app/storage/${type}/${category}/${fileName}`;
     }
     return `/uploads/${type}/${category}/${fileName}`;
   }

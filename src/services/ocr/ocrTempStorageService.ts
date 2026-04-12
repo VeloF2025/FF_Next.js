@@ -17,7 +17,7 @@ const VF_STORAGE_INTERNAL_URL = process.env.VF_STORAGE_URL || 'http://100.96.203
 /**
  * Upload an image file to VF Storage and return its internal URL for VLM access.
  *
- * Public VF Storage URLs route through nginx (`vf.fibreflow.app/storage/...`).
+ * Public VF Storage URLs route through nginx (`app.fibreflow.app/storage/...`).
  * The VLLM service is on the same network and needs direct internal access, so
  * this function rewrites public URLs to the internal endpoint.
  *
@@ -51,7 +51,7 @@ export async function uploadForOcr(
     const urlPath = fileUrl.replace(/^\/storage/, '');
     fileUrl = `${VF_STORAGE_INTERNAL_URL}${urlPath}`;
     log.info('Converted relative storage URL to internal for OCR', { original: uploadResult.url, internal: fileUrl });
-  } else if (fileUrl.includes('vf.fibreflow.app')) {
+  } else if (fileUrl.includes('vf.fibreflow.app') || fileUrl.includes('app.fibreflow.app')) {
     const urlPath = new URL(fileUrl).pathname.replace(/^\/storage/, '');
     fileUrl = `${VF_STORAGE_INTERNAL_URL}${urlPath}`;
     log.info('Converted public URL to internal for OCR', { original: uploadResult.url, internal: fileUrl });
