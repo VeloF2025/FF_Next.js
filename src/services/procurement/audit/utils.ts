@@ -11,8 +11,8 @@ import { AuditAction } from './types';
 export function generateChangesSummary(
   action: string,
   entityType: string,
-  oldValue?: any,
-  newValue?: any
+  oldValue?: Record<string, unknown>,
+  newValue?: Record<string, unknown>
 ): string {
   switch (action) {
     case AuditAction.CREATE:
@@ -50,7 +50,7 @@ export function generateChangesSummary(
 /**
  * Get list of changed fields between old and new values
  */
-export function getChangedFields(oldValue: any, newValue: any): string[] {
+export function getChangedFields(oldValue: Record<string, unknown>, newValue: Record<string, unknown>): string[] {
   const changes: string[] = [];
 
   if (!oldValue || !newValue) {
@@ -79,13 +79,13 @@ export function getChangedFields(oldValue: any, newValue: any): string[] {
 /**
  * Sanitize values to remove sensitive information
  */
-export function sanitizeValue(value: any): any {
+export function sanitizeValue(value: unknown): unknown {
   if (!value) {
     return value;
   }
 
   // Clone the object to avoid modifying the original
-  const sanitized = JSON.parse(JSON.stringify(value));
+  const sanitized = JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
 
   // Remove sensitive fields
   const sensitiveFields = [
@@ -93,13 +93,13 @@ export function sanitizeValue(value: any): any {
     'accessToken', 'refreshToken', 'magicLinkToken'
   ];
 
-  const sanitizeObject = (obj: any) => {
+  const sanitizeObject = (obj: Record<string, unknown>) => {
     if (typeof obj === 'object' && obj !== null) {
       for (const key in obj) {
         if (sensitiveFields.some(field => key.toLowerCase().includes(field))) {
           obj[key] = '[REDACTED]';
-        } else if (typeof obj[key] === 'object') {
-          sanitizeObject(obj[key]);
+        } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+          sanitizeObject(obj[key] as Record<string, unknown>);
         }
       }
     }

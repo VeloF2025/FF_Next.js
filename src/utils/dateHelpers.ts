@@ -10,7 +10,7 @@ import { formatDisplayDate, formatDateISO, parseDateSafe } from '@/utils/dateFor
 /**
  * Safely convert any date value to ISO string
  */
-export function safeToISOString(date: any): string {
+export function safeToISOString(date: unknown): string {
   try {
     if (!date) return new Date().toISOString();
 
@@ -42,8 +42,8 @@ export function safeToISOString(date: any): string {
 /**
  * Safely convert any date value to Date object
  */
-export function safeToDate(date: any): Date {
-  const d = parseDateSafe(date);
+export function safeToDate(date: unknown): Date {
+  const d = parseDateSafe(date as Parameters<typeof parseDateSafe>[0]);
   return d ?? new Date();
 }
 
@@ -51,16 +51,16 @@ export function safeToDate(date: any): Date {
  * Format date safely with fallback (ISO format for internal use)
  * @deprecated Use formatDateISO() or formatDisplayDate() from @/utils/dateFormat
  */
-export function safeFormatDate(date: any, fallback: string = 'N/A'): string {
-  return formatDateISO(date) || fallback;
+export function safeFormatDate(date: unknown, fallback: string = 'N/A'): string {
+  return formatDateISO(date as Parameters<typeof formatDateISO>[0]) || fallback;
 }
 
 /**
  * Format date for display
  * @deprecated Use formatDisplayDate() from @/utils/dateFormat
  */
-export function formatDate(date: any, fallback: string = 'N/A'): string {
-  return formatDisplayDate(date, fallback);
+export function formatDate(date: unknown, fallback: string = 'N/A'): string {
+  return formatDisplayDate(date as Parameters<typeof formatDisplayDate>[0], fallback);
 }
 
 /**

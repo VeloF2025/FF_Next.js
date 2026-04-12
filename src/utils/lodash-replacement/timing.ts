@@ -75,7 +75,7 @@ export function debounce<T extends (...args: any[]) => any>(
   }
 
   let lastArgs: Parameters<T> | undefined;
-  let lastThis: any;
+  let lastThis: unknown;
 
   function cancel(): void {
     if (timeoutId !== null) {
@@ -95,7 +95,7 @@ export function debounce<T extends (...args: any[]) => any>(
     return timeoutId === null ? result : trailingEdge(Date.now());
   }
 
-  function debounced(this: any, ...args: Parameters<T>): ReturnType<T> | undefined {
+  function debounced(this: unknown, ...args: Parameters<T>): ReturnType<T> | undefined {
     const time = Date.now();
     const isInvoking = shouldInvoke(time);
 
