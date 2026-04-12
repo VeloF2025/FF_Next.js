@@ -15,8 +15,15 @@ import { TicketPriority } from '../../types/ticket';
 import type { DatabaseStatus } from './KanbanBoard';
 import { getT1Label, getTicketCategoryLabel } from '../../constants/ticketCategories';
 
+/** Extended ticket shape returned by Kanban queries (extra DB columns not in base Ticket) */
+interface KanbanTicket extends Ticket {
+  category?: string | null;
+  status_changed_at?: string | null;
+  asset_id?: string | null;
+}
+
 interface KanbanCardProps {
-  ticket: Ticket;
+  ticket: KanbanTicket;
   isDragging?: boolean;
   onQuickMove?: (ticketId: string, direction: 'forward' | 'backward') => void;
   canMoveForward?: boolean;
@@ -57,7 +64,7 @@ function formatRelativeTime(date: Date | string) {
 export function KanbanCard({ ticket, isDragging, onQuickMove, canMoveForward, canMoveBackward }: KanbanCardProps) {
   const router = useRouter();
   const priorityStyle = priorityColors[ticket.priority] || priorityColors[TicketPriority.NORMAL];
-  const categoryStyle = categoryColors[(ticket as any).category?.toLowerCase()] ?? categoryColors['default'] ?? { bg: 'bg-gray-500/20', text: 'text-gray-400' };
+  const categoryStyle = categoryColors[ticket.category?.toLowerCase() ?? ''] ?? categoryColors['default'] ?? { bg: 'bg-gray-500/20', text: 'text-gray-400' };
 
   const handleClick = (e: React.MouseEvent) => {
     // Don't navigate when clicking quick-move buttons
@@ -66,7 +73,7 @@ export function KanbanCard({ ticket, isDragging, onQuickMove, canMoveForward, ca
   };
 
   const getTimeInStatus = () => {
-    const statusChangedAt = (ticket as any).status_changed_at || ticket.updated_at || ticket.created_at;
+    const statusChangedAt = ticket.status_changed_at || ticket.updated_at || ticket.created_at;
     return formatRelativeTime(new Date(statusChangedAt));
   };
 
@@ -162,7 +169,7 @@ export function KanbanCard({ ticket, isDragging, onQuickMove, canMoveForward, ca
             {ticket.dr_number}
           </div>
         )}
-        {(ticket as any).asset_id && (
+        {ticket.asset_id && (
           <div className="flex items-center gap-1 text-xs text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)] px-2 py-0.5 rounded">
             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -179,11 +186,11 @@ export function KanbanCard({ ticket, isDragging, onQuickMove, canMoveForward, ca
             <div className="flex items-center gap-1.5">
               <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
                 <span className="text-[10px] text-white font-medium">
-                  {(ticket as any).assigned_user?.name?.charAt(0) || 'U'}
+                  {ticket.assigned_user?.name?.charAt(0) || 'U'}
                 </span>
               </div>
               <span className="text-xs text-[var(--ff-text-secondary)] truncate max-w-[70px]">
-                {(ticket as any).assigned_user?.name || 'Assigned'}
+                {ticket.assigned_user?.name || 'Assigned'}
               </span>
             </div>
           ) : ticket.assigned_team_id ? (
@@ -194,7 +201,7 @@ export function KanbanCard({ ticket, isDragging, onQuickMove, canMoveForward, ca
                 </svg>
               </div>
               <span className="text-xs text-[var(--ff-text-secondary)] truncate max-w-[70px]">
-                {(ticket as any).assigned_team_name || ticket.assigned_team || 'Team'}
+                {ticket.assigned_team_name || ticket.assigned_team || 'Team'}
               </span>
             </div>
           ) : (

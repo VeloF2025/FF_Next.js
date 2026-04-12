@@ -12,6 +12,10 @@ import type {
 } from '../types/livekit.types';
 import { log } from '@/lib/logger';
 
+function toErrorMessage(err: unknown): string {
+    return err instanceof Error ? err.message : String(err);
+}
+
 // Environment variables
 const LIVEKIT_URL = process.env.LIVEKIT_URL || '';
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || '';
@@ -87,9 +91,9 @@ export async function generateToken(request: TokenRequest): Promise<TokenRespons
 
         const jwt = await token.toJwt();
         return { success: true, token: jwt };
-    } catch (error: any) {
+    } catch (error: unknown) {
         log.error('Error generating token', { error }, 'livekitService');
-        return { success: false, error: error.message };
+        return { success: false, error: toErrorMessage(error) };
     }
 }
 
@@ -122,9 +126,9 @@ export async function createRoom(request: CreateRoomRequest): Promise<CreateRoom
         };
 
         return { success: true, room: liveKitRoom };
-    } catch (error: any) {
+    } catch (error: unknown) {
         log.error('Error creating room', { error }, 'livekitService');
-        return { success: false, error: error.message };
+        return { success: false, error: toErrorMessage(error) };
     }
 }
 
@@ -155,7 +159,7 @@ export async function listRooms(): Promise<LiveKitRoom[]> {
                 maxParticipants: room.maxParticipants,
             };
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         log.error('Error listing rooms', { error }, 'livekitService');
         return [];
     }
@@ -173,7 +177,7 @@ export async function deleteRoom(roomName: string): Promise<boolean> {
         const client = getRoomServiceClient();
         await client.deleteRoom(roomName);
         return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
         log.error('Error deleting room', { error }, 'livekitService');
         return false;
     }
@@ -205,9 +209,9 @@ export async function startRecording(roomName: string): Promise<RecordingRespons
             egressId: egress.egressId,
             recordingPath: filepath,
         };
-    } catch (error: any) {
+    } catch (error: unknown) {
         log.error('Error starting recording', { error }, 'livekitService');
-        return { success: false, error: error.message };
+        return { success: false, error: toErrorMessage(error) };
     }
 }
 
@@ -224,9 +228,9 @@ export async function stopRecording(egressId: string): Promise<RecordingResponse
         await client.stopEgress(egressId);
 
         return { success: true, egressId };
-    } catch (error: any) {
+    } catch (error: unknown) {
         log.error('Error stopping recording', { error }, 'livekitService');
-        return { success: false, error: error.message };
+        return { success: false, error: toErrorMessage(error) };
     }
 }
 

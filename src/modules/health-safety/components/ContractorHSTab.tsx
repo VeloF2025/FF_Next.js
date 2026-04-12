@@ -25,6 +25,41 @@ import {
 import { DOCUMENT_TYPES, REQUIRED_DOCUMENTS } from '../types/compliance.types';
 import { formatDisplayDate } from '@/utils/dateFormat';
 
+interface GateBreakdown {
+  documents?: { passed: boolean; message?: string };
+  incidents?: { passed: boolean; message?: string };
+  compliance_score?: { passed: boolean; message?: string };
+  training?: { passed: boolean; message?: string };
+}
+
+interface ComplianceScore {
+  overallScore?: number | string;
+  ragStatus?: 'green' | 'amber' | 'red';
+  documentScore?: number;
+  incidentScore?: number;
+  trainingScore?: number;
+  correctiveActionScore?: number;
+  auditScore?: number;
+}
+
+interface ComplianceData {
+  score?: ComplianceScore;
+  documents?: { percentage?: number; valid_count?: number; required_count?: number };
+  incidents?: { total_12_months?: number; critical_12_months?: number; open?: number };
+  training?: { percentage?: number; valid_count?: number; required_count?: number; status?: Record<string, boolean> };
+  audits?: { average_score?: number | string; total_12_months?: number };
+  corrective_actions?: { open?: number; overdue?: number; closed?: number };
+}
+
+interface IncidentItem {
+  id: string;
+  title: string;
+  incident_date: string;
+  incident_type?: string;
+  severity?: string;
+  status?: string;
+}
+
 interface ContractorHSTabProps {
   contractorId: string | number;
   contractorName?: string;
@@ -176,7 +211,7 @@ function GateStatusBanner({
   breakdown,
 }: {
   gate?: { passed: boolean; blocking_reasons?: string[] };
-  breakdown?: any;
+  breakdown?: GateBreakdown;
 }) {
   if (!gate) return null;
 
@@ -293,8 +328,8 @@ function OverviewSection({
   compliance,
   breakdown,
 }: {
-  compliance?: any;
-  breakdown?: any;
+  compliance?: ComplianceData;
+  breakdown?: GateBreakdown;
 }) {
   return (
     <div className="grid md:grid-cols-2 gap-6">
@@ -441,7 +476,7 @@ function DocumentsSection({
   mutate,
 }: {
   contractorId: string | number;
-  documents?: any;
+  documents?: ComplianceData['documents'];
   onUpload?: () => void;
   mutate: () => void;
 }) {
@@ -538,7 +573,7 @@ function IncidentsSection({
   incidents,
 }: {
   contractorId: string | number;
-  incidents?: any;
+  incidents?: ComplianceData['incidents'];
 }) {
   // Fetch incidents
   const { data: incidentsData } = useSWR(
@@ -546,7 +581,7 @@ function IncidentsSection({
     fetcher
   );
 
-  const incidentList = incidentsData?.data?.incidents || [];
+  const incidentList: IncidentItem[] = incidentsData?.data?.incidents || [];
 
   return (
     <div className="space-y-4">
@@ -569,7 +604,7 @@ function IncidentsSection({
 
       {incidentList.length > 0 ? (
         <div className="bg-card rounded-lg border border-border divide-y divide-gray-200 dark:divide-gray-700">
-          {incidentList.map((incident: any) => (
+          {incidentList.map((incident) => (
             <a
               key={incident.id}
               href={`/noc/tickets/${incident.id}`}
