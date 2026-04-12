@@ -38,7 +38,7 @@ export class PoleTrackerNeonService {
     return this.poleDataService.updatePoleStatus(id, status);
   }
 
-  async bulkImportPoles(projectId: string, poles: any[]): Promise<number> {
+  async bulkImportPoles(projectId: string, poles: Pick<NeonPole, 'pole_number' | 'location'>[]): Promise<number> {
     return this.poleDataService.bulkImportPoles(projectId, poles);
   }
 
@@ -70,12 +70,12 @@ export const poleTrackerService = {
   getAll: () => poleTrackerNeonService.searchPoles({}),
   getById: (id: string) => poleTrackerNeonService.getPoleById(parseInt(id)),
   getByProject: (projectId: string) => poleTrackerNeonService.getPolesByProject(projectId),
-  create: async (_data: any) => {
+  create: async (_data: Record<string, unknown>) => {
     // This would need to be implemented based on your needs
     throw new Error('Create operation should use bulk import for Neon');
   },
-  update: async (id: string, data: any) => {
-    if (data.status) {
+  update: async (id: string, data: Record<string, unknown>) => {
+    if (typeof data.status === 'string') {
       await poleTrackerNeonService.updatePoleStatus(parseInt(id), data.status);
     }
     // Handle other updates as needed

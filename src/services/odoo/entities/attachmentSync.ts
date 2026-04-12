@@ -189,7 +189,7 @@ function getStoragePath(
  * Build entity mapping cache from database
  */
 async function buildEntityMappingCache(
-  sql: any
+  sql: NeonQueryFunction<false, false>
 ): Promise<Map<string, Map<number, string>>> {
   const cache = new Map<string, Map<number, string>>();
 
@@ -201,7 +201,7 @@ async function buildEntityMappingCache(
         FROM ${mapping.ffTable}
         WHERE ${mapping.odooIdColumn} IS NOT NULL
       `;
-      const rows = await sql.unsafe(query) as Array<{ ff_id: string; odoo_id: number }>;
+      const rows = await sql.query(query) as unknown as Array<{ ff_id: string; odoo_id: number }>;
 
       const modelCache = new Map<number, string>();
       for (const row of rows) {
@@ -827,7 +827,7 @@ export async function syncAttachmentsForEntity(
       FROM ${mapping.ffTable}
       WHERE ${mapping.idColumn} = $1
     `;
-    const rows = await (sql as any).unsafe(query, [ffEntityId]) as Array<{ odoo_id: number | null }>;
+    const rows = await sql.query(query, [ffEntityId]) as unknown as Array<{ odoo_id: number | null }>;
 
     if (rows.length === 0 || !rows[0]!.odoo_id) {
       result.errors.push(`Entity ${ffEntityType}:${ffEntityId} has no Odoo mapping`);
@@ -1016,7 +1016,17 @@ export async function getOrphanedDocuments(
         ORDER BY created_at DESC LIMIT ${options?.limit || 100}
       `;
 
-  return (rows as any[]).map((row: any) => ({
+  type OrphanRow = {
+    id: string;
+    odoo_attachment_id: number;
+    odoo_model: string;
+    odoo_record_id: number;
+    file_name: string;
+    file_path: string;
+    document_type: string;
+    created_at: Date;
+  };
+  return (rows as OrphanRow[]).map((row) => ({
     id: row.id,
     odooAttachmentId: row.odoo_attachment_id,
     odooModel: row.odoo_model,

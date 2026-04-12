@@ -213,6 +213,28 @@ export interface ListCasesOptions {
 }
 
 /**
+ * Raw event item from QContact /events API endpoint
+ */
+interface QContactRawEvent {
+  id?: string | number;
+  event_type?: string;
+  type?: string;
+  subtitle?: string;
+  html?: string;
+  content?: string;
+  description?: string;
+  raised_at?: string;
+  created_at?: string;
+  public_note?: boolean;
+  public?: boolean;
+  pinned?: boolean;
+  is_pinned?: boolean;
+  user?: { label?: string; name?: string; email?: string };
+  formatted_changes?: Record<string, { field?: string; old_value?: string; new_value: string }>;
+  changes?: Record<string, unknown>;
+}
+
+/**
  * QContact Activity Entry
  * Represents a single activity (note, update, status change) on a case
  */
@@ -614,7 +636,7 @@ export class FiberTimeQContactClient {
       logger.debug('Fetching case activities', { caseId });
 
       // QContact API endpoint for case events/timeline
-      const response = await this.request<any>(
+      const response = await this.request<QContactRawEvent[] | { results: QContactRawEvent[] }>(
         'GET',
         `/api/v2/entities/Case/${caseId}/events?expand_conversations=false&page=1&sort=id%20DESC`
       );
@@ -657,7 +679,7 @@ export class FiberTimeQContactClient {
   /**
    * Parse a raw event item from QContact API /events endpoint
    */
-  private parseActivity(item: any): QContactActivity {
+  private parseActivity(item: QContactRawEvent): QContactActivity {
     // Determine activity type from event_type field
     let type: QContactActivity['type'] = 'note';
     const eventType = item.event_type || item.type;
@@ -680,18 +702,21 @@ export class FiberTimeQContactClient {
     // Parse field changes from formatted_changes (QContact format)
     let fieldChanges: QContactActivity['field_changes'] = null;
     if (item.formatted_changes && Object.keys(item.formatted_changes).length > 0) {
-      fieldChanges = Object.values(item.formatted_changes).map((change: any) => ({
+      fieldChanges = Object.values(item.formatted_changes).map((change) => ({
         field: change.field || 'Unknown',
         old_value: change.old_value,
         new_value: change.new_value,
       }));
     } else if (item.changes && Object.keys(item.changes).length > 0) {
       // Fallback to raw changes
-      fieldChanges = Object.entries(item.changes).map(([field, value]: [string, any]) => ({
-        field,
-        old_value: typeof value === 'object' ? value.old_value : undefined,
-        new_value: typeof value === 'object' ? value.new_value : String(value),
-      }));
+      fieldChanges = Object.entries(item.changes).map(([field, value]) => {
+        const v = value as Record<string, string> | string | number | null;
+        return {
+          field,
+          old_value: v !== null && typeof v === 'object' ? v['old_value'] : undefined,
+          new_value: v !== null && typeof v === 'object' ? (v['new_value'] ?? '') : String(v ?? ''),
+        };
+      });
     }
 
     // Get description from subtitle or html
@@ -902,7 +927,7 @@ export class FiberTimeQContactClient {
       // Fetch current description to append (not overwrite)
       let existing = '';
       try {
-        const caseData = await this.request('GET', `/api/v2/entities/Case/${caseId}`);
+        const caseData = await this.request<{ fields?: { description?: string } }>('GET', `/api/v2/entities/Case/${caseId}`);
         existing = caseData?.fields?.description || '';
       } catch {
         // If we can't fetch, just set directly
