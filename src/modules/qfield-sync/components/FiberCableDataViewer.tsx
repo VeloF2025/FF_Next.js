@@ -77,45 +77,29 @@ export function FiberCableDataViewer() {
 
         // Add synchronized cables
         if (result.data.synchronized_cables) {
-          result.data.synchronized_cables.forEach((cable: any) => {
-            allCables.push({
-              ...cable,
-              sync_status: 'synced',
-              source: 'both'
-            });
+          (result.data.synchronized_cables as Partial<FiberCable>[]).forEach((cable) => {
+            allCables.push({ cable_id: '', ...cable, sync_status: 'synced', source: 'both' });
           });
         }
 
         // Add QFieldCloud only cables
         if (result.data.qfieldcloud_only) {
-          result.data.qfieldcloud_only.forEach((cable: any) => {
-            allCables.push({
-              ...cable,
-              sync_status: 'pending',
-              source: 'qfieldcloud'
-            });
+          (result.data.qfieldcloud_only as Partial<FiberCable>[]).forEach((cable) => {
+            allCables.push({ cable_id: '', ...cable, sync_status: 'pending', source: 'qfieldcloud' });
           });
         }
 
         // Add FibreFlow only cables
         if (result.data.fibreflow_only) {
-          result.data.fibreflow_only.forEach((cable: any) => {
-            allCables.push({
-              ...cable,
-              sync_status: 'pending',
-              source: 'fibreflow'
-            });
+          (result.data.fibreflow_only as Partial<FiberCable>[]).forEach((cable) => {
+            allCables.push({ cable_id: '', ...cable, sync_status: 'pending', source: 'fibreflow' });
           });
         }
 
         // Add cables that need sync
         if (result.data.needs_sync) {
-          result.data.needs_sync.forEach((cable: any) => {
-            allCables.push({
-              ...cable,
-              sync_status: 'conflict',
-              source: 'both'
-            });
+          (result.data.needs_sync as Partial<FiberCable>[]).forEach((cable) => {
+            allCables.push({ cable_id: '', ...cable, sync_status: 'conflict', source: 'both' });
           });
         }
 
@@ -294,7 +278,7 @@ export function FiberCableDataViewer() {
             ].map((option) => (
               <button
                 key={option.value}
-                onClick={() => setFilter(option.value as any)}
+                onClick={() => setFilter(option.value as 'all' | 'qfield_only' | 'fibreflow_only' | 'synced')}
                 className={`px-4 py-2 rounded-lg ${
                   filter === option.value
                     ? 'bg-blue-600 text-white'

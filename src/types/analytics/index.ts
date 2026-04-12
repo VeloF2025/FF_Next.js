@@ -184,8 +184,8 @@ export interface AuditMetadata {
 }
 
 export interface AuditChanges {
-  old?: any;
-  new?: any;
+  old?: Record<string, unknown>;
+  new?: Record<string, unknown>;
 }
 
 export interface AuditEntry {
@@ -195,8 +195,8 @@ export interface AuditEntry {
   entityId: string;
   userId: string;
   userName: string;
-  oldValue?: any;
-  newValue?: any;
+  oldValue?: Record<string, unknown>;
+  newValue?: Record<string, unknown>;
   ipAddress?: string;
   userAgent?: string;
   sessionId?: string;
