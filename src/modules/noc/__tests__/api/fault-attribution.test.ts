@@ -15,6 +15,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import type { NextRequest } from 'next/server';
 import type { Ticket } from '../../types/ticket';
 import { FaultCause } from '../../types/ticket';
 
@@ -122,7 +123,7 @@ describe('Fault Attribution API Endpoints', () => {
       });
 
       const response = await PUT(
-        mockRequest as any,
+        mockRequest as unknown as NextRequest,
         { params: { id: '123e4567-e89b-12d3-a456-426614174000' } }
       );
       const data = await response.json();
@@ -152,7 +153,7 @@ describe('Fault Attribution API Endpoints', () => {
       });
 
       const response = await PUT(
-        mockRequest as any,
+        mockRequest as unknown as NextRequest,
         { params: { id: '123e4567-e89b-12d3-a456-426614174000' } }
       );
       const data = await response.json();
@@ -175,7 +176,7 @@ describe('Fault Attribution API Endpoints', () => {
       });
 
       const response = await PUT(
-        mockRequest as any,
+        mockRequest as unknown as NextRequest,
         { params: { id: 'invalid-uuid' } }
       );
       const data = await response.json();
@@ -201,7 +202,7 @@ describe('Fault Attribution API Endpoints', () => {
       });
 
       const response = await PUT(
-        mockRequest as any,
+        mockRequest as unknown as NextRequest,
         { params: { id: '123e4567-e89b-12d3-a456-426614174000' } }
       );
       const data = await response.json();
@@ -226,7 +227,7 @@ describe('Fault Attribution API Endpoints', () => {
       });
 
       const response = await PUT(
-        mockRequest as any,
+        mockRequest as unknown as NextRequest,
         { params: { id: '123e4567-e89b-12d3-a456-426614174000' } }
       );
       const data = await response.json();
@@ -257,7 +258,7 @@ describe('Fault Attribution API Endpoints', () => {
       });
 
       const response = await PUT(
-        mockRequest as any,
+        mockRequest as unknown as NextRequest,
         { params: { id: '123e4567-e89b-12d3-a456-426614174000' } }
       );
       const data = await response.json();
@@ -298,7 +299,7 @@ describe('Fault Attribution API Endpoints', () => {
       const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=fault_cause');
-      const response = await GET(mockRequest as any);
+      const response = await GET(mockRequest as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -332,7 +333,7 @@ describe('Fault Attribution API Endpoints', () => {
       const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=pole_number');
-      const response = await GET(mockRequest as any);
+      const response = await GET(mockRequest as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -364,7 +365,7 @@ describe('Fault Attribution API Endpoints', () => {
       const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=pon_number');
-      const response = await GET(mockRequest as any);
+      const response = await GET(mockRequest as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -395,7 +396,7 @@ describe('Fault Attribution API Endpoints', () => {
       const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=zone_id');
-      const response = await GET(mockRequest as any);
+      const response = await GET(mockRequest as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -421,7 +422,7 @@ describe('Fault Attribution API Endpoints', () => {
       const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=fault_cause&project_id=proj-123');
-      const response = await GET(mockRequest as any);
+      const response = await GET(mockRequest as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -449,7 +450,7 @@ describe('Fault Attribution API Endpoints', () => {
       const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=fault_cause&start_date=2024-01-01&end_date=2024-12-31');
-      const response = await GET(mockRequest as any);
+      const response = await GET(mockRequest as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -464,7 +465,7 @@ describe('Fault Attribution API Endpoints', () => {
       const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=invalid_field');
-      const response = await GET(mockRequest as any);
+      const response = await GET(mockRequest as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(422);
@@ -480,7 +481,7 @@ describe('Fault Attribution API Endpoints', () => {
       const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=fault_cause');
-      const response = await GET(mockRequest as any);
+      const response = await GET(mockRequest as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -495,7 +496,7 @@ describe('Fault Attribution API Endpoints', () => {
       const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=fault_cause');
-      const response = await GET(mockRequest as any);
+      const response = await GET(mockRequest as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -520,7 +521,7 @@ describe('Fault Attribution API Endpoints', () => {
       const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=fault_cause');
-      const response = await GET(mockRequest as any);
+      const response = await GET(mockRequest as unknown as NextRequest);
       const data = await response.json();
 
       expect(response.status).toBe(200);

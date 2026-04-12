@@ -16,9 +16,9 @@ export class DomainLoggers {
     context: AuditContext,
     action: AuditAction,
     boqId: string,
-    oldValue?: any,
-    newValue?: any,
-    metadata?: Record<string, any>
+    oldValue?: unknown,
+    newValue?: unknown,
+    metadata?: Record<string, unknown>
   ): Promise<void> {
     await this.logger.logAction(
       context,
@@ -42,9 +42,9 @@ export class DomainLoggers {
     context: AuditContext,
     action: AuditAction,
     rfqId: string,
-    oldValue?: any,
-    newValue?: any,
-    metadata?: Record<string, any>
+    oldValue?: unknown,
+    newValue?: unknown,
+    metadata?: Record<string, unknown>
   ): Promise<void> {
     await this.logger.logAction(
       context,
@@ -68,9 +68,9 @@ export class DomainLoggers {
     context: AuditContext,
     action: AuditAction,
     quoteId: string,
-    oldValue?: any,
-    newValue?: any,
-    metadata?: Record<string, any>
+    oldValue?: unknown,
+    newValue?: unknown,
+    metadata?: Record<string, unknown>
   ): Promise<void> {
     await this.logger.logAction(
       context,
@@ -95,9 +95,9 @@ export class DomainLoggers {
     action: AuditAction,
     entityType: AuditEntityType.STOCK_POSITION | AuditEntityType.STOCK_MOVEMENT | AuditEntityType.CABLE_DRUM,
     entityId: string,
-    oldValue?: any,
-    newValue?: any,
-    metadata?: Record<string, any>
+    oldValue?: unknown,
+    newValue?: unknown,
+    metadata?: Record<string, unknown>
   ): Promise<void> {
     await this.logger.logAction(
       context,
@@ -122,7 +122,7 @@ export class DomainLoggers {
     action: AuditAction,
     entityType: AuditEntityType | string,
     entityIds: string[],
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): Promise<void> {
     const bulkMetadata = {
       ...metadata,
@@ -150,7 +150,7 @@ export class DomainLoggers {
     event: SecurityEventType,
     entityType: AuditEntityType | string,
     entityId: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): Promise<void> {
     await this.logger.logAction(
       context,

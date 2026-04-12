@@ -25,14 +25,14 @@ export interface ErrorContext {
   environment?: {
     userAgent: string;
     viewport: { width: number; height: number };
-    connection?: any;
+    connection?: { effectiveType?: string; downlink?: number; rtt?: number };
   };
   tags?: Record<string, string>;
-  extra?: Record<string, any>;
+  extra?: Record<string, unknown>;
 }
 
-// Error event structure
-export interface ErrorEvent {
+// Error event structure for tracking (named to avoid collision with DOM ErrorEvent)
+export interface TrackingErrorEvent {
   message: string;
   stack?: string;
   severity: ErrorSeverity;
@@ -48,7 +48,7 @@ const config = {
   enabled: process.env.NODE_ENV === 'production',
   endpoint: '/api/analytics/errors',
   sampleRate: 1.0, // 100% of errors
-  beforeSend: (event: ErrorEvent) => event, // Transform before sending
+  beforeSend: (event: TrackingErrorEvent) => event, // Transform before sending
 };
 
 /**
@@ -105,7 +105,7 @@ export function captureException(
   options?: {
     severity?: ErrorSeverity;
     tags?: Record<string, string>;
-    extra?: Record<string, any>;
+    extra?: Record<string, unknown>;
     user?: ErrorContext['user'];
   }
 ): void {
@@ -150,12 +150,12 @@ export function captureMessage(
   options?: {
     severity?: ErrorSeverity;
     tags?: Record<string, string>;
-    extra?: Record<string, any>;
+    extra?: Record<string, unknown>;
   }
 ): void {
   if (!config.enabled) return;
 
-  const errorEvent: ErrorEvent = {
+  const errorEvent: TrackingErrorEvent = {
     message,
     severity: options?.severity || 'info',
     timestamp: Date.now(),
@@ -182,10 +182,10 @@ function buildErrorEvent(
   options?: {
     severity?: ErrorSeverity;
     tags?: Record<string, string>;
-    extra?: Record<string, any>;
+    extra?: Record<string, unknown>;
     user?: ErrorContext['user'];
   }
-): ErrorEvent {
+): TrackingErrorEvent {
   const isError = error instanceof Error;
   const message = isError ? error.message : String(error);
   const stack = isError ? error.stack : undefined;
@@ -237,7 +237,7 @@ function getErrorContext(): ErrorContext {
         width: window.innerWidth,
         height: window.innerHeight,
       },
-      connection: (navigator as any).connection,
+      connection: (navigator as Navigator & { connection?: { effectiveType?: string; downlink?: number; rtt?: number } }).connection,
     },
     tags: {},
     extra: {},
@@ -247,7 +247,7 @@ function getErrorContext(): ErrorContext {
 /**
  * Send error event to endpoint
  */
-async function sendErrorEvent(event: ErrorEvent): Promise<void> {
+async function sendErrorEvent(event: TrackingErrorEvent): Promise<void> {
   if (!config.enabled) return;
 
   try {
@@ -270,20 +270,23 @@ async function sendErrorEvent(event: ErrorEvent): Promise<void> {
 export function setUser(user: ErrorContext['user'] | null): void {
   if (typeof window === 'undefined') return;
 
-  (window as any).__errorTrackingUser = user;
+  (window as Window & { __errorTrackingUser?: ErrorContext['user'] | null }).__errorTrackingUser = user;
 }
 
 /**
  * Set custom context
  */
-export function setContext(key: string, value: any): void {
+export function setContext(key: string, value: unknown): void {
   if (typeof window === 'undefined') return;
 
-  if (!(window as any).__errorTrackingContext) {
-    (window as any).__errorTrackingContext = {};
+  type TrackingWindow = Window & { __errorTrackingContext?: Record<string, unknown> };
+  const trackingWindow = window as TrackingWindow;
+
+  if (!trackingWindow.__errorTrackingContext) {
+    trackingWindow.__errorTrackingContext = {};
   }
 
-  (window as any).__errorTrackingContext[key] = value;
+  trackingWindow.__errorTrackingContext[key] = value;
 }
 
 /**
@@ -294,7 +297,7 @@ export interface Breadcrumb {
   category?: string;
   level?: ErrorSeverity;
   timestamp: number;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
 }
 
 const breadcrumbs: Breadcrumb[] = [];
@@ -329,14 +332,14 @@ export function clearBreadcrumbs(): void {
 /**
  * Wrap async function with error tracking
  */
-export function withErrorTracking<T extends (...args: any[]) => Promise<any>>(
+export function withErrorTracking<T extends (...args: unknown[]) => Promise<unknown>>(
   fn: T,
   options?: {
     name?: string;
     tags?: Record<string, string>;
   }
 ): T {
-  return (async (...args: any[]) => {
+  return (async (...args: unknown[]) => {
     try {
       return await fn(...args);
     } catch (error) {
@@ -382,7 +385,7 @@ export function captureAPIError(
   options?: {
     method?: string;
     status?: number;
-    body?: any;
+    body?: unknown;
   }
 ): void {
   captureException(error, {
