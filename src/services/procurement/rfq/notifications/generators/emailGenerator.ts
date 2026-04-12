@@ -19,7 +19,7 @@ export class RFQEmailGenerator extends BaseRFQGenerator {
   static generateEmailContent(
     event: EmailEvent,
     rfq: RFQ,
-    additionalData?: any
+    additionalData?: Record<string, unknown>
   ): EmailContent {
     const rfqUrl = `${this.getBaseUrl()}${this.generateRFQLink(rfq.id)}`;
     const responseUrl = `${this.getBaseUrl()}${this.generateSupplierRFQLink(rfq.id, '/respond')}`;
@@ -33,7 +33,7 @@ export class RFQEmailGenerator extends BaseRFQGenerator {
         };
 
       case 'deadline_extended': {
-        const newDeadline = additionalData?.newDeadline || rfq.responseDeadline;
+        const newDeadline = (additionalData?.newDeadline as Date | undefined) ?? rfq.responseDeadline;
         return {
           subject: generateSubject(event, rfq),
           content: HTMLTemplates.deadlineExtended(rfq, newDeadline, rfqUrl),
@@ -42,7 +42,7 @@ export class RFQEmailGenerator extends BaseRFQGenerator {
       }
 
       case 'cancelled': {
-        const reason = additionalData?.reason || 'No reason provided';
+        const reason = (additionalData?.reason as string | undefined) ?? 'No reason provided';
         return {
           subject: generateSubject(event, rfq),
           content: HTMLTemplates.cancelled(rfq, reason),
@@ -51,8 +51,8 @@ export class RFQEmailGenerator extends BaseRFQGenerator {
       }
 
       case 'awarded': {
-        const isWinner = additionalData?.isWinner || false;
-        const winnerName = additionalData?.winnerName || 'the selected supplier';
+        const isWinner = (additionalData?.isWinner as boolean | undefined) ?? false;
+        const winnerName = (additionalData?.winnerName as string | undefined) ?? 'the selected supplier';
         return {
           subject: generateSubject(event, rfq),
           content: isWinner
@@ -74,7 +74,7 @@ export class RFQEmailGenerator extends BaseRFQGenerator {
       }
 
       case 'response_confirmation': {
-        const responseId = additionalData?.responseId || 'N/A';
+        const responseId = (additionalData?.responseId as string | undefined) ?? 'N/A';
         return {
           subject: generateSubject(event, rfq),
           content: HTMLTemplates.responseConfirmation(rfq, responseId),

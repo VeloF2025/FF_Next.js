@@ -14,7 +14,7 @@ export class RFQEventNotificationGenerator extends BaseRFQGenerator {
   static generateNotificationContent(
     event: RFQNotificationEvent,
     rfq: RFQ,
-    additionalData?: any
+    additionalData?: Record<string, unknown>
   ): NotificationContent {
     switch (event) {
       case 'created':
@@ -78,8 +78,8 @@ export class RFQEventNotificationGenerator extends BaseRFQGenerator {
     };
   }
 
-  private static generatePublishedNotification(rfq: RFQ, additionalData?: any): NotificationContent {
-    const supplierCount = additionalData?.supplierCount || rfq.invitedSuppliers?.length || 0;
+  private static generatePublishedNotification(rfq: RFQ, additionalData?: Record<string, unknown>): NotificationContent {
+    const supplierCount = (additionalData?.supplierCount as number | undefined) ?? rfq.invitedSuppliers?.length ?? 0;
     
     return {
       title: 'RFQ Published',
@@ -102,8 +102,8 @@ export class RFQEventNotificationGenerator extends BaseRFQGenerator {
     };
   }
 
-  private static generateResponseReceivedNotification(rfq: RFQ, additionalData?: any): NotificationContent {
-    const supplierName = additionalData?.supplierName || 'A supplier';
+  private static generateResponseReceivedNotification(rfq: RFQ, additionalData?: Record<string, unknown>): NotificationContent {
+    const supplierName = (additionalData?.supplierName as string | undefined) ?? 'A supplier';
     
     return {
       title: 'New RFQ Response',
@@ -126,8 +126,8 @@ export class RFQEventNotificationGenerator extends BaseRFQGenerator {
     };
   }
 
-  private static generateAwardedNotification(rfq: RFQ, additionalData?: any): NotificationContent {
-    const winnerName = additionalData?.winnerName || 'Selected supplier';
+  private static generateAwardedNotification(rfq: RFQ, additionalData?: Record<string, unknown>): NotificationContent {
+    const winnerName = (additionalData?.winnerName as string | undefined) ?? 'Selected supplier';
     
     return {
       title: 'RFQ Awarded',
@@ -145,7 +145,7 @@ export class RFQEventNotificationGenerator extends BaseRFQGenerator {
     };
   }
 
-  private static generateClosedNotification(rfq: RFQ, additionalData?: any): NotificationContent {
+  private static generateClosedNotification(rfq: RFQ, additionalData?: Record<string, unknown>): NotificationContent {
     return {
       title: 'RFQ Closed',
       message: `RFQ "${rfq.title}" has been closed`,
@@ -162,7 +162,7 @@ export class RFQEventNotificationGenerator extends BaseRFQGenerator {
     };
   }
 
-  private static generateCancelledNotification(rfq: RFQ, additionalData?: any): NotificationContent {
+  private static generateCancelledNotification(rfq: RFQ, additionalData?: Record<string, unknown>): NotificationContent {
     return {
       title: 'RFQ Cancelled',
       message: `RFQ "${rfq.title}" has been cancelled`,
@@ -178,8 +178,8 @@ export class RFQEventNotificationGenerator extends BaseRFQGenerator {
     };
   }
 
-  private static generateDeadlineExtendedNotification(rfq: RFQ, additionalData?: any): NotificationContent {
-    const newDeadline = additionalData?.newDeadline || rfq.responseDeadline;
+  private static generateDeadlineExtendedNotification(rfq: RFQ, additionalData?: Record<string, unknown>): NotificationContent {
+    const newDeadline = (additionalData?.newDeadline as Date | undefined) ?? rfq.responseDeadline;
     const deadlineText = newDeadline ? this.formatDeadline(newDeadline) : 'a new date';
     
     return {
@@ -239,8 +239,8 @@ export class RFQEventNotificationGenerator extends BaseRFQGenerator {
     };
   }
 
-  private static generateUpdatedNotification(rfq: RFQ, additionalData?: any): NotificationContent {
-    const updateType = additionalData?.updateType || 'details';
+  private static generateUpdatedNotification(rfq: RFQ, additionalData?: Record<string, unknown>): NotificationContent {
+    const updateType = (additionalData?.updateType as string | undefined) ?? 'details';
     
     return {
       title: 'RFQ Updated',
@@ -258,7 +258,7 @@ export class RFQEventNotificationGenerator extends BaseRFQGenerator {
     };
   }
 
-  private static generateWithdrawnNotification(rfq: RFQ, additionalData?: any): NotificationContent {
+  private static generateWithdrawnNotification(rfq: RFQ, additionalData?: Record<string, unknown>): NotificationContent {
     return {
       title: 'RFQ Withdrawn',
       message: `RFQ "${rfq.title}" has been withdrawn from publication`,

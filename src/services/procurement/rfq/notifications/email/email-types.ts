@@ -22,8 +22,8 @@ export interface EmailNotificationOptions {
 export interface BulkNotification {
   suppliers: string[];
   event: 'rfq_issued' | 'deadline_extended' | 'cancelled';
-  rfq: any;
-  additionalData?: any;
+  rfq: Record<string, unknown>;
+  additionalData?: Record<string, unknown>;
 }
 
 export interface EmailValidationResult {
@@ -36,12 +36,12 @@ export interface EmailTemplate {
   subject: string;
   htmlContent: string;
   textContent?: string;
-  variables?: Record<string, any>;
+  variables?: Record<string, unknown>;
 }
 
 export interface EmailProvider {
   name: 'sendgrid' | 'ses' | 'mailgun' | 'smtp';
-  config: Record<string, any>;
+  config: Record<string, unknown>;
 }
 
 export type EmailEvent = 

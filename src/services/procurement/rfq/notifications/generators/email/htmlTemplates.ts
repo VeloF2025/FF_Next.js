@@ -10,7 +10,7 @@ export class RFQEmailHTMLTemplates {
   /**
    * Generate HTML for RFQ issued email
    */
-  static generateRFQIssuedHTML(rfq: RFQ, rfqUrl: string, responseUrl: string, _additionalData?: any): string {
+  static generateRFQIssuedHTML(rfq: RFQ, rfqUrl: string, responseUrl: string, _additionalData?: Record<string, unknown>): string {
     const deadline = rfq.responseDeadline;
     const deadlineText = deadline ? this.formatDeadline(deadline) : 'Not specified';
     
@@ -50,7 +50,7 @@ export class RFQEmailHTMLTemplates {
   /**
    * Generate HTML for deadline extended email
    */
-  static generateDeadlineExtendedHTML(rfq: RFQ, newDeadline: Date, rfqUrl: string, _additionalData?: any): string {
+  static generateDeadlineExtendedHTML(rfq: RFQ, newDeadline: Date, rfqUrl: string, _additionalData?: Record<string, unknown>): string {
     const deadlineText = this.formatDeadline(newDeadline);
     
     return `
@@ -80,8 +80,8 @@ export class RFQEmailHTMLTemplates {
   /**
    * Generate HTML for cancelled RFQ email
    */
-  static generateCancelledHTML(rfq: RFQ, additionalData?: any): string {
-    const reason = additionalData?.reason || 'No reason provided';
+  static generateCancelledHTML(rfq: RFQ, additionalData?: Record<string, unknown>): string {
+    const reason = (additionalData?.reason as string | undefined) ?? 'No reason provided';
     
     return `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -106,9 +106,9 @@ export class RFQEmailHTMLTemplates {
   /**
    * Generate HTML for awarded RFQ email
    */
-  static generateAwardedHTML(rfq: RFQ, rfqUrl: string, additionalData?: any): string {
-    const isWinner = additionalData?.isWinner || false;
-    const winnerName = additionalData?.winnerName || 'the selected supplier';
+  static generateAwardedHTML(rfq: RFQ, rfqUrl: string, additionalData?: Record<string, unknown>): string {
+    const isWinner = (additionalData?.isWinner as boolean | undefined) ?? false;
+    const winnerName = (additionalData?.winnerName as string | undefined) ?? 'the selected supplier';
     
     if (isWinner) {
       return `
@@ -196,8 +196,8 @@ export class RFQEmailHTMLTemplates {
   /**
    * Generate HTML for response confirmation email
    */
-  static generateResponseConfirmationHTML(rfq: RFQ, additionalData?: any): string {
-    const responseId = additionalData?.responseId || 'N/A';
+  static generateResponseConfirmationHTML(rfq: RFQ, additionalData?: Record<string, unknown>): string {
+    const responseId = (additionalData?.responseId as string | undefined) ?? 'N/A';
     
     return `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

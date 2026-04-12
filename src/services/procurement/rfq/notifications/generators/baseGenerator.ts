@@ -43,7 +43,7 @@ export abstract class BaseRFQGenerator {
   /**
    * Create standard notification metadata
    */
-  protected static createMetadata(rfq: RFQ, event: RFQNotificationEvent, additionalData?: any): Record<string, any> {
+  protected static createMetadata(rfq: RFQ, event: RFQNotificationEvent, additionalData?: Record<string, unknown>): Record<string, unknown> {
     return {
       rfqId: rfq.id,
       projectId: rfq.projectId,

@@ -7,13 +7,50 @@ import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { getNotificationMessage } from '../utils/rfqMessageTemplates';
 
-const sql: any = neon(process.env.DATABASE_URL!);
+/** Shape of a notification record passed to createNotification */
+interface RfqNotificationInput {
+  type: string;
+  recipientType: string;
+  recipientId?: string;
+  recipientEmail?: string;
+  subject: string;
+  message: string;
+  metadata?: Record<string, unknown>;
+  id?: string;
+}
+
+/** Supplier row from DB */
+interface SupplierRow {
+  email: string;
+  company_name: string;
+}
+
+/** RFQ row from DB */
+interface RfqRow {
+  rfq_number: string;
+  response_deadline: string | null;
+}
+
+/** Shape of a notification row returned from the DB */
+interface RfqNotificationRow {
+  id: string;
+  notification_type: string;
+  recipient_type: string;
+  recipient_email: string;
+  subject: string;
+  message: string;
+  status: string;
+  sent_at: string | null;
+  created_at: string;
+}
+
+const sql = neon(process.env.DATABASE_URL!);
 
 export class RfqNotificationService {
   /**
    * Create notification
    */
-  static async createNotification(rfqId: string, notification: any): Promise<void> {
+  static async createNotification(rfqId: string, notification: RfqNotificationInput): Promise<void> {
     try {
       await sql`
         INSERT INTO rfq_notifications (
@@ -48,33 +85,36 @@ export class RfqNotificationService {
   static async createSupplierNotification(rfqId: string, supplierId: string, type: string): Promise<void> {
     try {
       // Get supplier details
-      const supplier = await sql`
-        SELECT * FROM suppliers WHERE id = ${supplierId}`;
+      const supplierRows = (await sql`
+        SELECT * FROM suppliers WHERE id = ${supplierId}`) as SupplierRow[];
 
-      if (supplier.length === 0) {
+      if (supplierRows.length === 0) {
         log.warn('Supplier not found for notification', { supplierId }, 'RfqNotificationService');
         return;
       }
 
       // Get RFQ details
-      const rfq = await sql`
-        SELECT rfq_number, response_deadline FROM rfqs WHERE id = ${rfqId}`;
+      const rfqRows = (await sql`
+        SELECT rfq_number, response_deadline FROM rfqs WHERE id = ${rfqId}`) as RfqRow[];
 
-      if (rfq.length === 0) {
+      if (rfqRows.length === 0) {
         log.warn('RFQ not found for notification', { rfqId }, 'RfqNotificationService');
         return;
       }
+
+      const supplierRow = supplierRows[0]!;
+      const rfqRow = rfqRows[0]!;
 
       await this.createNotification(rfqId, {
         type,
         recipientType: 'supplier',
         recipientId: supplierId,
-        recipientEmail: supplier[0].email,
-        subject: `RFQ ${rfq[0].rfq_number}: ${type}`,
-        message: getNotificationMessage(type, rfq[0]),
+        recipientEmail: supplierRow.email,
+        subject: `RFQ ${rfqRow.rfq_number}: ${type}`,
+        message: getNotificationMessage(type, rfqRow),
         metadata: {
-          supplierName: supplier[0].company_name,
-          rfqNumber: rfq[0].rfq_number
+          supplierName: supplierRow.company_name,
+          rfqNumber: rfqRow.rfq_number
         }
       });
     } catch (error) {
@@ -85,7 +125,7 @@ export class RfqNotificationService {
   /**
    * Send notification (email/webhook)
    */
-  private static async sendNotification(notification: any): Promise<void> {
+  private static async sendNotification(notification: RfqNotificationInput): Promise<void> {
     try {
       // This would integrate with your email service (SendGrid, AWS SES, etc.)
       // or webhook service
@@ -111,14 +151,14 @@ export class RfqNotificationService {
   /**
    * Get notifications for an RFQ
    */
-  static async getNotifications(rfqId: string): Promise<any[]> {
+  static async getNotifications(rfqId: string): Promise<RfqNotificationInput[]> {
     try {
       const notifications = await sql`
         SELECT * FROM rfq_notifications
         WHERE rfq_id = ${rfqId}
         ORDER BY created_at DESC`;
 
-      return notifications.map((n: any) => ({
+      return (notifications as RfqNotificationRow[]).map((n) => ({
         id: n.id,
         type: n.notification_type,
         recipientType: n.recipient_type,
