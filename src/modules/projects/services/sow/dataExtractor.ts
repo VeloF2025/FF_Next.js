@@ -30,9 +30,9 @@ export class SOWDataExtractor {
   /**
    * Extract pole data from raw data
    */
-  static extractPoleData(rawData: any[]): {
+  static extractPoleData(rawData: Record<string, unknown>[]): {
     poleCount: number;
-    poleLocations: any[];
+    poleLocations: Record<string, unknown>[];
   } {
     // Implementation would parse raw data for pole information
     return {
@@ -44,9 +44,9 @@ export class SOWDataExtractor {
   /**
    * Extract drop data from raw data
    */
-  static extractDropData(_rawData: any[]): {
+  static extractDropData(_rawData: Record<string, unknown>[]): {
     dropCount: number;
-    dropLocations: any[];
+    dropLocations: Record<string, unknown>[];
   } {
     // Implementation would parse raw data for drop information
     return {
@@ -58,7 +58,7 @@ export class SOWDataExtractor {
   /**
    * Extract cable data from raw data
    */
-  static extractCableData(_rawData: any[]): {
+  static extractCableData(_rawData: Record<string, unknown>[]): {
     cableLength: number;
     cableTypes: string[];
   } {
@@ -88,15 +88,15 @@ export class SOWDataExtractor {
   /**
    * Parse CSV content
    */
-  static parseCSV(content: string): any[] {
+  static parseCSV(content: string): Record<string, string | undefined>[] {
     const lines = content.split('\n');
     const headers = lines[0]?.split(',') || [];
-    const data = [];
+    const data: Record<string, string | undefined>[] = [];
 
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i]!.split(',');
       if (values.length === headers.length) {
-        const row: any = {};
+        const row: Record<string, string | undefined> = {};
         headers.forEach((header, index) => {
           row[header.trim()] = values[index]?.trim();
         });

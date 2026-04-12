@@ -31,6 +31,7 @@ vi.mock('@clerk/nextjs', () => ({
 
 // Mock fetch for API calls
 global.fetch = vi.fn();
+const mockFetchFn = global.fetch as ReturnType<typeof vi.fn>;
 
 // Helper to create mock readiness check results
 const createMockReadinessCheck = (passed: boolean, failedChecks?: QAReadinessFailedCheck[]): QAReadinessCheckType => ({
@@ -78,7 +79,7 @@ describe('QAReadinessCheck Component', () => {
   describe('Initial Rendering', () => {
     it('should display "Run Check" button when no status loaded', async () => {
       // Arrange
-      (global.fetch as any).mockResolvedValue({
+      mockFetchFn.mockResolvedValue({
         ok: true,
         json: async () => ({
           success: true,
@@ -104,7 +105,7 @@ describe('QAReadinessCheck Component', () => {
 
     it('should show loading state while fetching status', async () => {
       // Arrange
-      (global.fetch as any).mockImplementation(() => new Promise(() => {})); // Never resolves
+      mockFetchFn.mockImplementation(() => new Promise(() => {})); // Never resolves
 
       // Act
       renderWithQueryClient(<QAReadinessCheck ticketId="ticket-456" />);
@@ -115,7 +116,7 @@ describe('QAReadinessCheck Component', () => {
 
     it('should show error state on fetch failure', async () => {
       // Arrange
-      (global.fetch as any).mockRejectedValue(new Error('Network error'));
+      mockFetchFn.mockRejectedValue(new Error('Network error'));
 
       // Act
       renderWithQueryClient(<QAReadinessCheck ticketId="ticket-456" />);
@@ -131,7 +132,7 @@ describe('QAReadinessCheck Component', () => {
     it('should display "Ready for QA" when check passed', async () => {
       // Arrange
       const passedCheck = createMockReadinessCheck(true);
-      (global.fetch as any).mockResolvedValue({
+      mockFetchFn.mockResolvedValue({
         ok: true,
         json: async () => ({
           success: true,
@@ -160,7 +161,7 @@ describe('QAReadinessCheck Component', () => {
       const failedCheck = createMockReadinessCheck(false, [
         { check_name: 'photos_exist', reason: 'Not enough photos uploaded', expected: 3, actual: 1 },
       ]);
-      (global.fetch as any).mockResolvedValue({
+      mockFetchFn.mockResolvedValue({
         ok: true,
         json: async () => ({
           success: true,
@@ -228,7 +229,7 @@ describe('QAReadinessCheck Component', () => {
           }),
         });
 
-      (global.fetch as any) = mockFetch;
+      mockFetchFn = mockFetch;
 
       // Act
       renderWithQueryClient(<QAReadinessCheck ticketId="ticket-456" />);
@@ -251,7 +252,7 @@ describe('QAReadinessCheck Component', () => {
 
     it('should disable button while check is running', async () => {
       // Arrange
-      (global.fetch as any).mockResolvedValueOnce({
+      mockFetchFn.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           success: true,

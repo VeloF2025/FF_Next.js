@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { ArrowLeft, Save } from 'lucide-react';
 import { ClientFormData } from '@/types/client.types';
+import { Client } from '@/types/client/core.types';
+import { PaymentTerms, CreditRating, ClientStatus, ClientCategory, ClientPriority, ContactMethod } from '@/types/client/enums';
 import { useClient, useCreateClient, useUpdateClient } from '@/hooks/useClients';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ClientFormFields } from './ClientFormFields';
@@ -15,8 +17,7 @@ export function ClientForm() {
   const { id } = router.query as Record<string, string>;
   const isEditing = !!id;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: client, isLoading } = useClient(id || '') as { data: Record<string, any>; isLoading: boolean };
+  const { data: client, isLoading } = useClient(id || '') as { data: Client | null; isLoading: boolean };
   const createMutation = useCreateClient();
   const updateMutation = useUpdateClient();
 
@@ -47,12 +48,12 @@ export function ClientForm() {
     alternativeEmail: '',
     alternativePhone: '',
     creditLimit: 0,
-    paymentTerms: 'NET_30' as any,
-    creditRating: 'GOOD' as any,
-    status: 'ACTIVE' as any,
-    category: 'STANDARD' as any,
-    priority: 'MEDIUM' as any,
-    preferredContactMethod: 'EMAIL' as any,
+    paymentTerms: PaymentTerms.NET_30,
+    creditRating: CreditRating.GOOD,
+    status: ClientStatus.ACTIVE,
+    category: ClientCategory.SME,
+    priority: ClientPriority.MEDIUM,
+    preferredContactMethod: ContactMethod.EMAIL,
     communicationLanguage: 'en',
     timezone: 'UTC',
     notes: '',
@@ -131,7 +132,7 @@ export function ClientForm() {
     }
   };
 
-  const handleInputChange = (field: keyof ClientFormData, value: any) => {
+  const handleInputChange = (field: keyof ClientFormData, value: ClientFormData[keyof ClientFormData]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 

@@ -27,11 +27,16 @@ export function RemindersTab() {
   });
   const [loading, setLoading] = useState(true);
   const [showNewForm, setShowNewForm] = useState(false);
-  const [newReminder, setNewReminder] = useState({
+  const [newReminder, setNewReminder] = useState<{
+    title: string;
+    description: string;
+    due_date: string;
+    priority: Reminder['priority'];
+  }>({
     title: '',
     description: '',
     due_date: '',
-    priority: 'medium' as const
+    priority: 'medium',
   });
 
   useEffect(() => {
@@ -47,7 +52,7 @@ export function RemindersTab() {
         setReminders(data.data);
       }
     } catch (error) {
-      log.error('Failed to fetch reminders', error as any, 'RemindersTab');
+      log.error('Failed to fetch reminders', error as Error, 'RemindersTab');
     } finally {
       setLoading(false);
     }
@@ -61,7 +66,7 @@ export function RemindersTab() {
         setPreferences(data.data);
       }
     } catch (error) {
-      log.error('Failed to fetch preferences', error as any, 'RemindersTab');
+      log.error('Failed to fetch preferences', error as Error, 'RemindersTab');
     }
   };
 
@@ -80,7 +85,7 @@ export function RemindersTab() {
         setShowNewForm(false);
       }
     } catch (error) {
-      log.error('Failed to create reminder', error as any, 'RemindersTab');
+      log.error('Failed to create reminder', error as Error, 'RemindersTab');
     }
   };
 
@@ -96,7 +101,7 @@ export function RemindersTab() {
         setReminders(reminders.filter(r => r.id !== id));
       }
     } catch (error) {
-      log.error('Failed to update reminder', error as any, 'RemindersTab');
+      log.error('Failed to update reminder', error as Error, 'RemindersTab');
     }
   };
 
@@ -111,7 +116,7 @@ export function RemindersTab() {
         setReminders(reminders.filter(r => r.id !== id));
       }
     } catch (error) {
-      log.error('Failed to delete reminder', error as any, 'RemindersTab');
+      log.error('Failed to delete reminder', error as Error, 'RemindersTab');
     }
   };
 
@@ -127,7 +132,7 @@ export function RemindersTab() {
         setPreferences(data.data);
       }
     } catch (error) {
-      log.error('Failed to update preferences', error as any, 'RemindersTab');
+      log.error('Failed to update preferences', error as Error, 'RemindersTab');
     }
   };
 
@@ -247,7 +252,7 @@ export function RemindersTab() {
                   <select
                     className="w-full rounded-lg border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)]"
                     value={newReminder.priority}
-                    onChange={(e) => setNewReminder({ ...newReminder, priority: e.target.value as any })}
+                    onChange={(e) => setNewReminder({ ...newReminder, priority: e.target.value as Reminder['priority'] })}
                   >
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
