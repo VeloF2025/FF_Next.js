@@ -202,7 +202,7 @@ export class StockErrorHandler {
       message: error.message || 'An error occurred',
       severity: 'error' as const,
       category: undefined,
-      itemCode: error.itemCode,
+      itemCode: 'itemCode' in error ? error.itemCode : undefined,
       priority: undefined
     };
   }
