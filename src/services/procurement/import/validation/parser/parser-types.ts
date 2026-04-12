@@ -32,20 +32,20 @@ export interface DataFormat {
   };
 }
 
-export interface ParseResult<T = any> {
+export interface ParseResult<T = unknown> {
   value: T | undefined;
   success: boolean;
   errors: ImportError[];
   warnings: ImportWarning[];
-  originalValue: any;
+  originalValue: unknown;
 }
 
 export interface SchemaField {
   name: string;
   format: DataFormat;
   aliases?: string[];
-  defaultValue?: any;
-  transformer?: (value: any) => any;
+  defaultValue?: unknown;
+  transformer?: (value: unknown) => unknown;
 }
 
 export interface DataSchema {
@@ -66,7 +66,7 @@ export type DataType = 'string' | 'number' | 'date' | 'boolean' | 'email' | 'pho
 export interface FormatDetectionResult {
   type: DataType;
   confidence: number;
-  samples: any[];
+  samples: unknown[];
   pattern?: RegExp;
   commonFormats?: string[];
 }

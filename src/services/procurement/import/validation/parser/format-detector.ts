@@ -8,7 +8,7 @@ import { DataType, FormatDetectionResult } from './parser-types';
 /**
  * Detect data type from sample values
  */
-export function detectDataType(samples: any[]): FormatDetectionResult {
+export function detectDataType(samples: unknown[]): FormatDetectionResult {
   if (!samples || samples.length === 0) {
     return {
       type: 'unknown',
@@ -72,7 +72,7 @@ export function detectDataType(samples: any[]): FormatDetectionResult {
 /**
  * Test if value looks like a number
  */
-export function isNumberFormat(value: any): boolean {
+export function isNumberFormat(value: unknown): boolean {
   if (typeof value === 'number') {
     return !isNaN(value);
   }
@@ -90,7 +90,7 @@ export function isNumberFormat(value: any): boolean {
 /**
  * Test if value looks like a date
  */
-export function isDateFormat(value: any): boolean {
+export function isDateFormat(value: unknown): boolean {
   if (value instanceof Date) {
     return !isNaN(value.getTime());
   }
@@ -127,7 +127,7 @@ export function isDateFormat(value: any): boolean {
 /**
  * Test if value looks like a boolean
  */
-export function isBooleanFormat(value: any): boolean {
+export function isBooleanFormat(value: unknown): boolean {
   if (typeof value === 'boolean') {
     return true;
   }
@@ -152,7 +152,7 @@ export function isBooleanFormat(value: any): boolean {
 /**
  * Test if value looks like an email
  */
-export function isEmailFormat(value: any): boolean {
+export function isEmailFormat(value: unknown): boolean {
   if (typeof value !== 'string') {
     return false;
   }
@@ -164,7 +164,7 @@ export function isEmailFormat(value: any): boolean {
 /**
  * Test if value looks like a phone number
  */
-export function isPhoneFormat(value: any): boolean {
+export function isPhoneFormat(value: unknown): boolean {
   if (typeof value !== 'string' && typeof value !== 'number') {
     return false;
   }
@@ -176,7 +176,7 @@ export function isPhoneFormat(value: any): boolean {
 /**
  * Detect common formats within a data type
  */
-export function detectCommonFormats(samples: any[], dataType: DataType): string[] {
+export function detectCommonFormats(samples: unknown[], dataType: DataType): string[] {
   const formats: string[] = [];
 
   switch (dataType) {
@@ -238,9 +238,9 @@ export function detectCommonFormats(samples: any[], dataType: DataType): string[
 /**
  * Analyze data consistency across samples
  */
-export function analyzeDataConsistency(samples: any[]): {
+export function analyzeDataConsistency(samples: unknown[]): {
   consistency: number;
-  inconsistentSamples: any[];
+  inconsistentSamples: unknown[];
   commonPattern: RegExp | undefined;
 } {
   if (!samples || samples.length === 0) {
@@ -258,7 +258,7 @@ export function analyzeDataConsistency(samples: any[]): {
   
   // Check how many samples match the detected type
   let consistentCount = 0;
-  const inconsistentSamples: any[] = [];
+  const inconsistentSamples: unknown[] = [];
 
   validSamples.forEach(sample => {
     let isConsistent = false;
@@ -300,7 +300,7 @@ export function analyzeDataConsistency(samples: any[]): {
 /**
  * Generate a regex pattern for common data formats
  */
-function generateCommonPattern(samples: any[], dataType: DataType): RegExp | undefined {
+function generateCommonPattern(samples: unknown[], dataType: DataType): RegExp | undefined {
   // Use samples to create more specific patterns
   const validSamples = samples.filter(s => s != null && s !== '').slice(0, 10);
   
