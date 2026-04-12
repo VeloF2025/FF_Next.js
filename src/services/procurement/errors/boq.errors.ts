@@ -9,7 +9,7 @@ import { ProcurementError } from './base.errors';
  * BOQ-specific base error class
  */
 export class BOQError extends ProcurementError {
-  constructor(message: string, code: string, statusCode: number = 400, context?: Record<string, any>) {
+  constructor(message: string, code: string, statusCode: number = 400, context?: Record<string, unknown>) {
     super(message, code, statusCode, context);
     this.name = 'BOQError';
     Object.setPrototypeOf(this, BOQError.prototype);
@@ -25,7 +25,7 @@ export class BOQMappingError extends BOQError {
     lineNumber: number;
     description: string;
     reason: string;
-    originalData?: Record<string, any>;
+    originalData?: Record<string, unknown>;
   }>;
   public readonly suggestions: Array<{
     lineNumber: number;
@@ -40,23 +40,23 @@ export class BOQMappingError extends BOQError {
 
   constructor(
     message: string,
-    unmappedItems: Array<{ 
-      lineNumber: number; 
-      description: string; 
+    unmappedItems: Array<{
+      lineNumber: number;
+      description: string;
       reason: string;
-      originalData?: Record<string, any>;
+      originalData?: Record<string, unknown>;
     }>,
-    suggestions: Array<{ 
-      lineNumber: number; 
-      catalogItems: Array<{ 
-        id: string; 
-        name: string; 
+    suggestions: Array<{
+      lineNumber: number;
+      catalogItems: Array<{
+        id: string;
+        name: string;
         confidence: number;
         category?: string;
         unitPrice?: number;
-      }> 
+      }>
     }>,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     super(message, 'BOQ_MAPPING_ERROR', 422, context);
     this.name = 'BOQMappingError';
@@ -79,11 +79,11 @@ export class BOQMappingError extends BOQError {
    * Get mapping success rate as percentage
    */
   getMappingSuccessRate(): number {
-    const totalItems = this.unmappedItems.length + (this.context?.totalMappedItems || 0);
+    const totalMapped = (this.context?.totalMappedItems as number | undefined) ?? 0;
+    const totalItems = this.unmappedItems.length + totalMapped;
     if (totalItems === 0) return 0;
-    
-    const mappedItems = this.context?.totalMappedItems || 0;
-    return Math.round((mappedItems / totalItems) * 100);
+
+    return Math.round((totalMapped / totalItems) * 100);
   }
 
   /**
@@ -141,7 +141,7 @@ export class BOQImportError extends BOQError {
       totalRows: number;
       processedRows: number;
     },
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     super(message, 'BOQ_IMPORT_FAILED', 400, context);
     this.name = 'BOQImportError';
@@ -187,7 +187,7 @@ export class BOQVersionError extends BOQError {
     currentVersion: number,
     requestedVersion: number,
     latestVersion: number,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     const message = `BOQ version conflict. Current: ${currentVersion}, Requested: ${requestedVersion}, Latest: ${latestVersion}`;
     super(message, 'BOQ_INVALID_VERSION', 409, context);
@@ -228,7 +228,7 @@ export class BOQStateError extends BOQError {
     currentState: string,
     requestedOperation: string,
     allowedOperations: string[],
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     const message = `Invalid BOQ operation '${requestedOperation}' in state '${currentState}'. Allowed operations: ${allowedOperations.join(', ')}`;
     super(message, 'BOQ_INVALID_STATE', 409, context);

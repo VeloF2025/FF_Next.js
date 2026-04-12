@@ -17,7 +17,7 @@ export class SOWValidator {
    */
   static validatePoles(poles: NeonPoleData[]): ValidationResult<NeonPoleData> {
     const valid: NeonPoleData[] = [];
-    const invalid: any[] = [];
+    const invalid: unknown[] = [];
     const errors: string[] = [];
     const seenPoleNumbers = new Set<string>();
     
@@ -56,7 +56,7 @@ export class SOWValidator {
    */
   static validateDrops(drops: NeonDropData[]): ValidationResult<NeonDropData> {
     const valid: NeonDropData[] = [];
-    const invalid: any[] = [];
+    const invalid: unknown[] = [];
     const errors: string[] = [];
     const seenDropNumbers = new Set<string>();
     
@@ -100,7 +100,7 @@ export class SOWValidator {
    */
   static validateFibre(fibres: NeonFibreData[]): ValidationResult<NeonFibreData> {
     const valid: NeonFibreData[] = [];
-    const invalid: any[] = [];
+    const invalid: unknown[] = [];
     const errors: string[] = [];
     const seenSegmentIds = new Set<string>();
     
@@ -137,7 +137,7 @@ export class SOWValidator {
   /**
    * Validate data based on type
    */
-  static validateData(data: any[], type: 'poles' | 'drops' | 'fibre'): ValidationResult<any> {
+  static validateData(data: unknown[], type: 'poles' | 'drops' | 'fibre'): ValidationResult<unknown> {
     switch (type) {
       case 'poles':
         return this.validatePoles(data as NeonPoleData[]);
@@ -155,7 +155,7 @@ export class SOWValidator {
    */
   static crossValidateData(poles: NeonPoleData[], drops: NeonDropData[]): CrossValidationResult {
     const poleNumbers = new Set(poles.map(p => p.pole_number));
-    const orphanedDrops: any[] = [];
+    const orphanedDrops: NeonDropData[] = [];
     const missingPoles: string[] = [];
     const inconsistentReferences: Array<{
       dropId: string;

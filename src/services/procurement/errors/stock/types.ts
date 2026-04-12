@@ -10,7 +10,7 @@ export interface RecoveryOption {
   type: string;
   description: string;
   action: string;
-  data: any;
+  data: Record<string, unknown>;
   priority?: number;
   estimatedTime?: string;
   cost?: number;
@@ -23,7 +23,7 @@ export interface RetryStrategy {
   type: string;
   description: string;
   action: string;
-  data: any;
+  data: Record<string, unknown>;
   maxAttempts?: number;
   backoffMs?: number;
   estimatedTime?: string;
@@ -37,7 +37,7 @@ export type ErrorSeverity = 'low' | 'medium' | 'high' | 'critical';
 /**
  * Handler result interface
  */
-export interface HandlerResult<T = any> {
+export interface HandlerResult<T = unknown> {
   error: T;
   recoveryOptions?: RecoveryOption[];
   retryStrategies?: RetryStrategy[];
@@ -56,7 +56,7 @@ export interface ErrorContext {
   sessionId?: string;
   requestId?: string;
   operation?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -91,7 +91,7 @@ export interface SystemErrorLog {
   errorType: string;
   severity: ErrorSeverity;
   message: string;
-  details: any;
+  details: Record<string, unknown>;
   stackTrace: string | undefined;
   context: ErrorContext | undefined;
   tags: string[];
@@ -222,7 +222,7 @@ export interface AdjustmentOptions {
 export interface InsufficientStockOptions {
   reservedQuantity?: number;
   category?: string;
-  specifications?: Record<string, any>;
+  specifications?: Record<string, unknown>;
   unitPrice?: number;
   alternativeLocations?: AlternativeLocation[];
   alternativeItems?: AlternativeItem[];
