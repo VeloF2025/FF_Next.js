@@ -4,9 +4,17 @@
  */
 
 import { Supplier } from '@/types/supplier/base.types';
-import type { 
+import type {
   ComplianceInfo
 } from './recommendation-types';
+
+/** Performance metrics shape used for recommendation generation */
+export interface SupplierPerformanceInput {
+  onTimeDelivery: number;
+  qualityScore: number;
+  responseTime: number;
+  issueResolution: number;
+}
 
 export class CoreRecommendationEngine {
   /**
@@ -16,7 +24,7 @@ export class CoreRecommendationEngine {
     supplier: Supplier,
     overallScore: number,
     compliance: ComplianceInfo,
-    performanceMetrics?: any
+    performanceMetrics?: SupplierPerformanceInput
   ): string[] {
     const recommendations: string[] = [];
 
@@ -78,7 +86,7 @@ export class CoreRecommendationEngine {
    */
   static generatePerformanceRecommendations(
     supplier: Supplier,
-    performance: any
+    performance: SupplierPerformanceInput
   ): string[] {
     const recommendations: string[] = [];
 
@@ -127,12 +135,12 @@ export class CoreRecommendationEngine {
       recommendations.push('Provide primary contact phone number for urgent communications');
     }
 
-    if (!(supplier as any).website) {
+    if (!supplier.website) {
       recommendations.push('Consider establishing an online presence with a company website');
     }
 
     // Check for alternative contacts
-    if (!(supplier as any).alternativeContacts || (supplier as any).alternativeContacts?.length === 0) {
+    if (!supplier.alternativeContacts || supplier.alternativeContacts.length === 0) {
       recommendations.push('Designate backup contacts to ensure communication continuity');
     }
 
@@ -166,12 +174,12 @@ export class CoreRecommendationEngine {
     }
 
     // Certification recommendations
-    if (!(supplier as any).certifications || (supplier as any).certifications?.length === 0) {
+    if (!supplier.certifications || supplier.certifications.length === 0) {
       recommendations.push('Pursue relevant industry certifications to enhance credibility');
     }
 
-    // Geographic expansion
-    if (overallScore > 80 && (!(supplier as any).serviceAreas || (supplier as any).serviceAreas?.length === 1)) {
+    // Geographic expansion — serviceAreas not in core type, so suggest expansion only by score
+    if (overallScore > 80) {
       recommendations.push('Consider expanding service areas to increase business opportunities');
     }
 
@@ -191,7 +199,7 @@ export class CoreRecommendationEngine {
       return supplier.rating;
     }
     if (supplier.rating && typeof supplier.rating === 'object') {
-      return (supplier.rating as any).overall || 0;
+      return supplier.rating.overall ?? 0;
     }
     return 0;
   }

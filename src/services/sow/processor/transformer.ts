@@ -6,6 +6,9 @@ import { extractValue, extractNumber, extractDate, parseBoolean } from './parser
  * Transforms raw data into structured formats
  */
 
+/** Raw row from CSV/Excel import — keys are column names, values are unparsed strings */
+type RawRow = Record<string, unknown>;
+
 /**
  * Process poles data
  *
@@ -14,7 +17,7 @@ import { extractValue, extractNumber, extractDate, parseBoolean } from './parser
  * - Lawley format: label_1, lat, lon, type_1, spec_1, etc.
  * - Standard format: pole_number, latitude, longitude, pole_type, etc.
  */
-export function transformPoles(rawData: any[]): NeonPoleData[] {
+export function transformPoles(rawData: RawRow[]): NeonPoleData[] {
   const processedPoles: NeonPoleData[] = [];
 
   for (const row of rawData) {
@@ -66,7 +69,7 @@ export function transformPoles(rawData: any[]): NeonPoleData[] {
  * - PlanNet/Fibertime format: label (drop), strtfeat (Pole), dim2, cblcpty, etc.
  * - Standard format: drop_number, pole_number, cable_length, etc.
  */
-export function transformDrops(rawData: any[]): NeonDropData[] {
+export function transformDrops(rawData: RawRow[]): NeonDropData[] {
   const processedDrops: NeonDropData[] = [];
 
   for (const row of rawData) {
@@ -115,7 +118,7 @@ export function transformDrops(rawData: any[]): NeonDropData[] {
 /**
  * Process Lawley-style fibre data
  */
-export function transformFibre(rawData: any[]): NeonFibreData[] {
+export function transformFibre(rawData: RawRow[]): NeonFibreData[] {
   const processedFibre: NeonFibreData[] = [];
   
   for (const row of rawData) {
@@ -146,7 +149,10 @@ export function transformFibre(rawData: any[]): NeonFibreData[] {
 /**
  * Transform generic data based on type
  */
-export function transformData(rawData: any[], type: 'poles' | 'drops' | 'fibre'): any[] {
+export function transformData(
+  rawData: RawRow[],
+  type: 'poles' | 'drops' | 'fibre'
+): NeonPoleData[] | NeonDropData[] | NeonFibreData[] {
   switch (type) {
     case 'poles':
       return transformPoles(rawData);
@@ -162,7 +168,10 @@ export function transformData(rawData: any[], type: 'poles' | 'drops' | 'fibre')
 /**
  * Get transformation statistics
  */
-export function getTransformStats(originalData: any[], transformedData: any[]): {
+export function getTransformStats(
+  originalData: RawRow[],
+  transformedData: (NeonPoleData | NeonDropData | NeonFibreData)[]
+): {
   totalRows: number;
   transformedRows: number;
   skippedRows: number;
@@ -181,37 +190,48 @@ export function getTransformStats(originalData: any[], transformedData: any[]): 
   };
 }
 
+/** Enriched record adds computed/audit fields on top of a typed SOW record */
+type EnrichedRecord = (NeonPoleData | NeonDropData | NeonFibreData) & Record<string, unknown>;
+
 /**
  * Enrich data with computed fields
  */
-export function enrichTransformedData(data: any[], type: 'poles' | 'drops' | 'fibre'): any[] {
+export function enrichTransformedData(
+  data: (NeonPoleData | NeonDropData | NeonFibreData)[],
+  type: 'poles' | 'drops' | 'fibre'
+): EnrichedRecord[] {
   return data.map(item => {
-    const enriched = { ...item };
-    
+    const enriched: EnrichedRecord = { ...item };
+
     // Add computed fields based on type
     switch (type) {
-      case 'poles':
-        enriched.has_coordinates = !!(item.latitude && item.longitude);
-        enriched.is_complete = item.status === 'complete' || item.status === 'installed';
+      case 'poles': {
+        const pole = item as NeonPoleData;
+        enriched.has_coordinates = !!(pole.latitude && pole.longitude);
+        enriched.is_complete = pole.status === 'complete' || pole.status === 'installed';
         break;
-        
-      case 'drops':
-        enriched.has_coordinates = !!(item.latitude && item.longitude);
-        enriched.has_pole_assignment = !!item.pole_number;
-        enriched.cable_length_numeric = parseFloat(item.cable_length) || 0;
+      }
+      case 'drops': {
+        const drop = item as NeonDropData;
+        enriched.has_coordinates = !!(drop.latitude && drop.longitude);
+        enriched.has_pole_assignment = !!drop.pole_number;
+        enriched.cable_length_numeric = parseFloat(drop.cable_length ?? '') || 0;
         break;
-        
-      case 'fibre':
-        enriched.completion_percentage = item.string_completed && item.length ? 
-          Math.min(100, (item.string_completed / item.length) * 100) : 0;
-        enriched.is_fully_complete = item.completion_percentage >= 100;
+      }
+      case 'fibre': {
+        const fibre = item as NeonFibreData;
+        enriched.completion_percentage = fibre.string_completed && fibre.length
+          ? Math.min(100, (fibre.string_completed / fibre.length) * 100)
+          : 0;
+        enriched.is_fully_complete = (enriched.completion_percentage as number) >= 100;
         break;
+      }
     }
-    
+
     // Add common fields
     enriched.processed_at = new Date().toISOString();
     enriched.data_quality_score = calculateDataQualityScore(item, type);
-    
+
     return enriched;
   });
 }
@@ -219,25 +239,30 @@ export function enrichTransformedData(data: any[], type: 'poles' | 'drops' | 'fi
 /**
  * Calculate data quality score based on completeness
  */
-function calculateDataQualityScore(item: any, type: 'poles' | 'drops' | 'fibre'): number {
+function calculateDataQualityScore(
+  item: NeonPoleData | NeonDropData | NeonFibreData,
+  type: 'poles' | 'drops' | 'fibre'
+): number {
   let score = 0;
   let maxScore = 0;
-  
+
   const requiredFields = getRequiredFields(type);
   const optionalFields = getOptionalFields(type);
-  
+  // Index as record for field-presence checks without introducing `any`
+  const record = item as unknown as Record<string, unknown>;
+
   // Check required fields (weight: 2)
   for (const field of requiredFields) {
     maxScore += 2;
-    if (item[field] !== undefined && item[field] !== null && item[field] !== '') {
+    if (record[field] !== undefined && record[field] !== null && record[field] !== '') {
       score += 2;
     }
   }
-  
+
   // Check optional fields (weight: 1)
   for (const field of optionalFields) {
     maxScore += 1;
-    if (item[field] !== undefined && item[field] !== null && item[field] !== '') {
+    if (record[field] !== undefined && record[field] !== null && record[field] !== '') {
       score += 1;
     }
   }
