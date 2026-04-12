@@ -74,7 +74,7 @@ export function sanitizeHtml(input: string | null | undefined): string {
  * @param allowHtml - If true, use HTML sanitization instead of plain text
  * @returns New object with all string values sanitized
  */
-export function sanitizeObject<T extends Record<string, any>>(
+export function sanitizeObject<T extends Record<string, unknown>>(
   obj: T,
   allowHtml: boolean = false
 ): T {
@@ -82,7 +82,9 @@ export function sanitizeObject<T extends Record<string, any>>(
     return obj;
   }
 
-  const sanitized: any = Array.isArray(obj) ? [] : {};
+  const sanitized: Record<string, unknown> = Array.isArray(obj)
+    ? ([] as unknown as Record<string, unknown>)
+    : {};
 
   for (const [key, value] of Object.entries(obj)) {
     if (value === null || value === undefined) {
@@ -90,7 +92,7 @@ export function sanitizeObject<T extends Record<string, any>>(
     } else if (typeof value === 'string') {
       sanitized[key] = allowHtml ? sanitizeHtml(value) : sanitizeText(value);
     } else if (typeof value === 'object') {
-      sanitized[key] = sanitizeObject(value, allowHtml);
+      sanitized[key] = sanitizeObject(value as Record<string, unknown>, allowHtml);
     } else {
       sanitized[key] = value;
     }
@@ -100,85 +102,97 @@ export function sanitizeObject<T extends Record<string, any>>(
 }
 
 /**
- * Sanitize specific fields in client/customer data
+ * Sanitize specific fields in client/customer data.
+ * Generic over T so callers pass their own typed form data and get it back typed.
  */
-export function sanitizeClientData(data: any): any {
+export function sanitizeClientData<T extends object>(data: T): T {
+  const d = data as Record<string, unknown>;
   return {
     ...data,
-    name: sanitizeText(data.name),
-    email: sanitizeText(data.email),
-    phone: sanitizeText(data.phone),
-    address: sanitizeText(data.address),
-    city: sanitizeText(data.city),
-    province: sanitizeText(data.province),
-    postalCode: sanitizeText(data.postalCode),
-    country: sanitizeText(data.country),
-    contactPerson: sanitizeText(data.contactPerson),
-    notes: sanitizeText(data.notes),
-    website: sanitizeText(data.website),
+    name: sanitizeText(d['name'] as string | undefined),
+    email: sanitizeText(d['email'] as string | undefined),
+    phone: sanitizeText(d['phone'] as string | undefined),
+    city: sanitizeText(d['city'] as string | undefined),
+    province: sanitizeText(d['province'] as string | undefined),
+    postalCode: sanitizeText(d['postalCode'] as string | undefined),
+    country: sanitizeText(d['country'] as string | undefined),
+    contactPerson: sanitizeText(d['contactPerson'] as string | undefined),
+    notes: sanitizeText(d['notes'] as string | undefined),
+    website: sanitizeText(d['website'] as string | undefined),
   };
 }
 
 /**
- * Sanitize supplier data
+ * Sanitize supplier data.
+ * Generic over T so callers pass their own typed form data and get it back typed.
  */
-export function sanitizeSupplierData(data: any): any {
+export function sanitizeSupplierData<T extends object>(data: T): T {
+  const d = data as Record<string, unknown>;
+  const addresses = d['addresses'] as
+    | { physical?: Record<string, unknown> }
+    | undefined;
   return {
     ...data,
-    name: sanitizeText(data.name),
-    companyName: sanitizeText(data.companyName),
-    email: sanitizeText(data.email),
-    phone: sanitizeText(data.phone),
-    contactName: sanitizeText(data.contactName),
-    contactEmail: sanitizeText(data.contactEmail),
-    contactPhone: sanitizeText(data.contactPhone),
-    notes: sanitizeText(data.notes),
+    name: sanitizeText(d['name'] as string | undefined),
+    companyName: sanitizeText(d['companyName'] as string | undefined),
+    email: sanitizeText(d['email'] as string | undefined),
+    phone: sanitizeText(d['phone'] as string | undefined),
+    contactName: sanitizeText(d['contactName'] as string | undefined),
+    contactEmail: sanitizeText(d['contactEmail'] as string | undefined),
+    contactPhone: sanitizeText(d['contactPhone'] as string | undefined),
+    notes: sanitizeText(d['notes'] as string | undefined),
     // Sanitize address fields if present
-    addresses: data.addresses ? {
-      physical: data.addresses.physical ? {
-        street1: sanitizeText(data.addresses.physical.street1),
-        street2: sanitizeText(data.addresses.physical.street2),
-        city: sanitizeText(data.addresses.physical.city),
-        state: sanitizeText(data.addresses.physical.state),
-        postalCode: sanitizeText(data.addresses.physical.postalCode),
-        country: sanitizeText(data.addresses.physical.country),
+    addresses: addresses ? {
+      physical: addresses.physical ? {
+        ...addresses.physical,
+        street1: sanitizeText(addresses.physical['street1'] as string | undefined),
+        street2: sanitizeText(addresses.physical['street2'] as string | undefined),
+        city: sanitizeText(addresses.physical['city'] as string | undefined),
+        state: sanitizeText(addresses.physical['state'] as string | undefined),
+        postalCode: sanitizeText(addresses.physical['postalCode'] as string | undefined),
+        country: sanitizeText(addresses.physical['country'] as string | undefined),
       } : undefined,
     } : undefined,
   };
 }
 
 /**
- * Sanitize product/stock item data
+ * Sanitize product/stock item data.
+ * Generic over T so callers pass their own typed form data and get it back typed.
  */
-export function sanitizeProductData(data: any): any {
+export function sanitizeProductData<T extends object>(data: T): T {
+  const d = data as Record<string, unknown>;
   return {
     ...data,
-    name: sanitizeText(data.name),
-    description: sanitizeText(data.description),
-    sku: sanitizeText(data.sku),
-    barcode: sanitizeText(data.barcode),
-    category: sanitizeText(data.category),
-    manufacturer: sanitizeText(data.manufacturer),
-    notes: sanitizeText(data.notes),
+    name: sanitizeText(d['name'] as string | undefined),
+    description: sanitizeText(d['description'] as string | undefined),
+    sku: sanitizeText(d['sku'] as string | undefined),
+    barcode: sanitizeText(d['barcode'] as string | undefined),
+    category: sanitizeText(d['category'] as string | undefined),
+    manufacturer: sanitizeText(d['manufacturer'] as string | undefined),
+    notes: sanitizeText(d['notes'] as string | undefined),
   };
 }
 
 /**
- * Sanitize order/purchase order data
+ * Sanitize order/purchase order data.
+ * Generic over T so callers pass their own typed form data and get it back typed.
  */
-export function sanitizeOrderData(data: any): any {
+export function sanitizeOrderData<T extends object>(data: T): T {
+  const d = data as Record<string, unknown>;
+  const items = d['items'] as Array<Record<string, unknown>> | undefined;
   return {
     ...data,
-    notes: sanitizeText(data.notes),
-    deliveryInstructions: sanitizeText(data.deliveryInstructions),
-    deliveryAddress: sanitizeText(data.deliveryAddress),
-    shippingAddress: sanitizeText(data.shippingAddress),
-    billingAddress: sanitizeText(data.billingAddress),
+    notes: sanitizeText(d['notes'] as string | undefined),
+    deliveryInstructions: sanitizeText(d['deliveryInstructions'] as string | undefined),
+    deliveryAddress: sanitizeText(d['deliveryAddress'] as string | undefined),
+    shippingAddress: sanitizeText(d['shippingAddress'] as string | undefined),
+    billingAddress: sanitizeText(d['billingAddress'] as string | undefined),
     // Sanitize line items if present
-    items: data.items ? data.items.map((item: any) => ({
+    items: items ? items.map((item) => ({
       ...item,
-      description: sanitizeText(item.description),
-      notes: sanitizeText(item.notes),
+      description: sanitizeText(item['description'] as string | undefined),
+      notes: sanitizeText(item['notes'] as string | undefined),
     })) : undefined,
   };
 }
@@ -187,11 +201,11 @@ export function sanitizeOrderData(data: any): any {
  * Middleware-friendly sanitization function
  * Can be used in API routes to sanitize request body
  */
-export function sanitizeRequestBody(body: any): any {
+export function sanitizeRequestBody(body: Record<string, unknown>): Record<string, unknown> {
   if (!body || typeof body !== 'object') {
     return body;
   }
-  
+
   return sanitizeObject(body, false);
 }
 

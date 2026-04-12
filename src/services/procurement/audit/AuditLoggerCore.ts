@@ -32,9 +32,9 @@ export class AuditLoggerCore {
     action: AuditAction | string,
     entityType: AuditEntityType | string,
     entityId: string,
-    oldValue?: any,
-    newValue?: any,
-    metadata?: Record<string, any>
+    oldValue?: unknown,
+    newValue?: unknown,
+    metadata?: Record<string, unknown>
   ): Promise<void> {
     // Unused parameters are acceptable for interface compliance
     void metadata;
@@ -84,12 +84,12 @@ export class AuditLoggerCore {
     entityType: AuditEntityType | string,
     entityId: string,
     options: AuditTrailOptions = {}
-  ): Promise<any[]> {
+  ): Promise<unknown[]> {
     try {
       const { limit = 50, offset = 0 } = options;
 
       // Build query conditions
-      const conditions: any[] = [
+      const conditions: unknown[] = [
         eq(auditLog.entityType, entityType),
         eq(auditLog.entityId, entityId)
       ];
@@ -136,7 +136,7 @@ export class AuditLoggerCore {
       void projectId;
       
       // Build conditions array
-      const conditions: any[] = [];
+      const conditions: unknown[] = [];
       
       if (dateFrom) {
         conditions.push(gte(auditLog.timestamp, dateFrom));
