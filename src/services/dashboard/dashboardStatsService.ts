@@ -30,9 +30,16 @@ const clientQueryService = {
   }),
 };
 
+interface ProjectRecord {
+  status?: string;
+  budget?: number;
+  endDate?: Date | string | null;
+  actualEndDate?: Date | string | { toDate?: () => Date } | null;
+}
+
 const ProjectQueryService = {
-  getAllProjects: async () => [] as any[],
-  getActiveProjects: async () => [] as any[],
+  getAllProjects: async (): Promise<ProjectRecord[]> => [],
+  getActiveProjects: async (): Promise<ProjectRecord[]> => [],
 };
 
 const ProjectStatus = {
@@ -134,12 +141,11 @@ export class DashboardStatsService {
       const onTimeProjects = completedProjects.filter(p => {
         if (!p.endDate || !p.actualEndDate) return false;
         // Compare actual end date with planned end date (using endDate as planned)
-        const actualEnd = p.actualEndDate instanceof Date ? p.actualEndDate : 
-          typeof p.actualEndDate === 'string' ? new Date(p.actualEndDate) : 
-          (p.actualEndDate as any)?.toDate?.() || new Date();
-        const plannedEnd = p.endDate instanceof Date ? p.endDate : 
-          typeof p.endDate === 'string' ? new Date(p.endDate) : 
-          (p.endDate as any)?.toDate?.() || new Date();
+        const actualEnd = p.actualEndDate instanceof Date ? p.actualEndDate :
+          typeof p.actualEndDate === 'string' ? new Date(p.actualEndDate) :
+          (typeof p.actualEndDate === 'object' && p.actualEndDate !== null && 'toDate' in p.actualEndDate ? p.actualEndDate.toDate?.() : undefined) || new Date();
+        const plannedEnd = p.endDate instanceof Date ? p.endDate :
+          typeof p.endDate === 'string' ? new Date(p.endDate) : new Date();
         return actualEnd <= plannedEnd;
       });
       
@@ -301,7 +307,7 @@ export class DashboardStatsService {
   /**
    * Calculate completed tasks from projects
    */
-  private static calculateCompletedTasks(projects: any[]): number {
+  private static calculateCompletedTasks(projects: ProjectRecord[]): number {
     // This would need to be connected to a task management system
     // For now, estimate based on completed projects
     const completedProjects = projects.filter(p => 
@@ -315,7 +321,7 @@ export class DashboardStatsService {
   /**
    * Calculate performance score from project data
    */
-  private static calculatePerformanceScore(projects: any[]): number {
+  private static calculatePerformanceScore(projects: ProjectRecord[]): number {
     if (projects.length === 0) return 0;
     
     const completedProjects = projects.filter(p => 
@@ -334,7 +340,7 @@ export class DashboardStatsService {
   /**
    * Calculate quality score from completed projects
    */
-  private static calculateQualityScore(completedProjects: any[]): number {
+  private static calculateQualityScore(completedProjects: ProjectRecord[]): number {
     if (completedProjects.length === 0) return 0;
     
     // This would need to be connected to quality metrics/ratings

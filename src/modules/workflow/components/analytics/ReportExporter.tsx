@@ -34,7 +34,7 @@ interface ReportExporterProps {
 type ExportFormat = 'pdf' | 'excel' | 'csv';
 type ReportType = 'summary' | 'detailed' | 'analytics' | 'comparison' | 'custom';
 
-interface LucideIconProps {
+interface IconProps {
   className?: string;
 }
 
@@ -42,7 +42,7 @@ interface ReportSection {
   id: string;
   name: string;
   description: string;
-  icon: React.ComponentType<LucideIconProps>;
+  icon: React.ComponentType<IconProps>;
   included: boolean;
 }
 
