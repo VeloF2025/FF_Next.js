@@ -125,8 +125,7 @@ describe('Ticket CRUD API Endpoints', () => {
       const { GET } = await import('../../../../app/api/noc/tickets/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets');
-      const response = await GET(mockRequest);
-      const data = await response.json();
+      const response = await GET(mockRequest);      const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
@@ -157,8 +156,7 @@ describe('Ticket CRUD API Endpoints', () => {
       const { GET } = await import('../../../../app/api/noc/tickets/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets?status=open');
-      const response = await GET(mockRequest);
-      const data = await response.json();
+      const response = await GET(mockRequest);      const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
@@ -185,7 +183,6 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const mockRequest = new Request('http://localhost/api/noc/tickets?ticket_type=maintenance');
       const response = await GET(mockRequest);
-
       expect(response.status).toBe(200);
       expect(listTickets).toHaveBeenCalledWith({
         ticket_type: 'fault_repair',
@@ -209,8 +206,7 @@ describe('Ticket CRUD API Endpoints', () => {
       const { GET } = await import('../../../../app/api/noc/tickets/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets?page=2&pageSize=10');
-      const response = await GET(mockRequest);
-      const data = await response.json();
+      const response = await GET(mockRequest);      const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data.pagination.page).toBe(2);
@@ -239,7 +235,6 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const mockRequest = new Request('http://localhost/api/noc/tickets?status=open&priority=high&assigned_to=user123');
       const response = await GET(mockRequest);
-
       expect(response.status).toBe(200);
       expect(listTickets).toHaveBeenCalledWith({
         status: 'open',
@@ -257,8 +252,7 @@ describe('Ticket CRUD API Endpoints', () => {
       const { GET } = await import('../../../../app/api/noc/tickets/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets');
-      const response = await GET(mockRequest);
-      const data = await response.json();
+      const response = await GET(mockRequest);      const data = await response.json();
 
       expect(response.status).toBe(500);
       expect(data.success).toBe(false);
@@ -295,8 +289,7 @@ describe('Ticket CRUD API Endpoints', () => {
         body: JSON.stringify(createPayload),
       });
 
-      const response = await POST(mockRequest);
-      const data = await response.json();
+      const response = await POST(mockRequest);      const data = await response.json();
 
       expect(response.status).toBe(201);
       expect(data.success).toBe(true);
@@ -331,7 +324,6 @@ describe('Ticket CRUD API Endpoints', () => {
       });
 
       const response = await POST(mockRequest);
-
       expect(response.status).toBe(201);
       expect(createTicket).toHaveBeenCalledWith(createPayload);
     });
@@ -350,8 +342,7 @@ describe('Ticket CRUD API Endpoints', () => {
         body: JSON.stringify(invalidPayload),
       });
 
-      const response = await POST(mockRequest);
-      const data = await response.json();
+      const response = await POST(mockRequest);      const data = await response.json();
 
       expect(response.status).toBe(422);
       expect(data.success).toBe(false);
@@ -376,8 +367,7 @@ describe('Ticket CRUD API Endpoints', () => {
         body: JSON.stringify(invalidPayload),
       });
 
-      const response = await POST(mockRequest);
-      const data = await response.json();
+      const response = await POST(mockRequest);      const data = await response.json();
 
       expect(response.status).toBe(422);
       expect(data.success).toBe(false);
@@ -405,8 +395,7 @@ describe('Ticket CRUD API Endpoints', () => {
         body: JSON.stringify(createPayload),
       });
 
-      const response = await POST(mockRequest);
-      const data = await response.json();
+      const response = await POST(mockRequest);      const data = await response.json();
 
       expect(response.status).toBe(500);
       expect(data.success).toBe(false);
@@ -427,8 +416,7 @@ describe('Ticket CRUD API Endpoints', () => {
       const { GET } = await import('../../../../app/api/noc/tickets/[id]/route');
 
       const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`);
-      const response = await GET(mockRequest, { params: { id: ticketId } });
-      const data = await response.json();
+      const response = await GET(mockRequest, { params: { id: ticketId } });      const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
@@ -446,8 +434,7 @@ describe('Ticket CRUD API Endpoints', () => {
       const { GET } = await import('../../../../app/api/noc/tickets/[id]/route');
 
       const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`);
-      const response = await GET(mockRequest, { params: { id: ticketId } });
-      const data = await response.json();
+      const response = await GET(mockRequest, { params: { id: ticketId } });      const data = await response.json();
 
       expect(response.status).toBe(404);
       expect(data.success).toBe(false);
@@ -463,8 +450,7 @@ describe('Ticket CRUD API Endpoints', () => {
       const { GET } = await import('../../../../app/api/noc/tickets/[id]/route');
 
       const mockRequest = new Request(`http://localhost/api/noc/tickets/${invalidId}`);
-      const response = await GET(mockRequest, { params: { id: invalidId } });
-      const data = await response.json();
+      const response = await GET(mockRequest, { params: { id: invalidId } });      const data = await response.json();
 
       expect(response.status).toBe(422);
       expect(data.success).toBe(false);
@@ -483,8 +469,7 @@ describe('Ticket CRUD API Endpoints', () => {
       const { GET } = await import('../../../../app/api/noc/tickets/[id]/route');
 
       const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`);
-      const response = await GET(mockRequest, { params: { id: ticketId } });
-      const data = await response.json();
+      const response = await GET(mockRequest, { params: { id: ticketId } });      const data = await response.json();
 
       expect(response.status).toBe(500);
       expect(data.success).toBe(false);
@@ -519,8 +504,7 @@ describe('Ticket CRUD API Endpoints', () => {
         body: JSON.stringify(updatePayload),
       });
 
-      const response = await PUT(mockRequest, { params: { id: ticketId } });
-      const data = await response.json();
+      const response = await PUT(mockRequest, { params: { id: ticketId } });      const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
@@ -552,7 +536,6 @@ describe('Ticket CRUD API Endpoints', () => {
       });
 
       const response = await PUT(mockRequest, { params: { id: ticketId } });
-
       expect(response.status).toBe(200);
       expect(updateTicket).toHaveBeenCalledWith(ticketId, updatePayload);
     });
@@ -572,8 +555,7 @@ describe('Ticket CRUD API Endpoints', () => {
         body: JSON.stringify(updatePayload),
       });
 
-      const response = await PUT(mockRequest, { params: { id: invalidId } });
-      const data = await response.json();
+      const response = await PUT(mockRequest, { params: { id: invalidId } });      const data = await response.json();
 
       expect(response.status).toBe(422);
       expect(data.error.code).toBe('VALIDATION_ERROR');
@@ -592,8 +574,7 @@ describe('Ticket CRUD API Endpoints', () => {
         body: JSON.stringify({}),
       });
 
-      const response = await PUT(mockRequest, { params: { id: ticketId } });
-      const data = await response.json();
+      const response = await PUT(mockRequest, { params: { id: ticketId } });      const data = await response.json();
 
       expect(response.status).toBe(422);
       expect(data.error.code).toBe('VALIDATION_ERROR');
@@ -618,8 +599,7 @@ describe('Ticket CRUD API Endpoints', () => {
         body: JSON.stringify(updatePayload),
       });
 
-      const response = await PUT(mockRequest, { params: { id: ticketId } });
-      const data = await response.json();
+      const response = await PUT(mockRequest, { params: { id: ticketId } });      const data = await response.json();
 
       expect(response.status).toBe(404);
       expect(data.error.code).toBe('NOT_FOUND');
@@ -644,8 +624,7 @@ describe('Ticket CRUD API Endpoints', () => {
         body: JSON.stringify(updatePayload),
       });
 
-      const response = await PUT(mockRequest, { params: { id: ticketId } });
-      const data = await response.json();
+      const response = await PUT(mockRequest, { params: { id: ticketId } });      const data = await response.json();
 
       expect(response.status).toBe(500);
       expect(data.error.code).toBe('DATABASE_ERROR');
@@ -671,8 +650,7 @@ describe('Ticket CRUD API Endpoints', () => {
         method: 'DELETE',
       });
 
-      const response = await DELETE(mockRequest, { params: { id: ticketId } });
-      const data = await response.json();
+      const response = await DELETE(mockRequest, { params: { id: ticketId } });      const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
@@ -691,8 +669,7 @@ describe('Ticket CRUD API Endpoints', () => {
         method: 'DELETE',
       });
 
-      const response = await DELETE(mockRequest, { params: { id: invalidId } });
-      const data = await response.json();
+      const response = await DELETE(mockRequest, { params: { id: invalidId } });      const data = await response.json();
 
       expect(response.status).toBe(422);
       expect(data.error.code).toBe('VALIDATION_ERROR');
@@ -711,8 +688,7 @@ describe('Ticket CRUD API Endpoints', () => {
         method: 'DELETE',
       });
 
-      const response = await DELETE(mockRequest, { params: { id: ticketId } });
-      const data = await response.json();
+      const response = await DELETE(mockRequest, { params: { id: ticketId } });      const data = await response.json();
 
       expect(response.status).toBe(404);
       expect(data.error.code).toBe('NOT_FOUND');
@@ -732,8 +708,7 @@ describe('Ticket CRUD API Endpoints', () => {
         method: 'DELETE',
       });
 
-      const response = await DELETE(mockRequest, { params: { id: ticketId } });
-      const data = await response.json();
+      const response = await DELETE(mockRequest, { params: { id: ticketId } });      const data = await response.json();
 
       expect(response.status).toBe(500);
       expect(data.error.code).toBe('DATABASE_ERROR');

@@ -46,7 +46,7 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 import { queryOne } from '../../utils/db';
-import { getDefaultQContactClient } from '../../services/qcontactClient';
+import { getDefaultQContactClient, QContactClient } from '../../services/qcontactClient';
 
 describe('QContact Outbound Sync Service', () => {
   beforeEach(() => {
@@ -75,7 +75,7 @@ describe('QContact Outbound Sync Service', () => {
       });
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         updateTicket: mockUpdateTicket,
-      } as any);
+      } as unknown as QContactClient);
 
       // Mock: Create sync log
       vi.mocked(queryOne).mockResolvedValueOnce({ id: 'log-123' });
@@ -130,7 +130,7 @@ describe('QContact Outbound Sync Service', () => {
       const mockUpdateTicket = vi.fn().mockRejectedValueOnce(new Error('QContact API error'));
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         updateTicket: mockUpdateTicket,
-      } as any);
+      } as unknown as QContactClient);
 
       // Mock: Create sync log (failure)
       vi.mocked(queryOne).mockResolvedValueOnce({ id: 'log-123' });
@@ -149,7 +149,7 @@ describe('QContact Outbound Sync Service', () => {
       const mockUpdateTicket = vi.fn().mockResolvedValue({ id: qcontactTicketId });
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         updateTicket: mockUpdateTicket,
-      } as any);
+      } as unknown as QContactClient);
 
       // Test OPEN status
       vi.mocked(queryOne)
@@ -195,7 +195,7 @@ describe('QContact Outbound Sync Service', () => {
       });
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         updateTicket: mockUpdateTicket,
-      } as any);
+      } as unknown as QContactClient);
 
       // Mock: Create sync log
       vi.mocked(queryOne).mockResolvedValueOnce({ id: 'log-123' });
@@ -237,7 +237,7 @@ describe('QContact Outbound Sync Service', () => {
       });
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         updateTicket: mockUpdateTicket,
-      } as any);
+      } as unknown as QContactClient);
 
       vi.mocked(queryOne).mockResolvedValueOnce({ id: 'log-123' });
 
@@ -262,7 +262,7 @@ describe('QContact Outbound Sync Service', () => {
       const mockUpdateTicket = vi.fn().mockRejectedValueOnce(new Error('Assignment update failed'));
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         updateTicket: mockUpdateTicket,
-      } as any);
+      } as unknown as QContactClient);
 
       // Mock fetch for error logging
       vi.mocked(queryOne).mockResolvedValueOnce({
@@ -300,7 +300,7 @@ describe('QContact Outbound Sync Service', () => {
       });
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         addNote: mockAddNote,
-      } as any);
+      } as unknown as QContactClient);
 
       // Mock: Create sync log
       vi.mocked(queryOne).mockResolvedValueOnce({ id: 'log-123' });
@@ -329,7 +329,7 @@ describe('QContact Outbound Sync Service', () => {
       const mockAddNote = vi.fn().mockResolvedValueOnce({ id: 'note-123' });
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         addNote: mockAddNote,
-      } as any);
+      } as unknown as QContactClient);
 
       vi.mocked(queryOne).mockResolvedValueOnce({ id: 'log-123' });
 
@@ -398,7 +398,7 @@ describe('QContact Outbound Sync Service', () => {
       const mockAddNote = vi.fn().mockRejectedValueOnce(new Error('QContact service unavailable'));
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         addNote: mockAddNote,
-      } as any);
+      } as unknown as QContactClient);
 
       // Mock fetch for error logging
       vi.mocked(queryOne).mockResolvedValueOnce({
@@ -436,7 +436,7 @@ describe('QContact Outbound Sync Service', () => {
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         updateTicket: mockUpdateTicket,
         addNote: vi.fn().mockResolvedValueOnce({ id: 'note-123' }),
-      } as any);
+      } as unknown as QContactClient);
 
       // Mock: Create sync log
       vi.mocked(queryOne).mockResolvedValueOnce({ id: 'log-123' });
@@ -465,7 +465,7 @@ describe('QContact Outbound Sync Service', () => {
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         updateTicket: mockUpdateTicket,
         addNote: mockAddNote,
-      } as any);
+      } as unknown as QContactClient);
 
       vi.mocked(queryOne).mockResolvedValueOnce({ id: 'log-123' });
 
@@ -493,7 +493,7 @@ describe('QContact Outbound Sync Service', () => {
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         updateTicket: mockUpdateTicket,
         addNote: mockAddNote,
-      } as any);
+      } as unknown as QContactClient);
 
       vi.mocked(queryOne).mockResolvedValueOnce({ id: 'log-123' });
 
@@ -516,7 +516,7 @@ describe('QContact Outbound Sync Service', () => {
       const mockUpdateTicket = vi.fn().mockRejectedValueOnce(new Error('API connection error'));
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         updateTicket: mockUpdateTicket,
-      } as any);
+      } as unknown as QContactClient);
 
       // Mock fetch for error logging
       vi.mocked(queryOne).mockResolvedValueOnce({
@@ -582,7 +582,7 @@ describe('QContact Outbound Sync Service', () => {
       const mockUpdateTicket = vi.fn().mockResolvedValueOnce({ id: qcontactTicketId });
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         updateTicket: mockUpdateTicket,
-      } as any);
+      } as unknown as QContactClient);
 
       // Mock: Create sync log
       vi.mocked(queryOne).mockResolvedValueOnce({ id: 'log-123' });
@@ -619,7 +619,7 @@ describe('QContact Outbound Sync Service', () => {
       const mockUpdateTicket = vi.fn().mockResolvedValueOnce({ id: qcontactTicketId });
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         updateTicket: mockUpdateTicket,
-      } as any);
+      } as unknown as QContactClient);
 
       // Mock: Create sync log
       vi.mocked(queryOne).mockResolvedValueOnce({ id: 'log-123' });
@@ -654,7 +654,7 @@ describe('QContact Outbound Sync Service', () => {
       const mockUpdateTicket = vi.fn().mockResolvedValueOnce({ id: qcontactTicketId });
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         updateTicket: mockUpdateTicket,
-      } as any);
+      } as unknown as QContactClient);
 
       vi.mocked(queryOne).mockResolvedValueOnce({ id: 'log-123' });
 
@@ -703,7 +703,7 @@ describe('QContact Outbound Sync Service', () => {
       const mockUpdateTicket = vi.fn().mockRejectedValueOnce(new Error('Network timeout'));
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         updateTicket: mockUpdateTicket,
-      } as any);
+      } as unknown as QContactClient);
 
       // Mock fetch for error logging
       vi.mocked(queryOne).mockResolvedValueOnce({
@@ -751,7 +751,7 @@ describe('QContact Outbound Sync Service', () => {
       const mockUpdateTicket = vi.fn().mockResolvedValueOnce({ id: qcontactTicketId });
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         updateTicket: mockUpdateTicket,
-      } as any);
+      } as unknown as QContactClient);
 
       // Mock: Create sync log with specific structure
       const logSql = `
@@ -799,7 +799,7 @@ describe('QContact Outbound Sync Service', () => {
       const mockUpdateTicket = vi.fn().mockRejectedValueOnce(new Error('API timeout'));
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         updateTicket: mockUpdateTicket,
-      } as any);
+      } as unknown as QContactClient);
 
       // Second queryOne: fetch ticket again in catch block (succeeds)
       vi.mocked(queryOne).mockResolvedValueOnce({

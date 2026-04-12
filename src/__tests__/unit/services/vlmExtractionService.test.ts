@@ -112,13 +112,13 @@ describe('VLM Extraction Service', () => {
     vi.clearAllMocks();
 
     // Sensible defaults for all dependency mocks
-    (fetchPhotoAsBase64 as any).mockResolvedValue('base64-photo-data');
-    (extractOntSerialFromBarcode as any).mockResolvedValue({ success: false, serial: null, confidence: 0 });
-    (detectBlur as any).mockResolvedValue({ isBlurry: false, score: 10, threshold: 50, assessment: 'sharp' });
-    (optimizeForVlm as any).mockResolvedValue('optimized-base64');
+    vi.mocked(fetchPhotoAsBase64).mockResolvedValue('base64-photo-data');
+    vi.mocked(extractOntSerialFromBarcode).mockResolvedValue({ success: false, serial: null, confidence: 0 });
+    vi.mocked(detectBlur).mockResolvedValue({ isBlurry: false, score: 10, threshold: 50, assessment: 'sharp' });
+    vi.mocked(optimizeForVlm).mockResolvedValue('optimized-base64');
     // vi.restoreAllMocks() in afterEach clears mockResolvedValue implementations on vi.fn() mocks,
     // so we must re-initialize recordCorrectExtraction here to ensure it returns a Promise.
-    (recordCorrectExtraction as any).mockResolvedValue(undefined);
+    vi.mocked(recordCorrectExtraction).mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -210,7 +210,7 @@ describe('VLM Extraction Service', () => {
     });
 
     it('should handle photo fetch failure gracefully', async () => {
-      (fetchPhotoAsBase64 as any).mockRejectedValueOnce(new Error('404 Not Found'));
+      vi.mocked(fetchPhotoAsBase64).mockRejectedValueOnce(new Error('404 Not Found'));
 
       const result = await extractPowerMeterReading('http://bad-url.example');
 
@@ -241,7 +241,7 @@ describe('VLM Extraction Service', () => {
 
   describe('extractOntSerialFromBack', () => {
     it('should return barcode result when barcode scan succeeds', async () => {
-      (extractOntSerialFromBarcode as any).mockResolvedValueOnce({
+      vi.mocked(extractOntSerialFromBarcode).mockResolvedValueOnce({
         success: true,
         serial: SERIAL_A,
         confidence: 0.99,
@@ -257,7 +257,7 @@ describe('VLM Extraction Service', () => {
     });
 
     it('should fall back to VLM when barcode returns no serial', async () => {
-      (extractOntSerialFromBarcode as any).mockResolvedValueOnce({ success: false, serial: null, confidence: 0 });
+      vi.mocked(extractOntSerialFromBarcode).mockResolvedValueOnce({ success: false, serial: null, confidence: 0 });
 
       vi.stubGlobal('fetch', mockFetchWith({
         found: true,
@@ -274,7 +274,7 @@ describe('VLM Extraction Service', () => {
     });
 
     it('should return success=false when both barcode and VLM fail', async () => {
-      (extractOntSerialFromBarcode as any).mockResolvedValueOnce({ success: false, serial: null, confidence: 0 });
+      vi.mocked(extractOntSerialFromBarcode).mockResolvedValueOnce({ success: false, serial: null, confidence: 0 });
 
       vi.stubGlobal('fetch', mockFetchWith({
         found: false,
@@ -290,7 +290,7 @@ describe('VLM Extraction Service', () => {
     });
 
     it('should handle VLM returning invalid serial format (SSID-like)', async () => {
-      (extractOntSerialFromBarcode as any).mockResolvedValueOnce({ success: false, serial: null, confidence: 0 });
+      vi.mocked(extractOntSerialFromBarcode).mockResolvedValueOnce({ success: false, serial: null, confidence: 0 });
 
       // VLM confuses SSID for serial — starts with ALHN (rejected by isValidOntSerial)
       vi.stubGlobal('fetch', mockFetchWith({
@@ -308,7 +308,7 @@ describe('VLM Extraction Service', () => {
     });
 
     it('should handle photo fetch failure', async () => {
-      (fetchPhotoAsBase64 as any).mockRejectedValueOnce(new Error('S3 access denied'));
+      vi.mocked(fetchPhotoAsBase64).mockRejectedValueOnce(new Error('S3 access denied'));
 
       const result = await extractOntSerialFromBack('http://example.com/step6.jpg');
 
@@ -317,13 +317,13 @@ describe('VLM Extraction Service', () => {
     });
 
     it('should detect blur and still attempt extraction', async () => {
-      (detectBlur as any).mockResolvedValueOnce({
+      vi.mocked(detectBlur).mockResolvedValueOnce({
         isBlurry: true,
         score: 2.1,
         threshold: 50,
         assessment: 'very blurry',
       });
-      (extractOntSerialFromBarcode as any).mockResolvedValueOnce({ success: false, serial: null, confidence: 0 });
+      vi.mocked(extractOntSerialFromBarcode).mockResolvedValueOnce({ success: false, serial: null, confidence: 0 });
       vi.stubGlobal('fetch', mockFetchWith({ found: false, serial: null, rawText: null, confidence: 0 }));
 
       const result = await extractOntSerialFromBack('http://example.com/blurry.jpg');
@@ -334,7 +334,7 @@ describe('VLM Extraction Service', () => {
     });
 
     it('should set location=back on result', async () => {
-      (extractOntSerialFromBarcode as any).mockResolvedValueOnce({
+      vi.mocked(extractOntSerialFromBarcode).mockResolvedValueOnce({
         success: true,
         serial: SERIAL_C,
         confidence: 0.99,
@@ -347,7 +347,7 @@ describe('VLM Extraction Service', () => {
     });
 
     it('should handle barcode scanner throwing an exception and fall back to VLM', async () => {
-      (extractOntSerialFromBarcode as any).mockRejectedValueOnce(new Error('Scanner crashed'));
+      vi.mocked(extractOntSerialFromBarcode).mockRejectedValueOnce(new Error('Scanner crashed'));
 
       vi.stubGlobal('fetch', mockFetchWith({
         found: true,
@@ -454,7 +454,7 @@ describe('VLM Extraction Service', () => {
     });
 
     it('should handle photo fetch failure', async () => {
-      (fetchPhotoAsBase64 as any).mockRejectedValueOnce(new Error('Timeout'));
+      vi.mocked(fetchPhotoAsBase64).mockRejectedValueOnce(new Error('Timeout'));
 
       const result = await confirmSerialVisible('http://bad.example', SERIAL_A);
 
@@ -507,7 +507,7 @@ describe('VLM Extraction Service', () => {
     });
 
     it('should prefer barcode serial over VLM when barcode succeeds', async () => {
-      (extractOntSerialFromBarcode as any).mockResolvedValueOnce({
+      vi.mocked(extractOntSerialFromBarcode).mockResolvedValueOnce({
         success: true,
         serial: SERIAL_C,
         confidence: 0.99,
@@ -551,7 +551,7 @@ describe('VLM Extraction Service', () => {
     });
 
     it('should return partial result when VLM fails but barcode already succeeded', async () => {
-      (extractOntSerialFromBarcode as any).mockResolvedValueOnce({
+      vi.mocked(extractOntSerialFromBarcode).mockResolvedValueOnce({
         success: true,
         serial: SERIAL_A,
         confidence: 0.99,
@@ -569,7 +569,7 @@ describe('VLM Extraction Service', () => {
     });
 
     it('should handle photo fetch failure for step9', async () => {
-      (fetchPhotoAsBase64 as any).mockRejectedValueOnce(new Error('Photo missing'));
+      vi.mocked(fetchPhotoAsBase64).mockRejectedValueOnce(new Error('Photo missing'));
 
       const result = await extractStep9Data('http://bad.example/step9.jpg');
 
@@ -660,7 +660,7 @@ describe('VLM Extraction Service', () => {
   describe('Feature Flags (default enabled state)', () => {
     it('should call extractOntSerialFromBarcode by default (ENABLE_BARCODE_EXTRACTION=true)', async () => {
       // Barcode succeeds — no VLM call needed
-      (extractOntSerialFromBarcode as any).mockResolvedValueOnce({
+      vi.mocked(extractOntSerialFromBarcode).mockResolvedValueOnce({
         success: true,
         serial: SERIAL_A,
         confidence: 0.99,
@@ -673,7 +673,7 @@ describe('VLM Extraction Service', () => {
     });
 
     it('should call detectBlur by default (ENABLE_BLUR_DETECTION=true)', async () => {
-      (extractOntSerialFromBarcode as any).mockResolvedValueOnce({ success: false, serial: null, confidence: 0 });
+      vi.mocked(extractOntSerialFromBarcode).mockResolvedValueOnce({ success: false, serial: null, confidence: 0 });
       vi.stubGlobal('fetch', mockFetchWith({ found: false, serial: null, rawText: null, confidence: 0 }));
 
       await extractOntSerialFromBack('http://example.com/step6.jpg');
@@ -682,8 +682,8 @@ describe('VLM Extraction Service', () => {
     });
 
     it('should call optimizeForVlm when image is not blurry', async () => {
-      (detectBlur as any).mockResolvedValueOnce({ isBlurry: false, score: 80, threshold: 50, assessment: 'sharp' });
-      (extractOntSerialFromBarcode as any).mockResolvedValueOnce({ success: false, serial: null, confidence: 0 });
+      vi.mocked(detectBlur).mockResolvedValueOnce({ isBlurry: false, score: 80, threshold: 50, assessment: 'sharp' });
+      vi.mocked(extractOntSerialFromBarcode).mockResolvedValueOnce({ success: false, serial: null, confidence: 0 });
       vi.stubGlobal('fetch', mockFetchWith({ found: false, serial: null, rawText: null, confidence: 0 }));
 
       await extractOntSerialFromBack('http://example.com/step6.jpg');

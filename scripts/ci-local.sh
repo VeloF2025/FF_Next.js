@@ -99,7 +99,7 @@ ZT_FAILED=false
 CHANGED_FILES=$(git diff --name-only HEAD 2>/dev/null || true)
 if [ -n "$CHANGED_FILES" ]; then
   # Check for console.log in changed .ts/.tsx files
-  CONSOLE_HITS=$(echo "$CHANGED_FILES" | grep -E '\.(ts|tsx)$' | grep -v '.test.' | grep -v '.spec.' | while read -r f; do
+  CONSOLE_HITS=$(echo "$CHANGED_FILES" | grep -E '\.(ts|tsx)$' | { grep -v '.test.' || true; } | { grep -v '.spec.' || true; } | while read -r f; do
     [ -f "$f" ] && grep -n 'console\.\(log\|error\|warn\|info\|debug\)' "$f" 2>/dev/null | grep -v '^\s*//' | sed "s|^|$f:|" || true
   done)
 
