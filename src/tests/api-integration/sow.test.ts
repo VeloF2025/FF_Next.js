@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll } from 'vitest';
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, AxiosError } from 'axios';
 
 describe('SOW Module API Integration Tests', () => {
   let api: AxiosInstance;
@@ -40,10 +40,11 @@ describe('SOW Module API Integration Tests', () => {
         expect(response.data).toHaveProperty('drops');
         expect(response.data).toHaveProperty('fibre');
         expect(response.data).toHaveProperty('summary');
-      } catch (error: any) {
-        if (error.response?.status === 404) {
+      } catch (error) {
+        const axiosErr = error as AxiosError;
+        if (axiosErr.response?.status === 404) {
           // Expected if test project doesn't exist
-          expect(error.response.data).toHaveProperty('error');
+          expect(axiosErr.response.data).toHaveProperty('error');
         } else {
           console.warn('SOW data fetch test skipped - API not available');
         }
@@ -53,9 +54,10 @@ describe('SOW Module API Integration Tests', () => {
     test('Invalid project ID returns 404', async () => {
       try {
         await api.get('/data/invalid-project-id-12345');
-      } catch (error: any) {
-        expect(error.response.status).toBe(404);
-        expect(error.response.data).toHaveProperty('error');
+      } catch (error) {
+        const axiosErr = error as AxiosError;
+        expect(axiosErr.response?.status).toBe(404);
+        expect(axiosErr.response?.data).toHaveProperty('error');
       }
     });
   });
@@ -71,9 +73,10 @@ describe('SOW Module API Integration Tests', () => {
           expect(response.data).toHaveProperty('totalFibre');
           expect(response.data).toHaveProperty('totalCost');
         }
-      } catch (error: any) {
-        if (error.response?.status === 404) {
-          expect(error.response.data).toHaveProperty('error');
+      } catch (error) {
+        const axiosErr = error as AxiosError;
+        if (axiosErr.response?.status === 404) {
+          expect(axiosErr.response.data).toHaveProperty('error');
         }
       }
     });
@@ -83,14 +86,15 @@ describe('SOW Module API Integration Tests', () => {
     test('Import endpoint exists and validates data', async () => {
       try {
         // Test with invalid data to check validation
-        const response = await api.post('/import', {
+        await api.post('/import', {
           projectId: null,
           data: {}
         });
-      } catch (error: any) {
+      } catch (error) {
+        const axiosErr = error as AxiosError;
         // Should fail validation
-        expect([400, 422]).toContain(error.response.status);
-        expect(error.response.data).toHaveProperty('error');
+        expect([400, 422]).toContain(axiosErr.response?.status);
+        expect(axiosErr.response?.data).toHaveProperty('error');
       }
     });
 
@@ -148,11 +152,12 @@ describe('SOW Module API Integration Tests', () => {
         const response = await api.post('/query', {
           query: 'SELECT * FROM non_existent_table'
         });
-      } catch (error: any) {
-        expect(error.response.status).toBeGreaterThanOrEqual(400);
-        expect(error.response.data).toHaveProperty('error');
-        expect(error.response.data.error).not.toContain('password');
-        expect(error.response.data.error).not.toContain('DATABASE_URL');
+      } catch (error) {
+        const axiosErr = error as AxiosError<{ error: string }>;
+        expect(axiosErr.response?.status).toBeGreaterThanOrEqual(400);
+        expect(axiosErr.response?.data).toHaveProperty('error');
+        expect(axiosErr.response?.data?.error).not.toContain('password');
+        expect(axiosErr.response?.data?.error).not.toContain('DATABASE_URL');
       }
     });
   });

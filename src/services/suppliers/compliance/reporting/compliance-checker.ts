@@ -249,7 +249,7 @@ export class ComplianceChecker {
     const compliantCount = supplierStatuses.filter(s => s.overall === 'compliant').length;
     const complianceRate = (compliantCount / totalSuppliers) * 100;
 
-    const totalScore = supplierStatuses.reduce((sum, status) => sum + ((status as any).score || 0), 0);
+    const totalScore = supplierStatuses.reduce((sum, status) => sum + (status.score ?? 0), 0);
     const averageScore = totalScore / totalSuppliers;
 
     // Calculate document completion rate
@@ -258,17 +258,15 @@ export class ComplianceChecker {
 
     supplierStatuses.forEach(status => {
       if (status.categories) {
-        Object.values(status.categories).forEach((category: any) => {
-          if (category.requirements) {
-            category.requirements.forEach((req: any) => {
-              if (req.required) {
-                totalRequired++;
-                if (req.provided) {
-                  totalProvided++;
-                }
+        Object.values(status.categories).forEach((category) => {
+          category.requirements.forEach((req) => {
+            if (req.required) {
+              totalRequired++;
+              if (req.provided) {
+                totalProvided++;
               }
-            });
-          }
+            }
+          });
         });
       }
     });
@@ -279,17 +277,15 @@ export class ComplianceChecker {
     let expiringCount = 0;
     supplierStatuses.forEach(status => {
       if (status.categories) {
-        Object.values(status.categories).forEach((category: any) => {
-          if (category.requirements) {
-            category.requirements.forEach((req: any) => {
-              if (req.expiryDate) {
-                const daysUntilExpiry = Math.ceil((req.expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-                if (daysUntilExpiry <= 90) {
-                  expiringCount++;
-                }
+        Object.values(status.categories).forEach((category) => {
+          category.requirements.forEach((req) => {
+            if (req.expiryDate) {
+              const daysUntilExpiry = Math.ceil((req.expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+              if (daysUntilExpiry <= 90) {
+                expiringCount++;
               }
-            });
-          }
+            }
+          });
         });
       }
     });

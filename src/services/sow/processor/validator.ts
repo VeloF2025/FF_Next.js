@@ -43,15 +43,15 @@ export function validateFibre(fibres: NeonFibreData[]): ValidationResult<NeonFib
  * Validate data based on type
  * @deprecated Use SOWValidator.validateData instead
  */
-export function validateData(data: any[], type: 'poles' | 'drops' | 'fibre'): ValidationResult<any> {
-  return SOWValidator.validateData(data, type);
+export function validateData(data: unknown[], type: 'poles' | 'drops' | 'fibre'): ValidationResult<unknown> {
+  return SOWValidator.validateData(data as NeonPoleData[], type);
 }
 
 /**
  * Get validation summary
  * @deprecated Use SOWErrorHandler.getValidationSummary instead
  */
-export function getValidationSummary(result: ValidationResult<any>): {
+export function getValidationSummary(result: ValidationResult<unknown>): {
   totalCount: number;
   validCount: number;
   invalidCount: number;
@@ -72,9 +72,15 @@ export function getValidationSummary(result: ValidationResult<any>): {
  * Batch validate multiple datasets
  * @deprecated Use SOWErrorHandler.batchValidate instead
  */
-export function batchValidate(datasets: { data: any[]; type: 'poles' | 'drops' | 'fibre' }[]): {
-  results: ValidationResult<any>[];
-  overallSummary: any;
+export function batchValidate(datasets: { data: unknown[]; type: 'poles' | 'drops' | 'fibre' }[]): {
+  results: ValidationResult<unknown>[];
+  overallSummary: {
+    totalDatasets: number;
+    totalRecords: number;
+    totalValidRecords: number;
+    totalInvalidRecords: number;
+    overallValidationRate: number;
+  };
 } {
   const batchResult = SOWErrorHandler.batchValidate(datasets);
   return {

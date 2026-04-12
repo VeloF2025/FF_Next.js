@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll } from 'vitest';
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, AxiosError } from 'axios';
 
 describe('Projects Module API Integration Tests', () => {
   let api: AxiosInstance;
@@ -56,9 +56,10 @@ describe('Projects Module API Integration Tests', () => {
           expect(response.data).toHaveProperty('clientId');
           expect(response.data).toHaveProperty('status');
         }
-      } catch (error: any) {
-        if (error.response?.status === 404) {
-          expect(error.response.data).toHaveProperty('error');
+      } catch (error) {
+        const axiosErr = error as AxiosError;
+        if (axiosErr.response?.status === 404) {
+          expect(axiosErr.response.data).toHaveProperty('error');
         }
       }
     });
@@ -74,15 +75,16 @@ describe('Projects Module API Integration Tests', () => {
         };
 
         const response = await api.post('/', newProject);
-        
+
         if (response.status === 201 || response.status === 200) {
           expect(response.data).toHaveProperty('id');
           expect(response.data.name).toBe(newProject.name);
         }
-      } catch (error: any) {
+      } catch (error) {
+        const axiosErr = error as AxiosError;
         // If validation fails, check error format
-        if (error.response?.status === 400) {
-          expect(error.response.data).toHaveProperty('error');
+        if (axiosErr.response?.status === 400) {
+          expect(axiosErr.response.data).toHaveProperty('error');
         }
       }
     });
@@ -91,9 +93,10 @@ describe('Projects Module API Integration Tests', () => {
       try {
         // Missing required fields
         await api.post('/', { description: 'Invalid project' });
-      } catch (error: any) {
-        expect([400, 422]).toContain(error.response.status);
-        expect(error.response.data).toHaveProperty('error');
+      } catch (error) {
+        const axiosErr = error as AxiosError;
+        expect([400, 422]).toContain(axiosErr.response?.status);
+        expect(axiosErr.response?.data).toHaveProperty('error');
       }
     });
 
@@ -105,13 +108,14 @@ describe('Projects Module API Integration Tests', () => {
         };
 
         const response = await api.put('/1', update);
-        
+
         if (response.status === 200) {
           expect(response.data).toHaveProperty('id');
           expect(response.data.status).toBe(update.status);
         }
-      } catch (error: any) {
-        if (error.response?.status !== 404) {
+      } catch (error) {
+        const axiosErr = error as AxiosError;
+        if (axiosErr.response?.status !== 404) {
           console.warn('Project update test failed unexpectedly');
         }
       }
@@ -157,7 +161,7 @@ describe('Projects Module API Integration Tests', () => {
         expect(response.status).toBe(200);
         expect(Array.isArray(response.data)).toBe(true);
         
-        response.data.forEach((project: any) => {
+        (response.data as Array<{ status: string }>).forEach((project) => {
           expect(project.status).toBe('active');
         });
       } catch (error) {
