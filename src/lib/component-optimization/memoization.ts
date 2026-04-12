@@ -8,7 +8,7 @@ import { memo, ComponentType } from 'react';
 /**
  * Deep equality check
  */
-function deepEqual(prev: any, next: any): boolean {
+function deepEqual(prev: object, next: object): boolean {
   return JSON.stringify(prev) === JSON.stringify(next);
 }
 
@@ -16,9 +16,9 @@ function deepEqual(prev: any, next: any): boolean {
  * Deep comparison memo
  * Use for components with complex props
  */
-export function deepMemo<T extends ComponentType<any>>(
+export function deepMemo<T extends ComponentType<object>>(
   Component: T,
-  propsAreEqual?: (prev: any, next: any) => boolean
+  propsAreEqual?: (prev: object, next: object) => boolean
 ): T {
   return memo(Component, propsAreEqual || deepEqual) as unknown as T;
 }
@@ -27,6 +27,6 @@ export function deepMemo<T extends ComponentType<any>>(
  * Shallow comparison memo (React.memo default behavior)
  * Best for simple props
  */
-export function shallowMemo<T extends ComponentType<any>>(Component: T): T {
+export function shallowMemo<T extends ComponentType<object>>(Component: T): T {
   return memo(Component) as unknown as T;
 }

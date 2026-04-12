@@ -3,7 +3,7 @@ export interface SOWFile {
   file: File;
   status: 'pending' | 'processing' | 'success' | 'error';
   message?: string;
-  data?: any[];
+  data?: Record<string, unknown>[];
   summary?: {
     total: number;
     valid: number;
@@ -16,7 +16,7 @@ export interface SOWUploadSectionProps {
   projectId: string;
   projectName: string;
   onComplete?: () => void;
-  onDataUpdate?: (data: { poles?: any[]; drops?: any[]; fibre?: any[] }) => void;
+  onDataUpdate?: (data: { poles?: Record<string, unknown>[]; drops?: Record<string, unknown>[]; fibre?: Record<string, unknown>[] }) => void;
   showActions?: boolean;
 }
 
@@ -24,12 +24,14 @@ export interface FileTypeConfig {
   type: 'poles' | 'drops' | 'fibre';
   title: string;
   description: string;
+  // icon is intentionally typed as any to support Lucide icon components assigned at runtime
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   icon: any;
   color: string;
   bgColor: string;
   borderColor: string;
   requiredColumns: string[];
-  sampleData: any[];
+  sampleData: Record<string, unknown>[];
 }
 
 export const FILE_TYPE_CONFIGS: FileTypeConfig[] = [
