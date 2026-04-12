@@ -6,6 +6,60 @@
 
 import { RFQ, RFQFormData, RFQStatus } from '@/types/procurement.types';
 import { RfqCrudService } from './core/RfqCrudService';
+
+/** Shape of a supplier response submitted to an RFQ */
+export interface RfqSubmitResponse {
+  supplierId: string;
+  supplierName: string;
+  totalAmount: number;
+  currency?: string;
+  validityPeriod?: number;
+  paymentTerms?: string;
+  deliveryTerms?: string;
+  deliveryDate?: string;
+  attachments?: unknown[];
+  technicalCompliance?: boolean;
+  commercialTerms?: Record<string, unknown>;
+  notes?: string;
+  items?: Array<{
+    rfqItemId: string;
+    unitPrice: number;
+    totalPrice?: number;
+    quantity?: number;
+    discountPercent?: number;
+    deliveryDays?: number;
+    complianceStatus?: string;
+    alternativeOffered?: boolean;
+    alternativeDescription?: string;
+    notes?: string;
+  }>;
+}
+
+/** Shape of an RFQ notification record */
+export interface RfqNotificationInput {
+  type: string;
+  recipientType: string;
+  recipientId?: string;
+  recipientEmail?: string;
+  subject: string;
+  message: string;
+  metadata?: Record<string, unknown>;
+  id?: string;
+}
+
+/** Statistics returned by getStatistics */
+export interface RfqStatistics {
+  totalRFQs: number;
+  byStatus: Record<string, number>;
+  totalBudget: number;
+  averageBudget: number;
+}
+
+/** Evaluation result from evaluateResponses */
+export type RfqEvaluationResult = Record<string, unknown>;
+
+/** Comparison result from compareResponses */
+export type RfqComparisonResult = Record<string, unknown>;
 import { RfqQueryService } from './core/RfqQueryService';
 import { RfqItemService } from './core/RfqItemService';
 import { RfqLifecycleService } from './lifecycle/RfqLifecycleService';
@@ -57,7 +111,7 @@ export class NeonRFQService {
 
   // ============= RESPONSE MANAGEMENT =============
 
-  static async submitResponse(rfqId: string, response: any): Promise<string> {
+  static async submitResponse(rfqId: string, response: RfqSubmitResponse): Promise<string> {
     return RfqResponseService.submitResponse(rfqId, response);
   }
 
@@ -67,17 +121,17 @@ export class NeonRFQService {
 
   // ============= WORKFLOW OPERATIONS =============
 
-  static async evaluateResponses(rfqId: string): Promise<any> {
+  static async evaluateResponses(rfqId: string): Promise<RfqEvaluationResult> {
     return RfqEvaluationService.evaluateResponses(rfqId);
   }
 
-  static async compareResponses(rfqId: string): Promise<any> {
+  static async compareResponses(rfqId: string): Promise<RfqComparisonResult> {
     return RfqEvaluationService.compareResponses(rfqId);
   }
 
   // ============= NOTIFICATION SYSTEM =============
 
-  static async createNotification(rfqId: string, notification: any): Promise<void> {
+  static async createNotification(rfqId: string, notification: RfqNotificationInput): Promise<void> {
     return RfqNotificationService.createNotification(rfqId, notification);
   }
 
@@ -101,7 +155,7 @@ export class NeonRFQService {
     return RfqQueryService.getAll(filter);
   }
 
-  static async getStatistics(projectId?: string): Promise<any> {
+  static async getStatistics(projectId?: string): Promise<RfqStatistics> {
     return RfqQueryService.getStatistics(projectId);
   }
 }

@@ -13,9 +13,12 @@ export interface RealtimeEvent {
   type: EventType;
   entityType: EntityType;
   entityId: string;
-  data?: any;
+  data?: Record<string, unknown>;
   timestamp: Date;
 }
+
+/** Typed WebSocket message for sending/receiving */
+export type WebSocketMessage = Record<string, unknown>;
 
 export interface WebSocketConfig {
   url?: string;
@@ -33,7 +36,7 @@ class WebSocketService extends EventEmitter {
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private subscriptions = new Map<string, Set<(event: RealtimeEvent) => void>>();
   private isConnecting = false;
-  private messageQueue: any[] = [];
+  private messageQueue: WebSocketMessage[] = [];
 
   constructor(config: WebSocketConfig = {}) {
     super();
@@ -148,7 +151,7 @@ class WebSocketService extends EventEmitter {
   /**
    * Handle incoming messages
    */
-  private handleMessage(message: any): void {
+  private handleMessage(message: WebSocketMessage): void {
     if (message.type === 'pong') {
       // Heartbeat response
       return;
@@ -171,7 +174,7 @@ class WebSocketService extends EventEmitter {
   /**
    * Send message to server
    */
-  send(message: any): void {
+  send(message: WebSocketMessage): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
     } else {

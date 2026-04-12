@@ -28,7 +28,7 @@ export class ProjectTrendAnalytics {
         endDate
       });
       
-      return trends.trends?.map((t: any) => ({
+      return trends.trends?.map((t: Record<string, unknown>) => ({
         month: t.month,
         completed: t.completedProjects || 0,
         started: t.newProjects || 0
@@ -80,7 +80,7 @@ export class ProjectTrendAnalytics {
       });
       
       // Transform API response to timeline data
-      return trendsData.timeline?.map((item: any) => ({
+      return trendsData.timeline?.map((item: Record<string, unknown>) => ({
         date: item.date,
         projectsStarting: item.projectsStarting || 0,
         projectsEnding: item.projectsEnding || 0,
@@ -112,7 +112,7 @@ export class ProjectTrendAnalytics {
         endDate: new Date().toISOString()
       });
       
-      return trendsData.quarters?.map((q: any) => ({
+      return trendsData.quarters?.map((q: Record<string, unknown>) => ({
         quarter: q.quarter,
         projectsCompleted: q.projectsCompleted || 0,
         totalBudget: q.totalBudget || 0,
@@ -222,7 +222,7 @@ export class ProjectTrendAnalytics {
         'Fall': { projects: [], budgets: [], completed: [] }
       };
       
-      trendsData.trends?.forEach((month: any) => {
+      trendsData.trends?.forEach((month: Record<string, unknown>) => {
         const monthNum = new Date(month.month).getMonth() + 1;
         let season = '';
         
