@@ -14,6 +14,8 @@ import type {
   AuthStateMethods,
   PermissionMethods,
 } from './types';
+import type { User, LoginCredentials, RegisterCredentials, PasswordResetRequest } from '@/types/auth.types';
+import type { AuthUser } from '../authHelpers';
 
 export class AuthCore implements
   AuthenticationMethods,
@@ -31,19 +33,19 @@ export class AuthCore implements
   signInWithEmail = (email: string, password: string) =>
     this.emailAuth.signInWithEmail(email, password);
 
-  signInWithEmailEnhanced = (credentials: any) =>
+  signInWithEmailEnhanced = (credentials: LoginCredentials) =>
     this.emailAuth.signInWithEmailEnhanced(credentials);
 
   signUp = (email: string, password: string, displayName?: string) =>
     this.emailAuth.signUp(email, password, displayName);
 
-  registerWithEmail = (credentials: any) =>
+  registerWithEmail = (credentials: RegisterCredentials) =>
     this.emailAuth.registerWithEmail(credentials);
 
   resetPassword = (email: string) =>
     this.emailAuth.resetPassword(email);
 
-  resetPasswordEnhanced = (request: any) =>
+  resetPasswordEnhanced = (request: PasswordResetRequest) =>
     this.emailAuth.resetPasswordEnhanced(request);
 
   changePassword = (currentPassword: string, newPassword: string) =>
@@ -79,10 +81,10 @@ export class AuthCore implements
     this.userState.sendEmailVerification();
 
   // Auth state listeners
-  onAuthStateChanged = (callback: any) =>
+  onAuthStateChanged = (callback: (user: AuthUser | null) => void) =>
     this.authState.onAuthStateChanged(callback);
 
-  onAuthStateChangedEnhanced = (callback: any) =>
+  onAuthStateChangedEnhanced = (callback: (user: User | null) => void) =>
     this.authState.onAuthStateChangedEnhanced(callback);
 
   // Permissions and roles

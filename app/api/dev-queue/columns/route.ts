@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from '@/lib/auth-mock';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -11,6 +12,11 @@ interface ColumnUpdate {
   wip_limit: number | null;
   position: number;
   isNew?: boolean;
+}
+
+interface WishlistColumn {
+  id: string;
+  name: string;
 }
 
 /**
@@ -49,12 +55,13 @@ export async function POST(req: NextRequest) {
     const existingColumns = await sql`
       SELECT id, name FROM wishlist_columns
     `;
-    const existingIds = new Set(existingColumns.map((c: any) => c.id));
+    const typedColumns = existingColumns as WishlistColumn[];
+    const existingIds = new Set(typedColumns.map((c) => c.id));
     const newIds = new Set(columns.map((c) => c.id));
 
     // Find columns to delete (in existing but not in new)
     const idsToDelete: string[] = [];
-    for (const col of existingColumns) {
+    for (const col of typedColumns) {
       if (!newIds.has(col.id)) {
         idsToDelete.push(col.id);
       }
@@ -62,8 +69,8 @@ export async function POST(req: NextRequest) {
 
     // Check if columns to delete have items
     if (idsToDelete.length > 0) {
-      const columnsWithNames = existingColumns.filter((c: any) => idsToDelete.includes(c.id));
-      const columnNames = columnsWithNames.map((c: any) => c.name);
+      const columnsWithNames = typedColumns.filter((c) => idsToDelete.includes(c.id));
+      const columnNames = columnsWithNames.map((c) => c.name);
 
       for (const name of columnNames) {
         const itemsInColumn = await sql`
@@ -94,7 +101,7 @@ export async function POST(req: NextRequest) {
         `;
       } else if (existingIds.has(column.id)) {
         // Get old column name for updating items
-        const oldColumn = existingColumns.find((c: any) => c.id === column.id);
+        const oldColumn = typedColumns.find((c) => c.id === column.id);
 
         // Update existing column
         await sql`
@@ -123,10 +130,10 @@ export async function POST(req: NextRequest) {
       success: true,
       message: 'Columns updated successfully',
     });
-  } catch (error: any) {
-    console.error('Columns PUT error:', error);
+  } catch (error: unknown) {
+    log.error('Columns POST error', error instanceof Error ? { message: error.message } : { error }, 'DevQueueColumns');
     return NextResponse.json(
-      { error: 'Internal server error', details: error?.message },
+      { error: 'Internal server error', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
@@ -149,10 +156,10 @@ export async function GET(req: NextRequest) {
     `;
 
     return NextResponse.json({ success: true, data: columns });
-  } catch (error: any) {
-    console.error('Columns GET error:', error);
+  } catch (error: unknown) {
+    log.error('Columns GET error', error instanceof Error ? { message: error.message } : { error }, 'DevQueueColumns');
     return NextResponse.json(
-      { error: 'Internal server error', details: error?.message },
+      { error: 'Internal server error', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
