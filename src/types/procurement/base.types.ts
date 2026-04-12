@@ -9,7 +9,7 @@ export interface ProcurementContext {
   userId: string;
   userName: string;
   permissions: ProcurementPermissions;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ProcurementPermissions {
@@ -55,7 +55,7 @@ export interface ProcurementFilter {
   searchTerm?: string;
   tags?: string[];
   createdBy?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface ProcurementSortOptions {
@@ -110,7 +110,7 @@ export interface ProcurementAuditLog {
   userId: string;
   userName: string;
   timestamp: Date;
-  details?: Record<string, any>;
-  previousValue?: any;
-  newValue?: any;
+  details?: Record<string, unknown>;
+  previousValue?: unknown;
+  newValue?: unknown;
 }

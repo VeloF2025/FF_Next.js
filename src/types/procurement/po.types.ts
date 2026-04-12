@@ -98,7 +98,7 @@ export interface POItem {
   quantityInvoiced: number;
   
   // Specifications
-  specifications?: Record<string, any>;
+  specifications?: Record<string, unknown>;
   technicalRequirements?: string;
   
   // Delivery Schedule
@@ -199,7 +199,7 @@ export interface POApproval {
 export interface POApprovalCondition {
   field: string;
   operator: 'equals' | 'greater' | 'less' | 'contains';
-  value: any;
+  value: unknown;
 }
 
 export interface PODeliveryNote {
@@ -315,8 +315,8 @@ export interface POAmendment {
 
 export interface POChange {
   field: string;
-  previousValue: any;
-  newValue: any;
+  previousValue: unknown;
+  newValue: unknown;
   changeType: 'added' | 'modified' | 'removed';
 }
 
@@ -554,5 +554,5 @@ export interface CreatePOItemRequest {
   uom: string;
   unitPrice: number;
   expectedDeliveryDate?: Date;
-  specifications?: Record<string, any>;
+  specifications?: Record<string, unknown>;
 }

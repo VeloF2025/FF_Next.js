@@ -4,8 +4,9 @@
  * Fully migrated to use Neon PostgreSQL
  */
 
-import { RFQ, RFQFormData, RFQStatus } from '@/types/procurement.types';
+import { RFQ, RFQFormData, RFQStatus, RFQItem } from '@/types/procurement.types';
 import { RFQCrud } from './rfqCrud';
+import type { RfqSubmitResponse, RfqNotificationInput } from './index';
 import { log } from '@/lib/logger';
 
 /**
@@ -146,7 +147,7 @@ export class RFQOperations {
   /**
    * Add items to RFQ
    */
-  static async addItems(rfqId: string, items: any[]): Promise<void> {
+  static async addItems(rfqId: string, items: RFQItem[]): Promise<void> {
     try {
       await RFQCrud.addItems(rfqId, items);
     } catch (error) {
@@ -158,7 +159,7 @@ export class RFQOperations {
   /**
    * Get RFQ items
    */
-  static async getItems(rfqId: string): Promise<any[]> {
+  static async getItems(rfqId: string): Promise<RFQItem[]> {
     try {
       return await RFQCrud.getItems(rfqId);
     } catch (error) {
@@ -170,7 +171,7 @@ export class RFQOperations {
   /**
    * Submit RFQ response
    */
-  static async submitResponse(rfqId: string, response: any): Promise<string> {
+  static async submitResponse(rfqId: string, response: RfqSubmitResponse): Promise<string> {
     try {
       return await RFQCrud.submitResponse(rfqId, response);
     } catch (error) {
@@ -182,7 +183,7 @@ export class RFQOperations {
   /**
    * Get RFQ responses
    */
-  static async getResponses(rfqId: string): Promise<any[]> {
+  static async getResponses(rfqId: string): Promise<RfqSubmitResponse[]> {
     try {
       return await RFQCrud.getResponses(rfqId);
     } catch (error) {
@@ -194,7 +195,7 @@ export class RFQOperations {
   /**
    * Create RFQ notification
    */
-  static async createNotification(rfqId: string, notification: any): Promise<void> {
+  static async createNotification(rfqId: string, notification: RfqNotificationInput): Promise<void> {
     try {
       await RFQCrud.createNotification(rfqId, notification);
     } catch (error) {
