@@ -68,14 +68,14 @@ export interface FirebaseProjectData {
   completedDrops?: number;
   budget?: number;
   spentAmount?: number;
-  startDate?: any; // Firebase timestamp
-  endDate?: any; // Firebase timestamp
-  actualEndDate?: any; // Firebase timestamp
+  startDate?: { toDate: () => Date } | string | number | null; // Firebase timestamp
+  endDate?: { toDate: () => Date } | string | number | null; // Firebase timestamp
+  actualEndDate?: { toDate: () => Date } | string | number | null; // Firebase timestamp
   progress?: number;
   completion?: number;
   qualityScore?: number;
   status?: string;
-  createdAt?: any;
+  createdAt?: { toDate: () => Date } | string | number | null;
 }
 
 export interface FirebaseClientData {
@@ -84,7 +84,7 @@ export interface FirebaseClientData {
   currentBalance?: number;
   creditLimit?: number;
   satisfactionScore?: number;
-  nextFollowUpDate?: any;
+  nextFollowUpDate?: { toDate: () => Date } | string | number | null;
   totalInteractions?: number;
 }
 
@@ -133,7 +133,7 @@ export interface RealtimeSyncEvent {
   type: 'added' | 'modified' | 'removed';
   collection: string;
   documentId: string;
-  data: any;
+  data: unknown;
   timestamp: Date;
 }
 
@@ -149,6 +149,6 @@ export interface BatchSyncConfig {
 export interface ParsedDate {
   success: boolean;
   date: Date | null;
-  originalValue: any;
+  originalValue: unknown;
   parseMethod: 'toDate' | 'seconds' | 'string' | 'number' | 'null';
 }

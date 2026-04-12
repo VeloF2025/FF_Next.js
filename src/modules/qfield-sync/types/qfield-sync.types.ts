@@ -91,7 +91,7 @@ export interface FieldMapping {
   source: string; // QField field name
   target: string; // FibreFlow column name
   transform?: 'none' | 'uppercase' | 'lowercase' | 'date' | 'number' | 'boolean' | 'json';
-  defaultValue?: any;
+  defaultValue?: string | number | boolean | null;
 }
 
 // Sync Job Types
@@ -133,8 +133,8 @@ export interface SyncConflict {
   id: string;
   recordId: string;
   field: string;
-  qfieldValue: any;
-  fibreflowValue: any;
+  qfieldValue: unknown;
+  fibreflowValue: unknown;
   detectedAt: string;
   resolution?: 'use_qfield' | 'use_fibreflow' | 'merge' | 'skip';
   resolvedAt?: string;
@@ -158,7 +158,7 @@ export interface QFieldSyncDashboardData {
 // API Response Types
 export interface SyncResponse {
   success: boolean;
-  data?: any;
+  data?: unknown;
   message?: string;
   errors?: SyncError[];
 }
@@ -181,23 +181,23 @@ export interface SyncHistoryResponse {
 export interface SyncWebSocketEvent {
   type: 'sync_started' | 'sync_progress' | 'sync_completed' | 'sync_error' | 'record_synced';
   jobId: string;
-  data: any;
+  data: unknown;
   timestamp: string;
 }
 
 // Transformation Functions
 export interface DataTransformer {
-  qfieldToFibreflow: (data: QFieldFiberCable) => any;
-  fibreflowToQfield: (data: any) => QFieldFiberCable;
+  qfieldToFibreflow: (data: QFieldFiberCable) => Record<string, unknown>;
+  fibreflowToQfield: (data: Record<string, unknown>) => QFieldFiberCable;
 }
 
 // Validation Rules
 export interface ValidationRule {
   field: string;
   type: 'required' | 'min' | 'max' | 'regex' | 'custom';
-  value?: any;
+  value?: string | number | boolean | RegExp | null;
   message: string;
-  validate?: (value: any) => boolean;
+  validate?: (value: unknown) => boolean;
 }
 
 export interface ValidationResult {
