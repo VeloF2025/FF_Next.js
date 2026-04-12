@@ -20,6 +20,9 @@ const EMBEDDING_MODEL = 'text-embedding-3-small';
 const EMBEDDING_DIMS = 1536;
 const CHUNK_MAX_CHARS = 500;
 const BATCH_SIZE = 50; // OpenAI embeddings batch limit
+const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || 'https://api.openai.com';
+// Note: captured at module load. Tests overriding OPENAI_BASE_URL must use vi.resetModules().
+// Value must not include a trailing /v1 — the fetch path appends /v1/embeddings directly.
 
 export interface IngestOptions {
   filePath: string;
@@ -166,11 +169,11 @@ function extractSectionTitle(chunk: string): string {
  * Generates embeddings for a batch of texts via OpenAI text-embedding-3-small.
  */
 async function generateEmbeddings(texts: string[]): Promise<number[][]> {
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
+  const response = await fetch(`${OPENAI_BASE_URL}/v1/embeddings`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      Authorization: `Bearer ${OPENAI_API_KEY ?? ''}`,
     },
     body: JSON.stringify({
       model: EMBEDDING_MODEL,

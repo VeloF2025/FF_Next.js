@@ -159,3 +159,6 @@ public/uploads/qa-photos/
 tests/e2e-results/
 metrics/
 .next-backup*
+
+# auto-improve-loop iteration log
+.claude/auto-improve-loop.log

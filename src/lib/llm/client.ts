@@ -18,6 +18,9 @@ let instance: OpenAI | null = null;
  *
  * @throws {Error} When OPENAI_API_KEY is not set in the environment.
  * @returns Configured OpenAI SDK instance.
+ * @remarks OPENAI_BASE_URL is read once on first call and frozen in the singleton.
+ * Tests that change process.env.OPENAI_BASE_URL after module import must call
+ * vi.resetModules() and re-import to pick up the new value.
  */
 export function getOpenAIClient(): OpenAI {
   if (!instance) {
@@ -25,7 +28,10 @@ export function getOpenAIClient(): OpenAI {
     if (!apiKey) {
       throw new Error('OPENAI_API_KEY environment variable is required');
     }
-    instance = new OpenAI({ apiKey });
+    instance = new OpenAI({
+      apiKey,
+      ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
+    });
   }
   return instance;
 }
