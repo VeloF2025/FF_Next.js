@@ -27,9 +27,9 @@ export interface SystemErrorLog {
   errorType: string;
   severity: 'critical' | 'high' | 'medium' | 'low';
   message: string;
-  details: Record<string, any>;
+  details: Record<string, unknown>;
   stackTrace: string | undefined;
-  context: Record<string, any> | undefined;
+  context: Record<string, unknown> | undefined;
   tags: string[];
 }
 
@@ -38,7 +38,7 @@ export interface ApiErrorResponse {
   errorType: string;
   message: string;
   code: string;
-  details: Record<string, any>;
+  details: Record<string, unknown>;
   timestamp: string;
 }
 
@@ -70,7 +70,7 @@ export interface ErrorReport {
 }
 
 export interface ErrorContext {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export type ErrorSeverity = 'critical' | 'high' | 'medium' | 'low';

@@ -59,13 +59,13 @@ export function useRenderCount(componentName: string) {
  * Why did you update hook
  * Logs which props caused a re-render
  */
-export function useWhyDidYouUpdate(name: string, props: Record<string, any>) {
-  const previousProps = useRef<Record<string, any>>();
+export function useWhyDidYouUpdate(name: string, props: Record<string, unknown>) {
+  const previousProps = useRef<Record<string, unknown>>();
 
   useEffect(() => {
     if (previousProps.current && process.env.NODE_ENV === 'development') {
       const allKeys = Object.keys({ ...previousProps.current, ...props });
-      const changedProps: Record<string, { from: any; to: any }> = {};
+      const changedProps: Record<string, { from: unknown; to: unknown }> = {};
 
       allKeys.forEach((key) => {
         if (previousProps.current![key] !== props[key]) {

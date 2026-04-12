@@ -5,11 +5,23 @@
 
 import { cn } from '@/utils/cn';
 
+type SOWRow = Record<string, unknown>;
+
 interface SOWDataTableProps {
   type: 'poles' | 'drops' | 'fibre';
-  data: any[];
+  data: SOWRow[];
   maxRows?: number;
   totalCount?: number; // Actual total count from database (may be larger than data.length)
+}
+
+function str(v: unknown, fallback = ''): string {
+  if (v == null) return fallback;
+  return String(v);
+}
+
+function num(v: unknown, fallback: number): number {
+  const n = Number(v);
+  return isNaN(n) ? fallback : n;
 }
 
 export function SOWDataTable({ type, data, maxRows = 20, totalCount }: SOWDataTableProps) {
@@ -36,19 +48,19 @@ export function SOWDataTable({ type, data, maxRows = 20, totalCount }: SOWDataTa
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--ff-border-light)]">
-              {displayData.map((pole: any) => (
-                <tr key={pole.id || pole.pole_number} className="hover:bg-[var(--ff-bg-tertiary)]">
+              {displayData.map((pole, idx) => (
+                <tr key={str(pole.id) || str(pole.pole_number) || idx} className="hover:bg-[var(--ff-bg-tertiary)]">
                   <td className="px-4 py-3 font-medium text-[var(--ff-text-primary)]">
-                    {pole.pole_number}
+                    {str(pole.pole_number)}
                   </td>
                   <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
                     {pole.latitude && pole.longitude
-                      ? `${Number(pole.latitude).toFixed(6)}, ${Number(pole.longitude).toFixed(6)}`
+                      ? `${num(pole.latitude, 0).toFixed(6)}, ${num(pole.longitude, 0).toFixed(6)}`
                       : 'No GPS'
                     }
                   </td>
                   <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
-                    {pole.max_drops || 12}
+                    {num(pole.max_drops, 12)}
                   </td>
                   <td className="px-4 py-3">
                     <span className={cn(
@@ -59,7 +71,7 @@ export function SOWDataTable({ type, data, maxRows = 20, totalCount }: SOWDataTa
                         ? "bg-yellow-500/20 text-yellow-400"
                         : "bg-gray-500/20 text-gray-400"
                     )}>
-                      {pole.status || 'planned'}
+                      {str(pole.status, 'planned')}
                     </span>
                   </td>
                 </tr>
@@ -91,19 +103,19 @@ export function SOWDataTable({ type, data, maxRows = 20, totalCount }: SOWDataTa
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--ff-border-light)]">
-              {displayData.map((drop: any) => (
-                <tr key={drop.id || drop.drop_number} className="hover:bg-[var(--ff-bg-tertiary)]">
+              {displayData.map((drop, idx) => (
+                <tr key={str(drop.id) || str(drop.drop_number) || idx} className="hover:bg-[var(--ff-bg-tertiary)]">
                   <td className="px-4 py-3 font-medium text-[var(--ff-text-primary)]">
-                    {drop.drop_number}
+                    {str(drop.drop_number)}
                   </td>
                   <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
-                    {drop.pole_number || 'Not assigned'}
+                    {str(drop.pole_number, 'Not assigned')}
                   </td>
                   <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
-                    {drop.address || 'Not specified'}
+                    {str(drop.address, 'Not specified')}
                   </td>
                   <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
-                    {drop.customer_name || '-'}
+                    {str(drop.customer_name, '-')}
                   </td>
                   <td className="px-4 py-3">
                     <span className={cn(
@@ -114,7 +126,7 @@ export function SOWDataTable({ type, data, maxRows = 20, totalCount }: SOWDataTa
                         ? "bg-blue-500/20 text-blue-400"
                         : "bg-gray-500/20 text-gray-400"
                     )}>
-                      {drop.status || 'planned'}
+                      {str(drop.status, 'planned')}
                     </span>
                   </td>
                 </tr>
@@ -147,22 +159,22 @@ export function SOWDataTable({ type, data, maxRows = 20, totalCount }: SOWDataTa
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--ff-border-light)]">
-            {displayData.map((segment: any) => (
-              <tr key={segment.id || segment.segment_id} className="hover:bg-[var(--ff-bg-tertiary)]">
+            {displayData.map((segment, idx) => (
+              <tr key={str(segment.id) || str(segment.segment_id) || idx} className="hover:bg-[var(--ff-bg-tertiary)]">
                 <td className="px-4 py-3 font-medium text-[var(--ff-text-primary)]">
-                  {segment.segment_id}
+                  {str(segment.segment_id)}
                 </td>
                 <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
-                  {segment.from_point} → {segment.to_point}
+                  {str(segment.from_point)} → {str(segment.to_point)}
                 </td>
                 <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
-                  {segment.distance}m
+                  {str(segment.distance)}m
                 </td>
                 <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
-                  {segment.cable_type || 'standard'}
+                  {str(segment.cable_type, 'standard')}
                 </td>
                 <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
-                  {segment.installation_method || 'aerial'}
+                  {str(segment.installation_method, 'aerial')}
                 </td>
                 <td className="px-4 py-3">
                   <span className={cn(
@@ -173,7 +185,7 @@ export function SOWDataTable({ type, data, maxRows = 20, totalCount }: SOWDataTa
                       ? "bg-yellow-500/20 text-yellow-400"
                       : "bg-gray-500/20 text-gray-400"
                   )}>
-                    {segment.status || 'planned'}
+                    {str(segment.status, 'planned')}
                   </span>
                 </td>
               </tr>
