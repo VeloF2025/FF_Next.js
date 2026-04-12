@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { neon } from '@neondatabase/serverless';
 import type { Contractor, ContractorFormData, ContractorFilter } from '@/types/contractor.core.types';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -20,9 +21,9 @@ export async function GET(req: NextRequest) {
     // Parse filters from query params
     const filters: ContractorFilter = {
       searchTerm: searchParams.get('search') || undefined,
-      status: searchParams.getAll('status') as any || undefined,
-      complianceStatus: searchParams.getAll('complianceStatus') as any || undefined,
-      businessType: searchParams.getAll('businessType') as any || undefined,
+      status: searchParams.getAll('status') as ContractorFilter['status'] || undefined,
+      complianceStatus: searchParams.getAll('complianceStatus') as ContractorFilter['complianceStatus'] || undefined,
+      businessType: searchParams.getAll('businessType') as ContractorFilter['businessType'] || undefined,
       province: searchParams.getAll('province') || undefined,
     };
 
@@ -136,7 +137,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ data: mapped });
   } catch (error) {
-    console.error('Error fetching contractors:', error);
+    log.error('Error fetching contractors', { error }, 'ContractorsAPI');
     return NextResponse.json(
       { error: 'Failed to fetch contractors' },
       { status: 500 }
@@ -213,17 +214,17 @@ export async function POST(req: NextRequest) {
       RETURNING *
     `;
 
-    const mapped = mapDbToContractor(contractor);
+    const mapped = mapDbToContractor(contractor as DbRow);
 
     // Revalidate the contractors page cache
     revalidatePath('/contractors');
 
     return NextResponse.json({ data: mapped }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error creating contractor:', error);
+  } catch (error) {
+    log.error('Error creating contractor', { error }, 'ContractorsAPI');
 
     // Handle unique constraint violations
-    if (error.code === '23505') {
+    if (typeof error === 'object' && error !== null && 'code' in error && (error as { code: string }).code === '23505') {
       return NextResponse.json(
         { error: 'Contractor with this registration number or email already exists' },
         { status: 409 }
@@ -242,47 +243,50 @@ export async function POST(req: NextRequest) {
 /**
  * Map database row (snake_case) to Contractor interface (camelCase)
  */
-function mapDbToContractor(row: any): Contractor {
+/** Database row type from Neon SQL result */
+type DbRow = { [key: string]: string | number | boolean | string[] | null | undefined };
+
+function mapDbToContractor(row: DbRow): Contractor {
   return {
-    id: row.id,
+    id: row.id as string,
 
     // Company
-    companyName: row.company_name,
-    registrationNumber: row.registration_number,
-    businessType: row.business_type,
-    industryCategory: row.industry_category || '',
-    yearsInBusiness: row.years_in_business,
+    companyName: row.company_name as string,
+    registrationNumber: row.registration_number as string,
+    businessType: row.business_type as import('@/types/contractor.core.types').BusinessType,
+    industryCategory: (row.industry_category as string) || '',
+    yearsInBusiness: row.years_in_business as number | undefined,
 
     // Contact
-    contactPerson: row.contact_person,
-    email: row.email,
-    phone: row.phone,
-    alternatePhone: row.alternate_phone,
+    contactPerson: row.contact_person as string,
+    email: row.email as string,
+    phone: row.phone as string,
+    alternatePhone: row.alternate_phone as string | undefined,
 
     // Address
-    physicalAddress: row.physical_address,
-    city: row.city,
-    province: row.province,
-    postalCode: row.postal_code,
+    physicalAddress: row.physical_address as string | undefined,
+    city: row.city as string | undefined,
+    province: row.province as string | undefined,
+    postalCode: row.postal_code as string | undefined,
 
     // Financial
-    bankName: row.bank_name,
-    accountNumber: row.account_number,
-    branchCode: row.branch_code,
+    bankName: row.bank_name as string | undefined,
+    accountNumber: row.account_number as string | undefined,
+    branchCode: row.branch_code as string | undefined,
 
     // Status
-    status: row.status,
-    isActive: row.is_active,
-    complianceStatus: row.compliance_status,
+    status: row.status as import('@/types/contractor.core.types').ContractorStatus,
+    isActive: row.is_active as boolean,
+    complianceStatus: row.compliance_status as import('@/types/contractor.core.types').ComplianceStatus,
 
     // Professional
-    specializations: row.specializations || [],
-    certifications: row.certifications || [],
+    specializations: (row.specializations as string[]) || [],
+    certifications: (row.certifications as string[]) || [],
 
     // Metadata
-    notes: row.notes,
-    tags: row.tags || [],
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
+    notes: row.notes as string | undefined,
+    tags: (row.tags as string[]) || [],
+    createdAt: new Date(row.created_at as string),
+    updatedAt: new Date(row.updated_at as string),
   };
 }
