@@ -11,7 +11,7 @@ interface QueryMetric {
   query: string;
   duration: number;
   timestamp: number;
-  params?: any;
+  params?: unknown;
   stackTrace?: string;
 }
 
@@ -41,7 +41,7 @@ class QueryPerformanceMonitor {
   /**
    * Track a query execution
    */
-  track(query: string, duration: number, params?: any): void {
+  track(query: string, duration: number, params?: unknown): void {
     if (!this.enabled) return;
 
     const metric: QueryMetric = {
@@ -79,7 +79,7 @@ class QueryPerformanceMonitor {
   async measure<T>(
     queryFn: () => Promise<T>,
     queryName: string,
-    params?: any
+    params?: unknown
   ): Promise<T> {
     if (!this.enabled) {
       return queryFn();
@@ -274,16 +274,16 @@ export const queryPerformance = new QueryPerformanceMonitor();
  */
 export function monitorQuery(queryName?: string) {
   return function (
-    target: any,
+    target: Record<string, unknown>,
     propertyKey: string,
     descriptor: PropertyDescriptor
   ) {
-    const originalMethod = descriptor.value;
-    const name = queryName || `${target.constructor.name}.${propertyKey}`;
+    const originalMethod = descriptor.value as (...args: unknown[]) => Promise<unknown>;
+    const name = queryName || `${(target.constructor as { name: string }).name}.${propertyKey}`;
 
-    descriptor.value = async function (...args: any[]) {
+    descriptor.value = async function (...args: unknown[]) {
       return queryPerformance.measure(
-        () => originalMethod.apply(this, args),
+        () => originalMethod.apply(this, args) as Promise<unknown>,
         name,
         args
       );
@@ -299,7 +299,7 @@ export function monitorQuery(queryName?: string) {
 export async function trackQuery<T>(
   queryName: string,
   queryFn: () => Promise<T>,
-  params?: any
+  params?: unknown
 ): Promise<T> {
   return queryPerformance.measure(queryFn, queryName, params);
 }

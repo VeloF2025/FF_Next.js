@@ -396,12 +396,12 @@ export interface TicketListResult {
  * Ticket with related data (for detail views)
  */
 export interface TicketWithRelations extends Ticket {
-  verification_steps?: any[]; // Will be typed in verification.ts
-  qa_readiness_checks?: any[]; // Will be typed in verification.ts
-  risk_acceptances?: any[]; // Will be typed in riskAcceptance.ts
-  handover_snapshots?: any[]; // Will be typed in handover.ts
-  attachments?: any[]; // Will be typed separately
-  notes?: any[]; // Will be typed separately
+  verification_steps?: unknown[]; // Will be typed in verification.ts
+  qa_readiness_checks?: unknown[]; // Will be typed in verification.ts
+  risk_acceptances?: unknown[]; // Will be typed in riskAcceptance.ts
+  handover_snapshots?: unknown[]; // Will be typed in handover.ts
+  attachments?: unknown[]; // Will be typed separately
+  notes?: unknown[]; // Will be typed separately
   assigned_user?: {
     id: string;
     name: string;

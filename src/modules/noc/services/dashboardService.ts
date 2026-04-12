@@ -195,7 +195,7 @@ export async function getTicketsByStatus(
   filters: DashboardFilters = {}
 ): Promise<TicketsByStatusResponse> {
   try {
-    const params: any[] = [];
+    const params: (string | number | boolean | Date)[] = [];
     let whereClause = 'WHERE 1=1';
     let paramIndex = 1;
 
@@ -257,7 +257,7 @@ export async function getSLACompliance(
   filters: DashboardFilters = {}
 ): Promise<SLAComplianceResponse> {
   try {
-    const params: any[] = [];
+    const params: (string | number | boolean | Date)[] = [];
     let whereClause = 'WHERE 1=1';
     let paramIndex = 1;
 
@@ -338,7 +338,7 @@ export async function getOverdueTickets(
   filters: DashboardFilters = {}
 ): Promise<OverdueTicketsResponse> {
   try {
-    const params: any[] = ['closed', 'cancelled'];
+    const params: (string | number | boolean | Date)[] = ['closed', 'cancelled'];
 
     if (filters.include_details) {
       // Get detailed list of overdue tickets
@@ -409,7 +409,7 @@ export async function getWorkloadByAssignee(
   filters: DashboardFilters = {}
 ): Promise<WorkloadByAssignee[]> {
   try {
-    const params: any[] = [];
+    const params: (string | number | boolean | Date)[] = [];
     let whereClause = 'WHERE 1=1';
     let paramIndex = 1;
 
@@ -467,7 +467,7 @@ export async function getAverageResolutionTime(
   filters: DashboardFilters = {}
 ): Promise<AverageResolutionTimeResponse> {
   try {
-    const params: any[] = ['closed'];
+    const params: (string | number | boolean | Date)[] = ['closed'];
     let whereClause = 'WHERE status = $1';
     let paramIndex = 2;
 
@@ -531,7 +531,7 @@ export async function getRecentTickets(
   filters: DashboardFilters = {}
 ): Promise<RecentTicket[]> {
   try {
-    const params: any[] = [];
+    const params: (string | number | boolean | Date)[] = [];
     let whereClause = 'WHERE 1=1';
     let paramIndex = 1;
 
