@@ -7,6 +7,30 @@
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 
+/** OCR-extracted fields from a staff document */
+export interface OcrDocumentData {
+  // Employment contract fields
+  employeeName?: string;
+  fullName?: string;
+  firstName?: string;
+  surname?: string;
+  employeeIdNumber?: string;
+  idNumber?: string;
+  jobTitle?: string;
+  position?: string;
+  startDate?: string | Date;
+  department?: string;
+  // SA ID fields
+  saIdNumber?: string;
+  documentNumber?: string;
+  // Bank document fields
+  accountHolder?: string;
+  accountHolderName?: string;
+  bankName?: string;
+  accountNumber?: string;
+  branchCode?: string;
+}
+
 const sql = neon(process.env.DATABASE_URL!);
 
 /** OCR-extracted fields from a document. All values are strings or absent. */

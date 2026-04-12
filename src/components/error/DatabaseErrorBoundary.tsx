@@ -3,20 +3,20 @@
  * Specifically handles database connection failures and prevents infinite re-rendering loops
  */
 
-import { Component, ReactNode } from 'react';
+import React, { Component, ReactNode } from 'react';
 import { log } from '@/lib/logger';
 
 interface DatabaseErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
-  errorInfo: any;
+  errorInfo: React.ErrorInfo | null;
   isDatabaseError: boolean;
 }
 
 interface DatabaseErrorBoundaryProps {
   children: ReactNode;
   fallback?: ReactNode;
-  onError?: (error: Error, errorInfo: any) => void;
+  onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
 }
 
 export class DatabaseErrorBoundary extends Component<
@@ -49,7 +49,7 @@ export class DatabaseErrorBoundary extends Component<
     };
   }
 
-  override componentDidCatch(error: Error, errorInfo: any) {
+  override componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({
       errorInfo,
     });
