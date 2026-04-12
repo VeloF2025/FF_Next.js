@@ -6,14 +6,32 @@
 import { SupplierRatingAnalyzer } from './rating-analyzer';
 import { SupplierPerformanceTracker } from './performance-tracker';
 import { log } from '@/lib/logger';
-import type { 
-  TrendSummaryReport, 
-  CategoryTrend, 
+import type {
+  TrendSummaryReport,
+  CategoryTrend,
   RatingTrend,
   PerformanceTrend,
   GrowthTrend,
-  TrendAnalysisOptions
+  TrendAnalysisOptions,
+  TrendMetrics,
+  CorrelationMatrix
 } from './trend-types';
+
+/** Anomaly record returned by SupplierRatingAnalyzer.identifyRatingAnomalies */
+interface RatingAnomaly {
+  period: string;
+  type: 'spike' | 'drop' | 'unusual_activity';
+  severity: 'low' | 'medium' | 'high';
+  description: string;
+  impact: number;
+}
+
+/** A single forward-looking prediction point */
+interface ForecastPoint {
+  period: string;
+  predictedRating: number;
+  confidence: number;
+}
 
 export class SupplierTrendReporter {
   /**
@@ -132,10 +150,10 @@ export class SupplierTrendReporter {
    * Generate advanced analytics report
    */
   static async generateAdvancedAnalyticsReport(options: TrendAnalysisOptions): Promise<{
-    trendMetrics: any;
-    performanceCorrelations: any;
-    anomalies: any[];
-    predictions: any[];
+    trendMetrics: TrendMetrics;
+    performanceCorrelations: CorrelationMatrix;
+    anomalies: RatingAnomaly[];
+    predictions: ForecastPoint[];
     recommendations: string[];
   }> {
     try {
@@ -174,9 +192,9 @@ export class SupplierTrendReporter {
    * Determine overall trend direction
    */
   private static determineOverallTrend(
-    ratingTrends: RatingTrend[], 
+    ratingTrends: RatingTrend[],
     performanceTrends: PerformanceTrend[],
-    metrics: any
+    metrics: TrendMetrics
   ): 'improving' | 'declining' | 'stable' {
     // Analyze multiple factors
     const ratingSlope = metrics.slope;
@@ -217,8 +235,8 @@ export class SupplierTrendReporter {
     _ratingTrends: RatingTrend[],
     _performanceTrends: PerformanceTrend[],
     growthTrends: GrowthTrend[],
-    metrics: any,
-    correlations: any,
+    metrics: TrendMetrics,
+    correlations: CorrelationMatrix,
     _months: number
   ): string[] {
     const insights: string[] = [];
@@ -267,8 +285,8 @@ export class SupplierTrendReporter {
    */
   private static generateRecommendations(
     overallTrend: string,
-    metrics: any,
-    correlations: any,
+    metrics: TrendMetrics,
+    correlations: CorrelationMatrix,
     growthTrends: GrowthTrend[],
     _months: number
   ): string[] {
@@ -317,9 +335,9 @@ export class SupplierTrendReporter {
    * Generate advanced recommendations
    */
   private static generateAdvancedRecommendations(
-    metrics: any,
-    correlations: any,
-    anomalies: any[]
+    metrics: TrendMetrics,
+    correlations: CorrelationMatrix,
+    anomalies: RatingAnomaly[]
   ): string[] {
     const recommendations: string[] = [];
 
@@ -349,8 +367,8 @@ export class SupplierTrendReporter {
     ratingTrends: RatingTrend[],
     _performanceTrends: PerformanceTrend[],
     forecastMonths: number
-  ): any[] {
-    const predictions: any[] = [];
+  ): ForecastPoint[] {
+    const predictions: ForecastPoint[] = [];
     
     if (ratingTrends.length < 3) return predictions;
 
