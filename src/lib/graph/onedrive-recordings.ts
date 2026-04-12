@@ -38,6 +38,18 @@ export interface OneDriveScrapeResult {
   errors: string[];
 }
 
+/** Row returned by "SELECT id FROM meetings WHERE onedrive_item_id = ..." */
+interface MeetingIdRow { id: number }
+
+/** Row returned by "SELECT id, title, recording_path FROM meetings ..." */
+interface MeetingMatchRow { id: number; title: string; recording_path: string | null }
+
+/** Row returned by "INSERT INTO meetings ... RETURNING id" */
+interface MeetingInsertRow { id: number }
+
+/** Row returned by "SELECT processing_status FROM meetings WHERE id = ..." */
+interface MeetingStatusRow { processing_status: string }
+
 /**
  * Lists all .mp4 files in a user's OneDrive /Recordings/ folder.
  * Returns empty array if folder doesn't exist or access is denied.
@@ -184,7 +196,7 @@ export async function scrapeOneDriveRecordings(
         // Check if already scraped
         const existing = await sql`
           SELECT id FROM meetings WHERE onedrive_item_id = ${item.id}
-        ` as any[];
+        ` as MeetingIdRow[];
         if (existing.length > 0) {
           result.alreadyProcessed++;
           continue;
@@ -209,13 +221,13 @@ export async function scrapeOneDriveRecordings(
               AND onedrive_item_id IS NULL
             ORDER BY ABS(EXTRACT(EPOCH FROM (meeting_date - ${recordingDate.toISOString()}::timestamptz)))
             LIMIT 1
-          ` as any[];
+          ` as MeetingMatchRow[];
 
           let meetingId: number;
 
           if (matchRows.length > 0) {
             // Match to existing meeting
-            meetingId = matchRows[0]!.id as number;
+            meetingId = matchRows[0]!.id;
             result.matched++;
             log.info('Matched to existing meeting', {
               meetingId,
@@ -236,8 +248,8 @@ export async function scrapeOneDriveRecordings(
                 'fetching', NOW(), NOW()
               )
               RETURNING id
-            ` as any[];
-            meetingId = newRows[0]!.id as number;
+            ` as MeetingInsertRow[];
+            meetingId = newRows[0]!.id;
             result.created++;
             log.info('Created meeting from OneDrive recording', {
               meetingId, title, recording: item.name,
@@ -258,7 +270,7 @@ export async function scrapeOneDriveRecordings(
                   onedrive_item_id = ${item.id},
                   updated_at = NOW()
               WHERE id = ${meetingId}
-            ` as any[];
+            `;
             result.newDownloads++;
             log.info('Recording downloaded', {
               meetingId, filePath, sizeMB: (sizeBytes / 1024 / 1024).toFixed(1),
@@ -273,23 +285,23 @@ export async function scrapeOneDriveRecordings(
                   onedrive_item_id = ${item.id},
                   updated_at = NOW()
               WHERE id = ${meetingId}
-            ` as any[];
+            `;
           }
 
           // Run LLM enrichment if not already done
           const meetingRow = await sql`
             SELECT processing_status FROM meetings WHERE id = ${meetingId}
-          ` as any[];
+          ` as MeetingStatusRow[];
           if (meetingRow[0]?.processing_status !== 'completed') {
             try {
-              await sql`UPDATE meetings SET processing_status = 'processing', updated_at = NOW() WHERE id = ${meetingId}` as any[];
+              await sql`UPDATE meetings SET processing_status = 'processing', updated_at = NOW() WHERE id = ${meetingId}`;
               await processWithLLM(meetingId);
-              await sql`UPDATE meetings SET processing_status = 'completed', processed_at = NOW(), updated_at = NOW() WHERE id = ${meetingId}` as any[];
+              await sql`UPDATE meetings SET processing_status = 'completed', processed_at = NOW(), updated_at = NOW() WHERE id = ${meetingId}`;
               result.enriched++;
             } catch (llmErr: unknown) {
               const msg = llmErr instanceof Error ? llmErr.message : String(llmErr);
               log.warn('LLM enrichment failed', { meetingId, error: msg }, LOGGER);
-              await sql`UPDATE meetings SET processing_status = 'failed', processing_error = ${msg}, updated_at = NOW() WHERE id = ${meetingId}` as any[];
+              await sql`UPDATE meetings SET processing_status = 'failed', processing_error = ${msg}, updated_at = NOW() WHERE id = ${meetingId}`;
             }
           }
 

@@ -4,13 +4,25 @@ import { collection, query, where, orderBy, getDocs, doc, addDoc, updateDoc, Tim
 import { log } from '@/lib/logger';
 // @ts-ignore — firebase config not available
 import { db } from '@/config/firebase';
-import { 
+import {
   Client,
   ClientDropdownOption,
   ClientSummary,
   ClientStatus,
   ContactHistory
 } from '@/types/client.types';
+
+/** Minimal shape of a Firestore QueryDocumentSnapshot (firebase not in deps) */
+interface FirestoreDoc {
+  id: string;
+  data(): Record<string, unknown>;
+}
+
+/** Minimal project data shape used for client metric calculations */
+interface ProjectData {
+  status?: string;
+  budget?: number;
+}
 
 /**
  * Specialized query operations for clients
@@ -27,14 +39,14 @@ export const clientQueryService = {
         orderBy('name', 'asc')
       );
       const snapshot = await getDocs(q);
-      
+
       // Filter for active/prospect clients client-side
       const activeStatuses = [ClientStatus.ACTIVE, ClientStatus.PROSPECT];
-      
-      return snapshot.docs
-        .map((doc: any) => ({ id: doc.id, ...doc.data() } as Client))
-        .filter((client: any) => activeStatuses.includes(client.status))
-        .map((client: any) => ({
+
+      return (snapshot.docs as FirestoreDoc[])
+        .map((d) => ({ id: d.id, ...d.data() } as Client))
+        .filter((client) => activeStatuses.includes(client.status))
+        .map((client) => ({
           id: client.id!,
           name: client.name,
           contactPerson: client.contactPerson,
@@ -55,7 +67,7 @@ export const clientQueryService = {
   async getClientSummary(): Promise<ClientSummary> {
     try {
       const clients = await clientQueryService.getAllClients();
-      
+
       const summary: ClientSummary = {
         totalClients: clients.length,
         activeClients: clients.filter(c => c.status === ClientStatus.ACTIVE).length,
@@ -70,35 +82,35 @@ export const clientQueryService = {
         monthlyGrowth: 0, // TODO: Calculate based on created dates
         conversionRate: 0, // TODO: Calculate prospects to active ratio
       };
-      
+
       // Calculate average project value
       if (clients.length > 0) {
         summary.averageProjectValue = summary.totalProjectValue / clients.length;
       }
-      
+
       // Get top clients by value
       summary.topClientsByValue = clients
         .sort((a, b) => b.totalProjectValue - a.totalProjectValue)
         .slice(0, 5);
-      
+
       // Count by category
       clients.forEach(client => {
-        summary.clientsByCategory[client.category] = 
+        summary.clientsByCategory[client.category] =
           (summary.clientsByCategory[client.category] || 0) + 1;
       });
-      
+
       // Count by status
       clients.forEach(client => {
-        summary.clientsByStatus[client.status] = 
+        summary.clientsByStatus[client.status] =
           (summary.clientsByStatus[client.status] || 0) + 1;
       });
-      
+
       // Count by priority
       clients.forEach(client => {
-        summary.clientsByPriority[client.priority] = 
+        summary.clientsByPriority[client.priority] =
           (summary.clientsByPriority[client.priority] || 0) + 1;
       });
-      
+
       return summary;
     } catch (error) {
       log.error('clientQueryService', { action: 'getClientSummaryFailed', error });
@@ -117,15 +129,15 @@ export const clientQueryService = {
         where('clientId', '==', clientId)
       );
       const projectsSnapshot = await getDocs(projectsQuery);
-      const projects = projectsSnapshot.docs.map((doc: any) => doc.data());
-      
+      const projects = (projectsSnapshot.docs as FirestoreDoc[]).map((d) => d.data() as ProjectData);
+
       // Calculate metrics
       const totalProjects = projects.length;
-      const activeProjects = projects.filter((p: any) => p.status === 'active').length;
-      const completedProjects = projects.filter((p: any) => p.status === 'completed').length;
-      const totalProjectValue = projects.reduce((sum: any, p: any) => sum + (p.budget || 0), 0);
+      const activeProjects = projects.filter((p) => p.status === 'active').length;
+      const completedProjects = projects.filter((p) => p.status === 'completed').length;
+      const totalProjectValue = projects.reduce((sum: number, p: ProjectData) => sum + (p.budget || 0), 0);
       const averageProjectValue = totalProjects > 0 ? totalProjectValue / totalProjects : 0;
-      
+
       // Update client metrics
       const clientRef = doc(db, 'clients', clientId);
       await updateDoc(clientRef, {
@@ -151,16 +163,16 @@ export const clientQueryService = {
         ...contactHistory,
         createdAt: Timestamp.now(),
       };
-      
+
       const docRef = await addDoc(collection(db, 'contactHistory'), historyData);
-      
+
       // Update client's last contact date
       const clientRef = doc(db, 'clients', contactHistory.clientId);
       await updateDoc(clientRef, {
         lastContactDate: contactHistory.contactDate,
         updatedAt: Timestamp.now(),
       });
-      
+
       return docRef.id;
     } catch (error) {
       log.error('clientQueryService', { action: 'addContactHistoryFailed', error });
@@ -179,10 +191,10 @@ export const clientQueryService = {
         orderBy('contactDate', 'desc')
       );
       const snapshot = await getDocs(q);
-      
-      return snapshot.docs.map((doc: any) => ({
-        id: doc.id,
-        ...doc.data()
+
+      return (snapshot.docs as FirestoreDoc[]).map((d) => ({
+        id: d.id,
+        ...d.data()
       } as ContactHistory));
     } catch (error) {
       log.error('clientQueryService', { action: 'getContactHistoryFailed', error });
@@ -195,9 +207,9 @@ export const clientQueryService = {
    */
   async getAllClients(): Promise<Client[]> {
     const snapshot = await getDocs(collection(db, 'clients'));
-    return snapshot.docs.map((doc: any) => ({
-      id: doc.id,
-      ...doc.data()
+    return (snapshot.docs as FirestoreDoc[]).map((d) => ({
+      id: d.id,
+      ...d.data()
     } as Client));
   }
 };
