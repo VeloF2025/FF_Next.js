@@ -34,7 +34,7 @@ export function isValidDate(date: Date): boolean {
  * Apply validation rules to a field
  */
 export function applyValidationRules(
-  value: any,
+  value: unknown,
   fieldName: string,
   row: number,
   rules: ValidationOptions,
@@ -111,7 +111,7 @@ export function applyValidationRules(
  * Validate required field
  */
 export function validateRequired(
-  value: any,
+  value: unknown,
   fieldName: string,
   row: number,
   errors: ImportError[]

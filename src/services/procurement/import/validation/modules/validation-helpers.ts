@@ -10,7 +10,7 @@ import { isValidDate, isValidEmail, isValidPhone } from './validation-rules';
  * Parse and validate a numeric value with comprehensive error handling
  */
 export function parseNumber(
-  value: any,
+  value: unknown,
   row: number,
   field: string,
   errors: ImportError[],
@@ -95,7 +95,7 @@ export function parseNumber(
  * Validate and clean string values
  */
 export function validateString(
-  value: any,
+  value: unknown,
   row: number,
   field: string,
   errors: ImportError[],
@@ -144,7 +144,7 @@ export function validateString(
  * Parse and validate date values
  */
 export function parseDate(
-  value: any,
+  value: unknown,
   row: number,
   field: string,
   errors: ImportError[],
@@ -259,7 +259,7 @@ export function parseDate(
  * Parse and validate boolean values
  */
 export function parseBoolean(
-  value: any,
+  value: unknown,
   row: number,
   field: string,
   errors: ImportError[],
@@ -352,7 +352,7 @@ export function normalizeString(str: string): string {
  * Parse email with validation
  */
 export function parseEmail(
-  value: any,
+  value: unknown,
   row: number,
   field: string,
   errors: ImportError[],
@@ -382,7 +382,7 @@ export function parseEmail(
  * Parse phone number with validation
  */
 export function parsePhone(
-  value: any,
+  value: unknown,
   row: number,
   field: string,
   errors: ImportError[],

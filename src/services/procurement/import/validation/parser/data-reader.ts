@@ -10,7 +10,7 @@ import { parseDate } from '../modules/validation-helpers';
  * Parse and validate a numeric value
  */
 export function parseNumber(
-  value: any,
+  value: unknown,
   row: number,
   field: string,
   errors: ImportError[],
@@ -98,7 +98,7 @@ export function parseNumber(
  * Read and validate string values
  */
 export function readString(
-  value: any,
+  value: unknown,
   _context: ValidationContext,
   _errors: ImportError[],
   _warnings: ImportWarning[]
@@ -117,7 +117,7 @@ export function readString(
  * Parse and validate boolean values
  */
 export function parseBoolean(
-  value: any,
+  value: unknown,
   row: number,
   field: string,
   errors: ImportError[],
@@ -182,8 +182,8 @@ export function parseBoolean(
 /**
  * Read value with type conversion
  */
-export function readValue<T = any>(
-  value: any,
+export function readValue<T = unknown>(
+  value: unknown,
   targetType: string,
   context: ValidationContext,
   errors: ImportError[],
@@ -214,9 +214,9 @@ export function readValue<T = any>(
 /**
  * Create parse result object
  */
-export function createParseResult<T = any>(
+export function createParseResult<T = unknown>(
   value: T | undefined,
-  originalValue: any,
+  originalValue: unknown,
   errors: ImportError[] = [],
   warnings: ImportWarning[] = []
 ): ParseResult<T> {
