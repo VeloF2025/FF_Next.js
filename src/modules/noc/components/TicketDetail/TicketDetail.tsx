@@ -26,7 +26,9 @@ import {
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
-import { useTicket } from '../../hooks/useTicket';
+import toast from 'react-hot-toast';
+import { log } from '@/lib/logger';
+import { useTicket, useUpdateTicket } from '../../hooks/useTicket';
 import { useTicketActivities } from '../../hooks/useTicketActivities';
 import { TicketHeader } from './TicketHeader';
 import { TicketActions } from './TicketActions';
@@ -64,13 +66,25 @@ interface Tab {
  */
 export function TicketDetail({ ticketId, compact = false, backLink }: TicketDetailProps) {
   const { ticket, isLoading, isError, error, refetch } = useTicket(ticketId);
+  const updateTicket = useUpdateTicket();
   const { summary: activitySummary } = useTicketActivities(ticketId);
   const { summary: notesSummary } = useTicketNotes(ticketId);
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
-  // Handle action complete (refetch ticket data)
+  // Handle refetch-only events (assignment saved, priority badge changed internally, etc.)
   const handleActionComplete = () => {
     refetch();
+  };
+
+  // Handle workflow button status changes (Approve QA, Reject QA, etc.)
+  const handleStatusChange = async (newStatus: string) => {
+    try {
+      await updateTicket.mutateAsync({ id: ticketId, payload: { status: newStatus } });
+      refetch();
+    } catch (err) {
+      log.error('Failed to update ticket status', { err, ticketId, newStatus });
+      toast.error('Failed to update ticket status');
+    }
   };
 
   // Mock timeline events (for overview tab)
@@ -162,7 +176,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
       <TicketHeader
         ticket={ticket}
         backLink={backLink}
-        onStatusChange={handleActionComplete}
+        onStatusChange={(newStatus) => { void handleStatusChange(newStatus); }}
         onPriorityChange={handleActionComplete}
       />
 
