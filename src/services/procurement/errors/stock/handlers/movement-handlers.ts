@@ -17,6 +17,7 @@
 // Import from new modular structure for backward compatibility
 import { MovementCore, TransferHandler, MovementExecutor } from './movement';
 import { StockMovementError, StockTransferError } from '../tracking';
+import type { RetryStrategy } from '../types';
 
 // Re-export types from new modular structure
 export type { RetryStrategy } from './movement';
@@ -32,7 +33,7 @@ export class MovementHandlers {
    */
   static handleMovementError(error: StockMovementError): {
     error: StockMovementError;
-    retryStrategies: any[];
+    retryStrategies: RetryStrategy[];
     severity: 'low' | 'medium' | 'high' | 'critical';
     autoRecoverable: boolean;
   } {
@@ -46,7 +47,7 @@ export class MovementHandlers {
    */
   static handleTransferError(error: StockTransferError): {
     error: StockTransferError;
-    retryStrategies: any[];
+    retryStrategies: RetryStrategy[];
     severity: 'low' | 'medium' | 'high' | 'critical';
     autoRecoverable: boolean;
   } {
@@ -58,9 +59,9 @@ export class MovementHandlers {
    * Execute movement retry strategy
    * @deprecated Use MovementExecutor.executeRetry() instead
    */
-  static async executeRetry(retryStrategy: any): Promise<{
+  static async executeRetry(retryStrategy: RetryStrategy): Promise<{
     success: boolean;
-    result: any | undefined;
+    result: Record<string, unknown> | undefined;
     error: string | undefined;
     shouldRetry: boolean | undefined;
   }> {

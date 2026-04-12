@@ -5,11 +5,20 @@
 
 import { ValidationError } from '../validator-types';
 
+interface QualityRecord {
+  latitude?: number | string;
+  longitude?: number | string;
+  installation_date?: string;
+  planning_date?: string;
+  status?: string;
+  [key: string]: unknown;
+}
+
 export class QualityValidators {
   /**
    * Check for common data quality issues
    */
-  static checkDataQuality(record: any): ValidationError[] {
+  static checkDataQuality(record: QualityRecord): ValidationError[] {
     const errors: ValidationError[] = [];
 
     // Check for suspiciously similar coordinates (handled by CoordinateValidators)
@@ -37,7 +46,7 @@ export class QualityValidators {
   /**
    * Check for placeholder values in record fields
    */
-  static checkPlaceholderValues(record: any): ValidationError[] {
+  static checkPlaceholderValues(record: QualityRecord): ValidationError[] {
     const errors: ValidationError[] = [];
     const placeholderValues = ['test', 'placeholder', 'tbd', 'n/a', 'unknown', ''];
     
@@ -59,14 +68,15 @@ export class QualityValidators {
   /**
    * Check for missing critical fields
    */
-  static checkMissingCriticalFields(record: any, criticalFields: string[]): ValidationError[] {
+  static checkMissingCriticalFields(record: QualityRecord, criticalFields: string[]): ValidationError[] {
     const errors: ValidationError[] = [];
     
     criticalFields.forEach(field => {
-      if (!record[field] || (typeof record[field] === 'string' && record[field].trim() === '')) {
+      const fieldValue = record[field];
+      if (!fieldValue || (typeof fieldValue === 'string' && fieldValue.trim() === '')) {
         errors.push({
           field,
-          value: record[field],
+          value: fieldValue,
           message: `Critical field "${field}" is missing or empty`,
           severity: 'error',
           code: 'MISSING_CRITICAL_FIELD'
@@ -80,7 +90,7 @@ export class QualityValidators {
   /**
    * Check for data consistency issues
    */
-  static checkDataConsistency(record: any): ValidationError[] {
+  static checkDataConsistency(record: QualityRecord): ValidationError[] {
     const errors: ValidationError[] = [];
 
     // Check if installation date is before planning date

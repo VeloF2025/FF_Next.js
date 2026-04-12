@@ -4,13 +4,59 @@
  */
 
 import { procurementApi } from '@/services/api/procurementApi';
-import type { StockPosition, StockMovement, StockDashboard } from '@/services/api/procurementApi';
+import type { StockPosition, StockMovement, StockMovementItem, StockDashboard } from '@/services/api/procurementApi';
 import type { ProcurementApiContext } from '../../index';
+
+interface StockPositionFilters {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  category?: string;
+  stockStatus?: string;
+  warehouseLocation?: string;
+  binLocation?: string;
+  itemCode?: string;
+  lowStock?: boolean;
+}
+
+interface StockMovementFilters {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  movementType?: string;
+  status?: string;
+  fromDate?: string;
+  toDate?: string;
+  referenceNumber?: string;
+}
+
+interface BulkMovementData {
+  movementType: string;
+  referenceNumber: string;
+  referenceType?: string;
+  referenceId?: string;
+  fromLocation?: string;
+  toLocation?: string;
+  fromProjectId?: string;
+  toProjectId?: string;
+  notes?: string;
+  reason?: string;
+  items: Array<{
+    itemCode: string;
+    itemName?: string;
+    plannedQuantity: number;
+    unitCost?: number;
+    lotNumbers?: string[];
+    serialNumbers?: string[];
+  }>;
+}
 
 export class StockClient {
   static async getStockPositions(
     context: ProcurementApiContext,
-    filters?: any
+    filters?: StockPositionFilters
   ): Promise<{ positions: StockPosition[], total: number, page: number, limit: number }> {
     const response = await procurementApi.stock.getPositions(context.projectId, filters);
     return {
@@ -45,7 +91,7 @@ export class StockClient {
 
   static async getStockMovements(
     context: ProcurementApiContext,
-    filters?: any
+    filters?: StockMovementFilters
   ): Promise<{ movements: StockMovement[], total: number, page: number, limit: number }> {
     const response = await procurementApi.stock.getMovements(context.projectId, filters);
     return {
@@ -65,8 +111,8 @@ export class StockClient {
 
   static async processBulkMovement(
     context: ProcurementApiContext,
-    bulkMovementData: any
-  ): Promise<{ movement: StockMovement, items: any[] }> {
+    bulkMovementData: BulkMovementData
+  ): Promise<{ movement: StockMovement, items: StockMovementItem[] }> {
     return procurementApi.stock.processBulkMovement(context.projectId, {
       ...bulkMovementData,
       userId: context.userId

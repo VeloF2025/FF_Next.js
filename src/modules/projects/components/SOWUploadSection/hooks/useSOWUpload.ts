@@ -4,11 +4,20 @@ import { useSOWService } from '@/hooks/useSOW';
 import { sowDataProcessor } from '@/services/sowDataProcessor';
 import { neonSOWService } from '@/services/neonSOWService';
 import { SOWFile, FileTypeConfig } from '../types/sowUpload.types';
+import type { NeonPoleData, NeonDropData, NeonFibreData } from '@/services/neonSOWService';
 import { log } from '@/lib/logger';
+
+type SOWDataUpdate = {
+  poles?: NeonPoleData[];
+  drops?: NeonDropData[];
+  fibre?: NeonFibreData[];
+};
+
+type ProcessedSOWData = NeonPoleData[] | NeonDropData[] | NeonFibreData[];
 
 export function useSOWUpload(
   projectId: string,
-  onDataUpdate?: (data: { poles?: any[]; drops?: any[]; fibre?: any[] }) => void
+  onDataUpdate?: (data: SOWDataUpdate) => void
 ) {
   const [files, setFiles] = useState<SOWFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -18,7 +27,7 @@ export function useSOWUpload(
     type: string,
     status: SOWFile['status'],
     message?: string,
-    data?: any[],
+    data?: ProcessedSOWData,
     summary?: SOWFile['summary']
   ) => {
     setFiles(prev => prev.map(f =>
@@ -47,48 +56,54 @@ export function useSOWUpload(
 
       updateFileStatus(sowFile.type, 'processing', 'Processing data...');
 
-      // Process data based on type WITHOUT validation - just like the direct import
-      let processedData: any[] = [];
-
-      switch (sowFile.type) {
-        case 'poles': {
-          processedData = sowDataProcessor.processPoles(rawData);
-          break;
-        }
-        case 'drops': {
-          processedData = sowDataProcessor.processDrops(rawData);
-          break;
-        }
-        case 'fibre': {
-          processedData = sowDataProcessor.processFibre(rawData);
-          break;
-        }
-      }
-
-      if (processedData.length === 0) {
-        updateFileStatus(sowFile.type, 'error', 'No data found in file');
-        setIsProcessing(false);
-        return;
-      }
-
       // Initialize Neon tables if not exists
       updateFileStatus(sowFile.type, 'processing', 'Initializing database...');
       await neonSOWService.initializeTables(projectId);
 
-      // Upload to Neon database
-      updateFileStatus(sowFile.type, 'processing', `Uploading ${processedData.length} items to database...`);
+      // Process data based on type and upload in one switch to preserve narrowing
+      let processedData: ProcessedSOWData;
+      let uploadResult: { message?: string } | undefined;
 
-      let uploadResult;
       switch (sowFile.type) {
-        case 'poles':
-          uploadResult = await neonSOWService.uploadPoles(projectId, processedData);
+        case 'poles': {
+          const poles = sowDataProcessor.processPoles(rawData);
+          if (poles.length === 0) {
+            updateFileStatus(sowFile.type, 'error', 'No data found in file');
+            setIsProcessing(false);
+            return;
+          }
+          updateFileStatus(sowFile.type, 'processing', `Uploading ${poles.length} items to database...`);
+          uploadResult = await neonSOWService.uploadPoles(projectId, poles);
+          processedData = poles;
           break;
-        case 'drops':
-          uploadResult = await neonSOWService.uploadDrops(projectId, processedData);
+        }
+        case 'drops': {
+          const drops = sowDataProcessor.processDrops(rawData);
+          if (drops.length === 0) {
+            updateFileStatus(sowFile.type, 'error', 'No data found in file');
+            setIsProcessing(false);
+            return;
+          }
+          updateFileStatus(sowFile.type, 'processing', `Uploading ${drops.length} items to database...`);
+          uploadResult = await neonSOWService.uploadDrops(projectId, drops);
+          processedData = drops;
           break;
-        case 'fibre':
-          uploadResult = await neonSOWService.uploadFibre(projectId, processedData);
+        }
+        case 'fibre': {
+          const fibres = sowDataProcessor.processFibre(rawData);
+          if (fibres.length === 0) {
+            updateFileStatus(sowFile.type, 'error', 'No data found in file');
+            setIsProcessing(false);
+            return;
+          }
+          updateFileStatus(sowFile.type, 'processing', `Uploading ${fibres.length} items to database...`);
+          uploadResult = await neonSOWService.uploadFibre(projectId, fibres);
+          processedData = fibres;
           break;
+        }
+        default:
+          setIsProcessing(false);
+          return;
       }
 
       // Data is now saved directly to Neon via API - no Firebase backup needed
@@ -103,14 +118,15 @@ export function useSOWUpload(
 
       // Update parent component
       if (onDataUpdate) {
-        const currentData = files.reduce((acc, f) => {
+        const currentData = files.reduce<SOWDataUpdate>((acc, f) => {
           if (f.data) {
-            acc[f.type] = f.data;
+            // f.data is Record<string,unknown>[] from SOWFile; cast via unknown for type assignment
+            acc[f.type] = f.data as unknown as NeonPoleData[] & NeonDropData[] & NeonFibreData[];
           }
           return acc;
-        }, {} as any);
+        }, {});
 
-        currentData[sowFile.type] = processedData;
+        currentData[sowFile.type] = processedData as NeonPoleData[] & NeonDropData[] & NeonFibreData[];
         onDataUpdate(currentData);
       }
 
