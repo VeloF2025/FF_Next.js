@@ -87,7 +87,7 @@ export function validateQuery<T extends ZodSchema>(
 ): z.infer<T> | NextResponse {
   try {
     // Convert URLSearchParams to plain object
-    const params: Record<string, any> = {};
+    const params: Record<string, unknown> = {};
     
     if (searchParams instanceof URLSearchParams) {
       searchParams.forEach((value, key) => {
@@ -239,7 +239,11 @@ export function createValidationMiddleware<
     query?: z.infer<TQuery>;
     params?: z.infer<TParams>;
   } | NextResponse> => {
-    const result: any = {};
+    const result: {
+      body?: z.infer<TBody>;
+      query?: z.infer<TQuery>;
+      params?: z.infer<TParams>;
+    } = {};
     
     // Validate body
     if (config.body) {
@@ -274,7 +278,7 @@ export function createValidationMiddleware<
 /**
  * Type guard to check if value is a NextResponse (error)
  */
-export function isValidationError(value: any): value is NextResponse {
+export function isValidationError(value: unknown): value is NextResponse {
   return value instanceof NextResponse;
 }
 

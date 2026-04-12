@@ -25,7 +25,7 @@ interface CacheStats {
 /**
  * Least Recently Used (LRU) Cache
  */
-export class LRUCache<T = any> {
+export class LRUCache<T = unknown> {
   private cache: Map<string, CacheEntry<T>> = new Map();
   private readonly maxSize: number;
   private readonly ttl: number; // Time to live in milliseconds
@@ -180,13 +180,13 @@ export class LRUCache<T = any> {
  * Manages multiple caches for different data types
  */
 class QueryCacheManager {
-  private caches: Map<string, LRUCache> = new Map();
+  private caches: Map<string, LRUCache<unknown>> = new Map();
   private enabled: boolean = true;
 
   /**
    * Get or create a cache for a namespace
    */
-  getCache(namespace: string, maxSize: number = 100, ttl: number = 5 * 60 * 1000): LRUCache {
+  getCache(namespace: string, maxSize: number = 100, ttl: number = 5 * 60 * 1000): LRUCache<unknown> {
     if (!this.caches.has(namespace)) {
       this.caches.set(namespace, new LRUCache(maxSize, ttl));
     }
@@ -202,7 +202,7 @@ class QueryCacheManager {
     const cache = this.caches.get(namespace);
     if (!cache) return null;
 
-    return cache.get(key);
+    return cache.get(key) as T | null;
   }
 
   /**
@@ -345,13 +345,13 @@ export async function cachedQuery<T>(
  */
 export function cacheQuery(namespace: string, ttl?: number) {
   return function (
-    target: any,
+    target: unknown,
     propertyKey: string,
     descriptor: PropertyDescriptor
   ) {
-    const originalMethod = descriptor.value;
+    const originalMethod = descriptor.value as (...args: unknown[]) => Promise<unknown>;
 
-    descriptor.value = async function (...args: any[]) {
+    descriptor.value = async function (...args: unknown[]) {
       const cacheKey = `${propertyKey}:${JSON.stringify(args)}`;
 
       return cachedQuery(
