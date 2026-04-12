@@ -97,7 +97,7 @@ interface ApplyResult {
 }
 
 // Fetch 3-way alignment report
-async function fetchThreeWayReport(rows: any[][], headers?: string[]): Promise<ThreeWayReport> {
+async function fetchThreeWayReport(rows: unknown[][], headers?: string[]): Promise<ThreeWayReport> {
   const response = await fetch('/api/noc/alignment/three-way', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -143,7 +143,7 @@ export function ThreeWayAlignmentReport() {
         // Prefer "MNT Tickets Logged" sheet
         if (name.toLowerCase().includes('tickets') || name.toLowerCase().includes('mnt')) {
           const sheet = workbook.Sheets[name];
-          const rows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+          const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 });
           // Check if this sheet has FT refs
           for (let r = 1; r < Math.min(10, rows.length); r++) {
             const row = rows[r] || [];
@@ -160,7 +160,7 @@ export function ThreeWayAlignmentReport() {
       }
 
       const sheet = workbook.Sheets[targetSheet];
-      const rows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+      const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 });
 
       // First row is headers
       const headers = rows[0] as string[];

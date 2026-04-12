@@ -9,11 +9,26 @@ import { log } from '@/lib/logger';
 
 const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://100.96.203.105:8001';
 
+interface BossPhotoResult {
+    photo_type: string;
+    status: string;
+    scores: { overall: number };
+    summary?: string;
+    issues?: string[];
+}
+
+interface BossApiResponse {
+    dr_number: string;
+    status?: string;
+    completed_at?: string;
+    results?: BossPhotoResult[];
+}
+
 export class BossEvaluationError extends Error {
     constructor(
         message: string,
         public readonly code?: string,
-        public readonly details?: any
+        public readonly details?: unknown
     ) {
         super(message);
         this.name = 'BossEvaluationError';
@@ -39,7 +54,7 @@ export async function fetchBossEvaluation(drNumber: string): Promise<EvaluationR
         });
 
         if (qaResponse.ok) {
-            const qaData = await qaResponse.json();
+            const qaData = await qaResponse.json() as BossApiResponse;
 
             if (qaData.status === 'completed' || qaData.status === 'failed') {
                 log.info('BossService', `Found completed evaluation for ${drNumber}`);
@@ -61,7 +76,7 @@ export async function fetchBossEvaluation(drNumber: string): Promise<EvaluationR
         });
 
         if (evalResponse.ok) {
-            const evalData = await evalResponse.json();
+            const evalData = await evalResponse.json() as BossApiResponse;
             if (evalData && evalData.dr_number) {
                 log.info('BossService', `Found evaluation via evaluations endpoint for ${drNumber}`);
                 return convertBossToEvaluationResult(evalData);
@@ -84,13 +99,13 @@ export async function fetchBossEvaluation(drNumber: string): Promise<EvaluationR
 /**
  * Convert BOSS API response to our EvaluationResult format
  */
-function convertBossToEvaluationResult(bossData: any): EvaluationResult {
+function convertBossToEvaluationResult(bossData: BossApiResponse): EvaluationResult {
     const drNumber = bossData.dr_number;
     const results = bossData.results || [];
 
     // Map BOSS photo-level results to our step-based format
     // BOSS evaluates individual photos, we need to aggregate by step type
-    const stepMap = new Map<string, any>();
+    const stepMap = new Map<string, BossPhotoResult>();
 
     for (const result of results) {
         const photoType = result.photo_type;

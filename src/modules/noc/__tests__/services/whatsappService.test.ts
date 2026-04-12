@@ -132,17 +132,17 @@ describe('WhatsAppService', () => {
   });
 
   // Helper to mock database insert
-  const mockDbInsert = (returnValue: any) => {
+  const mockDbInsert = (returnValue: unknown) => {
     mockQuery.mockResolvedValueOnce(returnValue);
   };
 
   // Helper to mock database update
-  const mockDbUpdate = (returnValue: any = { rowCount: 1 }) => {
+  const mockDbUpdate = (returnValue: unknown = { rowCount: 1 }) => {
     mockQuery.mockResolvedValueOnce(returnValue);
   };
 
   // Helper to mock database queryOne
-  const mockDbQueryOne = (returnValue: any) => {
+  const mockDbQueryOne = (returnValue: unknown) => {
     mockQueryOne.mockResolvedValueOnce(returnValue);
   };
 
