@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { log } from '@/lib/logger';
 import { analyticsService } from '@/services/analytics';
 import { FirebaseToNeonSync } from '@/services/sync';
-import { transformKPIDashboardItemsToMetrics } from '@/types/analytics';
+import { transformKPIDashboardItemsToMetrics, type ProjectOverview, type FinancialMetrics } from '@/types/analytics';
 import {
   DashboardData,
   DashboardLoadingState,
@@ -52,9 +52,9 @@ export function AnalyticsDashboard() {
       ]);
 
       setData({
-        projectOverview: projectOverview[0] as any || {} as any,
+        projectOverview: projectOverview[0] ?? ({} as ProjectOverview),
         kpiDashboard: transformKPIDashboardItemsToMetrics(kpiDashboard),
-        financialOverview: financialOverview[0] as any || {} as any,
+        financialOverview: financialOverview[0] ?? ({} as FinancialMetrics),
         topClients,
         projectTrends
       });

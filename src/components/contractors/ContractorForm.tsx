@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Contractor, ContractorFormData } from '@/types/contractor.core.types';
+import type { Contractor, ContractorFormData, BusinessType, ContractorStatus, ComplianceStatus } from '@/types/contractor.core.types';
 import { BUSINESS_TYPES, CONTRACTOR_STATUSES, COMPLIANCE_STATUSES, SA_PROVINCES } from '@/types/contractor.core.types';
 
 interface ContractorFormProps {
@@ -88,8 +88,8 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
         router.push('/contractors');
         router.refresh();
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save contractor');
     } finally {
       setIsSubmitting(false);
     }
@@ -171,7 +171,7 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
             <select
               required
               value={formData.businessType}
-              onChange={(e) => setFormData({ ...formData, businessType: e.target.value as any })}
+              onChange={(e) => setFormData({ ...formData, businessType: e.target.value as BusinessType })}
               className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {BUSINESS_TYPES.map((type) => (
@@ -385,7 +385,7 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
             </label>
             <select
               value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value as ContractorStatus })}
               className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {CONTRACTOR_STATUSES.map((status) => (
@@ -402,7 +402,7 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
             </label>
             <select
               value={formData.complianceStatus}
-              onChange={(e) => setFormData({ ...formData, complianceStatus: e.target.value as any })}
+              onChange={(e) => setFormData({ ...formData, complianceStatus: e.target.value as ComplianceStatus })}
               className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {COMPLIANCE_STATUSES.map((status) => (

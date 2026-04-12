@@ -5,8 +5,39 @@
 import { CheckCircle } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
+interface SowPole {
+  id?: string | number;
+  pole_number?: string;
+  latitude?: number;
+  longitude?: number;
+  pole_type?: string;
+  status?: string;
+  municipality?: string;
+}
+
+interface SowDrop {
+  id?: string | number;
+  drop_number?: string;
+  pole_number?: string;
+  address?: string;
+  cable_type?: string;
+  cable_length?: string | number;
+}
+
+interface SowFibreSegment {
+  id?: string | number;
+  segment_id?: string;
+  cable_size?: string;
+  layer?: string;
+  length?: number;
+  is_complete?: boolean;
+  contractor?: string;
+}
+
+type SowItem = SowPole | SowDrop | SowFibreSegment;
+
 interface SOWDataTableProps {
-  data: any[];
+  data: SowItem[];
   type: 'poles' | 'drops' | 'fibre';
   maxItems?: number;
 }
@@ -49,7 +80,7 @@ export function SOWDataTable({ data, type, maxItems = 50 }: SOWDataTableProps) {
         </tr>
       </thead>
       <tbody>
-        {displayData.map((pole: any, index: number) => (
+        {(displayData as SowPole[]).map((pole, index) => (
           <tr key={pole.id || index} className="border-b border-[var(--ff-border-secondary)] hover:bg-[var(--ff-surface-primary)]">
             <td className="px-4 py-3 text-sm font-medium text-[var(--ff-text-primary)]">
               {pole.pole_number}
@@ -61,7 +92,7 @@ export function SOWDataTable({ data, type, maxItems = 50 }: SOWDataTableProps) {
               {pole.pole_type || '-'}
             </td>
             <td className="px-4 py-3">
-              {getStatusBadge(pole.status)}
+              {getStatusBadge(pole.status ?? '')}
             </td>
             <td className="px-4 py-3 text-sm text-[var(--ff-text-secondary)]">
               {pole.municipality || '-'}
@@ -94,7 +125,7 @@ export function SOWDataTable({ data, type, maxItems = 50 }: SOWDataTableProps) {
         </tr>
       </thead>
       <tbody>
-        {displayData.map((drop: any, index: number) => (
+        {(displayData as SowDrop[]).map((drop, index) => (
           <tr key={drop.id || index} className="border-b border-[var(--ff-border-secondary)] hover:bg-[var(--ff-surface-primary)]">
             <td className="px-4 py-3 text-sm font-medium text-[var(--ff-text-primary)]">
               {drop.drop_number}
@@ -142,7 +173,7 @@ export function SOWDataTable({ data, type, maxItems = 50 }: SOWDataTableProps) {
         </tr>
       </thead>
       <tbody>
-        {displayData.map((segment: any, index: number) => (
+        {(displayData as SowFibreSegment[]).map((segment, index) => (
           <tr key={segment.id || index} className="border-b border-[var(--ff-border-secondary)] hover:bg-[var(--ff-surface-primary)]">
             <td className="px-4 py-3 text-sm font-medium text-[var(--ff-text-primary)]">
               {segment.segment_id}
