@@ -187,8 +187,7 @@ export class StockMovementService extends BaseService {
   }>> {
     try {
       // Test transaction capabilities
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: typeof db) => {
         await tx.select().from(stockMovements).limit(1);
       });
       
@@ -274,8 +273,7 @@ export class StockMovementService extends BaseService {
     grnData: GRNData
   ): Promise<ServiceResponse<{ movement: StockMovement, items: StockMovementItem[] }>> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return await db.transaction(async (tx: any) => {
+      return await db.transaction(async (tx: typeof db) => {
         // Create GRN movement
         const movementId = uuidv4();
         const movementRecord = {
@@ -427,8 +425,7 @@ export class StockMovementService extends BaseService {
     issueData: IssueData
   ): Promise<ServiceResponse<{ movement: StockMovement, items: StockMovementItem[] }>> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return await db.transaction(async (tx: any) => {
+      return await db.transaction(async (tx: typeof db) => {
         // Validate stock availability for all items first
         for (const item of issueData.items) {
           const [position] = await tx
@@ -571,8 +568,7 @@ export class StockMovementService extends BaseService {
     transferData: TransferData
   ): Promise<ServiceResponse<{ movement: StockMovement, items: StockMovementItem[] }>> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return await db.transaction(async (tx: any) => {
+      return await db.transaction(async (tx: typeof db) => {
         // Validate stock availability in source project
         for (const item of transferData.items) {
           const [sourcePosition] = await tx
@@ -873,8 +869,7 @@ export class StockMovementService extends BaseService {
     usageData: Omit<DrumUsageHistory, 'id' | 'drumId' | 'createdAt' | 'updatedAt'>
   ): Promise<ServiceResponse<DrumUsageHistory>> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return await db.transaction(async (tx: any) => {
+      return await db.transaction(async (tx: typeof db) => {
         // Get current drum information
         const [drum] = await tx
           .select()
@@ -968,20 +963,20 @@ export class StockMovementService extends BaseService {
       projectId: movement.projectId,
       movementType: movement.movementType as MovementTypeType,
       referenceNumber: movement.referenceNumber,
-      referenceType: movement.referenceType,
-      referenceId: movement.referenceId,
-      fromLocation: movement.fromLocation,
-      toLocation: movement.toLocation,
-      fromProjectId: movement.fromProjectId,
-      toProjectId: movement.toProjectId,
-      status: movement.status,
+      referenceType: movement.referenceType ?? undefined,
+      referenceId: movement.referenceId ?? undefined,
+      fromLocation: movement.fromLocation ?? undefined,
+      toLocation: movement.toLocation ?? undefined,
+      fromProjectId: movement.fromProjectId ?? undefined,
+      toProjectId: movement.toProjectId ?? undefined,
+      status: movement.status as StockMovement['status'],
       movementDate: movement.movementDate,
-      confirmedAt: movement.confirmedAt,
-      requestedBy: movement.requestedBy,
-      authorizedBy: movement.authorizedBy,
-      processedBy: movement.processedBy,
-      notes: movement.notes,
-      reason: movement.reason,
+      confirmedAt: movement.confirmedAt ?? undefined,
+      requestedBy: movement.requestedBy ?? undefined,
+      authorizedBy: movement.authorizedBy ?? undefined,
+      processedBy: movement.processedBy ?? undefined,
+      notes: movement.notes ?? undefined,
+      reason: movement.reason ?? undefined,
       createdAt: movement.createdAt,
       updatedAt: movement.updatedAt,
     };
@@ -1022,15 +1017,15 @@ export class StockMovementService extends BaseService {
       previousReading: Number(usage.previousReading),
       currentReading: Number(usage.currentReading),
       usedLength: Number(usage.usedLength),
-      poleNumber: usage.poleNumber,
-      sectionId: usage.sectionId,
-      workOrderId: usage.workOrderId,
-      technicianId: usage.technicianId,
-      installationType: usage.installationType,
-      startCoordinates: usage.startCoordinates,
-      endCoordinates: usage.endCoordinates,
-      installationNotes: usage.installationNotes,
-      qualityNotes: usage.qualityNotes,
+      poleNumber: usage.poleNumber ?? undefined,
+      sectionId: usage.sectionId ?? undefined,
+      workOrderId: usage.workOrderId ?? undefined,
+      technicianId: usage.technicianId ?? undefined,
+      installationType: usage.installationType as DrumUsageHistory['installationType'] ?? undefined,
+      startCoordinates: usage.startCoordinates ?? undefined,
+      endCoordinates: usage.endCoordinates ?? undefined,
+      installationNotes: usage.installationNotes ?? undefined,
+      qualityNotes: usage.qualityNotes ?? undefined,
       createdAt: usage.createdAt,
     };
   }

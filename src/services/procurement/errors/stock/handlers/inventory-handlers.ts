@@ -5,7 +5,7 @@
 
 import { InsufficientStockError, StockReservationError } from '../inventory';
 import { HandlerUtils } from './handler-utils';
-import type { RecoveryOption, ErrorSeverity } from '../types';
+import type { RecoveryOption, ErrorSeverity, ExistingReservation } from '../types';
 
 /**
  * Handlers for inventory-specific stock errors
@@ -106,13 +106,13 @@ export class InventoryHandlers {
       action: 'create_emergency_purchase_order',
       priority: 20,
       estimatedTime: '1-3 business days',
-      cost: error.getShortfall() * ((error as any).unitPrice || 0) * 1.25, // 25% premium for emergency
+      cost: error.getShortfall() * (error.unitPrice ?? 0) * 1.25, // 25% premium for emergency
       data: {
         itemCode: error.itemCode,
         requiredQuantity: error.getShortfall(),
         urgency: 'critical',
-        maxBudget: error.getShortfall() * ((error as any).unitPrice || 0) * 1.5,
-        preferredSuppliers: (error as any).preferredSuppliers || [],
+        maxBudget: error.getShortfall() * (error.unitPrice ?? 0) * 1.5,
+        preferredSuppliers: [] as string[],
         deliveryRequirement: 'ASAP'
       }
     });
@@ -237,7 +237,7 @@ export class InventoryHandlers {
   /**
    * Calculate estimated wait time for reservation queue
    */
-  private static calculateQueueWaitTime(existingReservations: any[]): string {
+  private static calculateQueueWaitTime(existingReservations: ExistingReservation[]): string {
     const queueLength = existingReservations.length;
     
     if (queueLength === 0) return 'Immediate';
@@ -251,11 +251,13 @@ export class InventoryHandlers {
   /**
    * Execute inventory recovery option
    */
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   static async executeRecovery(recoveryOption: RecoveryOption): Promise<{
     success: boolean;
     result?: any;
     error?: string;
   }> {
+    /* eslint-enable @typescript-eslint/no-explicit-any */
     try {
 
       switch (recoveryOption.action) {

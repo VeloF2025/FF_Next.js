@@ -9,7 +9,7 @@
  * - Groups by product and location (aggregates multiple quants)
  */
 
-import { neon, NeonQueryFunction } from '@/lib/db-neon';
+import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { OdooClient, OdooStockQuant } from '../odooClient';
 
@@ -50,13 +50,13 @@ export interface StockLevelSyncOptions {
  * Get stock item ID by Odoo product ID
  */
 async function getStockItemByOdooId(
-  sql: any,
+  sql: ReturnType<typeof neon>,
   odooProductId: number
 ): Promise<string | null> {
   const rows = await sql`
     SELECT id FROM stock_items WHERE odoo_product_id = ${odooProductId} LIMIT 1
   `;
-  return rows.length > 0 ? rows[0].id : null;
+  return rows.length > 0 ? String(rows[0]?.id ?? '') || null : null;
 }
 
 /**
@@ -64,7 +64,7 @@ async function getStockItemByOdooId(
  * Tries odoo_location_mappings first, then direct match
  */
 async function getWarehouseByOdooLocationId(
-  sql: any,
+  sql: ReturnType<typeof neon>,
   odooLocationId: number
 ): Promise<string | null> {
   // Try odoo_location_mappings first
@@ -74,15 +74,15 @@ async function getWarehouseByOdooLocationId(
       WHERE odoo_location_id = ${odooLocationId}
       LIMIT 1
     `;
-    if (mappingRows.length > 0 && mappingRows[0].ff_location_id) {
-      return mappingRows[0].ff_location_id;
+    if (mappingRows.length > 0 && mappingRows[0]?.ff_location_id) {
+      return String(mappingRows[0].ff_location_id) || null;
     }
     // If we have a warehouse code, look it up
-    if (mappingRows.length > 0 && mappingRows[0].ff_warehouse_code) {
+    if (mappingRows.length > 0 && mappingRows[0]?.ff_warehouse_code) {
       const warehouseRows = await sql`
-        SELECT id FROM stock_locations WHERE code = ${mappingRows[0].ff_warehouse_code} LIMIT 1
+        SELECT id FROM stock_locations WHERE code = ${String(mappingRows[0].ff_warehouse_code)} LIMIT 1
       `;
-      return warehouseRows.length > 0 ? warehouseRows[0].id : null;
+      return warehouseRows.length > 0 ? String(warehouseRows[0]?.id ?? '') || null : null;
     }
   } catch {
     // Table might not exist or have different structure
@@ -93,7 +93,7 @@ async function getWarehouseByOdooLocationId(
     const directRows = await sql`
       SELECT id FROM stock_locations WHERE odoo_location_id = ${odooLocationId} LIMIT 1
     `;
-    return directRows.length > 0 ? directRows[0].id : null;
+    return directRows.length > 0 ? String(directRows[0]?.id ?? '') || null : null;
   } catch {
     return null;
   }
@@ -103,21 +103,21 @@ async function getWarehouseByOdooLocationId(
  * Get default warehouse
  */
 async function getDefaultWarehouse(
-  sql: any
+  sql: ReturnType<typeof neon>
 ): Promise<string | null> {
   const rows = await sql`
     SELECT id FROM stock_locations
     ORDER BY name ASC
     LIMIT 1
   `;
-  return rows.length > 0 ? rows[0].id : null;
+  return rows.length > 0 ? String(rows[0]?.id ?? '') || null : null;
 }
 
 /**
  * Get existing stock level by item and warehouse
  */
 async function getExistingStockLevel(
-  sql: any,
+  sql: ReturnType<typeof neon>,
   stockItemId: string,
   warehouseId: string | null
 ): Promise<{ id: string; qty_on_hand: number } | null> {
@@ -127,14 +127,20 @@ async function getExistingStockLevel(
       WHERE stock_item_id = ${stockItemId} AND location_id = ${warehouseId}
       LIMIT 1
     `;
-    return rows.length > 0 ? rows[0] : null;
+    if (rows.length > 0 && rows[0]) {
+      return { id: String(rows[0].id ?? ''), qty_on_hand: Number(rows[0].qty_on_hand ?? 0) };
+    }
+    return null;
   } else {
     const rows = await sql`
       SELECT id, qty_on_hand FROM stock_levels
       WHERE stock_item_id = ${stockItemId} AND location_id IS NULL
       LIMIT 1
     `;
-    return rows.length > 0 ? rows[0] : null;
+    if (rows.length > 0 && rows[0]) {
+      return { id: String(rows[0].id ?? ''), qty_on_hand: Number(rows[0].qty_on_hand ?? 0) };
+    }
+    return null;
   }
 }
 
@@ -169,11 +175,7 @@ export async function syncStockLevels(
     const defaultWarehouseId = await getDefaultWarehouse(sql);
 
     // Fetch internal stock quants from Odoo
-    const odooQuants = await client.getInternalStockQuants({
-      productIds,
-      locationIds,
-      limit,
-    } as any);
+    const odooQuants = await client.getInternalStockQuants({ limit });
 
     logger.info(`Found ${odooQuants.length} stock quants in Odoo`);
 
