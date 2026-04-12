@@ -23,7 +23,7 @@ export class ChunkProcessor {
    * Process file in chunks for better memory management
    */
   async processInChunks(
-    rawData: any[],
+    rawData: Record<string, unknown>[],
     columnMapping: ColumnMapping,
     chunkSize: number = 1000
   ): Promise<ImportResult> {

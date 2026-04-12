@@ -5,6 +5,8 @@
 
 import {
   QFieldProject,
+  QFieldFiberCable,
+  QFieldSyncConfig,
   SyncJob,
   SyncStats,
   SyncConflict,
@@ -143,7 +145,7 @@ class QFieldSyncApiService {
   /**
    * Update sync configuration
    */
-  async updateConfig(config: any): Promise<SyncResponse> {
+  async updateConfig(config: QFieldSyncConfig): Promise<SyncResponse> {
     return this.request<SyncResponse>('/api/qfield-sync-config', {
       method: 'PUT',
       body: JSON.stringify(config),
@@ -153,8 +155,8 @@ class QFieldSyncApiService {
   /**
    * Get sync configuration
    */
-  async getConfig(): Promise<any> {
-    return this.request<any>('/api/qfield-sync-config');
+  async getConfig(): Promise<QFieldSyncConfig> {
+    return this.request<QFieldSyncConfig>('/api/qfield-sync-config');
   }
 
   /**
@@ -242,28 +244,28 @@ class QFieldSyncApiService {
   /**
    * Get fiber cable records from QFieldCloud
    */
-  async getQFieldFiberCables(projectId: string): Promise<any[]> {
-    return this.request<any[]>(`/api/qfield-sync-fiber-cables?projectId=${projectId}&source=qfield`);
+  async getQFieldFiberCables(projectId: string): Promise<QFieldFiberCable[]> {
+    return this.request<QFieldFiberCable[]>(`/api/qfield-sync-fiber-cables?projectId=${projectId}&source=qfield`);
   }
 
   /**
    * Get fiber cable records from FibreFlow
    */
-  async getFibreFlowFiberCables(): Promise<any[]> {
-    return this.request<any[]>('/api/qfield-sync-fiber-cables?source=fibreflow');
+  async getFibreFlowFiberCables(): Promise<QFieldFiberCable[]> {
+    return this.request<QFieldFiberCable[]>('/api/qfield-sync-fiber-cables?source=fibreflow');
   }
 
   /**
    * Compare records between systems
    */
-  async compareRecords(type: string): Promise<any> {
-    return this.request<any>(`/api/qfield-sync-compare?type=${type}`);
+  async compareRecords(type: string): Promise<SyncResponse> {
+    return this.request<SyncResponse>(`/api/qfield-sync-compare?type=${type}`);
   }
 
   /**
    * Batch update multiple records
    */
-  async batchUpdate(records: any[]): Promise<SyncResponse> {
+  async batchUpdate(records: Record<string, unknown>[]): Promise<SyncResponse> {
     return this.request<SyncResponse>('/api/qfield-sync-batch-update', {
       method: 'POST',
       body: JSON.stringify({ records }),
@@ -276,13 +278,13 @@ class QFieldSyncApiService {
   async getSyncLogs(
     jobId?: string,
     level?: 'info' | 'warning' | 'error'
-  ): Promise<any[]> {
+  ): Promise<Record<string, unknown>[]> {
     const params = new URLSearchParams();
     if (jobId) params.append('jobId', jobId);
     if (level) params.append('level', level);
 
     const query = params.toString() ? `?${params.toString()}` : '';
-    return this.request<any[]>(`/api/qfield-sync-logs${query}`);
+    return this.request<Record<string, unknown>[]>(`/api/qfield-sync-logs${query}`);
   }
 
   /**

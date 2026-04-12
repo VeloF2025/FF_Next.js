@@ -20,7 +20,7 @@ export interface ImportError {
   row: number;
   column?: string;
   message: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }
 
 export interface ImportWarning {
@@ -43,7 +43,7 @@ export interface ParsedBOQItem {
   phase?: string;
   task?: string;
   site?: string;
-  rawData: Record<string, any>;
+  rawData: Record<string, unknown>;
 }
 
 export interface ImportResult {
