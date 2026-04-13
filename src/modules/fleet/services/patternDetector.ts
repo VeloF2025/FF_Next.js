@@ -9,7 +9,6 @@ import type {
   DayType,
   RiskLevel,
   DetectedPattern,
-  PatternType,
   PatternSeverity,
 } from '../types';
 import { calculateTotalCosts, DEFAULT_FUEL_RATE, DEFAULT_DEPRECIATION_RATE } from './costCalculator';

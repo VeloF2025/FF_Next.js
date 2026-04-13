@@ -7,7 +7,7 @@
  * Imported by CommunicationsHub at ./settings/SettingsTab.
  */
 
-import { Bell, Save, RefreshCw } from 'lucide-react';
+import { Bell, Save } from 'lucide-react';
 import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import { useNotificationSettings } from '../hooks/useNotificationSettings';

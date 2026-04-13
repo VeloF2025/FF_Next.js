@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Send, RefreshCw, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, Send, Link as LinkIcon } from 'lucide-react';
 import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import { log } from '@/lib/logger';

@@ -6,7 +6,6 @@
 import { z } from 'zod';
 import {
   IdSchema,
-  StatusSchema,
   AuditFieldsSchema,
   CoordinatesSchema,
   MoneySchema,

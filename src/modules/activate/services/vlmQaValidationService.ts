@@ -12,7 +12,7 @@
  * NLNH Confidence: HIGH
  */
 
-import { log, createLogger } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
 import { STEP_LABELS } from '../utils/stepMapper';
 import { VLM_CHAT_ENDPOINT, VLM_QA_MODEL, VLM_TIMEOUT_QA, VLM_MAX_TOKENS_QA, VLM_TEMPERATURE } from '@/lib/vlm';
 
