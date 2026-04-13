@@ -282,7 +282,7 @@ export async function updateDrop(
  * Handle standard API response format
  * Unwraps { success: true, data: {...} } responses
  */
-async function handleResponse<T>(response: Response): Promise<T> {
+async function _handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Request failed' }));
     throw new Error(error.message || error.error || `HTTP ${response.status}`);

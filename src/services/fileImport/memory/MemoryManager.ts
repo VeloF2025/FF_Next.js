@@ -47,7 +47,7 @@ export class MemoryManager {
   private startMonitoring(): void {
     if (typeof window === 'undefined') return;
 
-    this.monitor.start((stats: MemoryStats) => {
+    this.monitor.start((_stats: MemoryStats) => {
       const currentStats = this.statsCollector.getCurrentMemoryStats();
       this.statsCollector.recordMemoryStats(currentStats);
       this.checkMemoryThresholds(currentStats);

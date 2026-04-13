@@ -21,7 +21,7 @@ export class ProjectSummaryAnalytics {
   /**
    * Get project summary statistics
    */
-  static async getProjectSummary(query?: AnalyticsQuery): Promise<ProjectSummary> {
+  static async getProjectSummary(_query?: AnalyticsQuery): Promise<ProjectSummary> {
     try {
       const summary = await analyticsApi.getProjectSummary();
       const overview = summary.overview;

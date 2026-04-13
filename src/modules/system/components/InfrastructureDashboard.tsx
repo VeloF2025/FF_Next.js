@@ -16,7 +16,6 @@ import {
   XCircle,
   AlertCircle,
   Clock,
-  RefreshCw,
   ChevronDown,
   ChevronRight,
   Wrench,

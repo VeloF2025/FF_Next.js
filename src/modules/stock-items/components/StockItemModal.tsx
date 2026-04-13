@@ -123,7 +123,7 @@ export function StockItemModal({ item, onClose, onSave }: StockItemModalProps) {
     if (result) onSave();
   };
 
-  const categoryColor = item?.category ? CATEGORY_COLORS[item.category] || 'bg-gray-500/20 text-gray-400' : '';
+  const _categoryColor = item?.category ? CATEGORY_COLORS[item.category] || 'bg-gray-500/20 text-gray-400' : '';
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

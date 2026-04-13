@@ -17,7 +17,7 @@ export class SupplierBatchOperations {
   /**
    * Get suppliers by multiple IDs
    */
-  static async getByIds(ids: string[], options?: SupplierBatchOptions): Promise<Supplier[]> {
+  static async getByIds(ids: string[], _options?: SupplierBatchOptions): Promise<Supplier[]> {
     try {
       if (ids.length === 0) return [];
 

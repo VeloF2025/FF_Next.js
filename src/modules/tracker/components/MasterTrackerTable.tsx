@@ -187,7 +187,7 @@ export function MasterTrackerTable({ rows, editMode, selectLists, onChange, filt
           </tr>
         </thead>
         <tbody>
-          {visibleRows.map((row, visIdx) => {
+          {visibleRows.map((row, _visIdx) => {
             const idx = rows.indexOf(row);
             return (
             <tr key={row.id} className="border-b border-slate-800 hover:bg-slate-800/50">

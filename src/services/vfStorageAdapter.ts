@@ -188,7 +188,7 @@ export async function uploadStaffDocument(
   staffId: string,
   file: Buffer | File | Blob,
   fileName: string,
-  documentType: string
+  _documentType: string
 ): Promise<VFStorageUploadResponse> {
   // Upload to staff/documents with staffId prefix in filename for organization
   const prefixedFileName = `${staffId}_${fileName}`;

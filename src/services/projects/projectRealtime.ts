@@ -70,7 +70,7 @@ export function subscribeToProjects(
   // Subscribe to all project changes
   const unsubscribe = socketIOAdapter.subscribeToAll(
     'project',
-    async (event: RealtimeEvent) => {
+    async (_event: RealtimeEvent) => {
       // Re-fetch the entire list on any change
       try {
         let url = '/api/projects';

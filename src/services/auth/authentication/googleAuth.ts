@@ -49,7 +49,7 @@ export class GoogleAuthentication {
   /**
    * Sign in with Google (enhanced method)
    */
-  async signInWithGoogleEnhanced(rememberMe = false): Promise<User> {
+  async signInWithGoogleEnhanced(_rememberMe = false): Promise<User> {
     if (authConfig.isDevMode) {
       log.debug('googleAuth', { message: 'DEV MODE: Mock Google sign in (enhanced)' });
       const user = authConfig.devUser;

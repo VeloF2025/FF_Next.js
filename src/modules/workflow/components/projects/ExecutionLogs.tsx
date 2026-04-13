@@ -26,11 +26,11 @@ interface ExecutionLogsProps {
   maxHeight?: string;
 }
 
-export function ExecutionLogs({ 
-  workflowId, 
-  workflow, 
-  compact = false, 
-  maxHeight = 'h-96' 
+export function ExecutionLogs({
+  workflowId,
+  workflow: _workflow,
+  compact = false,
+  maxHeight = 'h-96'
 }: ExecutionLogsProps) {
   const [logs, setLogs] = useState<WorkflowExecutionLog[]>([]);
   const [loading, setLoading] = useState(true);
