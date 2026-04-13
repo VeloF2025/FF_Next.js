@@ -34,6 +34,7 @@ import {
 import { logActivity } from './activityLogService';
 import { persistAutoQaResults, makeResult } from './autoQaHelpers';
 import { STEP_LABELS } from '../utils/stepMapper';
+import { extractExifDatesForPhotos } from './photoDateValidator';
 import type { VlmCategorizationResult, QaDecision } from '../types/unified.types';
 
 // ============================================================================
@@ -119,7 +120,8 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
          vlm_ont_serial_step6,
          vlm_ont_serial_step9,
          vlm_dr_number_step9,
-         project
+         project,
+         submitted_date
        FROM dr_photo_unified_reviews
        WHERE drop_number = $1`,
       [dropNumber]
@@ -217,6 +219,36 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
 
     if (autoDiscardedCount > 0) {
       log.info('AutoQA', `Auto-discarded ${autoDiscardedCount} within-DR duplicate(s) for ${dropNumber}`);
+    }
+
+    // --- DATE MISMATCH CHECK: discard photos taken >2 days from DR submission ---
+    const submittedDate = dr.submitted_date ? new Date(dr.submitted_date) : null;
+    if (submittedDate) {
+      const photosMetadata: Array<{ filename: string; url: string }> = dr.photos_json ? JSON.parse(dr.photos_json) : [];
+      const exifDates = await extractExifDatesForPhotos(dropNumber, photosMetadata);
+
+      for (const photo of photoResults) {
+        if (photo.step === -1) continue; // already discarded
+        const exifDate = exifDates.get(photo.filename);
+        if (!exifDate) continue; // no EXIF date available — skip check
+
+        const diffMs = Math.abs(exifDate.getTime() - submittedDate.getTime());
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        if (diffDays > 2) {
+          const reason = `Date mismatch — photo taken on ${exifDate.toISOString().split('T')[0]} but DR submitted on ${submittedDate.toISOString().split('T')[0]} (${Math.round(diffDays)} days difference, max 2 allowed)`;
+          discardedPhotos.push({ filename: photo.filename, originalStep: photo.step, reason });
+          photo.step = -1;
+          photo.stepLabel = 'Date Mismatch';
+          photo.decision = 'FAIL';
+          photo.comment = reason;
+          autoDiscardedCount++;
+        }
+      }
+
+      if (discardedPhotos.some((d) => d.reason.startsWith('Date mismatch'))) {
+        const dateMismatchCount = discardedPhotos.filter((d) => d.reason.startsWith('Date mismatch')).length;
+        log.info('AutoQA', `Auto-discarded ${dateMismatchCount} photo(s) for date mismatch on ${dropNumber}`);
+      }
     }
 
     // --- PHASE 3: Data Validation ---

@@ -187,8 +187,14 @@ export function generateFeedbackMessage(
     lines.push('');
   }
 
-  // Duplicate photos
-  const duplicatePhotos = photoResults.filter((p) => p.step === -1);
+  // Discarded photos (duplicates + date mismatches)
+  const discardedPhotos = photoResults.filter((p) => p.step === -1);
+  const dateMismatchPhotos = discardedPhotos.filter((p) => p.comment.startsWith('Date mismatch'));
+  const duplicatePhotos = discardedPhotos.filter((p) => !p.comment.startsWith('Date mismatch'));
+  if (dateMismatchPhotos.length > 0) {
+    lines.push(`*Date Mismatch:* ${dateMismatchPhotos.length} photo(s) discarded — taken more than 2 days from DR submission date`);
+    lines.push('');
+  }
   if (duplicatePhotos.length > 0) {
     lines.push(`*Duplicate Photos:* ${duplicatePhotos.length} photo(s) flagged as duplicates`);
     lines.push('');
