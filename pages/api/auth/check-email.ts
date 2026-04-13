@@ -117,7 +117,7 @@ export default async function handler(
         user_id,
         is_active
       FROM staff
-      WHERE email = ${normalizedEmail}
+      WHERE LOWER(email) = ${normalizedEmail}
       AND is_active = true
     `;
 
@@ -156,7 +156,7 @@ export default async function handler(
       userResult = await sql`
         SELECT id, email, password, is_active
         FROM users
-        WHERE email = ${normalizedEmail}
+        WHERE LOWER(email) = ${normalizedEmail}
       `;
     }
 
