@@ -3,6 +3,13 @@
  * Handles calculation of totals, statistics, and category breakdowns
  */
 
+interface BOQItemInput {
+  quantity?: number;
+  unitPrice?: number;
+  totalPrice?: number;
+  category?: string;
+}
+
 /**
  * BOQ Totals and Statistics Calculator
  */
@@ -10,7 +17,7 @@ export class BOQTotalsCalculator {
   /**
    * Calculate BOQ totals and statistics
    */
-  static calculateBOQTotals(items: any[]): {
+  static calculateBOQTotals(items: BOQItemInput[]): {
     totalItems: number;
     totalQuantity: number;
     totalValue: number;
@@ -26,7 +33,7 @@ export class BOQTotalsCalculator {
       totalQuantity: 0,
       totalValue: 0,
       averageUnitPrice: 0,
-      categoryBreakdown: {} as Record<string, any>
+      categoryBreakdown: {} as Record<string, { itemCount: number; totalQuantity: number; totalValue: number }>
     };
 
     const categoryMap = new Map<string, {
@@ -68,7 +75,7 @@ export class BOQTotalsCalculator {
   /**
    * Generate BOQ cost breakdown
    */
-  static generateCostBreakdown(items: any[]): {
+  static generateCostBreakdown(items: BOQItemInput[]): {
     labor: number;
     materials: number;
     equipment: number;
@@ -92,7 +99,7 @@ export class BOQTotalsCalculator {
     };
 
     items.forEach(item => {
-      const value = item.totalPrice || (item.quantity * item.unitPrice) || 0;
+      const value = item.totalPrice || ((item.quantity ?? 0) * (item.unitPrice ?? 0)) || 0;
       const category = (item.category || '').toLowerCase();
 
       if (category.includes('labor') || category.includes('manpower')) {

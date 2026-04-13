@@ -4,30 +4,52 @@
  */
 
 import { neon } from '@/lib/db-neon';
+import type { NeonQueryFunction } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { RFQStatus } from '@/types/procurement.types';
 import { RfqCrudService } from '../core/RfqCrudService';
 import { RfqResponseService } from './RfqResponseService';
 
-const sql: any = neon(process.env.DATABASE_URL!);
+const sql: NeonQueryFunction<false, false> = neon(process.env.DATABASE_URL!);
+
+interface RfqResponseRecord {
+  id: string;
+  totalAmount: number;
+  deliveryDays?: number;
+  paymentTerms?: string;
+  [key: string]: unknown;
+}
+
+interface EvaluationCriterion {
+  id: string;
+  criteria_type: string;
+  max_score: number;
+  weight: number;
+  [key: string]: unknown;
+}
 
 export class RfqEvaluationService {
   /**
    * Evaluate responses
    */
-  static async evaluateResponses(rfqId: string): Promise<any> {
+  static async evaluateResponses(rfqId: string): Promise<{
+    responses: Array<RfqResponseRecord & { totalScore: number; weightedScore: number }>;
+    recommended: RfqResponseRecord & { totalScore: number; weightedScore: number };
+    criteria: EvaluationCriterion[];
+  }> {
     try {
-      const responses = await RfqResponseService.getResponses(rfqId);
+      const rawResponses = await RfqResponseService.getResponses(rfqId);
+      const responses = rawResponses as RfqResponseRecord[];
 
       if (responses.length === 0) {
         throw new Error('No responses to evaluate');
       }
 
       // Get evaluation criteria
-      const criteria = await sql`
+      const criteria = (await sql`
         SELECT * FROM rfq_evaluation_criteria
         WHERE rfq_id = ${rfqId}
-        ORDER BY weight DESC`;
+        ORDER BY weight DESC`) as EvaluationCriterion[];
 
       // Calculate scores for each response
       const evaluatedResponses = await Promise.all(responses.map(async (response) => {
@@ -99,9 +121,14 @@ export class RfqEvaluationService {
       // Sort by weighted score
       evaluatedResponses.sort((a, b) => b.weightedScore - a.weightedScore);
 
+      const recommended = evaluatedResponses[0];
+      if (!recommended) {
+        throw new Error('No evaluated responses available');
+      }
+
       return {
         responses: evaluatedResponses,
-        recommended: evaluatedResponses[0],
+        recommended,
         criteria
       };
     } catch (error) {
@@ -113,9 +140,20 @@ export class RfqEvaluationService {
   /**
    * Compare responses
    */
-  static async compareResponses(rfqId: string): Promise<any> {
+  static async compareResponses(rfqId: string): Promise<{
+    responses: RfqResponseRecord[];
+    lowestPrice: RfqResponseRecord;
+    fastestDelivery: RfqResponseRecord;
+    bestPaymentTerms: RfqResponseRecord;
+    statistics: {
+      averagePrice: number;
+      priceRange: { min: number; max: number };
+      averageDeliveryDays: number;
+    };
+  }> {
     try {
-      const responses = await RfqResponseService.getResponses(rfqId);
+      const rawResponses = await RfqResponseService.getResponses(rfqId);
+      const responses = rawResponses as RfqResponseRecord[];
 
       if (responses.length === 0) {
         throw new Error('No responses to compare');
@@ -127,11 +165,11 @@ export class RfqEvaluationService {
           r.totalAmount < min.totalAmount ? r : min
         ),
         fastestDelivery: responses.reduce((min, r) =>
-          (r.deliveryDays || 999) < (min.deliveryDays || 999) ? r : min
+          (r.deliveryDays ?? 999) < (min.deliveryDays ?? 999) ? r : min
         ),
         bestPaymentTerms: responses.reduce((best, r) => {
-          const currentDays = parseInt(best.paymentTerms?.match(/\d+/)?.[0] || '0');
-          const newDays = parseInt(r.paymentTerms?.match(/\d+/)?.[0] || '0');
+          const currentDays = parseInt(best.paymentTerms?.match(/\d+/)?.[0] ?? '0');
+          const newDays = parseInt(r.paymentTerms?.match(/\d+/)?.[0] ?? '0');
           return newDays > currentDays ? r : best;
         }),
         statistics: {
@@ -140,7 +178,7 @@ export class RfqEvaluationService {
             min: Math.min(...responses.map(r => r.totalAmount)),
             max: Math.max(...responses.map(r => r.totalAmount))
           },
-          averageDeliveryDays: responses.reduce((sum, r) => sum + (r.deliveryDays || 0), 0) / responses.length
+          averageDeliveryDays: responses.reduce((sum, r) => sum + (r.deliveryDays ?? 0), 0) / responses.length
         }
       };
 

@@ -4,7 +4,7 @@
  */
 
 import { procurementApi } from '@/services/api/procurementApi';
-import type { BOQ } from '@/services/api/procurementApi';
+import type { BOQ, BOQRawRow, PaginatedResponse } from '@/services/api/procurementApi';
 import type { ProcurementApiContext } from '../../index';
 import type { BOQWithItems, BOQItem, BOQException } from '../../boqApi/types';
 
@@ -15,8 +15,8 @@ export class BOQClient {
     projectId: string
   ): Promise<BOQ[]> {
     const response = await procurementApi.boq.getBOQs(projectId);
-    // API returns {boqs: [...], items: [...], stats: {...}}
-    return (response as any).boqs || (response as any).data || [];
+    // API returns PaginatedResponse<BOQ> — extract data array
+    return (response as PaginatedResponse<BOQ>).data || [];
   }
 
   static async getBOQ(
@@ -38,8 +38,8 @@ export class BOQClient {
 
     return {
       ...boq,
-      items: items as BOQItem[],
-      exceptions: exceptions as BOQException[],
+      items: items as unknown as BOQItem[],
+      exceptions: exceptions as unknown as BOQException[],
     } as unknown as BOQWithItems;
   }
 
@@ -70,7 +70,7 @@ export class BOQClient {
 
   static async importBOQ(
     context: ProcurementApiContext,
-    importData: { name: string; data: any[]; mappings?: Record<string, string> }
+    importData: { name: string; data: BOQRawRow[]; mappings?: Record<string, string> }
   ): Promise<BOQ> {
     return procurementApi.boq.importBOQ(context.projectId, importData);
   }
@@ -81,7 +81,7 @@ export class BOQClient {
     boqId: string
   ): Promise<BOQItem[]> {
     const items = await procurementApi.boq.getItems(context.projectId, boqId);
-    return items as BOQItem[];
+    return items as unknown as BOQItem[];
   }
 
   static async getBOQItem(
@@ -125,7 +125,7 @@ export class BOQClient {
     boqId: string
   ): Promise<BOQException[]> {
     const exceptions = await procurementApi.boq.getExceptions(context.projectId, boqId);
-    return exceptions as BOQException[];
+    return exceptions as unknown as BOQException[];
   }
 
   static async getBOQException(

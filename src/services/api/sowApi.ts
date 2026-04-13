@@ -32,7 +32,7 @@ export const sowApi = {
     log.debug('sowApi', { message: `Uploading ${poles.length} poles in chunks of ${CHUNK_SIZE}` });
     let totalInserted = 0;
     let totalUpdated = 0;
-    const allErrors: any[] = [];
+    const allErrors: string[] = [];
 
     for (let i = 0; i < poles.length; i += CHUNK_SIZE) {
       const chunk = poles.slice(i, i + CHUNK_SIZE);
@@ -123,8 +123,8 @@ export const sowApi = {
     log.debug('sowApi', { message: `Uploading ${drops.length} drops in chunks of ${CHUNK_SIZE}` });
     let totalInserted = 0;
     let totalUpdated = 0;
-    const allErrors: any[] = [];
-    
+    const allErrors: string[] = [];
+
     for (let i = 0; i < drops.length; i += CHUNK_SIZE) {
       const chunk = drops.slice(i, i + CHUNK_SIZE);
       const chunkNumber = Math.floor(i / CHUNK_SIZE) + 1;
@@ -214,8 +214,8 @@ export const sowApi = {
     log.debug('sowApi', { message: `Uploading ${fibres.length} fibre records in chunks of ${CHUNK_SIZE}` });
     let totalInserted = 0;
     let totalUpdated = 0;
-    const allErrors: any[] = [];
-    
+    const allErrors: string[] = [];
+
     for (let i = 0; i < fibres.length; i += CHUNK_SIZE) {
       const chunk = fibres.slice(i, i + CHUNK_SIZE);
       const chunkNumber = Math.floor(i / CHUNK_SIZE) + 1;
