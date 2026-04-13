@@ -373,8 +373,9 @@ export function parseGridMapping(text: string): TqrGridMapping {
     // Format B (2025): "1  P.I031   1  P.H884   1  P.H888"
     // Format C (2025): "1  DR170291   1  DR175032   1  DR170552"
     // Format D (mixed): "1  -26.123,28.489   1  P.I031   1  DR170291"
-    // Refs: P.XXXX (pole), DR/DRXXXXXX (drop), CO/PLXX (label), or GPS coords
-    const gridLinePattern = /(\d{1,2})\s+((?:-?\d+\.\d+[,\s]\s*\d+\.\d+)|(?:P\.[A-Z]\s?\d{3,5}[A-Z]?)|(?:DR\d{5,7})|(?:CO\d{1,3})|(?:PL\d{1,3})|(?:PH\d{2,4}[A-Z]?))/g;
+    // Format E (2026):  "1  PC064   2  DR2598840   3  PC063"  (PC = cabinet/connection point)
+    // Refs: P.XXXX (pole), DR/DRXXXXXX (drop), PC/CO/PLXX (label), or GPS coords
+    const gridLinePattern = /(\d{1,2})\s+((?:-?\d+\.\d+[,\s]\s*\d+\.\d+)|(?:P\.[A-Z]\s?\d{3,5}[A-Z]?)|(?:DR\d{5,7})|(?:PC\d{1,4})|(?:CO\d{1,3})|(?:PL\d{1,3})|(?:PH\d{2,4}[A-Z]?))/g;
     gridLinePattern.lastIndex = 0;
     const gridMatches: Array<{ snagNumber: number; latitude: number | null; longitude: number | null; poleRef: string | null }> = [];
     let m: RegExpExecArray | null;
