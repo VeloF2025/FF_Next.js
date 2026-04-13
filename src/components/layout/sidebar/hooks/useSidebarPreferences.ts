@@ -33,7 +33,7 @@ export function useSidebarPreferences(): UseSidebarPreferencesReturn {
         setMainSectionItems(data.data.main_section_items || DEFAULT_ITEMS);
       }
     } catch (err) {
-      log.error('Failed to fetch sidebar preferences', err as any, 'useSidebarPreferences');
+      log.error('Failed to fetch sidebar preferences', { error: err }, 'useSidebarPreferences');
       setError(err instanceof Error ? err.message : 'Unknown error');
       // Keep using defaults on error
       setMainSectionItems(DEFAULT_ITEMS);

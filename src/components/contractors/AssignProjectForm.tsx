@@ -80,9 +80,9 @@ export function AssignProjectForm({ contractorId, onSuccess, onCancel }: AssignP
       // const projectsData = data.data || data;
       // setProjects(Array.isArray(projectsData) ? projectsData : []);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error('Error loading projects', { error: err }, 'AssignProjectForm');
-      setError(err.message);
+      setError(err instanceof Error ? err.message : 'Failed to load projects');
     } finally {
       setLoading(false);
     }
@@ -110,9 +110,9 @@ export function AssignProjectForm({ contractorId, onSuccess, onCancel }: AssignP
 
       await createContractorProject(assignmentData);
       onSuccess();
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error('Error creating assignment', { error: err }, 'AssignProjectForm');
-      setError(err.message || 'Failed to create assignment');
+      setError(err instanceof Error ? err.message : 'Failed to create assignment');
     } finally {
       setSubmitting(false);
     }

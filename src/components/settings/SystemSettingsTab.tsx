@@ -207,7 +207,7 @@ export function SystemSettingsTab() {
         throw new Error(data.error?.message || 'Failed to fetch features');
       }
     } catch (err) {
-      log.error('Failed to fetch features', err as any, 'SystemSettingsTab');
+      log.error('Failed to fetch features', { error: err }, 'SystemSettingsTab');
       setError(err instanceof Error ? err.message : 'Failed to fetch features');
     } finally {
       setIsLoading(false);
@@ -254,7 +254,7 @@ export function SystemSettingsTab() {
         throw new Error(data.error?.message || 'Failed to update feature');
       }
     } catch (err) {
-      log.error('Failed to toggle feature', err as any, 'SystemSettingsTab');
+      log.error('Failed to toggle feature', { error: err }, 'SystemSettingsTab');
       setError(err instanceof Error ? err.message : 'Failed to update feature');
     } finally {
       setSavingKeys((prev) => {

@@ -10,8 +10,18 @@ import { ContractorFilePreview } from './import/ContractorFilePreview';
 import { ContractorImportResults } from './import/ContractorImportResults';
 import { ContractorImportInstructions } from './import/ContractorImportInstructions';
 
+export interface ContractorRecord {
+  isValid: boolean;
+  isDuplicate: boolean;
+  companyName: string;
+  contactPerson?: string;
+  email?: string;
+  errors?: string[];
+  warnings?: string[];
+}
+
 export interface ContractorImportData {
-  contractors: any[];
+  contractors: ContractorRecord[];
 }
 
 export interface ContractorImportOptions {
@@ -20,10 +30,15 @@ export interface ContractorImportOptions {
   hasHeaders?: boolean;
 }
 
+export interface ContractorImportError {
+  row: number;
+  message: string;
+}
+
 export interface ContractorImportResult {
   successCount: number;
   totalProcessed: number;
-  errors: any[];
+  errors: ContractorImportError[];
 }
 
 // Placeholder service - replace with actual implementation if needed

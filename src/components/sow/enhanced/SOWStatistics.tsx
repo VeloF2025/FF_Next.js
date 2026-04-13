@@ -3,9 +3,12 @@
  * Shows meaningful pole utilization statistics
  */
 
+import type { PoleData } from '@/types/sow/pole.types';
+import type { DropData } from '@/types/sow/drop.types';
+
 interface SOWStatisticsProps {
-  poles: any[];
-  drops: any[];
+  poles: PoleData[];
+  drops: DropData[];
   totalPoles: number;  // Actual count from API (not limited array)
   totalDrops: number;  // Actual count from API (not limited array)
 }

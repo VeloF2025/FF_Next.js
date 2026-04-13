@@ -10,6 +10,10 @@ interface PinButtonProps {
   className?: string;
 }
 
+interface PinnedLinkRef {
+  route: string;
+}
+
 export function PinButton({ className }: PinButtonProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -36,7 +40,7 @@ export function PinButton({ className }: PinButtonProps) {
         if (!res.ok) return;
         const data = await res.json();
         const pins = data.data?.pins || [];
-        const found = pins.some((p: any) => p.route === currentRoute);
+        const found = pins.some((p: PinnedLinkRef) => p.route === currentRoute);
         setIsPinned(found);
       } catch {
         // Silently fail
@@ -56,9 +60,9 @@ export function PinButton({ className }: PinButtonProps) {
         .then(r => r.json())
         .then(data => {
           const pins = data.data?.pins || [];
-          setIsPinned(pins.some((p: any) => p.route === currentRoute));
+          setIsPinned(pins.some((p: PinnedLinkRef) => p.route === currentRoute));
         })
-        .catch(() => {});
+        .catch((err: unknown) => { log.warn('Failed to refresh pin status', { error: err }, 'PinButton'); });
     };
     window.addEventListener('pinned-links-changed', handler);
     return () => window.removeEventListener('pinned-links-changed', handler);
