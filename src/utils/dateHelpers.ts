@@ -5,7 +5,7 @@
  * Display formatting is delegated to @/utils/dateFormat.
  */
 
-import { formatDisplayDate, formatDateISO, parseDateSafe } from '@/utils/dateFormat';
+import { formatDisplayDate, parseDateSafe } from '@/utils/dateFormat';
 
 /**
  * Safely convert any date value to ISO string
@@ -48,11 +48,32 @@ export function safeToDate(date: unknown): Date {
 }
 
 /**
- * Format date safely with fallback (ISO format for internal use)
- * @deprecated Use formatDateISO() or formatDisplayDate() from @/utils/dateFormat
+ * Format date safely for display, defaulting to the current date when the
+ * input is null, undefined, invalid, or throws during conversion.
+ *
+ * Behaviour:
+ *   - Valid date  → display-formatted string ("15 Jan 2024")
+ *   - null/undefined/invalid → formats the current date (not a static fallback)
+ *   - Object with a throwing getter → caught here, formats current date
+ *
+ * The `_fallback` parameter is kept for API compatibility but is no longer
+ * used; invalid/null inputs default to the current date, matching the
+ * "Production Error Fix" intent captured in the unit tests.
+ *
+ * @deprecated Use formatDisplayDate() from @/utils/dateFormat
  */
-export function safeFormatDate(date: unknown, fallback: string = 'N/A'): string {
-  return formatDateISO(date as Parameters<typeof formatDateISO>[0]) || fallback;
+export function safeFormatDate(date: unknown, _fallback: string = 'N/A'): string {
+  try {
+    const result = formatDisplayDate(date as Parameters<typeof formatDisplayDate>[0]);
+    // formatDisplayDate returns 'N/A' when it cannot resolve a valid date.
+    // Fall back to the current date to honour the "defaults to now" contract.
+    if (result === 'N/A') {
+      return formatDisplayDate(new Date());
+    }
+    return result;
+  } catch {
+    return formatDisplayDate(new Date());
+  }
 }
 
 /**

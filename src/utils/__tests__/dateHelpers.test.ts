@@ -160,7 +160,9 @@ describe('dateHelpers - Production Error Fix Tests', () => {
       const date = new Date('2024-01-15');
       const result = safeFormatDate(date);
 
-      expect(result).toMatch(/Jan 15, 2024/);
+      // en-ZA locale produces "15 Jan 2024" (day-first ordering)
+      expect(result).toMatch(/Jan.*2024/);
+      expect(result).toMatch(/15/);
     });
 
     test('returns fallback for invalid dates', () => {
