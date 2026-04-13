@@ -67,7 +67,7 @@ interface StatusBadgeProps {
  * 3. Activated (in OES but not QA'd)
  * 4. Installed (default - submitted via WA)
  */
-function StatusBadge({ isActivated, qaPhase, qaDecision, feedbackSent }: StatusBadgeProps) {
+function _StatusBadge({ isActivated, qaPhase, qaDecision, feedbackSent: _feedbackSent }: StatusBadgeProps) {
   // Priority 1: QA Decision exists
   if (qaDecision === 'PASS') {
     return (
@@ -140,7 +140,7 @@ interface SerialDisplayProps {
 /**
  * Shows full serial with validation indicator and missing alert badge
  */
-function SerialDisplay({ label, serial, status, showMissingAlert = true }: SerialDisplayProps) {
+function _SerialDisplay({ label, serial, status, showMissingAlert = true }: SerialDisplayProps) {
   const isOnt = label === 'ONT';
 
   // Status indicator
@@ -228,7 +228,7 @@ interface StatusTimelineProps {
  * For OES-only DRs (no WA submission): Shows [OES Only] + [Activated date]
  * For WA-submitted DRs: Shows [Installed date] + [Activated date]
  */
-function InlineStatusBadges({ createdAt, isActivated, oesActivationDate, qaPhase, qaDecision, feedbackSent, senderPhone, hasMaintenanceTicket }: StatusTimelineProps) {
+function _InlineStatusBadges({ createdAt, isActivated, oesActivationDate, qaPhase: _qaPhase, qaDecision, feedbackSent, senderPhone, hasMaintenanceTicket }: StatusTimelineProps) {
   // Format date - shorter format for inline display
   const formatShortDate = (dateStr: string) => {
     const date = new Date(dateStr);

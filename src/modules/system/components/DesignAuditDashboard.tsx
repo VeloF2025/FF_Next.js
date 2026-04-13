@@ -10,8 +10,8 @@ import {
   Table2, Square, Loader2, Palette, Type, Eye,
   MousePointerClick, Bell, RefreshCw, AlertTriangle,
   CheckCircle2, XCircle, Minus, BarChart3, Layers,
-  Plus, Download, Trash2, Edit3, Save, Search as SearchIcon,
-  ChevronDown, Settings, ArrowRight, Filter, Upload
+  Plus, Download, Trash2, Edit3,
+  Settings
 } from 'lucide-react';
 import { log } from '@/lib/logger';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';

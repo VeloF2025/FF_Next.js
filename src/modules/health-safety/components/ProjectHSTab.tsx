@@ -16,7 +16,6 @@ import {
   Settings,
   ChevronRight,
   Calendar,
-  User,
   BarChart3,
   Building,
 } from 'lucide-react';
@@ -39,20 +38,20 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export function ProjectHSTab({
   projectId,
-  projectName,
+  projectName: _projectName,
   onStartAudit,
   onConfigureHS,
 }: ProjectHSTabProps) {
-  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [_showConfigModal, setShowConfigModal] = useState(false);
 
   // Fetch project H&S config
-  const { data: configData, error: configError, mutate: mutateConfig } = useSWR(
+  const { data: configData, error: configError, mutate: _mutateConfig } = useSWR(
     `/api/health-safety/project/${projectId}/config`,
     fetcher
   );
 
   // Fetch project audits
-  const { data: auditsData, error: auditsError, mutate: mutateAudits } = useSWR(
+  const { data: auditsData, error: _auditsError, mutate: mutateAudits } = useSWR(
     `/api/health-safety/project/${projectId}/audits?limit=5`,
     fetcher
   );
@@ -273,7 +272,7 @@ function NotConfiguredState({
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
+        const err = await res.json().catch((_e: unknown) => ({ error: 'Unknown error' }));
         throw new Error(err.error || 'Failed to save H&S configuration');
       }
 
