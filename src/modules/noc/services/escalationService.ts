@@ -23,7 +23,6 @@ import { query, queryOne } from '../utils/db';
 import {
   RepeatFaultEscalation,
   CreateEscalationPayload,
-  UpdateEscalationPayload,
   ResolveEscalationPayload,
   EscalationFilters,
   EscalationScopeType,

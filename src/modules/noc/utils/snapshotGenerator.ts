@@ -18,7 +18,6 @@
 
 import { query, queryOne } from './db';
 import type {
-  HandoverSnapshot,
   HandoverSnapshotData,
   EvidenceLink,
   HandoverDecision,

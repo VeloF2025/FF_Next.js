@@ -22,7 +22,6 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { FaultCause } from '../../types/ticket';
 import {
   getFaultCauseMetadata,
-  isContractorLiable,
   FAULT_TREND_FILTERS,
   type FaultCauseStats,
   type FaultTrendFilter,

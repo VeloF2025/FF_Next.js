@@ -28,7 +28,7 @@ import {
   UpdateGuaranteePeriodPayload,
   GuaranteeClassification
 } from '../types/guarantee';
-import { GuaranteeStatus, FaultCause } from '../types/ticket';
+import { FaultCause } from '../types/ticket';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('maintenance:guarantee-service');

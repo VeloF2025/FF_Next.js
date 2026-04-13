@@ -10,7 +10,7 @@
 'use client';
 
 import {
-  Camera, Upload, CheckCircle, AlertCircle, X,
+  Camera, CheckCircle, AlertCircle, X,
   Maximize2, Monitor, Video, Mic, FileVideo, FileAudio,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';

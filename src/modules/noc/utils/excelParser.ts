@@ -25,7 +25,6 @@ import {
   ExcelColumnMapping,
   ImportPreviewResult,
   ImportValidationError,
-  ImportErrorType
 } from '../types/weeklyReport';
 
 /**

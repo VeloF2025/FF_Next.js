@@ -23,7 +23,7 @@
  */
 
 import { ProductService } from '../products/productService';
-import { ProductAvailability, ProductCategory, PriceListItem, Product, ProductFormData, ProductCallback } from '../products/types';
+import { ProductAvailability, ProductCategory, PriceListItem, ProductFormData, ProductCallback } from '../products/types';
 
 // Create a service instance
 const service = new ProductService();
