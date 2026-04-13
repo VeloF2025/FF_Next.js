@@ -16,7 +16,6 @@ import {
   RefreshCw,
   LayoutGrid,
   List,
-  Download,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
 import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
@@ -64,7 +63,7 @@ export function PipelineDashboard() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [viewMode, setViewMode] = useState<ViewMode>('table');
-  const [exporting, setExporting] = useState(false);
+  const [_exporting, setExporting] = useState(false);
 
   // RBAC: Check if user is super_admin for Smartsheet sync access
   const { currentUser } = useAuth();
@@ -74,7 +73,7 @@ export function PipelineDashboard() {
     loadData();
   }, [search, statusFilter, page]);
 
-  const handleExport = async () => {
+  const _handleExport = async () => {
     setExporting(true);
     try {
       const res = await fetch('/api/pipeline/export');
@@ -366,7 +365,7 @@ export function PipelineDashboard() {
               ) : (
                 projects.map((project) => {
                   const statusStyle = STATUS_COLORS[project.pipeline_status];
-                  const priorityStyle = PRIORITY_COLORS[project.priority];
+                  const _priorityStyle = PRIORITY_COLORS[project.priority];
                   const approvalPercent =
                     project.total_required_approvals > 0
                       ? Math.round(

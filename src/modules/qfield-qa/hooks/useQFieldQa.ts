@@ -254,7 +254,7 @@ export function useQFieldQa(options: UseQFieldQaOptions = {}) {
     setSelectedFeatureType(undefined);
     setSelectedFeatureId(undefined);
     setFilters(prev => {
-      const { zoneNo, ponNo, featureType, featureId, ...rest } = prev;
+      const { zoneNo: _zoneNo, ponNo: _ponNo, featureType: _featureType, featureId: _featureId, ...rest } = prev;
       return rest;
     });
     setPagination(prev => ({ ...prev, page: 1 }));

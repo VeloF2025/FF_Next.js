@@ -19,7 +19,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Save, CheckCircle2, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
-import type { ConduitProject, ConduitProjectInputs, MonthlyPlanEntry, ConduitActual } from '../types';
+import type { ConduitProject, MonthlyPlanEntry, ConduitActual } from '../types';
 import { calcConduit } from '../hooks/useConduitCalc';
 import { MonthlyForecastGrid } from './MonthlyForecastGrid';
 import { MilestonesPanel } from './MilestonesPanel';
@@ -30,13 +30,6 @@ interface ForecastRow {
   label: string;
   values: (number | null)[];
   isTotal?: boolean;
-}
-
-interface ProjectDetailData {
-  months: string[];
-  rolloutPlan: ForecastRow[];
-  cosCategories: ForecastRow[];
-  revenueForecast: ForecastRow[];
 }
 
 // ─── Formatters ─────────────────────────────────────────────────────────────
@@ -53,7 +46,7 @@ function fInt(v: number | null): string {
   return Math.round(v).toLocaleString('en-ZA').replace(/,/g, '\u00a0');
 }
 
-function fZARShort(v: number): string {
+function _fZARShort(v: number): string {
   if (!isFinite(v) || v === 0) return '—';
   const abs = Math.abs(v);
   if (abs >= 1_000_000) return `R ${(v / 1_000_000).toFixed(2)}M`;
@@ -63,7 +56,7 @@ function fZARShort(v: number): string {
 
 // ─── Forecast sub-table ─────────────────────────────────────────────────────
 
-function ForecastTable({
+function _ForecastTable({
   title,
   months,
   rows,

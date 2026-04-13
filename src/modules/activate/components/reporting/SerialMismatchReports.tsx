@@ -76,7 +76,7 @@ interface MismatchData {
   available_zones: string[];
 }
 
-export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchReportsProps) {
+export function SerialMismatchReports({ filters: _filters, refreshKey }: SerialMismatchReportsProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<MismatchData | null>(null);
@@ -460,9 +460,9 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
                 const sc = record.serial_comparison;
                 // Determine which serials match (for highlighting)
                 const oesSerial = sc?.oes?.toUpperCase();
-                const offlineSerial = sc?.offline?.toUpperCase();
-                const onemapSerial = sc?.onemap?.toUpperCase();
-                const waPhotoSerial = sc?.wa_photo?.toUpperCase();
+                const _offlineSerial = sc?.offline?.toUpperCase();
+                const _onemapSerial = sc?.onemap?.toUpperCase();
+                const _waPhotoSerial = sc?.wa_photo?.toUpperCase();
 
                 // Helper to get cell color based on agreement with OES (reference)
                 const getSerialColor = (serial: string | null | undefined, isReference = false) => {

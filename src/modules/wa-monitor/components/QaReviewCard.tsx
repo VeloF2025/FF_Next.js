@@ -23,7 +23,6 @@ import {
   CardActions,
   Checkbox,
   FormControlLabel,
-  FormGroup,
   TextField,
   Button,
   Chip,
@@ -34,7 +33,7 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material';
-import { CheckCircle, XCircle, Send, Save, AlertTriangle, Edit2, X, Edit, Lock, Camera } from 'lucide-react';
+import { CheckCircle, Send, Save, AlertTriangle, Edit2, X, Edit, Lock } from 'lucide-react';
 import type { QaReviewDrop, QaSteps } from '../types/wa-monitor.types';
 import { QA_STEP_LABELS, ORDERED_STEP_KEYS } from '../types/wa-monitor.types';
 import { DropStatusBadge } from './DropStatusBadge';
@@ -71,7 +70,7 @@ export const QaReviewCard = memo(function QaReviewCard({ drop, onUpdate, onSendF
   const [editedDropNumber, setEditedDropNumber] = useState(drop.dropNumber);
 
   // Incorrect photos tracking
-  const [incorrectSteps, setIncorrectSteps] = useState<string[]>(drop.incorrectSteps || []);
+  const [_incorrectSteps, setIncorrectSteps] = useState<string[]>(drop.incorrectSteps || []);
   const [incorrectComments, setIncorrectComments] = useState<Record<string, string>>(drop.incorrectComments || {});
 
   // Locking system state

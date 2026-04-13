@@ -9,7 +9,7 @@
 'use client';
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { AlertTriangle, CheckCircle2, RotateCcw, RefreshCw, ChevronDown, ChevronRight, FileDown } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, RotateCcw, RefreshCw, FileDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { ConduitProject, MonthlyPlanEntry, ConduitActual } from '../types';
 
@@ -362,7 +362,7 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
-  const [breakdownOpen, setBreakdownOpen] = useState<Record<number, boolean>>({});
+  const [_breakdownOpen, _setBreakdownOpen] = useState<Record<number, boolean>>({});
 
   // Fetch actuals on mount for WIP projects with a mapping
   useEffect(() => {
