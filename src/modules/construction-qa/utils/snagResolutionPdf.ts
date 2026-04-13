@@ -58,9 +58,8 @@ export async function generateSnagResolutionPdf(
   dateFrom: string,
   dateTo: string
 ): Promise<Blob> {
-  const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+  const [{ jsPDF }] = await Promise.all([
     import('jspdf'),
-    import('jspdf-autotable'),
   ]);
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -70,32 +69,12 @@ export async function generateSnagResolutionPdf(
   const MR = 14;
   const CW = PW - ML - MR;
   let y = 14;
-  let pageNum = 1;
 
   const getPageCount = () =>
     (doc as unknown as { internal: { getNumberOfPages: () => number } }).internal.getNumberOfPages();
 
-  function drawFooter() {
-    doc.setFontSize(7);
-    doc.setTextColor(...B.grey);
-    doc.setFont('helvetica', 'normal');
-    doc.text(
-      `Page ${pageNum} of ${getPageCount()}  |  Confidential — VelocityFibre`,
-      PW / 2,
-      PH - 6,
-      { align: 'center' }
-    );
-    doc.text(
-      `Generated: ${fmt(new Date().toISOString())}`,
-      PW - MR,
-      PH - 6,
-      { align: 'right' }
-    );
-  }
-
   function newPage() {
     doc.addPage();
-    pageNum++;
     y = 14;
     // Light top-bar on continuation pages
     doc.setFillColor(...B.mid);

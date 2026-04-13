@@ -14,6 +14,28 @@ import { createLogger } from "@/lib/logger";
 
 const logger = createLogger("noc:db");
 
+// ============================================================================
+// Connection handle (thin wrapper exposed for testing / legacy callers)
+// ============================================================================
+
+/** Opaque connection handle returned by getConnection(). */
+export interface ConnectionHandle {
+  readonly pool: typeof pool;
+}
+
+let _connectionHandle: ConnectionHandle | null = null;
+
+/**
+ * Returns the singleton connection handle backed by the shared pg.Pool.
+ * Lazily initialised; subsequent calls return the same reference.
+ */
+export function getConnection(): ConnectionHandle {
+  if (!_connectionHandle) {
+    _connectionHandle = { pool };
+  }
+  return _connectionHandle;
+}
+
 export async function query<T = Record<string, unknown>>(
   queryText: string,
   params: unknown[] = []
@@ -103,7 +125,10 @@ export async function healthCheck(): Promise<HealthCheckResult> {
 }
 
 export async function closeConnection(): Promise<void> {
-  logger.info("closeConnection() is a no-op for pg Pool (shared singleton)");
+  // Reset the cached handle so getConnection() creates a fresh one next time.
+  // The underlying pg.Pool is a shared singleton and is NOT terminated here.
+  _connectionHandle = null;
+  logger.info("closeConnection(): handle reset (pg Pool singleton retained)");
 }
 
 export const db = {
