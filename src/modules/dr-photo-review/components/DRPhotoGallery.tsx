@@ -6,7 +6,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, XCircle, Camera } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, CheckCircle, XCircle, Camera } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { DRStepPhoto } from '../types';
 

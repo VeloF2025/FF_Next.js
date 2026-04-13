@@ -6,7 +6,7 @@
  */
 
 import { neon } from '@/lib/db-neon';
-import type { GateCheckResult, HSDocumentType, DocumentStatus } from '../types/compliance.types';
+import type { GateCheckResult, DocumentStatus } from '../types/compliance.types';
 import type { RAGStatus } from '../types/audit.types';
 import { REQUIRED_DOCUMENTS, DOCUMENT_TYPES } from '../types/compliance.types';
 import { DEFAULT_SCORING_CONFIG } from '../types/scoring.types';

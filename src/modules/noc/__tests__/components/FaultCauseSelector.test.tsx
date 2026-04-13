@@ -18,7 +18,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { FaultCauseSelector } from '../../components/FaultAttribution/FaultCauseSelector';
 import { FaultTrendAnalysis } from '../../components/FaultAttribution/FaultTrendAnalysis';
 import { FaultCause } from '../../types/ticket';
-import { FAULT_CAUSE_OPTIONS } from '../../constants/faultCauses';
 
 // Mock Clerk auth
 vi.mock('@clerk/nextjs', () => ({

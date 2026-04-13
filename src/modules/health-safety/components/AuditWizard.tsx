@@ -64,7 +64,6 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
   const audit = auditData?.data?.audit;
   const serverResponses = (auditData?.data?.responses || []) as AuditResponse[];
   const byCategory = auditData?.data?.by_category || {};
-  const summary = auditData?.data?.summary;
 
   // Get ordered categories
   const categories = useMemo(() => {

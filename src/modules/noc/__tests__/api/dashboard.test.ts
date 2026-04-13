@@ -518,7 +518,6 @@ describe('Dashboard API Endpoints - TDD', () => {
 
       // Act
       const response = await getSummary(req);
-      const data = await response.json();
 
       // Assert: Should handle invalid dates (create Invalid Date objects)
       // Service should handle Invalid Date gracefully or endpoint should validate

@@ -18,7 +18,7 @@ interface DREvaluationPanelProps {
 }
 
 export function DREvaluationPanel({
-    drNumber,
+    drNumber: _drNumber,
     evaluation,
     isEvaluating,
     onEvaluate,

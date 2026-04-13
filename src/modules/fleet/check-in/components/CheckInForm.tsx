@@ -70,7 +70,7 @@ export function CheckInForm({
     setOdometerVerifiedOverride,
     setCheckType,
     setOdometerReading,
-    setFuelLevel,
+    setFuelLevel: _setFuelLevel,
     setItemResponse,
     setPhoto,
     removePhoto,
