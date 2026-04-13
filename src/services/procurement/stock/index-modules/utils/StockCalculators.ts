@@ -3,10 +3,17 @@
  * Calculation functions for stock metrics
  */
 
+interface StockPosition {
+  onHandQuantity?: number;
+  averageUnitCost?: number;
+  availableQuantity?: number;
+  reorderLevel?: number;
+}
+
 /**
  * Calculate stock value from position
  */
-export function calculatePositionValue(position: any): number {
+export function calculatePositionValue(position: StockPosition): number {
   const quantity = position.onHandQuantity || 0;
   const cost = position.averageUnitCost || 0;
   return quantity * cost;
@@ -15,7 +22,7 @@ export function calculatePositionValue(position: any): number {
 /**
  * Determine if item needs reordering
  */
-export function needsReorder(position: any): boolean {
+export function needsReorder(position: StockPosition): boolean {
   const availableQuantity = position.availableQuantity || 0;
   const reorderLevel = position.reorderLevel || 0;
   return reorderLevel > 0 && availableQuantity <= reorderLevel;
@@ -24,7 +31,7 @@ export function needsReorder(position: any): boolean {
 /**
  * Calculate stock coverage in days
  */
-export function calculateStockCoverage(position: any, dailyUsage: number): number {
+export function calculateStockCoverage(position: StockPosition, dailyUsage: number): number {
   if (dailyUsage <= 0) return 0;
   const availableQuantity = position.availableQuantity || 0;
   return Math.floor(availableQuantity / dailyUsage);

@@ -6,6 +6,7 @@
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sql: any = neon(process.env.DATABASE_URL!);
 
 export interface NotificationPayload {
@@ -15,7 +16,7 @@ export interface NotificationPayload {
   recipientId?: string;
   subject: string;
   message: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /** Escape HTML entities to prevent XSS in email templates */
@@ -139,7 +140,7 @@ export class EmailNotificationService {
               <p>${escapeHtml(payload.message)}</p>
               ${payload.metadata?.actionUrl ? `
                 <p style="text-align: center; margin-top: 30px;">
-                  <a href="${encodeURI(payload.metadata.actionUrl)}" class="button">View Details</a>
+                  <a href="${encodeURI(String(payload.metadata.actionUrl))}" class="button">View Details</a>
                 </p>
               ` : ''}
             </div>
@@ -155,7 +156,7 @@ export class EmailNotificationService {
   /**
    * Send webhook notification
    */
-  static async sendWebhook(url: string, payload: any): Promise<boolean> {
+  static async sendWebhook(url: string, payload: Record<string, unknown>): Promise<boolean> {
     try {
       const response = await fetch(url, {
         method: 'POST',

@@ -546,7 +546,7 @@ export class EnhancedExcelProcessor {
 
   private getMemoryStats(): MemoryStats {
     if (typeof window !== 'undefined' && 'performance' in window && 'memory' in performance) {
-      const memory = (performance as any).memory;
+      const memory = (performance as unknown as { memory: { usedJSHeapSize: number; totalJSHeapSize: number } }).memory;
       return {
         heapUsed: memory.usedJSHeapSize,
         heapTotal: memory.totalJSHeapSize,
@@ -587,8 +587,8 @@ export class EnhancedExcelProcessor {
   }
 
   private triggerGarbageCollection(): void {
-    if (typeof window !== 'undefined' && (window as any).gc) {
-      (window as any).gc();
+    if (typeof window !== 'undefined' && (window as unknown as { gc?: () => void }).gc) {
+      (window as unknown as { gc: () => void }).gc();
     }
   }
 }
