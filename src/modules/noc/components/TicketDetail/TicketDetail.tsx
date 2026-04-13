@@ -13,7 +13,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   AlertTriangle,
   RefreshCw,
@@ -22,6 +22,9 @@ import {
   CheckSquare,
   History,
   MessageSquare,
+  Pencil,
+  X,
+  Check,
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
@@ -40,6 +43,8 @@ import { RelatedTickets } from './RelatedTickets';
 import { NearbyTickets } from './NearbyTickets';
 import { NotesTab } from './NotesTab';
 import { useTicketNotes } from '../../hooks/useTicketNotesWithMutations';
+import { useAuth } from '@/contexts/AuthContext';
+import { canEditDescription } from '@/modules/construction-qa/utils/snagPermissions';
 
 interface TicketDetailProps {
   /** Ticket ID to display */
@@ -68,6 +73,26 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
   const { summary: activitySummary } = useTicketActivities(ticketId);
   const { summary: notesSummary } = useTicketNotes(ticketId);
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState('');
+  const { currentUser } = useAuth();
+  const canEdit = canEditDescription({
+    userId: currentUser?.id ?? null,
+    userRole: currentUser?.role ?? null,
+    ticketAssignedTo: null,
+  });
+
+  const handleSaveDescription = useCallback(async () => {
+    try {
+      await updateTicket.mutateAsync({ id: ticketId, payload: { description: descriptionDraft } });
+      setEditingDescription(false);
+      refetch();
+      toast.success('Description updated');
+    } catch (err) {
+      log.error('Failed to update description', { err, ticketId });
+      toast.error('Failed to save description');
+    }
+  }, [updateTicket, ticketId, descriptionDraft, refetch]);
 
   // Handle refetch-only events (assignment saved, priority badge changed internally, etc.)
   const handleActionComplete = () => {
@@ -226,12 +251,53 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
               {/* Description */}
               {ticket.description && (
                 <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4 sm:p-6">
-                  <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-3">
-                    Description
-                  </h3>
-                  <p className="text-[var(--ff-text-secondary)] leading-relaxed whitespace-pre-wrap">
-                    {ticket.description}
-                  </p>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Description</h3>
+                    {canEdit && !editingDescription && (
+                      <button
+                        type="button"
+                        onClick={() => { setDescriptionDraft(ticket.description ?? ''); setEditingDescription(true); }}
+                        className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition-colors px-2 py-1 rounded hover:bg-zinc-700"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        Edit
+                      </button>
+                    )}
+                  </div>
+                  {editingDescription ? (
+                    <div className="space-y-3">
+                      <textarea
+                        value={descriptionDraft}
+                        onChange={(e) => setDescriptionDraft(e.target.value)}
+                        rows={8}
+                        className="w-full bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg px-3 py-2 text-sm text-[var(--ff-text-primary)] resize-y focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        autoFocus
+                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { void handleSaveDescription(); }}
+                          disabled={updateTicket.isPending}
+                          className="flex items-center gap-1.5 text-sm bg-green-800 hover:bg-green-700 disabled:opacity-50 text-green-100 px-3 py-1.5 rounded font-medium transition-colors"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingDescription(false)}
+                          className="flex items-center gap-1.5 text-sm bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-3 py-1.5 rounded font-medium transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-[var(--ff-text-secondary)] leading-relaxed whitespace-pre-wrap">
+                      {ticket.description}
+                    </p>
+                  )}
                 </div>
               )}
 

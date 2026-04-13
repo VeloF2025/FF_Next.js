@@ -35,6 +35,20 @@ export interface SnagPermissionContext {
   ticketAssignedTo: string | null;
 }
 
+/** Roles that can edit ticket descriptions */
+const DESCRIPTION_EDITOR_ROLES = new Set(['super_admin']);
+
+/**
+ * Check if the current user can edit the ticket description.
+ * Restricted to super_admin role + Chantall Cordier + Jacques White.
+ */
+export function canEditDescription(ctx: SnagPermissionContext): boolean {
+  if (!ctx.userId) return false;
+  if (ctx.userRole && DESCRIPTION_EDITOR_ROLES.has(ctx.userRole)) return true;
+  if (QA_APPROVER_USER_IDS.has(ctx.userId)) return true;
+  return false;
+}
+
 /**
  * Check if the current user can approve QA (move tickets through QA stages)
  */
