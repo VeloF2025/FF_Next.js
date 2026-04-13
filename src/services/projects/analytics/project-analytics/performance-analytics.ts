@@ -16,7 +16,7 @@ export class ProjectPerformanceAnalytics {
   /**
    * Get overdue projects
    */
-  static async getOverdueProjects(query?: AnalyticsQuery): Promise<OverdueProject[]> {
+  static async getOverdueProjects(_query?: AnalyticsQuery): Promise<OverdueProject[]> {
     try {
       // Get performance metrics including overdue projects
       const performance = await analyticsApi.getProjectPerformance('', ['overdue']);
@@ -31,7 +31,7 @@ export class ProjectPerformanceAnalytics {
   /**
    * Get project performance metrics
    */
-  static async getProjectPerformanceMetrics(query?: AnalyticsQuery): Promise<ProjectPerformanceMetrics> {
+  static async getProjectPerformanceMetrics(_query?: AnalyticsQuery): Promise<ProjectPerformanceMetrics> {
     try {
       // Get all performance metrics from API
       const performance = await analyticsApi.getProjectPerformance('', ['onTime', 'budget', 'quality', 'efficiency']);
@@ -164,7 +164,7 @@ export class ProjectPerformanceAnalytics {
    * Build WHERE clause for filtering
    * @deprecated API handles filtering now
    */
-  private static buildWhereClause(query: AnalyticsQuery): string {
+  private static buildWhereClause(_query: AnalyticsQuery): string {
     return "status NOT IN ('archived', 'cancelled', 'deleted')";
   }
 }

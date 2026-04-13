@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AlertTriangle, Plus, Calendar, User, FileText, CheckCircle, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertTriangle, Plus, User, FileText, CheckCircle, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import type { DisciplinaryIncident } from '@/types/staff';
 import {
@@ -71,12 +71,12 @@ export function DisciplinaryTab({ staffId, onAddIncident, onEditIncident }: Disc
     );
   }
 
-  const getTypeColorClass = (type: string) => {
+  const _getTypeColorClass = (type: string) => {
     const color = DISCIPLINARY_TYPE_COLORS[type as keyof typeof DISCIPLINARY_TYPE_COLORS] || 'gray';
     return `bg-${color}-500/20 text-${color}-400`;
   };
 
-  const getOutcomeColorClass = (outcome: string) => {
+  const _getOutcomeColorClass = (outcome: string) => {
     const color = DISCIPLINARY_OUTCOME_COLORS[outcome as keyof typeof DISCIPLINARY_OUTCOME_COLORS] || 'gray';
     return `bg-${color}-500/20 text-${color}-400`;
   };

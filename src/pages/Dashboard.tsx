@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import {
   FolderOpen,
   Building2,
@@ -41,7 +41,7 @@ interface QuickActionData {
 export function Dashboard() {
   // navigate removed - not used in current implementation
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { stats, isLoading, error, loadDashboardData } = useDashboardData();
+  const { stats, isLoading: _isLoading, error: _error, loadDashboardData } = useDashboardData();
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);

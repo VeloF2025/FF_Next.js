@@ -140,7 +140,7 @@ export async function getVlmFewShotExamples(
     analysisType,
     context,
     maxExamples = 3,
-    prioritizeCanonical = true,
+    prioritizeCanonical: _prioritizeCanonical = true,
     includePhotos = false,
   } = options;
 
@@ -522,7 +522,7 @@ interface GetMetricsOptions {
  * Get aggregated VLM metrics
  */
 export async function getVlmMetrics(options: GetMetricsOptions): Promise<VlmMetricsSummary> {
-  const { module, analysisType, dateFrom, dateTo, groupBy = 'day' } = options;
+  const { module, analysisType, dateFrom, dateTo, groupBy: _groupBy = 'day' } = options;
 
   const from = dateFrom || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
   const to = dateTo || new Date();

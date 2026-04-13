@@ -7,10 +7,10 @@ import { workflowManagementService } from '../../services/WorkflowManagementServ
 import {
   mockWorkflowTemplates,
   mockProjectWorkflows,
-  mockTemplateStats,
-  mockProjectWorkflowStats,
+  mockTemplateStats as _mockTemplateStats,
+  mockProjectWorkflowStats as _mockProjectWorkflowStats,
   mockSessionStorage,
-  waitForAsync
+  waitForAsync as _waitForAsync
 } from '../__mocks__/workflow.mocks';
 
 // Mock services

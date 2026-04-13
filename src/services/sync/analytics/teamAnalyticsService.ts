@@ -62,16 +62,16 @@ export class TeamAnalyticsService {
       const teams: TeamRecord[] = teamData.teams || [];
 
       // Aggregate data from all teams
-      let totalStaff = 0;
-      let totalProductivity = 0;
-      let totalQuality = 0;
+      let _totalStaff = 0;
+      let _totalProductivity = 0;
+      let _totalQuality = 0;
       const topPerformers: string[] = [];
       const improvementNeeded: string[] = [];
 
       teams.forEach((team) => {
-        totalStaff += team.size;
-        totalProductivity += team.performance.avgProductivity * team.size;
-        totalQuality += team.performance.avgQuality * team.size;
+        _totalStaff += team.size;
+        _totalProductivity += team.performance.avgProductivity * team.size;
+        _totalQuality += team.performance.avgQuality * team.size;
 
         // Find top performers from team members
         team.members?.forEach((member) => {

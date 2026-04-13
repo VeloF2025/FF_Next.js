@@ -154,8 +154,8 @@ export class BenchmarkCalculator {
         };
       }
 
-      const supplierScore = ScoreCalculator.calculateOverallScore(supplier);
-      // Note: supplierScore could be used for additional validation or logging
+      const _supplierScore = ScoreCalculator.calculateOverallScore(supplier);
+      // Note: _supplierScore could be used for additional validation or logging
       // Currently focusing on categoryScores below
       const categoryScores = categorySuppliers
         .map(s => ({
@@ -207,8 +207,8 @@ export class BenchmarkCalculator {
       const supplierCrudService = await import('../../supplier.crud');
       const allSuppliers = await supplierCrudService.SupplierCrudService.getAll();
       
-      const supplierScore = ScoreCalculator.calculateOverallScore(supplier);
-      // Note: supplierScore could be used for regional comparison validation
+      const _supplierScore = ScoreCalculator.calculateOverallScore(supplier);
+      // Note: _supplierScore could be used for regional comparison validation
       // Currently using supplier location for geographic ranking
       const supplierAddress = supplier.addresses?.physical;
 

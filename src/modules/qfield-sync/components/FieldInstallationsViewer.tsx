@@ -7,15 +7,12 @@ import { useState, useEffect } from 'react';
 import {
   MapPin,
   Home,
-  Activity,
   CheckCircle,
   Clock,
   AlertCircle,
   RefreshCw,
-  Download,
   Camera,
   Ruler,
-  Users
 } from 'lucide-react';
 import { log } from '@/lib/logger';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';

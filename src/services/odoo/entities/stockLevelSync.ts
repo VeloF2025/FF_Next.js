@@ -11,7 +11,7 @@
 
 import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
-import { OdooClient, OdooStockQuant } from '../odooClient';
+import { OdooClient } from '../odooClient';
 
 const logger = createLogger('odooStockLevelSync');
 
@@ -166,7 +166,7 @@ export async function syncStockLevels(
     details: [],
   };
 
-  const { dryRun = false, productIds, locationIds, limit = 1000 } = options;
+  const { dryRun = false, productIds: _productIds, locationIds: _locationIds, limit = 1000 } = options;
 
   try {
     logger.info('Starting stock level sync from Odoo', { dryRun, limit });

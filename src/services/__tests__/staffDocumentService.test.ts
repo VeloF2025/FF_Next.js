@@ -5,7 +5,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StaffDocumentServiceClass } from '../staffDocumentService';
-import type { StaffDocument, DocumentType, VerificationStatus } from '@/types/staff-document.types';
+import type { StaffDocument } from '@/types/staff-document.types';
 
 // Mock logger
 vi.mock('@/lib/logger', () => ({

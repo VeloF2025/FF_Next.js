@@ -8,11 +8,7 @@ import type {
   StaffDocument,
   StaffDocumentCreate,
   StaffDocumentUpdate,
-  DocumentType,
-  VerificationStatus,
   ComplianceStatus,
-  REQUIRED_DOCUMENTS,
-  DOCUMENTS_WITH_EXPIRY
 } from '@/types/staff-document.types';
 
 const logger = createLogger('StaffDocumentService');

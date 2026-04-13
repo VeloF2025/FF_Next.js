@@ -450,8 +450,8 @@ export const staffApiService = {
 
   async getStaffSummary(): Promise<StaffSummary> {
     const staff = await this.getAll();
-    const departments = [...new Set(staff.map(s => s.department).filter(Boolean))] as string[];
-    const activeSalaries = staff
+    const _departments = [...new Set(staff.map(s => s.department).filter(Boolean))] as string[];
+    const _activeSalaries = staff
       .filter(s => s.status === 'active' && s.salaryAmount)
       .map(s => s.salaryAmount || 0);
 

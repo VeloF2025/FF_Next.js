@@ -45,7 +45,7 @@ export class ClerkAuthService {
     return mockUser;
   }
 
-  async signInWithEmailAndPassword(email: string, password: string): Promise<User> {
+  async signInWithEmailAndPassword(email: string, _password: string): Promise<User> {
     return { ...mockUser, email, name: email.split('@')[0] ?? email };
   }
 
@@ -66,7 +66,7 @@ export class ClerkAuthService {
     };
   }
 
-  async updateUserProfile(updates: Partial<User>): Promise<void> {
+  async updateUserProfile(_updates: Partial<User>): Promise<void> {
     // No-op - no auth system
   }
 
@@ -82,7 +82,7 @@ export class ClerkAuthService {
     return 'admin';
   }
 
-  hasPermission(requiredRole: User['role']): boolean {
+  hasPermission(_requiredRole: User['role']): boolean {
     return true;
   }
 }

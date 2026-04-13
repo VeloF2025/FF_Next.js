@@ -4,8 +4,7 @@
  */
 
 import { NeonPoleData, NeonDropData, NeonFibreData } from '../../neonSOWService';
-import { ValidationResult, ValidationError, CrossValidationResult } from './validator-types';
-import { SOWValidationRules } from './validation-rules';
+import { ValidationResult, CrossValidationResult } from './validator-types';
 import { log } from '@/lib/logger';
 
 /**

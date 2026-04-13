@@ -13,10 +13,7 @@ import { TextProcessor } from '@/lib/utils/catalog/textProcessor';
 import type {
   MaterialCatalog,
   MaterialMatchResult,
-  MatchType,
   FiberBudgetCategoryCode,
-  MATCH_CONFIDENCE_THRESHOLD,
-  DUPLICATE_CODE_THRESHOLD,
 } from '@/types/procurement/material-catalog.types';
 
 // Match thresholds
