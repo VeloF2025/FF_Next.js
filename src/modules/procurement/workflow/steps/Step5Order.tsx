@@ -10,7 +10,6 @@ import {
   Package,
   FileText,
   CheckCircle,
-  ExternalLink,
   ArrowLeft,
   ArrowRight,
   Loader2,

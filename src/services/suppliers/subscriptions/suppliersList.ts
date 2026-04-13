@@ -6,7 +6,7 @@
  * Real-time subscriptions are converted to one-time fetches with no-op unsubscribe.
  */
 
-import { Supplier, SupplierStatus } from '@/types/supplier/base.types';
+import { SupplierStatus } from '@/types/supplier/base.types';
 import { SuppliersCallback, SupplierSubscriptionFilter, SubscriptionOptions } from './types';
 import { SupplierCrudService } from '../supplier.crud';
 import { log } from '@/lib/logger';

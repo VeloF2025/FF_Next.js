@@ -4,7 +4,6 @@
  */
 
 import { sql } from '@/lib/neon';
-import FormData from 'form-data';
 import { log } from '@/lib/logger';
 
 // ============================================================================

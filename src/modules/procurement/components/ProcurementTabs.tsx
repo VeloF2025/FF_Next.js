@@ -83,7 +83,7 @@ interface ProcurementTabsProps {
 export function ProcurementTabs({
   activeTab: propActiveTab,
   onTabChange: propOnTabChange,
-  selectedProject: propSelectedProject,
+  selectedProject: _propSelectedProject,
   tabBadges: propTabBadges,
   permissions: propPermissions,
   isLoading: propIsLoading = false,

@@ -9,7 +9,7 @@
  * - Parameterized query signatures unchanged
  */
 
-import { query as poolQuery, queryOne as poolQueryOne, transaction as poolTransaction, pool } from "@/lib/db-pool";
+import { query as poolQuery, transaction as poolTransaction, pool } from "@/lib/db-pool";
 import { createLogger } from "@/lib/logger";
 
 const logger = createLogger("noc:db");

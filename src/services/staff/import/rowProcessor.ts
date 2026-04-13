@@ -11,7 +11,6 @@ import {
   StaffMember,
   StaffStatus
 } from '@/types/staff.types';
-import { SAContractType } from '@/types/staff/compliance.types';
 import { extractUniqueManagers, sortByManagerHierarchy, findManagerByName } from './managerResolver';
 import { parseDate, parseSkills, parseContractType } from './parsers';
 import { log } from '@/lib/logger';

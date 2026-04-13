@@ -11,7 +11,7 @@
  * @module maintenance/services/ticketEnrichmentService
  */
 
-import { query, queryOne } from '../utils/db';
+import { queryOne } from '../utils/db';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('maintenance:enrichment');

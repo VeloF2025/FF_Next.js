@@ -6,7 +6,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type {
   StockReturn,
-  StockReturnLine,
   CreateReturnDTO,
   ReturnLineDisposition
 } from '../types';
