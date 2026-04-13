@@ -111,7 +111,12 @@ async function detectProject(
     }
   }
 
-  return { project: null, candidates: [] };
+  // No match via address/site — return all projects so user can pick manually
+  const allRows = await sql`
+    SELECT id, project_name FROM projects ORDER BY project_name ASC
+  ` as Array<{ id: string; project_name: string }>;
+
+  return { project: null, candidates: allRows.map((r) => ({ id: r.id, name: r.project_name })) };
 }
 
 // ============================================================
