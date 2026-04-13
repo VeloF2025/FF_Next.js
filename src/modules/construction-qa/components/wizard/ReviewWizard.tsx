@@ -39,7 +39,6 @@ import type {
   WorkflowStatus,
   QaDecision,
   QaReasonCode,
-  ChecklistStep,
 } from '../../types';
 import { PhasePrerequisites } from './PhasePrerequisites';
 import { PhasePhotoReview } from './PhasePhotoReview';

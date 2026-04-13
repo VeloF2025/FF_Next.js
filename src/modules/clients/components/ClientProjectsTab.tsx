@@ -75,7 +75,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.E
   cancelled: { label: 'Cancelled', color: 'bg-red-500/20 text-red-400', icon: AlertCircle },
 };
 
-const priorityConfig: Record<string, { label: string; color: string }> = {
+const _priorityConfig: Record<string, { label: string; color: string }> = {
   critical: { label: 'Critical', color: 'bg-red-500/20 text-red-400' },
   high: { label: 'High', color: 'bg-orange-500/20 text-orange-400' },
   medium: { label: 'Medium', color: 'bg-yellow-500/20 text-yellow-400' },

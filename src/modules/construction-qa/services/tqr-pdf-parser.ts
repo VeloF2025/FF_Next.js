@@ -338,7 +338,7 @@ function splitPoleReferenceLine(line: string): (string | null)[] {
 export function parseGridMapping(text: string): TqrGridMapping {
   // GPS line pattern: up to 3 groups of "snagNum  -lat  lon" on one line
   // Example: "1   -26.119823 28.48195   1   -26.119711 28.481402   1  -26.119648 28.480923"
-  const gpsGroupPattern = /(\d+)\s+(-\d+\.\d+)\s+(\d+\.\d+)/g;
+  const _gpsGroupPattern = /(\d+)\s+(-\d+\.\d+)\s+(\d+\.\d+)/g;
 
   const lines = text.split('\n');
   let inGridSection = false;
