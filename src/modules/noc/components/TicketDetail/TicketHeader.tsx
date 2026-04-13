@@ -66,15 +66,15 @@ const TICKET_WORKFLOW_ACTIONS: Record<string, {
   qa_approved:     { forward: { status: 'resolved',    label: 'Mark Resolved' } },
   pending_handover:{ forward: { status: 'resolved',    label: 'Mark Resolved' } },
   handed_to_ops:   { forward: { status: 'resolved',    label: 'Mark Resolved' } },
-  resolved:        { forward: { status: 'verified',    label: 'Customer Confirmed' },backward: { status: 'in_progress', label: 'Customer Unhappy' } },
+  resolved:        { forward: { status: 'closed',      label: 'Close Ticket' },      backward: { status: 'in_progress', label: 'Reopen' } },
   verified:        { forward: { status: 'closed',      label: 'Close Ticket' },      backward: { status: 'in_progress', label: 'Reopen' } },
   closed:          {                                                                   backward: { status: 'open',        label: 'Reopen' } },
   cancelled:       {                                                                   backward: { status: 'open',        label: 'Reopen' } },
 };
 
-/** DevOps tickets are internal — use different labels for the resolved step */
+/** DevOps tickets are internal — skip verified, close directly */
 const DEVOPS_RESOLVED_ACTIONS = {
-  forward: { status: 'verified', label: 'Fix Verified' },
+  forward: { status: 'closed', label: 'Close Ticket' },
   backward: { status: 'in_progress', label: 'Fix Not Working' },
 };
 
