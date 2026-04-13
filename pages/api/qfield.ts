@@ -119,7 +119,7 @@ async function getHealthStatus(): Promise<HealthStatus> {
     results[3].value.split('\n').filter(Boolean).forEach(line => {
       const parts = line.trim().split('|').map(s => s.trim());
       if (parts.length === 2) {
-        dbStats[parts[0]] = parseInt(parts[1], 10) || 0;
+        dbStats[parts[0]!] = parseInt(parts[1]!, 10) || 0;
       }
     });
   }
@@ -151,11 +151,11 @@ async function getHealthStatus(): Promise<HealthStatus> {
       const parts = line.trim().split('|').map(s => s.trim());
       if (parts.length >= 5) {
         stuckJobs.push({
-          id: parts[0],
-          type: parts[1],
-          status: parts[2],
-          project: parts[3],
-          createdAt: parts[4],
+          id: parts[0]!,
+          type: parts[1]!,
+          status: parts[2]!,
+          project: parts[3]!,
+          createdAt: parts[4]!,
         });
       }
     });
@@ -168,7 +168,7 @@ async function getHealthStatus(): Promise<HealthStatus> {
       "curl -s -o /dev/null -w '%{http_code}|%{time_total}' https://qfield.fibreflow.app/",
       { timeout: 10000 }
     );
-    const [code, time] = stdout.split('|');
+    const [code = '0', time = '0'] = stdout.split('|');
     externalUrl = {
       reachable: parseInt(code, 10) > 0,
       httpCode: parseInt(code, 10),
@@ -367,12 +367,12 @@ async function getJobById(jobId: string): Promise<{ success: boolean; job?: JobD
     return {
       success: true,
       job: {
-        id: parts[0],
-        type: parts[1],
-        status: parts[2],
-        project: parts[3],
-        projectId: parts[4],
-        createdAt: parts[5],
+        id: parts[0]!,
+        type: parts[1]!,
+        status: parts[2]!,
+        project: parts[3]!,
+        projectId: parts[4]!,
+        createdAt: parts[5]!,
         startedAt: parts[6] || null,
         finishedAt: parts[7] || null,
         output: parts[8] || null,
@@ -424,11 +424,11 @@ async function getProjectById(projectId: string): Promise<{ success: boolean; pr
     return {
       success: true,
       project: {
-        id: parts[0],
-        name: parts[1],
-        owner: parts[2],
-        createdAt: parts[3],
-        jobCount: parseInt(parts[4], 10) || 0,
+        id: parts[0]!,
+        name: parts[1]!,
+        owner: parts[2]!,
+        createdAt: parts[3]!,
+        jobCount: parseInt(parts[4]!, 10) || 0,
         lastJobStatus: parts[5] || null,
         lastJobDate: parts[6] || null,
       },
@@ -468,11 +468,11 @@ async function getJobStats(): Promise<{ success: boolean; stats?: JobStats; erro
       return { success: false, error: 'Invalid stats data' };
     }
 
-    const total = parseInt(parts[0], 10) || 0;
-    const success = parseInt(parts[1], 10) || 0;
-    const failed = parseInt(parts[2], 10) || 0;
-    const pending = parseInt(parts[3], 10) || 0;
-    const queued = parseInt(parts[4], 10) || 0;
+    const total = parseInt(parts[0]!, 10) || 0;
+    const success = parseInt(parts[1]!, 10) || 0;
+    const failed = parseInt(parts[2]!, 10) || 0;
+    const pending = parseInt(parts[3]!, 10) || 0;
+    const queued = parseInt(parts[4]!, 10) || 0;
     const avgDuration = parts[5] ? parseInt(parts[5], 10) : null;
 
     return {
@@ -560,7 +560,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     }
 
-    return apiResponse.methodNotAllowed(res, ['GET', 'POST']);
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET', 'POST']);
   } catch (error) {
     log.error('QField API error', { error });
     return apiResponse.internalError(res, error);

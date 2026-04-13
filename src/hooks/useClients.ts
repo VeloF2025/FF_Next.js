@@ -2,11 +2,12 @@ import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { clientService } from '@/services/clientService';
 import { log } from '@/lib/logger';
-import { 
-  ClientFormData, 
+import {
+  ClientFormData,
   ClientFilter,
   ClientDropdownOption
 } from '@/types/client.types';
+import type { ClientSummary } from '@/types/client/summary.types';
 
 // Query Keys
 export const clientKeys = {
@@ -59,9 +60,9 @@ export function useClient(id: string) {
  * Hook to fetch client summary statistics
  */
 export function useClientSummary() {
-  return useQuery({
+  return useQuery<ClientSummary>({
     queryKey: clientKeys.summary(),
-    queryFn: () => clientService.getClientSummary(),
+    queryFn: () => clientService.getClientSummary() as Promise<ClientSummary>,
     staleTime: 15 * 60 * 1000, // 15 minutes
   });
 }
