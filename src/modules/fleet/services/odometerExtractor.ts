@@ -9,7 +9,9 @@
  * NLNH Confidence: HIGH
  */
 
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('FleetVlmService');
 import { OdometerExtractionResult } from '../types/check-in.types';
 import {
   getVlmFewShotExamples,
@@ -151,7 +153,7 @@ export async function extractOdometerReading(
   base64Image: string
 ): Promise<OdometerExtractionResult> {
   try {
-    log.info('FleetVlmService', 'Extracting odometer reading (multi-pass with few-shot)...');
+    logger.info('Extracting odometer reading (multi-pass with few-shot)...');
 
     let fewShotSection = '';
     try {
@@ -163,10 +165,10 @@ export async function extractOdometerReading(
       });
       if (examples.length > 0) {
         fewShotSection = buildVlmFewShotPrompt(examples);
-        log.info('FleetVlmService', `Injecting ${examples.length} few-shot examples for odometer`);
+        logger.info(`Injecting ${examples.length} few-shot examples for odometer`);
       }
     } catch (fewShotError) {
-      log.warn('FleetVlmService', `Few-shot retrieval failed (continuing without): ${fewShotError}`);
+      logger.warn(`Few-shot retrieval failed (continuing without): ${fewShotError}`);
     }
 
     const enhancedPrompt = fewShotSection
@@ -175,7 +177,7 @@ export async function extractOdometerReading(
 
     const content1 = await callVlmApi(base64Image, enhancedPrompt, 'odometer');
     const result1 = parseVlmJson<OdometerVlmResult>(content1);
-    log.info('FleetVlmService', `Pass 1: ${result1.reading} km (${result1.confidence} conf)`);
+    logger.info(`Pass 1: ${result1.reading} km (${result1.confidence} conf)`);
 
     if (!result1.reading || result1.confidence < 0.5) {
       return {
@@ -188,14 +190,14 @@ export async function extractOdometerReading(
 
     const content2 = await callVlmApi(base64Image, enhancedPrompt, 'odometer');
     const result2 = parseVlmJson<OdometerVlmResult>(content2);
-    log.info('FleetVlmService', `Pass 2: ${result2.reading} km (${result2.confidence} conf)`);
+    logger.info(`Pass 2: ${result2.reading} km (${result2.confidence} conf)`);
 
     const readingsMatch = result1.reading === result2.reading;
     const diff = Math.abs((result1.reading || 0) - (result2.reading || 0));
     const percentDiff = (diff / (result1.reading || 1)) * 100;
 
     if (!readingsMatch) {
-      log.warn('FleetVlmService', `Multi-pass mismatch: ${result1.reading} vs ${result2.reading} (${percentDiff.toFixed(1)}% diff)`);
+      logger.warn(`Multi-pass mismatch: ${result1.reading} vs ${result2.reading} (${percentDiff.toFixed(1)}% diff)`);
 
       if (percentDiff > 1) {
         const confusionDetected = detectDigitConfusion(
@@ -203,7 +205,7 @@ export async function extractOdometerReading(
           String(result2.reading)
         );
         if (confusionDetected) {
-          log.error('FleetVlmService', `Digit confusion detected: ${confusionDetected}`);
+          logger.error(`Digit confusion detected: ${confusionDetected}`);
           return {
             reading: result1.reading,
             confidence: Math.min(result1.confidence, 0.6),
@@ -231,7 +233,7 @@ export async function extractOdometerReading(
       rawResponse: `Pass1: ${result1.reading} (${result1.confidence}), Pass2: ${result2.reading} (${result2.confidence})`,
     };
   } catch (error) {
-    log.error('FleetVlmService', `Odometer extraction failed: ${error}`);
+    logger.error(`Odometer extraction failed: ${error}`);
     return {
       reading: null,
       confidence: 0,
@@ -257,30 +259,30 @@ export async function extractOdometerWithCalibration(
     const calibration = await getVehicleCalibration(vehicleId);
 
     if (!calibration) {
-      log.info('FleetVlmService', `No calibration found for vehicle ${vehicleId}, using standard extraction`);
+      logger.info(`No calibration found for vehicle ${vehicleId}, using standard extraction`);
       const result = await extractOdometerReading(base64Image);
       return { ...result, calibrationUsed: false };
     }
 
-    log.info('FleetVlmService', `Using calibration context: baseline=${calibration.baselineOdometer} km`);
+    logger.info(`Using calibration context: baseline=${calibration.baselineOdometer} km`);
 
     const prompt = buildCalibrationAwarePrompt(
       calibration.baselineOdometer,
-      new Date(calibration.calibratedAt).toISOString().split('T')[0]
+      new Date(calibration.calibratedAt).toISOString().split('T')[0] ?? ''
     );
 
     const content1 = await callVlmApi(base64Image, prompt, 'odometer');
     const result1 = parseVlmJson<OdometerVlmResult>(content1);
-    log.info('FleetVlmService', `Calibration-aware Pass 1: ${result1.reading} km (${result1.confidence} conf)`);
+    logger.info(`Calibration-aware Pass 1: ${result1.reading} km (${result1.confidence} conf)`);
 
     if (!result1.reading || result1.confidence < 0.5) {
-      log.info('FleetVlmService', 'Calibration pass failed, falling back to standard extraction');
+      logger.info('Calibration pass failed, falling back to standard extraction');
       const fallback = await extractOdometerReading(base64Image);
       return { ...fallback, calibrationUsed: false };
     }
 
     if (result1.reading < calibration.baselineOdometer) {
-      log.warn('FleetVlmService', `Reading ${result1.reading} km is below calibration baseline ${calibration.baselineOdometer} km`);
+      logger.warn(`Reading ${result1.reading} km is below calibration baseline ${calibration.baselineOdometer} km`);
       return {
         reading: result1.reading,
         confidence: Math.min(result1.confidence, 0.5),
@@ -294,7 +296,7 @@ export async function extractOdometerWithCalibration(
 
     const content2 = await callVlmApi(base64Image, prompt, 'odometer');
     const result2 = parseVlmJson<OdometerVlmResult>(content2);
-    log.info('FleetVlmService', `Calibration-aware Pass 2: ${result2.reading} km (${result2.confidence} conf)`);
+    logger.info(`Calibration-aware Pass 2: ${result2.reading} km (${result2.confidence} conf)`);
 
     const readingsMatch = result1.reading === result2.reading;
     const bestResult = result2.confidence > result1.confidence ? result2 : result1;
@@ -311,7 +313,7 @@ export async function extractOdometerWithCalibration(
       baselineOdometer: calibration.baselineOdometer,
     };
   } catch (error) {
-    log.error('FleetVlmService', `Calibration-aware extraction failed: ${error}`);
+    logger.error(`Calibration-aware extraction failed: ${error}`);
     const fallback = await extractOdometerReading(base64Image);
     return { ...fallback, calibrationUsed: false };
   }
@@ -338,13 +340,12 @@ export async function extractAndValidateOdometerReading(
     { minConfidence: extractionResult.calibrationUsed ? 0.8 : 0.85 }
   );
 
-  log.info(
-    'FleetVlmService',
+  logger.info(
     `ODO validation: extracted=${extractionResult.reading}, previous=${effectivePrevious}, calibration=${extractionResult.calibrationUsed}, action=${validation.suggestedAction}`
   );
 
   if (validation.warning) {
-    log.warn('FleetVlmService', `ODO warning: ${validation.warning}`);
+    logger.warn(`ODO warning: ${validation.warning}`);
   }
 
   return { ...extractionResult, validation, calibrationUsed: extractionResult.calibrationUsed };

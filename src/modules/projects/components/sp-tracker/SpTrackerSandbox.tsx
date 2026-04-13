@@ -38,16 +38,14 @@ interface SpPonTracker {
   id: string;
   zone_no: number;
   hld_pon: number;
-  poles_planted: number | null;
+  scope_poles: number | null;
   sign_ups: number | null;
-  cwc_poles_date: string | null;
-  optical_activated_date: string | null;
+  cwc_qa_approved: number;
+  atp_qa_approved: number;
   activated: number | null;
   available: number | null;
-  pct_original: number | null;
   pct_recon: number | null;
   blockage: string | null;
-  synced_at: string;
 }
 
 interface SpTrackerData {
@@ -129,39 +127,39 @@ export default function SpTrackerSandbox({ projectId }: SpTrackerSandboxProps): 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <SummaryCard
           label="Permissions"
-          scope={summary?.permissions_scope}
-          complete={summary?.permissions_complete}
-          pct={summary?.pct_permissions}
+          scope={summary?.permissions_scope ?? null}
+          complete={summary?.permissions_complete ?? null}
+          pct={summary?.pct_permissions ?? null}
         />
         <SummaryCard
           label="Poles Planted"
-          scope={summary?.poles_scope}
-          complete={summary?.poles_complete}
-          pct={summary?.pct_poles}
+          scope={summary?.poles_scope ?? null}
+          complete={summary?.poles_complete ?? null}
+          pct={summary?.pct_poles ?? null}
         />
         <SummaryCard
           label="Sign-ups"
-          scope={summary?.signups_scope}
-          complete={summary?.signups_complete}
-          pct={summary?.pct_signups}
+          scope={summary?.signups_scope ?? null}
+          complete={summary?.signups_complete ?? null}
+          pct={summary?.pct_signups ?? null}
         />
         <SummaryCard
           label="CWC Complete"
-          scope={summary?.cwc_scope}
-          complete={summary?.cwc_complete}
-          pct={summary?.pct_cwc}
+          scope={summary?.cwc_scope ?? null}
+          complete={summary?.cwc_complete ?? null}
+          pct={summary?.pct_cwc ?? null}
         />
         <SummaryCard
           label="Optical Live"
-          scope={summary?.optical_scope}
-          complete={summary?.optical_complete}
-          pct={summary?.pct_optical}
+          scope={summary?.optical_scope ?? null}
+          complete={summary?.optical_complete ?? null}
+          pct={summary?.pct_optical ?? null}
         />
         <SummaryCard
           label="Connected"
-          scope={summary?.connected_scope}
-          complete={summary?.connected_complete}
-          pct={summary?.pct_connected}
+          scope={summary?.connected_scope ?? null}
+          complete={summary?.connected_complete ?? null}
+          pct={summary?.pct_connected ?? null}
         />
       </div>
 
