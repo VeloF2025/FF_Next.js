@@ -205,7 +205,7 @@ export const CONTRACTOR_VALIDATION = {
     required: true,
   },
   registrationNumber: {
-    pattern: /^[A-Z0-9\/-]+$/i,
+    pattern: /^[A-Z0-9/-]+$/i,
     required: true,
   },
   email: {

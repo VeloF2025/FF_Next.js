@@ -60,7 +60,7 @@ export function crossValidateSaIdWithDob(
   dateOfBirth: string
 ): IdCrossValidationResult {
   // Clean the ID number (remove spaces/dashes)
-  const cleanId = (idNumber || '').replace(/[\s\-]/g, '');
+  const cleanId = (idNumber || '').replace(/[\s-]/g, '');
 
   // Parse DOB (expected format: YYYY-MM-DD)
   const dobMatch = (dateOfBirth || '').match(/(\d{4})-(\d{2})-(\d{2})/);
