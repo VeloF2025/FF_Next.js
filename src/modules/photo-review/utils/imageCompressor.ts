@@ -67,7 +67,7 @@ export async function compressImage(
 
       if (needsResize) {
         // Resize with aspect ratio preservation
-        const resizeOptions: any = {
+        const resizeOptions: { width: number; height: number; fit: 'inside' | 'fill'; withoutEnlargement: boolean } = {
           width: COMPRESSION_CONFIG.maxWidth,
           height: COMPRESSION_CONFIG.maxHeight,
           fit: COMPRESSION_CONFIG.preserveAspectRatio ? 'inside' : 'fill',

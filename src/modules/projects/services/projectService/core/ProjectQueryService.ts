@@ -31,7 +31,7 @@ export class ProjectQueryService {
   static async getProjects(queryOptions?: ProjectListQuery): Promise<ProjectQueryResult> {
     try {
       const q = collection(db, COLLECTION_NAME);
-      const constraints: any[] = [];
+      const constraints: ReturnType<typeof where>[] = [];
 
       // Apply filters
       if (queryOptions?.filters) {

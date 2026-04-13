@@ -11,20 +11,26 @@ interface HistoryTabProps {
   po: PurchaseOrder;
 }
 
+interface ActivityEntry {
+  date: Date | undefined;
+  action: string;
+  user: string | undefined;
+}
+
 export const HistoryTab: React.FC<HistoryTabProps> = ({ po }) => {
   const formatDate = (date: Date | undefined) =>
     date ? formatterService.date(date, { dateStyle: 'long' }) : '-';
 
-  const activities = [
+  const activities: ActivityEntry[] = ([
     { date: po.createdAt, action: 'Purchase Order created', user: po.createdBy },
-    po.issuedAt && { date: po.issuedAt, action: 'Purchase Order issued', user: po.issuedBy },
-    po.sentAt && { date: po.sentAt, action: 'Purchase Order sent to supplier', user: po.issuedBy },
-    po.acknowledgedAt && {
+    po.issuedAt ? { date: po.issuedAt, action: 'Purchase Order issued', user: po.issuedBy } : null,
+    po.sentAt ? { date: po.sentAt, action: 'Purchase Order sent to supplier', user: po.issuedBy } : null,
+    po.acknowledgedAt ? {
       date: po.acknowledgedAt,
       action: 'Purchase Order acknowledged by supplier',
       user: 'Supplier'
-    }
-  ].filter(Boolean);
+    } : null,
+  ] as (ActivityEntry | null)[]).filter((e): e is ActivityEntry => e !== null);
 
   return (
     <div className="space-y-4">
@@ -35,7 +41,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ po }) => {
         </h3>
 
         <div className="space-y-4">
-          {activities.map((entry: any, index) => (
+          {activities.map((entry, index) => (
             <div
               key={index}
               className="flex items-start space-x-4 border-l-2 border-blue-500 pl-4"

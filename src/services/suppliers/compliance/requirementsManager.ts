@@ -160,7 +160,7 @@ export class RequirementsManager {
   /**
    * Get special rules for business type
    */
-  static getSpecialRules(businessType: string): Record<string, any> {
+  static getSpecialRules(businessType: string): Record<string, unknown> {
     const requirements = this.getComplianceRequirements(businessType);
     return requirements.specialRules || {};
   }

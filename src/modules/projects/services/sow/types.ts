@@ -21,7 +21,7 @@ export interface SOWDataExtractionResult {
   dropCount?: number;
   cableLength?: number;
   estimatedCost?: number;
-  rawData?: any[];
+  rawData?: unknown[];
 }
 
 export interface SOWValidationResult {

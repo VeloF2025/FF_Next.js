@@ -3,10 +3,10 @@
  * Notes textarea field for additional meeting information
  */
 
-import { UseFormRegister } from 'react-hook-form';
+import { UseFormRegister, FieldValues } from 'react-hook-form';
 
 interface MeetingNotesFieldProps {
-  register: UseFormRegister<any>;
+  register: UseFormRegister<FieldValues>;
 }
 
 export function MeetingNotesField({ register }: MeetingNotesFieldProps) {

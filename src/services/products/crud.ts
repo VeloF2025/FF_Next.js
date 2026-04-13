@@ -35,7 +35,7 @@ export class ProductCrudService {
       }
       
       const snapshot = await getDocs(q);
-      return snapshot.docs.map((doc: any) => ({
+      return snapshot.docs.map((doc: { id: string; data: () => Record<string, unknown> }) => ({
         id: doc.id,
         ...doc.data()
       } as Product));

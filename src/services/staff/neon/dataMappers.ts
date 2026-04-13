@@ -29,7 +29,7 @@ function dateToTimestamp(date: Date): TimestampLike {
 /**
  * Map database result to StaffMember
  */
-export function mapToStaffMember(staff: any): StaffMember {
+export function mapToStaffMember(staff: any): StaffMember { // eslint-disable-line @typescript-eslint/no-explicit-any
   return {
     id: staff.id,
     name: staff.name || '',

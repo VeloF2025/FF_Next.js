@@ -80,7 +80,8 @@ export class SOWUploadService {
   /**
    * Process file for data extraction
    */
-  private static async processFileForUpload(file: File, type: SOWDocumentType): Promise<any[]> {
+  // PARTIAL: return type still needs proper typing once NeonPoleData/NeonDropData types are stabilized
+  private static async processFileForUpload(file: File, type: SOWDocumentType): Promise<any[]> { // eslint-disable-line @typescript-eslint/no-explicit-any
     try {
       // Read file as array buffer
       const arrayBuffer = await file.arrayBuffer();

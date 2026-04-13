@@ -10,7 +10,7 @@ import { RfqCrudService } from '../core/RfqCrudService';
 import { RfqNotificationService } from '../notifications/RfqNotificationService';
 import { validateStatusTransition } from '../utils/rfqStatusValidator';
 
-const sql: any = neon(process.env.DATABASE_URL!);
+const sql = neon(process.env.DATABASE_URL!);
 
 export class RfqLifecycleService {
   /**

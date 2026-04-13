@@ -3,10 +3,10 @@
  * Virtual meeting checkbox and conditional location/link fields
  */
 
-import { UseFormRegister } from 'react-hook-form';
+import { UseFormRegister, FieldValues } from 'react-hook-form';
 
 interface MeetingLocationFieldsProps {
-  register: UseFormRegister<any>;
+  register: UseFormRegister<FieldValues>;
   isVirtual: boolean;
 }
 

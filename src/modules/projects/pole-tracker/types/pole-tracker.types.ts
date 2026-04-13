@@ -115,7 +115,7 @@ export interface PoleTracker {
   // Import Tracking
   importBatchId?: string; // If created from bulk import
   importSource?: string; // "OneMap", "Excel", "Manual"
-  originalData?: Record<string, any>; // Original import data for reference
+  originalData?: Record<string, unknown>; // Original import data for reference
 }
 
 export interface PolePhoto {

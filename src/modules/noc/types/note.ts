@@ -83,7 +83,7 @@ export interface TicketNote {
  */
 export interface SystemEventData {
   event_type: SystemEvent;
-  [key: string]: any; // Additional event-specific data
+  [key: string]: unknown; // Additional event-specific data
 }
 
 /**

@@ -36,7 +36,7 @@ export class ProductStatusService {
    */
   static async discontinueProduct(id: string, replacementId?: string): Promise<void> {
     try {
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         isDiscontinued: true,
         isActive: false,
         availability: ProductAvailability.DISCONTINUED,

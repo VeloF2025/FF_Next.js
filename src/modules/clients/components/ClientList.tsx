@@ -28,7 +28,7 @@ export function ClientList() {
   });
 
   // Filter clients locally for instant search (more responsive than API-only)
-  const filteredClients = clients?.filter((client: any) => {
+  const filteredClients = clients?.filter((client) => {
     if (!searchTerm) return true;
     const search = searchTerm.toLowerCase();
     return (

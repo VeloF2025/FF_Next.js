@@ -18,7 +18,7 @@ export interface CreateProjectRequest {
   priority: ProjectPriority;
   budget?: Partial<ProjectBudget>;
   teamMembers?: string[]; // Staff IDs
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   notes?: string; // Additional notes field
 }
 

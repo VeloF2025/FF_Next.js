@@ -6,7 +6,20 @@ import React, { useState } from 'react';
 import useSWR from 'swr';
 import { AlertTriangle, Clock, CheckCircle, Filter } from 'lucide-react';
 import { CAPAStatusBadge, CAPASeverityBadge } from './CAPAStatusBadge';
-import type { CAPAStatus } from '@/modules/health-safety/types/capa.types';
+import type { CAPAStatus, CAPASeverity } from '@/modules/health-safety/types/capa.types';
+
+interface CAPARow {
+  id: string;
+  title: string;
+  severity: CAPASeverity;
+  status: CAPAStatus;
+  source_type?: string;
+  project_name?: string;
+  assigned_to_name?: string;
+  is_overdue?: boolean;
+  due_date: string;
+  created_at: string;
+}
 
 const fetcher = (url: string) =>
   fetch(url, { credentials: 'include' }).then((r) => {
@@ -79,7 +92,7 @@ export function CAPAList({ projectId, contractorId, onSelectCAPA }: CAPAListProp
         </div>
       ) : (
         <div className="space-y-2">
-          {capas.map((capa: any) => (
+          {(capas as CAPARow[]).map((capa) => (
             <button
               key={capa.id}
               type="button"

@@ -136,7 +136,7 @@ export function useCreateBOQTemplate() {
 // Export BOQ to Excel
 export function useExportBOQ() {
   return useMutation({
-    mutationFn: async (boq: any) => {
+    mutationFn: async (boq: Record<string, unknown> & { boqNumber: string }) => {
       const csvData = await boqService.exportToCsv(boq);
       const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);

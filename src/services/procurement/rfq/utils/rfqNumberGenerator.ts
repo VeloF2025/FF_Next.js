@@ -5,7 +5,7 @@
 
 import { neon } from '@/lib/db-neon';
 
-const sql: any = neon(process.env.DATABASE_URL!);
+const sql = neon(process.env.DATABASE_URL!);
 
 /**
  * Generate unique RFQ number

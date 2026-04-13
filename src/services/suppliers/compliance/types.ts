@@ -39,7 +39,7 @@ export interface ComplianceRequirements {
   required: string[];
   optional: string[];
   exemptions?: string[];
-  specialRules?: Record<string, any>;
+  specialRules?: Record<string, unknown>;
 }
 
 /**

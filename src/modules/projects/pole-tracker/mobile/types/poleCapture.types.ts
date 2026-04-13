@@ -9,7 +9,7 @@ export interface PoleFormData {
   drops: DropData[];
   latitude?: number;
   longitude?: number;
-  photos?: Record<string, any>;
+  photos?: Record<string, unknown>;
   notes?: string;
 }
 

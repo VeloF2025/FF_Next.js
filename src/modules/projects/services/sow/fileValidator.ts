@@ -27,7 +27,7 @@ export class SOWFileValidator {
    * Validate file type
    */
   private static validateFileType(file: File): void {
-    if (!SOW_CONFIG.ALLOWED_TYPES.includes(file.type as any)) {
+    if (!(SOW_CONFIG.ALLOWED_TYPES as readonly string[]).includes(file.type)) {
       throw new Error(
         'File type not supported. Please upload PDF, Excel, Word, or image files.'
       );

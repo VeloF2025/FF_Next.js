@@ -197,7 +197,7 @@ export class ComplianceAuditService {
   /**
    * Get suppliers by compliance status
    */
-  static async getSuppliersByComplianceStatus(status: 'compliant' | 'non_compliant' | 'pending'): Promise<any[]> {
+  static async getSuppliersByComplianceStatus(status: 'compliant' | 'non_compliant' | 'pending'): Promise<Supplier[]> {
     try {
       const supplierCrudService = await import('../supplier.crud');
       const suppliers = await supplierCrudService.SupplierCrudService.getAll();
