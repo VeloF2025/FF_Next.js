@@ -31,6 +31,7 @@ vi.mock('@/lib/logger', () => ({
   }),
 }));
 
+vi.mock('@clerk/nextjs/server', () => ({
   getAuth: vi.fn().mockReturnValue({ userId: null }),
 }));
 
