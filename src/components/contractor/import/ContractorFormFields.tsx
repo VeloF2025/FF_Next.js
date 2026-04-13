@@ -28,7 +28,7 @@ interface ServiceTemplate {
 
 const ServiceTemplateApiService = {
   getTemplates: async () => [] as ServiceTemplate[],
-  getTemplate: async (id: string) => null as ServiceTemplate | null,
+  getTemplate: async (_id: string) => null as ServiceTemplate | null,
   getServiceTemplates: async (_options: Record<string, unknown>) => ({ data: [] as ServiceTemplate[] }),
 };
 

@@ -3,7 +3,7 @@
  * Tests for the main contractor import UI component
  */
 
-import { describe, it, expect, beforeEach, vi, type MockedObject } from 'vitest';
+import { describe, expect, beforeEach, vi, type MockedObject } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ContractorImport } from './ContractorImport';

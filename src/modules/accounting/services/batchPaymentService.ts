@@ -103,7 +103,7 @@ export async function createBatch(
   return result!;
 }
 
-export async function approveBatch(id: string, userId: string): Promise<void> {
+export async function approveBatch(id: string, _userId: string): Promise<void> {
   await sql`UPDATE supplier_payment_batches SET status = 'approved' WHERE id = ${id} AND status = 'draft'`;
   await sql`UPDATE supplier_payments SET status = 'approved' WHERE batch_id = ${id}::UUID AND status = 'draft'`;
   log.info('Approved batch', { id }, 'accounting');

@@ -18,7 +18,6 @@ import {
   DOCUMENT_TYPE_LABELS,
   type AccountingDocumentType,
   type AccountingEntityType,
-  type ProcurementDocumentType,
 } from '@/types/procurement/document.types';
 import { formatDisplayDate } from '@/utils/dateFormat';
 

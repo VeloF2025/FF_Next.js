@@ -151,7 +151,7 @@ interface ProjectCardProps {
   onUpdate: () => void;
 }
 
-function ProjectCard({ project, totalPaid, onUpdate }: ProjectCardProps) {
+function ProjectCard({ project, totalPaid, onUpdate: _onUpdate }: ProjectCardProps) {
   const statusConfig = ASSIGNMENT_STATUSES.find(s => s.value === project.assignmentStatus);
   const statusColor = statusConfig?.color || 'gray';
 

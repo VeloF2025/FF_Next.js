@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X } from 'lucide-react';
 import { TeamSelector } from '@/modules/noc/components/Assignment/TeamSelector';
 import { Button } from '@/components/ui/button';
 

@@ -15,7 +15,7 @@ import {
   Clock
 } from 'lucide-react';
 import { BOQ } from '@/types/procurement/boq.types';
-import { BOQ_STATUS_COLORS, MAPPING_STATUS_COLORS } from './BOQListTypes';
+import { BOQ_STATUS_COLORS } from './BOQListTypes';
 
 interface BOQListTableProps {
   boqs: BOQ[];

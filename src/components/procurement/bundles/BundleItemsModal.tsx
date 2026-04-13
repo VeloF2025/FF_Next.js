@@ -50,7 +50,7 @@ export function BundleItemsModal({
 }: BundleItemsModalProps) {
   const [items, setItems] = useState<StockBundleItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const isSaving = false;
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<StockItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
