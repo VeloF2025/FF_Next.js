@@ -19,7 +19,6 @@ interface PdfParseResult {
   text: string;
   numpages: number;
 }
-
 // ─── Public Interface Types ─────────────────────────────────────────────────
 
 export interface ParsedPaymentSummary {

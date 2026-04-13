@@ -20,7 +20,6 @@ import {
   clearDRCache,
   getDRFromCache
 } from '../../services/drLookupService';
-import { DRLookupResult } from '../../types/ticket';
 
 // Mock the database utility
 vi.mock('../../utils/db', () => ({
@@ -39,7 +38,7 @@ vi.mock('@/lib/logger', () => ({
   }))
 }));
 
-import { query, queryOne } from '../../utils/db';
+import { queryOne } from '../../utils/db';
 
 describe('DR Lookup Service', () => {
   beforeEach(() => {

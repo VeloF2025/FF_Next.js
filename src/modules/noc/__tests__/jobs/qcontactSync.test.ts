@@ -18,8 +18,6 @@ import {
   runSyncJob,
   getSyncJobHistory,
   getLastSyncJobRun,
-  type SyncJobResult,
-  type SyncJobHistoryEntry,
 } from '../../jobs/qcontactSync';
 
 // Mock dependencies

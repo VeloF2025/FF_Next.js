@@ -31,7 +31,6 @@ import {
   UpdateWeeklyReportPayload,
   ImportRow,
   ImportErrorType,
-  ImportProcessResult
 } from '../../types/weeklyReport';
 import type { Ticket } from '../../types/ticket';
 
@@ -58,7 +57,7 @@ vi.mock('../../services/ticketService', () => ({
   createTicket: vi.fn()
 }));
 
-import { query, queryOne, transaction } from '../../utils/db';
+import { query, queryOne } from '../../utils/db';
 import { createTicket } from '../../services/ticketService';
 
 describe('Weekly Report Service - TDD', () => {
