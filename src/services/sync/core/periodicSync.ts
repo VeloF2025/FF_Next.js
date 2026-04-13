@@ -38,7 +38,7 @@ export class PeriodicSyncManager {
         this.onSyncComplete(result);
         
         if (result.success) {
-
+          // Sync completed successfully; no additional action needed
         } else {
           log.error(`[SyncCore] Scheduled sync completed with errors - ${result.failedRecords} failures`, undefined, 'periodicSync');
         }

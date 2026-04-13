@@ -102,16 +102,14 @@ export async function processImportRows(
           const managerUuid = await findManagerByName(managerName);
           if (managerUuid) {
             reportsTo = managerUuid;
-
           } else {
-
-
+            // No manager found by name; leave reportsTo as null
           }
         } catch (error) {
           log.warn('rowProcessor', { action: 'managerLookupFailed', managerName, error });
         }
       } else {
-
+        // No manager name provided; leave reportsTo as null
       }
       
       // Ensure employeeId is never null or empty

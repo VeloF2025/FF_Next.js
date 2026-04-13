@@ -766,10 +766,14 @@ export async function triggerRecovery(
       const result = await handleSafeAction(action, incidentId);
       return { success: result.success, result };
     }
+
+
     case 'moderate': {
       const moderateResult = await handleModerateAction(action, incidentId);
       return { success: true, queued: true, queueId: moderateResult.queueId };
     }
+
+
     case 'dangerous': {
       const dangerousResult = await handleDangerousAction(action, incidentId);
       return { success: true, queued: true, queueId: dangerousResult.queueId };

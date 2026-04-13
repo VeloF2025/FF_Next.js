@@ -248,7 +248,7 @@ function PerformanceTrends({ metrics }: { metrics: PerformanceMetric[] }) {
 }
 
 // Benchmarking component
-function BenchmarkingSection({ }: { metrics: PerformanceMetric[] }) {
+function BenchmarkingSection(_props: { metrics: PerformanceMetric[] }) {
   const benchmarkData = [
     { category: 'Delivery Performance', rank: 2, totalSuppliers: 15, score: 94.5 },
     { category: 'Quality Standards', rank: 1, totalSuppliers: 15, score: 98.2 },
