@@ -268,7 +268,7 @@ export function QFieldImportPanel({ projectId }: QFieldImportPanelProps) {
 
 /** Radio-style option for import mode */
 function ImportModeOption({
-  mode,
+  mode: _mode,
   label,
   description,
   selected,

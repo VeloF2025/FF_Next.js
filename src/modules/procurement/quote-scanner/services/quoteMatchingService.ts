@@ -307,40 +307,6 @@ function calculateSimilarity(s1: string, s2: string): number {
   return combinedScore;
 }
 
-/**
- * Levenshtein distance (for reference, not used in main algorithm)
- */
-function levenshteinDistance(s1: string, s2: string): number {
-  const m = s1.length;
-  const n = s2.length;
-
-  if (m === 0) return n;
-  if (n === 0) return m;
-
-  const matrix: number[][] = [];
-
-  for (let i = 0; i <= m; i++) {
-    matrix[i] = [i];
-  }
-
-  for (let j = 0; j <= n; j++) {
-    matrix[0]![j] = j;
-  }
-
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
-      matrix[i]![j] = Math.min(
-        matrix[i - 1]![j]! + 1,      // deletion
-        matrix[i]![j - 1]! + 1,      // insertion
-        matrix[i - 1]![j - 1]! + cost // substitution
-      );
-    }
-  }
-
-  return matrix[m]![n]!;
-}
-
 // ============================================================================
 // UTILITIES
 // ============================================================================

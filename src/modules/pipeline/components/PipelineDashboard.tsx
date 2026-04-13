@@ -24,7 +24,6 @@ import type {
   PipelineDashboardStats,
   PipelineProjectSummary,
   PipelineStatus,
-  Priority,
 } from '../types';
 import { AlertsDashboard } from './AlertsDashboard';
 import { SmartsheetSyncPanel } from './SmartsheetSyncPanel';

@@ -82,7 +82,7 @@ export class SOWDocumentService {
   static async updateMetadata(
     projectId: string,
     documentId: string,
-    metadata: Record<string, unknown>
+    _metadata: Record<string, unknown>
   ): Promise<void> {
     log.warn('SOWDocumentService.updateMetadata is deprecated.',
       { projectId, documentId }, 'documentService');

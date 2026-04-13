@@ -7,7 +7,7 @@ interface DropsStatsCardsProps {
   allDropsStats: DropsStats;
 }
 
-export function DropsStatsCards({ stats, allDropsStats }: DropsStatsCardsProps) {
+export function DropsStatsCards({ stats: _stats, allDropsStats }: DropsStatsCardsProps) {
   return (
     <StatCardGrid columns={5}>
       <StatCard

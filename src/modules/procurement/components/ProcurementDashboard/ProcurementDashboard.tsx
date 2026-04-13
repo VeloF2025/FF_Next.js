@@ -64,7 +64,6 @@ export function ProcurementDashboard() {
     stats,
     trends,
     isLoading,
-    error,
     formatNumber,
     formatCurrency,
     formatPercentage,

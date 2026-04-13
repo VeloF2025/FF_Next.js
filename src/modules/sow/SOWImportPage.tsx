@@ -15,7 +15,7 @@ export function SOWImportPage() {
   const projectIdStr = typeof projectId === 'string' ? projectId : '';
   const projectNameStr = typeof projectName === 'string' ? projectName : 'Current Project';
   const [showWizard, setShowWizard] = useState(false);
-  const [selectorError, setSelectorError] = useState<string | null>(null);
+  const [selectorError] = useState<string | null>(null);
   const [urlValidationError, setUrlValidationError] = useState<string | null>(null);
 
   // Validate URL parameters

@@ -353,7 +353,7 @@ export function StaffDetail() {
   };
 
   // Document upload handler
-  const handleUploadDocument = (documentType: string) => {
+  const handleUploadDocument = (_documentType: string) => {
     // Switch to documents tab with the document type pre-selected
     setActiveTab('documents');
     // The StaffDocumentList component handles the actual upload

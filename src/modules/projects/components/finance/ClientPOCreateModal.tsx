@@ -9,7 +9,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import type { ClientPOCreateInput } from '@/types/finance';
 import { log } from '@/lib/logger';
 import type { POExtractionAPIResponse, POExtractionResult } from '@/modules/projects/types/po-extraction.types';
-import { getConfidenceColorClass, getConfidenceLevel, CONFIDENCE_THRESHOLDS } from '@/modules/projects/types/po-extraction.types';
+import { getConfidenceColorClass, getConfidenceLevel } from '@/modules/projects/types/po-extraction.types';
 import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ClientPOCreateModalProps {
