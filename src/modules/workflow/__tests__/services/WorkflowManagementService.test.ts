@@ -25,7 +25,7 @@ import type {
 } from '../../types/workflow.types';
 
 // Mock fetch API for HTTP requests
-const mockFetch = jest.fn();
+const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 // Mock environment variables
@@ -33,7 +33,7 @@ process.env.VITE_API_BASE_URL = 'http://localhost:3001';
 
 describe('WorkflowManagementService Integration Tests', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockFetch.mockClear();
   });
 
@@ -760,7 +760,7 @@ describe('WorkflowManagementService Integration Tests', () => {
       const mockToken = 'mock-jwt-token';
       Object.defineProperty(window, 'localStorage', {
         value: {
-          getItem: jest.fn(() => mockToken)
+          getItem: vi.fn(() => mockToken)
         }
       });
 

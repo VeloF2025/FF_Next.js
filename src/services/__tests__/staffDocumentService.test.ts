@@ -429,7 +429,7 @@ describe('StaffDocumentService', () => {
     it('should return compliant status when all required documents are verified', async () => {
       const documents = [
         createMockDocument({
-          documentType: 'id_document',
+          documentType: 'sa_id',
           verificationStatus: 'verified',
         }),
         createMockDocument({
@@ -468,14 +468,14 @@ describe('StaffDocumentService', () => {
 
       expect(result.status).toBe('non_compliant');
       expect(result.compliancePercentage).toBe(0);
-      expect(result.missingRequired).toContain('id_document');
+      expect(result.missingRequired).toContain('sa_id');
       expect(result.missingRequired).toContain('employment_contract');
     });
 
     it('should return non_compliant status when documents are expired', async () => {
       const documents = [
         createMockDocument({
-          documentType: 'id_document',
+          documentType: 'sa_id',
           verificationStatus: 'expired',
         }),
         createMockDocument({
@@ -498,7 +498,7 @@ describe('StaffDocumentService', () => {
     it('should return warning status when documents are pending', async () => {
       const documents = [
         createMockDocument({
-          documentType: 'id_document',
+          documentType: 'sa_id',
           verificationStatus: 'verified',
         }),
         createMockDocument({
@@ -524,7 +524,7 @@ describe('StaffDocumentService', () => {
 
       const documents = [
         createMockDocument({
-          documentType: 'id_document',
+          documentType: 'sa_id',
           verificationStatus: 'verified',
           expiryDate: in5Days.toISOString(),
         }),
@@ -551,7 +551,7 @@ describe('StaffDocumentService', () => {
 
       const documents = [
         createMockDocument({
-          documentType: 'id_document',
+          documentType: 'sa_id',
           verificationStatus: 'verified',
           expiryDate: in20Days.toISOString(),
         }),
