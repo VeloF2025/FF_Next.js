@@ -207,7 +207,7 @@ function HandoverTimelineEntry({
 export function HandoverHistory({
   ticketId,
   expandedByDefault = false,
-  compact = false,
+  compact: _compact = false,
 }: HandoverHistoryProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
     new Set(expandedByDefault ? [] : [])

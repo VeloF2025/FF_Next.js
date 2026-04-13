@@ -14,7 +14,7 @@
 
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createLogger } from '@/lib/logger';
 import { useAuth } from '@/contexts/AuthContext';

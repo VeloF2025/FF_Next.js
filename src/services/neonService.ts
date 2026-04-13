@@ -1,6 +1,5 @@
 // Browser environment - use API wrapper
 // This file now redirects all database operations through API endpoints
-import { log } from '@/lib/logger';
 
 // Import the API wrapper instead of direct database connection
 import { neonService as apiService, sowQueries as apiSowQueries } from './neonServiceAPI';

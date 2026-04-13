@@ -20,7 +20,6 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createLogger } from '@/lib/logger';
-import { NoteVisibility } from '../types/note';
 
 const logger = createLogger('maintenance:hooks:notes');
 

@@ -4,13 +4,12 @@
  */
 
 import { neon } from '@/lib/db-neon';
-import { 
-  Supplier, 
+import {
+  Supplier,
   SupplierStatus,
   SupplierFormData,
   BusinessType,
   DocumentType,
-  SupplierRating
 } from '@/types/supplier/base.types';
 import { log } from '@/lib/logger';
 import { sanitizeSupplierData } from '@/lib/security/sanitization';

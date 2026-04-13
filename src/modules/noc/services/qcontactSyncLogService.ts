@@ -15,7 +15,6 @@ import { query } from '../utils/db';
 import type {
   SyncStatusOverview,
   SyncLogListResponse,
-  SyncLogFilters,
   QContactSyncLog,
 } from '../types/qcontact';
 import { SyncDirection, SyncStatus } from '../types/qcontact';

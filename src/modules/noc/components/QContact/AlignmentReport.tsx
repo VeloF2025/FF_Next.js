@@ -17,7 +17,6 @@ import {
   AlertCircle,
   CheckCircle2,
   RefreshCw,
-  Download,
   Play,
   AlertTriangle,
   ArrowRight,

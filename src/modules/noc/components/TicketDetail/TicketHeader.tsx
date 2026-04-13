@@ -35,7 +35,6 @@ import { log } from '@/lib/logger';
 import { useAuth } from '@/contexts/AuthContext';
 import { getVisibleActions } from '@/modules/construction-qa/utils/snagPermissions';
 import { formatDistanceToNow } from 'date-fns';
-import { cn } from '@/lib/utils';
 import { ClickableStatusBadge } from './ClickableStatusBadge';
 import { ClickablePriorityBadge } from './ClickablePriorityBadge';
 import type { EnrichedTicket } from '../../types/ticket';
