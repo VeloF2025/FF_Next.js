@@ -14,7 +14,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
-import { apiResponse } from '@/lib/apiResponse';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 
 export const config = {
@@ -37,7 +37,7 @@ async function resolveToken(token: string) {
     JOIN maintenance_tickets mt ON mt.id = st.ticket_id
     LEFT JOIN users u ON u.id = mt.assigned_to
     LEFT JOIN snags s ON s.noc_ticket_id = mt.id
-    LEFT JOIN projects p ON p.id = COALESCE(s.project_id, mt.project_id)
+    LEFT JOIN projects p ON p.id = s.project_id
     WHERE st.token = ${token}
     LIMIT 1
   ` as Array<Record<string, unknown>>;
@@ -49,12 +49,18 @@ async function resolveToken(token: string) {
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { token } = req.query;
   if (!token || typeof token !== 'string') {
-    return apiResponse.error(res, 400 as never, 'Token is required');
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Token is required');
   }
 
-  const ticketData = await resolveToken(token);
+  let ticketData: Record<string, unknown> | null;
+  try {
+    ticketData = await resolveToken(token);
+  } catch (err) {
+    log.error('Failed to resolve share token', { error: err instanceof Error ? err.message : 'Unknown', token: token.substring(0, 8) });
+    return apiResponse.internalError(res, err);
+  }
   if (!ticketData || !ticketData.is_active) {
-    return apiResponse.error(res, 404 as never, 'Invalid or expired share link');
+    return apiResponse.error(res, ErrorCode.NOT_FOUND, 'Invalid or expired share link');
   }
 
   const ticketId = ticketData.ticket_id as string;
@@ -140,7 +146,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (contentType.includes('multipart/form-data')) {
       // Photo upload via formidable
       if (status !== 'in_progress') {
-        return apiResponse.error(res, 400 as never, 'Ticket must be In Progress to upload photos');
+        return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Ticket must be In Progress to upload photos');
       }
       try {
         const formidable = (await import('formidable')).default;
@@ -149,7 +155,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         const [fields, files] = await form.parse(req);
         const file = files.file?.[0];
         const stepIdField = fields.stepId?.[0];
-        if (!file) return apiResponse.error(res, 400 as never, 'file is required');
+        if (!file) return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'file is required');
 
         // Upload to VF Storage
         const buffer = fs.readFileSync(file.filepath);
@@ -180,7 +186,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.success(res, { uploaded: true, url: fileUrl });
       } catch (err) {
         log.error('Shared ticket: photo upload failed', { ticketId, error: err instanceof Error ? err.message : 'Unknown' });
-        return apiResponse.error(res, 500 as never, 'Photo upload failed');
+        return apiResponse.internalError(res, new Error('Photo upload failed'));
       }
     }
 
@@ -191,7 +197,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       for await (const chunk of req) chunks.push(Buffer.from(chunk));
       body = JSON.parse(Buffer.concat(chunks).toString('utf-8'));
     } catch {
-      return apiResponse.error(res, 400 as never, 'Invalid JSON body');
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Invalid JSON body');
     }
     const { action, stepId, notes } = body as {
       action: 'start_work' | 'submit_for_qa' | 'complete_step';
@@ -200,13 +206,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     };
 
     if (!action) {
-      return apiResponse.error(res, 400 as never, 'action is required');
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'action is required');
     }
 
     try {
       if (action === 'start_work') {
         if (status !== 'assigned') {
-          return apiResponse.error(res, 400 as never, 'Ticket must be in Assigned status to start work');
+          return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Ticket must be in Assigned status to start work');
         }
         await sql`UPDATE maintenance_tickets SET status = 'in_progress', updated_at = NOW() WHERE id = ${ticketId}`;
         // Mirror status on linked snag row (civils tickets). No-op for other discipline types.
@@ -217,7 +223,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       if (action === 'submit_for_qa') {
         if (status !== 'in_progress') {
-          return apiResponse.error(res, 400 as never, 'Ticket must be In Progress to submit for QA');
+          return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Ticket must be In Progress to submit for QA');
         }
         await sql`UPDATE maintenance_tickets SET status = 'pending_qa', updated_at = NOW() WHERE id = ${ticketId}`;
         // Mirror status on linked snag row (civils tickets). No-op for other discipline types.
@@ -228,10 +234,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       if (action === 'complete_step') {
         if (status !== 'in_progress') {
-          return apiResponse.error(res, 400 as never, 'Ticket must be In Progress to complete steps');
+          return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Ticket must be In Progress to complete steps');
         }
         if (!stepId) {
-          return apiResponse.error(res, 400 as never, 'stepId is required');
+          return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'stepId is required');
         }
         await sql`
           UPDATE maintenance_verification_steps
@@ -242,7 +248,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.success(res, { completed: true });
       }
 
-      return apiResponse.error(res, 400 as never, 'Invalid action');
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Invalid action');
     } catch (error) {
       log.error('Shared ticket action error', { error, ticketId, action });
       return apiResponse.internalError(res, error);
