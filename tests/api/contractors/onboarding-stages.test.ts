@@ -5,7 +5,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import handler from './stages';
+import handler from '../../../pages/api/contractors-onboarding-stages';
 import { neonContractorService } from '@/services/contractor/neonContractorService';
 
 // Mock the service
