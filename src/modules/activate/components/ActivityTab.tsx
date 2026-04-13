@@ -341,7 +341,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
 
               {/* Timeline Events */}
               {timeline.map((entry, index) => {
-                const meta = entry.metadata as Record<string, any> | undefined;
+                const meta = entry.metadata as Record<string, unknown> | undefined;
                 return (
                 <div key={entry.id} className="relative pl-10 pb-6">
                   {/* Timeline Dot */}
@@ -369,7 +369,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                         </p>
 
                         {/* Show detailed changes for SERIAL_UPDATE events */}
-                        {entry.eventType === 'SERIAL_UPDATE' && meta?.changes && (
+                        {entry.eventType === 'SERIAL_UPDATE' && Boolean(meta?.changes) && (
                           <div className="mt-3 space-y-2 text-sm">
                             {(meta?.changes as { ont?: { old: string; new: string }; ups?: { old: string; new: string } }).ont && (
                               <div className="flex items-center gap-2 p-2 bg-orange-50 dark:bg-orange-900/20 rounded border border-orange-200 dark:border-orange-800">
@@ -395,7 +395,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                                 </span>
                               </div>
                             )}
-                            {meta?.swap_corrected && (
+                            {Boolean(meta?.swap_corrected) && (
                               <div className="flex items-center gap-2 mt-2 text-green-600 dark:text-green-400">
                                 <span>✅</span>
                                 <span className="font-medium">Swap was corrected by technician</span>
@@ -412,8 +412,8 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                               <span className="font-medium">Serials appear swapped!</span>
                             </div>
                             <div className="mt-2 text-xs text-muted-foreground font-mono">
-                              <div>ONT field: {meta?.ont_serial as string}</div>
-                              <div>UPS field: {meta?.ups_serial as string}</div>
+                              <div>ONT field: {String(meta?.ont_serial ?? '')}</div>
+                              <div>UPS field: {String(meta?.ups_serial ?? '')}</div>
                             </div>
                           </div>
                         )}
@@ -426,8 +426,8 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                               <span className="font-medium">ONT replaced but not updated in 1Map</span>
                             </div>
                             <div className="mt-2 text-xs text-muted-foreground font-mono">
-                              <div>1Map shows: {meta?.onemap_serial as string}</div>
-                              <div>OES activated: {meta?.oes_serial as string}</div>
+                              <div>1Map shows: {String(meta?.onemap_serial ?? '')}</div>
+                              <div>OES activated: {String(meta?.oes_serial ?? '')}</div>
                             </div>
                           </div>
                         )}
@@ -680,7 +680,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
               <h4 className="font-medium text-foreground">Change History</h4>
               {serialHistory.map((entry: SerialHistoryEntry) => {
                 const safeEntry = entry as SerialHistoryEntry;
-                const meta = safeEntry.metadata as Record<string, any>;
+                const meta = safeEntry.metadata as Record<string, unknown>;
                 const isOnt = safeEntry.change_type === 'ont_serial';
                 const sourceLabel: Record<string, string> = {
                   onemap_sync: '1Map Sync',

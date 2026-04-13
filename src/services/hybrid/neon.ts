@@ -63,7 +63,7 @@ export class NeonAnalyticsService {
   /**
    * Sync project data to analytics database
    */
-  async syncProjectToAnalytics(_projectId: string, _projectData: any): Promise<void> {
+  async syncProjectToAnalytics(_projectId: string, _projectData: unknown): Promise<void> {
     try {
       // const _analyticsData: NewProjectAnalytics = {
       //   projectId,
@@ -91,7 +91,7 @@ export class NeonAnalyticsService {
   /**
    * Sync client data to analytics database
    */
-  async syncClientToAnalytics(_clientId: string, _clientData: any): Promise<void> {
+  async syncClientToAnalytics(_clientId: string, _clientData: unknown): Promise<void> {
     try {
       // const _analyticsData: NewClientAnalytics = {
       //   clientId,

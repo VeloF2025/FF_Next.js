@@ -409,7 +409,7 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
   const [maintenanceLoading, setMaintenanceLoading] = useState(true);
 
   // Convert photos_metadata to Photo[] format for PhotoGalleryUnified
-  const installationPhotos = (review.photos_metadata || []).map((photo: any) => ({
+  const installationPhotos = (review.photos_metadata || []).map((photo) => ({
     filename: photo.filename,
     step: photo.step || 0,
     url: photo.url,
@@ -684,7 +684,7 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
                       </div>
                       <PhotoGalleryUnified
                         photos={installationPhotos}
-                        source={review.photo_source as any}
+                        source={review.photo_source}
                         groupByStep={true}
                       />
                     </>
@@ -805,7 +805,7 @@ function FeedbackTab({ review, generateFeedback, sendFeedback }: FeedbackTabProp
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed to send feedback';
       setSendError(msg);
-      log.error('Failed to send feedback', error, 'UnifiedReviewCard.FeedbackTab');
+      log.error('Failed to send feedback', { error }, 'UnifiedReviewCard.FeedbackTab');
     } finally {
       setIsSending(false);
     }

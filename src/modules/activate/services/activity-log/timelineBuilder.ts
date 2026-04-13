@@ -222,7 +222,7 @@ export async function getActivityTimeline(
 
     log.info(`DR query returned ${drRows.length} rows for ${drNumber}`, undefined, 'ActivityLog');
     if (drRows.length > 0) {
-      const dr = drRows[0]! as Record<string, any>;
+      const dr = drRows[0]! as Record<string, unknown>;
       log.info(`DR timestamps: wa_received=${dr.wa_received_at}, vlm_cat=${dr.vlm_categorized_at}`, undefined, 'ActivityLog');
 
       // Add events from DR timestamps (only if not already in activity log)
@@ -232,7 +232,7 @@ export async function getActivityTimeline(
       if (dr.wa_received_at && !existingEventTypes.has('whatsapp_submitted')) {
         timeline.push({
           id: `dr-wa-received-${drNumber}`,
-          timestamp: new Date(dr.wa_received_at),
+          timestamp: new Date(String(dr.wa_received_at)),
           eventType: 'whatsapp_submitted',
           title: '📱 DR Submitted via WhatsApp',
           description: dr.sender_phone ? `From ${dr.sender_phone}` : 'Received via WhatsApp',
@@ -247,7 +247,7 @@ export async function getActivityTimeline(
       if (dr.acknowledged_at && !existingEventTypes.has('dr_acknowledged')) {
         timeline.push({
           id: `dr-ack-${drNumber}`,
-          timestamp: new Date(dr.acknowledged_at),
+          timestamp: new Date(String(dr.acknowledged_at)),
           eventType: 'dr_acknowledged',
           title: '✓ Acknowledgment Sent',
           description: dr.photo_count ? `${dr.photo_count} photos received` : 'DR acknowledged',
@@ -262,7 +262,7 @@ export async function getActivityTimeline(
       if (dr.photos_fetched_at && !existingEventTypes.has('photos_fetched')) {
         timeline.push({
           id: `dr-photos-${drNumber}`,
-          timestamp: new Date(dr.photos_fetched_at),
+          timestamp: new Date(String(dr.photos_fetched_at)),
           eventType: 'photos_fetched',
           title: '📷 Photos Fetched',
           description: dr.photo_count ? `${dr.photo_count} photos from OneMap` : 'Photos fetched from OneMap',
@@ -277,7 +277,7 @@ export async function getActivityTimeline(
       if (dr.vlm_categorized_at && !existingEventTypes.has('attribute_categorized')) {
         timeline.push({
           id: `dr-categorized-${drNumber}`,
-          timestamp: new Date(dr.vlm_categorized_at),
+          timestamp: new Date(String(dr.vlm_categorized_at)),
           eventType: 'attribute_categorized',
           title: '🏷️ AI Photo Categorization',
           description: 'Photos categorized by VLM',
@@ -292,7 +292,7 @@ export async function getActivityTimeline(
       if (dr.ai_evaluated_at) {
         timeline.push({
           id: `dr-ai-eval-${drNumber}`,
-          timestamp: new Date(dr.ai_evaluated_at),
+          timestamp: new Date(String(dr.ai_evaluated_at)),
           eventType: 'vlm_qa_completed',
           title: '🔍 AI Data Extraction',
           description: 'Power meter, serials extracted by VLM',
@@ -307,7 +307,7 @@ export async function getActivityTimeline(
       if (dr.vlm_qa_validated_at) {
         timeline.push({
           id: `dr-vlm-qa-${drNumber}`,
-          timestamp: new Date(dr.vlm_qa_validated_at),
+          timestamp: new Date(String(dr.vlm_qa_validated_at)),
           eventType: 'vlm_qa_completed',
           title: '✅ VLM QA Validated',
           description: 'Automated QA validation completed',
@@ -322,7 +322,7 @@ export async function getActivityTimeline(
       if (dr.human_review_completed_at && !existingEventTypes.has('human_review_completed')) {
         timeline.push({
           id: `dr-human-review-${drNumber}`,
-          timestamp: new Date(dr.human_review_completed_at),
+          timestamp: new Date(String(dr.human_review_completed_at)),
           eventType: 'human_review_completed',
           title: '👤 Human Review Completed',
           description: 'Photo assignments reviewed by QA team',
@@ -340,7 +340,7 @@ export async function getActivityTimeline(
         const decisionColor = dr.qa_decision === 'PASS' ? 'text-green-500' : dr.qa_decision === 'FAIL' ? 'text-red-500' : 'text-orange-500';
         timeline.push({
           id: `dr-decision-${drNumber}`,
-          timestamp: new Date(dr.qa_decision_at),
+          timestamp: new Date(String(dr.qa_decision_at)),
           eventType: isAutoQa ? 'AUTO_QA_COMPLETED' : 'human_review_completed',
           title: isAutoQa
             ? `${decisionIcon} Auto-QA Decision: ${dr.qa_decision}`
@@ -357,7 +357,7 @@ export async function getActivityTimeline(
       if (dr.feedback_sent_at && !existingEventTypes.has('feedback_sent')) {
         timeline.push({
           id: `dr-feedback-${drNumber}`,
-          timestamp: new Date(dr.feedback_sent_at),
+          timestamp: new Date(String(dr.feedback_sent_at)),
           eventType: 'feedback_sent',
           title: '📤 WhatsApp Feedback Sent',
           description: 'QA feedback sent to technician',
@@ -372,7 +372,7 @@ export async function getActivityTimeline(
       if (dr.serial_swap_detected_at && !existingEventTypes.has('SWAP_DETECTED')) {
         timeline.push({
           id: `dr-swap-detected-${drNumber}`,
-          timestamp: new Date(dr.serial_swap_detected_at),
+          timestamp: new Date(String(dr.serial_swap_detected_at)),
           eventType: 'SWAP_DETECTED',
           title: '⚠️ Serial Swap Detected',
           description: 'ONT and UPS serials appear swapped',
@@ -387,7 +387,7 @@ export async function getActivityTimeline(
       if (dr.serial_swap_corrected_at) {
         timeline.push({
           id: `dr-swap-fixed-${drNumber}`,
-          timestamp: new Date(dr.serial_swap_corrected_at),
+          timestamp: new Date(String(dr.serial_swap_corrected_at)),
           eventType: 'SWAP_DETECTED',
           title: '✅ Serial Swap Corrected',
           description: 'Technician fixed the swapped serials in 1Map',
@@ -402,7 +402,7 @@ export async function getActivityTimeline(
       if (dr.last_resubmitted_at) {
         timeline.push({
           id: `dr-resubmit-${drNumber}`,
-          timestamp: new Date(dr.last_resubmitted_at),
+          timestamp: new Date(String(dr.last_resubmitted_at)),
           eventType: 'whatsapp_submitted',
           title: '🔄 DR Resubmitted',
           description: 'Additional photos submitted',
@@ -427,17 +427,17 @@ export async function getActivityTimeline(
     `;
 
     if (oesRows.length > 0) {
-      const oes = oesRows[0]! as Record<string, any>;
+      const oes = oesRows[0]! as Record<string, unknown>;
       if (oes.activation_date) {
         timeline.push({
           id: `oes-activation-${drNumber}`,
-          timestamp: new Date(oes.activation_date),
+          timestamp: new Date(String(oes.activation_date)),
           eventType: 'feedback_sent' as ActivityEventType, // Using closest event type
           title: '⚡ OES Activation',
           description: `Activated by ${oes.team || 'OES'} - Serial: ${oes.serial_number || 'N/A'}`,
           icon: '⚡',
           iconColor: 'text-yellow-500',
-          actor: oes.team || 'oes',
+          actor: typeof oes.team === 'string' ? oes.team : 'oes',
           metadata: {
             source: 'oes_activations',
             serial: oes.serial_number,

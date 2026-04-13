@@ -36,7 +36,7 @@ export async function getById(id: string): Promise<Project | null> {
  * Create a new project
  */
 export async function create(data: ProjectFormData): Promise<string> {
-  const project = await projectApiService.create(data as any);
+  const project = await projectApiService.create(data as unknown as Parameters<typeof projectApiService.create>[0]);
   return project.id || '';
 }
 
@@ -44,7 +44,7 @@ export async function create(data: ProjectFormData): Promise<string> {
  * Update an existing project
  */
 export async function update(id: string, data: Partial<ProjectFormData>): Promise<void> {
-  await projectApiService.update(id, data as any);
+  await projectApiService.update(id, data as unknown as Parameters<typeof projectApiService.update>[1]);
 }
 
 /**

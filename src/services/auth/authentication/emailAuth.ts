@@ -66,7 +66,7 @@ export class EmailAuthentication {
       await updateLastLogin(clerkUser.id);
 
       // Get user profile from database
-      const user = await getUserProfile({ uid: clerkUser.id } as any);
+      const user = await getUserProfile({ uid: clerkUser.id });
       return user;
     } catch (error: unknown) {
       log.error('emailAuth', { message: 'Email sign in error', error });
@@ -132,7 +132,7 @@ export class EmailAuthentication {
       );
 
       // Create user profile in database
-      const user = await createUserProfile({ uid: clerkUser.id } as any, {
+      const user = await createUserProfile({ uid: clerkUser.id }, {
         displayName,
       });
 

@@ -57,7 +57,7 @@ const statusConfig = {
 };
 
 // Helper function to format location from various data types
-function formatLocation(location: any): string {
+function formatLocation(location: unknown): string {
   if (!location) return 'Unknown';
   
   // Already a string
@@ -73,18 +73,19 @@ function formatLocation(location: any): string {
   
   // It's an object with city/province/region
   if (typeof location === 'object') {
+    const loc = location as Record<string, unknown>;
     const parts: string[] = [];
-    
-    if (location.city) parts.push(location.city);
-    if (location.region && location.region !== location.city) parts.push(location.region);
-    if (location.province && location.province !== location.city && location.province !== location.region) {
-      parts.push(location.province);
+
+    if (loc.city) parts.push(String(loc.city));
+    if (loc.region && loc.region !== loc.city) parts.push(String(loc.region));
+    if (loc.province && loc.province !== loc.city && loc.province !== loc.region) {
+      parts.push(String(loc.province));
     }
-    
+
     if (parts.length > 0) return parts.join(', ');
-    
+
     // Fallback: if only coordinates, return "Unknown"
-    if (location.coordinates) return 'Unknown';
+    if (loc.coordinates) return 'Unknown';
   }
   
   return 'Unknown';
@@ -93,11 +94,12 @@ function formatLocation(location: any): string {
 // Helper function to map Project to DisplayProject
 function mapProjectToDisplay(project: Project): DisplayProject {
   // 🟢 WORKING: Safe date conversion with fallbacks
-  const safeDate = (date: any): string => {
+  const safeDate = (date: unknown): string => {
     if (!date) return new Date().toISOString();
     if (typeof date === 'string') return date;
-    if (date.toDate && typeof date.toDate === 'function') return date.toDate().toISOString();
-    return date.toString();
+    const d = date as Record<string, unknown>;
+    if (d.toDate && typeof d.toDate === 'function') return (d.toDate as () => Date)().toISOString();
+    return String(date);
   };
 
   return {

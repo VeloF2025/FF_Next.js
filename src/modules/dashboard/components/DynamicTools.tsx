@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ComponentType } from 'react';
 import Link from 'next/link';
 import {
   HardHat, Package, Wrench, BarChart3, Zap, FolderOpen,
@@ -13,7 +13,7 @@ import { log } from '@/lib/logger';
 import { ROLE_DEFAULT_TOOLS, ROUTE_MODULE_MAP, getModuleFromRoute } from '../config/roleDefaultTools';
 import type { DefaultTool } from '../config/roleDefaultTools';
 
-const ICON_MAP: Record<string, any> = {
+const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   HardHat, Package, Wrench, BarChart3, Zap, FolderOpen,
   Users, MapPin, FileText, Truck, Activity, Box, Cable,
   MessageSquare, Building2, CheckSquare, Settings, LayoutDashboard,
@@ -40,7 +40,7 @@ export function DynamicTools() {
         if (data.data?.source === 'usage' && data.data.tools?.length > 0) {
           // Map usage routes to tool cards
           const usageTools: DefaultTool[] = data.data.tools
-            .map((t: any) => {
+            .map((t: { route: string }) => {
               const moduleKey = getModuleFromRoute(t.route);
               const moduleInfo = ROUTE_MODULE_MAP[moduleKey];
               if (!moduleInfo || moduleKey === '/dashboard') return null;

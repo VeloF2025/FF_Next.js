@@ -244,13 +244,13 @@ export const RAG_CATEGORY_CONFIG = {
 /**
  * Check if a value is a valid RAG status
  */
-export function isValidRagStatus(value: any): value is RagStatus {
+export function isValidRagStatus(value: unknown): value is RagStatus {
   return value === 'green' || value === 'amber' || value === 'red';
 }
 
 /**
  * Check if a value is a valid RAG category
  */
-export function isValidRagCategory(value: any): value is RagCategory {
-  return ['overall', 'financial', 'compliance', 'performance', 'safety'].includes(value);
+export function isValidRagCategory(value: unknown): value is RagCategory {
+  return ['overall', 'financial', 'compliance', 'performance', 'safety'].includes(value as string);
 }

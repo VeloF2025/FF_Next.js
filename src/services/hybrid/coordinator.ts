@@ -199,7 +199,7 @@ export class HybridCoordinator {
   /**
    * Subscribe to projects with analytics updates
    */
-  subscribeToProjectsWithAnalytics(callback: (data: any) => void): () => void {
+  subscribeToProjectsWithAnalytics(callback: (data: { projects: unknown; analytics: unknown }) => void): () => void {
     return this.firebaseProjects.subscribeToProjects(async (projects) => {
       try {
         const analyticsData = await this.neonAnalytics.getProjectAnalytics();
@@ -213,7 +213,7 @@ export class HybridCoordinator {
   /**
    * Subscribe to clients with analytics updates
    */
-  subscribeToClientsWithAnalytics(callback: (data: any) => void): () => void {
+  subscribeToClientsWithAnalytics(callback: (data: { clients: unknown; analytics: unknown }) => void): () => void {
     return this.firebaseClients.subscribeToClients(async (clients) => {
       try {
         const analyticsData = await this.neonAnalytics.getClientAnalytics();

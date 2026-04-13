@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   QFieldSyncDashboardData,
+  QFieldSyncConfig,
   SyncJob,
   SyncConflict,
   SyncDirection,
@@ -23,7 +24,7 @@ interface UseQFieldSyncReturn {
   cancelSync: () => Promise<void>;
   resolveConflict: (conflictId: string, resolution: SyncConflict['resolution']) => Promise<void>;
   refreshData: () => void;
-  updateConfig: (config: any) => Promise<void>;
+  updateConfig: (config: QFieldSyncConfig) => Promise<void>;
 }
 
 export function useQFieldSync(): UseQFieldSyncReturn {
@@ -151,7 +152,7 @@ export function useQFieldSync(): UseQFieldSyncReturn {
   }, [dashboardData]);
 
   // Update configuration
-  const updateConfig = useCallback(async (config: any) => {
+  const updateConfig = useCallback(async (config: QFieldSyncConfig) => {
     try {
       await qfieldSyncApiService.updateConfig(config);
       if (dashboardData) {

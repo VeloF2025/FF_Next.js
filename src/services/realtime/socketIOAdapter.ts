@@ -116,13 +116,13 @@ class SocketIOAdapter extends EventEmitter {
   /**
    * Handle incoming events
    */
-  private handleEvent(data: any): void {
+  private handleEvent(data: Record<string, unknown>): void {
     const event: RealtimeEvent = {
-      type: this.mapEventType(data.eventType),
-      entityType: data.entityType,
-      entityId: data.entityId,
-      data: data.data,
-      timestamp: new Date(data.timestamp)
+      type: this.mapEventType(String(data.eventType ?? '')),
+      entityType: data.entityType as EntityType,
+      entityId: String(data.entityId ?? ''),
+      data: data.data as Record<string, unknown> | undefined,
+      timestamp: new Date(String(data.timestamp ?? ''))
     };
 
     this.emit('event', event);
@@ -238,7 +238,7 @@ class SocketIOAdapter extends EventEmitter {
     eventType: EventType;
     entityType: EntityType;
     entityId: string;
-    data: any;
+    data: unknown;
   }): void {
     if (this.socket?.connected) {
       this.socket.emit('broadcast_change', event);
