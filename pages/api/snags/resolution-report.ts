@@ -101,8 +101,14 @@ async function attachPhotosAndNotes(snagRows: RawSnagRow[]): Promise<ResolutionR
     .map((s) => s.noc_ticket_id as string | null)
     .filter((id): id is string => !!id);
 
-  // Batch-fetch photos and notes in parallel
-  const [photoRows, noteRows] = await Promise.all([
+  // Build ticket→snag map so we can merge attachment photos by snag
+  const ticketToSnag = new Map<string, string>();
+  for (const s of snagRows) {
+    if (s.noc_ticket_id) ticketToSnag.set(s.noc_ticket_id as string, s.id as string);
+  }
+
+  // Batch-fetch snag_photos, ticket attachments, and notes in parallel
+  const [photoRows, attachmentRows, noteRows] = await Promise.all([
     sql`
       SELECT id, snag_id, phase, photo_url, thumbnail_url
       FROM snag_photos
@@ -110,6 +116,15 @@ async function attachPhotosAndNotes(snagRows: RawSnagRow[]): Promise<ResolutionR
         AND phase IN ('before', 'after')
       ORDER BY phase ASC, created_at ASC
     ` as Array<{ id: string; snag_id: string; phase: string; photo_url: string; thumbnail_url: string | null }>,
+    ticketIds.length > 0
+      ? sql`
+          SELECT id, ticket_id, filename, COALESCE(storage_url, file_url) AS url
+          FROM maintenance_attachments
+          WHERE ticket_id = ANY(${ticketIds})
+            AND (file_type IN ('image', 'photo') OR mime_type LIKE 'image/%')
+          ORDER BY uploaded_at ASC
+        ` as Array<{ id: string; ticket_id: string; filename: string; url: string }>
+      : Promise.resolve([]),
     ticketIds.length > 0
       ? sql`
           SELECT mn.ticket_id, mn.content, mn.note_type, mn.created_at,
@@ -123,8 +138,9 @@ async function attachPhotosAndNotes(snagRows: RawSnagRow[]): Promise<ResolutionR
       : Promise.resolve([]),
   ]);
 
-  // Group by snag / ticket
+  // Group snag_photos by snag — track URLs to de-dup
   const photosBySnag = new Map<string, ResolutionPhoto[]>();
+  const seenUrls = new Set<string>();
   for (const p of photoRows) {
     if (!photosBySnag.has(p.snag_id)) photosBySnag.set(p.snag_id, []);
     photosBySnag.get(p.snag_id)!.push({
@@ -132,6 +148,24 @@ async function attachPhotosAndNotes(snagRows: RawSnagRow[]): Promise<ResolutionR
       phase: p.phase,
       photo_url: p.photo_url,
       thumbnail_url: p.thumbnail_url,
+    });
+    seenUrls.add(p.photo_url);
+  }
+
+  // Merge maintenance_attachments photos (after photos often only here)
+  for (const a of attachmentRows) {
+    const snagId = ticketToSnag.get(a.ticket_id);
+    if (!snagId || !a.url) continue;
+    // Skip duplicates already in snag_photos
+    if (seenUrls.has(a.url)) continue;
+    seenUrls.add(a.url);
+    const phase = a.filename?.toLowerCase().includes('before') ? 'before' : 'after';
+    if (!photosBySnag.has(snagId)) photosBySnag.set(snagId, []);
+    photosBySnag.get(snagId)!.push({
+      id: a.id,
+      phase,
+      photo_url: a.url,
+      thumbnail_url: null,
     });
   }
 
