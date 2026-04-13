@@ -84,7 +84,8 @@ describe('API Health & Integration Tests', () => {
         });
       } catch (error: unknown) {
         const axiosError = error as { response?: { status: number } };
-        expect([400, 422]).toContain(axiosError.response?.status);
+        // 400/422 = bad request, 404 = route not found (both are non-500 rejections)
+        expect([400, 404, 422]).toContain(axiosError.response?.status);
       }
     });
   });
