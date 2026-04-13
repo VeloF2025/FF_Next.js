@@ -22,7 +22,6 @@ import {
   CheckSquare,
   History,
   MessageSquare,
-  Paperclip,
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
@@ -40,7 +39,6 @@ import { AssignmentPanel } from '../Assignment/AssignmentPanel';
 import { RelatedTickets } from './RelatedTickets';
 import { NearbyTickets } from './NearbyTickets';
 import { NotesTab } from './NotesTab';
-import { AttachmentsTab } from './AttachmentsTab';
 import { useTicketNotes } from '../../hooks/useTicketNotesWithMutations';
 
 interface TicketDetailProps {
@@ -130,7 +128,6 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
     { key: 'overview', label: 'Overview', icon: FileText },
     { key: 'activity', label: 'Activity', icon: Activity, badge: activitySummary.total },
     { key: 'notes', label: 'Notes', icon: MessageSquare, badge: notesSummary.total },
-    { key: 'attachments', label: 'Attachments', icon: Paperclip },
     { key: 'verification', label: 'Verification', icon: CheckSquare },
   ];
 
@@ -396,13 +393,6 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
           {/* Notes Tab */}
           {activeTab === 'notes' && <NotesTab ticketId={ticketId} />}
 
-          {/* Attachments Tab */}
-          {activeTab === 'attachments' && (
-            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4 sm:p-6">
-              <AttachmentsTab ticketId={ticketId} />
-            </div>
-          )}
-
           {/* Verification Tab */}
           {activeTab === 'verification' && (
             <VerificationChecklist ticketId={ticketId} editable groupByCategory />
@@ -579,7 +569,7 @@ function BeforePhoto({ ticketId }: { ticketId: string }) {
           )) : (
             <div className="h-48 rounded-lg border-2 border-dashed border-zinc-700 flex flex-col items-center justify-center gap-2">
               <span className="text-xs text-zinc-500">No after photo yet</span>
-              <span className="text-[10px] text-zinc-600">Upload via Attachments tab or Verification step</span>
+              <span className="text-[10px] text-zinc-600">Upload via the Verification tab</span>
             </div>
           )}
         </div>
