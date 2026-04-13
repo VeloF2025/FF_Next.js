@@ -5,6 +5,9 @@
 
 import type { Project } from '@/types/project.types';
 
+/** Raw database row returned from Neon queries */
+type ProjectDbRecord = Record<string, unknown>;
+
 /**
  * Project data mapping utilities
  */
@@ -12,45 +15,45 @@ export class ProjectDataMapper {
   /**
    * Map database project record to Project type
    */
-  static mapToProject(project: any): Project {
+  static mapToProject(project: ProjectDbRecord): Project {
     return {
-      id: project.id,
-      name: project.name,
-      code: project.code || project.project_code,
-      description: project.description,
-      projectType: project.type || project.project_type || 'OTHER',
-      status: project.status,
-      priority: project.priority,
-      clientId: project.client_id,
-      clientName: project.client_name,
-      startDate: project.start_date,
-      endDate: project.end_date,
-      budget: project.budget,
-      plannedProgress: project.progress || 0,
-      actualProgress: project.progress || 0,
+      id: project.id as string,
+      name: project.name as string,
+      code: (project.code ?? project.project_code) as string,
+      description: project.description as string | undefined,
+      projectType: (project.type ?? project.project_type ?? 'OTHER') as Project['projectType'],
+      status: project.status as Project['status'],
+      priority: project.priority as Project['priority'],
+      clientId: project.client_id as string | undefined,
+      clientName: project.client_name as string | undefined,
+      startDate: project.start_date as Project['startDate'],
+      endDate: project.end_date as Project['endDate'],
+      budget: project.budget as number | undefined,
+      plannedProgress: (project.progress as number) || 0,
+      actualProgress: (project.progress as number) || 0,
       isActive: project.is_active !== false,
-      createdAt: project.created_at,
+      createdAt: project.created_at as Project['createdAt'],
       createdBy: 'system',
-      updatedAt: project.updated_at,
+      updatedAt: project.updated_at as Project['updatedAt'],
       // Additional fields
-      location: project.location,
-      projectManager: project.project_manager_name || project.manager || project.project_manager,
-      risks: project.risks || [],
-      milestones: project.milestones || []
+      location: project.location as string | undefined,
+      projectManager: (project.project_manager_name ?? project.manager ?? project.project_manager) as string | undefined,
+      risks: (project.risks as string[]) || [],
+      milestones: (project.milestones as Project['milestones']) || []
     };
   }
 
   /**
    * Map multiple database records to Project array
    */
-  static mapToProjects(projects: any[]): Project[] {
+  static mapToProjects(projects: ProjectDbRecord[]): Project[] {
     return projects.map(project => this.mapToProject(project));
   }
 
   /**
    * Map Project to database insert/update data
    */
-  static mapToDatabase(project: Partial<Project>): any {
+  static mapToDatabase(project: Partial<Project>): ProjectDbRecord {
     return {
       name: project.name,
       code: project.code,

@@ -4,7 +4,7 @@ import { extractValue, extractNumber, extractDate, parseBoolean } from './helper
 /**
  * Process Lawley-style poles data
  */
-export function processPoles(rawData: any[]): NeonPoleData[] {
+export function processPoles(rawData: Record<string, unknown>[]): NeonPoleData[] {
   const processedPoles: NeonPoleData[] = [];
   
   for (const row of rawData) {
@@ -42,7 +42,7 @@ export function processPoles(rawData: any[]): NeonPoleData[] {
 /**
  * Process Lawley-style drops data
  */
-export function processDrops(rawData: any[]): NeonDropData[] {
+export function processDrops(rawData: Record<string, unknown>[]): NeonDropData[] {
   const processedDrops: NeonDropData[] = [];
   
   for (const row of rawData) {
@@ -79,7 +79,7 @@ export function processDrops(rawData: any[]): NeonDropData[] {
 /**
  * Process Lawley-style fibre data
  */
-export function processFibre(rawData: any[]): NeonFibreData[] {
+export function processFibre(rawData: Record<string, unknown>[]): NeonFibreData[] {
   const processedFibre: NeonFibreData[] = [];
   
   for (const row of rawData) {

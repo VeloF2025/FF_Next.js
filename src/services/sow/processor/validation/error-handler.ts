@@ -6,6 +6,7 @@
 import { ValidationResult, ValidationError, ValidationSummary, BatchValidationResult } from './validator-types';
 import { SOWValidationRules } from './validation-rules';
 import { SOWValidator } from './sow-validator';
+import { NeonPoleData } from '../../neonSOWService';
 
 /**
  * Error processing and formatting utilities
@@ -71,7 +72,7 @@ export class SOWErrorHandler {
    * Batch validate multiple datasets
    */
   static batchValidate(datasets: { data: unknown[]; type: 'poles' | 'drops' | 'fibre' }[]): BatchValidationResult {
-    const results = datasets.map(dataset => SOWValidator.validateData(dataset.data, dataset.type));
+    const results = datasets.map(dataset => SOWValidator.validateData(dataset.data as NeonPoleData[], dataset.type));
     
     const totalDatasets = datasets.length;
     const totalRecords = results.reduce((sum, result) => sum + result.valid.length + result.invalid.length, 0);

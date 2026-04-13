@@ -10,7 +10,7 @@ import { log } from '@/lib/logger';
 /**
  * Process uploaded file (Excel or CSV)
  */
-export async function processFile(file: File, type: 'poles' | 'drops' | 'fibre'): Promise<any[]> {
+export async function processFile(file: File, type: 'poles' | 'drops' | 'fibre'): Promise<Record<string, unknown>[]> {
   const fileExtension = file.name.split('.').pop()?.toLowerCase();
   
   if (fileExtension === 'csv') {
@@ -25,7 +25,7 @@ export async function processFile(file: File, type: 'poles' | 'drops' | 'fibre')
 /**
  * Process CSV file
  */
-async function processCSV(file: File, _type: string): Promise<any[]> {
+async function processCSV(file: File, _type: string): Promise<Record<string, unknown>[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
@@ -40,7 +40,7 @@ async function processCSV(file: File, _type: string): Promise<any[]> {
       if (parseResult.errors.length > 0) {
         log.warn('CSV parsing warnings:', { data: parseResult.errors }, 'parser');
       }
-      resolve(parseResult.data);
+      resolve(parseResult.data as Record<string, unknown>[]);
     };
     
     reader.onerror = () => {
@@ -54,7 +54,7 @@ async function processCSV(file: File, _type: string): Promise<any[]> {
 /**
  * Process Excel file
  */
-async function processExcel(file: File, _type: string): Promise<any[]> {
+async function processExcel(file: File, _type: string): Promise<Record<string, unknown>[]> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { 
     type: 'array',
@@ -71,7 +71,7 @@ async function processExcel(file: File, _type: string): Promise<any[]> {
     dateNF: 'yyyy-mm-dd'
   });
   
-  return data;
+  return data as Record<string, unknown>[];
 }
 
 /**

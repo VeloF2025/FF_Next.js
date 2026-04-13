@@ -8,6 +8,7 @@ import { collection, doc, getDocs, getDoc, addDoc, updateDoc, query, where, orde
 // @ts-expect-error — firebase config
 import { db } from '@/config/firebase';
 import { Product, PriceList, PriceListItem, CreatePriceListData, PriceAdjustment } from './types';
+import { Currency } from '@/types/supplier/common.types';
 import { log } from '@/lib/logger';
 
 const PRODUCTS_COLLECTION = 'products';
@@ -31,7 +32,7 @@ export class ProductPricingService {
         ...(data.effectiveTo && { expiryDate: data.effectiveTo }),
         version: '1.0',
         status: 'active',
-        currency: 'ZAR' as any,
+        currency: Currency.ZAR,
         createdBy: 'current-user',
         createdAt: new Date(),
         updatedAt: new Date()
@@ -57,9 +58,9 @@ export class ProductPricingService {
       );
       
       const snapshot = await getDocs(q);
-      return snapshot.docs.map((doc: any) => ({
-        id: doc.id,
-        ...doc.data()
+      return snapshot.docs.map((docSnap: { id: string; data: () => Record<string, unknown> }) => ({
+        id: docSnap.id,
+        ...docSnap.data()
       } as PriceList));
     } catch (error) {
       log.error('Error fetching price lists:', { data: error }, 'pricing');
@@ -150,8 +151,8 @@ export class ProductPricingService {
       
       const snapshot = await getDocs(q);
       
-      const batch = snapshot.docs.map(async (docSnapshot: any) => {
-        const product = docSnapshot.data() as Product;
+      const batch = snapshot.docs.map(async (docSnapshot: { id: string; data: () => Record<string, unknown> }) => {
+        const product = docSnapshot.data() as unknown as Product;
         let newPrice = product.pricing.unitPrice;
         
         if (priceAdjustment.type === 'percentage') {

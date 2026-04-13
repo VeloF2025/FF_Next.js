@@ -108,7 +108,7 @@ export function crossValidateData(poles: NeonPoleData[], drops: NeonDropData[]):
 } {
   const result = SOWValidator.crossValidateData(poles, drops);
   return {
-    orphanedDrops: result.orphanedDrops.map(drop => drop.drop_number),
+    orphanedDrops: result.orphanedDrops.map(drop => (drop as { drop_number: string }).drop_number),
     missingPoles: result.missingPoles,
     warnings: result.orphanedDrops.length > 0 ? 
       [`${result.orphanedDrops.length} drops reference non-existent poles`] : []
