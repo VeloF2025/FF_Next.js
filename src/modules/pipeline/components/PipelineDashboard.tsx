@@ -63,7 +63,7 @@ export function PipelineDashboard() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [viewMode, setViewMode] = useState<ViewMode>('table');
-  const [_exporting, setExporting] = useState(false);
+  // export state removed — export button is commented out
 
   // RBAC: Check if user is super_admin for Smartsheet sync access
   const { currentUser } = useAuth();
@@ -73,24 +73,6 @@ export function PipelineDashboard() {
     loadData();
   }, [search, statusFilter, page]);
 
-  const _handleExport = async () => {
-    setExporting(true);
-    try {
-      const res = await fetch('/api/pipeline/export');
-      if (!res.ok) throw new Error('Export failed');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Pipeline-Projects-${new Date().toISOString().slice(0, 10)}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      log.error('Pipeline export failed', err, 'PipelineDashboard');
-    } finally {
-      setExporting(false);
-    }
-  };
 
   const loadData = async () => {
     setLoading(true);
@@ -365,7 +347,10 @@ export function PipelineDashboard() {
               ) : (
                 projects.map((project) => {
                   const statusStyle = STATUS_COLORS[project.pipeline_status];
+<<<<<<< HEAD
                   const _priorityStyle = PRIORITY_COLORS[project.priority];
+=======
+>>>>>>> ef48fbb44 (fix(lint): remove unused imports and vars — no-unused-vars batch #2)
                   const approvalPercent =
                     project.total_required_approvals > 0
                       ? Math.round(

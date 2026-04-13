@@ -33,8 +33,8 @@ export function NotesTab({ ticketId }: NotesTabProps) {
   const [newNoteContent, setNewNoteContent] = useState('');
   const [newNoteVisibility, setNewNoteVisibility] = useState<'private' | 'public'>('private');
   const [isAddingNote, setIsAddingNote] = useState(false);
-  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
-  const [editingContent, setEditingContent] = useState('');
+  const [_editingNoteId, _setEditingNoteId] = useState<string | null>(null);
+  const [_editingContent, _setEditingContent] = useState('');
 
   const visibility = visibilityFilter === 'all' ? undefined : visibilityFilter;
 

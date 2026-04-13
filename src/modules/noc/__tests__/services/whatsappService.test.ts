@@ -43,12 +43,10 @@ global.fetch = mockFetch;
 import type {
   WhatsAppNotification,
   SendNotificationRequest,
-  NotificationDeliveryStatus,
   WAHAWebhookPayload,
   BatchNotificationRequest,
-  BatchNotificationResult,
 } from '../../types/whatsapp';
-import { RecipientType, NotificationStatus, NotificationUseCase } from '../../types/whatsapp';
+import { RecipientType, NotificationStatus } from '../../types/whatsapp';
 
 // Import the database mocks
 import { query, queryOne } from '../../utils/db';
@@ -60,7 +58,6 @@ import {
   WAHAError,
   WAHAErrorCode,
   type WAHAConfig,
-  type WAHASendMessagePayload,
   type WAHASendMessageResponse,
 } from '../../services/whatsappService';
 

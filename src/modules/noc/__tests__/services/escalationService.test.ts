@@ -28,7 +28,7 @@ import {
   CreateEscalationPayload,
   ResolveEscalationPayload,
 } from '../../types/escalation';
-import { TicketSource, TicketType, Ticket } from '../../types/ticket';
+import { Ticket } from '../../types/ticket';
 import type { RepeatFaultEscalation } from '../../types/escalation';
 
 // Mock logger
@@ -456,7 +456,7 @@ describe('EscalationService (TDD)', () => {
       vi.mocked(db.query).mockResolvedValue(mockEscalations as unknown as RepeatFaultEscalation[]);
 
       // Act
-      const result = await escalationService.listEscalations({
+      const _result = await escalationService.listEscalations({
         scope_type: EscalationScopeType.POLE,
       });
 
@@ -481,7 +481,7 @@ describe('EscalationService (TDD)', () => {
       vi.mocked(db.query).mockResolvedValue(mockEscalations as unknown as RepeatFaultEscalation[]);
 
       // Act
-      const result = await escalationService.listEscalations({
+      const _result2 = await escalationService.listEscalations({
         status: EscalationStatus.OPEN,
       });
 
