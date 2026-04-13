@@ -12,7 +12,7 @@
 # Baselines (ratchet down over time, never up):
 #   Lint warnings: 167    (react-hooks/exhaustive-deps, react-refresh/only-export-components)
 #   Lint errors:   0      (all resolved)
-#   Silent catches: 94    (catch blocks without logging)
+#   Silent catches: 75    (catch blocks without logging)
 # =============================================================================
 
 set -euo pipefail
@@ -34,7 +34,7 @@ START_TIME=$(date +%s)
 # --- Baselines (ratchet: lower these as you fix issues, never raise) ---
 MAX_LINT_WARNINGS=167
 MAX_LINT_ERRORS=0
-MAX_SILENT_CATCHES=84
+MAX_SILENT_CATCHES=75
 
 pass() { echo -e "${GREEN}  ✓ $*${NC}"; PASSED=$((PASSED + 1)); }
 fail() { echo -e "${RED}  ✗ $*${NC}"; FAILED=$((FAILED + 1)); }
