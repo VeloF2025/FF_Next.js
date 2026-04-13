@@ -172,7 +172,7 @@ export function ReadinessBlocker({
 
           <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
             <p className="text-sm text-yellow-300 text-center">
-              Click "Run Readiness Check" above to validate QA requirements
+              Click &quot;Run Readiness Check&quot; above to validate QA requirements
             </p>
           </div>
         </div>

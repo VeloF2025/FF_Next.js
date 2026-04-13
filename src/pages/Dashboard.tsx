@@ -202,14 +202,14 @@ export function Dashboard() {
               <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
                 <div className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-sm text-muted-foreground">New project "Lawley" created</span>
+                  <span className="text-sm text-muted-foreground">New project &quot;Lawley&quot; created</span>
                 </div>
                 <span className="text-xs text-muted-foreground">2 hours ago</span>
               </div>
               <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
                 <div className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span className="text-sm text-muted-foreground">Staff member "John Doe" added</span>
+                  <span className="text-sm text-muted-foreground">Staff member &quot;John Doe&quot; added</span>
                 </div>
                 <span className="text-xs text-muted-foreground">4 hours ago</span>
               </div>

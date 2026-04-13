@@ -227,7 +227,7 @@ export function ProcurementProjectSelector({
               </div>
             ) : searchTerm ? (
               <div className="px-4 py-6 text-center text-muted-foreground text-sm">
-                No projects found matching "{searchTerm}"
+                No projects found matching &quot;{searchTerm}&quot;
               </div>
             ) : (
               <div className="px-4 py-6 text-center text-muted-foreground text-sm">

@@ -71,7 +71,7 @@ function WelcomeState() {
         </h2>
         
         <p className="text-muted-foreground mb-6">
-          Select a specific project to view its procurement dashboard, or choose "All Projects" 
+          Select a specific project to view its procurement dashboard, or choose &quot;All Projects&quot;
           to see aggregated metrics across your entire portfolio.
         </p>
         
@@ -80,7 +80,7 @@ function WelcomeState() {
             <Building2 className="h-8 w-8 text-blue-600 mb-2 mx-auto" />
             <h3 className="font-semibold text-foreground mb-1">Single Project</h3>
             <p className="text-sm text-muted-foreground">
-              Detailed view of a specific project's procurement activities
+              Detailed view of a specific project&apos;s procurement activities
             </p>
           </div>
           

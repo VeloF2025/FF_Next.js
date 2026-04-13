@@ -88,7 +88,7 @@ export function HierarchyTab() {
       
       <div className="bg-blue-500/20 border border-blue-500/30 rounded-lg p-4 mb-6">
         <p className="text-blue-400">
-          The reporting hierarchy is built from the "Reports To" relationships in staff profiles.
+          The reporting hierarchy is built from the &quot;Reports To&quot; relationships in staff profiles.
           Click on staff members to view their details or edit reporting relationships.
         </p>
       </div>

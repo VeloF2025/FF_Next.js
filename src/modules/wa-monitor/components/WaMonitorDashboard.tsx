@@ -373,7 +373,7 @@ export function WaMonitorDashboard() {
               <Box display="flex" alignItems="center" gap={1}>
                 <Calendar size={20} />
                 <Typography variant="h6" component="h2" sx={{ color: 'var(--ff-text-primary)' }}>
-                  Today's Submissions ({dailyDrops.date})
+                  Today&apos;s Submissions ({dailyDrops.date})
                 </Typography>
               </Box>
               <Typography variant="caption" sx={{ color: 'var(--ff-text-secondary)' }}>
@@ -387,7 +387,7 @@ export function WaMonitorDashboard() {
                 <strong>Accurate Daily Counts:</strong> Shows submissions by actual WhatsApp message date, not database processing time.
               </Typography>
               <Typography variant="caption" sx={{ color: 'var(--ff-text-secondary)' }}>
-                Note: Historical batch processing (e.g., old messages processed today) are excluded from today's count.
+                Note: Historical batch processing (e.g., old messages processed today) are excluded from today&apos;s count.
                 Only drops submitted via WhatsApp <strong>today</strong> are shown. Previous issue where 27 historical drops
                 inflated the count has been resolved (Nov 6, 2025).
               </Typography>

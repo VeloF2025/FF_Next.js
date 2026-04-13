@@ -102,7 +102,7 @@ export function FieldAppPortal() {
           <DeviceStatus battery={0} signal="fair" gpsAccuracy={0} storage={{ used: 0, total: 0 }} />
 
           <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
-            <h3 className="font-medium text-[var(--ff-text-primary)] mb-4">Today's Progress</h3>
+            <h3 className="font-medium text-[var(--ff-text-primary)] mb-4">Today&apos;s Progress</h3>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-[var(--ff-text-secondary)]">Completed</span>

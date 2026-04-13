@@ -335,7 +335,7 @@ export function CreatePickingForm({
           <div className="rounded-lg border-2 border-dashed border-border bg-background p-8 text-center dark:border-gray-600 dark:bg-gray-800">
             <Package className="mx-auto h-10 w-10 text-gray-400" />
             <p className="mt-2 text-sm text-muted-foreground">
-              No items added yet. Click "Add Item" to start.
+              No items added yet. Click &quot;Add Item&quot; to start.
             </p>
           </div>
         ) : (

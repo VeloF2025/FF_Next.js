@@ -152,7 +152,7 @@ export function SOWProjectSelector({ onProjectSelect, className = '' }: SOWProje
               </div>
             ) : searchTerm ? (
               <div className="px-4 py-6 text-center text-[var(--ff-text-secondary)] text-sm">
-                No projects found matching "{searchTerm}"
+                No projects found matching &quot;{searchTerm}&quot;
               </div>
             ) : loadError ? (
               <div className="px-4 py-6 text-center">

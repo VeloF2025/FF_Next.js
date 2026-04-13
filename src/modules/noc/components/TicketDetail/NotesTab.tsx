@@ -292,7 +292,7 @@ export function NotesTab({ ticketId }: NotesTabProps) {
             />
           </svg>
           <p>No notes yet</p>
-          <p className="text-sm mt-1">Click "Add Note" to create the first note for this ticket.</p>
+          <p className="text-sm mt-1">Click &quot;Add Note&quot; to create the first note for this ticket.</p>
         </div>
       ) : (
         <div className="space-y-3">

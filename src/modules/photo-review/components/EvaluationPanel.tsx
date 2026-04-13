@@ -296,7 +296,7 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
         <div className="text-center py-8 text-[var(--ff-text-secondary)]">
           <Sparkles className="w-12 h-12 mx-auto mb-3 opacity-50" />
           <p className="text-sm">
-            Click "Run AI Evaluation" to analyze this DR's photos
+            Click &quot;Run AI Evaluation&quot; to analyze this DR&apos;s photos
           </p>
           <p className="text-xs mt-1">
             AI will check all 12 installation steps and generate feedback
