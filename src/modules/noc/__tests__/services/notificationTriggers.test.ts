@@ -58,13 +58,12 @@ import {
   type NotificationEvent,
   type NotificationEventType,
   type NotificationPreferences,
-  type TriggerResult,
 } from '../../services/notificationTriggers';
 
 describe('NotificationTriggerService', () => {
   let service: NotificationTriggerService;
   let mockWhatsAppService: { sendNotification: Mock };
-  const mockQuery = query as unknown as ReturnType<typeof vi.fn>;
+  const _mockQuery = query as unknown as ReturnType<typeof vi.fn>;
   const mockQueryOne = queryOne as unknown as ReturnType<typeof vi.fn>;
   const mockGetDefaultWhatsAppService = getDefaultWhatsAppService as unknown as ReturnType<typeof vi.fn>;
 

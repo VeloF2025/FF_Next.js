@@ -18,7 +18,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { createHmac } from 'crypto';
 import type { QContactTicket, QContactWebhookPayload } from '../../types/qcontact';
-import { SyncType, SyncStatus } from '../../types/qcontact';
 
 // Mock environment variables
 process.env.QCONTACT_WEBHOOK_SECRET = 'test-webhook-secret-key';

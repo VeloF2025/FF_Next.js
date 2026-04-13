@@ -10,8 +10,8 @@
 #   bash scripts/ci-local.sh --pre-deploy # Lint gates only (deploy uses this)
 #
 # Baselines (ratchet down over time, never up):
-#   Lint warnings: 740    (no-explicit-any, no-unused-vars, etc.)
-#   Lint errors:   77     (ts-ignore, prefer-const — pre-existing)
+#   Lint warnings: 723    (no-explicit-any, no-unused-vars, etc.)
+#   Lint errors:   12     (ts-ignore, prefer-const — pre-existing)
 #   Silent catches: 94    (catch blocks without logging)
 # =============================================================================
 
@@ -32,8 +32,8 @@ MODE="${1:---full}"
 START_TIME=$(date +%s)
 
 # --- Baselines (ratchet: lower these as you fix issues, never raise) ---
-MAX_LINT_WARNINGS=731
-MAX_LINT_ERRORS=77
+MAX_LINT_WARNINGS=721
+MAX_LINT_ERRORS=13
 MAX_SILENT_CATCHES=84
 
 pass() { echo -e "${GREEN}  ✓ $*${NC}"; PASSED=$((PASSED + 1)); }

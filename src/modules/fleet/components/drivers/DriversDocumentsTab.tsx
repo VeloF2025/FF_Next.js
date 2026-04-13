@@ -13,7 +13,6 @@ import {
   Clock,
   XCircle,
   AlertTriangle,
-  Shield,
   ExternalLink,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
