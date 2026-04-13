@@ -112,7 +112,7 @@ Please describe what you were doing when this error occurred:
                 Something went wrong
               </h1>
               <p className="text-[var(--ff-text-secondary)] mb-4">
-                We're sorry, but something unexpected happened. The error has been logged and we'll look into it.
+                We&apos;re sorry, but something unexpected happened. The error has been logged and we&apos;ll look into it.
               </p>
 
               {/* Error Details (Development only) */}

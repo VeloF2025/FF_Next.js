@@ -113,7 +113,7 @@ export class DatabaseErrorBoundary extends Component<
 
                 {/* Description */}
                 <p className="text-muted-foreground mb-8 leading-relaxed">
-                  We're experiencing connectivity issues with the database. This may be temporary due to network conditions or server maintenance.
+                  We&apos;re experiencing connectivity issues with the database. This may be temporary due to network conditions or server maintenance.
                 </p>
 
                 {/* Action Buttons */}

@@ -183,7 +183,7 @@ export function ClientDetail() {
           <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl p-6 max-w-md w-full">
             <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Delete Client?</h3>
             <p className="text-[var(--ff-text-secondary)] mb-6">
-              Are you sure you want to delete "{client.name}"? This action cannot be undone and will remove all associated data.
+              Are you sure you want to delete &quot;{client.name}&quot;? This action cannot be undone and will remove all associated data.
             </p>
             <div className="flex justify-end gap-3">
               <Button

@@ -620,7 +620,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
               </p>
               {qfieldSyncResult.totalPoints && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  {qfieldSyncResult.totalPoints} drop locations synced to QFieldCloud as "OES Report" layer with DR number labels
+                  {qfieldSyncResult.totalPoints} drop locations synced to QFieldCloud as &quot;OES Report&quot; layer with DR number labels
                 </p>
               )}
               <p className="text-sm text-muted-foreground dark:text-gray-400 mt-2">

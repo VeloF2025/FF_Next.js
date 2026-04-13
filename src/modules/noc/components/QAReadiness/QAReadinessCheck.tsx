@@ -240,7 +240,7 @@ export function QAReadinessCheck({
           <AlertCircle className="w-12 h-12 text-[var(--ff-text-tertiary)] mx-auto mb-3" />
           <p className="text-[var(--ff-text-secondary)] mb-2">No readiness checks have been run yet</p>
           <p className="text-sm text-[var(--ff-text-tertiary)]">
-            Click "Run Readiness Check" to validate QA requirements
+            Click &quot;Run Readiness Check&quot; to validate QA requirements
           </p>
         </div>
       )}

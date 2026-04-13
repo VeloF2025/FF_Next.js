@@ -286,7 +286,7 @@ export function BundleItemsModal({
 
                     {searchTerm.length >= 2 && searchResults.length === 0 && !isSearching && (
                       <p className="text-sm text-[var(--ff-text-tertiary)] text-center py-2">
-                        No items found matching "{searchTerm}"
+                        No items found matching &quot;{searchTerm}&quot;
                       </p>
                     )}
 
@@ -318,7 +318,7 @@ export function BundleItemsModal({
                   <AlertCircle className="h-12 w-12 text-[var(--ff-text-tertiary)] mx-auto mb-2" />
                   <p className="text-[var(--ff-text-secondary)]">No items in this bundle</p>
                   <p className="text-sm text-[var(--ff-text-tertiary)]">
-                    Click "Add Item" to start building the bundle
+                    Click &quot;Add Item&quot; to start building the bundle
                   </p>
                 </div>
               ) : (

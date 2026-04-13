@@ -297,7 +297,7 @@ export function AddDevQueueItemModal({ isOpen, onClose, onSubmit, onUpdate, edit
                 {!hasSpecContent && (
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm text-blue-800">
-                      <strong>Tip:</strong> Add spec details in the "Spec Details" tab to enable Agent OS automated development.
+                      <strong>Tip:</strong> Add spec details in the &quot;Spec Details&quot; tab to enable Agent OS automated development.
                     </p>
                   </div>
                 )}

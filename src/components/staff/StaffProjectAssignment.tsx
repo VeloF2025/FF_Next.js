@@ -305,7 +305,7 @@ export function StaffProjectAssignment({ staffId, staffName }: StaffProjectAssig
           <Briefcase className="h-12 w-12 text-[var(--ff-text-secondary)] mx-auto mb-3" />
           <p className="text-[var(--ff-text-secondary)]">No project assignments</p>
           <p className="text-sm text-[var(--ff-text-secondary)] opacity-70 mt-1">
-            Click "Assign to Project" to add this staff member to a project
+            Click &quot;Assign to Project&quot; to add this staff member to a project
           </p>
         </div>
       ) : (

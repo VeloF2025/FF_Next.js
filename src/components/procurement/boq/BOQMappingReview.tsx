@@ -77,7 +77,7 @@ export default function BOQMappingReview({
             <CheckCircle className="mx-auto h-12 w-12 text-green-500" />
             <h3 className="mt-4 text-lg font-medium text-foreground">All items mapped successfully</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              No exceptions found for BOQ "{boq.fileName}"
+              No exceptions found for BOQ &quot;{boq.fileName}&quot;
             </p>
             {onClose && (
               <button

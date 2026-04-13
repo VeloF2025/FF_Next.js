@@ -572,7 +572,7 @@ export function FinalDecisionPhase({
       {/* Issue Classification */}
       <div className="bg-card rounded-lg p-4 border border-border">
         <h4 className="font-medium text-foreground mb-3">
-          What's the Issue?
+          What&apos;s the Issue?
         </h4>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">

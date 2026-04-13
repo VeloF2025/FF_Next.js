@@ -127,7 +127,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           ) : searchResults.length === 0 ? (
             <div className="p-4 text-center">
               <p className="text-sm text-[var(--ff-text-tertiary)]">
-                No results found for "{searchQuery}"
+                No results found for &quot;{searchQuery}&quot;
               </p>
               <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
                 Try different keywords or browse the table of contents
