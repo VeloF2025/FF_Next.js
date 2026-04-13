@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useAuditLogs } from '../hooks/useAuditLogs';
-import type { AuditLogListItem, AuditEntityTypeValue, AuditActionValue } from '@/types/procurement/audit.types';
+import type { AuditLogListItem, AuditEntityTypeValue } from '@/types/procurement/audit.types';
 import { formatDisplayDateShort } from '@/utils/dateFormat';
 
 interface EntityAuditPanelProps {
@@ -90,7 +90,7 @@ export function EntityAuditPanel({ entityType, entityId }: EntityAuditPanelProps
         {/* Timeline line */}
         <div className="absolute left-2.5 top-0 h-full w-px bg-gray-200 dark:bg-gray-700" />
 
-        {history.map((entry, idx) => (
+        {history.map((entry) => (
           <div key={entry.id} className="relative mb-4 last:mb-0">
             {/* Timeline dot */}
             <div className={`absolute -left-3.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 bg-white dark:bg-gray-900 ${ACTION_LINE_COLORS[entry.action] ?? 'border-gray-400'}`}>

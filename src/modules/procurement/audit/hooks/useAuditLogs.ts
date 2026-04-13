@@ -7,10 +7,8 @@ import { useState, useCallback, useEffect } from 'react';
 import { log } from '@/lib/logger';
 import type {
   AuditLogListItem,
-  AuditLog,
   AuditLogFilter,
   AuditEntityTypeValue,
-  AuditActionValue,
 } from '@/types/procurement/audit.types';
 
 interface UseAuditLogsReturn {

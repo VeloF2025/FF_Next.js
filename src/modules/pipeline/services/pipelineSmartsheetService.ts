@@ -17,8 +17,6 @@ import type {
   SmartsheetColumn,
   CreateSyncConfigInput,
   UpdateSyncConfigInput,
-  ColumnMappings,
-  StatusMappings,
 } from '../types/smartsheet.types';
 
 // ============================================================================

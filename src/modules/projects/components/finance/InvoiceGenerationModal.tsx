@@ -3,8 +3,8 @@
  * Wizard to generate customer invoices from activated drops
  */
 
-import { useState, useEffect } from 'react';
-import type { ClientPurchaseOrder, GenerateInvoicePreview, UninvoicedDrop } from '@/types/finance';
+import { useState } from 'react';
+import type { ClientPurchaseOrder, GenerateInvoicePreview } from '@/types/finance';
 import { log } from '@/lib/logger';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';

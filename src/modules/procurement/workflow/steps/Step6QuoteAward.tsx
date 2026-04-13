@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  FileText, CheckCircle, ArrowLeft, ArrowRight, Loader2, AlertCircle, Award, Upload,
+  FileText, CheckCircle, ArrowLeft, ArrowRight, Loader2, Award, Upload,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { log } from '@/lib/logger';
@@ -149,7 +149,6 @@ export const Step6QuoteAward: React.FC<Step6Props> = ({ state, onComplete, onBac
 
   // ---- RFQ Evaluation Form ----
   if (isRfq) {
-    const hasQuotes = quotes.some((q) => q.amount !== '');
     const canAward = selectedWinner !== '' && quotes.find((q) => q.supplierId === selectedWinner)?.amount !== '';
 
     return (

@@ -53,7 +53,7 @@ interface WeeklyImportWizardProps {
 /**
  * 🟢 WORKING: Multi-step wizard for weekly report imports
  */
-export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardProps) {
+export function WeeklyImportWizard({ onComplete, onCancel: _onCancel }: WeeklyImportWizardProps) {
   const { currentUser } = useAuth();
 
   // Wizard state
@@ -62,7 +62,7 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
   const [previewData, setPreviewData] = useState<ImportPreviewResult | null>(null);
   const [importResult, setImportResult] = useState<ImportProcessResult | null>(null);
   const [importProgress, setImportProgress] = useState<ImportProgressUpdate | null>(null);
-  const [reportId, setReportId] = useState<string | null>(null);
+  const [_reportId, setReportId] = useState<string | null>(null);
 
   // Loading and error states
   const [isParsing, setIsParsing] = useState(false);

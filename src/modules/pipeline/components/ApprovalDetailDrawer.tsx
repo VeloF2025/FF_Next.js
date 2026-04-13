@@ -19,8 +19,6 @@ import {
   MapPin,
   Send,
   MessageSquare,
-  ChevronRight,
-  ChevronDown,
   Pencil,
   Save,
   Calendar,

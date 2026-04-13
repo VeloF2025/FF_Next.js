@@ -7,7 +7,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Cpu, BatteryCharging, Loader2, Package, CheckCircle, AlertTriangle, Zap, Download } from 'lucide-react';
+import { Cpu, BatteryCharging, Package, CheckCircle, AlertTriangle, Zap, Download } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 
@@ -81,7 +81,6 @@ export function BootstockReportsPage() {
       if (!res.ok) throw new Error('Export failed');
 
       const blob = await res.blob();
-      const count = res.headers.get('X-Export-Count') || '?';
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

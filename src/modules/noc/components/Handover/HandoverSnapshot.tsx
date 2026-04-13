@@ -21,7 +21,6 @@ import {
   FileText,
   Image,
   CheckCircle2,
-  AlertTriangle,
   ArrowRight,
   ChevronDown,
   ChevronUp,
@@ -119,7 +118,7 @@ function CollapsibleSection({
  */
 export function HandoverSnapshot({
   snapshot,
-  compact = false,
+  compact: _compact = false,
   expandedByDefault = false,
   showEvidence = false,
   showDecisions = false,

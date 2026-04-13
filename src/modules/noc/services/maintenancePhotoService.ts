@@ -16,7 +16,6 @@
 import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import fs from 'fs';
-import path from 'path';
 
 const logger = createLogger('maintenancePhotoService');
 
@@ -267,19 +266,6 @@ async function updatePhotoStatus(
       updated_at = NOW()
     WHERE id = ${photoId}
   `;
-}
-
-/**
- * Get chat JID for a message
- */
-async function getChatJidForMessage(messageId: string): Promise<string | null> {
-  const sql = getDb();
-
-  const result = await sql`
-    SELECT wa_group_jid FROM maintenance_wa_messages WHERE id = ${messageId}
-  `;
-
-  return result[0]?.wa_group_jid || null;
 }
 
 /**
