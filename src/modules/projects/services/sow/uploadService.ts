@@ -10,7 +10,7 @@ import {
   DocumentStatus
 } from '../../types/project.types';
 import { SOWFileValidator } from './fileValidator';
-import { SOW_CONFIG, SOWMetadata } from './types';
+import { SOWMetadata } from './types';
 import { log } from '@/lib/logger';
 import { neonSOWService } from '@/services/neonSOWService';
 
@@ -84,7 +84,7 @@ export class SOWUploadService {
   private static async processFileForUpload(file: File, type: SOWDocumentType): Promise<any[]> { // eslint-disable-line @typescript-eslint/no-explicit-any
     try {
       // Read file as array buffer
-      const arrayBuffer = await file.arrayBuffer();
+      await file.arrayBuffer();
       
       // Parse Excel file using the data processor service
       // For now, return empty array - actual processing should be handled by the data processor service

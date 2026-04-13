@@ -12,9 +12,7 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  Activity,
   Settings,
-  Download,
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ConnectionStatus } from './ConnectionStatus';

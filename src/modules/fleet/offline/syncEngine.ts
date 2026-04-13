@@ -119,7 +119,8 @@ async function syncFuelTransaction(
     );
 
     if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
+      const jsonResult = await response.json().catch((_e: unknown) => null);
+      const data: Record<string, unknown> = jsonResult ?? Object.create(null);
       return {
         success: false,
         error: data.error?.message || data.message || `API error: ${response.status}`,
@@ -180,7 +181,8 @@ async function syncCheckIn(
     );
 
     if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
+      const jsonResult = await response.json().catch((_e: unknown) => null);
+      const data: Record<string, unknown> = jsonResult ?? Object.create(null);
       return {
         success: false,
         error: data.error?.message || data.message || `API error: ${response.status}`,
@@ -201,8 +203,8 @@ async function syncCheckIn(
  */
 async function processSyncItem(
   item: SyncQueueItem,
-  onProgress?: ProgressCallback,
-  currentProgress?: SyncProgress
+  _onProgress?: ProgressCallback,
+  _currentProgress?: SyncProgress
 ): Promise<{ success: boolean; error?: string }> {
   let lastError: string | undefined;
 

@@ -163,7 +163,7 @@ export function BankTxTable(props: Props) {
   const {
     transactions, glAccounts, suppliers, customers,
     cc1Options, cc2Options, buOptions,
-    selectedIds, rowSelections, allSelected, tab,
+    selectedIds, rowSelections, allSelected, tab: _tab,
     onToggleSelect, onSelectAll, onRowTypeChange, onRowEntityChange, onRowVatChange,
     onRowDimensionChange,
     onAccept, onExclude, onUnmatch, onSplit, onUpdateNotes,

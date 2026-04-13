@@ -241,7 +241,7 @@ export async function getConfusionPairCorrections(
     // Build WHERE clause for confusion pairs
     const pairConditions = confusionPairs
       .map(
-        ([a, b], i) =>
+        ([_a, _b], i) =>
           `((vlm_predicted_step = $${i * 2 + 2} AND correct_step = $${i * 2 + 3}) OR ` +
           `(vlm_predicted_step = $${i * 2 + 3} AND correct_step = $${i * 2 + 2}))`
       )

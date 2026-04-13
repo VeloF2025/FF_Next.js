@@ -11,7 +11,6 @@ import {
   MessageSquare,
   Plus,
   FileText,
-  Briefcase,
   Clock,
   User,
   Sparkles,
@@ -19,7 +18,6 @@ import {
   Check,
   AlertCircle,
   Trash2,
-  RefreshCw,
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
