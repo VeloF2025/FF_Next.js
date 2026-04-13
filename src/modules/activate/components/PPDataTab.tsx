@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Search, RefreshCw, Loader2, AlertCircle, XCircle, Wrench } from 'lucide-react';
+import { Search, RefreshCw, AlertCircle, XCircle, Wrench } from 'lucide-react';
 import { log } from '@/lib/logger';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';

@@ -11,7 +11,7 @@
 import { useState, useCallback } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Cell, LabelList,
+  Tooltip, ResponsiveContainer, LabelList,
 } from '@/components/ui/DynamicChart';
 import { AlertCircle } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';

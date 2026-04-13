@@ -90,11 +90,6 @@ export interface BatchRegistrationResult {
  * Map stock item categories to asset categories
  * This determines which GRN items should trigger asset registration
  */
-const STOCK_TO_ASSET_CATEGORY: Record<string, string[]> = {
-  tools: ['TKIT', 'CCUT', 'CTST', 'CRMP', 'LADR', 'LBLT', 'MMTR', 'DRLL', 'WSTR'],
-  // Add more mappings as needed
-};
-
 // Categories that always require asset registration
 const REGISTRABLE_STOCK_CATEGORIES = ['tools'];
 

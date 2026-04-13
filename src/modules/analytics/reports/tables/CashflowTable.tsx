@@ -113,10 +113,6 @@ export function CashflowTable({ rows }: Props) {
                 ? 'rgba(17,141,255,0.08)'        // subtle blue tint for closing balance
                 : ri % 2 === 0 ? 'transparent' : PBI.rowAlt;
 
-              const borderStyle = isBalance
-                ? `2px solid ${PBI.primary}`     // PBI-blue border around closing balance row
-                : undefined;
-
               return (
                 <tr
                   key={row.label}

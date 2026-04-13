@@ -409,7 +409,7 @@ export async function scanBarcodeEnhanced(
   }
 ): Promise<EnhancedBarcodeResult> {
   const startTime = Date.now();
-  const { maxAttempts = SCAN_STRATEGIES.length, minConfidence = 0.7, quickScan = false } = options || {};
+  const { maxAttempts = SCAN_STRATEGIES.length, minConfidence: _minConfidence = 0.7, quickScan = false } = options || {};
 
   try {
     const imageBuffer = Buffer.from(base64Image, 'base64');

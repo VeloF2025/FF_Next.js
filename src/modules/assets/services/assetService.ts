@@ -8,7 +8,6 @@ import { log } from '@/lib/logger';
 import { getDbConnection } from '../utils/db';
 import {
   CreateAssetSchema,
-  UpdateAssetSchema,
   type CreateAssetInput,
   type UpdateAssetInput,
   type AssetFilterInput,

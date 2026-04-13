@@ -179,13 +179,6 @@ export function ReportsTab() {
     return null;
   };
 
-  // Skeleton component
-  const Skeleton = ({ className }: { className?: string }) => (
-    <div
-      className={`animate-pulse bg-secondary rounded ${className || ''}`}
-    />
-  );
-
   return (
     <div className="space-y-6">
       {/* Report Type Navigation (Daily Counts moved to Dashboard) */}

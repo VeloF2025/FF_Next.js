@@ -18,7 +18,6 @@ import {
   Clock,
   MessageSquare,
   MapPin,
-  RefreshCw,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
