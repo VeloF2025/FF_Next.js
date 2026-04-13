@@ -121,7 +121,7 @@ export class BasicStatsCalculator {
    */
   private static calculateAveragePerformance(suppliers: Supplier[]): number {
     const performanceScores = suppliers
-      .map(supplier => (supplier.performance as any)?.overallScore || 0)
+      .map(supplier => (supplier.performance as { overallScore?: number } | undefined)?.overallScore || 0)
       .filter(score => score > 0);
 
     return performanceScores.length > 0
@@ -206,8 +206,8 @@ export class BasicStatsCalculator {
 
     suppliers.forEach(supplier => {
       if (supplier.complianceStatus) {
-        const compliance = supplier.complianceStatus as any;
-        if (compliance.complianceScore >= 80 || (compliance.taxCompliant && compliance.beeCompliant && compliance.insuranceValid)) {
+        const compliance = supplier.complianceStatus as { complianceScore?: number; taxCompliant?: boolean; beeCompliant?: boolean; insuranceValid?: boolean };
+        if ((compliance.complianceScore ?? 0) >= 80 || (compliance.taxCompliant && compliance.beeCompliant && compliance.insuranceValid)) {
           compliant++;
         } else {
           nonCompliant++;

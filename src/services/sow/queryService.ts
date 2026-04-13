@@ -128,7 +128,8 @@ export class SOWQueryService {
       }
 
       const searchLower = searchTerm.toLowerCase();
-      const filteredPoles = (result.data || []).filter((pole: any) => 
+      type PoleRecord = { pole_number?: string; address?: string; municipality?: string; status?: string };
+      const filteredPoles = (result.data || []).filter((pole: PoleRecord) =>
         pole.pole_number?.toLowerCase().includes(searchLower) ||
         pole.address?.toLowerCase().includes(searchLower) ||
         pole.municipality?.toLowerCase().includes(searchLower) ||
@@ -163,7 +164,8 @@ export class SOWQueryService {
       }
 
       const searchLower = searchTerm.toLowerCase();
-      const filteredDrops = (result.data || []).filter((drop: any) => 
+      type DropRecord = { drop_number?: string; pole_number?: string; cable_type?: string; address?: string };
+      const filteredDrops = (result.data || []).filter((drop: DropRecord) =>
         drop.drop_number?.toLowerCase().includes(searchLower) ||
         drop.pole_number?.toLowerCase().includes(searchLower) ||
         drop.cable_type?.toLowerCase().includes(searchLower) ||

@@ -4,11 +4,15 @@ import { cleanup } from '@testing-library/react'
 
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {
+  readonly root: Element | Document | null = null;
+  readonly rootMargin: string = '';
+  readonly thresholds: ReadonlyArray<number> = [];
   constructor() {}
   disconnect() {}
   observe() {}
   unobserve() {}
-} as any
+  takeRecords(): IntersectionObserverEntry[] { return []; }
+} as unknown as typeof IntersectionObserver;
 
 // Mock ResizeObserver
 global.ResizeObserver = class ResizeObserver {
@@ -16,7 +20,7 @@ global.ResizeObserver = class ResizeObserver {
   disconnect() {}
   observe() {}
   unobserve() {}
-} as any
+} as unknown as typeof ResizeObserver;
 
 // Mock matchMedia
 Object.defineProperty(window, 'matchMedia', {

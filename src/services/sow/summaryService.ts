@@ -13,7 +13,7 @@ export class SOWSummaryService {
   /**
    * Update project summary via API
    */
-  static async updateProjectSummary(projectId: string): Promise<{ success: boolean; error?: any }> {
+  static async updateProjectSummary(projectId: string): Promise<{ success: boolean; error?: unknown }> {
     try {
       // The API will handle the summary update when data is uploaded
       // We can trigger a summary refresh by fetching the data
@@ -40,7 +40,7 @@ export class SOWSummaryService {
 
       // Find the summary for the requested project
       const projectSummary = Array.isArray(result.data) 
-        ? result.data.find((s: any) => s.project_id === projectId)
+        ? result.data.find((s: { project_id?: string }) => s.project_id === projectId)
         : result.data;
 
       return {

@@ -132,7 +132,7 @@ class SocketIOAdapter extends EventEmitter {
   /**
    * Map database operation to event type
    */
-  private mapEventType(operation: string): EventType {
+  private mapEventType(operation: string | undefined): EventType {
     switch (operation?.toLowerCase()) {
       case 'insert':
         return 'added';

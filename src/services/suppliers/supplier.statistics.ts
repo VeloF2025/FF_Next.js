@@ -83,7 +83,7 @@ export class SupplierStatisticsService {
           sampleSize: stats.sampleSize
         };
         return acc;
-      }, {} as Record<string, any>),
+      }, {} as Record<string, { topQuartile: number; median: number; bottomQuartile: number; sampleSize: number }>),
       byBusinessType: Object.keys(analyzerBenchmarks.byBusinessType).reduce((acc, key) => {
         const stats = analyzerBenchmarks.byBusinessType[key]!;
         acc[key] = {
@@ -93,7 +93,7 @@ export class SupplierStatisticsService {
           sampleSize: stats.sampleSize
         };
         return acc;
-      }, {} as Record<string, any>),
+      }, {} as Record<string, { topQuartile: number; median: number; bottomQuartile: number; sampleSize: number }>),
       trends: {
         improving: 0,
         stable: 0,

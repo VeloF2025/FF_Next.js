@@ -33,9 +33,9 @@ export class StaffSyncCore {
 
     try {
       const snapshot = await getDocs(collection(db, 'staff'));
-      const staff = snapshot.docs.map((doc: any) => ({
-        id: doc.id, 
-        ...doc.data() 
+      const staff = snapshot.docs.map((doc: { id: string; data: () => Record<string, unknown> }) => ({
+        id: doc.id,
+        ...doc.data()
       })) as FirebaseStaffData[];
 
       for (const member of staff) {
@@ -150,7 +150,7 @@ export class StaffSyncCore {
       const totalStaff = records.length;
       
       const lastSyncTime = records.length > 0
-        ? records.reduce((latest: Date | null, record: any) => {
+        ? records.reduce((latest: Date | null, record: { calculatedAt?: Date | null; createdAt?: Date | null }) => {
             const syncTime = record.calculatedAt || record.createdAt;
             return syncTime && (!latest || syncTime > latest) ? syncTime : latest;
           }, null as Date | null)

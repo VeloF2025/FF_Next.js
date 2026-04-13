@@ -9,9 +9,9 @@ export interface FirebaseClientData {
   currentBalance?: number;
   creditLimit?: number;
   satisfactionScore?: number;
-  nextFollowUpDate?: any;
+  nextFollowUpDate?: Date | string | null;
   totalInteractions?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface ClientMetrics {

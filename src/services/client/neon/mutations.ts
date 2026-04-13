@@ -20,7 +20,7 @@ export async function createClient(data: ClientFormData): Promise<string> {
       account_manager_id: sanitized.accountManagerId,
       notes: sanitized.notes,
       tags: sanitized.tags || [],
-      contract_value: (sanitized as any).contractValue
+      contract_value: (sanitized as ClientFormData & { contractValue?: unknown }).contractValue
     };
 
     const result = await getSql()`
@@ -64,8 +64,8 @@ export async function createClient(data: ClientFormData): Promise<string> {
       RETURNING id
     `;
     
-    const rows = result as any[];
-    return rows[0].id;
+    const rows = result as Array<{ id: string }>;
+    return rows[0]?.id ?? '';
   } catch (error) {
     log.error('Error creating client:', { data: error }, 'mutations');
     throw error;

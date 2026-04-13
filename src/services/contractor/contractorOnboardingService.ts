@@ -110,7 +110,8 @@ class ContractorOnboardingService {
       RETURNING *
     `;
 
-    return rows.map((row: any) => this.mapDbToStage(row));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return rows.map((row: Record<string, any>) => this.mapDbToStage(row));
   }
 
   /**
@@ -175,6 +176,7 @@ class ContractorOnboardingService {
       RETURNING *
     `;
 
+    if (!updated) throw new Error(`Stage ${stageId} not found`);
     return this.mapDbToStage(updated);
   }
 
@@ -252,22 +254,23 @@ class ContractorOnboardingService {
   /**
    * Map database row to OnboardingStage
    */
-  private mapDbToStage(row: any): OnboardingStage {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private mapDbToStage(row: Record<string, any>): OnboardingStage {
     return {
-      id: row.id,
-      contractorId: row.contractor_id,
-      stageName: row.stage_name,
-      stageOrder: row.stage_order,
-      status: row.status,
-      completionPercentage: row.completion_percentage,
-      requiredDocuments: row.required_documents || [],
-      completedDocuments: row.completed_documents || [],
-      startedAt: row.started_at ? new Date(row.started_at) : undefined,
-      completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
-      dueDate: row.due_date ? new Date(row.due_date) : undefined,
-      notes: row.notes,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
+      id: row.id as number,
+      contractorId: row.contractor_id as number | string,
+      stageName: row.stage_name as string,
+      stageOrder: row.stage_order as number,
+      status: row.status as OnboardingStage['status'],
+      completionPercentage: row.completion_percentage as number,
+      requiredDocuments: (row.required_documents as string[]) || [],
+      completedDocuments: (row.completed_documents as string[]) || [],
+      startedAt: row.started_at ? new Date(row.started_at as string) : undefined,
+      completedAt: row.completed_at ? new Date(row.completed_at as string) : undefined,
+      dueDate: row.due_date ? new Date(row.due_date as string) : undefined,
+      notes: row.notes as string | undefined,
+      createdAt: new Date(row.created_at as string),
+      updatedAt: new Date(row.updated_at as string),
     };
   }
 }

@@ -50,7 +50,7 @@ export class SupplierQueryBuilder {
 
       // Filter by category
       suppliers = suppliers.filter(s =>
-        s.categories && s.categories.includes(category as any)
+        s.categories && s.categories.includes(category as string & never)
       );
 
       // Filter by status
@@ -100,7 +100,7 @@ export class SupplierQueryBuilder {
       // Filter by category if specified
       if (options?.category) {
         suppliers = suppliers.filter(s =>
-          s.categories && s.categories.includes(options.category! as any)
+          s.categories && s.categories.includes(options.category! as string & never)
         );
       }
 
