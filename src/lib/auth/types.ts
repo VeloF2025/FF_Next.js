@@ -17,6 +17,8 @@ export interface AuthUser {
   isActive: boolean;
   profilePicture?: string;
   department?: string;
+  /** True when the current session is an impersonation started by an admin */
+  isImpersonation?: boolean;
 }
 
 export type AuthRole = 'super_admin' | 'admin' | 'manager' | 'storeman' | 'technician' | 'viewer' | 'system';
@@ -30,6 +32,10 @@ export interface JWTPayload {
   sessionId: string;
   iat: number;
   exp: number;
+  /** True when this JWT was issued for an admin impersonating another user */
+  isImpersonation?: boolean;
+  /** User ID of the admin who initiated the impersonation */
+  impersonatedBy?: string;
 }
 
 export interface Session {
