@@ -28,7 +28,7 @@ export interface DashboardFormatters {
 export const getMainDashboardCards = (stats: DashboardStats, trends: DashboardTrends, formatters: DashboardFormatters): EnhancedStatCardProps[] => [
   {
     title: 'Active Projects',
-    value: stats.activeProjects,
+    value: stats.activeProjects ?? 0,
     icon: FolderOpen,
     color: '#3B82F6',
     trend: trends.activeProjects,
@@ -40,7 +40,7 @@ export const getMainDashboardCards = (stats: DashboardStats, trends: DashboardTr
   },
   {
     title: 'Team Members',
-    value: stats.teamMembers,
+    value: stats.teamMembers ?? 0,
     icon: Users,
     color: '#10B981',
     trend: trends.teamMembers,
@@ -52,7 +52,7 @@ export const getMainDashboardCards = (stats: DashboardStats, trends: DashboardTr
   },
   {
     title: 'Completed Tasks',
-    value: stats.completedTasks,
+    value: stats.completedTasks ?? 0,
     icon: CheckCircle,
     color: '#059669',
     trend: trends.completedTasks,
@@ -64,7 +64,7 @@ export const getMainDashboardCards = (stats: DashboardStats, trends: DashboardTr
   },
   {
     title: 'Open Issues',
-    value: stats.openIssues,
+    value: stats.openIssues ?? 0,
     icon: AlertTriangle,
     color: '#D97706',
     trend: trends.openIssues,
@@ -76,7 +76,7 @@ export const getMainDashboardCards = (stats: DashboardStats, trends: DashboardTr
   },
   {
     title: 'Poles Installed',
-    value: stats.polesInstalled,
+    value: stats.polesInstalled ?? 0,
     icon: MapPin,
     color: '#8B5CF6',
     trend: trends.polesInstalled,
@@ -88,7 +88,7 @@ export const getMainDashboardCards = (stats: DashboardStats, trends: DashboardTr
   },
   {
     title: 'Total Revenue',
-    value: stats.totalRevenue,
+    value: stats.totalRevenue ?? 0,
     icon: DollarSign,
     color: '#059669',
     trend: trends.totalRevenue,
@@ -104,7 +104,7 @@ export const getMainDashboardCards = (stats: DashboardStats, trends: DashboardTr
 export const getContractorsDashboardCards = (stats: DashboardStats, trends: DashboardTrends, formatters: DashboardFormatters): EnhancedStatCardProps[] => [
   {
     title: 'Active Contractors',
-    value: stats.contractorsActive,
+    value: stats.contractorsActive ?? 0,
     icon: UserCheck,
     color: '#3B82F6',
     trend: trends.contractorsActive,
@@ -116,7 +116,7 @@ export const getContractorsDashboardCards = (stats: DashboardStats, trends: Dash
   },
   {
     title: 'Pending Applications',
-    value: stats.contractorsPending,
+    value: stats.contractorsPending ?? 0,
     icon: Clock,
     color: '#D97706',
     trend: trends.contractorsPending,
@@ -128,7 +128,7 @@ export const getContractorsDashboardCards = (stats: DashboardStats, trends: Dash
   },
   {
     title: 'Performance Score',
-    value: stats.performanceScore,
+    value: stats.performanceScore ?? 0,
     icon: TrendingUp,
     color: '#10B981',
     trend: trends.performanceScore,
@@ -140,7 +140,7 @@ export const getContractorsDashboardCards = (stats: DashboardStats, trends: Dash
   },
   {
     title: 'Quality Score',
-    value: stats.qualityScore,
+    value: stats.qualityScore ?? 0,
     icon: Award,
     color: '#8B5CF6',
     trend: trends.qualityScore,
@@ -152,7 +152,7 @@ export const getContractorsDashboardCards = (stats: DashboardStats, trends: Dash
   },
   {
     title: 'On-Time Delivery',
-    value: stats.onTimeDelivery,
+    value: stats.onTimeDelivery ?? 0,
     icon: Calendar,
     color: '#059669',
     trend: trends.onTimeDelivery,
@@ -164,7 +164,7 @@ export const getContractorsDashboardCards = (stats: DashboardStats, trends: Dash
   },
   {
     title: 'Total Projects',
-    value: stats.totalProjects,
+    value: stats.totalProjects ?? 0,
     icon: FolderOpen,
     color: '#6B7280',
     trend: trends.totalProjects,
@@ -180,7 +180,7 @@ export const getContractorsDashboardCards = (stats: DashboardStats, trends: Dash
 export const getProcurementDashboardCards = (stats: DashboardStats, trends: DashboardTrends, formatters: DashboardFormatters): EnhancedStatCardProps[] => [
   {
     title: 'Active BOQs',
-    value: stats.boqsActive,
+    value: stats.boqsActive ?? 0,
     icon: ClipboardList,
     color: '#3B82F6',
     trend: trends.boqsActive,
@@ -192,7 +192,7 @@ export const getProcurementDashboardCards = (stats: DashboardStats, trends: Dash
   },
   {
     title: 'Active RFQs',
-    value: stats.rfqsActive,
+    value: stats.rfqsActive ?? 0,
     icon: ShoppingCart,
     color: '#8B5CF6',
     trend: trends.rfqsActive,
@@ -204,7 +204,7 @@ export const getProcurementDashboardCards = (stats: DashboardStats, trends: Dash
   },
   {
     title: 'Active Suppliers',
-    value: stats.supplierActive,
+    value: stats.supplierActive ?? 0,
     icon: Truck,
     color: '#10B981',
     trend: trends.supplierActive,
@@ -216,7 +216,7 @@ export const getProcurementDashboardCards = (stats: DashboardStats, trends: Dash
   },
   {
     title: 'Budget Utilization',
-    value: stats.budgetUtilization,
+    value: stats.budgetUtilization ?? 0,
     icon: PieChart,
     color: '#D97706',
     trend: trends.budgetUtilization,
@@ -228,7 +228,7 @@ export const getProcurementDashboardCards = (stats: DashboardStats, trends: Dash
   },
   {
     title: 'Procurement Value',
-    value: stats.totalRevenue,
+    value: stats.totalRevenue ?? 0,
     icon: DollarSign,
     color: '#059669',
     trend: trends.totalRevenue,
@@ -240,7 +240,7 @@ export const getProcurementDashboardCards = (stats: DashboardStats, trends: Dash
   },
   {
     title: 'Pending Issues',
-    value: stats.openIssues,
+    value: stats.openIssues ?? 0,
     icon: AlertTriangle,
     color: '#EF4444',
     trend: trends.openIssues,
@@ -256,7 +256,7 @@ export const getProcurementDashboardCards = (stats: DashboardStats, trends: Dash
 export const getAnalyticsDashboardCards = (stats: DashboardStats, trends: DashboardTrends, formatters: DashboardFormatters): EnhancedStatCardProps[] => [
   {
     title: 'Total Poles',
-    value: stats.polesInstalled,
+    value: stats.polesInstalled ?? 0,
     icon: MapPin,
     color: '#3B82F6',
     trend: trends.polesInstalled,
@@ -268,7 +268,7 @@ export const getAnalyticsDashboardCards = (stats: DashboardStats, trends: Dashbo
   },
   {
     title: 'Total Drops',
-    value: stats.dropsCompleted,
+    value: stats.dropsCompleted ?? 0,
     icon: Wifi,
     color: '#8B5CF6',
     trend: trends.dropsCompleted,
@@ -280,7 +280,7 @@ export const getAnalyticsDashboardCards = (stats: DashboardStats, trends: Dashbo
   },
   {
     title: 'Fiber Installed',
-    value: stats.fiberInstalled,
+    value: stats.fiberInstalled ?? 0,
     icon: Activity,
     color: '#D97706',
     trend: trends.fiberInstalled,
@@ -288,11 +288,11 @@ export const getAnalyticsDashboardCards = (stats: DashboardStats, trends: Dashbo
     description: 'Total fiber optic cable installed',
     route: '/fiber-stringing',
     variant: 'detailed',
-    formatValue: (value: number) => `${formatters.formatNumber(value)}m`,
+    formatValue: (value: number | string) => `${formatters.formatNumber(value)}m`,
   },
   {
     title: 'Revenue',
-    value: stats.totalRevenue,
+    value: stats.totalRevenue ?? 0,
     icon: DollarSign,
     color: '#10B981',
     trend: trends.totalRevenue,
@@ -304,7 +304,7 @@ export const getAnalyticsDashboardCards = (stats: DashboardStats, trends: Dashbo
   },
   {
     title: 'Active Teams',
-    value: stats.teamMembers,
+    value: stats.teamMembers ?? 0,
     icon: Users,
     color: '#059669',
     trend: trends.teamMembers,
@@ -320,7 +320,7 @@ export const getAnalyticsDashboardCards = (stats: DashboardStats, trends: Dashbo
 export const getReportsDashboardCards = (stats: DashboardStats, trends: DashboardTrends, formatters: DashboardFormatters): EnhancedStatCardProps[] => [
   {
     title: 'Reports Generated',
-    value: stats.reportsGenerated,
+    value: stats.reportsGenerated ?? 0,
     icon: FileText,
     color: '#3B82F6',
     trend: trends.reportsGenerated,
@@ -332,7 +332,7 @@ export const getReportsDashboardCards = (stats: DashboardStats, trends: Dashboar
   },
   {
     title: 'Active Projects',
-    value: stats.activeProjects,
+    value: stats.activeProjects ?? 0,
     icon: FolderOpen,
     color: '#8B5CF6',
     trend: trends.activeProjects,
@@ -344,7 +344,7 @@ export const getReportsDashboardCards = (stats: DashboardStats, trends: Dashboar
   },
   {
     title: 'Revenue Tracked',
-    value: stats.totalRevenue,
+    value: stats.totalRevenue ?? 0,
     icon: DollarSign,
     color: '#10B981',
     trend: trends.totalRevenue,
@@ -356,7 +356,7 @@ export const getReportsDashboardCards = (stats: DashboardStats, trends: Dashboar
   },
   {
     title: 'Performance Score',
-    value: stats.performanceScore,
+    value: stats.performanceScore ?? 0,
     icon: TrendingUp,
     color: '#D97706',
     trend: trends.performanceScore,
@@ -368,7 +368,7 @@ export const getReportsDashboardCards = (stats: DashboardStats, trends: Dashboar
   },
   {
     title: 'Data Points',
-    value: stats.completedTasks,
+    value: stats.completedTasks ?? 0,
     icon: Database,
     color: '#6B7280',
     trend: trends.completedTasks,
@@ -380,7 +380,7 @@ export const getReportsDashboardCards = (stats: DashboardStats, trends: Dashboar
   },
   {
     title: 'Team Coverage',
-    value: stats.teamMembers,
+    value: stats.teamMembers ?? 0,
     icon: Shield,
     color: '#059669',
     trend: trends.teamMembers,
@@ -396,7 +396,7 @@ export const getReportsDashboardCards = (stats: DashboardStats, trends: Dashboar
 export const getKPIDashboardCards = (stats: DashboardStats, trends: DashboardTrends, formatters: DashboardFormatters): EnhancedStatCardProps[] => [
   {
     title: 'Performance Score',
-    value: stats.performanceScore,
+    value: stats.performanceScore ?? 0,
     icon: BarChart3,
     color: '#3B82F6',
     trend: trends.performanceScore,
@@ -408,7 +408,7 @@ export const getKPIDashboardCards = (stats: DashboardStats, trends: DashboardTre
   },
   {
     title: 'Quality Score',
-    value: stats.qualityScore,
+    value: stats.qualityScore ?? 0,
     icon: Target,
     color: '#10B981',
     trend: trends.qualityScore,
@@ -420,7 +420,7 @@ export const getKPIDashboardCards = (stats: DashboardStats, trends: DashboardTre
   },
   {
     title: 'On-Time Delivery',
-    value: stats.onTimeDelivery,
+    value: stats.onTimeDelivery ?? 0,
     icon: Calendar,
     color: '#8B5CF6',
     trend: trends.onTimeDelivery,
@@ -432,7 +432,7 @@ export const getKPIDashboardCards = (stats: DashboardStats, trends: DashboardTre
   },
   {
     title: 'Budget Efficiency',
-    value: stats.budgetUtilization,
+    value: stats.budgetUtilization ?? 0,
     icon: DollarSign,
     color: '#D97706',
     trend: trends.budgetUtilization,
@@ -444,7 +444,7 @@ export const getKPIDashboardCards = (stats: DashboardStats, trends: DashboardTre
   },
   {
     title: 'Team Productivity',
-    value: stats.teamMembers,
+    value: stats.teamMembers ?? 0,
     icon: Users,
     color: '#059669',
     trend: trends.teamMembers,
@@ -456,7 +456,7 @@ export const getKPIDashboardCards = (stats: DashboardStats, trends: DashboardTre
   },
   {
     title: 'Project Success',
-    value: stats.activeProjects,
+    value: stats.activeProjects ?? 0,
     icon: Award,
     color: '#DC2626',
     trend: trends.activeProjects,
