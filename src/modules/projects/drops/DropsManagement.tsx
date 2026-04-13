@@ -6,6 +6,7 @@ import {
   DropsGrid,
   useDropsManagement
 } from './DropsManagement/index';
+import type { DropsFiltersState } from './DropsManagement/types/drops.types';
 
 export function DropsManagement() {
   const {
@@ -36,7 +37,7 @@ export function DropsManagement() {
     );
   }
 
-  const handleFiltersChange = async (newFilters: Partial<any>) => {
+  const handleFiltersChange = async (newFilters: Partial<DropsFiltersState>) => {
     updateFilters(newFilters);
 
     // If search term or status filter changed, perform server-side search

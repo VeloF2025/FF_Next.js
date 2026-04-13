@@ -172,13 +172,13 @@ function parsePythonOutput(
 
   // Convert Python output format to our TypeScript format
   const stepResults = pythonOutput.results
-    ? Object.entries(pythonOutput.results).map(([stepNum, result]: [string, any]) => ({
+    ? Object.entries(pythonOutput.results as Record<string, Record<string, unknown>>).map(([stepNum, result]) => ({
         step_number: parseInt(stepNum, 10),
-        step_name: result.step_name || `step_${stepNum}`,
-        step_label: result.step_name || `Step ${stepNum}`,
-        passed: result.passed || false,
-        score: result.score || 0,
-        comment: result.recommendation || result.issues?.join('; ') || 'No comment',
+        step_name: (result.step_name as string | undefined) || `step_${stepNum}`,
+        step_label: (result.step_name as string | undefined) || `Step ${stepNum}`,
+        passed: (result.passed as boolean | undefined) || false,
+        score: (result.score as number | undefined) || 0,
+        comment: (result.recommendation as string | undefined) || (result.issues as string[] | undefined)?.join('; ') || 'No comment',
       }))
     : [];
 

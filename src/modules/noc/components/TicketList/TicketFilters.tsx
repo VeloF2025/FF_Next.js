@@ -60,7 +60,7 @@ export function TicketFilters({ filters, onFiltersChange, compact = false }: Tic
     .sort((a, b) => a.name.localeCompare(b.name));
 
   // 🟢 WORKING: Handle filter change
-  const handleFilterChange = (key: keyof TicketFiltersType, value: any) => {
+  const handleFilterChange = (key: keyof TicketFiltersType, value: TicketFiltersType[keyof TicketFiltersType]) => {
     onFiltersChange({
       ...filters,
       [key]: value || undefined,

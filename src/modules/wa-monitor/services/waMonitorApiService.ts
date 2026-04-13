@@ -295,7 +295,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 /**
  * Build query string from parameters
  */
-export function buildQueryString(params: Record<string, any>): string {
+export function buildQueryString(params: Record<string, string | number | boolean | undefined | null>): string {
   const query = new URLSearchParams();
 
   Object.entries(params).forEach(([key, value]) => {

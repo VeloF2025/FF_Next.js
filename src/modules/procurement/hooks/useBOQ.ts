@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { boqService } from '@/services/procurement/boqService';
 import { BOQFormData, BOQStatus } from '@/types/procurement.types';
+import type { BOQ } from '@/types/procurement/boq.types';
 import { notificationService } from '@/services/core/NotificationService';
 
 // Get all BOQs
@@ -136,7 +137,7 @@ export function useCreateBOQTemplate() {
 // Export BOQ to Excel
 export function useExportBOQ() {
   return useMutation({
-    mutationFn: async (boq: Record<string, unknown> & { boqNumber: string }) => {
+    mutationFn: async (boq: BOQ) => {
       const csvData = await boqService.exportToCsv(boq);
       const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);

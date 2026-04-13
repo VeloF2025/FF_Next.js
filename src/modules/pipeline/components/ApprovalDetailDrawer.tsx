@@ -261,7 +261,7 @@ export function ApprovalDetailDrawer({
     setLoading(true);
     setError(null);
     try {
-      const updateData: any = { updated_by: currentUserId };
+      const updateData: Record<string, string | number | boolean | null | undefined> = { updated_by: currentUserId };
 
       if (editingSection === 'timeline') {
         updateData.application_date = timelineData.application_date || null;

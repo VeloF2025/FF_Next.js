@@ -482,7 +482,7 @@ export class QContactClient {
           error instanceof QContactError ||
           (error instanceof Error &&
             'code' in error &&
-            Object.values(QContactErrorCode).includes((error as any).code));
+            Object.values(QContactErrorCode).includes((error as QContactError).code as QContactErrorCode));
 
         if (!isQContactError) {
           // Wrap unexpected errors

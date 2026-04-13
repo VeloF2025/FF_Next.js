@@ -37,7 +37,7 @@ export function HierarchyTab() {
   };
 
   // Build hierarchy tree structure
-  const buildHierarchyTree = (staff: any[]): StaffMember[] => {
+  const buildHierarchyTree = (staff: { id: string; name: string; position: string; department?: string; status?: string; reportsTo?: string }[]): StaffMember[] => {
     const staffMap = new Map<string, StaffMember>();
     const roots: StaffMember[] = [];
 

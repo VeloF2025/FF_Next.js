@@ -221,7 +221,7 @@ export const DROP_STATUS_CONFIG = {
 /**
  * Check if a value is a valid drop status
  */
-export function isValidDropStatus(value: any): value is DropStatus {
+export function isValidDropStatus(value: unknown): value is DropStatus {
   return value === 'incomplete' || value === 'complete';
 }
 

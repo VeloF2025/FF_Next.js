@@ -152,7 +152,7 @@ export async function updateGuaranteePeriod(
 
   // Build dynamic UPDATE query based on provided fields
   const updates: string[] = [];
-  const values: any[] = [];
+  const values: (number | boolean | string)[] = [];
   let paramIndex = 1;
 
   if (payload.installation_guarantee_days !== undefined) {

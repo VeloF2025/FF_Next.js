@@ -53,7 +53,7 @@ export function DevQueueSettings({ columns, onColumnsUpdated }: DevQueueSettings
     );
   }, [columns]);
 
-  const handleColumnChange = (index: number, field: keyof ColumnSettings, value: any) => {
+  const handleColumnChange = (index: number, field: keyof ColumnSettings, value: string | number | boolean | null | undefined) => {
     setColumnSettings((prev) => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
