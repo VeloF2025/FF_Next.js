@@ -125,7 +125,7 @@ export class RFQCrudOperations {
       const oldRFQ = existing[0];
 
       // Update RFQ
-      const updateFields: any = {
+      const updateFields: Record<string, unknown> = {
         ...validData,
         updatedAt: new Date()
       };

@@ -7,7 +7,7 @@ export class QualityCheckService {
    */
   async updateQualityChecks(id: number, checks: Partial<NeonPole>): Promise<void> {
     const updates: string[] = [];
-    const params: any[] = [];
+    const params: unknown[] = [];
     let paramIndex = 1;
     
     // Build dynamic update query

@@ -5,6 +5,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import type { NeonQueryFunction } from '@neondatabase/serverless';
 
 const FIREFLIES_API_URL = 'https://api.fireflies.ai/graphql';
 const RECORDINGS_BASE = process.env.MEETING_RECORDINGS_PATH || '/home/velo/meeting-recordings';
@@ -152,7 +153,7 @@ async function downloadRecording(url: string, destPath: string): Promise<number>
   return buffer.length;
 }
 
-export async function syncFirefliesToNeon(apiKey: string, sql: any) {
+export async function syncFirefliesToNeon(apiKey: string, sql: NeonQueryFunction<false, false>) {
   const transcripts = await fetchFirefliesTranscripts(apiKey);
 
   let newRecordings = 0;

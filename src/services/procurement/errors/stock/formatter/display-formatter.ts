@@ -251,7 +251,7 @@ export class DisplayFormatter {
       itemCode = error.itemCode;
     }
 
-    const result: any = {
+    const result: Record<string, unknown> = {
       title: error.constructor.name.replace(/Error$/, '').replace(/([A-Z])/g, ' $1').trim(),
       message: error.message,
       priority,

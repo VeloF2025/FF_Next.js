@@ -4,6 +4,7 @@
  */
 import * as XLSX from 'xlsx';
 import { neon } from '@/lib/db-neon';
+import type { NeonQueryFunction } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import type {
   BOQTargetField,
@@ -180,7 +181,7 @@ export async function checkSavedTemplates(
   databaseUrl: string
 ): Promise<{ id: string; name: string; supplierName?: string; mapping: Record<string, BOQTargetField>; sheetName?: string; headerRow: number } | null> {
   try {
-    const sql: any = neon(databaseUrl);
+    const sql: NeonQueryFunction<false, false> = neon(databaseUrl);
     const templates = await sql`
       SELECT id, name, supplier_name, headers, column_mapping, sheet_name, header_row
       FROM boq_column_templates ORDER BY usage_count DESC

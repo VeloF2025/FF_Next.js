@@ -11,7 +11,7 @@ interface ProjectCardProps {
   onView: (id: string) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
-  formatDate: (date: any) => string;
+  formatDate: (date: Date | string | number | null | undefined) => string;
   formatCurrency: (amount: number) => string;
 }
 

@@ -3,7 +3,7 @@ import { formatLabel } from '@/lib/utils';
 
 interface SkillsSectionProps {
   formData: StaffFormData;
-  handleInputChange: (field: keyof StaffFormData, value: any) => void;
+  handleInputChange: (field: keyof StaffFormData, value: StaffFormData[keyof StaffFormData]) => void;
   toggleSkill?: (skill: Skill) => void;
 }
 

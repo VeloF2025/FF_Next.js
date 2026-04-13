@@ -46,7 +46,7 @@ export async function recordKPI(
 /**
  * Sync project data to analytics database
  */
-export async function syncProjectToAnalytics(_projectId: string, _projectData: any): Promise<void> {
+export async function syncProjectToAnalytics(_projectId: string, _projectData: Record<string, unknown>): Promise<void> {
   try {
     // const _analyticsData: NewProjectAnalytics = {
     //   projectId,

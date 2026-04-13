@@ -58,7 +58,7 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 describe('DR Lookup API Endpoint', () => {
-  let mockLookupDR: any;
+  let mockLookupDR: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     vi.clearAllMocks();

@@ -92,7 +92,7 @@ export interface StockFilters extends PaginationParams {
 export const initializeProcurementServices = async (): Promise<{
   success: boolean;
   services: string[];
-  healthStatus: Record<string, any>;
+  healthStatus: Record<string, unknown>;
 }> => {
   try {
     // Check health of all services

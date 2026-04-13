@@ -60,7 +60,7 @@ export interface BOQExceptionCreateData {
   severity?: string;
   issueDescription: string;
   suggestedAction: string;
-  suggestions?: any[];
+  suggestions?: Record<string, unknown>[];
   status?: string;
   priority?: string;
 }

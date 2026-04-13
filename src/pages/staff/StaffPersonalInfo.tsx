@@ -6,7 +6,7 @@ import { StaffFormData } from '@/types/staff.types';
 
 interface StaffPersonalInfoProps {
   formData: StaffFormData;
-  onInputChange: (field: keyof StaffFormData, value: any) => void;
+  onInputChange: (field: keyof StaffFormData, value: StaffFormData[keyof StaffFormData]) => void;
 }
 
 export function StaffPersonalInfo({ formData, onInputChange }: StaffPersonalInfoProps) {

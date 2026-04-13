@@ -10,7 +10,7 @@ import type { ProcurementApiContext } from '../../index';
 export class RFQClient {
   static async getRFQList(
     context: ProcurementApiContext,
-    filters?: any
+    filters?: Record<string, unknown>
   ): Promise<{ rfqs: RFQ[], total: number, page: number, limit: number }> {
     const response = await procurementApi.rfq.getRFQs(context.projectId, filters);
     return {

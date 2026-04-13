@@ -10,7 +10,19 @@ interface FormData {
   name: string;
   description: string;
   orderIndex: number;
-  [key: string]: any;
+  color?: string;
+  estimatedDuration?: number;
+  estimatedHours?: number;
+  isOptional?: boolean;
+  isParallel?: boolean;
+  isRequired?: boolean;
+  isMilestone?: boolean;
+  stepType?: StepType;
+  assigneeRole?: string;
+  isAutomated?: boolean;
+  priority?: TaskPriority;
+  canBeParallel?: boolean;
+  [key: string]: unknown;
 }
 
 export function WorkflowEditorForms() {

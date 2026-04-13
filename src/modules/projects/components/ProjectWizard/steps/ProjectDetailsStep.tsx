@@ -61,7 +61,7 @@ export function ProjectDetailsStep({
             Status
           </label>
           <select
-            {...register('status' as any)}
+            {...register('status' as Parameters<typeof register>[0])}
             className="w-full px-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value={ProjectStatus.PLANNING}>Planning</option>

@@ -6,7 +6,7 @@ import { StaffFormData } from '@/types/staff.types';
 
 interface StaffEmergencyContactProps {
   formData: StaffFormData;
-  onInputChange: (field: keyof StaffFormData, value: any) => void;
+  onInputChange: (field: keyof StaffFormData, value: StaffFormData[keyof StaffFormData]) => void;
 }
 
 export function StaffEmergencyContact({ formData, onInputChange }: StaffEmergencyContactProps) {

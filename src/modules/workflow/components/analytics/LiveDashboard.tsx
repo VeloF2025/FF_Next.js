@@ -52,7 +52,7 @@ interface ActivityFeed {
   title: string;
   description: string;
   timestamp: Date;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export function LiveDashboard({ analytics, onRefresh, refreshing = false }: LiveDashboardProps) {

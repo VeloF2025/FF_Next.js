@@ -114,7 +114,7 @@ export function SupplierFilter() {
   }, [suppliers, filters]);
 
   // Handle filter changes
-  const updateFilter = (key: keyof SupplierFilters, value: any) => {
+  const updateFilter = (key: keyof SupplierFilters, value: SupplierFilters[keyof SupplierFilters]) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 

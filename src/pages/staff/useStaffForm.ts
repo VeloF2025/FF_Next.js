@@ -111,7 +111,7 @@ export function useStaffForm(id?: string) {
     }
   };
 
-  const handleInputChange = (field: keyof StaffFormData, value: any) => {
+  const handleInputChange = (field: keyof StaffFormData, value: unknown) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 

@@ -77,7 +77,7 @@ export const clientApi = {
       const clients = result.data || [];
 
       // Map company_name to name for compatibility with dropdown component
-      return clients.map((client: any) => ({
+      return clients.map((client: Record<string, unknown>) => ({
         ...client,
         name: client.name || client.company_name || 'Unnamed Client'
       }));

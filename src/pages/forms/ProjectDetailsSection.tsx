@@ -6,7 +6,7 @@ import { ProjectFormData, ProjectType, ProjectStatus, Priority } from '@/types/p
 
 interface ProjectDetailsSectionProps {
   formData: ProjectFormData;
-  onInputChange: (field: keyof ProjectFormData, value: any) => void;
+  onInputChange: (field: keyof ProjectFormData, value: ProjectFormData[keyof ProjectFormData]) => void;
 }
 
 export function ProjectDetailsSection({ formData, onInputChange }: ProjectDetailsSectionProps) {

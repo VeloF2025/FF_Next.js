@@ -2,7 +2,7 @@ import { ClientFormData, ServiceType, PaymentTerms } from '@/types/client.types'
 
 interface ServiceBillingFieldsProps {
   formData: ClientFormData;
-  onChange: (field: keyof ClientFormData, value: any) => void;
+  onChange: (field: keyof ClientFormData, value: unknown) => void;
 }
 
 export function ServiceBillingFields({ formData, onChange }: ServiceBillingFieldsProps) {

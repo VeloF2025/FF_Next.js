@@ -49,7 +49,7 @@ export class CorePermissionChecker {
    * Create error response for permission failures
    */
   static createPermissionErrorResponse<T>(
-    error: any,
+    error: unknown,
     defaultMessage: string,
     defaultCode: string
   ): ServiceResponse<T> {

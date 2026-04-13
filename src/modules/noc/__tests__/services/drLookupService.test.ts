@@ -487,7 +487,7 @@ describe('DR Lookup Service', () => {
       vi.mocked(queryOne).mockResolvedValueOnce({
         // Missing required fields
         some_random_field: 'value'
-      } as any);
+      } as unknown as Parameters<typeof queryOne>[0]);
 
       const result = await lookupDR(drNumber);
 

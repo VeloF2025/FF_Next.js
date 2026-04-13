@@ -346,7 +346,7 @@ export function ProjectWorkflowDetail({
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as 'overview' | 'timeline' | 'logs' | 'analytics')}
                 className={`flex items-center space-x-2 pb-2 border-b-2 transition-colors ${
                   activeTab === tab.id
                     ? 'border-green-500 text-green-600 dark:text-green-400'

@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { 
   BarChart3, 
@@ -33,7 +33,7 @@ export type SupplierTabId =
 export interface SupplierTab {
   id: SupplierTabId;
   label: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   path: string;
   requiresSupplier: boolean;
   badge?: {

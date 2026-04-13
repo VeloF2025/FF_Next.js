@@ -4,7 +4,7 @@
 
 import { log } from '@/lib/logger';
 import type { QaReviewDrop } from '../../types/wa-monitor.types';
-import { getDbConnection, transformDbRowToDrop } from './_shared';
+import { getDbConnection, transformDbRowToDrop, type QaReviewDbRow } from './_shared';
 
 /**
  * Pagination result type for getPaginatedDrops
@@ -92,7 +92,7 @@ export async function getAllDrops(): Promise<QaReviewDrop[]> {
       ORDER BY q.created_at DESC
     `;
 
-    return rows.map(transformDbRowToDrop);
+    return (rows as QaReviewDbRow[]).map(transformDbRowToDrop);
   } catch (error) {
     log.error('Error fetching all drops', { error }, 'waMonitorService.getAllDrops');
     throw new Error('Failed to fetch QA review drops');
@@ -270,7 +270,7 @@ export async function getPaginatedDrops(
     const totalPages = Math.ceil(totalCount / validPageSize);
 
     return {
-      drops: rows.map(transformDbRowToDrop),
+      drops: (rows as QaReviewDbRow[]).map(transformDbRowToDrop),
       pagination: {
         currentPage: validPage,
         pageSize: validPageSize,
@@ -306,7 +306,7 @@ export async function getDropById(id: string): Promise<QaReviewDrop | null> {
       WHERE id = ${id}
     `;
 
-    return row ? transformDbRowToDrop(row) : null;
+    return row ? transformDbRowToDrop(row as QaReviewDbRow) : null;
   } catch (error) {
     log.error('Error fetching drop by ID', { error, id }, 'waMonitorService.getDropById');
     throw new Error('Failed to fetch QA review drop');
@@ -334,7 +334,7 @@ export async function getDropsByStatus(status: 'incomplete' | 'complete'): Promi
       ORDER BY created_at DESC
     `;
 
-    return rows.map(transformDbRowToDrop);
+    return (rows as QaReviewDbRow[]).map(transformDbRowToDrop);
   } catch (error) {
     log.error('Error fetching drops by status', { error, status }, 'waMonitorService.getDropsByStatus');
     throw new Error('Failed to fetch QA review drops by status');

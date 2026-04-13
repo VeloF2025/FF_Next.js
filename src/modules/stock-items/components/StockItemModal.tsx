@@ -98,7 +98,7 @@ export function StockItemModal({ item, onClose, onSave }: StockItemModalProps) {
     }
   }, [item]);
 
-  const handleChange = (field: keyof CreateStockItemInput, value: any) => {
+  const handleChange = (field: keyof CreateStockItemInput, value: CreateStockItemInput[keyof CreateStockItemInput]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     clearError();
   };

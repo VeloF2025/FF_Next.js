@@ -79,7 +79,7 @@ export class PoleValidationService {
   /**
    * Validate pole data completeness
    */
-  validatePoleData(data: any): {
+  validatePoleData(data: { poleNumber?: unknown; location?: unknown; projectId?: unknown; dropCount?: number | null; coordinates?: { lat?: unknown; lng?: unknown } | null }): {
     isValid: boolean;
     errors: string[];
   } {

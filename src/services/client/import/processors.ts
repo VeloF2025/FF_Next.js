@@ -117,11 +117,11 @@ export async function processImportRows(rows: ClientImportRow[]): Promise<Client
         imported++;
       }
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       errors.push({
         row: rowNumber,
         field: 'general',
-        message: error.message || 'Failed to import row',
+        message: error instanceof Error ? error.message : 'Failed to import row',
         value: row
       });
       failed++;

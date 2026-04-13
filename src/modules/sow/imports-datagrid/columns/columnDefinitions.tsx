@@ -126,7 +126,7 @@ export const onemapColumns: GridColDef[] = [
     width: 150,
     renderCell: (params) => {
       const status = params.value || 'unknown';
-      let color: any = 'default';
+      let color: 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' = 'default';
       if (status.includes('Approved')) color = 'success';
       else if (status.includes('Complete')) color = 'success';
       else if (status.includes('Installed')) color = 'info';

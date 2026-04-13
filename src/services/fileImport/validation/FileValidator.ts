@@ -304,7 +304,7 @@ export class FileValidator {
    */
   private getAvailableMemory(): number {
     if (typeof window !== 'undefined' && 'performance' in window && 'memory' in performance) {
-      const memory = (performance as any).memory;
+      const memory = (performance as unknown as { memory: { totalJSHeapSize: number; usedJSHeapSize: number } }).memory;
       return memory.totalJSHeapSize - memory.usedJSHeapSize;
     }
     

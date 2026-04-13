@@ -33,7 +33,7 @@ interface MetricCard {
   change?: number;
   trend?: 'up' | 'down' | 'stable';
   target?: number;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<{ className?: string }>;
   color: string;
   bgColor: string;
   description: string;

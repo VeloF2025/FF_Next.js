@@ -136,7 +136,7 @@ export class PoleSyncService {
 
     const snapshot = await getDocs(q);
     const updates = snapshot.docs.map((doc: FirestoreDocSnapshot) =>
-      updateDoc(doc.ref as any, {
+      updateDoc(doc.ref as Parameters<typeof updateDoc>[0], {
         'metadata.syncStatus': 'pending',
         'metadata.syncError': null
       })

@@ -10,7 +10,7 @@ export class RegressionAnalyzer {
    * Generate advanced forecasting models
    */
   static generateAdvancedForecasts(
-    historicalErrors: any[],
+    historicalErrors: Record<string, unknown>[],
     forecastHorizon: number = 30
   ): {
     exponentialSmoothing: { forecast: number; trend: number; seasonal: number };

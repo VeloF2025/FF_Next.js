@@ -275,7 +275,7 @@ export function StaffList() {
       {/* Staff Display */}
       <StandardDataTable<StaffMember>
         data={filteredStaff}
-        columns={tableColumns as any}
+        columns={tableColumns as Parameters<typeof StandardDataTable>[0]['columns']}
         isLoading={isLoading}
         onRowClick={(staff: StaffMember) => router.push(`/app/staff/${staff.id}`)}
         getRowKey={(staff: StaffMember) => staff.id || ''}

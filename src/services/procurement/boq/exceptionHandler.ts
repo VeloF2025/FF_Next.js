@@ -23,7 +23,7 @@ export async function createMappingException(
   severity: 'low' | 'medium' | 'high' | 'critical',
   issueDescription: string,
   suggestedAction: string,
-  systemSuggestions: any[]
+  systemSuggestions: Record<string, unknown>[]
 ): Promise<BOQException> {
   const newException: NewBOQException = {
     boqId: item.boqId,

@@ -69,7 +69,7 @@ export class FinancialAnalyticsService {
       // Extract revenue trends from API response
       const revenueData = trends.revenue?.data || [];
       
-      return revenueData.map((item: any) => ({
+      return revenueData.map((item: Record<string, unknown>) => ({
         month: item.period,
         income: item.collected || 0,
         expenses: 0, // Not provided by current API

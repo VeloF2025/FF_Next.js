@@ -62,7 +62,7 @@ export { StockErrorAnalytics, type ErrorPattern as LegacyErrorPattern, type Erro
 /**
  * Check if an error is a stock-related error
  */
-export function isStockError(error: any): error is StockError {
+export function isStockError(error: unknown): error is StockError {
   return error instanceof Error && 
          (error.name === 'StockError' || 
           error.name === 'InsufficientStockError' ||

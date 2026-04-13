@@ -369,7 +369,7 @@ describe('QContact Inbound Sync Service', () => {
   });
 
   describe('syncInboundTickets', () => {
-    let mockQContactClient: any;
+    let mockQContactClient: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
       mockQContactClient = {

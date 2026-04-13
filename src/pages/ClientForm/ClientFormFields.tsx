@@ -2,7 +2,7 @@ import { ClientFormData } from '@/types/client.types';
 
 interface ClientFormFieldsProps {
   formData: ClientFormData;
-  onChange: (field: keyof ClientFormData, value: any) => void;
+  onChange: (field: keyof ClientFormData, value: unknown) => void;
 }
 
 export function ClientFormFields({ formData, onChange }: ClientFormFieldsProps) {

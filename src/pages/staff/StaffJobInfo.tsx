@@ -12,7 +12,7 @@ import {
 
 interface StaffJobInfoProps {
   formData: StaffFormData;
-  onInputChange: (field: keyof StaffFormData, value: any) => void;
+  onInputChange: (field: keyof StaffFormData, value: StaffFormData[keyof StaffFormData]) => void;
 }
 
 export function StaffJobInfo({ formData, onInputChange }: StaffJobInfoProps) {

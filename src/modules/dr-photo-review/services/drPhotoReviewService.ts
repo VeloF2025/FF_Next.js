@@ -48,7 +48,7 @@ export async function fetchDRPhotos(drNumber: string, project = DEFAULT_PROJECT)
     const data = await response.json();
 
     // Map photos to include full URLs and step info
-    return (data.photos || data || []).map((photo: any, index: number) => {
+    return (data.photos || data || []).map((photo: { step_number?: number; filename?: string; timestamp?: unknown; evaluation?: unknown }, index: number) => {
         const stepNumber = photo.step_number || index + 1;
         const stepInfo = getStepInfo(stepNumber);
 
@@ -57,7 +57,7 @@ export async function fetchDRPhotos(drNumber: string, project = DEFAULT_PROJECT)
             step_name: stepInfo.name,
             step_label: stepInfo.label,
             filename: photo.filename,
-            url: `${API_BASE}/photos/${encodeURIComponent(drNumber)}/${encodeURIComponent(photo.filename)}`,
+            url: `${API_BASE}/photos/${encodeURIComponent(drNumber)}/${encodeURIComponent(photo.filename ?? '')}`,
             critical: stepInfo.critical,
             timestamp: photo.timestamp,
             evaluation: photo.evaluation,

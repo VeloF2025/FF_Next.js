@@ -132,7 +132,7 @@ const mockDataTransfer = {
   dropEffect: 'none'
 };
 
-global.DataTransfer = jest.fn(() => mockDataTransfer) as any;
+global.DataTransfer = jest.fn(() => mockDataTransfer) as unknown as typeof DataTransfer;
 
 // Mock File and FileList
 global.File = class MockFile {

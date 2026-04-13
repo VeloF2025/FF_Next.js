@@ -40,7 +40,7 @@ export class StockErrorFormatter {
   /**
    * Format error for system logging
    */
-  static formatErrorForLogging(error: StockError, context?: Record<string, any>): SystemErrorLog {
+  static formatErrorForLogging(error: StockError, context?: Record<string, unknown>): SystemErrorLog {
     return LogFormatter.formatErrorForLogging(error, context);
   }
 

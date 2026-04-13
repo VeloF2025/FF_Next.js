@@ -268,7 +268,7 @@ describe('Escalation API Endpoints', () => {
     it('should reject resolve without resolution_notes', async () => {
       // Arrange
       const escalationId = mockEscalation.id;
-      const invalidPayload: any = {
+      const invalidPayload: Record<string, unknown> = {
         resolved_by: 'user-123',
         status: 'resolved',
       };

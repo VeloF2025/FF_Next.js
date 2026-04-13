@@ -125,7 +125,7 @@ export function usePoleCapture(projectId: string) {
       poleNumber: formData.poleNumber,
       dateInstalled: new Date(),
       location: `${formData.latitude || 0}, ${formData.longitude || 0}`,
-      poleType: 'wooden' as any,
+      poleType: 'wooden' as PoleData['poleType'],
       contractorId: '',
       workingTeam: '',
       dropCount: formData.currentDrops,

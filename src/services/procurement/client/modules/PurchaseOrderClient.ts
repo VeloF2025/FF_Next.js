@@ -10,7 +10,7 @@ import type { ProcurementApiContext } from '../../index';
 export class PurchaseOrderClient {
   static async getPurchaseOrders(
     context: ProcurementApiContext,
-    filters?: any
+    filters?: Record<string, unknown>
   ): Promise<{ orders: PurchaseOrder[], total: number, page: number, limit: number }> {
     const response = await procurementApi.purchaseOrders.getOrders(context.projectId, filters);
     return {

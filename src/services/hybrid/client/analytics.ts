@@ -21,7 +21,7 @@ export async function getTopClients(limit: number = 10) {
 /**
  * Sync client data to analytics database
  */
-export async function syncClientToAnalytics(_clientId: string, _clientData: any): Promise<void> {
+export async function syncClientToAnalytics(_clientId: string, _clientData: Record<string, unknown>): Promise<void> {
   try {
     // const _analyticsData: NewClientAnalytics = {
     //   clientId,

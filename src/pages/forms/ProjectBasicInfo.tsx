@@ -6,7 +6,7 @@ import { ProjectFormData } from '@/types/project.types';
 
 interface ProjectBasicInfoProps {
   formData: ProjectFormData;
-  onInputChange: (field: keyof ProjectFormData, value: any) => void;
+  onInputChange: (field: keyof ProjectFormData, value: ProjectFormData[keyof ProjectFormData]) => void;
 }
 
 export function ProjectBasicInfo({ formData, onInputChange }: ProjectBasicInfoProps) {

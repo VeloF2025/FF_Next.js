@@ -12,7 +12,7 @@ export const formatCurrency = (amount: number): string => {
   }).format(amount);
 };
 
-export const formatDate = (timestamp: any): string => {
+export const formatDate = (timestamp: Date | string | number | null | undefined): string => {
   return formatDisplayDate(timestamp);
 };
 

@@ -604,7 +604,7 @@ describe('useUpdateVerificationStep', () => {
 
     result.current.mutate({
       ticketId: mockTicketId,
-      stepNumber: 99 as any, // Invalid step number
+      stepNumber: 99 as unknown as number, // Invalid step number
       payload: {
         is_complete: true,
       },

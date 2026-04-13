@@ -126,7 +126,7 @@ export function StaffForm() {
     }
   };
 
-  const handleInputChange = (field: keyof StaffFormData, value: any) => {
+  const handleInputChange = (field: keyof StaffFormData, value: unknown) => {
     // Clear position when department changes if current position doesn't belong to new department
     if (field === 'department') {
       const newDept = value as string;

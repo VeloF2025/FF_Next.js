@@ -75,7 +75,7 @@ describe('VerificationService - TDD', () => {
             return mockSteps.shift();
           }),
         };
-        return await callback(mockTxn as any);
+        return await callback(mockTxn as Parameters<typeof callback>[0]);
       });
 
       // Act

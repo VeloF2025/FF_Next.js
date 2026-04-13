@@ -567,7 +567,7 @@ mockQuery.mockResolvedValueOnce([]); // No existing escalation
       const mockZoneTickets = createMockTickets(8, zoneId);
 
       // Mock implementation that returns correct data based on query parameters
-      mockQuery.mockImplementation(async (queryText: string, params: any[]) => {
+      mockQuery.mockImplementation(async (queryText: string, params: unknown[]) => {
         const scopeValue = params[0];
         if (scopeValue === poleNumber) {
           // Check if this is the escalation check query

@@ -2,7 +2,7 @@ import { StaffFormData } from '@/types/staff.types';
 
 interface PersonalInfoSectionProps {
   formData: StaffFormData;
-  handleInputChange: (field: keyof StaffFormData, value: any) => void;
+  handleInputChange: (field: keyof StaffFormData, value: StaffFormData[keyof StaffFormData]) => void;
   isCreating?: boolean;
 }
 

@@ -393,7 +393,7 @@ describe('Dashboard API Endpoints - TDD', () => {
 
     it('should handle empty workload gracefully', async () => {
       // Arrange: No tickets assigned to anyone
-      const mockWorkload: any[] = [];
+      const mockWorkload: Record<string, unknown>[] = [];
 
       vi.mocked(getWorkloadByAssignee).mockResolvedValue(mockWorkload);
 

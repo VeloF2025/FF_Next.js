@@ -2,7 +2,7 @@ import { StaffFormData } from '@/types/staff.types';
 
 interface ContactSectionProps {
   formData: StaffFormData;
-  handleInputChange: (field: keyof StaffFormData, value: any) => void;
+  handleInputChange: (field: keyof StaffFormData, value: StaffFormData[keyof StaffFormData]) => void;
 }
 
 const provinces = [

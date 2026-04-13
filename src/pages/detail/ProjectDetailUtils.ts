@@ -18,7 +18,7 @@ export const formatCurrency = (amount: number): string => {
 /**
  * Format date from timestamp to localized string
  */
-export const formatDate = (timestamp: any): string => {
+export const formatDate = (timestamp: Date | string | number | null | undefined): string => {
   return formatDisplayDate(timestamp);
 };
 

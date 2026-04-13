@@ -7,7 +7,7 @@ import { StaffDropdownOption } from '@/types/staff.types';
 
 interface ProjectScheduleBudgetProps {
   formData: ProjectFormData;
-  onInputChange: (field: keyof ProjectFormData, value: any) => void;
+  onInputChange: (field: keyof ProjectFormData, value: ProjectFormData[keyof ProjectFormData]) => void;
   managers: StaffDropdownOption[];
   isManagersLoading: boolean;
 }

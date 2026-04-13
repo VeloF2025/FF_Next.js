@@ -14,7 +14,7 @@ export class MemoryStatsCollector {
    */
   public getCurrentMemoryStats(): MemoryStats {
     if (typeof window !== 'undefined' && 'performance' in window && 'memory' in performance) {
-      const memory = (performance as any).memory;
+      const memory = (performance as unknown as { memory: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number } }).memory;
       return {
         heapUsed: memory.usedJSHeapSize,
         heapTotal: memory.totalJSHeapSize,

@@ -7,7 +7,7 @@ import { ClientDropdownOption } from '@/types/client.types';
 
 interface ProjectClientInfoProps {
   formData: ProjectFormData;
-  onInputChange: (field: keyof ProjectFormData, value: any) => void;
+  onInputChange: (field: keyof ProjectFormData, value: ProjectFormData[keyof ProjectFormData]) => void;
   clients: ClientDropdownOption[];
   isClientsLoading: boolean;
 }

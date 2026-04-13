@@ -27,7 +27,7 @@ export interface ErrorInsight {
   impact: 'high' | 'medium' | 'low';
   actionable: boolean;
   recommendations: string[];
-  data: Record<string, any>;
+  data: Record<string, unknown>;
 }
 
 export interface ErrorAnalysisResult {

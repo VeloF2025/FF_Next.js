@@ -659,7 +659,7 @@ describe('QA Readiness Validator (TDD)', () => {
   describe('Edge Cases', () => {
     it('should handle missing ticket_id gracefully', () => {
       const input = createMockTicket({
-        ticket_id: undefined as any,
+        ticket_id: undefined as unknown as string,
       });
 
       const result = validateQAReadiness(input);

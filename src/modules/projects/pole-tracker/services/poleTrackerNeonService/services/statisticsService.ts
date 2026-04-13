@@ -37,7 +37,7 @@ export class StatisticsService {
   /**
    * Get poles requiring sync
    */
-  async getPendingSync(projectId: string): Promise<any[]> {
+  async getPendingSync(projectId: string): Promise<unknown[]> {
     const result = await neonService.query(
       POLE_QUERIES.getPendingSync,
       [projectId, 'pending']

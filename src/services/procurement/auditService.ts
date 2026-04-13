@@ -16,7 +16,8 @@ import type {
   AuditLogFilter,
 } from '@/types/procurement/audit.types';
 
-const sql: any = neon(process.env.DATABASE_URL!);
+import type { NeonQueryFunction } from '@neondatabase/serverless';
+const sql: NeonQueryFunction<false, false> = neon(process.env.DATABASE_URL!);
 
 // ============= Types =============
 

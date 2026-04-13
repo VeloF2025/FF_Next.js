@@ -371,7 +371,7 @@ export class WorkflowTestRunner {
   /**
    * Generate markdown report
    */
-  private generateMarkdownReport(reportData: any): string {
+  private generateMarkdownReport(reportData: Record<string, unknown>): string {
     return `# Workflow System Test Coverage Report
 
 Generated: ${reportData.timestamp}

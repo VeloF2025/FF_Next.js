@@ -63,7 +63,7 @@ export function ProjectForm() {
     }
   }, [project]);
 
-  const handleInputChange = (field: keyof ProjectFormData, value: any) => {
+  const handleInputChange = (field: keyof ProjectFormData, value: ProjectFormData[keyof ProjectFormData]) => {
     setFormData(prev => ({
       ...prev,
       [field]: value

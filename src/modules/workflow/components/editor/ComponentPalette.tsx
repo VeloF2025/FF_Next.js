@@ -19,7 +19,7 @@ interface PaletteItem {
   icon: React.ElementType;
   category: string;
   color: string;
-  template?: any; // Pre-filled data for the item
+  template?: { estimatedDuration?: number; estimatedHours?: number; [key: string]: unknown }; // Pre-filled data for the item
 }
 
 // Predefined palette items

@@ -57,7 +57,7 @@ export class PoleTrackerNeonService {
     return this.statisticsService.getProjectStatistics(projectId);
   }
 
-  async getPendingSync(projectId: string): Promise<any[]> {
+  async getPendingSync(projectId: string): Promise<unknown[]> {
     return this.statisticsService.getPendingSync(projectId);
   }
 }

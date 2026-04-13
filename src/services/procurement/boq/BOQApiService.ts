@@ -44,7 +44,7 @@ export class BOQApiService extends BaseService {
       // First, import the BOQ using base service
       const importResult = await procurementApiService.importBOQ(context, importData);
       if (!importResult.success) {
-        return importResult as any;
+        return importResult as unknown as ServiceResponse<BOQImportResult>;
       }
 
       const boqId = importResult.data!.boqId;
