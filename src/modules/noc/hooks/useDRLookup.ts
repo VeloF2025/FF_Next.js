@@ -101,7 +101,7 @@ async function fetchDRLookup(drNumber: string): Promise<DRLookupData | null> {
  */
 export function useDRLookup(): UseDRLookupResult {
   const queryClient = useQueryClient();
-  const [currentDR, setCurrentDR] = useState<string | null>(null);
+  const [_currentDR, setCurrentDR] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DRLookupData | null>(null);

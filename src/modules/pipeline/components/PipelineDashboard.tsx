@@ -44,12 +44,6 @@ const STATUS_COLORS: Record<PipelineStatus, { bg: string; text: string; label: s
   lost: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', label: 'Lost' },
 };
 
-const PRIORITY_COLORS: Record<Priority, { bg: string; text: string }> = {
-  low: { bg: 'bg-secondary/30', text: 'text-muted-foreground' },
-  medium: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-600 dark:text-blue-400' },
-  high: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-600 dark:text-orange-400' },
-  critical: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-600 dark:text-red-400' },
-};
 
 type ViewMode = 'table' | 'kanban';
 

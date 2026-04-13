@@ -66,7 +66,7 @@ export function AssignmentSection({ formData, errors, setField, setFields, disab
           </label>
           <TeamSelector
             value={formData.assigned_team_id || null}
-            onChange={(teamId, team) => {
+            onChange={(teamId, _team) => {
               setFields({
                 assigned_team_id: teamId || '',
                 assigned_team: teamId || '',

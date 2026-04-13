@@ -76,7 +76,7 @@ export function HandoverWizard({
 
   // 🟢 WORKING: Use handover wizard hook
   const {
-    validation,
+    validation: _validation,
     canHandover,
     blockingIssues,
     warnings,
