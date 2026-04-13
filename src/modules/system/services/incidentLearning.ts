@@ -73,7 +73,7 @@ const KB_BASE_PATH = '.claude/knowledge-base/incidents';
 /**
  * Track successful action execution
  */
-export async function trackSuccess(actionId: string, incidentId: string): Promise<void> {
+export async function trackSuccess(actionId: string, _incidentId: string): Promise<void> {
   const db = await getDb();
   await db.query(
     `

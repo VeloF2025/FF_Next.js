@@ -484,7 +484,7 @@ export async function syncAssetsFromOdoo(
             RETURNING id, asset_number
           `;
 
-          const newAsset = inserted[0] as Record<string, unknown>;
+          const _newAsset = inserted[0] as Record<string, unknown>;
 
           result.details.push({
             source: asset.source,

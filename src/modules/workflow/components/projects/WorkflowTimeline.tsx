@@ -6,7 +6,6 @@ import {
   Calendar,
   Clock,
   CheckCircle2,
-  AlertCircle,
   Play
 } from 'lucide-react';
 

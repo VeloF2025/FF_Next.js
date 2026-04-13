@@ -168,8 +168,8 @@ export class ProgressTracker {
     if (currentPercentage === 0) return 0;
 
     // Calculate remaining percentage for future use
-    const remainingPercentage = 100 - currentPercentage;
-    // Note: remainingPercentage could be used for more detailed ETA calculations
+    const _remainingPercentage = 100 - currentPercentage;
+    // Note: _remainingPercentage could be used for more detailed ETA calculations
     // Currently using elapsed time ratio method instead
     const estimatedTotal = (elapsedTime / currentPercentage) * 100;
     const estimatedRemaining = estimatedTotal - elapsedTime;

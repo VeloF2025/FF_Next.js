@@ -2,7 +2,7 @@
 // Supplier messaging with threading, filtering, and real-time communication
 
 import { useState, useMemo } from 'react';
-import { MessageSquare, Send, Search } from 'lucide-react';
+import { Send, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSuppliersPortal } from '../../context/SuppliersPortalContext';
 import { useMessageFilters } from './messages-tab/hooks/useMessageFilters';

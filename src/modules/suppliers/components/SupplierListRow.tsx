@@ -6,7 +6,7 @@
 
 'use client';
 
-import { Star, Phone, Mail, Building2, MoreVertical } from 'lucide-react';
+import { Star, Phone, Mail, MoreVertical } from 'lucide-react';
 import type { Supplier } from '@/types/supplier.types';
 import { SupplierStatus } from '@/types/supplier.types';
 

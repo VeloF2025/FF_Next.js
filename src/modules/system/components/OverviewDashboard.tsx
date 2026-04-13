@@ -15,7 +15,6 @@ import {
   Zap,
   AlertTriangle,
   Bell,
-  RefreshCw,
 } from 'lucide-react';
 import type { OverallStatus, ServiceHealth, ActivityEvent } from '../types/self-healing.types';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';

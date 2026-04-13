@@ -155,7 +155,7 @@ export function subscribeToProjects(callback: (projects: Project[]) => void): ()
   // Subscribe to all project changes
   const unsubscribe = socketIOAdapter.subscribeToAll(
     'project',
-    async (event: RealtimeEvent) => {
+    async (_event: RealtimeEvent) => {
       // Re-fetch the entire list on any change
       try {
         const projects = await getAllProjects();

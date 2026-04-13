@@ -20,7 +20,7 @@ import {
 } from './monitoring/components';
 
 export default function MonitoringDashboard() {
-  const { webVitals, errors, systemHealth, isLoading } = useMonitoringData();
+  const { webVitals, errors, systemHealth, isLoading: _isLoading } = useMonitoringData();
 
   return (
     <AppLayout>

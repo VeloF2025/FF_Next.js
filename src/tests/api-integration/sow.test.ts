@@ -149,7 +149,7 @@ describe('SOW Module API Integration Tests', () => {
     test('Handles database connection errors gracefully', async () => {
       try {
         // Simulate a complex query that might fail
-        const response = await api.post('/query', {
+        const _response = await api.post('/query', {
           query: 'SELECT * FROM non_existent_table'
         });
       } catch (error) {

@@ -351,7 +351,7 @@ describe('WorkflowEditor Component', () => {
     });
 
     it('should handle save button click', async () => {
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const _user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
       renderWithProvider('template-1');
 
       await waitFor(() => {

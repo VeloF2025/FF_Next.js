@@ -13,7 +13,7 @@ interface Props {
   projectName?: string;
 }
 
-const COLS_ORDER = [
+const _COLS_ORDER = [
   'zone_no','hld_pon','z_pon','olt_port','scope_poles','scope_drops',
   'pole_permission','poles_planted','cwc_poles_date','cwc_stringing_date',
   'ready_for_optical','cwc_qa','optical_splicing_date','optical_submitted_date',

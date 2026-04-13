@@ -148,7 +148,7 @@ export function SupplierForm() {
     }));
   };
 
-  const toggleCategory = (category: ProductCategory) => {
+  const _toggleCategory = (category: ProductCategory) => {
     setFormData(prev => ({
       ...prev,
       categories: prev.categories.includes(category)

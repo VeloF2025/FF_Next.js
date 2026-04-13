@@ -156,7 +156,7 @@ async function downloadRecording(url: string, destPath: string): Promise<number>
 export async function syncFirefliesToNeon(apiKey: string, sql: NeonQueryFunction<false, false>) {
   const transcripts = await fetchFirefliesTranscripts(apiKey);
 
-  let newRecordings = 0;
+  let _newRecordings = 0;
   for (const transcript of transcripts) {
     const merged = mergeParticipants(transcript);
 
@@ -215,7 +215,7 @@ export async function syncFirefliesToNeon(apiKey: string, sql: NeonQueryFunction
             SET recording_path = ${filePath}, recording_size_bytes = ${sizeBytes}, updated_at = NOW()
             WHERE id = ${row.id}
           `;
-          newRecordings++;
+          _newRecordings++;
         }
       } catch {
         // Non-fatal — recording download failure shouldn't block sync

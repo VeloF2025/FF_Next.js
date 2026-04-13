@@ -333,7 +333,7 @@ test.describe('Workflow Editor Drag and Drop', () => {
       // Create step node first
       await page.click('[data-testid="component-palette-toggle"]');
       const stepComponent = page.locator('[data-testid="palette-step"]');
-      const taskComponent = page.locator('[data-testid="palette-task"]');
+      const _taskComponent = page.locator('[data-testid="palette-task"]');
       const canvas = page.locator('[data-testid="editor-canvas"]');
       
       await stepComponent.dragTo(canvas, {

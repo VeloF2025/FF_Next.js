@@ -52,7 +52,7 @@ export function ProjectTabs({ activeTab, onTabChange, badges = {} }: ProjectTabs
   );
 
   // Generate grid columns class based on number of tabs
-  const gridColsClass = `grid-cols-${groups.length}`;
+  const _gridColsClass = `grid-cols-${groups.length}`;
 
   // Arrow key navigation for primary tabs
   const handlePrimaryTabKeyDown = useCallback(

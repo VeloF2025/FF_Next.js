@@ -91,7 +91,7 @@ export function ProjectWorkflowChecklist({ projectId, projectStatus }: ProjectWo
     );
   }
 
-  const { requirements, summary } = data;
+  const { requirements, summary: _summary } = data;
 
   // Group requirements by stage
   const stages = ['pipeline', 'planning', 'execution', 'closure'];

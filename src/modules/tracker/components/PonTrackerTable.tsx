@@ -88,7 +88,7 @@ export function PonTrackerTable({ rows, editMode, onChange, filters, onFiltersCh
           </tr>
         </thead>
         <tbody>
-          {visibleRows.map((row, visIdx) => {
+          {visibleRows.map((row, _visIdx) => {
             const idx = rows.indexOf(row);
             return (
             <tr

@@ -17,7 +17,6 @@ import {
   Cloud,
   HardDrive,
   Activity,
-  Clock,
   RotateCcw,
   Search,
   Settings,

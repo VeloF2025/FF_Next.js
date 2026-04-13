@@ -1,5 +1,5 @@
 // Quick test runner to validate workflow test setup
-import { execSync } from 'child_process';
+import { execSync as _execSync } from 'child_process';
 import { log } from '@/lib/logger';
 
 export class QuickWorkflowTestValidator {
