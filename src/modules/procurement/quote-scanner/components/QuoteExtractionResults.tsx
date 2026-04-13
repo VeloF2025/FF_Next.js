@@ -21,8 +21,6 @@ import {
 import { Button } from '@/components/ui/button';
 import type {
   QuoteExtractionResult,
-  ExtractedLineItem,
-  EditableExtractionItem,
 } from '../types/extraction.types';
 
 // ============================================================================

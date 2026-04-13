@@ -348,16 +348,3 @@ const ErrorView: React.FC<{ message: string; onRetry: () => void; onBack: () => 
     <Button variant="secondary" onClick={onBack}><ArrowLeft style={{ width: 16, height: 16 }} /> Back</Button>
   </div>
 );
-
-const backBtn: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 6,
-  padding: '10px 16px', border: '1px solid var(--ff-border-light)',
-  borderRadius: 8, cursor: 'pointer', background: 'transparent',
-  color: 'var(--ff-text-secondary)', fontSize: 14,
-};
-
-const primaryBtn = (bg: string): React.CSSProperties => ({
-  display: 'flex', alignItems: 'center', gap: 8,
-  padding: '10px 20px', background: bg, color: '#fff',
-  border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 14,
-});

@@ -16,14 +16,12 @@ import {
   ChevronDown,
   CheckCircle,
   XCircle,
-  ArrowRight,
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import type {
   QuoteExtractionResult,
   QuoteMatchingResult,
   ItemMatchResult,
-  MatchReason,
 } from '../types/extraction.types';
 
 // ============================================================================

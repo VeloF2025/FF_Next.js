@@ -242,23 +242,3 @@ const ErrorBanner: React.FC<{ message: string; onRetry: () => void }> = ({ messa
     </Button>
   </div>
 );
-
-const backBtnStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 6,
-  padding: '10px 16px',
-  border: '1px solid var(--ff-border-light)',
-  borderRadius: 8, cursor: 'pointer',
-  background: 'transparent',
-  color: 'var(--ff-text-secondary)',
-  fontSize: 14,
-};
-
-const primaryBtnStyle = (bg?: string): React.CSSProperties => ({
-  display: 'flex', alignItems: 'center', gap: 8,
-  padding: '10px 20px',
-  background: bg ?? 'var(--ff-bg-tertiary)',
-  color: bg ? '#fff' : 'var(--ff-text-tertiary)',
-  border: 'none', borderRadius: 8,
-  cursor: bg ? 'pointer' : 'not-allowed',
-  fontWeight: 600, fontSize: 14,
-});

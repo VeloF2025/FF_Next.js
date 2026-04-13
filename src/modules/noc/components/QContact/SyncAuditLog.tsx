@@ -400,7 +400,7 @@ export function SyncAuditLog({
   onPageChange,
   currentPage = 1,
   pageSize = 50,
-  compact = false,
+  compact: _compact = false,
 }: SyncAuditLogProps) {
   const [filters, setFilters] = useState<AuditLogFilters>({});
 
@@ -414,7 +414,7 @@ export function SyncAuditLog({
     isLoading: internalIsLoading,
     isError,
     error: internalError,
-    refetch,
+    refetch: _refetch,
   } = useQContactSyncLog(undefined, {
     // Only fetch if no external data is provided
     enabled: externalData === undefined,

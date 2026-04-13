@@ -28,7 +28,7 @@ import type {
   NotificationListResponse,
   NotificationVariables,
 } from '../types/whatsapp';
-import { RecipientType, NotificationStatus, NotificationUseCase } from '../types/whatsapp';
+import { NotificationStatus } from '../types/whatsapp';
 
 // 🟢 WORKING: Logger instance for WhatsApp service
 const logger = createLogger('whatsappService');

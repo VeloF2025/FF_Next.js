@@ -58,8 +58,8 @@ export function AssignmentPanel({
   // Local state for selection (before saving)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(currentUserId);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(currentTeamId);
-  const [selectedUserName, setSelectedUserName] = useState<string | null>(currentUserName);
-  const [selectedTeamName, setSelectedTeamName] = useState<string | null>(currentTeamName);
+  const [_selectedUserName, setSelectedUserName] = useState<string | null>(currentUserName);
+  const [_selectedTeamName, setSelectedTeamName] = useState<string | null>(currentTeamName);
   const [isEditing, setIsEditing] = useState(false);
 
   // Check if there are unsaved changes

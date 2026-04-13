@@ -22,7 +22,7 @@ import {
   hashPromptContent,
 } from '@/services/vlmLearningService';
 import type { RecordCorrectionInput } from '@/types/vlm-learning';
-import { VLM_CHAT_ENDPOINT, VLM_EXTRACTION_MODEL, VLM_TIMEOUT_DOCUMENT, VLM_MAX_TOKENS_DOCUMENT, VLM_TEMPERATURE } from '@/lib/vlm';
+import { VLM_CHAT_ENDPOINT, VLM_EXTRACTION_MODEL, VLM_TIMEOUT_DOCUMENT, VLM_TEMPERATURE } from '@/lib/vlm';
 
 // ============================================================================
 // CONFIGURATION
@@ -401,7 +401,7 @@ function normalizeConfidence(value: unknown): number {
   return 0.7; // Default confidence
 }
 
-function createEmptyResult(note: string): POExtractionResult {
+function createEmptyResult(_note: string): POExtractionResult {
   return {
     poNumber: null,
     reference: null,
