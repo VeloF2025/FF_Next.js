@@ -8,7 +8,7 @@ interface LineItemCardProps {
   index: number;
   readOnly: boolean;
   errors: Record<string, string>;
-  onUpdate: (index: number, field: keyof QuoteLineItem, value: any) => void;
+  onUpdate: (index: number, field: keyof QuoteLineItem, value: string | number | undefined) => void;
   onRemove?: (index: number) => void;
 }
 

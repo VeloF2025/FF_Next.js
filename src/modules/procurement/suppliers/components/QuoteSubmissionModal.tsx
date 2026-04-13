@@ -99,7 +99,7 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
     }
   }, [rfq, formData.lineItems?.length]);
 
-  const updateLineItem = (index: number, field: keyof QuoteLineItem, value: any) => {
+  const updateLineItem = (index: number, field: keyof QuoteLineItem, value: string | number | undefined) => {
     const newLineItems = [...(formData.lineItems || [])];
     newLineItems[index] = { ...newLineItems[index], [field]: value };
     

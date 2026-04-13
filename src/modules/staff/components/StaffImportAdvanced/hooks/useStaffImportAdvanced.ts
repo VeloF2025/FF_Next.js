@@ -91,13 +91,13 @@ export function useStaffImportAdvanced() {
         notificationService.warning(`Import completed with ${result.failed} errors. Check details below.`);
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error('Import failed:', { data: error }, 'useStaffImportAdvanced');
       setState(prev => ({
         ...prev,
         progress: { ...prev.progress, status: 'error' }
       }));
-      notificationService.operationError('import', error.message || 'Unknown error', 'staff data');
+      notificationService.operationError('import', error instanceof Error ? error.message : 'Unknown error', 'staff data');
     } finally {
       setState(prev => ({ ...prev, importing: false }));
     }

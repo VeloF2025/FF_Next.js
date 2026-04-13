@@ -53,7 +53,7 @@ export async function getEvaluationByDR(drNumber: string): Promise<EvaluationRes
       return null;
     }
 
-    const row = rows[0];
+    const row = rows[0] as EvaluationDbRow;
     return transformDbRowToEvaluation(row);
   } catch (error) {
     log.error(`Error fetching evaluation for DR ${drNumber}`, { error }, 'fotoDbService');
@@ -117,7 +117,7 @@ export async function getAllEvaluations(filters?: {
       ORDER BY evaluation_date DESC
     `;
 
-    return rows.map(transformDbRowToEvaluation);
+    return (rows as EvaluationDbRow[]).map(transformDbRowToEvaluation);
   } catch (error) {
     log.error('Error fetching evaluations', { error }, 'fotoDbService');
     throw new Error('Failed to fetch evaluations from database');
@@ -243,10 +243,23 @@ export async function getDropSubmitterPhone(drNumber: string): Promise<string | 
 
 // ==================== HELPER FUNCTIONS ====================
 
+interface EvaluationDbRow {
+  dr_number: string;
+  overall_status: 'PASS' | 'FAIL';
+  average_score: string;
+  total_steps: number;
+  passed_steps: number;
+  step_results: unknown[] | string;
+  markdown_report?: string;
+  feedback_sent: boolean;
+  feedback_sent_at?: string | null;
+  evaluation_date?: string | null;
+}
+
 /**
  * Transform database row to EvaluationResult type
  */
-function transformDbRowToEvaluation(row: any): EvaluationResult {
+function transformDbRowToEvaluation(row: EvaluationDbRow): EvaluationResult {
   return {
     dr_number: row.dr_number,
     overall_status: row.overall_status,
@@ -255,7 +268,7 @@ function transformDbRowToEvaluation(row: any): EvaluationResult {
     passed_steps: row.passed_steps,
     step_results: Array.isArray(row.step_results)
       ? row.step_results
-      : JSON.parse(row.step_results || '[]'),
+      : JSON.parse(typeof row.step_results === 'string' ? row.step_results : '[]'),
     markdown_report: row.markdown_report || undefined,
     feedback_sent: row.feedback_sent,
     feedback_sent_at: row.feedback_sent_at ? new Date(row.feedback_sent_at) : undefined,

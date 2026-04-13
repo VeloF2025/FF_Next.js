@@ -131,7 +131,7 @@ async function triggerBuild(
 
     return result;
   } catch (error: unknown) {
-    log.error(`Failed to trigger ${stageLabel}:`, error, 'HarnessTrigger');
+    log.error(`Failed to trigger ${stageLabel}:`, { error }, 'HarnessTrigger');
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

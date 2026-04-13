@@ -252,7 +252,7 @@ export async function listSyncLogs(
   try {
     // Build WHERE clause dynamically
     const conditions: string[] = [];
-    const params: (string | Date)[] = [];
+    const params: unknown[] = [];
     let paramIndex = 1;
 
     if (ticket_id) {

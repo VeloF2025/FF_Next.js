@@ -260,7 +260,7 @@ export async function updateVerificationStep(
 
   // 🟢 WORKING: Build dynamic UPDATE query
   const updates: string[] = [];
-  const values: any[] = [];
+  const values: (string | number | boolean | null)[] = [];
   let paramIndex = 1;
 
   if (payload.is_complete !== undefined) {

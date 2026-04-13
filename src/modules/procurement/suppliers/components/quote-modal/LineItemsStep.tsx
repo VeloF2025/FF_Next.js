@@ -10,7 +10,7 @@ interface LineItemsStepProps {
   errors: Record<string, string>;
   rfq: RFQInvitation;
   totalAmount: number;
-  onUpdateItem: (index: number, field: keyof QuoteLineItem, value: any) => void;
+  onUpdateItem: (index: number, field: keyof QuoteLineItem, value: string | number | undefined) => void;
   onAddItem: () => void;
   onRemoveItem: (index: number) => void;
 }

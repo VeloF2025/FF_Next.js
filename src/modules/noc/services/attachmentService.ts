@@ -362,7 +362,7 @@ export async function listAttachmentsForTicket(
 
     // Build WHERE clause
     const whereClauses = ['ticket_id = $1'];
-    const params: (string | string[])[] = [ticketId];
+    const params: unknown[] = [ticketId];
     let paramIndex = 2;
 
     if (filters?.file_type) {

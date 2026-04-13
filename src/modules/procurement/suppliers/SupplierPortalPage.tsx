@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { RFQInvitation, SupplierPortalTab } from './types/portal.types';
 import { QuoteSubmissionModal } from './components/quote-modal';
+import type { QuoteSubmission } from './components/quote-modal/types';
 import { log } from '@/lib/logger';
 import { useSupplierAuth } from './hooks/useSupplierAuth';
 import {
@@ -48,7 +49,7 @@ const SupplierPortalPage: React.FC<SupplierPortalProps> = () => {
     setShowQuoteModal(true);
   };
 
-  const handleSubmitQuote = async (quoteData: any) => {
+  const handleSubmitQuote = async (quoteData: QuoteSubmission) => {
     try {
       // In production, this would submit the quote via the API
 

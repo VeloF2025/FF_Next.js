@@ -11,7 +11,7 @@ interface ProjectSummary {
 
 interface ProjectSummaryCardsProps {
   summary?: ProjectSummary;
-  projects?: { status?: string; budget_allocated?: number; budget?: number; priority?: string }[];
+  projects?: { status?: string; budget?: number; budget_allocated?: number; priority?: string }[];
 }
 
 export function ProjectSummaryCards({ summary, projects = [] }: ProjectSummaryCardsProps) {

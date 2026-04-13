@@ -75,7 +75,7 @@ export const POFiltersPanel: React.FC<POFiltersPanelProps> = ({
     setLocalFilters(filters);
   }, [filters]);
 
-  const updateFilter = (key: keyof POFilters, value: POFilters[keyof POFilters]) => {
+  const updateFilter = (key: keyof POFilters, value: unknown) => {
     setLocalFilters(prev => ({
       ...prev,
       [key]: value

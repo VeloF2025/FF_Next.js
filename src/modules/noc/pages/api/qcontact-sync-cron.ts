@@ -98,7 +98,7 @@ export default async function handler(
       error_count: result.sync_result?.errors?.length || 0,
       message: `QContact sync ${result.status}: ${result.sync_result?.total_success || 0} successful, ${result.sync_result?.total_failed || 0} failed`,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     logger.error('QContact sync cron job failed', {

@@ -326,7 +326,7 @@ export async function getSyncJobHistory(
   logger.debug('Fetching sync job history', options);
 
   const conditions: string[] = [];
-  const values: any[] = [];
+  const values: unknown[] = [];
   let paramCounter = 1;
 
   // Filter by status

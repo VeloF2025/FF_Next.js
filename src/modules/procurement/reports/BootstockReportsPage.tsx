@@ -358,7 +358,7 @@ function ProjectBreakdown({ type }: { type: 'ont' | 'ups' }) {
             };
           })
         );
-        setData(results.filter(Boolean) as any[]);
+        setData(results.filter(Boolean) as Array<{ project: string; total: number; available: number; waMatched: number; oesMatched: number }>);
       } finally {
         setLoading(false);
       }
