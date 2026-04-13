@@ -42,7 +42,7 @@ export function CAPAList({ projectId, contractorId, onSelectCAPA }: CAPAListProp
   if (statusFilter) params.set('status', statusFilter);
   params.set('limit', '100');
 
-  const { data, error, isLoading } = useSWR(
+  const { data, isLoading } = useSWR(
     `/api/health-safety/capa?${params}`,
     fetcher,
     { refreshInterval: 30000, revalidateOnFocus: true, errorRetryCount: 3 }

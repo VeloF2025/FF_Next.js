@@ -291,19 +291,6 @@ export function DailyCheckoutModal({
     [scannedSerials]
   );
 
-  // Group serials by item
-  const serialsByItem = useMemo(() => {
-    const grouped = new Map<string, CheckoutSerial[]>();
-    for (const serial of validSerials) {
-      const itemId = serial.stockItemId || 'unknown';
-      if (!grouped.has(itemId)) {
-        grouped.set(itemId, []);
-      }
-      grouped.get(itemId)!.push(serial);
-    }
-    return grouped;
-  }, [validSerials]);
-
   // Add serial to list
   const addSerial = useCallback(
     async (serialNumber: string) => {

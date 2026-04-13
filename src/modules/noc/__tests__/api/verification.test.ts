@@ -11,7 +11,7 @@
  * Implementation comes AFTER tests pass (green phase)
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import * as verificationService from '../../services/verificationService';
 import type { VerificationStep, VerificationProgress } from '../../types/verification';

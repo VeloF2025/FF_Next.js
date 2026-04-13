@@ -13,7 +13,6 @@ import type {
 } from '../types/scoring.types';
 import { DEFAULT_SCORING_CONFIG } from '../types/scoring.types';
 import type { RAGStatus } from '../types/audit.types';
-import type { ChecklistCategory } from '../types/checklist.types';
 import { getRAGStatus } from '../types/audit.types';
 
 /**

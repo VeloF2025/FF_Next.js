@@ -5,8 +5,6 @@
  * These types are used alongside the hs_ticket_details table.
  */
 
-import type { RAGStatus } from './audit.types';
-
 // H&S-specific incident types
 export type HSIncidentType =
   | 'injury'

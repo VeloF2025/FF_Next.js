@@ -39,7 +39,7 @@ interface UseModuleTabsReturn {
 
 export function useModuleTabs({
   config,
-  tabBadges = {},
+  tabBadges: _tabBadges = {},
 }: UseModuleTabsOptions): UseModuleTabsReturn {
   const router = useRouter();
   const pathname = usePathname();

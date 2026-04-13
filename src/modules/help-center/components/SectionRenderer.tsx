@@ -16,7 +16,7 @@ interface SectionRendererProps {
 
 export const SectionRenderer: React.FC<SectionRendererProps> = ({
   content,
-  sectionId,
+  sectionId: _sectionId,
   className
 }) => {
   // Parse markdown content into JSX elements
