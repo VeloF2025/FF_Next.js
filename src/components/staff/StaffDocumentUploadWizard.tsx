@@ -789,7 +789,7 @@ export function StaffDocumentUploadWizard({
                 </div>
                 {warningMismatches.map((m, i) => (
                   <div key={i} className="ml-7 text-sm text-amber-300 mb-1">
-                    <strong>{m.label}:</strong> Document shows "{m.documentValue || 'N/A'}", record has "{m.recordValue || 'N/A'}"
+                    <strong>{m.label}:</strong> Document shows &quot;{m.documentValue || 'N/A'}&quot;, record has &quot;{m.recordValue || 'N/A'}&quot;
                   </div>
                 ))}
               </div>

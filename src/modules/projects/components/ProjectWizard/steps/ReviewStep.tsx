@@ -83,7 +83,7 @@ export function ReviewStep({
             </h3>
             <div className="mt-2 text-sm text-blue-300">
               <p>
-                Click "Create Project" to proceed. You can upload SOW documents and
+                Click &quot;Create Project&quot; to proceed. You can upload SOW documents and
                 make additional changes after the project is created.
               </p>
             </div>

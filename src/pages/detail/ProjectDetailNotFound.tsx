@@ -14,7 +14,7 @@ export function ProjectDetailNotFound({ onNavigateBack }: ProjectDetailNotFoundP
         <div className="text-red-500 text-6xl mb-4">⚠️</div>
         <h2 className="text-xl font-semibold text-foreground mb-2">Project not found</h2>
         <p className="text-muted-foreground mb-4">
-          The project you're looking for doesn't exist or has been deleted.
+          The project you&apos;re looking for doesn&apos;t exist or has been deleted.
         </p>
         <button
           onClick={onNavigateBack}

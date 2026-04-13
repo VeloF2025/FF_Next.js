@@ -264,7 +264,7 @@ export function ValidationPanel() {
       <div className="p-4 border-t border-border">
         <div className="text-xs text-muted-foreground space-y-1">
           <div>• Validation runs automatically as you edit</div>
-          <div>• Click "Jump to" to navigate to problematic items</div>
+          <div>• Click &quot;Jump to&quot; to navigate to problematic items</div>
           <div>• Fix all errors before saving your workflow</div>
         </div>
       </div>

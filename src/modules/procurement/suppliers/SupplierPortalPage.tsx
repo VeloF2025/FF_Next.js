@@ -114,7 +114,7 @@ const SupplierPortalPage: React.FC<SupplierPortalProps> = () => {
                 {loading ? 'Sending...' : 'Send Magic Link'}
               </VelocityButton>
               <p className="text-sm text-muted-foreground text-center">
-                We'll send you a secure login link via email
+                We&apos;ll send you a secure login link via email
               </p>
             </div>
           ) : (

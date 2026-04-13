@@ -67,7 +67,7 @@ export function GpsCoordinatesInput({
           </button>
         </div>
         <p className="mt-1 text-xs text-[var(--ff-text-secondary)]">
-          Supports: decimal (-34.031, 18.463), DMS (33°55'19" S, 18°25'23" E), and more
+          Supports: decimal (-34.031, 18.463), DMS (33°55&apos;19&quot; S, 18°25&apos;23&quot; E), and more
         </p>
       </div>
 
