@@ -36,8 +36,7 @@ export async function processImportRows(
   // Sort rows to process managers first
   const sortedRows = sortByManagerHierarchy(rows, managerNames);
 
-  for (let i = 0; i < sortedRows.length; i++) {
-    const row = sortedRows[i];
+  for (const row of sortedRows) {
     const originalIndex = rows.indexOf(row);
     const rowNumber = originalIndex + 2; // +2 because row 1 is headers, and arrays are 0-indexed
     
@@ -113,9 +112,9 @@ export async function processImportRows(
       }
       
       // Ensure employeeId is never null or empty
-      const employeeId = row.employeeId && row.employeeId.trim() !== '' 
-        ? row.employeeId.trim() 
-        : `AUTO_${Date.now()}_${i}`;
+      const employeeId = row.employeeId && row.employeeId.trim() !== ''
+        ? row.employeeId.trim()
+        : `AUTO_${Date.now()}_${originalIndex}`;
 
       // COMPREHENSIVE DEBUG LOGGING - IMPORT SERVICE TRACING
 
