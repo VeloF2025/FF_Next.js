@@ -43,3 +43,11 @@ describe('createImpersonationSession export', () => {
     expect(typeof createImpersonationSession).toBe('function');
   });
 });
+
+describe('POST /api/admin/impersonate — module exists', () => {
+  it('exports a default handler function', async () => {
+    // Dynamic import to avoid DB connection at module load
+    const mod = await import('../../../pages/api/admin/impersonate');
+    expect(typeof mod.default).toBe('function');
+  });
+});
