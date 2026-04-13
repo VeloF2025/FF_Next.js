@@ -3,7 +3,7 @@
  * Color-coded actions: create=green, update=blue, approve=green, reject=red, override=orange, reverse=red
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { ChevronDown, ChevronRight, Filter, RefreshCw } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useAuditLogs } from '../hooks/useAuditLogs';

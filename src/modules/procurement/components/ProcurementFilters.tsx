@@ -17,13 +17,6 @@ import type { Project } from '@/types/project.types';
 // Date range presets
 type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all';
 
-interface DateRange {
-  preset: DatePreset;
-  label: string;
-  from?: Date;
-  to?: Date;
-}
-
 interface ProcurementFiltersProps {
   selectedProject?: Project;
   onProjectChange: (project: Project | undefined) => void;

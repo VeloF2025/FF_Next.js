@@ -18,7 +18,7 @@ import { query, queryOne } from '../utils/db';
 import { syncFiberTimeInboundTickets } from './qcontactSyncInbound';
 import { pushStatusUpdate } from './qcontactSyncOutbound';
 import { TicketStatus } from '../types/ticket';
-import { mapFibreFlowStatusToQContact } from '../constants/qcontactStatusMapping';
+
 import type {
   FullSyncRequest,
   FullSyncResult,

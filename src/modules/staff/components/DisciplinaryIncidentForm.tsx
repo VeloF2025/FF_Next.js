@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X, Calendar, FileText, Upload, Trash2 } from 'lucide-react';
 import { formatDateISO } from '@/utils/dateFormat';
 import type { DisciplinaryIncident } from '@/types/staff';

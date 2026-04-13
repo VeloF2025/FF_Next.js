@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, MessageCircle, Send, Loader2, RefreshCw } from 'lucide-react';
+import { X, MessageCircle, Send, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'react-hot-toast';
 import { MancoActionItem, MancoActionItemComment, MancoMeetingContext } from '@/types/manco-action-items.types';
@@ -99,7 +99,7 @@ export function MancoDetailPane({
       });
 
       if (!res.ok) {
-        const json = await res.json().catch(() => ({})) as { message?: string };
+        const json = await res.json().catch(() => ({ message: undefined })) as { message?: string };
         toast.error(json.message ?? 'Failed to update status');
         log.error('Failed to update status', { itemId: item.id, status: res.status });
         return;
@@ -127,7 +127,7 @@ export function MancoDetailPane({
       });
 
       if (!res.ok) {
-        const json = await res.json().catch(() => ({})) as { message?: string };
+        const json = await res.json().catch(() => ({ message: undefined })) as { message?: string };
         toast.error(json.message ?? 'Failed to update ongoing status');
         log.error('Failed to toggle ongoing', { itemId: item.id, status: res.status });
         return;
@@ -159,7 +159,7 @@ export function MancoDetailPane({
       });
 
       if (!res.ok) {
-        const json = await res.json().catch(() => ({})) as { message?: string };
+        const json = await res.json().catch(() => ({ message: undefined })) as { message?: string };
         toast.error(json.message ?? 'Failed to add comment');
         log.error('Failed to add comment', { itemId: item.id, status: res.status });
         return;

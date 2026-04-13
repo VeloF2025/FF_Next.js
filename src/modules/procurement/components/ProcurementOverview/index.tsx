@@ -20,7 +20,6 @@ import {
   ArrowRight,
   TrendingUp,
   Clock,
-  AlertTriangle,
   Package,
   Wallet,
 } from 'lucide-react';

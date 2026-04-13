@@ -20,7 +20,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   BarChart3,
-  TrendingUp,
   Target,
   CheckCircle,
   XCircle,
