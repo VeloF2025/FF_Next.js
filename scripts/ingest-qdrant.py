@@ -282,7 +282,7 @@ def embed_texts(texts):
                 with urllib.request.urlopen(req, timeout=60) as resp:
                     data = json.loads(resp.read())
                 break
-            except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as e:
+            except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, ConnectionResetError, OSError) as e:
                 wait = 2 ** attempt
                 print(f"    Embed error (attempt {attempt+1}/5): {e} — retrying in {wait}s")
                 time.sleep(wait)
