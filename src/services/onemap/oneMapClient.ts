@@ -477,7 +477,7 @@ export class OneMapClient {
 
       const records = await this.getAllInstallations(site, {
         maxPages: options.maxPagesPerSite,
-        onProgress: (page, totalPages, count) => {
+        onProgress: (page, totalPages, _count) => {
           if (options.onSiteProgress) {
             const progress = Math.round((page / totalPages) * 100);
             options.onSiteProgress(site, progress);
@@ -601,7 +601,7 @@ export class OneMapClient {
    * Parse pole label to extract zone info.
    * Examples: "MAM.P.C334" → zone C = zone 3, "LAW.P.A453" → zone A = zone 1
    */
-  static parsePoleLabel(pole: string, site: string): { zone_no: number | null; pon_no: number | null } {
+  static parsePoleLabel(pole: string, _site: string): { zone_no: number | null; pon_no: number | null } {
     if (!pole) return { zone_no: null, pon_no: null };
 
     // Pattern: SITE.P.XNNN where X is zone letter, NNN is number

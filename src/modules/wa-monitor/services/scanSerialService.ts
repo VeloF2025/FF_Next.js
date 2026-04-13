@@ -65,7 +65,7 @@ function getDbConnection(): NeonQueryFunction<false, false> {
  */
 export async function validateSerial(
   serialNumber: string,
-  technicianId?: string
+  _technicianId?: string
 ): Promise<ValidateSerialResult> {
   const sql = getDbConnection();
 
@@ -184,17 +184,6 @@ export async function recordScan(
   `;
 
   // 3. Update qa_photo_reviews with serial and consumption link
-  const updateFields =
-    request.stepNumber === 8
-      ? {
-          ont_serial_scanned: request.serialNumber,
-          ont_consumption_id: consumptionId,
-        }
-      : {
-          ups_serial_scanned: request.serialNumber,
-          ups_consumption_id: consumptionId,
-        };
-
   if (request.stepNumber === 8) {
     await sql`
       UPDATE qa_photo_reviews

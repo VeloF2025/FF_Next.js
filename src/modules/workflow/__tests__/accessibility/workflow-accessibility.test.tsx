@@ -174,14 +174,14 @@ describe('Workflow System Accessibility', () => {
       // Check that all interactive elements are reachable
       const interactiveElements = screen.getAllByRole('button');
       
-      for (const element of interactiveElements.slice(0, 5)) { // Test first 5
+      for (const _element of interactiveElements.slice(0, 5)) { // Test first 5
         await user.tab();
         // Should be able to reach each element
       }
     });
 
     test('should have proper focus management', async () => {
-      const user = userEvent.setup();
+      const _user = userEvent.setup();
       renderWorkflowEditor();
       
       await screen.findByRole('main');

@@ -26,7 +26,6 @@ import {
   classifyDocument,
   getDocumentConfig,
   validateField,
-  validateSAID,
   extractDOBFromSAID,
   extractGenderFromSAID,
 } from '@/config/ocrFieldMappings';
@@ -254,7 +253,7 @@ export class OcrService {
    */
   processTextLocally(
     text: string,
-    entityType: OcrEntityType
+    _entityType: OcrEntityType
   ): { classification: DocumentClassification | null; extractedFields: ExtractedFields } {
     // Classify the document
     const classification = classifyDocument(text);

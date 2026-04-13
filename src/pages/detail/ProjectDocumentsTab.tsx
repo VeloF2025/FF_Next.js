@@ -22,7 +22,6 @@ import {
   FileSpreadsheet,
   Trash2,
   Download,
-  Database,
   Plus,
   FolderOpen,
 } from 'lucide-react';
@@ -204,9 +203,6 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
 
   const bssDoc = getActiveDocument('bss');
   const mssDoc = getActiveDocument('mss');
-
-  // Client POs with source documents
-  const posWithDocs = clientPOs.filter((po) => po.sourceDocumentUrl);
 
   if (loading) {
     return (
