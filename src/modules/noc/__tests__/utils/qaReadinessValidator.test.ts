@@ -8,7 +8,6 @@
 
 import { describe, it, expect } from 'vitest';
 import { validateQAReadiness, type QAReadinessValidationInput } from '../../utils/qaReadinessValidator';
-import type { QAReadinessFailedCheck } from '../../types/verification';
 
 describe('QA Readiness Validator (TDD)', () => {
   /**

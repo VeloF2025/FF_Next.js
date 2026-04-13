@@ -103,7 +103,7 @@ describe('Snapshot Generator (TDD)', () => {
   /**
    * Helper to create mock verification steps
    */
-  const createMockVerificationSteps = () => [
+  const _createMockVerificationSteps = () => [
     {
       id: 'step-uuid-001',
       ticket_id: 'ticket-uuid-001',

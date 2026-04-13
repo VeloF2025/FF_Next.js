@@ -20,7 +20,6 @@ import React, { useState } from 'react';
 import {
   Activity,
   AlertTriangle,
-  CheckCircle2,
   Clock,
   RefreshCw,
   TrendingUp,

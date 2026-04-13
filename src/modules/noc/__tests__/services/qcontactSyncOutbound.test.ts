@@ -753,22 +753,7 @@ describe('QContact Outbound Sync Service', () => {
         updateTicket: mockUpdateTicket,
       } as unknown as QContactClient);
 
-      // Mock: Create sync log with specific structure
-      const logSql = `
-    INSERT INTO maintenance_qcontact_sync_log (
-      ticket_id,
-      qcontact_ticket_id,
-      sync_direction,
-      sync_type,
-      request_payload,
-      response_payload,
-      status,
-      error_message
-    ) VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8
-    )
-    RETURNING id
-  `;
+      // Mock: Create sync log
       vi.mocked(queryOne).mockResolvedValueOnce({ id: 'log-123' });
 
       await pushStatusUpdate(ticketId, TicketStatus.IN_PROGRESS);

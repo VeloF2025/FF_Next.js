@@ -22,7 +22,7 @@ import {
   calculateSyncSuccessRate,
 } from '../../services/qcontactSyncOrchestrator';
 import type { FullSyncRequest } from '../../types/qcontact';
-import { SyncDirection, SyncStatus } from '../../types/qcontact';
+import { SyncDirection } from '../../types/qcontact';
 
 // Mock dependencies
 vi.mock('../../services/qcontactSyncInbound', () => ({
