@@ -81,7 +81,7 @@ function mapApiUser(apiUser: {
   // Build display name from firstName/lastName or fall back to name or email
   const displayName = apiUser.firstName && apiUser.lastName
     ? `${apiUser.firstName} ${apiUser.lastName}`
-    : apiUser.name || apiUser.email.split('@')[0];
+    : apiUser.name ?? apiUser.email;
 
   const user: User = {
     id: apiUser.id,
