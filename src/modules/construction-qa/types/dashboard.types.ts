@@ -5,7 +5,7 @@
  * API-aligned: each interface matches a specific endpoint response shape.
  */
 
-import type { Discipline, WorkflowStatus } from './construction.types';
+import type { Discipline, SpSyncStatus, WorkflowStatus } from './construction.types';
 
 // =============================================================================
 // Project Dashboard (project-dashboard.ts)
@@ -119,6 +119,9 @@ export interface PonFeatureRow {
   priority: string;
   assigned_to: string | null;
   updated_at: string;
+  sp_sync_status: SpSyncStatus | null;
+  sp_synced_at: string | null;
+  sp_folder_url: string | null;
 }
 
 // =============================================================================

@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { ChevronLeft, ChevronRight, Bot, User } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Bot, User, Cloud, CloudOff, Loader2, CheckCircle2 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { log } from '@/lib/logger';
@@ -36,6 +36,49 @@ const STATUS_COLORS: Record<string, string> = {
   escalated: 'bg-purple-500/20 text-purple-400',
   unidentified: 'bg-gray-500/20 text-gray-400',
 };
+
+function SpSyncBadge({
+  status,
+  folderUrl,
+}: {
+  status: string | null;
+  folderUrl: string | null;
+}) {
+  if (!status) return null;
+
+  if (status === 'synced' && folderUrl) {
+    return (
+      <a
+        href={folderUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 text-green-400 hover:text-green-300"
+        title="View in SharePoint"
+        onClick={e => e.stopPropagation()}
+      >
+        <CheckCircle2 className="h-3.5 w-3.5" />
+      </a>
+    );
+  }
+
+  if (status === 'synced') {
+    return <span title="Synced to SharePoint"><CheckCircle2 className="h-3.5 w-3.5 text-green-400" /></span>;
+  }
+
+  if (status === 'pending') {
+    return <span title="SharePoint sync pending"><Cloud className="h-3.5 w-3.5 text-gray-400" /></span>;
+  }
+
+  if (status === 'syncing') {
+    return <span title="Syncing to SharePoint…"><Loader2 className="h-3.5 w-3.5 animate-spin text-blue-400" /></span>;
+  }
+
+  if (status === 'failed') {
+    return <span title="SharePoint sync failed"><CloudOff className="h-3.5 w-3.5 text-red-400" /></span>;
+  }
+
+  return null;
+}
 
 export function PonFeaturesPanel({ projectId, zoneNo, ponNo, highlightId, dateFrom, dateTo, parentDiscipline, approvalFilter }: PonFeaturesPanelProps) {
   const router = useRouter();
@@ -139,19 +182,20 @@ export function PonFeaturesPanel({ projectId, zoneNo, ponNo, highlightId, dateFr
             <th className="text-center px-4 py-2 text-xs font-medium text-gray-400 uppercase">AI</th>
             <th className="text-center px-4 py-2 text-xs font-medium text-gray-400 uppercase">Status</th>
             <th className="text-center px-4 py-2 text-xs font-medium text-gray-400 uppercase">Decision</th>
+            <th className="px-3 py-2 text-right text-xs font-medium text-gray-400">SP</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-[var(--border-color)]">
           {loading && features.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+              <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                 <LoadingSpinner size="sm" label="" className="mb-2" />
                 Loading...
               </td>
             </tr>
           ) : features.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-4 py-8 text-center text-gray-500 text-sm">
+              <td colSpan={7} className="px-4 py-8 text-center text-gray-500 text-sm">
                 No features in this PON.
               </td>
             </tr>
@@ -210,6 +254,12 @@ export function PonFeaturesPanel({ projectId, zoneNo, ponNo, highlightId, dateFr
                     ) : (
                       <span className="text-gray-500">—</span>
                     )}
+                  </td>
+                  <td className="px-3 py-2 text-right" onClick={e => e.stopPropagation()}>
+                    <SpSyncBadge
+                      status={f.sp_sync_status}
+                      folderUrl={f.sp_folder_url}
+                    />
                   </td>
                 </tr>
               );

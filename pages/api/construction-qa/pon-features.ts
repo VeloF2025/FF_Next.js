@@ -106,7 +106,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         r.qa_decision_by,
         r.priority,
         r.assigned_to,
-        r.updated_at
+        r.updated_at,
+        r.sp_sync_status,
+        r.sp_synced_at,
+        r.sp_folder_url
       FROM construction_qa_reviews r
       WHERE ${whereClause}
       ORDER BY r.feature_id

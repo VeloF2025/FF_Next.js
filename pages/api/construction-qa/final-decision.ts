@@ -53,9 +53,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.badRequest(res, 'Notes are required for FAIL and REWORK_NEEDED decisions');
     }
 
+    const spProjectId = process.env.SHAREPOINT_QA_PROJECT_ID;
+
     // Build the snapshot for rework tracking
     const currentReview = await sql`
-      SELECT workflow_status, photo_count, vlm_confidence, qa_decision, qa_notes
+      SELECT workflow_status, photo_count, vlm_confidence, qa_decision, qa_notes, project_id
       FROM construction_qa_reviews WHERE id = ${reviewId}::uuid LIMIT 1
     `;
 
@@ -86,6 +88,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           qa_notes = ${notes || null},
           rework_count = CASE WHEN ${decision} = 'REWORK_NEEDED' THEN rework_count + 1 ELSE rework_count END,
           resubmission_snapshots = COALESCE(resubmission_snapshots, '[]'::jsonb) || ${JSON.stringify(snapshot)}::jsonb,
+          sp_sync_status = CASE WHEN ${decision} = 'PASS' AND (${spProjectId ?? ''} = '' OR project_id::text = ${spProjectId ?? ''}) THEN 'pending' ELSE sp_sync_status END,
           updated_at = NOW()
       WHERE id = ${reviewId}::uuid
     `;
@@ -100,6 +103,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ${JSON.stringify({ decision, reason_codes: reasonCodes, notes })}::jsonb
       )
     `;
+
+    // Trigger SharePoint sync in the background for PASS decisions
+    if (decision === 'PASS') {
+      const reviewProjectId = String(row.project_id);
+      if (!spProjectId || reviewProjectId === spProjectId) {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app';
+        void fetch(`${baseUrl}/api/construction-qa/sp-sync`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            cookie: req.headers.cookie ?? '',
+          },
+          body: JSON.stringify({ reviewId }),
+        }).catch((err: Error) => {
+          log.warn('sp-sync fire-and-forget failed', { module: 'construction-qa', error: err.message });
+        });
+      }
+    }
 
     // Send WhatsApp feedback if requested
     let waSent = false;

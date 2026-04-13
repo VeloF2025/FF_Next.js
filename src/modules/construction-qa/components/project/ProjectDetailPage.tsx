@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowLeft, RefreshCw, Download, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Download, CheckCircle, XCircle, Cloud } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import type { DateFilter } from '@/modules/data-sync/types';
@@ -55,6 +55,8 @@ export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageP
   const [customTo, setCustomTo] = useState('');
   const [exporting, setExporting] = useState(false);
   const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>('');
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
 
   // Compute date range from filter preset or custom inputs
   const { dateFrom, dateTo } = useMemo(() => {
@@ -139,6 +141,32 @@ export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageP
     setSelectedPon({ zone: zoneNo, pon: ponNo });
     setHighlightId(undefined);
   };
+
+  const handleSpSync = useCallback(async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch('/api/construction-qa/sp-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+      const data = await res.json() as { data?: { queued: number; synced: number; failed: number } };
+      const r = data.data;
+      if (r) {
+        setSyncResult(
+          r.failed > 0
+            ? `${r.synced} synced, ${r.failed} failed`
+            : `Synced ${r.synced} reviews`,
+        );
+      }
+    } catch (err) {
+      setSyncResult('Sync failed — see logs');
+      log.error('sp-sync UI error', { error: (err as Error).message });
+    } finally {
+      setSyncing(false);
+    }
+  }, [projectId]);
 
   const handleExport = async () => {
     setExporting(true);
@@ -273,6 +301,18 @@ export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageP
           <Download className={`w-3.5 h-3.5 ${exporting ? 'animate-pulse' : ''}`} />
           Export
         </button>
+        <button
+          onClick={() => void handleSpSync()}
+          disabled={syncing}
+          className="flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          title="Sync approved reviews to SharePoint"
+        >
+          <Cloud className="h-3.5 w-3.5" />
+          {syncing ? 'Syncing…' : 'Sync to SharePoint'}
+        </button>
+        {syncResult && (
+          <span className="text-xs text-gray-400">{syncResult}</span>
+        )}
       </div>
 
       {/* Zone accordion */}

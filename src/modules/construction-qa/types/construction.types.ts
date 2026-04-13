@@ -49,6 +49,9 @@ export type PhotoSource = 'qfield' | 'sharepoint' | 'whatsapp' | 'upload';
  */
 export type QaDecision = 'PASS' | 'FAIL' | 'REWORK_NEEDED';
 
+/** SharePoint sync status for civil QA approved photos. */
+export type SpSyncStatus = 'pending' | 'syncing' | 'synced' | 'failed';
+
 /** Review queue priority for triage and assignment ordering. */
 export type Priority = 'low' | 'normal' | 'high' | 'urgent';
 
