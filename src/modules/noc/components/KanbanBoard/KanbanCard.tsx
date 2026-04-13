@@ -12,7 +12,7 @@ import { useRouter } from 'next/navigation';
 import { formatDisplayDateShort } from '@/utils/dateFormat';
 import type { Ticket } from '../../types/ticket';
 import { TicketPriority } from '../../types/ticket';
-import type { DatabaseStatus } from './KanbanBoard';
+
 import { getT1Label, getTicketCategoryLabel } from '../../constants/ticketCategories';
 
 /** Extended ticket shape returned by Kanban queries (extra DB columns not in base Ticket) */

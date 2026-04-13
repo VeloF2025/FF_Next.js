@@ -15,7 +15,7 @@
 'use client';
 
 import React, { useCallback, useState, useRef } from 'react';
-import { Upload, Camera, X, Image as ImageIcon, CheckCircle, AlertCircle, Maximize2 } from 'lucide-react';
+import { Upload, Camera, X, CheckCircle, AlertCircle, Maximize2 } from 'lucide-react';
 import { VelocityButton } from '@/components/ui/VelocityButton';
 import { cn } from '@/lib/utils';
 
@@ -122,7 +122,7 @@ export function PhotoUpload({
         clearInterval(progressInterval);
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
+          const errorData = await response.json().catch(() => ({ error: undefined }));
           throw new Error(errorData.error || `Upload failed: ${response.status}`);
         }
 

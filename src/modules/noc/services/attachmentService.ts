@@ -14,7 +14,6 @@ import { createLogger } from '@/lib/logger';
 import {
   TicketAttachment,
   CreateAttachmentPayload,
-  UpdateAttachmentPayload,
   FileUploadRequest,
   FileUploadResult,
   AttachmentFilters,

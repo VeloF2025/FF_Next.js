@@ -32,7 +32,7 @@ MODE="${1:---full}"
 START_TIME=$(date +%s)
 
 # --- Baselines (ratchet: lower these as you fix issues, never raise) ---
-MAX_LINT_WARNINGS=515
+MAX_LINT_WARNINGS=500
 MAX_LINT_ERRORS=13
 MAX_SILENT_CATCHES=84
 

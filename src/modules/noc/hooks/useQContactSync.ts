@@ -23,7 +23,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createLogger } from '@/lib/logger';
 import type {
-  QContactSyncLog,
   SyncStatusOverview,
   SyncLogFilters,
   SyncLogListResponse,

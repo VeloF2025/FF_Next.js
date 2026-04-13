@@ -7,7 +7,6 @@ import {
   Plus,
   Search,
   Filter,
-  Download,
   RefreshCw,
   Boxes,
   DollarSign,

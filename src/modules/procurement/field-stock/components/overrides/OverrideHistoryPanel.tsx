@@ -3,7 +3,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { RotateCcw, Filter } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import type { AuditLogListItem } from '@/types/procurement/audit.types';

@@ -16,7 +16,6 @@ import {
   FiberTimeCase,
 } from './fibertimeQContactClient';
 import {
-  mapQContactStatusToFibreFlow,
   getStatusAlignment,
 } from '../constants/qcontactStatusMapping';
 import { TicketStatus } from '../types/ticket';
