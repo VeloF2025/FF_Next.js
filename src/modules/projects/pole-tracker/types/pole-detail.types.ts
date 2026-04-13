@@ -2,6 +2,7 @@
  * Pole Detail Types
  * Type definitions for pole tracker detail component
  */
+import type React from 'react';
 
 import { InstallationPhase, PoleType } from '../types/pole-tracker.types';
 
@@ -60,7 +61,7 @@ export interface PoleDetail {
 export interface TabConfig {
   id: 'overview' | 'photos' | 'quality' | 'history';
   label: string;
-  icon: any;
+  icon: React.ElementType;
 }
 
 export interface StatConfig {
@@ -68,6 +69,6 @@ export interface StatConfig {
   subtitle: string;
   value: string | number;
   subValue: string;
-  icon: any;
+  icon: React.ElementType;
   color: string;
 }

@@ -28,7 +28,7 @@ import {
   AlertTriangle,
   Minus
 } from 'lucide-react';
-import { WorkflowAnalytics } from '../../types/workflow.types';
+import { WorkflowAnalytics, WorkflowTemplate } from '../../types/workflow.types';
 import { workflowTemplateService } from '../../services/WorkflowTemplateService';
 import { log } from '@/lib/logger';
 
@@ -42,8 +42,8 @@ interface ComparisonToolsProps {
 }
 
 interface TemplateComparison {
-  template1: any;
-  template2: any;
+  template1: WorkflowTemplate;
+  template2: WorkflowTemplate;
   comparison: {
     phaseCount: { template1: number; template2: number };
     avgStepsPerPhase: { template1: number; template2: number };

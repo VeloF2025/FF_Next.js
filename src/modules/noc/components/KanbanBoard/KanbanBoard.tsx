@@ -14,7 +14,7 @@
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import { DragDropContext, Droppable, type DropResult } from '@hello-pangea/dnd';
-import type { Ticket, TicketFilters } from '../../types/ticket';
+import type { Ticket, TicketFilters, TicketStatus } from '../../types/ticket';
 import { useTickets } from '../../hooks/useTickets';
 import { useTicketSummary } from '../../hooks/useTicketSummary';
 import { useUpdateTicket } from '../../hooks/useTicket';
@@ -165,10 +165,10 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
     try {
       await updateTicket.mutateAsync({
         id: ticketId,
-        payload: { status: newStatus as any },
+        payload: { status: newStatus as unknown as TicketStatus },
       });
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to update ticket status');
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to update ticket status');
       refetch();
     } finally {
       // Clear optimistic override — real data takes over from refetch/cache

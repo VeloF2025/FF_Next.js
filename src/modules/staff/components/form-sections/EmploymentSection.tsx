@@ -39,7 +39,7 @@ import {
 
 interface EmploymentSectionProps {
   formData: StaffFormData;
-  handleInputChange: (field: keyof StaffFormData, value: any) => void;
+  handleInputChange: (field: keyof StaffFormData, value: unknown) => void;
 }
 
 const inputClasses = "w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -260,7 +260,7 @@ function SAComplianceSection({
   handleInputChange,
 }: {
   formData: StaffFormData;
-  handleInputChange: (field: keyof StaffFormData, value: any) => void;
+  handleInputChange: (field: keyof StaffFormData, value: unknown) => void;
 }) {
   const contractType = (formData.saContractType || formData.contractType) as SAContractType;
   const config = contractType ? getContractConfig(contractType) : null;

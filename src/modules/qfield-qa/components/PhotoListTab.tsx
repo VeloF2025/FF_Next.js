@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { qfieldQaApiService } from '../services/qfieldQaApiService';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
-import type { PhotoValidation, QAProject, QAFilters, Priority, WorkflowStatus } from '../types';
+import type { PhotoValidation, QAProject, QAFilters, Priority, WorkflowStatus, WorkType } from '../types';
 
 interface PhotoListTabProps {
   validations: PhotoValidation[];
@@ -85,10 +85,10 @@ export function PhotoListTab({
         if (res.ok) {
           const data = await res.json();
           // Map staff data to expected format
-          const staffList = (data.data || []).map((s: any) => ({
-            id: s.id,
-            name: s.name || `${s.first_name || ''} ${s.last_name || ''}`.trim(),
-            email: s.email,
+          const staffList = (data.data || []).map((s: Record<string, unknown>) => ({
+            id: s.id as string,
+            name: (s.name as string) || `${(s.first_name as string) || ''} ${(s.last_name as string) || ''}`.trim(),
+            email: s.email as string,
           }));
           setAvailableUsers(staffList);
         }
@@ -222,7 +222,7 @@ export function PhotoListTab({
             {/* Work Type Filter */}
             <select
               value={filters.workType || ''}
-              onChange={(e) => onFilterChange({ workType: e.target.value as any || undefined })}
+              onChange={(e) => onFilterChange({ workType: (e.target.value as WorkType) || undefined })}
               className="px-3 py-2 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             >
               <option value="">All Types</option>

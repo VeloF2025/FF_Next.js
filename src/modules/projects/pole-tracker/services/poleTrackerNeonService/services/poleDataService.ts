@@ -32,7 +32,7 @@ export class PoleDataService {
    */
   async searchPoles(filters: PoleFilters): Promise<NeonPole[]> {
     let query = POLE_QUERIES.searchPolesBase;
-    const params: any[] = [];
+    const params: (string | number)[] = [];
     let paramIndex = 1;
     
     if (filters.projectId) {
@@ -80,7 +80,7 @@ export class PoleDataService {
   /**
    * Bulk import poles from CSV data
    */
-  async bulkImportPoles(projectId: string, poles: any[]): Promise<number> {
+  async bulkImportPoles(projectId: string, poles: { pole_number: string; location?: string }[]): Promise<number> {
     // Prepare bulk insert query
     const values = poles.map((_pole, index) => {
       const offset = index * 4;

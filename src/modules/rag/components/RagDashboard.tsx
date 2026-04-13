@@ -33,9 +33,9 @@ export function RagDashboard() {
       const result = await getAllContractorsRagStatus();
       setContractors(result.data);
       setSummary(result.summary);
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error('Error loading RAG data', { error: err }, 'RagDashboard');
-      setError(err.message || 'Failed to load RAG status');
+      setError(err instanceof Error ? err.message : 'Failed to load RAG status');
     } finally {
       setLoading(false);
     }
@@ -160,7 +160,7 @@ export function RagDashboard() {
                 </td>
               </tr>
             ) : (
-              filteredContractors.map((contractor: any) => (
+              filteredContractors.map((contractor) => (
                 <tr key={contractor.contractorId} className="hover:bg-[var(--ff-bg-hover)]">
                   <td className="px-4 py-3">
                     <div className="font-medium text-[var(--ff-text-primary)]">{contractor.companyName || 'Unknown'}</div>

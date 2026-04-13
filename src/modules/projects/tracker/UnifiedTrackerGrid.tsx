@@ -51,8 +51,8 @@ export function UnifiedTrackerGrid({ projectId: projectIdProp }: { projectId?: s
 
     // Apply sorting
     filtered.sort((a, b) => {
-      let aVal: any;
-      let bVal: any;
+      let aVal: string | number | undefined;
+      let bVal: string | number | undefined;
 
       if (sortBy === 'updated') {
         aVal = a.lastUpdated ? a.lastUpdated.getTime() : 0;

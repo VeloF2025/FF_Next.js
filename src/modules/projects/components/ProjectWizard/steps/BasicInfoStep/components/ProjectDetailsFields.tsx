@@ -1,8 +1,10 @@
 
+import type { UseFormRegister, FieldErrors } from 'react-hook-form';
+import type { FormData } from '../../../types';
 
 interface ProjectDetailsFieldsProps {
-  register: any;
-  errors: any;
+  register: UseFormRegister<FormData>;
+  errors: FieldErrors<FormData>;
   clients: Array<{ id: string; name: string }>;
   isClientsLoading: boolean;
 }

@@ -130,14 +130,14 @@ export function WorkflowCharts({ analytics, dateRange }: WorkflowChartsProps) {
     );
   }
 
-  const CustomTooltip = ({ active, payload, label, labelKey: _labelKey = 'name' }: any) => {
+  const CustomTooltip = ({ active, payload, label, labelKey: _labelKey = 'name' }: { active?: boolean; payload?: { name: string; value: number; color: string; payload: { fullName?: string } }[]; label?: string; labelKey?: string }) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-card p-3 border rounded-lg shadow-lg">
           <p className="font-medium text-foreground">
-            {payload[0].payload.fullName || label}
+            {payload[0]?.payload.fullName || label}
           </p>
-          {payload.map((entry: any, index: number) => (
+          {payload.map((entry, index: number) => (
             <p key={index} style={{ color: entry.color }} className="text-sm">
               {`${entry.name}: ${entry.value}${
                 entry.name.includes('Rate') ? '%' : 

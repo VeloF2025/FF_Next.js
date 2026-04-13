@@ -7,6 +7,20 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ProjectSummaryCards } from './ProjectSummaryCards';
 import { ProjectTable } from './ProjectTable';
 
+interface ProjectApiRow {
+  id: string;
+  name?: string;
+  client_name?: string;
+  city?: string;
+  province?: string;
+  status?: string;
+  priority?: string;
+  total_drops?: number;
+  completed_drops?: number;
+  start_date?: string;
+  end_date?: string;
+}
+
 export function ProjectList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -15,9 +29,9 @@ export function ProjectList() {
   const [selectedPriority, setSelectedPriority] = useState<string[]>([]);
 
   const { projects, loading: isLoading, error, refetch } = useNeonProjects();
-  
+
   // Filter projects based on search and filters
-  const filteredProjects = projects.filter((project: any) => {
+  const filteredProjects = (projects as unknown as ProjectApiRow[]).filter((project) => {
     const matchesSearch = !searchTerm || 
       project.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -56,7 +70,7 @@ export function ProjectList() {
   const handleExport = async () => {
     try {
       // Export filtered projects to CSV
-      const csvContent = filteredProjects.map((project: any) => ({
+      const csvContent = filteredProjects.map((project) => ({
         'Name': project.name || '',
         'Client': project.client_name || '',
         'Status': project.status || '',
@@ -74,7 +88,7 @@ export function ProjectList() {
         return;
       }
 
-      const firstRow = csvContent[0];
+      const firstRow = csvContent[0]!;
       const csv = [
         Object.keys(firstRow).join(','),
         ...csvContent.map(row => Object.values(row).map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
@@ -226,7 +240,7 @@ export function ProjectList() {
       </div>
 
       <ProjectTable
-        projects={filteredProjects}
+        projects={filteredProjects as Parameters<typeof ProjectTable>[0]['projects']}
         isLoading={isLoading}
         error={error ? new Error(error) : null}
         onDelete={handleDelete}

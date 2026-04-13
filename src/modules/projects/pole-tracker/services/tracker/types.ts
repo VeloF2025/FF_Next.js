@@ -37,8 +37,8 @@ export interface PoleStatusHistory {
 }
 
 export interface PoleMetadata {
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
   createdBy?: string;
   syncStatus?: 'synced' | 'pending' | 'error';
   lastSyncAttempt?: Date;

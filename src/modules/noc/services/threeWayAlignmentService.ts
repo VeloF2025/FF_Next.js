@@ -108,7 +108,7 @@ export interface ThreeWayAlignmentReport {
 /**
  * Parse Excel ticket data from raw rows
  */
-export function parseExcelTickets(rows: any[][], headers?: string[]): ExcelTicketRow[] {
+export function parseExcelTickets(rows: unknown[][], headers?: string[]): ExcelTicketRow[] {
   const tickets: ExcelTicketRow[] = [];
 
   // Default column indices (0-based)
@@ -131,21 +131,21 @@ export function parseExcelTickets(rows: any[][], headers?: string[]): ExcelTicke
   }
 
   for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
+    const row = rows[i] as (string | number | null | undefined)[];
     if (!row) continue;
 
-    const ftRef = (row[ftRefIdx] || '').toString().trim();
+    const ftRef = (row[ftRefIdx] ?? '').toString().trim();
 
     // Skip rows without FT reference
     if (!ftRef || !ftRef.startsWith('FT')) continue;
 
     tickets.push({
       row_number: i + 2, // +2 for 1-based and header row
-      status: (row[statusIdx] || '').toString().trim(),
+      status: (row[statusIdx] ?? '').toString().trim(),
       ft_ref: ftRef,
-      dr_number: (row[drNumberIdx] || '').toString().trim(),
-      issue: (row[issueIdx] || '').toString().trim(),
-      area: (row[areaIdx] || '').toString().trim(),
+      dr_number: (row[drNumberIdx] ?? '').toString().trim(),
+      issue: (row[issueIdx] ?? '').toString().trim(),
+      area: (row[areaIdx] ?? '').toString().trim(),
     });
   }
 
@@ -175,12 +175,15 @@ async function getQContactTickets(): Promise<QContactTicketSummary[]> {
     const client = new FiberTimeQContactClient();
     const cases = await client.listAllCases(500); // Get up to 500 cases
 
-    return cases.map((c: any) => ({
-      case_id: c.id?.toString() || '',
-      ft_ref: `FT${c.id}`,
-      status: c.fields?.status || 'Unknown',
-      subject: c.fields?.subject || '',
-    }));
+    return (cases as unknown[]).map((c) => {
+      const cas = c as { id?: number; fields?: { status?: string; subject?: string } };
+      return {
+        case_id: cas.id?.toString() || '',
+        ft_ref: `FT${cas.id}`,
+        status: cas.fields?.status || 'Unknown',
+        subject: cas.fields?.subject || '',
+      };
+    });
   } catch (error) {
     logger.warn('Could not fetch QContact tickets', { error });
     return [];

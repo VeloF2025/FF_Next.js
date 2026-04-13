@@ -1,8 +1,10 @@
 
+import type { UseFormRegister, FieldErrors } from 'react-hook-form';
+import type { FormData } from '../../../types';
 
 interface ProjectTimingFieldsProps {
-  register: any;
-  errors: any;
+  register: UseFormRegister<FormData>;
+  errors: FieldErrors<FormData>;
 }
 
 export function ProjectTimingFields({ register, errors }: ProjectTimingFieldsProps) {

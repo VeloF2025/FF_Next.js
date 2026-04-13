@@ -96,7 +96,8 @@ export async function calculateSummary(): Promise<WaMonitorSummary> {
       ORDER BY date DESC, project ASC
     `;
 
-    const stats = (statsRows as any[])[0]!;
+    interface StatsRow { total: string; complete: string; incomplete: string; avgCompletedPhotos: string; totalReviewed: string }
+    const stats = (statsRows as unknown as StatsRow[])[0]!;
     return {
       total: parseInt(stats.total, 10),
       incomplete: parseInt(stats.incomplete, 10),
@@ -275,7 +276,8 @@ export async function getDailyDropsPerProject(date?: string): Promise<Array<{ da
       ORDER BY project ASC
     `;
 
-    return rows.map((row: any) => ({
+    interface DailyRow { date: string; project: string; count: string }
+    return (rows as unknown as DailyRow[]).map((row) => ({
       date: row.date,
       project: row.project,
       count: parseInt(row.count, 10),

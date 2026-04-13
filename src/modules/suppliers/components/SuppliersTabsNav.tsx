@@ -1,7 +1,7 @@
 import { } from 'react';
 import Link from 'next/link';
 import { LucideIcon } from 'lucide-react';
-import { useSuppliersPortal } from '../context/SuppliersPortalContext';
+import { useSuppliersPortal, type Supplier, type SupplierTabId } from '../context/SuppliersPortalContext';
 import { cn } from '@/lib/utils';
 
 // Badge component
@@ -46,7 +46,7 @@ interface TabItemProps {
     count?: number;
     type?: 'info' | 'warning' | 'error' | 'success';
   } | undefined;
-  supplier?: any;
+  supplier?: Supplier;
   onClick: () => void;
 }
 
@@ -121,7 +121,7 @@ export function SuppliersTabsNav() {
   } = useSuppliersPortal();
 
   const handleTabClick = (tabId: string) => {
-    setActiveTab(tabId as any);
+    setActiveTab(tabId as SupplierTabId);
   };
 
   return (

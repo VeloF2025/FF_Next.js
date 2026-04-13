@@ -127,7 +127,7 @@ export class ProjectQueryOperations {
 
       const result = await response.json();
       const activeProjects = (result.data || [])
-        .map((p: any) => ({
+        .map((p: Record<string, unknown>) => ({
           ...p,
           id: p.id,
           name: p.project_name || p.name,
@@ -141,9 +141,10 @@ export class ProjectQueryOperations {
           description: p.description,
           status: p.status
         }))
-        .filter((project: any) => {
+        .filter((project: { status?: unknown }) => {
           const inactiveStatuses = ['completed', 'archived', 'cancelled', 'on_hold'];
-          return !inactiveStatuses.includes(project.status?.toLowerCase() || '');
+          const statusStr = typeof project.status === 'string' ? project.status.toLowerCase() : '';
+          return !inactiveStatuses.includes(statusStr);
         });
 
       return activeProjects;
