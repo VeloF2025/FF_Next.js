@@ -23,7 +23,7 @@ export class SupplierSearchCore {
    */
   static async search(filters: SupplierSearchFilters): Promise<Supplier[]> {
     try {
-      let suppliers = await SupplierQueryBuilder.getBaseSupplierSet(filters as any);
+      let suppliers = await SupplierQueryBuilder.getBaseSupplierSet(filters as Record<string, unknown>);
       
       // Apply client-side filters for complex criteria
       suppliers = SupplierFilterProcessor.applyClientSideFilters(suppliers, filters);

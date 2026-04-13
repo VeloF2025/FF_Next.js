@@ -53,7 +53,7 @@ export class ClientDataAccess {
       const totalClients = records.length;
       
       const lastSyncTime = records.length > 0
-        ? records.reduce((latest: Date | null, record: any) => {
+        ? records.reduce((latest: Date | null, record: { lastCalculatedAt?: Date; updatedAt?: Date }) => {
             const syncTime = record.lastCalculatedAt || record.updatedAt;
             return syncTime && (!latest || syncTime > latest) ? syncTime : latest;
           }, null as Date | null)

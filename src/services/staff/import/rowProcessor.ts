@@ -151,7 +151,7 @@ export async function processImportRows(
         position: row.position || 'Staff',
         department: row.department || 'Operations',
         saContractType: parsedContractType, // SA-compliant contract type
-        contractType: parsedContractType as unknown as any, // Legacy field
+        contractType: parsedContractType as unknown as import('@/types/staff/enums.types').ContractType, // Legacy field
         status: StaffStatus.ACTIVE, // Default status
         ...(reportsTo && { reportsTo }), // Only include if manager found
         startDate: startDate, // Use parsed date

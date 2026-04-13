@@ -30,7 +30,7 @@ export class ClientSyncCore {
 
     try {
       const snapshot = await getDocs(collection(db, 'clients'));
-      const clients = snapshot.docs.map((doc: any) => ({
+      const clients = snapshot.docs.map((doc: { id: string; data: () => Record<string, unknown> }) => ({
         id: doc.id, 
         ...doc.data() 
       })) as FirebaseClientData[];

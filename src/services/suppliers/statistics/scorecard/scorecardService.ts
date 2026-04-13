@@ -143,7 +143,7 @@ export class ScorecardService {
     supplierId: string,
     includeRegionalBenchmarks: boolean = true,
     includeCategoryBenchmarks: boolean = true
-  ): Promise<any> {
+  ): Promise<unknown> {
     return ScorecardEnhancedGenerator.generateEnhancedScorecard(
       supplierId,
       includeRegionalBenchmarks,

@@ -246,7 +246,7 @@ export class CategoryAnalyticsService {
    */
   private static calculateAveragePerformance(suppliers: Supplier[]): number {
     const performances = suppliers
-      .map(s => (s.performance as any)?.overallScore || 0)
+      .map(s => (s.performance as { overallScore?: number } | undefined)?.overallScore || 0)
       .filter(score => score > 0);
 
     return performances.length > 0 

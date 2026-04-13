@@ -153,7 +153,7 @@ export class ComplianceCalculator {
       documents.filter(doc => doc.verified).map(doc => doc.type)
     );
     
-    const missingRequiredDocs = requiredDocTypes.filter(type => !verifiedDocTypes.has(type as any));
+    const missingRequiredDocs = requiredDocTypes.filter(type => !verifiedDocTypes.has(type as import('@/types/supplier/base.types').DocumentType));
     compliance.documentsComplete = missingRequiredDocs.length === 0;
 
     // Calculate overall score

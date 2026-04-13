@@ -40,7 +40,7 @@ describe('API Performance Benchmarks', () => {
   async function benchmarkEndpoint(
     method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     endpoint: string,
-    data?: any,
+    data?: unknown,
     iterations: number = BENCHMARK_ITERATIONS
   ): Promise<BenchmarkResult> {
     const times: number[] = [];

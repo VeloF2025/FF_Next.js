@@ -48,7 +48,7 @@ export class SuppliersListSubscription {
       }
       if (filter?.category) {
         suppliers = suppliers.filter(s =>
-          s.categories && s.categories.includes(filter.category! as any)
+          s.categories && s.categories.includes(filter.category! as unknown as import('@/types/supplier/common.types').ProductCategory)
         );
       }
 

@@ -66,7 +66,7 @@ export class PerformanceMetricsCalculator {
     }
     if (supplier.rating && typeof supplier.rating === 'object') {
       // Assume it's an aggregated rating object with an average field
-      return (supplier.rating as any).average || 0;
+      return (supplier.rating as { average?: number }).average || 0;
     }
     return 0;
   }

@@ -35,7 +35,7 @@ export class ClientClassification {
    */
   static calculateEngagementMetrics(
     clientData: FirebaseClientData, 
-    projects: any[]
+    projects: Array<{ createdAt?: unknown }>
   ): ClientEngagementMetrics {
     const totalInteractions = clientData.totalInteractions || 0;
     

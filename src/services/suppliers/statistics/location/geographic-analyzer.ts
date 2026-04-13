@@ -381,7 +381,7 @@ export class GeographicAnalyzer {
       return supplier.rating;
     }
     if (supplier.rating && typeof supplier.rating === 'object') {
-      return (supplier.rating as any).average || 0;
+      return (supplier.rating as { average?: number }).average || 0;
     }
     return 0;
   }

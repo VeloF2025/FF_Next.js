@@ -95,7 +95,7 @@ export class SOWValidationRules {
   }
 
   // Quality validation methods - delegate to QualityValidators
-  static checkDataQuality(record: any): ValidationError[] {
+  static checkDataQuality(record: Record<string, unknown>): ValidationError[] {
     return QualityValidators.checkDataQuality(record);
   }
 }

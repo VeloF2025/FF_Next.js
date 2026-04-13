@@ -77,7 +77,7 @@ export class ReportGenerator {
         businessType,
         overallStatus,
         overallScore,
-        lastUpdated: (complianceStatus as any).lastUpdated || new Date(),
+        lastUpdated: (complianceStatus as { lastUpdated?: Date }).lastUpdated || new Date(),
         
         // Add properties expected by legacy interface
         complianceStatus,

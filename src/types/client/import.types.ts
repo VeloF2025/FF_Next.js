@@ -47,5 +47,5 @@ export interface ClientImportError {
   row: number;
   field: string;
   message: string;
-  value?: any;
+  value?: unknown;
 }

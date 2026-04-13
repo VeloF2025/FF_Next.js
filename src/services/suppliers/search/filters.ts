@@ -20,7 +20,7 @@ export class SupplierFilterProcessor {
       // Category filter (if not already applied in query)
       if (filters.categories && filters.categories.length > 0) {
         const hasMatchingCategory = filters.categories.some(cat => 
-          supplier.categories?.includes(cat as any)
+          supplier.categories?.includes(cat as unknown as import('@/types/supplier/common.types').ProductCategory)
         );
         if (!hasMatchingCategory) {
           return false;

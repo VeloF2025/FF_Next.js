@@ -27,7 +27,7 @@ export class PerformanceAnalysisEngine {
     
     // Calculate compliance rate based on supplier compliance status
     const compliantSuppliers = suppliers.filter(s => 
-      s.complianceStatus && (s.complianceStatus as any).overall === 'compliant'
+      s.complianceStatus && (s.complianceStatus as { overall?: string }).overall === 'compliant'
     );
     const complianceRate = suppliers.length > 0 ? compliantSuppliers.length / suppliers.length : 0;
 

@@ -66,7 +66,7 @@ export function parseContractType(value: string | undefined): SAContractType {
 /**
  * Parse date from various formats
  */
-export function parseDate(dateValue: any): Date | undefined {
+export function parseDate(dateValue: unknown): Date | undefined {
   if (!dateValue) return undefined;
   
   // If already a Date object

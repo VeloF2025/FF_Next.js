@@ -90,7 +90,7 @@ export interface QuoteItem {
   partNumber?: string;
   modelNumber?: string;
   technicalNotes?: string;
-  complianceCertificates?: any[];
+  complianceCertificates?: unknown[];
   
   // Evaluation
   technicalCompliance: boolean;

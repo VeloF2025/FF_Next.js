@@ -34,7 +34,7 @@ export class RecommendationEngine {
     }
 
     // Score-based recommendations
-    const score = (complianceStatus as any).score || 0;
+    const score = (complianceStatus as { score?: number }).score || 0;
     if (score < 60) {
       recommendations.push('Critical: Compliance score below minimum threshold. Immediate action required.');
     } else if (score < 80) {
