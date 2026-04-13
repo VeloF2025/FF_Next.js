@@ -14,12 +14,14 @@
  * NLNH Confidence: HIGH
  */
 
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('OneMapAPI');
 
 const ONEMAP_EMAIL = process.env.ONEMAP_EMAIL || 'hein@velocityfibre.co.za';
 const ONEMAP_PASSWORD = process.env.ONEMAP_PASSWORD;
 if (!ONEMAP_PASSWORD) {
-  log.warn('OneMapAPI', 'ONEMAP_PASSWORD not set — authentication will fail');
+  logger.warn('ONEMAP_PASSWORD not set — authentication will fail');
 }
 const LAYER_ID = '5121';
 const BASE_URL = 'https://www.1map.co.za';
@@ -144,14 +146,14 @@ class OneMapApiService {
   async authenticate(): Promise<boolean> {
     try {
       // Step 1: GET login page for CSRF token
-      log.info('OneMapAPI', 'Step 1: Getting CSRF token...');
+      logger.info('Step 1: Getting CSRF token...');
       const loginPage = await fetchWithTimeout(`${BASE_URL}/login`);
       const html = await loginPage.text();
       const csrfMatch = html.match(/name="_csrf"\s+value="([^"]+)"/);
       const csrf = csrfMatch ? csrfMatch[1] : null;
 
       if (!csrf) {
-        log.error('OneMapAPI', 'Failed to extract CSRF token');
+        logger.error('Failed to extract CSRF token');
         return false;
       }
 
@@ -163,7 +165,7 @@ class OneMapApiService {
         .join('; ');
 
       // Step 2: POST login with CSRF
-      log.info('OneMapAPI', 'Step 2: Authenticating...');
+      logger.info('Step 2: Authenticating...');
       const loginResponse = await fetchWithTimeout(`${BASE_URL}/login`, {
         method: 'POST',
         headers: {
@@ -173,7 +175,7 @@ class OneMapApiService {
         body: new URLSearchParams({
           _csrf: csrf,
           email: ONEMAP_EMAIL,
-          password: ONEMAP_PASSWORD,
+          password: ONEMAP_PASSWORD ?? '',
         }).toString(),
         redirect: 'manual',
       });
@@ -182,23 +184,23 @@ class OneMapApiService {
       const respCookies = loginResponse.headers.get('set-cookie') || '';
       const sidMatch = respCookies.match(/connect\.sid=([^;]+)/);
       if (!sidMatch) {
-        log.error('OneMapAPI', 'Failed to get session cookie');
+        logger.error('Failed to get session cookie');
         return false;
       }
       this.sessionCookie = sidMatch[1] || '';
 
       // Step 3: Visit app to initialize layer access (CRITICAL!)
-      log.info('OneMapAPI', 'Step 3: Initializing layer access...');
+      logger.info('Step 3: Initializing layer access...');
       await fetchWithTimeout(`${BASE_URL}/app?layer=${LAYER_ID}`, {
         headers: { Cookie: `connect.sid=${this.sessionCookie}` },
       });
 
       this.sessionInitializedAt = Date.now();
-      log.info('OneMapAPI', 'Authentication successful');
+      logger.info('Authentication successful');
       return true;
     } catch (error) {
       const isTimeout = error instanceof Error && error.name === 'AbortError';
-      log.error('OneMapAPI', { message: isTimeout ? 'Authentication timed out' : 'Authentication failed', error });
+      logger.error(isTimeout ? 'Authentication timed out' : 'Authentication failed', { error });
       return false;
     }
   }
@@ -263,7 +265,7 @@ class OneMapApiService {
       return { success: true, records };
     } catch (error) {
       const isTimeout = error instanceof Error && error.name === 'AbortError';
-      log.error('OneMapAPI', isTimeout ? 'Search timed out' : 'Search failed', { drNumber, error });
+      logger.error(isTimeout ? 'Search timed out' : 'Search failed', { drNumber, error });
       return {
         success: false,
         records: [],
@@ -320,7 +322,7 @@ class OneMapApiService {
       const success = response.ok && text.includes('"success":true');
 
       if (!success) {
-        log.error('OneMapAPI', 'Update failed', { propId, response: text });
+        logger.error('Update failed', { propId, response: text });
         return {
           success: false,
           oldValue: null,
@@ -330,7 +332,7 @@ class OneMapApiService {
         };
       }
 
-      log.info('OneMapAPI', 'ONT serial updated', { propId, newOntSerial });
+      logger.info('ONT serial updated', { propId, newOntSerial });
       return {
         success: true,
         oldValue: null, // Caller should provide this from pre-search
@@ -339,7 +341,7 @@ class OneMapApiService {
       };
     } catch (error) {
       const isTimeout = error instanceof Error && error.name === 'AbortError';
-      log.error('OneMapAPI', isTimeout ? 'Update timed out' : 'Update failed', { propId, error });
+      logger.error(isTimeout ? 'Update timed out' : 'Update failed', { propId, error });
       return {
         success: false,
         oldValue: null,
@@ -413,7 +415,7 @@ class OneMapApiService {
       const success = response.ok && text.includes('"success":true');
 
       if (!success) {
-        log.error('OneMapAPI', 'Dual update failed', { propId, response: text });
+        logger.error('Dual update failed', { propId, response: text });
         return {
           success: false,
           propId,
@@ -423,7 +425,7 @@ class OneMapApiService {
         };
       }
 
-      log.info('OneMapAPI', 'ONT and UPS serials updated', {
+      logger.info('ONT and UPS serials updated', {
         propId,
         newOntSerial,
         newUpsSerial: newUpsSerial || 'not updated',
@@ -437,7 +439,7 @@ class OneMapApiService {
       };
     } catch (error) {
       const isTimeout = error instanceof Error && error.name === 'AbortError';
-      log.error('OneMapAPI', isTimeout ? 'Dual update timed out' : 'Dual update failed', { propId, error });
+      logger.error(isTimeout ? 'Dual update timed out' : 'Dual update failed', { propId, error });
       return {
         success: false,
         propId,
@@ -536,7 +538,7 @@ class OneMapApiService {
       if (match) primaryTarget = match;
     }
 
-    log.info('OneMapAPI', `Fixed ${updatedCount}/${records.length} records for ${drNumber}`, {
+    logger.info(`Fixed ${updatedCount}/${records.length} records for ${drNumber}`, {
       drNumber,
       updatedCount,
       alreadyCorrectCount,
@@ -654,7 +656,7 @@ class OneMapApiService {
       if (match) primaryTarget = match;
     }
 
-    log.info('OneMapAPI', `Fixed ${updatedCount}/${records.length} records for ${drNumber} (ONT+UPS)`, {
+    logger.info(`Fixed ${updatedCount}/${records.length} records for ${drNumber} (ONT+UPS)`, {
       drNumber,
       updatedCount,
       alreadyCorrectCount,
@@ -713,15 +715,15 @@ class OneMapApiService {
       const success = response.ok && text.includes('"success":true');
 
       if (!success) {
-        log.error('OneMapAPI', 'Status update failed', { propId, newStatus, response: text });
+        logger.error('Status update failed', { propId, newStatus, response: text });
         return { success: false, propId, newStatus, error: 'API returned failure' };
       }
 
-      log.info('OneMapAPI', 'Record status updated', { propId, newStatus });
+      logger.info('Record status updated', { propId, newStatus });
       return { success: true, propId, newStatus };
     } catch (error) {
       const isTimeout = error instanceof Error && error.name === 'AbortError';
-      log.error('OneMapAPI', isTimeout ? 'Status update timed out' : 'Status update failed', { propId, error });
+      logger.error(isTimeout ? 'Status update timed out' : 'Status update failed', { propId, error });
       return {
         success: false,
         propId,

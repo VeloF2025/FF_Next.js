@@ -17,7 +17,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import pool from '@/lib/db';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('EnsureData');
 import { photoTypeToStep } from '@/modules/activate/utils/stepMapper';
 import { logPhotosSynced } from '@/modules/activate/services/activityLogService';
 
@@ -55,7 +57,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber is required');
     }
 
-    log.info('EnsureData', `Checking data completeness for ${dropNumber}`, { force });
+    logger.info(`Checking data completeness for ${dropNumber}`, { force });
 
     // 1. Check current data in unified table
     const existingResult = await pool.query(
@@ -96,7 +98,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       }
 
       // Create unified record and fetch data
-      log.info('EnsureData', `Creating unified record for ${dropNumber}`);
+      logger.info(`Creating unified record for ${dropNumber}`);
       await pool.query(
         `INSERT INTO dr_photo_unified_reviews (drop_number, created_at, updated_at)
          VALUES ($1, NOW(), NOW())
@@ -135,7 +137,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     const needsPhotoSync = oneMapCheck.localCount > photoCount;
 
     if (needsPhotoSync) {
-      log.info('EnsureData', `1Map has more downloadable photos for ${dropNumber}`, {
+      logger.info(`1Map has more downloadable photos for ${dropNumber}`, {
         dbCount: photoCount,
         availableCount: oneMapCheck.localCount,
         cloudMetadata: oneMapCheck.cloudCount,
@@ -145,7 +147,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
     // Log and record verification: our DB matches actual available photos
     if (!needsPhotoSync && photoCount > 0 && oneMapCheck.localCount > 0) {
-      log.debug('EnsureData', `Photo count verified for ${dropNumber}`, {
+      logger.debug(`Photo count verified for ${dropNumber}`, {
         dbCount: photoCount,
         availableCount: oneMapCheck.localCount,
         match: photoCount === oneMapCheck.localCount,
@@ -153,13 +155,13 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
       // Update verification timestamp (async, don't block response)
       markPhotoCountVerified(dropNumber, photoCount, oneMapCheck.localCount).catch((err) => {
-        log.warn('EnsureData', `Failed to mark verification for ${dropNumber}`, { error: err });
+        logger.warn(`Failed to mark verification for ${dropNumber}`, { error: err });
       });
     }
 
     // Fast path: Data is complete, not forced, and no new photos in 1Map
     if (!force && !needsPhotoSync && hasPhotos && (hasOntSerial || hasUpsSerial)) {
-      log.info('EnsureData', `Data complete for ${dropNumber}`, {
+      logger.info(`Data complete for ${dropNumber}`, {
         photoCount,
         hasOntSerial,
         hasUpsSerial,
@@ -180,7 +182,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
     // 3. Data incomplete, force refresh, or new photos available - fetch from OneMap
     const refreshReason = force ? 'forced' : needsPhotoSync ? 'new_photos_available' : 'incomplete';
-    log.info('EnsureData', `Refreshing data for ${dropNumber}`, {
+    logger.info(`Refreshing data for ${dropNumber}`, {
       reason: refreshReason,
       hasPhotos,
       hasOntSerial,
@@ -196,7 +198,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     const finalHasUpsSerial = !!fetchResult.upsSerial || hasUpsSerial;
     const isComplete = finalHasPhotos && (finalHasOntSerial || finalHasUpsSerial);
 
-    log.info('EnsureData', `Refresh complete for ${dropNumber}`, {
+    logger.info(`Refresh complete for ${dropNumber}`, {
       status: isComplete ? 'refreshed' : 'partial',
       photoCount: fetchResult.photoCount,
       hasOntSerial: finalHasOntSerial,
@@ -217,7 +219,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         : `Partial data: ${!finalHasPhotos ? 'no photos' : ''}${!finalHasOntSerial && !finalHasUpsSerial ? ' no serials' : ''}`.trim(),
     } as EnsureDataResponse);
   } catch (error) {
-    log.error('EnsureData', 'Error ensuring data', error);
+    logger.error('Error ensuring data', { error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -249,7 +251,7 @@ async function check1MapPhotoCount(dropNumber: string): Promise<{
 
     // Log if there's orphaned metadata (cloud > local means some photos aren't actually available)
     if (cloudCount > localCount && localCount > 0) {
-      log.info('EnsureData', `Orphaned 1Map metadata detected for ${dropNumber}`, {
+      logger.info(`Orphaned 1Map metadata detected for ${dropNumber}`, {
         cloudMetadata: cloudCount,
         actualPhotos: localCount,
         orphaned: cloudCount - localCount,
@@ -262,7 +264,7 @@ async function check1MapPhotoCount(dropNumber: string): Promise<{
       hasOrphanedMetadata: cloudCount > localCount,
     };
   } catch (error) {
-    log.warn('EnsureData', `Failed to check 1Map photo count for ${dropNumber}`, { error });
+    logger.warn(`Failed to check 1Map photo count for ${dropNumber}`, { error });
     return { cloudCount: 0, localCount: 0, hasOrphanedMetadata: false };
   }
 }
@@ -283,7 +285,7 @@ async function fetchAndUpdateFromOneMap(dropNumber: string, previousPhotoCount: 
 
     // If 404, try to trigger download
     if (response.status === 404 || response.status === 422) {
-      log.info('EnsureData', `Record not found on OneMap, triggering download for ${dropNumber}`);
+      logger.info(`Record not found on OneMap, triggering download for ${dropNumber}`);
 
       const downloadResponse = await fetch(`${BOSS_API_HOST}/api/download/${dropNumber}`, {
         method: 'POST',
@@ -302,7 +304,7 @@ async function fetchAndUpdateFromOneMap(dropNumber: string, previousPhotoCount: 
     }
 
     if (!response.ok) {
-      log.warn('EnsureData', `OneMap fetch failed for ${dropNumber}`, { status: response.status });
+      logger.warn(`OneMap fetch failed for ${dropNumber}`, { status: response.status });
       return { photoCount: 0, ontSerial: null, upsSerial: null };
     }
 
@@ -312,7 +314,7 @@ async function fetchAndUpdateFromOneMap(dropNumber: string, previousPhotoCount: 
 
     // If cloud has more photos than local, trigger download to get ALL photos
     if (cloudPhotoCount > localPhotos.length) {
-      log.info('EnsureData', `Cloud has more photos than local for ${dropNumber}`, {
+      logger.info(`Cloud has more photos than local for ${dropNumber}`, {
         cloudCount: cloudPhotoCount,
         localCount: localPhotos.length,
       });
@@ -334,7 +336,7 @@ async function fetchAndUpdateFromOneMap(dropNumber: string, previousPhotoCount: 
         if (retryResponse.ok) {
           const retryData = await retryResponse.json();
           localPhotos = retryData.local_photos || [];
-          log.info('EnsureData', `After download: ${localPhotos.length} local photos for ${dropNumber}`);
+          logger.info(`After download: ${localPhotos.length} local photos for ${dropNumber}`);
         }
       }
     }
@@ -347,9 +349,9 @@ async function fetchAndUpdateFromOneMap(dropNumber: string, previousPhotoCount: 
     if (newPhotoCount > previousPhotoCount) {
       try {
         await logPhotosSynced(dropNumber, previousPhotoCount, newPhotoCount, '1Map', 'qa_wizard');
-        log.info('EnsureData', `Logged photo sync for ${dropNumber}: ${previousPhotoCount} → ${newPhotoCount}`);
+        logger.info(`Logged photo sync for ${dropNumber}: ${previousPhotoCount} → ${newPhotoCount}`);
       } catch (logError) {
-        log.warn('EnsureData', `Failed to log photo sync for ${dropNumber}`, { error: logError });
+        logger.warn(`Failed to log photo sync for ${dropNumber}`, { error: logError });
       }
     }
 
@@ -359,7 +361,7 @@ async function fetchAndUpdateFromOneMap(dropNumber: string, previousPhotoCount: 
       upsSerial: data.ups_serial || null,
     };
   } catch (error) {
-    log.error('EnsureData', `OneMap fetch error for ${dropNumber}`, error);
+    logger.error(`OneMap fetch error for ${dropNumber}`, { error });
     return { photoCount: 0, ontSerial: null, upsSerial: null };
   }
 }
