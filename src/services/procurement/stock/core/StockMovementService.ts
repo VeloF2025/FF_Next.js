@@ -787,7 +787,7 @@ export class StockMovementService extends BaseService {
     try {
       // Route to appropriate movement processor based on type
       switch (bulkData.movementType) {
-        case 'GRN':
+        case 'GRN': {
           const grnData: GRNData = {
             referenceNumber: bulkData.referenceNumber,
             poNumber: bulkData.referenceId || 'N/A',
@@ -805,8 +805,8 @@ export class StockMovementService extends BaseService {
             })),
           };
           return this.processGRN(projectId, grnData);
-
-        case 'ISSUE':
+        }
+        case 'ISSUE': {
           const issueData: IssueData = {
             referenceNumber: bulkData.referenceNumber,
             workOrderNumber: bulkData.referenceId || 'N/A',
@@ -824,12 +824,12 @@ export class StockMovementService extends BaseService {
             })),
           };
           return this.processIssue(projectId, issueData);
-
-        case 'TRANSFER':
+        }
+        case 'TRANSFER': {
           if (!bulkData.fromProjectId || !bulkData.toProjectId) {
             throw new StockMovementError('Transfer requires fromProjectId and toProjectId', 'transfer', '', 0);
           }
-          
+
           const transferData: TransferData = {
             referenceNumber: bulkData.referenceNumber,
             fromProjectId: bulkData.fromProjectId,
@@ -846,6 +846,7 @@ export class StockMovementService extends BaseService {
             })),
           };
           return this.processTransfer(transferData);
+        }
 
         default:
           throw new StockMovementError(

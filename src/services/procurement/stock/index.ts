@@ -104,15 +104,27 @@ export {
   getModuleInfo
 } from './index-modules/config/version';
 
-// Default export for convenience
+// Default export for convenience — imported inline to avoid redeclaration conflicts with named exports above
+import _StockService from './StockService';
+import { StockOperations as _StockOperations } from '../api/stockOperations';
+import { StockCalculations as _StockCalculations } from './utils/stockCalculations';
+import { StockUtils as _StockUtils } from './index-modules/utils';
+import { STOCK_CONSTANTS as _STOCK_CONSTANTS } from './index-modules/config/constants';
+import {
+  initializeStockServices as _initializeStockServices,
+  createStockService as _createStockService,
+  createStockOperations as _createStockOperations,
+} from './index-modules/initialization/ServiceInitializer';
+import { getModuleInfo as _getModuleInfo } from './index-modules/config/version';
+
 export default {
-  StockService: require('./StockService').default,
-  StockOperations: require('../api/stockOperations').StockOperations,
-  StockCalculations: require('./utils/stockCalculations').StockCalculations,
-  StockUtils: require('./index-modules/utils').StockUtils,
-  STOCK_CONSTANTS: require('./index-modules/config/constants').STOCK_CONSTANTS,
-  initializeStockServices: require('./index-modules/initialization/ServiceInitializer').initializeStockServices,
-  createStockService: require('./index-modules/initialization/ServiceInitializer').createStockService,
-  createStockOperations: require('./index-modules/initialization/ServiceInitializer').createStockOperations,
-  getModuleInfo: require('./index-modules/config/version').getModuleInfo,
+  StockService: _StockService,
+  StockOperations: _StockOperations,
+  StockCalculations: _StockCalculations,
+  StockUtils: _StockUtils,
+  STOCK_CONSTANTS: _STOCK_CONSTANTS,
+  initializeStockServices: _initializeStockServices,
+  createStockService: _createStockService,
+  createStockOperations: _createStockOperations,
+  getModuleInfo: _getModuleInfo,
 };

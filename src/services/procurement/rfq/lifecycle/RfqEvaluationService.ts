@@ -60,17 +60,18 @@ export class RfqEvaluationService {
           let score = 0;
 
           switch (criterion.criteria_type) {
-            case 'price':
+            case 'price': {
               // Lowest price gets highest score
               const minPrice = Math.min(...responses.map(r => r.totalAmount));
               score = (minPrice / response.totalAmount) * criterion.max_score;
               break;
-
-            case 'delivery':
+            }
+            case 'delivery': {
               // Fastest delivery gets highest score
               const minDays = Math.min(...responses.map(r => r.deliveryDays || 30));
               score = (minDays / (response.deliveryDays || 30)) * criterion.max_score;
               break;
+            }
 
             default:
               // Default scoring (manual in real scenario)
