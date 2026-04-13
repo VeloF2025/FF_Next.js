@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * RFQ CRUD Service
  * Core create, read, update, delete operations for RFQs
