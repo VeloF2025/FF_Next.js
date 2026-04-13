@@ -6,7 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
 import {
   extractOdometerReading,
   verifyLicensePlate,
@@ -21,10 +21,12 @@ import {
   getLatestOdometerReading,
 } from '@/modules/fleet/services/checkInService';
 import type { VlmAnalysisType } from '@/modules/fleet/types/check-in.types';
+import type { VlmAnalysisType as LearningVlmAnalysisType } from '@/types/vlm-learning';
 import { withFleetAuth } from '@/lib/auth/middleware';
 import { recordVlmCorrection, recordCorrectExtraction } from '@/services/vlmLearningService';
 import { VLM_FLEET_MODEL } from '@/lib/vlm';
 
+const log = createLogger('FleetVlmApi');
 const sql = neon(process.env.DATABASE_URL!);
 
 interface ProcessVlmRequest {
@@ -83,13 +85,13 @@ async function handler(
     }
 
     // Validate analysis type
-    const validTypes: VlmAnalysisType[] = ['odometer', 'license_plate', 'fuel_gauge', 'damage'];
+    const validTypes: VlmAnalysisType[] = ['odometer', 'license_plate', 'fuel_gauge', 'fuel_receipt', 'damage'];
     if (!validTypes.includes(analysisType)) {
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, `Invalid analysisType. Must be one of: ${validTypes.join(', ')}`);
     }
 
     const startTime = Date.now();
-    log.info('FleetVlmApi', `Processing ${analysisType} for photo ${photoId}`);
+    log.info(`Processing ${analysisType} for photo ${photoId}`);
 
     // Detect preview mode early - preview uses temp IDs that aren't valid UUIDs
     // In preview mode, we process VLM but don't persist to database
@@ -136,19 +138,19 @@ async function handler(
 
         // Log validation warnings
         if (validation.warning) {
-          log.warn('FleetVlmApi', `ODO Validation: ${validation.warning} (action: ${validation.suggestedAction})`);
+          log.warn(`ODO Validation: ${validation.warning} (action: ${validation.suggestedAction})`);
         }
         if (extractionWarning) {
-          log.warn('FleetVlmApi', `ODO Extraction warning: ${extractionWarning}`);
+          log.warn(`ODO Extraction warning: ${extractionWarning}`);
         }
 
         // Only record odometer reading if not in preview mode, not persist-only mode,
         // extraction succeeded, and validation doesn't suggest rejection
         if (!isPreviewMode && !persistResultsOnly && odometerResult.reading !== null) {
           if (validation.suggestedAction === 'reject') {
-            log.warn('FleetVlmApi', `ODO rejected by validation: ${validation.warning}`);
+            log.warn(`ODO rejected by validation: ${validation.warning}`);
             // Write raw VLM response to debug log for diagnosis without SSH (e.g. digit drop issues)
-            try { require('fs').appendFileSync('/home/velo/vlm-odometer-debug.log', JSON.stringify({ ts: new Date().toISOString(), vehicleId, reading: odometerResult.reading, rawResponse: odometerResult.rawResponse, warning: validation.warning }) + '\n'); } catch (e) { log.error('FleetVlmApi', 'Failed to write odometer debug log', { error: e }); }
+            try { require('fs').appendFileSync('/home/velo/vlm-odometer-debug.log', JSON.stringify({ ts: new Date().toISOString(), vehicleId, reading: odometerResult.reading, rawResponse: odometerResult.rawResponse, warning: validation.warning }) + '\n'); } catch (e) { log.error('Failed to write odometer debug log', { error: e as Error }); }
             result.error = validation.warning || 'Reading failed validation';
           } else {
             await recordOdometerReading({
@@ -160,8 +162,8 @@ async function handler(
               discrepancyFlag: validation.suggestedAction === 'verify',
               discrepancyReason: validation.warning || undefined,
             });
-            log.info('FleetVlmApi', `Recorded odometer reading: ${odometerResult.reading} km (validation: ${validation.suggestedAction})`);
-            if (validation.suggestedAction === 'verify') { try { require('fs').appendFileSync('/home/velo/vlm-odometer-debug.log', JSON.stringify({ ts: new Date().toISOString(), vehicleId, reading: odometerResult.reading, rawResponse: odometerResult.rawResponse, warning: validation.warning }) + '\n'); } catch (e) { log.error('FleetVlmApi', 'Failed to write odometer debug log', { error: e }); } }
+            log.info(`Recorded odometer reading: ${odometerResult.reading} km (validation: ${validation.suggestedAction})`);
+            if (validation.suggestedAction === 'verify') { try { require('fs').appendFileSync('/home/velo/vlm-odometer-debug.log', JSON.stringify({ ts: new Date().toISOString(), vehicleId, reading: odometerResult.reading, rawResponse: odometerResult.rawResponse, warning: validation.warning }) + '\n'); } catch (e) { log.error('Failed to write odometer debug log', { error: e as Error }); } }
           }
         }
         break;
@@ -201,7 +203,7 @@ async function handler(
             source: 'vlm',
             vlmConfidence: fuelResult.confidence,
           });
-          log.info('FleetVlmApi', `Recorded fuel level: ${fuelResult.level}%`);
+          log.info(`Recorded fuel level: ${fuelResult.level}%`);
         }
         break;
       }
@@ -210,6 +212,16 @@ async function handler(
         // Damage photos don't need VLM analysis - they're documentation
         result = {
           extractedValue: 'Damage photo recorded',
+          extractedNumeric: null,
+          confidence: 1.0,
+        };
+        break;
+      }
+
+      case 'fuel_receipt': {
+        // Fuel receipts are documentation photos — no VLM extraction needed
+        result = {
+          extractedValue: 'Fuel receipt recorded',
           extractedNumeric: null,
           confidence: 1.0,
         };
@@ -250,28 +262,30 @@ async function handler(
     }
 
     // Record VLM learning metrics (fire-and-forget, never blocks main flow)
-    if (!isPreviewMode && !result.error) {
+    // Only record for types that exist in the learning type system (not 'damage')
+    const learningAnalysisType = analysisType as LearningVlmAnalysisType;
+    if (!isPreviewMode && !result.error && analysisType !== 'damage') {
       if (overrideValue && result.extractedValue) {
         // User corrected the VLM reading — record as correction for learning
         recordVlmCorrection({
           module: 'fleet',
-          analysisType,
+          analysisType: learningAnalysisType,
           sourceId: recordId,
           sourceTable: 'fleet_check_records',
           vlmExtractedValue: String(result.extractedNumeric ?? result.extractedValue),
           vlmConfidence: result.confidence,
           vlmModel: VLM_FLEET_MODEL,
           correctedValue: overrideValue,
-          correctionReason: 'human_override',
-        }).catch(e => log.warn('FleetVlmApi', `Learning correction record failed (non-critical): ${e}`));
+          correctionReason: 'other',
+        }).catch(e => log.warn(`Learning correction record failed (non-critical): ${String(e)}`));
       } else if (result.confidence >= 0.7) {
         // High-confidence successful extraction — record as correct for metrics
-        recordCorrectExtraction('fleet', analysisType, result.confidence)
-          .catch(e => log.warn('FleetVlmApi', `Learning metric record failed (non-critical): ${e}`));
+        recordCorrectExtraction('fleet', learningAnalysisType, result.confidence)
+          .catch(e => log.warn(`Learning metric record failed (non-critical): ${String(e)}`));
       }
     }
 
-    log.info('FleetVlmApi', `${analysisType} processing completed in ${processingTimeMs}ms (preview: ${isPreviewMode})`);
+    log.info(`${analysisType} processing completed in ${processingTimeMs}ms (preview: ${isPreviewMode})`);
 
     return apiResponse.success(res, {
       success: !result.error,
@@ -280,7 +294,7 @@ async function handler(
       processingTimeMs,
     });
   } catch (error) {
-    log.error('FleetVlmApi', `VLM processing failed: ${error}`);
+    log.error(`VLM processing failed: ${String(error)}`);
     return apiResponse.internalError(res, error);
   }
 }
@@ -296,7 +310,7 @@ export async function checkVlmHealthEndpoint(
     const isHealthy = await checkFleetVlmHealth();
     return apiResponse.success(res, { healthy: isHealthy });
   } catch (error) {
-    log.error('FleetVlmApi', 'VLM health check failed', { error });
+    log.error('VLM health check failed', { error: error as Error });
     return apiResponse.internalError(res, error);
   }
 }
