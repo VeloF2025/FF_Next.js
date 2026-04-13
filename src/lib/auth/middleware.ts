@@ -10,7 +10,6 @@
 
 import crypto from 'crypto';
 import type { NextApiRequest, NextApiResponse, NextApiHandler } from 'next';
-import crypto from 'crypto';
 import { neon } from '@/lib/db-neon';
 import { verifyToken } from './jwt';
 import type { AuthUser, AuthRole } from './types';
@@ -186,7 +185,6 @@ export function withAuth(handler: AuthenticatedHandler): NextApiHandler {
       }
 
       // Hash token for session lookup
-      const crypto = await import('crypto');
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
       // Single optimized query: validate session + get user (replaces 2 queries)
@@ -315,7 +313,6 @@ export function withOptionalAuth(
       if (token) {
         const payload = await verifyToken(token);
         if (payload) {
-          const crypto = await import('crypto');
           const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
           const user = await getUserAndValidateSession(
@@ -385,7 +382,6 @@ export function withFleetAuth(handler: (req: FleetAuthenticatedRequest, res: Nex
       if (token) {
         const payload = await verifyToken(token);
         if (payload) {
-          const crypto = await import('crypto');
           const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
           const user = await getUserAndValidateSession(
