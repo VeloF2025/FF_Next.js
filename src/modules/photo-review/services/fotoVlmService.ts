@@ -12,9 +12,11 @@
  */
 
 import { EvaluationResult } from '../types';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
 import fs from 'fs';
 import path from 'path';
+
+const logger = createLogger('VlmService');
 
 /** Shape of a single DR entry returned by the BOSS API */
 interface BossDrEntry {
@@ -88,14 +90,14 @@ function loadQASteps() {
     const configData = fs.readFileSync(configPath, 'utf-8');
     const config = JSON.parse(configData);
 
-    log.info('VlmService', `Loaded ${config.steps.length} QA steps from config (version ${config.version})`);
+    logger.info(`Loaded ${config.steps.length} QA steps from config (version ${config.version})`);
 
     return config.steps;
   } catch (error) {
-    log.error('VlmService', `Failed to load QA steps config: ${error}`);
+    logger.error(`Failed to load QA steps config: ${error}`);
 
     // Fallback to hardcoded steps if config file not found
-    log.warn('VlmService', 'Using fallback hardcoded QA steps');
+    logger.warn('Using fallback hardcoded QA steps');
     return [
       {
         step_number: 1,
@@ -190,7 +192,7 @@ export async function fetchDrPhotos(drNumber: string): Promise<string[]> {
   const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://100.96.203.105:8001';
 
   try {
-    log.info('VlmService', `Fetching photos from BOSS API for ${drNumber}`);
+    logger.info(`Fetching photos from BOSS API for ${drNumber}`);
 
     // Fetch all DRs from BOSS VPS API
     const response = await fetch(`${BOSS_API_URL}/api/photos`, {
@@ -218,11 +220,11 @@ export async function fetchDrPhotos(drNumber: string): Promise<string[]> {
       `${BOSS_API_URL}/api/photo/${drNumber}/${photo.filename}`
     );
 
-    log.info('VlmService', `Found ${photoUrls.length} photos for ${drNumber}`);
+    logger.info(`Found ${photoUrls.length} photos for ${drNumber}`);
 
     return photoUrls;
   } catch (error) {
-    log.error('VlmService', `Failed to fetch DR photos: ${error}`);
+    logger.error(`Failed to fetch DR photos: ${error}`);
     throw new VlmEvaluationError(
       `Failed to fetch photos for ${drNumber}`,
       'FETCH_PHOTOS_ERROR',
@@ -300,7 +302,7 @@ async function fetchImageAsBase64(imageUrl: string): Promise<string> {
 
     return base64;
   } catch (error) {
-    log.error('VlmService', `Failed to fetch/encode image ${imageUrl}: ${error}`);
+    logger.error(`Failed to fetch/encode image ${imageUrl}: ${error}`);
     throw error;
   }
 }
@@ -315,19 +317,19 @@ async function fetchImageAsBase64(imageUrl: string): Promise<string> {
 async function callVlmApiBatch(drNumber: string, photoUrls: string[]): Promise<VlmApiResponse> {
   const prompt = buildSmartBatchEvaluationPrompt(drNumber);
 
-  log.info('VlmService', `Fetching and encoding ${photoUrls.length} photos for ${drNumber}...`);
+  logger.info(`Fetching and encoding ${photoUrls.length} photos for ${drNumber}...`);
 
   // Fetch all images and convert to base64
   // Ollama requires base64-encoded images, not URLs
   const base64Images: string[] = [];
 
-  for (let i = 0; i < photoUrls.length; i++) {
+  for (const [i, url] of photoUrls.entries()) {
     try {
-      log.debug('VlmService', `Fetching photo ${i + 1}/${photoUrls.length}: ${photoUrls[i]}`);
-      const base64 = await fetchImageAsBase64(photoUrls[i]);
+      logger.debug(`Fetching photo ${i + 1}/${photoUrls.length}: ${url}`);
+      const base64 = await fetchImageAsBase64(url);
       base64Images.push(base64);
     } catch (error) {
-      log.warn('VlmService', `Skipping photo ${i + 1} due to error: ${error}`);
+      logger.warn(`Skipping photo ${i + 1} due to error: ${error}`);
       // Continue with other photos even if one fails
     }
   }
@@ -339,7 +341,7 @@ async function callVlmApiBatch(drNumber: string, photoUrls: string[]): Promise<V
     );
   }
 
-  log.info('VlmService', `Successfully encoded ${base64Images.length}/${photoUrls.length} photos`);
+  logger.info(`Successfully encoded ${base64Images.length}/${photoUrls.length} photos`);
 
   // Build OpenAI-compatible API request with base64 images
   // MiniCPM-V-2_6 uses OpenAI format for vision models
@@ -367,7 +369,7 @@ async function callVlmApiBatch(drNumber: string, photoUrls: string[]): Promise<V
     temperature: 0.1, // Low temperature for consistent evaluation
   };
 
-  log.info('VlmService', `Calling MiniCPM-V-2_6 VLM API for ${drNumber}...`);
+  logger.info(`Calling MiniCPM-V-2_6 VLM API for ${drNumber}...`);
 
   try {
     const controller = new AbortController();
@@ -394,7 +396,7 @@ async function callVlmApiBatch(drNumber: string, photoUrls: string[]): Promise<V
     }
 
     const data = await response.json() as VlmApiResponse;
-    log.info('VlmService', `VLM API response received for ${drNumber}`);
+    logger.info(`VLM API response received for ${drNumber}`);
 
     return data;
   } catch (error: unknown) {
@@ -431,7 +433,7 @@ function parseSmartBatchResponse(vlmResponse: VlmApiResponse): VlmStepEvaluation
       throw new Error('No content in VLM response');
     }
 
-    log.debug('VlmService', `Raw VLM batch response: ${content.substring(0, 200)}...`);
+    logger.debug(`Raw VLM batch response: ${content.substring(0, 200)}...`);
 
     // Parse JSON from content
     let batchData: VlmBatchData;
@@ -444,7 +446,7 @@ function parseSmartBatchResponse(vlmResponse: VlmApiResponse): VlmStepEvaluation
     try {
       batchData = JSON.parse(jsonMatch[1] || content) as VlmBatchData;
     } catch (parseError) {
-      log.error('VlmService', `Failed to parse VLM batch JSON: ${content}`);
+      logger.error(`Failed to parse VLM batch JSON: ${content}`);
       throw new Error('VLM response is not valid JSON');
     }
 
@@ -473,11 +475,11 @@ function parseSmartBatchResponse(vlmResponse: VlmApiResponse): VlmStepEvaluation
       }
     }
 
-    log.info('VlmService', `Extracted ${allEvaluations.length} evaluations from ${batchData.photo_evaluations.length} photos`);
+    logger.info(`Extracted ${allEvaluations.length} evaluations from ${batchData.photo_evaluations.length} photos`);
 
     return allEvaluations;
   } catch (error) {
-    log.error('VlmService', `Failed to parse VLM batch response: ${error}`);
+    logger.error(`Failed to parse VLM batch response: ${error}`);
     throw new VlmEvaluationError(
       `Failed to parse VLM batch response: ${error instanceof Error ? error.message : 'Unknown error'}`,
       'PARSE_ERROR',
@@ -497,12 +499,12 @@ function parseSmartBatchResponse(vlmResponse: VlmApiResponse): VlmStepEvaluation
 export async function executeVlmEvaluation(
   drNumber: string
 ): Promise<EvaluationResult> {
-  log.info('VlmService', `Starting SMART BATCH VLM evaluation for ${drNumber}`);
+  logger.info(`Starting SMART BATCH VLM evaluation for ${drNumber}`);
 
   try {
     // Step 1: Fetch DR photos
     const photoUrls = await fetchDrPhotos(drNumber);
-    log.info('VlmService', `Fetched ${photoUrls.length} photos for ${drNumber}`);
+    logger.info(`Fetched ${photoUrls.length} photos for ${drNumber}`);
 
     // Step 2: Batch photos to stay within context limits
     // Qwen3-VL-8B-Instruct has 16K token limit, images + prompt = ~2500 tokens per photo
@@ -514,7 +516,7 @@ export async function executeVlmEvaluation(
       batches.push(photoUrls.slice(i, i + BATCH_SIZE));
     }
 
-    log.info('VlmService', `Split ${photoUrls.length} photos into ${batches.length} batches of ${BATCH_SIZE}`);
+    logger.info(`Split ${photoUrls.length} photos into ${batches.length} batches of ${BATCH_SIZE}`);
 
     // Step 3: Evaluate ALL batches in parallel (VLM identifies and evaluates all photos at once!)
     const totalStartTime = Date.now();
@@ -524,19 +526,19 @@ export async function executeVlmEvaluation(
       const batchNum = batchIndex + 1;
       const batchStart = Date.now();
 
-      log.info('VlmService', `Batch ${batchNum}/${batches.length}: Evaluating ${batch.length} photos (smart classification)`);
+      logger.info(`Batch ${batchNum}/${batches.length}: Evaluating ${batch.length} photos (smart classification)`);
 
       try {
         const vlmResponse = await callVlmApiBatch(drNumber, batch);
         const evaluations = parseSmartBatchResponse(vlmResponse);
 
         const batchTime = Date.now() - batchStart;
-        log.info('VlmService', `Batch ${batchNum} completed in ${batchTime}ms - Found ${evaluations.length} step matches`);
+        logger.info(`Batch ${batchNum} completed in ${batchTime}ms - Found ${evaluations.length} step matches`);
 
         return evaluations;
       } catch (error) {
         const batchTime = Date.now() - batchStart;
-        log.error('VlmService', `Batch ${batchNum} failed after ${batchTime}ms: ${error}`);
+        logger.error(`Batch ${batchNum} failed after ${batchTime}ms: ${error}`);
         return []; // Return empty array for failed batch
       }
     });
@@ -549,7 +551,7 @@ export async function executeVlmEvaluation(
     }
 
     const totalTime = Date.now() - totalStartTime;
-    log.info('VlmService', `All ${batches.length} batches completed in ${totalTime}ms - Total ${allEvaluations.length} evaluations`);
+    logger.info(`All ${batches.length} batches completed in ${totalTime}ms - Total ${allEvaluations.length} evaluations`);
 
     // Step 4: Group evaluations by step and take BEST score for each step
     const stepResultsMap = new Map<number, VlmStepEvaluation>();
@@ -610,11 +612,11 @@ export async function executeVlmEvaluation(
       markdown_report: `Evaluation for ${drNumber}: ${passedCount}/${QA_STEPS.length} steps passed (${Math.round(passRate * 100)}%)`,
     };
 
-    log.info('VlmService', `✅ SMART BATCH evaluation completed: ${overallStatus} (${passedCount}/${QA_STEPS.length} passed) - ${batches.length} API calls (10x faster!)`);
+    logger.info(`✅ SMART BATCH evaluation completed: ${overallStatus} (${passedCount}/${QA_STEPS.length} passed) - ${batches.length} API calls (10x faster!)`);
 
     return result;
   } catch (error) {
-    log.error('VlmService', `VLM evaluation failed for ${drNumber}: ${error}`);
+    logger.error(`VLM evaluation failed for ${drNumber}: ${error}`);
 
     if (error instanceof VlmEvaluationError) {
       throw error;
@@ -647,12 +649,12 @@ export async function checkVlmHealth(): Promise<boolean> {
     const hasModel = data.data?.some((m: { id: string }) => m.id === 'openbmb/MiniCPM-V-2_6');
 
     if (!hasModel) {
-      log.warn('VlmService', `MiniCPM-V-2_6 model not found in vLLM`);
+      logger.warn(`MiniCPM-V-2_6 model not found in vLLM`);
     }
 
-    return hasModel;
+    return hasModel ?? false;
   } catch (error) {
-    log.error('VlmService', `VLM health check failed: ${error}`);
+    logger.error(`VLM health check failed: ${error}`);
     return false;
   }
 }

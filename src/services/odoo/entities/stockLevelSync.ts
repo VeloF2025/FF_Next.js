@@ -9,7 +9,7 @@
  * - Groups by product and location (aggregates multiple quants)
  */
 
-import { neon } from '@/lib/db-neon';
+import { neon, NeonQueryFunction } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { OdooClient } from '../odooClient';
 
@@ -43,19 +43,33 @@ export interface StockLevelSyncOptions {
 }
 
 // ============================================================================
+// Row Types
+// ============================================================================
+
+interface IdRow { id: string | number }
+interface LocationMappingRow { ff_location_id: string | null; ff_warehouse_code: string | null }
+interface StockLevelRow { id: string | number; qty_on_hand: number | string }
+interface StatsRow { total: string; odoo_synced: string; total_qty: string }
+interface WarehouseStatsRow { warehouse_name: string | null; count: string; total_qty: string }
+interface LastSyncRow { last_sync: Date | null }
+interface FfLevelRow { odoo_product_id: number; product_name: string | null; total_qty: string }
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
+
+type SqlFn = NeonQueryFunction<false, false>;
 
 /**
  * Get stock item ID by Odoo product ID
  */
 async function getStockItemByOdooId(
-  sql: ReturnType<typeof neon>,
+  sql: SqlFn,
   odooProductId: number
 ): Promise<string | null> {
   const rows = await sql`
     SELECT id FROM stock_items WHERE odoo_product_id = ${odooProductId} LIMIT 1
-  `;
+  ` as IdRow[];
   return rows.length > 0 ? String(rows[0]?.id ?? '') || null : null;
 }
 
@@ -64,7 +78,7 @@ async function getStockItemByOdooId(
  * Tries odoo_location_mappings first, then direct match
  */
 async function getWarehouseByOdooLocationId(
-  sql: ReturnType<typeof neon>,
+  sql: SqlFn,
   odooLocationId: number
 ): Promise<string | null> {
   // Try odoo_location_mappings first
@@ -73,7 +87,7 @@ async function getWarehouseByOdooLocationId(
       SELECT ff_location_id, ff_warehouse_code FROM odoo_location_mappings
       WHERE odoo_location_id = ${odooLocationId}
       LIMIT 1
-    `;
+    ` as LocationMappingRow[];
     if (mappingRows.length > 0 && mappingRows[0]?.ff_location_id) {
       return String(mappingRows[0].ff_location_id) || null;
     }
@@ -81,7 +95,7 @@ async function getWarehouseByOdooLocationId(
     if (mappingRows.length > 0 && mappingRows[0]?.ff_warehouse_code) {
       const warehouseRows = await sql`
         SELECT id FROM stock_locations WHERE code = ${String(mappingRows[0].ff_warehouse_code)} LIMIT 1
-      `;
+      ` as IdRow[];
       return warehouseRows.length > 0 ? String(warehouseRows[0]?.id ?? '') || null : null;
     }
   } catch {
@@ -92,7 +106,7 @@ async function getWarehouseByOdooLocationId(
   try {
     const directRows = await sql`
       SELECT id FROM stock_locations WHERE odoo_location_id = ${odooLocationId} LIMIT 1
-    `;
+    ` as IdRow[];
     return directRows.length > 0 ? String(directRows[0]?.id ?? '') || null : null;
   } catch {
     return null;
@@ -103,13 +117,13 @@ async function getWarehouseByOdooLocationId(
  * Get default warehouse
  */
 async function getDefaultWarehouse(
-  sql: ReturnType<typeof neon>
+  sql: SqlFn
 ): Promise<string | null> {
   const rows = await sql`
     SELECT id FROM stock_locations
     ORDER BY name ASC
     LIMIT 1
-  `;
+  ` as IdRow[];
   return rows.length > 0 ? String(rows[0]?.id ?? '') || null : null;
 }
 
@@ -117,7 +131,7 @@ async function getDefaultWarehouse(
  * Get existing stock level by item and warehouse
  */
 async function getExistingStockLevel(
-  sql: ReturnType<typeof neon>,
+  sql: SqlFn,
   stockItemId: string,
   warehouseId: string | null
 ): Promise<{ id: string; qty_on_hand: number } | null> {
@@ -126,7 +140,7 @@ async function getExistingStockLevel(
       SELECT id, qty_on_hand FROM stock_levels
       WHERE stock_item_id = ${stockItemId} AND location_id = ${warehouseId}
       LIMIT 1
-    `;
+    ` as StockLevelRow[];
     if (rows.length > 0 && rows[0]) {
       return { id: String(rows[0].id ?? ''), qty_on_hand: Number(rows[0].qty_on_hand ?? 0) };
     }
@@ -136,7 +150,7 @@ async function getExistingStockLevel(
       SELECT id, qty_on_hand FROM stock_levels
       WHERE stock_item_id = ${stockItemId} AND location_id IS NULL
       LIMIT 1
-    `;
+    ` as StockLevelRow[];
     if (rows.length > 0 && rows[0]) {
       return { id: String(rows[0].id ?? ''), qty_on_hand: Number(rows[0].qty_on_hand ?? 0) };
     }
@@ -421,7 +435,7 @@ export async function getStockLevelSyncStats(
 }> {
   const sql = neon(databaseUrl);
 
-  const [totals, byWarehouse, lastSync] = await Promise.all([
+  const [rawTotals, rawByWarehouse, rawLastSync] = await Promise.all([
     sql`
       SELECT
         COUNT(*) as total,
@@ -445,8 +459,11 @@ export async function getStockLevelSyncStats(
       LIMIT 1
     `,
   ]);
+  const totals = rawTotals as StatsRow[];
+  const byWarehouse = rawByWarehouse as WarehouseStatsRow[];
+  const lastSync = rawLastSync as LastSyncRow[];
 
-  const stats = totals[0] || { total: '0', odoo_synced: '0', total_qty: '0' };
+  const stats = totals[0] ?? { total: '0', odoo_synced: '0', total_qty: '0' };
 
   return {
     totalLevels: parseInt(stats.total, 10),
@@ -457,7 +474,7 @@ export async function getStockLevelSyncStats(
       count: parseInt(w.count, 10),
       totalQty: parseFloat(w.total_qty),
     })),
-    lastSync: lastSync[0]?.last_sync || null,
+    lastSync: lastSync[0]?.last_sync ?? null,
   };
 }
 
@@ -508,7 +525,7 @@ export async function compareStockLevels(
     LEFT JOIN stock_levels sl ON sl.stock_item_id = si.id
     WHERE si.odoo_product_id IS NOT NULL
     GROUP BY si.id, si.odoo_product_id, si.name
-  `;
+  ` as FfLevelRow[];
 
   const ffByProduct = new Map(
     ffLevels.map((row) => [
