@@ -97,7 +97,7 @@ function normalizeNameForComparison(name: string | null | undefined): string[] {
 
   // Split into parts and sort alphabetically for comparison
   const parts = normalized
-    .replace(/[,\.]/g, ' ')
+    .replace(/[,.]/g, ' ')
     .split(/\s+/)
     .filter(p => p.length > 1) // Ignore single letters/initials
     .sort();
@@ -129,7 +129,7 @@ function areNamesSimilar(name1: string | null, name2: string | null): boolean {
  */
 function normalizeIdNumber(id: string | null | undefined): string {
   if (!id) return '';
-  return id.replace(/[\s\-]/g, '');
+  return id.replace(/[\s-]/g, '');
 }
 
 /**

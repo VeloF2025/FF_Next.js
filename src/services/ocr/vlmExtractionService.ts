@@ -166,7 +166,7 @@ export function applyIdValidationPostProcessing(
   }
 
   // --- 1. Length check ---
-  const idValue = String(extractedFields.documentNumber.value ?? '').replace(/[\s\-]/g, '');
+  const idValue = String(extractedFields.documentNumber.value ?? '').replace(/[\s-]/g, '');
   if (idValue.length !== 13) {
     log.warn('SA ID extraction returned wrong digit count', {
       extracted: idValue,

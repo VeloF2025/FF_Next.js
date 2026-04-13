@@ -487,13 +487,13 @@ function normalizeDate(value: unknown): string | null {
   try {
     // Handle common date formats
     // DD/MM/YYYY or DD-MM-YYYY
-    const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    const dmyMatch = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
     if (dmyMatch) {
       return `${dmyMatch[3]}-${dmyMatch[2]!.padStart(2, '0')}-${dmyMatch[1]!.padStart(2, '0')}`;
     }
 
     // YYYY/MM/DD or YYYY-MM-DD
-    const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    const ymdMatch = str.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
     if (ymdMatch) {
       return `${ymdMatch[1]}-${ymdMatch[2]!.padStart(2, '0')}-${ymdMatch[3]!.padStart(2, '0')}`;
     }

@@ -192,7 +192,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
           );
 
           // Check if next line is separator
-          if (i + 1 < lines.length && lines[i + 1]!.match(/^\s*\|[\s\|\-:]+\|\s*$/)) {
+          if (i + 1 < lines.length && lines[i + 1]!.match(/^\s*\|[\s|:-]+\|\s*$/)) {
             isTableHeader = false;
             i++; // Skip separator line
           } else if (isTableHeader) {
@@ -205,7 +205,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
       }
 
       // Lists
-      if (line.match(/^\s*[\-\*\+]\s+/) || line.match(/^\s*\d+\.\s+/)) {
+      if (line.match(/^\s*[-*+]\s+/) || line.match(/^\s*\d+\.\s+/)) {
         const isOrdered = line.match(/^\s*\d+\.\s+/);
         const newListType = isOrdered ? 'ol' : 'ul';
         
@@ -214,7 +214,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
           currentListType = newListType;
         }
         
-        const text = line.replace(/^\s*(\d+\.|\-|\*|\+)\s+/, '');
+        const text = line.replace(/^\s*(\d+\.|-|\*|\+)\s+/, '');
         const content = formatInlineElements(text);
         
         currentList.push(
@@ -240,7 +240,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
       }
 
       // Horizontal rules
-      if (line.match(/^[\-\*_]{3,}$/)) {
+      if (line.match(/^[-*_]{3,}$/)) {
         elements.push(
           <hr key={`hr-${i}`} className="my-6 border-[var(--ff-border-light)]" />
         );
