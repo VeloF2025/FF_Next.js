@@ -167,8 +167,7 @@ export async function syncReview(reviewId: string): Promise<void> {
       throw new Error(`Review ${reviewId} not found`);
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const review = reviews[0]!;
+    const review = reviews[0]!
     const featureId = String(review.feature_id);
     const zoneNo = review.zone_no != null ? Number(review.zone_no) : null;
     const ponNo = review.pon_no != null ? Number(review.pon_no) : null;
