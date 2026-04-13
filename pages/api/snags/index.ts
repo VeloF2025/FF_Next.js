@@ -109,12 +109,16 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
   // No filter — all snags paginated
   const rows = await sql`
-    SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, (tu.first_name || ' ' || tu.last_name) AS noc_ticket_assignee_name
+    SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, (tu.first_name || ' ' || tu.last_name) AS noc_ticket_assignee_name, COALESCE(pole.zone_no, dr.zone_no, zb.zone_no) AS pole_zone_no, COALESCE(pole.pon_no, dr.pon_no, pb.pon_no) AS pole_pon_no
     FROM snags s
     LEFT JOIN users u ON u.id = s.assigned_to
     LEFT JOIN snag_reports sr ON sr.id = s.report_id
     LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
     LEFT JOIN users tu ON tu.id = mt.assigned_to
+    LEFT JOIN poles pole ON pole.id = s.pole_ids[1]
+    LEFT JOIN drops dr ON dr.id = s.drop_id
+    LEFT JOIN zone_boundaries zb ON zb.id = s.zone_id
+    LEFT JOIN pon_boundaries pb ON pb.id = s.pon_id
     ORDER BY s.grid_index ASC, s.snag_number ASC
     LIMIT ${pageSizeNum} OFFSET ${offset}
   ` as Snag[];
