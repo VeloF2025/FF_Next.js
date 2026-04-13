@@ -122,9 +122,8 @@ export function isValidRating(rating: unknown): boolean {
     return rating >= 0 && rating <= 5;
   }
   if (rating != null && typeof rating === 'object' && 'overall' in rating) {
-    return typeof (rating as Record<string, unknown>).overall === 'number' &&
-           (rating as Record<string, unknown>).overall as number >= 0 &&
-           (rating as Record<string, unknown>).overall as number <= 5;
+    const overall = (rating as Record<string, unknown>).overall;
+    return typeof overall === 'number' && overall >= 0 && overall <= 5;
   }
   return false;
 }
