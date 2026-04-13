@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useDebounce } from './useDebounce';
 import { log } from '@/lib/logger';
 
-interface SearchResult {
+export interface SearchResult {
   type: 'project' | 'staff' | 'client' | 'contractor';
   id: string;
   title: string;

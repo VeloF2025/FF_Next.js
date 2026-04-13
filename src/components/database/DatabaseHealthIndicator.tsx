@@ -45,7 +45,7 @@ export const DatabaseHealthIndicator: React.FC<DatabaseHealthIndicatorProps> = (
     retry: (failureCount, error) => {
       // Don't retry on auth errors
       if (error && typeof error === 'object') {
-        const errorMessage = 'message' in error ? (error as any).message : '';
+        const errorMessage = 'message' in error ? (error as { message: string }).message : '';
         if (errorMessage.includes('password authentication failed') || 
             errorMessage.includes('connection refused')) {
           return false;

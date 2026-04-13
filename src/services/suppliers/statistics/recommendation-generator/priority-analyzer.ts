@@ -5,11 +5,12 @@
 
 import { Supplier } from '@/types/supplier/base.types';
 import { CoreRecommendationEngine } from './core-recommendations';
-import type { 
-  ComplianceInfo, 
-  RecommendationItem, 
+import type {
+  ComplianceInfo,
+  RecommendationItem,
   ImprovementPlan,
 } from './recommendation-types';
+import type { PerformanceMetrics } from '../scorecard/types';
 
 export class RecommendationPriorityAnalyzer {
   /**
@@ -19,7 +20,7 @@ export class RecommendationPriorityAnalyzer {
     supplier: Supplier,
     overallScore: number,
     compliance: ComplianceInfo,
-    performanceMetrics?: any
+    performanceMetrics?: Partial<PerformanceMetrics>
   ): RecommendationItem[] {
     const recommendations: RecommendationItem[] = [];
 

@@ -4,6 +4,8 @@
  */
 
 import { ComplianceStatus as ReportComplianceStatus, SupplierDocument } from './report-types';
+
+type DocumentLike = SupplierDocument | Record<string, unknown>;
 import { ComplianceChecker } from './compliance-checker';
 
 export class ComplianceCalculator {
@@ -11,7 +13,7 @@ export class ComplianceCalculator {
    * Calculate compliance status from documents
    */
   static calculateComplianceFromDocuments(
-    documents: any[],
+    documents: DocumentLike[],
     businessType: string
   ): ReportComplianceStatus {
     const supplierDocuments = documents as unknown as SupplierDocument[];
@@ -55,7 +57,7 @@ export class ComplianceCalculator {
    */
   static calculateCategoryStatuses(
     _complianceStatus: ReportComplianceStatus,
-    documents: any[]
+    documents: DocumentLike[]
   ): Record<string, {
     status: 'compliant' | 'partial' | 'non-compliant';
     score: number;

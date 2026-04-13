@@ -119,7 +119,7 @@ function isRecoverableError(error: Error): boolean {
 /**
  * Execute a query with automatic retry logic
  */
-export async function executeQuery<T = any>(
+export async function executeQuery<T = unknown>(
   queryFn: (sql: ReturnType<typeof neon>) => Promise<T>,
   maxRetries: number = 2
 ): Promise<T> {

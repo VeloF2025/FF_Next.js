@@ -12,6 +12,7 @@ export * from './reporting';
 // Import classes for backward compatibility
 import { ComplianceReportBuilder } from './reporting/report-builder';
 import { ComplianceReportFormatter } from './reporting/report-formatter';
+import type { ComplianceReport } from './reporting/report-types';
 
 /**
  * Legacy ComplianceReportGenerator class for backward compatibility
@@ -37,7 +38,7 @@ export class ComplianceReportGenerator {
    * Export report in specified format
    * @deprecated Use ComplianceReportFormatter.exportReport instead
    */
-  static exportReport(report: any, format: 'json' | 'csv' | 'text' = 'json') {
+  static exportReport(report: ComplianceReport, format: 'json' | 'csv' | 'text' = 'json') {
     return ComplianceReportFormatter.exportReport(report, format);
   }
 }

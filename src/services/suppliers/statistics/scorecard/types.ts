@@ -111,7 +111,7 @@ export const RECOMMENDATION_THRESHOLDS = {
  * Scorecard generation result
  */
 export interface ScorecardGenerationResult {
-  scorecard: any; // Using SupplierScorecard from main types
+  scorecard: Record<string, unknown>; // Shape defined by SupplierScorecard in main statistics/types
   warnings: string[];
   dataQuality: {
     completeness: number;

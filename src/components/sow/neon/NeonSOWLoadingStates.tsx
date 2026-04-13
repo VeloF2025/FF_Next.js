@@ -16,7 +16,7 @@ export function NeonSOWLoadingState() {
 
 interface NeonSOWErrorStateProps {
   error?: string;
-  sowData?: any;
+  sowData?: { error?: string } | null;
   neonHealth?: NeonHealthData;
   neonConnected?: boolean;
 }

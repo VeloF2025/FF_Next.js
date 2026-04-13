@@ -24,6 +24,10 @@ class DatabaseHealthMonitor {
 
   private checkInterval: NodeJS.Timeout | null = null;
   private readonly MAX_CONSECUTIVE_FAILURES = 3;
+
+  get isMonitoring(): boolean {
+    return this.checkInterval !== null;
+  }
   private readonly CHECK_INTERVAL_MS = 30000; // 30 seconds
 
   /**
@@ -202,7 +206,7 @@ export function useDatabaseHealth() {
   return {
     ...healthStatus,
     checkHealth: () => databaseHealthMonitor.checkHealth(),
-    isMonitoring: (databaseHealthMonitor as any).checkInterval !== null,
+    isMonitoring: databaseHealthMonitor.isMonitoring,
   };
 }
 

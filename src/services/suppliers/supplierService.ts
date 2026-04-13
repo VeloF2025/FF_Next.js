@@ -29,12 +29,14 @@ import { SupplierSearchService } from './supplier.search';
 import { SupplierComplianceService } from './supplier.compliance';
 import { SupplierSubscriptionService } from './supplier.subscriptions';
 import { SupplierStatisticsService } from './supplier.statistics';
-import type { 
-  Supplier, 
-  SupplierFormData, 
+import type {
+  Supplier,
+  SupplierFormData,
   SupplierStatus,
   SupplierRating,
-  PerformancePeriod
+  PerformancePeriod,
+  ComplianceStatus,
+  SupplierDocument
 } from '@/types/supplier/base.types';
 
 /**
@@ -144,14 +146,14 @@ export const supplierService = {
   /**
    * @deprecated Use SupplierComplianceService.updateCompliance() instead
    */
-  async updateCompliance(id: string, compliance: any): Promise<void> {
+  async updateCompliance(id: string, compliance: Partial<ComplianceStatus>): Promise<void> {
     return SupplierComplianceService.updateCompliance(id, compliance);
   },
 
   /**
    * @deprecated Use SupplierComplianceService.addDocument() instead
    */
-  async addDocument(id: string, document: any): Promise<void> {
+  async addDocument(id: string, document: Omit<SupplierDocument, 'id'>): Promise<void> {
     await SupplierComplianceService.addDocument(id, document);
   },
 

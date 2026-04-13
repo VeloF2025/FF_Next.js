@@ -3,7 +3,7 @@ export interface SOWUploadStep {
   title: string;
   description: string;
   file?: File;
-  data?: any[];
+  data?: Record<string, unknown>[];
   completed: boolean;
   required?: boolean;
 }

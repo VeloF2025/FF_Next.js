@@ -4,9 +4,10 @@
 
 import { useState, useEffect } from 'react';
 import { apiSOWService } from '@/services/sow/apiSOWService';
+import type { SOWData } from '@/types/sow/base.types';
 
 export function useSOWData(projectId: string) {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<SOWData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

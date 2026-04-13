@@ -4,8 +4,15 @@
 
 import { MapPin, Home, Cable } from 'lucide-react';
 
+interface SOWSummary {
+  total_poles?: number;
+  total_drops?: number;
+  total_fibre_segments?: number;
+  total_fibre_length?: number;
+}
+
 interface SOWSummaryViewProps {
-  summary: any;
+  summary: SOWSummary;
 }
 
 export function SOWSummaryView({ summary }: SOWSummaryViewProps) {

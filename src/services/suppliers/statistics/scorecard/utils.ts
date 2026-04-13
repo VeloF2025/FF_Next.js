@@ -179,7 +179,7 @@ export class SupplierUtils {
   /**
    * Safe number conversion
    */
-  static toSafeNumber(value: any, defaultValue: number = 0): number {
+  static toSafeNumber(value: unknown, defaultValue: number = 0): number {
     const num = Number(value);
     return isNaN(num) ? defaultValue : num;
   }

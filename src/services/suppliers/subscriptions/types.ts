@@ -3,7 +3,7 @@
  * Type definitions for real-time supplier subscriptions
  */
 
-import { Supplier, SupplierStatus } from '@/types/supplier/base.types';
+import { Supplier, SupplierStatus, SupplierRating, ComplianceStatus } from '@/types/supplier/base.types';
 
 /**
  * Subscription callback types
@@ -35,7 +35,7 @@ export interface SubscriptionOptions {
  */
 export interface SupplierRatingData {
   id: string;
-  rating: any;
+  rating: SupplierRating | number;
   companyName: string;
 }
 
@@ -45,7 +45,7 @@ export interface SupplierRatingData {
 export interface SupplierComplianceData {
   id: string;
   companyName: string;
-  complianceStatus: any;
+  complianceStatus: ComplianceStatus;
   status: SupplierStatus;
 }
 

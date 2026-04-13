@@ -83,7 +83,7 @@ export interface SupplierEvaluationReport {
  */
 export interface IRatingService {
   updateRating(id: string, rating: RatingUpdateData, reviewerId?: string): Promise<void>;
-  normalizeRating(rating: any): SupplierRating;
+  normalizeRating(rating: Partial<SupplierRating> | number | unknown): SupplierRating;
   calculateOverallRating(rating: SupplierRating): number;
 }
 

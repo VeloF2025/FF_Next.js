@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Search, X, TrendingUp, Clock, Users, Briefcase, User, Building } from 'lucide-react';
-import { useGlobalSearch } from '@/hooks/useGlobalSearch';
+import { useGlobalSearch, type SearchResult } from '@/hooks/useGlobalSearch';
 import { useRouter } from 'next/navigation';
 
 export function GlobalSearch() {
@@ -59,7 +59,7 @@ export function GlobalSearch() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, clearSearch]);
 
-  const handleResultClick = (result: any) => {
+  const handleResultClick = (result: SearchResult) => {
     // Navigate based on result type
     switch (result.type) {
       case 'project':

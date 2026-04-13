@@ -12,7 +12,7 @@ export interface CatalogItem {
   subcategory?: string;
   uom: string;
   price?: number; // Optional price for matching
-  specifications?: Record<string, any>;
+  specifications?: Record<string, unknown>;
   aliases?: string[]; // Alternative names/codes
   keywords?: string[]; // Search keywords
   status: 'active' | 'inactive' | 'discontinued';

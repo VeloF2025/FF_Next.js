@@ -3,6 +3,7 @@
  */
 
 import { MapPin, Home, Cable, CheckCircle, LucideIcon } from 'lucide-react';
+import type { SOWData } from '@/types/sow/base.types';
 
 export interface SOWDataViewerProps {
   projectId: string;
@@ -18,7 +19,7 @@ export interface TabConfig {
   count: number | null;
 }
 
-export const getTabsConfig = (data: any): TabConfig[] => [
+export const getTabsConfig = (data: Partial<SOWData> | null | undefined): TabConfig[] => [
   { 
     id: 'summary' as const, 
     label: 'Summary', 
