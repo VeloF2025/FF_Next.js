@@ -100,7 +100,7 @@ describe('POST /api/noc/tickets/[id]/risk-acceptance', () => {
     vi.mocked(riskAcceptanceService.createRiskAcceptance).mockResolvedValue(mockRiskAcceptance);
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/risk-acceptance/route'
+      '@/app/api/noc/tickets/[id]/risk-acceptance/route'
     );
 
     const requestBody = {
@@ -159,7 +159,7 @@ describe('POST /api/noc/tickets/[id]/risk-acceptance', () => {
     vi.mocked(riskAcceptanceService.createRiskAcceptance).mockResolvedValue(minimalRisk);
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/risk-acceptance/route'
+      '@/app/api/noc/tickets/[id]/risk-acceptance/route'
     );
 
     const requestBody = {
@@ -189,7 +189,7 @@ describe('POST /api/noc/tickets/[id]/risk-acceptance', () => {
   it('should return 422 when missing required fields', async () => {
     // Arrange
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/risk-acceptance/route'
+      '@/app/api/noc/tickets/[id]/risk-acceptance/route'
     );
 
     const requestBody = {
@@ -219,7 +219,7 @@ describe('POST /api/noc/tickets/[id]/risk-acceptance', () => {
   it('should return 422 for invalid ticket ID format', async () => {
     // Arrange
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/risk-acceptance/route'
+      '@/app/api/noc/tickets/[id]/risk-acceptance/route'
     );
 
     const requestBody = {
@@ -254,7 +254,7 @@ describe('POST /api/noc/tickets/[id]/risk-acceptance', () => {
     );
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/risk-acceptance/route'
+      '@/app/api/noc/tickets/[id]/risk-acceptance/route'
     );
 
     const requestBody = {
@@ -288,7 +288,7 @@ describe('POST /api/noc/tickets/[id]/risk-acceptance', () => {
     );
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/risk-acceptance/route'
+      '@/app/api/noc/tickets/[id]/risk-acceptance/route'
     );
 
     const requestBody = {
@@ -332,7 +332,7 @@ describe('GET /api/noc/tickets/[id]/risk-acceptances', () => {
     vi.mocked(riskAcceptanceService.listRisksForTicket).mockResolvedValue(mockRisksList);
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/risk-acceptances/route'
+      '@/app/api/noc/tickets/[id]/risk-acceptances/route'
     );
 
     const request = new NextRequest(
@@ -357,7 +357,7 @@ describe('GET /api/noc/tickets/[id]/risk-acceptances', () => {
     vi.mocked(riskAcceptanceService.listRisksForTicket).mockResolvedValue([mockResolvedRisk]);
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/risk-acceptances/route'
+      '@/app/api/noc/tickets/[id]/risk-acceptances/route'
     );
 
     const request = new NextRequest(
@@ -381,7 +381,7 @@ describe('GET /api/noc/tickets/[id]/risk-acceptances', () => {
     vi.mocked(riskAcceptanceService.listRisksForTicket).mockResolvedValue([]);
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/risk-acceptances/route'
+      '@/app/api/noc/tickets/[id]/risk-acceptances/route'
     );
 
     const request = new NextRequest(
@@ -401,7 +401,7 @@ describe('GET /api/noc/tickets/[id]/risk-acceptances', () => {
   it('should return 422 for invalid ticket ID format', async () => {
     // Arrange
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/risk-acceptances/route'
+      '@/app/api/noc/tickets/[id]/risk-acceptances/route'
     );
 
     const request = new NextRequest(
@@ -426,7 +426,7 @@ describe('GET /api/noc/tickets/[id]/risk-acceptances', () => {
     );
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/risk-acceptances/route'
+      '@/app/api/noc/tickets/[id]/risk-acceptances/route'
     );
 
     const request = new NextRequest(
@@ -460,7 +460,7 @@ describe('PUT /api/noc/risk-acceptances/[id]/resolve', () => {
     vi.mocked(riskAcceptanceService.resolveRiskAcceptance).mockResolvedValue(mockResolvedRisk);
 
     const { PUT } = await loadRouteHandlers(
-      '../../../../app/api/noc/risk-acceptances/[id]/resolve/route'
+      '@/app/api/noc/risk-acceptances/[id]/resolve/route'
     );
 
     const requestBody = {
@@ -498,7 +498,7 @@ describe('PUT /api/noc/risk-acceptances/[id]/resolve', () => {
   it('should return 422 when missing resolved_by', async () => {
     // Arrange
     const { PUT } = await loadRouteHandlers(
-      '../../../../app/api/noc/risk-acceptances/[id]/resolve/route'
+      '@/app/api/noc/risk-acceptances/[id]/resolve/route'
     );
 
     const requestBody = {
@@ -528,7 +528,7 @@ describe('PUT /api/noc/risk-acceptances/[id]/resolve', () => {
   it('should return 422 when missing resolution_notes', async () => {
     // Arrange
     const { PUT } = await loadRouteHandlers(
-      '../../../../app/api/noc/risk-acceptances/[id]/resolve/route'
+      '@/app/api/noc/risk-acceptances/[id]/resolve/route'
     );
 
     const requestBody = {
@@ -557,7 +557,7 @@ describe('PUT /api/noc/risk-acceptances/[id]/resolve', () => {
   it('should return 422 for invalid risk ID format', async () => {
     // Arrange
     const { PUT } = await loadRouteHandlers(
-      '../../../../app/api/noc/risk-acceptances/[id]/resolve/route'
+      '@/app/api/noc/risk-acceptances/[id]/resolve/route'
     );
 
     const requestBody = {
@@ -591,7 +591,7 @@ describe('PUT /api/noc/risk-acceptances/[id]/resolve', () => {
     );
 
     const { PUT } = await loadRouteHandlers(
-      '../../../../app/api/noc/risk-acceptances/[id]/resolve/route'
+      '@/app/api/noc/risk-acceptances/[id]/resolve/route'
     );
 
     const requestBody = {
@@ -624,7 +624,7 @@ describe('PUT /api/noc/risk-acceptances/[id]/resolve', () => {
     );
 
     const { PUT } = await loadRouteHandlers(
-      '../../../../app/api/noc/risk-acceptances/[id]/resolve/route'
+      '@/app/api/noc/risk-acceptances/[id]/resolve/route'
     );
 
     const requestBody = {

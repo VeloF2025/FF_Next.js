@@ -228,7 +228,7 @@ describe('POST /api/noc/tickets/[id]/handover', () => {
     vi.mocked(handoverService.createHandoverSnapshot).mockResolvedValue(mockHandoverSnapshot);
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/handover/route'
+      '@/app/api/noc/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -292,7 +292,7 @@ describe('POST /api/noc/tickets/[id]/handover', () => {
     vi.mocked(handoverService.createHandoverSnapshot).mockResolvedValue(minimalSnapshot);
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/handover/route'
+      '@/app/api/noc/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -323,7 +323,7 @@ describe('POST /api/noc/tickets/[id]/handover', () => {
     vi.mocked(handoverService.validateHandoverGate).mockResolvedValue(mockGateValidationFail);
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/handover/route'
+      '@/app/api/noc/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -360,7 +360,7 @@ describe('POST /api/noc/tickets/[id]/handover', () => {
   it('should return 422 when missing handover_type', async () => {
     // Arrange
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/handover/route'
+      '@/app/api/noc/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -390,7 +390,7 @@ describe('POST /api/noc/tickets/[id]/handover', () => {
   it('should return 422 when missing handover_by', async () => {
     // Arrange
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/handover/route'
+      '@/app/api/noc/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -420,7 +420,7 @@ describe('POST /api/noc/tickets/[id]/handover', () => {
   it('should return 422 for invalid ticket ID format', async () => {
     // Arrange
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/handover/route'
+      '@/app/api/noc/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -450,7 +450,7 @@ describe('POST /api/noc/tickets/[id]/handover', () => {
   it('should return 422 for invalid handover_by UUID format', async () => {
     // Arrange
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/handover/route'
+      '@/app/api/noc/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -484,7 +484,7 @@ describe('POST /api/noc/tickets/[id]/handover', () => {
     );
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/handover/route'
+      '@/app/api/noc/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -517,7 +517,7 @@ describe('POST /api/noc/tickets/[id]/handover', () => {
     );
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/handover/route'
+      '@/app/api/noc/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -551,7 +551,7 @@ describe('POST /api/noc/tickets/[id]/handover', () => {
     );
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/handover/route'
+      '@/app/api/noc/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -580,7 +580,7 @@ describe('POST /api/noc/tickets/[id]/handover', () => {
   it('should return 400 for invalid JSON in request body', async () => {
     // Arrange
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/handover/route'
+      '@/app/api/noc/tickets/[id]/handover/route'
     );
 
     const request = new NextRequest(
@@ -619,7 +619,7 @@ describe('GET /api/noc/tickets/[id]/handover-history', () => {
     vi.mocked(handoverService.getHandoverHistory).mockResolvedValue(mockHandoverHistory);
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/handover-history/route'
+      '@/app/api/noc/tickets/[id]/handover-history/route'
     );
 
     const request = new NextRequest(
@@ -657,7 +657,7 @@ describe('GET /api/noc/tickets/[id]/handover-history', () => {
     vi.mocked(handoverService.getHandoverHistory).mockResolvedValue(emptyHistory);
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/handover-history/route'
+      '@/app/api/noc/tickets/[id]/handover-history/route'
     );
 
     const request = new NextRequest(
@@ -679,7 +679,7 @@ describe('GET /api/noc/tickets/[id]/handover-history', () => {
   it('should return 422 for invalid ticket ID format', async () => {
     // Arrange
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/handover-history/route'
+      '@/app/api/noc/tickets/[id]/handover-history/route'
     );
 
     const request = new NextRequest(
@@ -704,7 +704,7 @@ describe('GET /api/noc/tickets/[id]/handover-history', () => {
     );
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/handover-history/route'
+      '@/app/api/noc/tickets/[id]/handover-history/route'
     );
 
     const request = new NextRequest(
@@ -728,7 +728,7 @@ describe('GET /api/noc/tickets/[id]/handover-history', () => {
     );
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/handover-history/route'
+      '@/app/api/noc/tickets/[id]/handover-history/route'
     );
 
     const request = new NextRequest(

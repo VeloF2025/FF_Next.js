@@ -122,7 +122,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(listTickets).mockResolvedValue(mockResponse);
 
-      const { GET } = await import('../../../../app/api/noc/tickets/route');
+      const { GET } = await import('@/app/api/noc/tickets/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets');
       const response = await GET(mockRequest);      const data = await response.json();
@@ -153,7 +153,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(listTickets).mockResolvedValue(mockResponse);
 
-      const { GET } = await import('../../../../app/api/noc/tickets/route');
+      const { GET } = await import('@/app/api/noc/tickets/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets?status=open');
       const response = await GET(mockRequest);      const data = await response.json();
@@ -179,7 +179,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(listTickets).mockResolvedValue(mockResponse);
 
-      const { GET } = await import('../../../../app/api/noc/tickets/route');
+      const { GET } = await import('@/app/api/noc/tickets/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets?ticket_type=maintenance');
       const response = await GET(mockRequest);
@@ -203,7 +203,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(listTickets).mockResolvedValue(mockResponse);
 
-      const { GET } = await import('../../../../app/api/noc/tickets/route');
+      const { GET } = await import('@/app/api/noc/tickets/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets?page=2&pageSize=10');
       const response = await GET(mockRequest);      const data = await response.json();
@@ -231,7 +231,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(listTickets).mockResolvedValue(mockResponse);
 
-      const { GET } = await import('../../../../app/api/noc/tickets/route');
+      const { GET } = await import('@/app/api/noc/tickets/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets?status=open&priority=high&assigned_to=user123');
       const response = await GET(mockRequest);
@@ -249,7 +249,7 @@ describe('Ticket CRUD API Endpoints', () => {
         new Error('Database connection failed')
       );
 
-      const { GET } = await import('../../../../app/api/noc/tickets/route');
+      const { GET } = await import('@/app/api/noc/tickets/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets');
       const response = await GET(mockRequest);      const data = await response.json();
@@ -281,7 +281,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(createTicket).mockResolvedValue(mockTicket);
 
-      const { POST } = await import('../../../../app/api/noc/tickets/route');
+      const { POST } = await import('@/app/api/noc/tickets/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets', {
         method: 'POST',
@@ -315,7 +315,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(createTicket).mockResolvedValue(mockTicket);
 
-      const { POST } = await import('../../../../app/api/noc/tickets/route');
+      const { POST } = await import('@/app/api/noc/tickets/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets', {
         method: 'POST',
@@ -334,7 +334,7 @@ describe('Ticket CRUD API Endpoints', () => {
         description: 'No title or source',
       };
 
-      const { POST } = await import('../../../../app/api/noc/tickets/route');
+      const { POST } = await import('@/app/api/noc/tickets/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets', {
         method: 'POST',
@@ -359,7 +359,7 @@ describe('Ticket CRUD API Endpoints', () => {
         ticket_type: 'fault_repair',
       };
 
-      const { POST } = await import('../../../../app/api/noc/tickets/route');
+      const { POST } = await import('@/app/api/noc/tickets/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets', {
         method: 'POST',
@@ -387,7 +387,7 @@ describe('Ticket CRUD API Endpoints', () => {
         new Error('Database error')
       );
 
-      const { POST } = await import('../../../../app/api/noc/tickets/route');
+      const { POST } = await import('@/app/api/noc/tickets/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets', {
         method: 'POST',
@@ -413,7 +413,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(getTicketById).mockResolvedValue(mockTicket);
 
-      const { GET } = await import('../../../../app/api/noc/tickets/[id]/route');
+      const { GET } = await import('@/app/api/noc/tickets/[id]/route');
 
       const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`);
       const response = await GET(mockRequest, { params: { id: ticketId } });      const data = await response.json();
@@ -431,7 +431,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(getTicketById).mockResolvedValue(null);
 
-      const { GET } = await import('../../../../app/api/noc/tickets/[id]/route');
+      const { GET } = await import('@/app/api/noc/tickets/[id]/route');
 
       const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`);
       const response = await GET(mockRequest, { params: { id: ticketId } });      const data = await response.json();
@@ -447,7 +447,7 @@ describe('Ticket CRUD API Endpoints', () => {
       const { getTicketById } = await import('../../services/ticketService');
       const invalidId = 'not-a-uuid';
 
-      const { GET } = await import('../../../../app/api/noc/tickets/[id]/route');
+      const { GET } = await import('@/app/api/noc/tickets/[id]/route');
 
       const mockRequest = new Request(`http://localhost/api/noc/tickets/${invalidId}`);
       const response = await GET(mockRequest, { params: { id: invalidId } });      const data = await response.json();
@@ -466,7 +466,7 @@ describe('Ticket CRUD API Endpoints', () => {
         new Error('Database error')
       );
 
-      const { GET } = await import('../../../../app/api/noc/tickets/[id]/route');
+      const { GET } = await import('@/app/api/noc/tickets/[id]/route');
 
       const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`);
       const response = await GET(mockRequest, { params: { id: ticketId } });      const data = await response.json();
@@ -496,7 +496,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(updateTicket).mockResolvedValue(updatedTicket);
 
-      const { PUT } = await import('../../../../app/api/noc/tickets/[id]/route');
+      const { PUT } = await import('@/app/api/noc/tickets/[id]/route');
 
       const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`, {
         method: 'PUT',
@@ -527,7 +527,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(updateTicket).mockResolvedValue(updatedTicket);
 
-      const { PUT } = await import('../../../../app/api/noc/tickets/[id]/route');
+      const { PUT } = await import('@/app/api/noc/tickets/[id]/route');
 
       const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`, {
         method: 'PUT',
@@ -547,7 +547,7 @@ describe('Ticket CRUD API Endpoints', () => {
         status: 'in_progress',
       };
 
-      const { PUT } = await import('../../../../app/api/noc/tickets/[id]/route');
+      const { PUT } = await import('@/app/api/noc/tickets/[id]/route');
 
       const mockRequest = new Request(`http://localhost/api/noc/tickets/${invalidId}`, {
         method: 'PUT',
@@ -566,7 +566,7 @@ describe('Ticket CRUD API Endpoints', () => {
       const { updateTicket } = await import('../../services/ticketService');
       const ticketId = '123e4567-e89b-12d3-a456-426614174000';
 
-      const { PUT } = await import('../../../../app/api/noc/tickets/[id]/route');
+      const { PUT } = await import('@/app/api/noc/tickets/[id]/route');
 
       const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`, {
         method: 'PUT',
@@ -591,7 +591,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(updateTicket).mockResolvedValue(null);
 
-      const { PUT } = await import('../../../../app/api/noc/tickets/[id]/route');
+      const { PUT } = await import('@/app/api/noc/tickets/[id]/route');
 
       const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`, {
         method: 'PUT',
@@ -616,7 +616,7 @@ describe('Ticket CRUD API Endpoints', () => {
         new Error('Database error')
       );
 
-      const { PUT } = await import('../../../../app/api/noc/tickets/[id]/route');
+      const { PUT } = await import('@/app/api/noc/tickets/[id]/route');
 
       const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`, {
         method: 'PUT',
@@ -644,7 +644,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(deleteTicket).mockResolvedValue(deletedTicket);
 
-      const { DELETE } = await import('../../../../app/api/noc/tickets/[id]/route');
+      const { DELETE } = await import('@/app/api/noc/tickets/[id]/route');
 
       const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`, {
         method: 'DELETE',
@@ -663,7 +663,7 @@ describe('Ticket CRUD API Endpoints', () => {
       const { deleteTicket } = await import('../../services/ticketService');
       const invalidId = 'not-a-uuid';
 
-      const { DELETE } = await import('../../../../app/api/noc/tickets/[id]/route');
+      const { DELETE } = await import('@/app/api/noc/tickets/[id]/route');
 
       const mockRequest = new Request(`http://localhost/api/noc/tickets/${invalidId}`, {
         method: 'DELETE',
@@ -682,7 +682,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(deleteTicket).mockResolvedValue(null);
 
-      const { DELETE } = await import('../../../../app/api/noc/tickets/[id]/route');
+      const { DELETE } = await import('@/app/api/noc/tickets/[id]/route');
 
       const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`, {
         method: 'DELETE',
@@ -702,7 +702,7 @@ describe('Ticket CRUD API Endpoints', () => {
         new Error('Database error')
       );
 
-      const { DELETE } = await import('../../../../app/api/noc/tickets/[id]/route');
+      const { DELETE } = await import('@/app/api/noc/tickets/[id]/route');
 
       const mockRequest = new Request(`http://localhost/api/noc/tickets/${ticketId}`, {
         method: 'DELETE',
