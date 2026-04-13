@@ -220,11 +220,12 @@ describe('Attachment Service - VF Storage API Integration', () => {
       const result = await uploadAttachment(request);
 
       // Verify VF Storage API was called correctly
+      // Implementation uses flat category 'ticket-attachments' and prefixes filename with ticketId
       expect(vfStorage.uploadFile).toHaveBeenCalledWith(
-        expect.any(Buffer),
+        expect.anything(),
         'maintenance',
-        expect.stringContaining('attachments/ticket-uuid-123'),
-        expect.stringMatching(/^\d+_photo\.jpg$/)
+        'ticket-attachments',
+        expect.stringMatching(/^ticket-uuid-123_\d+_photo\.jpg$/)
       );
 
       // Verify DB record was created
@@ -555,7 +556,7 @@ describe('Attachment Service - VF Storage API Integration', () => {
         }
       ];
 
-      vi.mocked(query).mockResolvedValue({ rows: mockAttachments, rowCount: 2 });
+      vi.mocked(query).mockResolvedValue(mockAttachments);
 
       const result = await listAttachmentsForTicket(ticketId);
 
@@ -593,7 +594,7 @@ describe('Attachment Service - VF Storage API Integration', () => {
         }
       ];
 
-      vi.mocked(query).mockResolvedValue({ rows: mockAttachments, rowCount: 1 });
+      vi.mocked(query).mockResolvedValue(mockAttachments);
 
       const result = await listAttachmentsForTicket(ticketId, filters);
 
@@ -612,7 +613,7 @@ describe('Attachment Service - VF Storage API Integration', () => {
         is_evidence: true
       };
 
-      vi.mocked(query).mockResolvedValue({ rows: [], rowCount: 0 });
+      vi.mocked(query).mockResolvedValue([]);
 
       await listAttachmentsForTicket(ticketId, filters);
 
@@ -628,7 +629,7 @@ describe('Attachment Service - VF Storage API Integration', () => {
         verification_step_id: 'step-uuid-789'
       };
 
-      vi.mocked(query).mockResolvedValue({ rows: [], rowCount: 0 });
+      vi.mocked(query).mockResolvedValue([]);
 
       await listAttachmentsForTicket(ticketId, filters);
 
@@ -639,7 +640,7 @@ describe('Attachment Service - VF Storage API Integration', () => {
     });
 
     it('should return empty result for ticket with no attachments', async () => {
-      vi.mocked(query).mockResolvedValue({ rows: [], rowCount: 0 });
+      vi.mocked(query).mockResolvedValue([]);
 
       const result = await listAttachmentsForTicket('ticket-uuid-999');
 
@@ -674,7 +675,7 @@ describe('Attachment Service - VF Storage API Integration', () => {
       vi.mocked(queryOne).mockResolvedValueOnce(mockAttachment);
 
       // Mock delete from DB
-      vi.mocked(query).mockResolvedValue({ rows: [], rowCount: 1 });
+      vi.mocked(query).mockResolvedValue([]);
 
       // Mock delete from VF Storage
       vi.mocked(vfStorage.deleteFile).mockResolvedValue(undefined);
@@ -723,7 +724,7 @@ describe('Attachment Service - VF Storage API Integration', () => {
 
       vi.mocked(queryOne).mockResolvedValueOnce(mockAttachment);
       vi.mocked(vfStorage.deleteFile).mockRejectedValue(new Error('Storage error'));
-      vi.mocked(query).mockResolvedValue({ rows: [], rowCount: 1 });
+      vi.mocked(query).mockResolvedValue([]);
 
       // Should not throw - logs warning and continues
       await deleteAttachment(attachmentId);
@@ -784,8 +785,8 @@ describe('Attachment Service - VF Storage API Integration', () => {
       ];
 
       vi.mocked(query)
-        .mockResolvedValueOnce({ rows: mockAttachments, rowCount: 2 }) // attachments query
-        .mockResolvedValueOnce({ rows: mockSteps, rowCount: 2 }); // verification steps query
+        .mockResolvedValueOnce(mockAttachments) // attachments query
+        .mockResolvedValueOnce(mockSteps); // verification steps query
 
       const result = await getPhotoEvidenceSummary(ticketId);
 
@@ -800,8 +801,8 @@ describe('Attachment Service - VF Storage API Integration', () => {
       const ticketId = 'ticket-uuid-999';
 
       vi.mocked(query)
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // no attachments
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 }); // no steps
+        .mockResolvedValueOnce([]) // no attachments
+        .mockResolvedValueOnce([]); // no steps
 
       const result = await getPhotoEvidenceSummary(ticketId);
 
