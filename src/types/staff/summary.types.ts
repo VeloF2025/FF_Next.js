@@ -18,6 +18,6 @@ export interface StaffSummary {
   utilizationRate: number;
   overallocatedStaff: number;
   underutilizedStaff: number;
-  topPerformers?: any[];
-  topSkills?: any[];
+  topPerformers?: Record<string, unknown>[];
+  topSkills?: Record<string, unknown>[];
 }

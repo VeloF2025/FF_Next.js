@@ -139,7 +139,7 @@ export enum TaskStatus {
 
 // Hierarchy interfaces
 export interface ProjectHierarchy {
-  project: any; // Using any to avoid circular dependency
+  project: Record<string, unknown>; // Using unknown to avoid circular dependency
   phases: PhaseHierarchy[];
 }
 

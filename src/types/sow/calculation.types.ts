@@ -159,7 +159,7 @@ export interface ImportError {
   column: string;
   error_type: 'validation' | 'format' | 'missing' | 'duplicate' | 'constraint';
   error_message: string;
-  provided_value?: any;
+  provided_value?: unknown;
   expected_format?: string;
   severity: 'error' | 'warning' | 'info';
 }

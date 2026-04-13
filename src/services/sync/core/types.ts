@@ -43,14 +43,14 @@ export interface SyncError {
   message: string;
   entityId?: string;
   entityType?: string;
-  error?: any;
+  error?: unknown;
 }
 
 export interface RealtimeSyncEvent {
   type: 'added' | 'modified' | 'removed';
   entityType: string;
   entityId: string;
-  data?: any;
+  data?: Record<string, unknown>;
   timestamp: Date;
 }
 

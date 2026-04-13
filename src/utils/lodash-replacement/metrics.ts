@@ -6,7 +6,7 @@
 export class LodashReplacementMetrics {
   private static metrics = new Map<string, { calls: number; totalTime: number }>();
 
-  static trackPerformance<T extends (...args: any[]) => any>(
+  static trackPerformance<T extends (...args: unknown[]) => unknown>(
     name: string,
     func: T
   ): T {

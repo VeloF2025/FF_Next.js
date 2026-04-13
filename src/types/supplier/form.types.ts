@@ -76,5 +76,5 @@ export interface SupplierSearchFilters {
 export interface SupplierBulkAction {
   action: 'activate' | 'deactivate' | 'delete' | 'tag' | 'export';
   supplierIds: string[];
-  data?: any; // Additional data for specific actions
+  data?: Record<string, unknown>; // Additional data for specific actions
 }

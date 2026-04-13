@@ -49,7 +49,7 @@ export interface Project {
   deliverables?: Deliverable[];
   risks?: string[];
   dependencies?: string[];
-  kpiTargets?: any; // TODO: Import ProjectKPITargets from kpi.types
+  kpiTargets?: Record<string, unknown>; // TODO: Import ProjectKPITargets from kpi.types
   metadata?: ProjectMetadata;
   tags?: string[];
   attachments?: Attachment[];
@@ -125,7 +125,7 @@ export interface ProjectMetadata {
   importedFrom?: string;
   exportedTo?: string;
   lastSyncDate?: Date | Timestamp | string;
-  customFields?: Record<string, any>;
+  customFields?: Record<string, unknown>;
 }
 
 export interface Attachment {

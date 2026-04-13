@@ -42,5 +42,5 @@ export interface StaffImportError {
   row: number;
   field: string;
   message: string;
-  value?: any;
+  value?: unknown;
 }

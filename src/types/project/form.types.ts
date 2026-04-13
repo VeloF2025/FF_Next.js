@@ -19,9 +19,9 @@ export interface ProjectFormData {
   projectManagerId?: string;
   teamMembers?: string[];
   contractorId?: string;
-  milestones?: any[];
+  milestones?: Record<string, unknown>[];
   tags?: string[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ProjectFilter {
