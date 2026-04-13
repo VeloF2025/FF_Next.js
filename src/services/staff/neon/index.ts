@@ -17,7 +17,7 @@ import { log } from '@/lib/logger';
 /**
  * Helper to safely cast Neon query results to array
  */
-function asArray<T = any>(result: unknown): T[] {
+function asArray<T = unknown>(result: unknown): T[] {
   if (Array.isArray(result)) return result as T[];
   return [];
 }
@@ -82,7 +82,7 @@ export const staffNeonService = {
   async getActiveStaff(): Promise<StaffDropdownOption[]> {
     try {
       const result = await queryActiveStaff();
-      return asArray(result).map((staff: any) => mapToDropdownOption(staff));
+      return asArray<Record<string, unknown>>(result).map((staff) => mapToDropdownOption(staff));
     } catch (error) {
       log.error('Error fetching active staff:', { data: error }, 'index');
       throw error;
@@ -95,7 +95,7 @@ export const staffNeonService = {
   async getProjectManagers(): Promise<StaffDropdownOption[]> {
     try {
       const result = await queryProjectManagers();
-      return asArray(result).map((staff: any) => mapToDropdownOption(staff, true));
+      return asArray<Record<string, unknown>>(result).map((staff) => mapToDropdownOption(staff, true));
     } catch (error) {
       log.error('Error fetching project managers:', { data: error }, 'index');
       throw error;

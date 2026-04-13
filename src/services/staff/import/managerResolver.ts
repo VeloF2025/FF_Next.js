@@ -1,4 +1,5 @@
 import { log } from '@/lib/logger';
+import { StaffImportRow } from '@/types/staff/import.types';
 
 /**
  * Manager Resolver
@@ -46,7 +47,7 @@ export async function findManagerByName(managerName: string): Promise<string | n
 /**
  * Get unique manager names from import rows
  */
-export function extractUniqueManagers(rows: any[]): Set<string> {
+export function extractUniqueManagers(rows: StaffImportRow[]): Set<string> {
   const managerNames = new Set<string>();
   
   rows.forEach(row => {
@@ -61,7 +62,7 @@ export function extractUniqueManagers(rows: any[]): Set<string> {
 /**
  * Sort rows to process managers first
  */
-export function sortByManagerHierarchy(rows: any[], managerNames: Set<string>): any[] {
+export function sortByManagerHierarchy(rows: StaffImportRow[], managerNames: Set<string>): StaffImportRow[] {
   return [...rows].sort((a, b) => {
     // If A is a manager and B is not, A comes first
     const aIsManager = managerNames.has(a.name?.trim() || '');

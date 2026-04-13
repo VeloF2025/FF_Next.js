@@ -40,7 +40,9 @@ interface StaffService {
 export const staffService: StaffService = {
   // Main CRUD operations
   getAll: async (filter?: StaffFilter): Promise<StaffMember[]> => {
-    return isBrowser ? staffApiService.getAll(filter as any) : staffNeonService.getAll(filter as any);
+    return isBrowser
+      ? staffApiService.getAll(filter as Record<string, unknown>)
+      : staffNeonService.getAll(filter);
   },
 
   getById: async (id: string): Promise<StaffMember | null> => {
@@ -79,7 +81,7 @@ export const staffService: StaffService = {
           name: s.name,
           email: s.email,
           position: s.position as string,
-          department: s.department as any,
+          department: s.department,
           status: s.status,
           currentProjectCount: s.currentProjectCount,
           maxProjectCount: s.maxProjectCount,

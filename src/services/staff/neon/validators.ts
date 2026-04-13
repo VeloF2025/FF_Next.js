@@ -62,7 +62,7 @@ export function processReportsToField(reportsTo: string | undefined | null): str
 /**
  * Log debug information for staff data
  */
-export function logDebugInfo(_operation: string, data: any, reportsTo?: any): void {
+export function logDebugInfo(_operation: string, data: unknown, reportsTo?: unknown): void {
 
   log.info('1. Raw input data:', { data: JSON.stringify(data, null, 2) }, 'validators');
   
@@ -82,7 +82,7 @@ export function logDebugInfo(_operation: string, data: any, reportsTo?: any): vo
 /**
  * Log error information
  */
-export function logError(operation: string, error: unknown, data: any): void {
+export function logError(operation: string, error: unknown, data: StaffFormData): void {
   log.error(`❌ ${operation} ERROR - Detailed error info:`, { data: {
     message: error instanceof Error ? error.message : 'Unknown error',
     stack: error instanceof Error ? error.stack : 'No stack trace',

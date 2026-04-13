@@ -3,8 +3,9 @@
  * Type definitions for compliance reporting system
  */
 
-import { 
-  ComplianceStatus as BaseComplianceStatus
+import {
+  ComplianceStatus as BaseComplianceStatus,
+  DocumentType
 } from '../../../../types/supplier/base.types';
 
 // Re-export base SupplierDocument for compatibility
@@ -22,8 +23,8 @@ export interface ComplianceReport {
   lastUpdated: Date;
   
   // Legacy properties for backward compatibility
-  complianceStatus: any;
-  documents: any[];
+  complianceStatus: ComplianceStatus;
+  documents: SupplierDocumentReport[];
   
   // Document status
   totalDocuments: number;
@@ -112,7 +113,7 @@ export interface ComplianceStatus extends BaseComplianceStatus {
 export interface SupplierDocumentReport {
   // Base document fields
   id: string;
-  type: string;
+  type: DocumentType;
   name: string;
   url: string;
   expiryDate?: Date | string;
@@ -136,8 +137,8 @@ export interface SupplierDocumentReport {
   issuingAuthority?: string;
   documentNumber?: string;
   
-  // Status
-  status?: 'valid' | 'expired' | 'expiring' | 'rejected' | 'pending' | 'approved';
+  // Status - base statuses match BaseSupplierDocument; 'valid' and 'expiring' are report-level display states
+  status?: 'pending' | 'approved' | 'rejected' | 'expired';
   verificationStatus?: 'verified' | 'pending' | 'rejected';
   
   // Audit trail
@@ -168,7 +169,7 @@ export interface ReportTemplate {
     id: string;
     title: string;
     type: 'summary' | 'detailed' | 'chart' | 'table' | 'recommendations';
-    config: Record<string, any>;
+    config: Record<string, unknown>;
     order: number;
   }>;
   businessTypes?: string[];
