@@ -30,11 +30,12 @@ export async function querySnagsByReport(
 ) {
   if (status && category && severity && searchTerm) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, COALESCE(pole.longitude, dr.latitude) AS pole_latitude, COALESCE(pole.latitude, dr.longitude) AS pole_longitude, COALESCE(pole.zone_no, dr.zone_no) AS pole_zone_no, COALESCE(pole.pon_no, dr.pon_no) AS pole_pon_no
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, (tu.first_name || ' ' || tu.last_name) AS noc_ticket_assignee_name, COALESCE(pole.longitude, dr.latitude) AS pole_latitude, COALESCE(pole.latitude, dr.longitude) AS pole_longitude, COALESCE(pole.zone_no, dr.zone_no) AS pole_zone_no, COALESCE(pole.pon_no, dr.pon_no) AS pole_pon_no
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
       LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
+      LEFT JOIN users tu ON tu.id = mt.assigned_to
       LEFT JOIN poles pole ON pole.id = s.pole_ids[1]
       LEFT JOIN drops dr ON dr.id = s.drop_id
       WHERE s.report_id = ${reportId} AND s.status = ${status}
@@ -52,11 +53,12 @@ export async function querySnagsByReport(
 
   if (status && category && severity) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, COALESCE(pole.longitude, dr.latitude) AS pole_latitude, COALESCE(pole.latitude, dr.longitude) AS pole_longitude, COALESCE(pole.zone_no, dr.zone_no) AS pole_zone_no, COALESCE(pole.pon_no, dr.pon_no) AS pole_pon_no
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, (tu.first_name || ' ' || tu.last_name) AS noc_ticket_assignee_name, COALESCE(pole.longitude, dr.latitude) AS pole_latitude, COALESCE(pole.latitude, dr.longitude) AS pole_longitude, COALESCE(pole.zone_no, dr.zone_no) AS pole_zone_no, COALESCE(pole.pon_no, dr.pon_no) AS pole_pon_no
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
       LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
+      LEFT JOIN users tu ON tu.id = mt.assigned_to
       LEFT JOIN poles pole ON pole.id = s.pole_ids[1]
       LEFT JOIN drops dr ON dr.id = s.drop_id
       WHERE s.report_id = ${reportId} AND s.status = ${status}
@@ -72,11 +74,12 @@ export async function querySnagsByReport(
 
   if (status && category) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, COALESCE(pole.longitude, dr.latitude) AS pole_latitude, COALESCE(pole.latitude, dr.longitude) AS pole_longitude, COALESCE(pole.zone_no, dr.zone_no) AS pole_zone_no, COALESCE(pole.pon_no, dr.pon_no) AS pole_pon_no
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, (tu.first_name || ' ' || tu.last_name) AS noc_ticket_assignee_name, COALESCE(pole.longitude, dr.latitude) AS pole_latitude, COALESCE(pole.latitude, dr.longitude) AS pole_longitude, COALESCE(pole.zone_no, dr.zone_no) AS pole_zone_no, COALESCE(pole.pon_no, dr.pon_no) AS pole_pon_no
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
       LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
+      LEFT JOIN users tu ON tu.id = mt.assigned_to
       LEFT JOIN poles pole ON pole.id = s.pole_ids[1]
       LEFT JOIN drops dr ON dr.id = s.drop_id
       WHERE s.report_id = ${reportId} AND s.status = ${status} AND s.category = ${category}
@@ -91,11 +94,12 @@ export async function querySnagsByReport(
 
   if (status) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, COALESCE(pole.longitude, dr.latitude) AS pole_latitude, COALESCE(pole.latitude, dr.longitude) AS pole_longitude, COALESCE(pole.zone_no, dr.zone_no) AS pole_zone_no, COALESCE(pole.pon_no, dr.pon_no) AS pole_pon_no
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, (tu.first_name || ' ' || tu.last_name) AS noc_ticket_assignee_name, COALESCE(pole.longitude, dr.latitude) AS pole_latitude, COALESCE(pole.latitude, dr.longitude) AS pole_longitude, COALESCE(pole.zone_no, dr.zone_no) AS pole_zone_no, COALESCE(pole.pon_no, dr.pon_no) AS pole_pon_no
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
       LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
+      LEFT JOIN users tu ON tu.id = mt.assigned_to
       LEFT JOIN poles pole ON pole.id = s.pole_ids[1]
       LEFT JOIN drops dr ON dr.id = s.drop_id
       WHERE s.report_id = ${reportId} AND s.status = ${status}
@@ -140,11 +144,12 @@ export async function querySnagsByProject(
 ) {
   if (status && category && severity) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, COALESCE(pole.longitude, dr.latitude) AS pole_latitude, COALESCE(pole.latitude, dr.longitude) AS pole_longitude, COALESCE(pole.zone_no, dr.zone_no) AS pole_zone_no, COALESCE(pole.pon_no, dr.pon_no) AS pole_pon_no
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, (tu.first_name || ' ' || tu.last_name) AS noc_ticket_assignee_name, COALESCE(pole.longitude, dr.latitude) AS pole_latitude, COALESCE(pole.latitude, dr.longitude) AS pole_longitude, COALESCE(pole.zone_no, dr.zone_no) AS pole_zone_no, COALESCE(pole.pon_no, dr.pon_no) AS pole_pon_no
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
       LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
+      LEFT JOIN users tu ON tu.id = mt.assigned_to
       LEFT JOIN poles pole ON pole.id = s.pole_ids[1]
       LEFT JOIN drops dr ON dr.id = s.drop_id
       WHERE s.project_id = ${projectId} AND s.status = ${status}
@@ -160,11 +165,12 @@ export async function querySnagsByProject(
 
   if (status && category) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, COALESCE(pole.longitude, dr.latitude) AS pole_latitude, COALESCE(pole.latitude, dr.longitude) AS pole_longitude, COALESCE(pole.zone_no, dr.zone_no) AS pole_zone_no, COALESCE(pole.pon_no, dr.pon_no) AS pole_pon_no
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, (tu.first_name || ' ' || tu.last_name) AS noc_ticket_assignee_name, COALESCE(pole.longitude, dr.latitude) AS pole_latitude, COALESCE(pole.latitude, dr.longitude) AS pole_longitude, COALESCE(pole.zone_no, dr.zone_no) AS pole_zone_no, COALESCE(pole.pon_no, dr.pon_no) AS pole_pon_no
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
       LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
+      LEFT JOIN users tu ON tu.id = mt.assigned_to
       LEFT JOIN poles pole ON pole.id = s.pole_ids[1]
       LEFT JOIN drops dr ON dr.id = s.drop_id
       WHERE s.project_id = ${projectId} AND s.status = ${status} AND s.category = ${category}
@@ -179,11 +185,12 @@ export async function querySnagsByProject(
 
   if (status) {
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, COALESCE(pole.longitude, dr.latitude) AS pole_latitude, COALESCE(pole.latitude, dr.longitude) AS pole_longitude, COALESCE(pole.zone_no, dr.zone_no) AS pole_zone_no, COALESCE(pole.pon_no, dr.pon_no) AS pole_pon_no
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name, sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid, (tu.first_name || ' ' || tu.last_name) AS noc_ticket_assignee_name, COALESCE(pole.longitude, dr.latitude) AS pole_latitude, COALESCE(pole.latitude, dr.longitude) AS pole_longitude, COALESCE(pole.zone_no, dr.zone_no) AS pole_zone_no, COALESCE(pole.pon_no, dr.pon_no) AS pole_pon_no
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
       LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
+      LEFT JOIN users tu ON tu.id = mt.assigned_to
       LEFT JOIN poles pole ON pole.id = s.pole_ids[1]
       LEFT JOIN drops dr ON dr.id = s.drop_id
       WHERE s.project_id = ${projectId} AND s.status = ${status}
@@ -239,6 +246,7 @@ export async function querySnagsByProjectAndZone(
     const rows = await sql`
       SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name,
         sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid,
+        (tu.first_name || ' ' || tu.last_name) AS noc_ticket_assignee_name,
         COALESCE(pole.longitude, dr.latitude) AS pole_latitude,
         COALESCE(pole.latitude,  dr.longitude) AS pole_longitude,
         COALESCE(pole.zone_no,   dr.zone_no)  AS pole_zone_no,
@@ -247,6 +255,7 @@ export async function querySnagsByProjectAndZone(
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
       LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
+      LEFT JOIN users tu ON tu.id = mt.assigned_to
       LEFT JOIN poles pole ON pole.id = s.pole_ids[1]
       LEFT JOIN drops dr ON dr.id = s.drop_id
       WHERE s.project_id = ${projectId}
@@ -273,6 +282,7 @@ export async function querySnagsByProjectAndZone(
     const rows = await sql`
       SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name,
         sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid,
+        (tu.first_name || ' ' || tu.last_name) AS noc_ticket_assignee_name,
         COALESCE(pole.longitude, dr.latitude) AS pole_latitude,
         COALESCE(pole.latitude,  dr.longitude) AS pole_longitude,
         COALESCE(pole.zone_no,   dr.zone_no)  AS pole_zone_no,
@@ -281,6 +291,7 @@ export async function querySnagsByProjectAndZone(
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
       LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
+      LEFT JOIN users tu ON tu.id = mt.assigned_to
       LEFT JOIN poles pole ON pole.id = s.pole_ids[1]
       LEFT JOIN drops dr ON dr.id = s.drop_id
       WHERE s.project_id = ${projectId}
@@ -305,6 +316,7 @@ export async function querySnagsByProjectAndZone(
     const rows = await sql`
       SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name,
         sr.report_number, sr.audit_date, mt.ticket_uid AS noc_ticket_uid,
+        (tu.first_name || ' ' || tu.last_name) AS noc_ticket_assignee_name,
         COALESCE(pole.longitude, dr.latitude) AS pole_latitude,
         COALESCE(pole.latitude,  dr.longitude) AS pole_longitude,
         COALESCE(pole.zone_no,   dr.zone_no)  AS pole_zone_no,
@@ -313,6 +325,7 @@ export async function querySnagsByProjectAndZone(
       LEFT JOIN users u ON u.id = s.assigned_to
       LEFT JOIN snag_reports sr ON sr.id = s.report_id
       LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
+      LEFT JOIN users tu ON tu.id = mt.assigned_to
       LEFT JOIN poles pole ON pole.id = s.pole_ids[1]
       LEFT JOIN drops dr ON dr.id = s.drop_id
       WHERE s.project_id = ${projectId}

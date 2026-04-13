@@ -218,13 +218,13 @@ export function SnagListTable({
                         <span className="text-zinc-600">—</span>
                       )}
                     </td>
-                    {/* Assigned To */}
+                    {/* Assigned To — shows current NOC ticket assignee (live from ticket, not snag) */}
                     <td className="px-3 py-3 text-xs text-zinc-400 whitespace-nowrap">
-                      {snag.assigned_to_name ?? <span className="text-zinc-600">—</span>}
+                      {snag.noc_ticket_assignee_name ?? <span className="text-zinc-600">—</span>}
                     </td>
-                    {/* Created */}
+                    {/* Created — shows report audit date, not import date */}
                     <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">
-                      {formatDate(snag.created_at)}
+                      {formatDate(snag.audit_date ?? snag.created_at)}
                     </td>
                   </tr>,
 

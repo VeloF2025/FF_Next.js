@@ -126,6 +126,7 @@ export interface Snag {
   report_number?: string;
   audit_date?: string;
   noc_ticket_uid?: string | null;
+  noc_ticket_assignee_name?: string | null;
   pole_latitude?: string | null;
   pole_longitude?: string | null;
   pole_zone_no?: number | null;
