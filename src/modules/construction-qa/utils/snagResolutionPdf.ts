@@ -42,12 +42,16 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
     const res = await fetch(url);
     if (!res.ok) return null;
     const blob = await res.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror  = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
+    // Draw through canvas so the browser applies EXIF orientation
+    const bmp = await createImageBitmap(blob);
+    const canvas = document.createElement('canvas');
+    canvas.width = bmp.width;
+    canvas.height = bmp.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(bmp, 0, 0);
+    bmp.close();
+    return canvas.toDataURL('image/jpeg', 0.82);
   } catch { return null; }
 }
 
