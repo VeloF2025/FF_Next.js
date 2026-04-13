@@ -18,7 +18,7 @@ interface Props {
 }
 
 export function ExpensePivotTable({ pivot }: Props) {
-  const { months, yearGroups, rows, grandTotals } = pivot;
+  const { months: _months, yearGroups, rows, grandTotals } = pivot;
   const years = Object.keys(yearGroups).sort();
 
   const th = 'px-3 py-2.5 text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap';

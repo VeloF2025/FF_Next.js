@@ -13,7 +13,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Minus, BarChart3, Target, Clock } from 'lucide-react';
+import { BarChart3, Target, Clock } from 'lucide-react';
 import type {
   ReportFilters,
   TrendAnalysisResponse,
@@ -183,12 +183,6 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
 
     fetchTTA();
   }, [filters, refreshKey]);
-
-  const TrendIcon = trendData?.velocity?.installed_trend === 'up'
-    ? TrendingUp
-    : trendData?.velocity?.installed_trend === 'down'
-      ? TrendingDown
-      : Minus;
 
   return (
     <div className="p-6 space-y-6">

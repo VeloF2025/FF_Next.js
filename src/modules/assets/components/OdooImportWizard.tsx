@@ -26,7 +26,7 @@ import {
   ChevronLeft,
   X,
 } from 'lucide-react';
-import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
 // ============================================================================
 // Types

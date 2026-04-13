@@ -193,7 +193,7 @@ export const UnifiedReviewCard = React.memo(function UnifiedReviewCard({ dropNum
         {activeTab === 'wizard' && (
           <QaWizardContainer
             dropNumber={dropNumber}
-            onPhaseChange={(phase) => {
+            onPhaseChange={(_phase) => {
               // Could log phase changes or update parent state
             }}
             onComplete={handleQAWizardComplete}

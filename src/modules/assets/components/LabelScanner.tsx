@@ -19,7 +19,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
-  Image as ImageIcon,
 } from 'lucide-react';
 import { modalVariants, overlayVariants } from '@/lib/animations/modal-variants';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';

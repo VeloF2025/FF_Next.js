@@ -15,7 +15,7 @@ interface PrerequisitesPhaseProps {
 }
 
 export function PrerequisitesPhase({
-  dropNumber,
+  dropNumber: _dropNumber,
   state,
   onComplete,
   onRefresh,

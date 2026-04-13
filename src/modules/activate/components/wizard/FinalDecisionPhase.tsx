@@ -25,7 +25,6 @@ import {
   getTechnicianIssueDescription,
   detectSwappedSerials,
   type DrValidationData,
-  type TechnicianIssue,
 } from '../../services/qaAutoFailService';
 import { Button } from '@/components/ui/button';
 

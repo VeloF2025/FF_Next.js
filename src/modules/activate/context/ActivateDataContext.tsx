@@ -245,7 +245,7 @@ export function ActivateDataProvider({
 
   // Set up auto-refresh
   const {
-    refresh: autoRefresh,
+    refresh: _autoRefresh,
     pause: pauseAutoRefresh,
     resume: resumeAutoRefresh,
   } = useAutoRefresh(() => fetchData(false), {

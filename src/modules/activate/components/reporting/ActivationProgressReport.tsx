@@ -32,7 +32,6 @@ import type {
   ActivationProgressView,
   ActivationProgressGranularity,
   ProjectProgressNode,
-  ZoneProgressNode,
   FlatProgressRow,
 } from '../../types/reporting.types';
 
