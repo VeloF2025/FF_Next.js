@@ -3,7 +3,7 @@
  * Placeholder schema to fix build errors
  */
 
-import { pgTable, text, timestamp, integer, boolean, uuid, jsonb, decimal } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 // Basic projects table for reference
 export const projects = pgTable('projects', {

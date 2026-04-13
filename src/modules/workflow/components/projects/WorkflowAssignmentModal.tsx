@@ -3,11 +3,7 @@ import { useState, useEffect } from 'react';
 import {
   X,
   Search,
-  User,
-  Users,
-  FileText,
   CheckCircle2,
-  AlertTriangle,
 } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 
@@ -42,7 +38,7 @@ export function WorkflowAssignmentModal({
   // Data from APIs
   const [projects, setProjects] = useState<Project[]>([]);
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
-  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [_loadingProjects, setLoadingProjects] = useState(false);
   const [loadingStaff, setLoadingStaff] = useState(false);
 
   // Form state

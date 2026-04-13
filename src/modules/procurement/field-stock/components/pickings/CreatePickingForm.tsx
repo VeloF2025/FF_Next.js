@@ -12,7 +12,6 @@ import {
   Trash2,
   AlertCircle,
   Check,
-  ScanLine,
   ArrowRight
 } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
@@ -22,10 +21,8 @@ import { useStockItems } from '../../hooks/useStockItems';
 import { SignatureCapture } from './SignatureCapture';
 import type {
   CreatePickingInput,
-  CreatePickingLineInput,
   PickingType,
   StockLocation,
-  StockItem
 } from '../../types';
 
 interface PickingLineForm {
@@ -61,7 +58,7 @@ export function CreatePickingForm({
 }: CreatePickingFormProps) {
   const { createPicking, signPicking } = usePickings();
   const { locations, loading: loadingLocations } = useLocations({ autoFetch: true });
-  const { items: stockItems, loading: loadingItems } = useStockItems({ autoFetch: true });
+  const { items: stockItems, loading: _loadingItems } = useStockItems({ autoFetch: true });
 
   const [pickingType, setPickingType] = useState<PickingType>(defaultType);
   const [sourceLocationId, setSourceLocationId] = useState(defaultSourceId || '');
@@ -343,7 +340,7 @@ export function CreatePickingForm({
           </div>
         ) : (
           <div className="space-y-3">
-            {lines.map((line, index) => (
+            {lines.map((line, _index) => (
               <div
                 key={line.id}
                 className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 dark:border-gray-700 dark:bg-gray-800"

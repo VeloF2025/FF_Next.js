@@ -10,15 +10,13 @@
 
 import { neon, type NeonQueryFunction } from '@/lib/db-neon';
 import * as XLSX from 'xlsx';
-import { MaterialMatcher, MatchInput, MatchOptions } from './materialMatcher';
+import { MaterialMatcher } from './materialMatcher';
 import { CategoryMapper } from './categoryMapper';
-import { TextProcessor } from '@/lib/utils/catalog/textProcessor';
 import { log } from '@/lib/logger';
 import type {
   BOQImportResult,
   FiberBudgetCategoryCode,
   MaterialMatchResult,
-  BudgetItem,
 } from '@/types/procurement/material-catalog.types';
 
 export interface BOQRow {
@@ -52,21 +50,6 @@ export interface ImportProgress {
   total: number;
   message: string;
 }
-
-// Column mapping for Lawley BOQ format
-const COLUMN_MAPPING = {
-  A: 'itemNo',
-  B: 'uom',
-  C: 'itemCategory',
-  D: 'description',
-  E: 'quantity',
-  F: 'itemCode',
-  G: 'itemRate',
-  H: 'photonicsRef',
-  I: 'supplier',
-  J: 'leadTime',
-  K: 'totalCost',
-} as const;
 
 export class BOQImportEnhanced {
   private sql: NeonQueryFunction<false, false>;

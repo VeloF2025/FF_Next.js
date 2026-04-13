@@ -19,7 +19,6 @@ import { useState, useCallback, useRef, useEffect, type ChangeEvent } from 'reac
 import {
   X,
   Upload,
-  FileText,
   AlertCircle,
   Loader2,
   CheckCircle,
@@ -263,12 +262,6 @@ export function StaffDocumentUploadWizard({
     }
   };
 
-  const handleLabelClick = () => {
-    const fileInput = document.getElementById('wizard-file-upload') as HTMLInputElement;
-    if (fileInput) {
-      fileInput.click();
-    }
-  };
 
   // =========================================================================
   // Step 2: OCR Processing
@@ -463,8 +456,6 @@ export function StaffDocumentUploadWizard({
       const expiryDate = extractValue(finalFields.expiryDate) || extractValue(finalFields.expirationDate);
       const issuingAuthority = extractValue(finalFields.issuingAuthority);
       const issuingCountry = extractValue(finalFields.issuingCountry) || extractValue(finalFields.passportCountry);
-      const nationality = extractValue(finalFields.nationality);
-
       // Handle document number based on document type
       const isPassport = state.selectedDocumentType === 'passport';
       const documentNumber = isPassport ? passportNumber : idNumber;
@@ -1344,8 +1335,6 @@ export function StaffDocumentUploadWizard({
       ...state.extractedFields,
       ...state.fieldOverrides,
     };
-
-    const isDriversLicense = state.selectedDocumentType === 'drivers_license';
 
     return (
       <div className="space-y-4">

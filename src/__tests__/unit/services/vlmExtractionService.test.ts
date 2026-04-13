@@ -60,10 +60,6 @@ import {
   extractOntSerialFromBack,
   confirmSerialVisible,
   extractStep9Data,
-  type PowerMeterExtraction,
-  type SerialExtraction,
-  type SerialConfirmation,
-  type Step9Extraction,
 } from '@/modules/activate/services/vlmExtractionService';
 
 import { fetchPhotoAsBase64 } from '@/modules/activate/services/photoFetchService';

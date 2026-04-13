@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, Send, Bot, User, HelpCircle, Zap, Upload } from 'lucide-react';
+import { Send, Bot, User } from 'lucide-react';
 
 interface Message {
   id: string;
