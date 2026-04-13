@@ -9,6 +9,7 @@ import { ContractorFileDropZone } from './import/ContractorFileDropZone';
 import { ContractorFilePreview } from './import/ContractorFilePreview';
 import { ContractorImportResults } from './import/ContractorImportResults';
 import { ContractorImportInstructions } from './import/ContractorImportInstructions';
+import { contractorImportService } from '@/services/contractor/import/contractorImportService';
 
 export interface ContractorRecord {
   isValid: boolean;
@@ -41,13 +42,6 @@ export interface ContractorImportResult {
   errors: ContractorImportError[];
 }
 
-// Placeholder service - replace with actual implementation if needed
-const contractorImportService = {
-  parseFile: async (_file: File) => ({ contractors: [] } as ContractorImportData),
-  processFile: async (_file: File, _options?: ContractorImportOptions) => ({ contractors: [] } as ContractorImportData),
-  importContractors: async (_data: ContractorImportData, _options: ContractorImportOptions) => ({ successCount: 0, totalProcessed: 0, errors: [] } as ContractorImportResult),
-  downloadTemplate: async () => new Blob(),
-};
 
 interface ContractorImportProps {
   isOpen: boolean;
@@ -100,7 +94,7 @@ export function ContractorImport({
       const result = await contractorImportService.importContractors(importData, importOptions);
       setImportResult(result);
       setStep('results');
-      
+
       if (onComplete) {
         onComplete(result);
       }
