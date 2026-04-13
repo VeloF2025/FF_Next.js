@@ -33,7 +33,7 @@ function createMockTicket(overrides: Partial<Ticket> = {}): Ticket {
     external_id: null,
     title: 'Test Ticket',
     description: 'Test description',
-    ticket_type: 'fault_repair',
+    ticket_type: 'maintenance',
     priority: 'normal',
     status: 'open',
     dr_number: null,
@@ -78,6 +78,8 @@ vi.mock('../../services/ticketService', () => ({
   getTicketById: vi.fn(),
   updateTicket: vi.fn(),
   deleteTicket: vi.fn(),
+  logTicketActivity: vi.fn(async () => {}),
+  logTicketChanges: vi.fn(async () => {}),
 }));
 
 // Mock logger
@@ -89,6 +91,48 @@ vi.mock('@/lib/logger', () => ({
     warn: vi.fn(),
     debug: vi.fn(),
   }),
+}));
+
+// Mock next/headers so cookies() doesn't throw in test env
+vi.mock('next/headers', () => ({
+  cookies: vi.fn(() => ({ get: vi.fn(() => ({ value: 'mock-token' })) })),
+}));
+
+// Mock JWT verification to return a test user
+vi.mock('@/lib/auth/jwt', () => ({
+  verifyToken: vi.fn(async () => ({ sub: 'test-user-id-123' })),
+}));
+
+// Mock notification/side-effect services (non-blocking fire-and-forget)
+vi.mock('@/modules/noc/services/notificationTriggers', () => ({
+  triggerOnTicketAssignment: vi.fn(async () => {}),
+  triggerOnTeamAssignment: vi.fn(async () => {}),
+  triggerCreatorStatusUpdate: vi.fn(async () => {}),
+  triggerOnReassignment: vi.fn(async () => {}),
+  triggerOnTicketResolution: vi.fn(async () => {}),
+}));
+vi.mock('@/modules/noc/services/snagGroupNotifications', () => ({
+  notifySnagGroupOnCreate: vi.fn(async () => {}),
+  notifySnagGroupOnStatusChange: vi.fn(async () => {}),
+}));
+vi.mock('@/modules/noc/services/verificationService', () => ({
+  initializeVerificationSteps: vi.fn(async () => {}),
+}));
+vi.mock('@/modules/noc/services/teamService', () => ({
+  isTeamLead: vi.fn(async () => false),
+}));
+vi.mock('@/modules/noc/services/ticketEnrichmentService', () => ({
+  enrichTicketData: vi.fn(async (t: unknown) => t),
+}));
+vi.mock('@/modules/noc/services/qcontactSyncOutbound', () => ({
+  syncOutboundUpdate: vi.fn(async () => {}),
+}));
+vi.mock('@/modules/noc/services/dataSyncResolution', () => ({
+  markLinkedDataSyncResolved: vi.fn(async () => {}),
+}));
+vi.mock('@neondatabase/serverless', () => ({
+  neon: vi.fn(() => vi.fn(async () => [])),
+  neonConfig: {},
 }));
 
 describe('Ticket CRUD API Endpoints', () => {
@@ -112,12 +156,10 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const mockResponse = {
         tickets: mockTickets,
-        pagination: {
-          page: 1,
-          pageSize: 50,
-          total: 2,
-          totalPages: 1,
-        },
+        page: 1,
+        limit: 50,
+        total: 2,
+        total_pages: 1,
       };
 
       vi.mocked(listTickets).mockResolvedValue(mockResponse);
@@ -143,12 +185,10 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const mockResponse = {
         tickets: mockTickets,
-        pagination: {
-          page: 1,
-          pageSize: 50,
-          total: 1,
-          totalPages: 1,
-        },
+        page: 1,
+        limit: 50,
+        total: 1,
+        total_pages: 1,
       };
 
       vi.mocked(listTickets).mockResolvedValue(mockResponse);
@@ -169,12 +209,10 @@ describe('Ticket CRUD API Endpoints', () => {
       const { listTickets } = await import('../../services/ticketService');
       const mockResponse = {
         tickets: [],
-        pagination: {
-          page: 1,
-          pageSize: 50,
-          total: 0,
-          totalPages: 0,
-        },
+        page: 1,
+        limit: 50,
+        total: 0,
+        total_pages: 0,
       };
 
       vi.mocked(listTickets).mockResolvedValue(mockResponse);
@@ -185,7 +223,7 @@ describe('Ticket CRUD API Endpoints', () => {
       const response = await GET(mockRequest);
       expect(response.status).toBe(200);
       expect(listTickets).toHaveBeenCalledWith({
-        ticket_type: 'fault_repair',
+        ticket_type: 'maintenance',
       });
     });
 
@@ -193,12 +231,10 @@ describe('Ticket CRUD API Endpoints', () => {
       const { listTickets } = await import('../../services/ticketService');
       const mockResponse = {
         tickets: [],
-        pagination: {
-          page: 2,
-          pageSize: 10,
-          total: 25,
-          totalPages: 3,
-        },
+        page: 2,
+        limit: 10,
+        total: 25,
+        total_pages: 3,
       };
 
       vi.mocked(listTickets).mockResolvedValue(mockResponse);
@@ -221,12 +257,10 @@ describe('Ticket CRUD API Endpoints', () => {
       const { listTickets } = await import('../../services/ticketService');
       const mockResponse = {
         tickets: [],
-        pagination: {
-          page: 1,
-          pageSize: 50,
-          total: 0,
-          totalPages: 0,
-        },
+        page: 1,
+        limit: 50,
+        total: 0,
+        total_pages: 0,
       };
 
       vi.mocked(listTickets).mockResolvedValue(mockResponse);
@@ -267,10 +301,10 @@ describe('Ticket CRUD API Endpoints', () => {
     it('should create ticket with valid data', async () => {
       const { createTicket } = await import('../../services/ticketService');
       const createPayload: CreateTicketPayload = {
-        source: 'manual',
+        source: 'qcontact',
         title: 'New Ticket',
         description: 'Test description',
-        ticket_type: 'fault_repair',
+        ticket_type: 'maintenance',
         priority: 'normal',
       };
 
@@ -296,7 +330,7 @@ describe('Ticket CRUD API Endpoints', () => {
       expect(data.data).toBeDefined();
       expect(data.data.ticket_uid).toBeDefined();
       expect(data.message).toContain('created');
-      expect(createTicket).toHaveBeenCalledWith(createPayload);
+      expect(createTicket).toHaveBeenCalledWith({ ...createPayload, created_by: 'test-user-id-123' });
     });
 
     it('should create ticket with minimal required fields', async () => {
@@ -304,13 +338,13 @@ describe('Ticket CRUD API Endpoints', () => {
       const createPayload: CreateTicketPayload = {
         source: 'qcontact',
         title: 'Minimal Ticket',
-        ticket_type: 'new_installation',
+        ticket_type: 'civils',
       };
 
       const mockTicket = createMockTicket({
         source: 'qcontact',
         title: 'Minimal Ticket',
-        ticket_type: 'new_installation',
+        ticket_type: 'civils',
       });
 
       vi.mocked(createTicket).mockResolvedValue(mockTicket);
@@ -325,7 +359,7 @@ describe('Ticket CRUD API Endpoints', () => {
 
       const response = await POST(mockRequest);
       expect(response.status).toBe(201);
-      expect(createTicket).toHaveBeenCalledWith(createPayload);
+      expect(createTicket).toHaveBeenCalledWith({ ...createPayload, created_by: 'test-user-id-123' });
     });
 
     it('should reject ticket without required fields', async () => {
@@ -378,9 +412,9 @@ describe('Ticket CRUD API Endpoints', () => {
     it('should handle database errors during creation', async () => {
       const { createTicket } = await import('../../services/ticketService');
       const createPayload: CreateTicketPayload = {
-        source: 'manual',
+        source: 'qcontact',
         title: 'Test',
-        ticket_type: 'fault_repair',
+        ticket_type: 'maintenance',
       };
 
       vi.mocked(createTicket).mockRejectedValue(
