@@ -130,7 +130,8 @@ async function fetchAllAttachments(): Promise<SmartsheetAttachment[]> {
   let page = 1;
   const pageSize = 100;
 
-  while (true) {
+  let hasMore = true;
+  while (hasMore) {
     const response = await fetch(
       `${SMARTSHEET_API_BASE}/sheets/${SHEET_ID}/attachments?page=${page}&pageSize=${pageSize}`,
       {
@@ -146,9 +147,10 @@ async function fetchAllAttachments(): Promise<SmartsheetAttachment[]> {
     allAttachments.push(...data.data);
 
     if (data.data.length < pageSize) {
-      break;
+      hasMore = false;
+    } else {
+      page++;
     }
-    page++;
   }
 
   return allAttachments;

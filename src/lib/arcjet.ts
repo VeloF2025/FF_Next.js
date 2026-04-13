@@ -145,7 +145,7 @@ export function isArcjetEnabled(): boolean {
  * ```
  */
 export function withArcjetProtection(
-  handler: Function,
+  handler: (req: NextApiRequest, res: NextApiResponse) => Promise<void> | void,
   protection: typeof aj = aj
 ) {
   return async (req: NextApiRequest, res: NextApiResponse) => {

@@ -422,11 +422,13 @@ export class OneMapClient {
 
     logger.info('Fetching all drops from 1Map', { site });
 
-    while (true) {
+    let continueLoop = true;
+    while (continueLoop) {
       const result = await this.searchInstallations(site, { page, limit: 500 });
 
       if (!result.success || !result.result) {
-        break;
+        continueLoop = false;
+        continue;
       }
 
       allRecords.push(...result.result);
@@ -437,12 +439,14 @@ export class OneMapClient {
 
       // Check if we should continue
       if (page >= result.total_pages) {
-        break;
+        continueLoop = false;
+        continue;
       }
 
       if (maxPages && page >= maxPages) {
         logger.info('Reached max pages limit', { maxPages });
-        break;
+        continueLoop = false;
+        continue;
       }
 
       page++;

@@ -107,11 +107,10 @@ const SendTab: React.FC = () => {
       if (phone.startsWith('0')) {
         phone = '27' + phone.substring(1); // SA country code
       }
-      if (!phone.startsWith('+')) {
-        phone = phone; // Keep as-is if no + prefix
-      } else {
+      if (phone.startsWith('+')) {
         phone = phone.substring(1); // Remove + prefix
       }
+      // Otherwise keep as-is if no + prefix
       input.mention_phone = phone;
     }
 

@@ -31,7 +31,7 @@ export function cloneDeep<T>(value: T): T {
   if (typeof value === 'object' && value.constructor === Object) {
     const cloned = {} as T;
     for (const key in value) {
-      if (value.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
         (cloned as Record<string, unknown>)[key] = cloneDeep((value as Record<string, unknown>)[key]);
       }
     }
@@ -125,7 +125,7 @@ export function merge<T extends Record<string, unknown>>(...sources: Partial<T>[
     if (source == null) continue;
 
     for (const key in source) {
-      if (source.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
         const sourceValue = source[key];
         const currentValue = result[key];
 

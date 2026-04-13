@@ -128,7 +128,8 @@ export class FileValidator {
    * Validate file name
    */
   private validateFileName(fileName: string): ValidationResult {
-    // Check for valid characters
+    // Check for valid characters (control chars \u0000-\u001f are intentionally matched)
+    // eslint-disable-next-line no-control-regex
     const invalidChars = /[<>:"/\\|?*\x00-\x1f]/;
     if (invalidChars.test(fileName)) {
       return {
