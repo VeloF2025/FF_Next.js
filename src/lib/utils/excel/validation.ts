@@ -137,7 +137,7 @@ export function normalizeUOM(uom: string): string {
 }
 
 // Parse numeric value from string
-export function parseNumericValue(value: any, locale: string = 'en-US'): number | null {
+export function parseNumericValue(value: unknown, locale: string = 'en-US'): number | null {
   if (value === null || value === undefined || value === '') {
     return null;
   }
@@ -168,7 +168,7 @@ export function parseNumericValue(value: any, locale: string = 'en-US'): number 
 }
 
 // Clean and normalize text
-export function cleanText(text: any): string | null {
+export function cleanText(text: unknown): string | null {
   if (text === null || text === undefined || text === '') {
     return null;
   }

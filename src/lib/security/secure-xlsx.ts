@@ -40,7 +40,7 @@ export class SecureXLSX {
     }
   }
 
-  private static validateCellContent(cellValue: any, maxLength: number = MAX_CELL_LENGTH): string {
+  private static validateCellContent(cellValue: unknown, maxLength: number = MAX_CELL_LENGTH): string {
     if (cellValue == null) return '';
     
     const stringValue = String(cellValue).trim();
@@ -172,7 +172,7 @@ export class SecureXLSX {
   /**
    * Securely convert worksheet to JSON
    */
-  static sheetToJSON<T = any>(worksheet: XLSX.WorkSheet, options: SecureXLSXOptions = {}): T[] {
+  static sheetToJSON<T = Record<string, unknown>>(worksheet: XLSX.WorkSheet, options: SecureXLSXOptions = {}): T[] {
     try {
       const sanitizedWorksheet = this.sanitizeWorksheet(worksheet, options);
       

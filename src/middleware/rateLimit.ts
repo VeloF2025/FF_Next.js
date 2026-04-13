@@ -97,7 +97,8 @@ const globalStore = new RateLimitStore();
  */
 function getClientId(req: NextApiRequest): string {
   // Try to get user ID from session/auth
-  const userId = (req as any).userId || (req as any).user?.id;
+  const reqExt = req as NextApiRequest & { userId?: string; user?: { id: string } };
+  const userId = reqExt.userId ?? reqExt.user?.id;
   if (userId) {
     return `user:${userId}`;
   }

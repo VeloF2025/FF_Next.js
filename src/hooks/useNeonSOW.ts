@@ -68,10 +68,10 @@ export function useNeonHealth() {
 /**
  * Hook for custom Neon queries
  */
-export function useNeonQuery<T = any>(
+export function useNeonQuery<T = unknown>(
   queryKey: string[],
   queryText: string,
-  params: any[] = [],
+  params: unknown[] = [],
   enabled: boolean = true
 ) {
   return useQuery({

@@ -15,7 +15,7 @@ import { extractHeaders, getColumnLetter, getPerformanceMetrics, requestGarbageC
 /**
  * Read Excel file with streaming support for better performance
  */
-export async function readExcelFile<T = any>(
+export async function readExcelFile<T = Record<string, unknown>>(
   buffer: ArrayBuffer,
   options: SecureExcelOptions = {}
 ): Promise<ExcelReadResult<T>> {
@@ -167,7 +167,7 @@ function processRow<T>(
   const { allowFormulas, allowHTML, maxCellLength } = options;
 
   try {
-    const rowData: any = {};
+    const rowData: Record<string, unknown> = {};
 
     row.eachCell((cell, colNumber) => {
       const header = headers[colNumber - 1];

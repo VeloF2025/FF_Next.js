@@ -35,7 +35,7 @@ export class SecureExcelProcessor {
   /**
    * Read Excel file with streaming support for better performance
    */
-  static async readExcelFile<T = any>(
+  static async readExcelFile<T = Record<string, unknown>>(
     buffer: ArrayBuffer,
     options = {}
   ) {
@@ -45,7 +45,7 @@ export class SecureExcelProcessor {
   /**
    * Create Excel file with optimized performance
    */
-  static async createExcelFile<T = any>(
+  static async createExcelFile<T extends Record<string, unknown> = Record<string, unknown>>(
     data: T[],
     worksheetName: string = 'Data',
     options = {}

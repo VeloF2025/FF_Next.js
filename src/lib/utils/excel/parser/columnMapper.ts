@@ -71,12 +71,12 @@ export class ColumnMapper {
   /**
    * Convert array row to object using column mapping
    */
-  arrayToObject(row: any[], mapping: ColumnMapping[]): RawBOQRow {
+  arrayToObject(row: unknown[], mapping: ColumnMapping[]): RawBOQRow {
     const obj: RawBOQRow = {};
-    
+
     mapping.forEach((map, index) => {
       if (row[index] !== undefined && row[index] !== '') {
-        (obj as any)[map.target] = row[index];
+        (obj as Record<string, unknown>)[map.target] = row[index];
       }
     });
     

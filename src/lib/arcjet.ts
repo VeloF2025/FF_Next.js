@@ -13,6 +13,7 @@
  */
 
 import arcjet, { detectBot, fixedWindow, shield } from "@arcjet/next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { log } from "@/lib/logger";
 
 // Get API key from environment
@@ -147,7 +148,7 @@ export function withArcjetProtection(
   handler: Function,
   protection: typeof aj = aj
 ) {
-  return async (req: any, res: any) => {
+  return async (req: NextApiRequest, res: NextApiResponse) => {
     // Skip protection if Arcjet not configured
     if (!ARCJET_KEY) {
       log.warn('arcjet', { action: 'protect', message: 'Arcjet protection skipped - ARCJET_KEY not configured' });

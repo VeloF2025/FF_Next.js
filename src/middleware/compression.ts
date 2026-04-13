@@ -145,7 +145,7 @@ export const CachePresets = {
 /**
  * Add ETag for conditional requests
  */
-export function setETag(res: NextApiResponse, data: any): string {
+export function setETag(res: NextApiResponse, data: unknown): string {
   const etag = `"${Buffer.from(JSON.stringify(data)).toString('base64').slice(0, 27)}"`;
   res.setHeader('ETag', etag);
   return etag;
@@ -202,7 +202,7 @@ export function withCacheAndCompression(
 /**
  * Response size helper
  */
-export function getResponseSize(data: any): number {
+export function getResponseSize(data: unknown): number {
   return Buffer.from(JSON.stringify(data)).length;
 }
 

@@ -16,7 +16,7 @@ export function getColumnLetter(colNumber: number): string {
  */
 export function extractHeaders(
   worksheet: ExcelJS.Worksheet,
-  sanitizeValue: (value: any) => string,
+  sanitizeValue: (value: ExcelJS.CellValue) => string,
   onError: (row: number, column: string, message: string) => void
 ): string[] {
   const headerRow = worksheet.getRow(1);
@@ -50,7 +50,7 @@ export function calculateColumnWidth<T>(
 
   const samplesToCheck = Math.min(sampleSize, data.length);
   for (let i = 0; i < samplesToCheck; i++) {
-    const value = String((data[i] as any)[header] || '');
+    const value = String((data[i] as Record<string, unknown>)[header] || '');
     maxLength = Math.max(maxLength, value.length);
   }
 
