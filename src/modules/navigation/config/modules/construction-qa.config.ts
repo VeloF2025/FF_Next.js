@@ -43,6 +43,7 @@ export const constructionQaConfig: ModuleNavigationConfig = {
         { id: 'cards', label: 'Cards', icon: LayoutGrid, path: '/field-ops/snags' },
         { id: 'list', label: 'List', icon: List, path: '/field-ops/snags/list' },
         { id: 'summary', label: 'Summary', icon: Table2, path: '/field-ops/snags/summary' },
+        { id: 'reports', label: 'Reports', icon: BarChart3, path: '/field-ops/snags/reports' },
       ],
     },
     {
