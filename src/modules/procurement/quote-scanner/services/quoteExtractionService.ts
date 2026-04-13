@@ -25,14 +25,14 @@ import {
   buildVlmFewShotPrompt,
   recordCorrectExtraction,
 } from '@/services/vlmLearningService';
-import { VLM_CHAT_ENDPOINT, VLM_EXTRACTION_MODEL, VLM_TIMEOUT_DOCUMENT, VLM_MAX_TOKENS_DOCUMENT, VLM_TEMPERATURE } from '@/lib/vlm';
+import { VLM_CHAT_ENDPOINT, VLM_EXTRACTION_MODEL, VLM_TIMEOUT_DOCUMENT, VLM_TEMPERATURE } from '@/lib/vlm';
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
 
-const MAX_IMAGE_DIMENSION = 1280;
-const JPEG_QUALITY = 0.85;
+const _MAX_IMAGE_DIMENSION = 1280;
+const _JPEG_QUALITY = 0.85;
 
 // ============================================================================
 // VLM PROMPTS

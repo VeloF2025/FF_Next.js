@@ -14,7 +14,7 @@
  * 🟢 WORKING: All 12 tests passing - comprehensive coverage
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   syncInboundTickets,
   syncSingleInboundTicket,
@@ -46,7 +46,7 @@ vi.mock('@/lib/logger', () => ({
   })),
 }));
 
-import { query, queryOne, transaction } from '../../utils/db';
+import { queryOne } from '../../utils/db';
 import { getDefaultQContactClient } from '../../services/qcontactClient';
 
 describe('QContact Inbound Sync Service', () => {

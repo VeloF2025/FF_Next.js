@@ -15,11 +15,9 @@
 
 import React from 'react';
 import {
-  Clock,
   User,
   FileText,
   CheckCircle2,
-  XCircle,
   ArrowRight,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -60,7 +58,7 @@ function getEventConfig(type: string) {
 /**
  * 🟢 WORKING: Ticket timeline component
  */
-export function TicketTimeline({ events, compact = false }: TicketTimelineProps) {
+export function TicketTimeline({ events, compact: _compact = false }: TicketTimelineProps) {
   if (!events || events.length === 0) {
     return (
       <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">

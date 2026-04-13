@@ -166,7 +166,7 @@ export function PipelineProjectDetail() {
   const cessionFileRef = useRef<HTMLInputElement>(null);
   const [transitioning, setTransitioning] = useState(false);
   const [bulkApproving, setBulkApproving] = useState(false);
-  const [transitionModalOpen, setTransitionModalOpen] = useState(false);
+  const [_transitionModalOpen, _setTransitionModalOpen] = useState(false);
   const [linkToProjectModalOpen, setLinkToProjectModalOpen] = useState(false);
   const [createAndLinkModalOpen, setCreateAndLinkModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -767,7 +767,7 @@ export function PipelineProjectDetail() {
                         const daysUntilExpiry = getDaysUntilExpiry(approval.expiry_date);
                         const isExpired = daysUntilExpiry !== null && daysUntilExpiry < 0;
                         const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 30 && daysUntilExpiry >= 0;
-                        const isConditional = approval.approval_type_condition_type !== null;
+                        const _isConditional = approval.approval_type_condition_type !== null;
                         const isRural = legalDocs.is_rural || project?.is_rural || false;
                         const isNotApplicable =
                           (approval.approval_type_condition_type === 'rural_only' && !isRural) ||

@@ -21,13 +21,10 @@
 import { query, queryOne } from '../utils/db';
 import {
   runFullSync,
-  runInboundOnlySync,
-  runOutboundOnlySync,
 } from '../services/qcontactSyncOrchestrator';
 import type {
   FullSyncRequest,
   FullSyncResult,
-  SyncDirection,
 } from '../types/qcontact';
 import { createLogger } from '@/lib/logger';
 

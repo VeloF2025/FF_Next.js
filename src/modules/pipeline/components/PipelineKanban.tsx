@@ -9,9 +9,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import {
   AlertTriangle,
   Building2,
-  Calendar,
   DollarSign,
-  FileText,
   GripVertical,
   ChevronDown,
   ChevronRight,
@@ -47,7 +45,7 @@ const CLOSED_STATUSES: PipelineStatus[] = ['planned', 'on_hold', 'cancelled', 'l
 export function PipelineKanban({ projects, onStatusChange, loading }: PipelineKanbanProps) {
   const [columns, setColumns] = useState<KanbanColumn[]>([]);
   const [showClosed, setShowClosed] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
+  const [_isDragging, setIsDragging] = useState(false);
 
   // Organize projects into columns
   useEffect(() => {
