@@ -150,16 +150,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       gridSlots: gridMapping.totalSlots,
     });
 
-    // ── 5. Check for duplicate report ────────────────────────
+    // ── 5. Check for duplicate report (scoped to project) ────
+    // Same report number can exist across different projects — scope by project_id
     const existing = await sql`
-      SELECT id FROM snag_reports WHERE report_number = ${metadata.reportNumber}
+      SELECT id FROM snag_reports
+      WHERE report_number = ${metadata.reportNumber}
+        AND project_id = ${projectId}
     ` as Array<{ id: string }>;
 
     if (existing.length > 0) {
       return apiResponse.error(
         res,
         ErrorCode.CONFLICT,
-        `Report ${metadata.reportNumber} has already been imported (id: ${existing[0]?.id ?? 'unknown'})`
+        `Report ${metadata.reportNumber} has already been imported for this project (id: ${existing[0]?.id ?? 'unknown'})`
       );
     }
 
