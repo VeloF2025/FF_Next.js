@@ -45,6 +45,8 @@ import { NotesTab } from './NotesTab';
 import { useTicketNotes } from '../../hooks/useTicketNotesWithMutations';
 import { useAuth } from '@/contexts/AuthContext';
 import { canEditDescription } from '@/modules/construction-qa/utils/snagPermissions';
+import { PhotoLightbox } from '@/components/PhotoLightbox';
+import type { LightboxPhoto } from '@/components/PhotoLightbox';
 
 interface TicketDetailProps {
   /** Ticket ID to display */
@@ -526,6 +528,7 @@ function classifyPhoto(filename: string): 'before' | 'after' | 'other' {
 /** Fetches and displays Before / After photo comparison for a ticket on the Overview tab */
 function BeforePhoto({ ticketId }: { ticketId: string }) {
   const [photos, setPhotos] = useState<Array<{ id: string; filename: string; storage_url: string }>>([]);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -575,77 +578,97 @@ function BeforePhoto({ ticketId }: { ticketId: string }) {
   const displayBefore = beforePhotos.length > 0 ? beforePhotos : (otherPhotos.length > 0 ? otherPhotos : photos);
   const displayAfter = afterPhotos;
 
-  return (
-    <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4 sm:p-6">
-      <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-3">
-        Photo Evidence
-      </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* BEFORE column */}
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-red-400 bg-red-500/10 px-2 py-0.5 rounded">
-              Before
-            </span>
-          </div>
-          {displayBefore.length > 0 ? displayBefore.map((photo) => (
-            <a
-              key={photo.id}
-              href={photo.storage_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block overflow-hidden rounded-lg border-2 border-red-500/30 hover:border-red-500/60 transition-colors mb-2"
-            >
-              <img
-                src={photo.storage_url}
-                alt={photo.filename}
-                className="w-full h-48 object-cover"
-                loading="lazy"
-              />
-              <div className="px-3 py-2 bg-[var(--ff-bg-tertiary)]">
-                <span className="text-xs text-[var(--ff-text-secondary)]">{photo.filename}</span>
-              </div>
-            </a>
-          )) : (
-            <div className="h-48 rounded-lg border-2 border-dashed border-zinc-700 flex items-center justify-center">
-              <span className="text-xs text-zinc-500">No before photo</span>
-            </div>
-          )}
-        </div>
+  // Build flat array of all displayed photos (before first, then after) for the lightbox
+  const allDisplayPhotos: LightboxPhoto[] = [
+    ...displayBefore.map(p => ({ url: p.storage_url, label: p.filename })),
+    ...displayAfter.map(p => ({ url: p.storage_url, label: p.filename })),
+  ];
 
-        {/* AFTER column */}
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-green-400 bg-green-500/10 px-2 py-0.5 rounded">
-              After
-            </span>
-          </div>
-          {displayAfter.length > 0 ? displayAfter.map((photo) => (
-            <a
-              key={photo.id}
-              href={photo.storage_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block overflow-hidden rounded-lg border-2 border-green-500/30 hover:border-green-500/60 transition-colors mb-2"
-            >
-              <img
-                src={photo.storage_url}
-                alt={photo.filename}
-                className="w-full h-48 object-cover"
-                loading="lazy"
-              />
-              <div className="px-3 py-2 bg-[var(--ff-bg-tertiary)]">
-                <span className="text-xs text-[var(--ff-text-secondary)]">{photo.filename}</span>
-              </div>
-            </a>
-          )) : (
-            <div className="h-48 rounded-lg border-2 border-dashed border-zinc-700 flex flex-col items-center justify-center gap-2">
-              <span className="text-xs text-zinc-500">No after photo yet</span>
-              <span className="text-[10px] text-zinc-600">Upload via the Verification tab</span>
+  // Map a photo from its section (before/after) back to its index in allDisplayPhotos
+  const beforeOffset = 0;
+  const afterOffset = displayBefore.length;
+
+  const openLightbox = (globalIndex: number) => setLightboxIndex(globalIndex);
+
+  return (
+    <>
+      <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4 sm:p-6">
+        <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-3">
+          Photo Evidence
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* BEFORE column */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-red-400 bg-red-500/10 px-2 py-0.5 rounded">
+                Before
+              </span>
             </div>
-          )}
+            {displayBefore.length > 0 ? displayBefore.map((photo, i) => (
+              <button
+                key={photo.id}
+                type="button"
+                onClick={() => openLightbox(beforeOffset + i)}
+                className="block w-full overflow-hidden rounded-lg border-2 border-red-500/30 hover:border-red-500/60 transition-colors mb-2 text-left"
+              >
+                <img
+                  src={photo.storage_url}
+                  alt={photo.filename}
+                  className="w-full h-48 object-cover"
+                  loading="lazy"
+                />
+                <div className="px-3 py-2 bg-[var(--ff-bg-tertiary)]">
+                  <span className="text-xs text-[var(--ff-text-secondary)]">{photo.filename}</span>
+                </div>
+              </button>
+            )) : (
+              <div className="h-48 rounded-lg border-2 border-dashed border-zinc-700 flex items-center justify-center">
+                <span className="text-xs text-zinc-500">No before photo</span>
+              </div>
+            )}
+          </div>
+
+          {/* AFTER column */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-green-400 bg-green-500/10 px-2 py-0.5 rounded">
+                After
+              </span>
+            </div>
+            {displayAfter.length > 0 ? displayAfter.map((photo, i) => (
+              <button
+                key={photo.id}
+                type="button"
+                onClick={() => openLightbox(afterOffset + i)}
+                className="block w-full overflow-hidden rounded-lg border-2 border-green-500/30 hover:border-green-500/60 transition-colors mb-2 text-left"
+              >
+                <img
+                  src={photo.storage_url}
+                  alt={photo.filename}
+                  className="w-full h-48 object-cover"
+                  loading="lazy"
+                />
+                <div className="px-3 py-2 bg-[var(--ff-bg-tertiary)]">
+                  <span className="text-xs text-[var(--ff-text-secondary)]">{photo.filename}</span>
+                </div>
+              </button>
+            )) : (
+              <div className="h-48 rounded-lg border-2 border-dashed border-zinc-700 flex flex-col items-center justify-center gap-2">
+                <span className="text-xs text-zinc-500">No after photo yet</span>
+                <span className="text-[10px] text-zinc-600">Upload via the Verification tab</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      {lightboxIndex !== null && (
+        <PhotoLightbox
+          photos={allDisplayPhotos}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
+      )}
+    </>
   );
 }
