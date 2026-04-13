@@ -62,7 +62,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `) as Row[];
 
     // Normalize date to YYYY-MM-DD regardless of input format
-    function toISODate(val: unknown): string {
+    const toISODate = (val: unknown): string => {
       if (!val) return '1970-01-01';
       if (val instanceof Date) return val.toISOString().split('T')[0];
       const s = String(val);

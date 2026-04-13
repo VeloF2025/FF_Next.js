@@ -193,7 +193,7 @@ export default async function handler(
     const results: ReviewResult[] = [];
     let succeeded = 0;
     let failed = 0;
-    let skipped = 0;
+    const skipped = 0;
 
     // Process sequentially — each review has 7+ sequential VLM calls internally
     // Running multiple reviews concurrently would overload the single GPU
