@@ -139,7 +139,7 @@ describe('POST /api/noc/tickets/[id]/qa-readiness-check', () => {
 
     // Import the route handler
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/qa-readiness-check/route'
+      '@/app/api/noc/tickets/[id]/qa-readiness-check/route'
     );
 
     const request = new NextRequest(
@@ -175,7 +175,7 @@ describe('POST /api/noc/tickets/[id]/qa-readiness-check', () => {
     vi.mocked(qaReadinessService.runReadinessCheck).mockResolvedValue(mockFailedCheck);
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/qa-readiness-check/route'
+      '@/app/api/noc/tickets/[id]/qa-readiness-check/route'
     );
 
     const request = new NextRequest(
@@ -203,7 +203,7 @@ describe('POST /api/noc/tickets/[id]/qa-readiness-check', () => {
     vi.mocked(qaReadinessService.runReadinessCheck).mockResolvedValue(mockPassedCheck);
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/qa-readiness-check/route'
+      '@/app/api/noc/tickets/[id]/qa-readiness-check/route'
     );
 
     const request = new NextRequest(
@@ -229,7 +229,7 @@ describe('POST /api/noc/tickets/[id]/qa-readiness-check', () => {
     const invalidId = 'not-a-uuid';
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/qa-readiness-check/route'
+      '@/app/api/noc/tickets/[id]/qa-readiness-check/route'
     );
 
     const request = new NextRequest(
@@ -259,7 +259,7 @@ describe('POST /api/noc/tickets/[id]/qa-readiness-check', () => {
     );
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/qa-readiness-check/route'
+      '@/app/api/noc/tickets/[id]/qa-readiness-check/route'
     );
 
     const request = new NextRequest(
@@ -288,7 +288,7 @@ describe('POST /api/noc/tickets/[id]/qa-readiness-check', () => {
     );
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/qa-readiness-check/route'
+      '@/app/api/noc/tickets/[id]/qa-readiness-check/route'
     );
 
     const request = new NextRequest(
@@ -324,7 +324,7 @@ describe('GET /api/noc/tickets/[id]/qa-readiness', () => {
     vi.mocked(qaReadinessService.getReadinessStatus).mockResolvedValue(mockReadyStatus);
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/qa-readiness/route'
+      '@/app/api/noc/tickets/[id]/qa-readiness/route'
     );
 
     const request = new NextRequest(
@@ -353,7 +353,7 @@ describe('GET /api/noc/tickets/[id]/qa-readiness', () => {
     vi.mocked(qaReadinessService.getReadinessStatus).mockResolvedValue(mockNotReadyStatus);
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/qa-readiness/route'
+      '@/app/api/noc/tickets/[id]/qa-readiness/route'
     );
 
     const request = new NextRequest(
@@ -378,7 +378,7 @@ describe('GET /api/noc/tickets/[id]/qa-readiness', () => {
     vi.mocked(qaReadinessService.getReadinessStatus).mockResolvedValue(mockNoCheckStatus);
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/qa-readiness/route'
+      '@/app/api/noc/tickets/[id]/qa-readiness/route'
     );
 
     const request = new NextRequest(
@@ -403,7 +403,7 @@ describe('GET /api/noc/tickets/[id]/qa-readiness', () => {
     const invalidId = 'not-a-uuid';
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/qa-readiness/route'
+      '@/app/api/noc/tickets/[id]/qa-readiness/route'
     );
 
     const request = new NextRequest(
@@ -430,7 +430,7 @@ describe('GET /api/noc/tickets/[id]/qa-readiness', () => {
     );
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/noc/tickets/[id]/qa-readiness/route'
+      '@/app/api/noc/tickets/[id]/qa-readiness/route'
     );
 
     const request = new NextRequest(

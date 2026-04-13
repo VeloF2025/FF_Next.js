@@ -114,7 +114,7 @@ describe('GET /api/noc/tickets/[id]/verification', () => {
     vi.mocked(verificationService.getVerificationSteps).mockResolvedValue(mockAllSteps);
 
     // Import the route handler dynamically
-    const { GET } = await import('../../../../app/api/noc/tickets/[id]/verification/route');
+    const { GET } = await import('@/app/api/noc/tickets/[id]/verification/route');
 
     const request = new NextRequest('http://localhost:3000/api/noc/tickets/123/verification');
     const response = await GET(request, { params: { id: mockTicketId } });
@@ -131,7 +131,7 @@ describe('GET /api/noc/tickets/[id]/verification', () => {
   });
 
   it('should return validation error for invalid ticket ID', async () => {
-    const { GET } = await import('../../../../app/api/noc/tickets/[id]/verification/route');
+    const { GET } = await import('@/app/api/noc/tickets/[id]/verification/route');
 
     const request = new NextRequest('http://localhost:3000/api/noc/tickets/invalid/verification');
     const response = await GET(request, { params: { id: 'invalid-uuid' } });
@@ -150,7 +150,7 @@ describe('GET /api/noc/tickets/[id]/verification', () => {
       new Error('Ticket not found')
     );
 
-    const { GET } = await import('../../../../app/api/noc/tickets/[id]/verification/route');
+    const { GET } = await import('@/app/api/noc/tickets/[id]/verification/route');
 
     const request = new NextRequest('http://localhost:3000/api/noc/tickets/123/verification');
     const response = await GET(request, { params: { id: mockTicketId } });
@@ -165,7 +165,7 @@ describe('GET /api/noc/tickets/[id]/verification', () => {
     // 🟢 WORKING: Mock service to return empty array
     vi.mocked(verificationService.getVerificationSteps).mockResolvedValue([]);
 
-    const { GET } = await import('../../../../app/api/noc/tickets/[id]/verification/route');
+    const { GET } = await import('@/app/api/noc/tickets/[id]/verification/route');
 
     const request = new NextRequest('http://localhost:3000/api/noc/tickets/123/verification');
     const response = await GET(request, { params: { id: mockTicketId } });
@@ -188,7 +188,7 @@ describe('PUT /api/noc/tickets/[id]/verification/[step]', () => {
     // 🟢 WORKING: Mock service to return updated step
     vi.mocked(verificationService.updateVerificationStep).mockResolvedValue(mockCompletedStep);
 
-    const { PUT } = await import('../../../../app/api/noc/tickets/[id]/verification/[step]/route');
+    const { PUT } = await import('@/app/api/noc/tickets/[id]/verification/[step]/route');
 
     const requestBody = {
       is_complete: true,
@@ -219,7 +219,7 @@ describe('PUT /api/noc/tickets/[id]/verification/[step]', () => {
     // 🟢 WORKING: Mock service to return step with photo
     vi.mocked(verificationService.updateVerificationStep).mockResolvedValue(mockStepWithPhoto);
 
-    const { PUT } = await import('../../../../app/api/noc/tickets/[id]/verification/[step]/route');
+    const { PUT } = await import('@/app/api/noc/tickets/[id]/verification/[step]/route');
 
     const requestBody = {
       photo_url: 'https://storage.example.com/photos/dr-photo.jpg',
@@ -241,7 +241,7 @@ describe('PUT /api/noc/tickets/[id]/verification/[step]', () => {
   });
 
   it('should return validation error for invalid ticket ID', async () => {
-    const { PUT } = await import('../../../../app/api/noc/tickets/[id]/verification/[step]/route');
+    const { PUT } = await import('@/app/api/noc/tickets/[id]/verification/[step]/route');
 
     const request = new NextRequest('http://localhost:3000/api/noc/tickets/invalid/verification/1', {
       method: 'PUT',
@@ -258,7 +258,7 @@ describe('PUT /api/noc/tickets/[id]/verification/[step]', () => {
   });
 
   it('should return validation error for invalid step number', async () => {
-    const { PUT } = await import('../../../../app/api/noc/tickets/[id]/verification/[step]/route');
+    const { PUT } = await import('@/app/api/noc/tickets/[id]/verification/[step]/route');
 
     const request = new NextRequest('http://localhost:3000/api/noc/tickets/123/verification/invalid', {
       method: 'PUT',
@@ -276,7 +276,7 @@ describe('PUT /api/noc/tickets/[id]/verification/[step]', () => {
   });
 
   it('should return validation error for out-of-range step number', async () => {
-    const { PUT } = await import('../../../../app/api/noc/tickets/[id]/verification/[step]/route');
+    const { PUT } = await import('@/app/api/noc/tickets/[id]/verification/[step]/route');
 
     const request = new NextRequest('http://localhost:3000/api/noc/tickets/123/verification/13', {
       method: 'PUT',
@@ -299,7 +299,7 @@ describe('PUT /api/noc/tickets/[id]/verification/[step]', () => {
       new Error('Verification step not found')
     );
 
-    const { PUT } = await import('../../../../app/api/noc/tickets/[id]/verification/[step]/route');
+    const { PUT } = await import('@/app/api/noc/tickets/[id]/verification/[step]/route');
 
     const request = new NextRequest('http://localhost:3000/api/noc/tickets/123/verification/1', {
       method: 'PUT',
@@ -318,7 +318,7 @@ describe('PUT /api/noc/tickets/[id]/verification/[step]', () => {
     // 🟢 WORKING: Mock service to return unchanged step
     vi.mocked(verificationService.updateVerificationStep).mockResolvedValue(mockVerificationStep);
 
-    const { PUT } = await import('../../../../app/api/noc/tickets/[id]/verification/[step]/route');
+    const { PUT } = await import('@/app/api/noc/tickets/[id]/verification/[step]/route');
 
     const request = new NextRequest('http://localhost:3000/api/noc/tickets/123/verification/1', {
       method: 'PUT',
@@ -350,7 +350,7 @@ describe('POST /api/noc/tickets/[id]/verification/complete', () => {
     vi.mocked(verificationService.calculateProgress).mockResolvedValue(mockCompleteProgress);
     vi.mocked(verificationService.isAllStepsComplete).mockResolvedValue(true);
 
-    const { POST } = await import('../../../../app/api/noc/tickets/[id]/verification/complete/route');
+    const { POST } = await import('@/app/api/noc/tickets/[id]/verification/complete/route');
 
     const request = new NextRequest('http://localhost:3000/api/noc/tickets/123/verification/complete', {
       method: 'POST',
@@ -372,7 +372,7 @@ describe('POST /api/noc/tickets/[id]/verification/complete', () => {
     vi.mocked(verificationService.calculateProgress).mockResolvedValue(mockProgress);
     vi.mocked(verificationService.isAllStepsComplete).mockResolvedValue(false);
 
-    const { POST } = await import('../../../../app/api/noc/tickets/[id]/verification/complete/route');
+    const { POST } = await import('@/app/api/noc/tickets/[id]/verification/complete/route');
 
     const request = new NextRequest('http://localhost:3000/api/noc/tickets/123/verification/complete', {
       method: 'POST',
@@ -390,7 +390,7 @@ describe('POST /api/noc/tickets/[id]/verification/complete', () => {
   });
 
   it('should return validation error for invalid ticket ID', async () => {
-    const { POST } = await import('../../../../app/api/noc/tickets/[id]/verification/complete/route');
+    const { POST } = await import('@/app/api/noc/tickets/[id]/verification/complete/route');
 
     const request = new NextRequest('http://localhost:3000/api/noc/tickets/invalid/verification/complete', {
       method: 'POST',
@@ -411,7 +411,7 @@ describe('POST /api/noc/tickets/[id]/verification/complete', () => {
       new Error('No verification steps found for this ticket')
     );
 
-    const { POST } = await import('../../../../app/api/noc/tickets/[id]/verification/complete/route');
+    const { POST } = await import('@/app/api/noc/tickets/[id]/verification/complete/route');
 
     const request = new NextRequest('http://localhost:3000/api/noc/tickets/123/verification/complete', {
       method: 'POST',
@@ -431,7 +431,7 @@ describe('POST /api/noc/tickets/[id]/verification/complete', () => {
       new Error('Database connection failed')
     );
 
-    const { POST } = await import('../../../../app/api/noc/tickets/[id]/verification/complete/route');
+    const { POST } = await import('@/app/api/noc/tickets/[id]/verification/complete/route');
 
     const request = new NextRequest('http://localhost:3000/api/noc/tickets/123/verification/complete', {
       method: 'POST',

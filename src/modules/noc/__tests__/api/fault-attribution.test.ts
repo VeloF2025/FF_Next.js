@@ -111,7 +111,7 @@ describe('Fault Attribution API Endpoints', () => {
       vi.mocked(getTicketById).mockResolvedValue(mockTicket);
       vi.mocked(updateTicket).mockResolvedValue(mockTicket);
 
-      const { PUT } = await import('../../../../app/api/noc/tickets/[id]/fault-cause/route');
+      const { PUT } = await import('@/app/api/noc/tickets/[id]/fault-cause/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets/123e4567-e89b-12d3-a456-426614174000/fault-cause', {
         method: 'PUT',
@@ -142,7 +142,7 @@ describe('Fault Attribution API Endpoints', () => {
     });
 
     it('should validate fault cause enum values', async () => {
-      const { PUT } = await import('../../../../app/api/noc/tickets/[id]/fault-cause/route');
+      const { PUT } = await import('@/app/api/noc/tickets/[id]/fault-cause/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets/123e4567-e89b-12d3-a456-426614174000/fault-cause', {
         method: 'PUT',
@@ -165,7 +165,7 @@ describe('Fault Attribution API Endpoints', () => {
     });
 
     it('should validate UUID format', async () => {
-      const { PUT } = await import('../../../../app/api/noc/tickets/[id]/fault-cause/route');
+      const { PUT } = await import('@/app/api/noc/tickets/[id]/fault-cause/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets/invalid-uuid/fault-cause', {
         method: 'PUT',
@@ -191,7 +191,7 @@ describe('Fault Attribution API Endpoints', () => {
       const { updateTicket } = await import('../../services/ticketService');
       vi.mocked(updateTicket).mockResolvedValue(null);
 
-      const { PUT } = await import('../../../../app/api/noc/tickets/[id]/fault-cause/route');
+      const { PUT } = await import('@/app/api/noc/tickets/[id]/fault-cause/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets/123e4567-e89b-12d3-a456-426614174000/fault-cause', {
         method: 'PUT',
@@ -216,7 +216,7 @@ describe('Fault Attribution API Endpoints', () => {
       const { updateTicket } = await import('../../services/ticketService');
       vi.mocked(updateTicket).mockRejectedValue(new Error('Database connection failed'));
 
-      const { PUT } = await import('../../../../app/api/noc/tickets/[id]/fault-cause/route');
+      const { PUT } = await import('@/app/api/noc/tickets/[id]/fault-cause/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets/123e4567-e89b-12d3-a456-426614174000/fault-cause', {
         method: 'PUT',
@@ -247,7 +247,7 @@ describe('Fault Attribution API Endpoints', () => {
       vi.mocked(getTicketById).mockResolvedValue(mockTicket);
       vi.mocked(updateTicket).mockResolvedValue(mockTicket);
 
-      const { PUT } = await import('../../../../app/api/noc/tickets/[id]/fault-cause/route');
+      const { PUT } = await import('@/app/api/noc/tickets/[id]/fault-cause/route');
 
       const mockRequest = new Request('http://localhost/api/noc/tickets/123e4567-e89b-12d3-a456-426614174000/fault-cause', {
         method: 'PUT',
@@ -296,7 +296,7 @@ describe('Fault Attribution API Endpoints', () => {
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
-      const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
+      const { GET } = await import('@/app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=fault_cause');
       const response = await GET(mockRequest as unknown as NextRequest);
@@ -330,7 +330,7 @@ describe('Fault Attribution API Endpoints', () => {
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
-      const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
+      const { GET } = await import('@/app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=pole_number');
       const response = await GET(mockRequest as unknown as NextRequest);
@@ -362,7 +362,7 @@ describe('Fault Attribution API Endpoints', () => {
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
-      const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
+      const { GET } = await import('@/app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=pon_number');
       const response = await GET(mockRequest as unknown as NextRequest);
@@ -393,7 +393,7 @@ describe('Fault Attribution API Endpoints', () => {
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
-      const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
+      const { GET } = await import('@/app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=zone_id');
       const response = await GET(mockRequest as unknown as NextRequest);
@@ -419,7 +419,7 @@ describe('Fault Attribution API Endpoints', () => {
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
-      const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
+      const { GET } = await import('@/app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=fault_cause&project_id=proj-123');
       const response = await GET(mockRequest as unknown as NextRequest);
@@ -447,7 +447,7 @@ describe('Fault Attribution API Endpoints', () => {
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
-      const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
+      const { GET } = await import('@/app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=fault_cause&start_date=2024-01-01&end_date=2024-12-31');
       const response = await GET(mockRequest as unknown as NextRequest);
@@ -462,7 +462,7 @@ describe('Fault Attribution API Endpoints', () => {
     });
 
     it('should validate group_by parameter', async () => {
-      const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
+      const { GET } = await import('@/app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=invalid_field');
       const response = await GET(mockRequest as unknown as NextRequest);
@@ -478,7 +478,7 @@ describe('Fault Attribution API Endpoints', () => {
       const { query } = await import('../../utils/db');
       vi.mocked(query).mockResolvedValue({ rows: [] });
 
-      const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
+      const { GET } = await import('@/app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=fault_cause');
       const response = await GET(mockRequest as unknown as NextRequest);
@@ -493,7 +493,7 @@ describe('Fault Attribution API Endpoints', () => {
       const { query } = await import('../../utils/db');
       vi.mocked(query).mockRejectedValue(new Error('Database connection failed'));
 
-      const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
+      const { GET } = await import('@/app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=fault_cause');
       const response = await GET(mockRequest as unknown as NextRequest);
@@ -518,7 +518,7 @@ describe('Fault Attribution API Endpoints', () => {
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
-      const { GET } = await import('../../../../app/api/noc/analytics/fault-trends/route');
+      const { GET } = await import('@/app/api/noc/analytics/fault-trends/route');
 
       const mockRequest = new Request('http://localhost/api/noc/analytics/fault-trends?group_by=fault_cause');
       const response = await GET(mockRequest as unknown as NextRequest);
