@@ -87,16 +87,6 @@ const B = {
   blue:      [60, 120, 220]    as [number, number, number],
 };
 
-const SEVERITY_COLOR: Record<string, [number, number, number]> = {
-  critical: B.red, major: B.orange, minor: B.light,
-};
-
-const STATUS_COLOR: Record<string, [number, number, number]> = {
-  open: B.red, assigned: B.orange, in_progress: B.orange,
-  pending_qa: B.orange, fixed: B.orange, resolved: B.blue,
-  verified: B.green, closed: B.green, reopened: B.red,
-};
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const fmtDate = (d: string | null): string => {

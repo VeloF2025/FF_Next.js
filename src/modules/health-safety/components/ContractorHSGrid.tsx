@@ -6,7 +6,6 @@
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import {
-  Shield,
   AlertTriangle,
   CheckCircle,
   XCircle,
@@ -17,7 +16,6 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
-import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface ContractorHSStatus {
   contractor_id: string;

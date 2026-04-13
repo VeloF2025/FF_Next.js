@@ -14,8 +14,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  X, Loader2, ScanLine, ScanLine, PenLine,
-  PackagePlus, Camera,
+  X, ScanLine, ScanLine, PenLine,
+  PackagePlus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LabelScanner } from './LabelScanner';

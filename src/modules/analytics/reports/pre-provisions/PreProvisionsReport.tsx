@@ -18,7 +18,6 @@ import { usePreProvisionsData } from './usePreProvisionsData';
 import type { PreProvisionYear, PreProvisionMonth } from './usePreProvisionsData';
 
 const HEADER_BG = '#1a3a4a';
-const PALETTE = ['#3b82f6', '#f97316', '#22c55e', '#a855f7', '#eab308'];
 
 function getPC(projects: { projectName: string; logged: number; activated: number; open: number; notFound: number }[], name: string, key: 'logged' | 'activated' | 'open' | 'notFound') {
   return projects.find(p => p.projectName === name)?.[key] ?? 0;
@@ -112,7 +111,7 @@ const PreProvisionsTable = ({
 
 // ─── Chart ──────────────────────────────────────────────────────────────────
 
-const PreProvisionsChart = ({ years, allProjects }: { years: PreProvisionYear[]; allProjects: string[] }) => {
+const PreProvisionsChart = ({ years, allProjects: _allProjects }: { years: PreProvisionYear[]; allProjects: string[] }) => {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const toggle = (k: string) => setHidden(p => { const n = new Set(p); n.has(k) ? n.delete(k) : n.add(k); return n; });
 

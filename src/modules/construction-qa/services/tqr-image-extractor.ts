@@ -178,8 +178,8 @@ interface VfUploadResult {
 async function uploadToVfStorage(
   buffer: Buffer,
   filename: string,
-  projectId: string,
-  reportNumber: string
+  _projectId: string,
+  _reportNumber: string
 ): Promise<VfUploadResult> {
   const VF_STORAGE_BASE = process.env.VF_STORAGE_URL ?? 'http://100.96.203.105:8091';
 

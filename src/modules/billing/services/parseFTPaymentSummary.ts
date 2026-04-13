@@ -19,7 +19,6 @@ interface PdfParseResult {
   text: string;
   numpages: number;
 }
-type PdfParseFunction = (buffer: Buffer) => Promise<PdfParseResult>;
 
 // ─── Public Interface Types ─────────────────────────────────────────────────
 
@@ -117,17 +116,6 @@ function extractProjectFromFilename(filename: string): string {
   }
   // Fallback: return the whole base name
   return base;
-}
-
-/**
- * Parse an integer from a text fragment.
- * Strips minus signs (we use absolute values for counts) and whitespace.
- * Returns 0 if the string is empty or non-numeric.
- */
-function parseCount(raw: string): number {
-  const cleaned = raw.replace(/\s/g, '').replace(/-/g, '');
-  const n = parseInt(cleaned, 10);
-  return isNaN(n) ? 0 : n;
 }
 
 /**

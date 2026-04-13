@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Trash2, Image } from 'lucide-react';
+import { ChevronDown, ChevronRight, Image } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import type { EodInstallSheet } from '../../../types';
@@ -45,7 +45,7 @@ export function EodHistoryTab() {
     }
     setExpandedId(id);
     // Fetch full sheet with entries
-    const res = await fetch(`/api/eod/sheets?page=1&date=`);
+    await fetch(`/api/eod/sheets?page=1&date=`);
     // For now just expand the row — entries will come from a detail endpoint later
     setExpandedSheet(sheets.find((s) => s.id === id) || null);
   };

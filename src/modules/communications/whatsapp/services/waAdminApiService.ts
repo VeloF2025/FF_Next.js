@@ -4,8 +4,6 @@
  */
 
 import type {
-  WaGroupConfig,
-  WaGroupConfigInput,
   WaMonitoredGroup,
   WaMonitoredGroupInput,
   WaGroupType,

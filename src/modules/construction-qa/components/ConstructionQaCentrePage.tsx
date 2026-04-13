@@ -99,7 +99,7 @@ export function ConstructionQaCentrePage() {
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
+  const [_showFilters, _setShowFilters] = useState(false);
 
   // Fetch projects list
   useEffect(() => {

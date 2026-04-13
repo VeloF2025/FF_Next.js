@@ -12,7 +12,7 @@ import { log } from '@/lib/logger';
 import sharp from 'sharp';
 import { neon } from '@/lib/db-neon';
 import { VlmAnalysisType } from '../types/check-in.types';
-import { VLM_API_URL as _VLM_URL, VLM_FLEET_MODEL, VLM_TIMEOUT_DEFAULT, VLM_MAX_IMAGE_WIDTH, VLM_MAX_IMAGE_HEIGHT, VLM_JPEG_QUALITY, VLM_MAX_TOKENS_QUICK, VLM_TEMPERATURE, checkVlmHealth } from '@/lib/vlm';
+import { VLM_API_URL as _VLM_URL, VLM_FLEET_MODEL, VLM_TIMEOUT_DEFAULT, VLM_MAX_IMAGE_WIDTH, VLM_MAX_IMAGE_HEIGHT, VLM_JPEG_QUALITY, VLM_MAX_TOKENS_QUICK } from '@/lib/vlm';
 
 // Database connection for calibration queries
 export const sql = neon(process.env.DATABASE_URL!);

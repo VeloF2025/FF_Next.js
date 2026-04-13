@@ -11,7 +11,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { ChevronRight, ChevronDown, Save, Loader2, CheckCircle2, AlertCircle, Plus, X, ArrowRight, Trash2, BookMarked, Copy } from 'lucide-react';
+import { ChevronRight, ChevronDown, Save, CheckCircle2, AlertCircle, Plus, X, ArrowRight, Trash2, BookMarked, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { ConduitProject } from '../types';
 import { calcConduit } from '../hooks/useConduitCalc';
@@ -256,7 +256,7 @@ export function ProjectsGrid({
     }));
   };
 
-  const updateDuration = (id: string, raw: string) => {
+  const _updateDuration = (id: string, raw: string) => {
     updateProject(id, p => ({ ...p, build_duration_months: Number(raw) }));
   };
 

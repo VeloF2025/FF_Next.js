@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { Plus, RefreshCw, Video, Calendar, Film } from 'lucide-react';
+import { RefreshCw, Video, Calendar, Film } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import Link from 'next/link';
-import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 import type { Meeting, MeetingAttendee, MeetingSource, ProcessingStatus, UpcomingMeeting } from './types/meeting.types';
