@@ -66,7 +66,7 @@ function toFilter(v: string): string { return v === ALL ? '' : v; }
 function fromFilter(v: string): string { return v === '' ? ALL : v; }
 
 /** Filter bar for snag grid with sort */
-export function SnagFiltersBar({ filters, projects, zones, pons, onChange }: SnagFiltersProps) {
+export function SnagFiltersBar({ filters, projects: _projects, zones, pons, onChange }: SnagFiltersProps) {
   const hasProject = !!filters.projectId;
   const selectedZone = filters.zone_no ?? '';
 

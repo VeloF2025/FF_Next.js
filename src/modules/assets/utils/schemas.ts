@@ -22,7 +22,7 @@ const DateStringSchema = z.string().refine(
   },
   { message: 'Invalid date format' }
 );
-const PositiveNumberSchema = z.number().positive('Must be a positive number');
+const _PositiveNumberSchema = z.number().positive('Must be a positive number');
 const NonNegativeNumberSchema = z.number().min(0, 'Cannot be negative');
 
 // Status enum schema

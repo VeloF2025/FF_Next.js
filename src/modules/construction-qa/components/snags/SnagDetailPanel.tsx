@@ -81,19 +81,6 @@ export function SnagDetailPanel({
     }
   };
 
-  const handleMarkVerified = async () => {
-    setSaving(true);
-    try {
-      const updated = await updateSnag(snag.id, { status: 'verified' });
-      setSnag(updated);
-      onUpdated(updated);
-    } catch (err) {
-      log.error('Failed to verify snag', { err, snagId: snag.id });
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handlePoleLinked = useCallback(
     (updated: Snag) => {
       setSnag(updated);
