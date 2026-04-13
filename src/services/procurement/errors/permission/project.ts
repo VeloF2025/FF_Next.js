@@ -20,7 +20,7 @@ export class ProjectAccessDeniedError extends ProcurementPermissionError {
     requiredPermission: string,
     userPermissions: string[],
     options?: ProjectAccessOptions,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     const message = `Access denied to project '${options?.projectName || projectId}'. ${
       options?.requiredRole ? `Required role: ${options.requiredRole}` : `Required permission: ${requiredPermission}`

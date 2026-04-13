@@ -59,7 +59,7 @@ export interface NotificationEvent {
   ticket: Ticket;
   previous_status?: TicketStatus;
   new_status?: TicketStatus;
-  metadata?: Record<string, any>; // Additional event-specific data
+  metadata?: Record<string, unknown>; // Additional event-specific data
   timestamp: Date;
 }
 
@@ -544,7 +544,7 @@ export class NotificationTriggerService {
       case 'ticket.qa_rejected':
         return {
           ...baseVariables,
-          rejection_reason: event.metadata?.rejection_reason || 'Please review QA feedback',
+          rejection_reason: (event.metadata?.['rejection_reason'] as string | undefined) || 'Please review QA feedback',
         };
 
       case 'ticket.closed':
@@ -712,7 +712,7 @@ export async function triggerOnTicketAssignment(
         recipient_user_ids: [assignee.id],
       };
 
-      notify(emailPayload).catch(() => {});
+      notify(emailPayload).catch((err: unknown) => { logger.warn('notify email suppressed', { error: err }); });
       deliverEmail(assignee.id, emailPayload, null).catch((err) => {
         logger.error('Failed to send assignment email', { error: err, ticket_id: ticket.id });
       });
@@ -928,7 +928,7 @@ export async function triggerOnSLAWarning(ticket: Ticket): Promise<TriggerResult
         source_module: 'maintenance',
         source_id: ticket.id,
         recipient_user_ids: [assignee.id],
-      }).catch(() => {});
+      }).catch((err: unknown) => { logger.warn('maintenance notify suppressed', { error: err }); });
     }
   }
 
@@ -1033,7 +1033,7 @@ export async function triggerOnTeamAssignment(
     recipient_user_ids: memberIds,
   };
 
-  notify(teamEmailPayload).catch(() => {});
+  notify(teamEmailPayload).catch((err: unknown) => { logger.warn('team email notify suppressed', { error: err }); });
 
   // Send email to each team member
   for (const member of members) {

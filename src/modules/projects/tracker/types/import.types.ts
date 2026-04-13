@@ -38,5 +38,5 @@ export interface ImportError {
   type: TrackerType;
   identifier: string;
   error: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
 }

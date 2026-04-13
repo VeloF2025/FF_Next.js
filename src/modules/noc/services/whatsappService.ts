@@ -592,7 +592,7 @@ export class WhatsAppService {
   ): Promise<NotificationListResponse> {
     // Build WHERE clause
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: unknown[] = [];
 
     if (filters.ticket_id) {
       conditions.push(`ticket_id = $${params.length + 1}`);

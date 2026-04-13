@@ -32,7 +32,7 @@ export interface TrackerGridItem {
   metadata?: {
     importSource?: string;
     importDate?: Date;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   
   // Type-specific fields

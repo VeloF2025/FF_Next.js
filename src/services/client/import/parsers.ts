@@ -5,7 +5,7 @@ import {
 /**
  * Helper to parse enum values
  */
-export function parseEnumValue<T>(value: string | undefined, enumType: any, defaultValue: T): T {
+export function parseEnumValue<T>(value: string | undefined, enumType: Record<string, string>, defaultValue: T): T {
   if (!value) return defaultValue;
   
   const upperValue = value.toUpperCase().replace(/\s+/g, '_');

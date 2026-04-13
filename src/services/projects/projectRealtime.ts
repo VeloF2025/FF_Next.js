@@ -162,7 +162,7 @@ export function subscribeToProjectHierarchy(
 ): (() => void)[] {
   const unsubscribes: (() => void)[] = [];
   const hierarchy: ProjectHierarchy = {
-    project: null as any,
+    project: null as unknown as Record<string, unknown>,
     phases: []
   };
   

@@ -2,6 +2,7 @@ import { ProjectQueryService } from './core/projectQueryService';
 import { ProjectCRUDService } from './core/projectCRUDService';
 import { ProjectAnalyticsService } from './analytics/projectAnalyticsService';
 import type { Project, ProjectFormData, ProjectFilter } from '@/types/project.types';
+import type { ProjectSummary } from './analytics/projectAnalyticsService';
 
 /**
  * Project service using Neon PostgreSQL database
@@ -45,7 +46,7 @@ export const projectNeonService = {
   /**
    * Get project summary statistics
    */
-  async getProjectSummary(): Promise<any> {
+  async getProjectSummary(): Promise<ProjectSummary> {
     return ProjectAnalyticsService.getProjectSummary();
   }
 };

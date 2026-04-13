@@ -175,7 +175,7 @@ async function fetchTicketsForOutboundSync(
   options: FullSyncRequest
 ): Promise<OutboundTicket[]> {
   const conditions: string[] = [];
-  const values: any[] = [];
+  const values: unknown[] = [];
   let paramCounter = 1;
 
   // Only sync tickets that came from QContact (have external_id)

@@ -4,6 +4,26 @@
  */
 
 import { neon } from '@/lib/db-neon';
+
+interface PhaseTaskRow {
+  id: string;
+  phaseId: string;
+  name: string;
+  description?: string;
+  status: string;
+  taskOrder?: number;
+  assignedTo?: string;
+  priority?: string;
+  dueDate?: string;
+  completedAt?: string;
+  attachments?: unknown[];
+  tags?: string[];
+  dependencies?: string[];
+  createdBy?: string;
+  createdAt?: string;
+  updatedBy?: string;
+  updatedAt?: string;
+}
 import { 
   Phase, 
   Step, 
@@ -467,7 +487,7 @@ export const taskOperations = {
         ORDER BY t.task_order ASC
       `;
       
-      return result.map((task: any) => ({
+      return result.map((task: PhaseTaskRow) => ({
         ...task,
         attachments: task.attachments || [],
         tags: task.tags || [],

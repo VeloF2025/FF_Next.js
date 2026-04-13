@@ -20,7 +20,7 @@ export class ProcurementPermissionError extends ProcurementError {
     requiredPermission: string,
     userPermissions: string[],
     options?: PermissionErrorOptions,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     const message = options?.customMessage || 
       `Access denied. Required permission: ${requiredPermission}${

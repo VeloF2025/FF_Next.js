@@ -128,7 +128,7 @@ export interface HandoverDecision {
   decision_by: string; // User ID
   decision_at: Date;
   notes: string | null;
-  metadata: Record<string, any> | null;
+  metadata: Record<string, unknown> | null;
 }
 
 /**

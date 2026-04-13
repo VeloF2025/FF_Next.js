@@ -21,7 +21,7 @@ export class RoleAccessError extends ProcurementPermissionError {
     requiredPermission: string,
     userPermissions: string[],
     options?: RoleAccessOptions,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     const message = `Insufficient role level. Required: ${requiredRole}, Current: ${userRole}${
       options?.departmentRestriction ? ` (Department: ${options.departmentRestriction})` : ''

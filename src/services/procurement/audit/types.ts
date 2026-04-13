@@ -63,7 +63,7 @@ export interface AuditSummary {
   totalActions: number;
   actionsByType: Record<string, number>;
   actionsByUser: Record<string, number>;
-  recentActions: any[];
+  recentActions: unknown[];
 }
 
 // Security event types

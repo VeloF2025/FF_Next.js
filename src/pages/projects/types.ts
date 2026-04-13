@@ -47,7 +47,7 @@ export interface ProjectCardProps {
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   formatCurrency: (amount: number) => string;
-  formatDate: (timestamp: any) => string;
+  formatDate: (timestamp: string | number | Date) => string;
 }
 
 export interface ProjectFiltersProps {

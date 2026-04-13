@@ -110,7 +110,7 @@ export interface Project {
   updates?: ProjectUpdate[];
   
   // Custom Fields
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 // Forward declarations for types defined in other modules

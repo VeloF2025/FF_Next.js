@@ -98,7 +98,7 @@ export interface DateRangeFilter {
 /**
  * Bulk operation request
  */
-export interface BulkOperationRequest<T = any> {
+export interface BulkOperationRequest<T = unknown> {
   ids: string[];
   operation: string;
   data?: T;

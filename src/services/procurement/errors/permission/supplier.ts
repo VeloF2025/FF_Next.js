@@ -20,7 +20,7 @@ export class SupplierAccessError extends ProcurementPermissionError {
     requiredPermission: string,
     userPermissions: string[],
     options?: SupplierAccessOptions,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     let message = `Supplier access denied for '${options?.supplierName || supplierId}'`;
     

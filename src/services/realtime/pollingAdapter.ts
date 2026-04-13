@@ -13,6 +13,14 @@ export interface PollingConfig {
   enabled?: boolean;
 }
 
+interface PollingChange {
+  event_type: string;
+  entity_type: string;
+  entity_id?: string | number;
+  data: unknown;
+  timestamp: string;
+}
+
 class PollingAdapter extends EventEmitter {
   private config: Required<PollingConfig>;
   private pollTimer: NodeJS.Timeout | null = null;
@@ -90,7 +98,7 @@ class PollingAdapter extends EventEmitter {
       
       if (data.changes && data.changes.length > 0) {
         // Process each change
-        data.changes.forEach((change: any) => {
+        data.changes.forEach((change: PollingChange) => {
           const event: RealtimeEvent = {
             type: this.mapEventType(change.event_type),
             entityType: change.entity_type as EntityType,

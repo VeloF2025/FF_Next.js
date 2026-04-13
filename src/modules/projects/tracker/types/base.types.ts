@@ -18,7 +18,7 @@ export interface BaseTracker {
   importBatchId?: string;
   importSource?: 'Excel' | 'CSV' | 'Manual' | 'OneMap';
   importedAt?: Timestamp | Date;
-  originalData?: Record<string, any>;
+  originalData?: Record<string, unknown>;
   
   // Status tracking
   status: string;
