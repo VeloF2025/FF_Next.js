@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * WA Monitor API Response Helper (Internalized)
  * Self-contained copy to ensure module independence

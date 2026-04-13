@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * RFQ CRUD Operations
  * Basic create, read, update, delete operations for RFQs
