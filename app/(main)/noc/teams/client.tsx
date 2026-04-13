@@ -37,7 +37,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTeams, useCreateTeam, useUpdateTeam, useDeleteTeam } from '@/modules/noc/hooks/useTeams';
-import type { Team, TeamType, CreateTeamPayload, UpdateTeamPayload } from '@/modules/noc/types/team';
+import { TeamType } from '@/modules/noc/types/team';
+import type { Team, CreateTeamPayload, UpdateTeamPayload } from '@/modules/noc/types/team';
 import { TeamDetailPanel } from '@/modules/noc/components/TeamDetailPanel';
 
 type ViewMode = 'cards' | 'list';
@@ -45,12 +46,12 @@ type ViewMode = 'cards' | 'list';
 type TeamTypeFilter = 'all' | 'internal' | 'contractor';
 
 const TEAM_TYPE_OPTIONS: { value: TeamType; label: string }[] = [
-  { value: 'internal', label: 'Internal' },
-  { value: 'field', label: 'Field' },
-  { value: 'support', label: 'Support' },
-  { value: 'maintenance', label: 'Maintenance' },
-  { value: 'installation', label: 'Installation' },
-  { value: 'contractor', label: 'Contractor' },
+  { value: TeamType.INTERNAL, label: 'Internal' },
+  { value: TeamType.FIELD, label: 'Field' },
+  { value: TeamType.SUPPORT, label: 'Support' },
+  { value: TeamType.MAINTENANCE, label: 'Maintenance' },
+  { value: TeamType.INSTALLATION, label: 'Installation' },
+  { value: TeamType.CONTRACTOR, label: 'Contractor' },
 ];
 
 export default function TeamsPageClient() {
@@ -75,7 +76,7 @@ export default function TeamsPageClient() {
   }>({
     name: '',
     description: '',
-    team_type: 'internal',
+    team_type: TeamType.INTERNAL,
   });
 
   // Filter teams by search and type
@@ -114,7 +115,7 @@ export default function TeamsPageClient() {
 
   // Handle create team
   const handleCreate = () => {
-    setFormData({ name: '', description: '', team_type: 'internal' });
+    setFormData({ name: '', description: '', team_type: TeamType.INTERNAL });
     setShowCreateModal(true);
   };
 
@@ -123,7 +124,7 @@ export default function TeamsPageClient() {
     setFormData({
       name: team.name,
       description: team.description || '',
-      team_type: (team.team_type as TeamType) || 'internal',
+      team_type: (team.team_type as TeamType) || TeamType.INTERNAL,
     });
     setEditingTeam(team);
   };
@@ -148,7 +149,7 @@ export default function TeamsPageClient() {
         {
           onSuccess: () => {
             setEditingTeam(null);
-            setFormData({ name: '', description: '', team_type: 'internal' });
+            setFormData({ name: '', description: '', team_type: TeamType.INTERNAL });
           },
         }
       );
@@ -163,7 +164,7 @@ export default function TeamsPageClient() {
         {
           onSuccess: () => {
             setShowCreateModal(false);
-            setFormData({ name: '', description: '', team_type: 'internal' });
+            setFormData({ name: '', description: '', team_type: TeamType.INTERNAL });
           },
         }
       );
