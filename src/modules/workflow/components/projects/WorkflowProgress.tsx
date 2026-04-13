@@ -1,5 +1,4 @@
 // 🟢 WORKING: WorkflowProgress component - displays workflow execution progress
-import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   CheckCircle2,
@@ -157,7 +156,7 @@ export function WorkflowProgress({ workflow, compact = false, showPhases = true 
           </h3>
           
           <div className="space-y-4">
-            {phaseProgress.map((phase, index) => (
+            {phaseProgress.map((phase, _index) => (
               <div key={phase.id} className="flex items-center space-x-4">
                 {/* Phase Icon and Status */}
                 <div className="flex items-center space-x-2 w-48">

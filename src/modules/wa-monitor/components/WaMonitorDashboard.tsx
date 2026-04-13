@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, memo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Alert, Button, Card, CardContent, Grid, Typography, Box, CircularProgress, Pagination, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
 import { RefreshCw, Download, AlertCircle, Calendar } from 'lucide-react';
 import { fetchAllDrops, sendFeedbackToWhatsApp, fetchDailyDropsPerProject } from '../services/waMonitorApiService';
@@ -21,7 +21,7 @@ const ITEMS_PER_PAGE = 20; // Show 20 drops per page
 
 export function WaMonitorDashboard() {
   const [drops, setDrops] = useState<QaReviewDrop[]>([]);
-  const [summary, setSummary] = useState<WaMonitorSummary | null>(null);
+  const [_summary, setSummary] = useState<WaMonitorSummary | null>(null);
   const [dailyDrops, setDailyDrops] = useState<{ drops: DailyDropsPerProject[]; total: number; date: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

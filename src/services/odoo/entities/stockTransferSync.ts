@@ -12,7 +12,7 @@
 import { neon } from '@/lib/db-neon';
 import type { NeonQueryFunction } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
-import { OdooClient, OdooStockPicking, OdooStockMove } from '../odooClient';
+import { OdooClient } from '../odooClient';
 
 const logger = createLogger('odooStockTransferSync');
 

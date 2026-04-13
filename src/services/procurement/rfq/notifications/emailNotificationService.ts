@@ -69,7 +69,7 @@ export class EmailNotificationService {
   /**
    * Send via SendGrid (placeholder)
    */
-  private static async sendViaSendGrid(payload: NotificationPayload): Promise<boolean> {
+  private static async sendViaSendGrid(_payload: NotificationPayload): Promise<boolean> {
     try {
       // Implement SendGrid API call
       // const sgMail = require('@sendgrid/mail');
@@ -91,7 +91,7 @@ export class EmailNotificationService {
   /**
    * Send via AWS SES (placeholder)
    */
-  private static async sendViaAWSSES(payload: NotificationPayload): Promise<boolean> {
+  private static async sendViaAWSSES(_payload: NotificationPayload): Promise<boolean> {
     try {
       // Implement AWS SES API call
       // const AWS = require('aws-sdk');

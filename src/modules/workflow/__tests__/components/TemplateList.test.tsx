@@ -1,12 +1,11 @@
 // Component tests for TemplateList
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TemplateList } from '../../components/templates/TemplateList';
 import { WorkflowPortalProvider } from '../../context/WorkflowPortalContext';
 import { workflowManagementService } from '../../services/WorkflowManagementService';
 import {
   mockWorkflowTemplates,
-  mockTemplateStats
 } from '../__mocks__/workflow.mocks';
 
 // Mock services

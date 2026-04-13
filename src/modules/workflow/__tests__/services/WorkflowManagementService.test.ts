@@ -18,9 +18,7 @@ import type {
   CreateWorkflowTemplateRequest,
   UpdateWorkflowTemplateRequest,
   CreateWorkflowPhaseRequest,
-  UpdateWorkflowPhaseRequest,
   CreateWorkflowStepRequest,
-  UpdateWorkflowStepRequest,
   CreateProjectWorkflowRequest,
   UpdateProjectWorkflowRequest,
   BulkUpdateOrderRequest

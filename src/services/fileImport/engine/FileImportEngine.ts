@@ -10,12 +10,11 @@ import type {
   ProcessingStrategy,
   ProcessorConfig,
   ProcessingContext,
-  PerformanceMetrics
 } from '../types';
 
 import { ProcessorRouter } from './ProcessorRouter';
 import { WorkerManager } from '../workers/WorkerManager';
-import { MemoryManager } from '../memory/MemoryManager';
+// import { MemoryManager } from '../memory/MemoryManager';
 // import { ProgressTracker } from '../progress/ProgressTracker';
 import { FileValidator } from '../validation/FileValidator';
 

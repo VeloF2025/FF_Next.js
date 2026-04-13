@@ -122,41 +122,6 @@ export async function validateImport(
 }
 
 /**
- * Build upsert SQL for a data type
- */
-function buildUpsertSQL(
-  dataType: DataType,
-  columns: string[],
-  projectId: string
-): { sql: string; conflictColumns: string[] } {
-  const mapping = getMapping(dataType);
-  if (!mapping) {
-    throw new Error(`Unknown data type: ${dataType}`);
-  }
-
-  const tableName = mapping.tableName;
-  const conflictColumns = mapping.uniqueConstraint;
-
-  // Build column list (always include project_id)
-  const allColumns = ['project_id', ...columns];
-  const placeholders = allColumns.map((_, i) => `$${i + 1}`).join(', ');
-
-  // Build update set clause (exclude conflict columns)
-  const updateColumns = columns.filter(c => !conflictColumns.includes(c));
-  const updateSet = updateColumns.map(c => `${c} = EXCLUDED.${c}`).join(', ');
-
-  const sql = `
-    INSERT INTO ${tableName} (${allColumns.join(', ')})
-    VALUES (${placeholders})
-    ON CONFLICT (${conflictColumns.join(', ')})
-    DO UPDATE SET ${updateSet}, updated_at = NOW()
-    RETURNING id
-  `;
-
-  return { sql, conflictColumns };
-}
-
-/**
  * Import data into database
  */
 export async function importData(
