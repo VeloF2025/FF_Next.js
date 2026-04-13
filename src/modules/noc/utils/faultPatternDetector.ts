@@ -81,77 +81,73 @@ export async function detectFaultPattern(
     };
   }
 
-  try {
-    // Build WHERE clause based on scope type
-    const whereColumn = getScopeColumnName(scope_type);
+  // Build WHERE clause based on scope type
+  const whereColumn = getScopeColumnName(scope_type);
 
-    // Build SQL query to find tickets matching the scope within time window
-    let queryText = `
-      SELECT
-        id,
-        ticket_uid,
-        created_at,
-        fault_cause,
-        status
-      FROM maintenance_tickets
-      WHERE ${whereColumn} = $1
-        AND created_at >= NOW() - INTERVAL '1 day' * $2
-    `;
+  // Build SQL query to find tickets matching the scope within time window
+  let queryText = `
+    SELECT
+      id,
+      ticket_uid,
+      created_at,
+      fault_cause,
+      status
+    FROM maintenance_tickets
+    WHERE ${whereColumn} = $1
+      AND created_at >= NOW() - INTERVAL '1 day' * $2
+  `;
 
-    const params: (string | number)[] = [scope_value, time_window_days.toString()];
+  const params: (string | number)[] = [scope_value, time_window_days.toString()];
 
-    // Add project filter if provided
-    if (project_id) {
-      queryText += ` AND project_id = $3`;
-      params.push(project_id);
-    }
-
-    queryText += ` ORDER BY created_at DESC`;
-
-    // Execute query to get contributing tickets
-    const tickets = await query<ContributingTicket>(queryText, params);
-
-    const fault_count = tickets.length;
-    const pattern_detected = fault_count >= threshold;
-
-    // Map to contributing tickets
-    const contributing_tickets: ContributingTicket[] = tickets.map((ticket) => ({
-      ticket_id: ticket.id,
-      ticket_uid: ticket.ticket_uid,
-      created_at: new Date(ticket.created_at),
-      fault_cause: ticket.fault_cause,
-      status: ticket.status,
-    }));
-
-    // Check for existing active escalations
-    const existingEscalation = await checkExistingEscalation(scope_type, scope_value);
-
-    const should_escalate = pattern_detected && existingEscalation === null;
-
-    // Generate recommendation message
-    const recommendation = generateRecommendation({
-      scope_type,
-      scope_value,
-      fault_count,
-      threshold,
-      pattern_detected,
-      has_existing_escalation: existingEscalation !== null,
-    });
-
-    return {
-      pattern_detected,
-      scope_type,
-      scope_value,
-      fault_count,
-      threshold,
-      contributing_tickets,
-      should_escalate,
-      existing_escalation_id: existingEscalation,
-      recommendation,
-    };
-  } catch (error) {
-    throw error;
+  // Add project filter if provided
+  if (project_id) {
+    queryText += ` AND project_id = $3`;
+    params.push(project_id);
   }
+
+  queryText += ` ORDER BY created_at DESC`;
+
+  // Execute query to get contributing tickets
+  const tickets = await query<ContributingTicket>(queryText, params);
+
+  const fault_count = tickets.length;
+  const pattern_detected = fault_count >= threshold;
+
+  // Map to contributing tickets
+  const contributing_tickets: ContributingTicket[] = tickets.map((ticket) => ({
+    ticket_id: ticket.id,
+    ticket_uid: ticket.ticket_uid,
+    created_at: new Date(ticket.created_at),
+    fault_cause: ticket.fault_cause,
+    status: ticket.status,
+  }));
+
+  // Check for existing active escalations
+  const existingEscalation = await checkExistingEscalation(scope_type, scope_value);
+
+  const should_escalate = pattern_detected && existingEscalation === null;
+
+  // Generate recommendation message
+  const recommendation = generateRecommendation({
+    scope_type,
+    scope_value,
+    fault_count,
+    threshold,
+    pattern_detected,
+    has_existing_escalation: existingEscalation !== null,
+  });
+
+  return {
+    pattern_detected,
+    scope_type,
+    scope_value,
+    fault_count,
+    threshold,
+    contributing_tickets,
+    should_escalate,
+    existing_escalation_id: existingEscalation,
+    recommendation,
+  };
 }
 
 /**

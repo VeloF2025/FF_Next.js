@@ -5,6 +5,7 @@
  * detects issues, classifies them, and triggers appropriate recovery actions.
  */
 
+import net from 'net';
 import { log } from '@/lib/logger';
 
 // Normalize query result to always have rows array

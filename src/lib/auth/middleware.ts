@@ -10,6 +10,7 @@
 
 import crypto from 'crypto';
 import type { NextApiRequest, NextApiResponse, NextApiHandler } from 'next';
+import crypto from 'crypto';
 import { neon } from '@/lib/db-neon';
 import { verifyToken } from './jwt';
 import type { AuthUser, AuthRole } from './types';

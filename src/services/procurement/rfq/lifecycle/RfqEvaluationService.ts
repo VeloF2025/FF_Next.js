@@ -66,6 +66,8 @@ export class RfqEvaluationService {
               score = (minPrice / response.totalAmount) * criterion.max_score;
               break;
             }
+
+
             case 'delivery': {
               // Fastest delivery gets highest score
               const minDays = Math.min(...responses.map(r => r.deliveryDays || 30));

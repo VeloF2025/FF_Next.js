@@ -128,84 +128,80 @@ export async function generateHandoverSnapshot(
     to_owner_id = null,
   } = input;
 
-  try {
-    // 1. Fetch ticket data
-    const ticket = await fetchTicketData(ticket_id);
+  // 1. Fetch ticket data
+  const ticket = await fetchTicketData(ticket_id);
 
-    if (!ticket) {
-      throw new Error(`Ticket not found: ${ticket_id}`);
-    }
-
-    // 2. Fetch evidence links (attachments)
-    const evidenceLinks = await fetchEvidenceLinks(ticket_id);
-
-    // 3. Fetch verification progress
-    const verificationProgress = await fetchVerificationProgress(ticket_id);
-
-    // 4. Fetch decisions (risk acceptances, etc.)
-    const decisions = await fetchDecisions(ticket_id);
-
-    // 5. Build snapshot data
-    const snapshot_data: HandoverSnapshotData = {
-      // Core ticket data
-      ticket_uid: ticket.ticket_uid,
-      title: ticket.title,
-      description: ticket.description,
-      status: ticket.status,
-      priority: ticket.priority,
-      ticket_type: ticket.ticket_type,
-
-      // Location data
-      dr_number: ticket.dr_number,
-      project_id: ticket.project_id,
-      zone_id: ticket.zone_id,
-      pole_number: ticket.pole_number,
-      pon_number: ticket.pon_number,
-      address: ticket.address,
-
-      // Equipment data
-      ont_serial: ticket.ont_serial,
-      ont_rx_level: ticket.ont_rx_level,
-      ont_model: ticket.ont_model,
-
-      // Assignment data
-      assigned_to: ticket.assigned_to,
-      assigned_contractor_id: ticket.assigned_contractor_id,
-      assigned_team: ticket.assigned_team,
-
-      // QA readiness
-      qa_ready: ticket.qa_ready ?? false,
-      qa_readiness_check_at: ticket.qa_readiness_check_at ? new Date(ticket.qa_readiness_check_at) : null,
-
-      // Fault attribution
-      fault_cause: ticket.fault_cause,
-      fault_cause_details: ticket.fault_cause_details,
-
-      // Verification progress
-      verification_steps_completed: verificationProgress.completed,
-      verification_steps_total: verificationProgress.total,
-
-      // Snapshot metadata
-      snapshot_timestamp: new Date(),
-    };
-
-    // 6. Return generated snapshot
-    return {
-      ticket_id,
-      handover_type,
-      snapshot_data,
-      evidence_links: evidenceLinks.length > 0 ? evidenceLinks : [],
-      decisions: decisions.length > 0 ? decisions : [],
-      guarantee_status: ticket.guarantee_status,
-      from_owner_type,
-      from_owner_id,
-      to_owner_type,
-      to_owner_id,
-      is_locked: true, // Always locked by default for immutability
-    };
-  } catch (error) {
-    throw error;
+  if (!ticket) {
+    throw new Error(`Ticket not found: ${ticket_id}`);
   }
+
+  // 2. Fetch evidence links (attachments)
+  const evidenceLinks = await fetchEvidenceLinks(ticket_id);
+
+  // 3. Fetch verification progress
+  const verificationProgress = await fetchVerificationProgress(ticket_id);
+
+  // 4. Fetch decisions (risk acceptances, etc.)
+  const decisions = await fetchDecisions(ticket_id);
+
+  // 5. Build snapshot data
+  const snapshot_data: HandoverSnapshotData = {
+    // Core ticket data
+    ticket_uid: ticket.ticket_uid,
+    title: ticket.title,
+    description: ticket.description,
+    status: ticket.status,
+    priority: ticket.priority,
+    ticket_type: ticket.ticket_type,
+
+    // Location data
+    dr_number: ticket.dr_number,
+    project_id: ticket.project_id,
+    zone_id: ticket.zone_id,
+    pole_number: ticket.pole_number,
+    pon_number: ticket.pon_number,
+    address: ticket.address,
+
+    // Equipment data
+    ont_serial: ticket.ont_serial,
+    ont_rx_level: ticket.ont_rx_level,
+    ont_model: ticket.ont_model,
+
+    // Assignment data
+    assigned_to: ticket.assigned_to,
+    assigned_contractor_id: ticket.assigned_contractor_id,
+    assigned_team: ticket.assigned_team,
+
+    // QA readiness
+    qa_ready: ticket.qa_ready ?? false,
+    qa_readiness_check_at: ticket.qa_readiness_check_at ? new Date(ticket.qa_readiness_check_at) : null,
+
+    // Fault attribution
+    fault_cause: ticket.fault_cause,
+    fault_cause_details: ticket.fault_cause_details,
+
+    // Verification progress
+    verification_steps_completed: verificationProgress.completed,
+    verification_steps_total: verificationProgress.total,
+
+    // Snapshot metadata
+    snapshot_timestamp: new Date(),
+  };
+
+  // 6. Return generated snapshot
+  return {
+    ticket_id,
+    handover_type,
+    snapshot_data,
+    evidence_links: evidenceLinks.length > 0 ? evidenceLinks : [],
+    decisions: decisions.length > 0 ? decisions : [],
+    guarantee_status: ticket.guarantee_status,
+    from_owner_type,
+    from_owner_id,
+    to_owner_type,
+    to_owner_id,
+    is_locked: true, // Always locked by default for immutability
+  };
 }
 
 /**

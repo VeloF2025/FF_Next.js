@@ -806,6 +806,8 @@ export class StockMovementService extends BaseService {
           };
           return this.processGRN(projectId, grnData);
         }
+
+
         case 'ISSUE': {
           const issueData: IssueData = {
             referenceNumber: bulkData.referenceNumber,
@@ -825,6 +827,8 @@ export class StockMovementService extends BaseService {
           };
           return this.processIssue(projectId, issueData);
         }
+
+
         case 'TRANSFER': {
           if (!bulkData.fromProjectId || !bulkData.toProjectId) {
             throw new StockMovementError('Transfer requires fromProjectId and toProjectId', 'transfer', '', 0);

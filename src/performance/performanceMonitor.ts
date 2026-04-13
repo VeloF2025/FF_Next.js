@@ -239,12 +239,7 @@ class PerformanceMonitor {
    */
   async measureAsync<T>(_operationName: string, asyncFn: () => Promise<T>): Promise<T> {
     // Performance measurement disabled in production
-    try {
-      const result = await asyncFn();
-      return result;
-    } catch (error) {
-      throw error;
-    }
+    return asyncFn();
   }
 
   /**

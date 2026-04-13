@@ -55,12 +55,13 @@ export function WorkflowEditorForms() {
     setError(null);
 
     try {
-      const isEditing = !!state.editingItem?.id;
-      
-      switch (state.editingItem?.type) {
+      const editingItem = state.editingItem;
+      const isEditing = !!editingItem?.id;
+
+      switch (editingItem?.type) {
         case 'phase':
           if (isEditing) {
-            await workflowManagementService.updatePhase(state.editingItem?.id!, {
+            await workflowManagementService.updatePhase(editingItem.id as string, {
               name: formData.name,
               description: formData.description,
               orderIndex: formData.orderIndex,
@@ -85,7 +86,7 @@ export function WorkflowEditorForms() {
 
         case 'step':
           if (isEditing) {
-            await workflowManagementService.updateStep(state.editingItem?.id!, {
+            await workflowManagementService.updateStep(editingItem.id as string, {
               name: formData.name,
               description: formData.description,
               orderIndex: formData.orderIndex,
@@ -97,7 +98,7 @@ export function WorkflowEditorForms() {
             });
           } else {
             await workflowManagementService.createStep({
-              workflowPhaseId: state.editingItem?.parentId!,
+              workflowPhaseId: editingItem.parentId as string,
               name: formData.name,
               description: formData.description,
               orderIndex: formData.orderIndex,
@@ -112,7 +113,7 @@ export function WorkflowEditorForms() {
 
         case 'task':
           if (isEditing) {
-            await workflowManagementService.updateTask(state.editingItem?.id!, {
+            await workflowManagementService.updateTask(editingItem.id as string, {
               name: formData.name,
               description: formData.description,
               orderIndex: formData.orderIndex,
@@ -123,7 +124,7 @@ export function WorkflowEditorForms() {
             });
           } else {
             await workflowManagementService.createTask({
-              workflowStepId: state.editingItem?.parentId!,
+              workflowStepId: editingItem.parentId as string,
               name: formData.name,
               description: formData.description,
               orderIndex: formData.orderIndex,
