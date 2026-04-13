@@ -13,20 +13,15 @@ import type {
   CostTrendReport,
   AnalyticsSnapshot,
   VehicleTCORow,
-  rowToVehicleTCO,
-  rowToAnalyticsSnapshot,
-  AnalyticsSnapshotRow,
 } from '../types/analytics.types';
 import type {
   ServiceUrgency,
   UpcomingService,
   UpcomingServiceRow,
-  rowToUpcomingService,
 } from '../types/maintenance.types';
 import type {
   DriverCompliance,
   DriverComplianceRow,
-  rowToDriverCompliance,
 } from '../types/driver-score.types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -91,7 +86,7 @@ export async function getFleetKPIs(): Promise<FleetKPIs> {
     `;
 
     // Get previous period for trends (compare to previous 12 months)
-    const previousTco = await sql`
+    const _previousTco = await sql`
       SELECT AVG(total_tco) as prev_avg_tco
       FROM fleet_analytics_snapshots
       WHERE snapshot_type = 'monthly'

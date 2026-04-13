@@ -10,11 +10,6 @@ import {
   Edit2,
   Trash2,
   Building2,
-  Phone,
-  Mail,
-  MapPin,
-  Clock,
-  DollarSign,
   Check,
   X,
   ChevronLeft,
@@ -27,7 +22,6 @@ import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type {
   ServiceAuthorityWithType,
   CreateServiceAuthorityInput,
-  UpdateServiceAuthorityInput,
   PipelineApprovalType,
 } from '../types';
 
@@ -47,7 +41,7 @@ const SA_PROVINCES = [
   'Western Cape',
 ];
 
-export function AuthorityManager({ currentUserId }: AuthorityManagerProps) {
+export function AuthorityManager({ currentUserId: _currentUserId }: AuthorityManagerProps) {
   // List state
   const [authorities, setAuthorities] = useState<ServiceAuthorityWithType[]>([]);
   const [approvalTypes, setApprovalTypes] = useState<PipelineApprovalType[]>([]);

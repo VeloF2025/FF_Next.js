@@ -15,16 +15,12 @@ import {
   Users,
   UserPlus,
   Search,
-  Filter,
   RefreshCw,
   Download,
   CheckCircle,
-  XCircle,
   Phone,
   MessageSquare,
   TrendingUp,
-  Target,
-  BarChart3,
   Zap,
   Eye,
   Pencil,
@@ -38,8 +34,6 @@ import { Badge } from '@/shared/components/ui/Badge';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import type {
   TechnicianSummary,
-  ActivatorSummary,
-  InstallerSummary,
   DiscoveredTechnician,
   TechnicianType
 } from '@/types/technician.types';
@@ -59,7 +53,7 @@ export function TechnicianDirectory({ onViewTechnician }: TechnicianDirectoryPro
   const [activeTab, setActiveTab] = useState<'directory' | 'discover'>('directory');
   const [typeFilter, setTypeFilter] = useState<TechnicianType | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [_showAddModal, setShowAddModal] = useState(false);
   const [editingTechnician, setEditingTechnician] = useState<TechnicianSummary | null>(null);
 
   const fetchTechnicians = useCallback(async () => {
@@ -334,7 +328,7 @@ export function TechnicianDirectory({ onViewTechnician }: TechnicianDirectoryPro
         <EditTechnicianModal
           technician={editingTechnician}
           onClose={() => setEditingTechnician(null)}
-          onSave={async (updated) => {
+          onSave={async (_updated) => {
             await fetchTechnicians();
             setEditingTechnician(null);
           }}
