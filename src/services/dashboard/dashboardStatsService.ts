@@ -88,8 +88,8 @@ export class DashboardStatsService {
    */
   static async getDashboardStats(): Promise<DashboardStats> {
     try {
-      const stats = await analyticsApi.getDashboardStats();
-      
+      const stats = await analyticsApi.getDashboardStats() as unknown as DashboardStats;
+
       return {
         totalProjects: stats.totalProjects,
         activeProjects: stats.activeProjects,
@@ -357,12 +357,13 @@ export class DashboardStatsService {
       const endDate = new Date().toISOString();
       const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       
-      const trendsData = await analyticsApi.getDashboardTrends(startDate, endDate, 'monthly');
-      
+      type TrendEntry = { direction?: 'up' | 'down' | 'stable'; percentage?: number };
+      const trendsData = await analyticsApi.getDashboardTrends(startDate, endDate, 'monthly') as Record<string, TrendEntry>;
+
       // Convert API response to DashboardTrends format
       const trends: DashboardTrends = {};
       const stats = await this.getDashboardStats();
-      
+
       // Map trends from API response
       // Note: analyticsApi.fetch() unwraps data.data, so trendsData is already
       // the flat trend object { activeProjects: {value,direction,percentage}, ... }
@@ -371,8 +372,8 @@ export class DashboardStatsService {
 
         trends[key] = {
           value: typeof value === 'number' ? value : 0,
-          direction: trendObj?.direction || 'stable',
-          percentage: trendObj?.percentage || 0,
+          direction: trendObj?.direction ?? 'stable',
+          percentage: trendObj?.percentage ?? 0,
         };
       });
       

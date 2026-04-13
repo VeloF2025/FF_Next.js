@@ -10,6 +10,17 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
 
+interface StatusCountRow { workflow_status: string; count: string }
+interface ConfidenceCountRow { confidence_level: string; count: string }
+interface RetakeCountRow { needs_retake: string; retaken: string }
+interface SingleCountRow { count: string }
+interface WorkTypeRow {
+  work_type: string; total: string; approved: string;
+  rejected: string; pending: string; avg_confidence: string | null;
+}
+interface PriorityCountRow { priority: string; count: string }
+interface ActivityRow { action_type: string; action_by: string; action_at: string; notes: string }
+
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -20,11 +31,11 @@ async function handler(
 
   try {
     const authReq = req as unknown as AuthenticatedRequest;
-    const currentUser = authReq.user?.email || authReq.user?.username;
+    const currentUser = authReq.user?.email;
     const { projectId } = req.query;
 
     // Get overall counts by workflow status
-    const statusCounts = projectId
+    const statusCounts = (projectId
       ? await sql`
           SELECT workflow_status, COUNT(*) as count
           FROM qfield_photo_validations
@@ -35,10 +46,10 @@ async function handler(
           SELECT workflow_status, COUNT(*) as count
           FROM qfield_photo_validations
           GROUP BY workflow_status
-        `;
+        `) as unknown as StatusCountRow[];
 
     // Get counts by AI result
-    const aiCounts = projectId
+    const aiCounts = (projectId
       ? await sql`
           SELECT
             CASE
@@ -63,10 +74,10 @@ async function handler(
             COUNT(*) as count
           FROM qfield_photo_validations
           GROUP BY confidence_level
-        `;
+        `) as unknown as ConfidenceCountRow[];
 
     // Get needs retake count
-    const retakeCounts = projectId
+    const retakeCounts = (projectId
       ? await sql`
           SELECT
             COUNT(*) FILTER (WHERE needs_retake = TRUE AND retake_completed_at IS NULL) as needs_retake,
@@ -79,10 +90,10 @@ async function handler(
             COUNT(*) FILTER (WHERE needs_retake = TRUE AND retake_completed_at IS NULL) as needs_retake,
             COUNT(*) FILTER (WHERE needs_retake = TRUE AND retake_completed_at IS NOT NULL) as retaken
           FROM qfield_photo_validations
-        `;
+        `) as unknown as RetakeCountRow[];
 
     // Get escalated count
-    const escalatedCount = projectId
+    const escalatedCount = (projectId
       ? await sql`
           SELECT COUNT(*) as count
           FROM qfield_photo_validations
@@ -95,10 +106,10 @@ async function handler(
           FROM qfield_photo_validations
           WHERE escalation_level > 0
             AND workflow_status = 'escalated'
-        `;
+        `) as unknown as SingleCountRow[];
 
     // Get overdue count (past due date, not completed)
-    const overdueCount = projectId
+    const overdueCount = (projectId
       ? await sql`
           SELECT COUNT(*) as count
           FROM qfield_photo_validations
@@ -111,12 +122,12 @@ async function handler(
           FROM qfield_photo_validations
           WHERE due_date < NOW()
             AND workflow_status IN ('pending', 'in_review')
-        `;
+        `) as unknown as SingleCountRow[];
 
     // Get my queue count if user is logged in
     let myQueueCount = 0;
     if (currentUser) {
-      const myQueue = projectId
+      const myQueue = (projectId
         ? await sql`
             SELECT COUNT(*) as count
             FROM qfield_photo_validations
@@ -129,12 +140,12 @@ async function handler(
             FROM qfield_photo_validations
             WHERE assigned_to = ${currentUser}
               AND workflow_status IN ('pending', 'in_review')
-          `;
-      myQueueCount = parseInt(myQueue[0]?.count || '0', 10);
+          `) as unknown as SingleCountRow[];
+      myQueueCount = parseInt(myQueue[0]?.count ?? '0', 10);
     }
 
     // Get counts by work type
-    const workTypeCounts = projectId
+    const workTypeCounts = (projectId
       ? await sql`
           SELECT
             COALESCE(work_type, 'unknown') as work_type,
@@ -159,10 +170,10 @@ async function handler(
           FROM qfield_photo_validations
           GROUP BY work_type
           ORDER BY total DESC
-        `;
+        `) as unknown as WorkTypeRow[];
 
     // Get counts by priority
-    const priorityCounts = projectId
+    const priorityCounts = (projectId
       ? await sql`
           SELECT
             COALESCE(priority, 'normal') as priority,
@@ -179,10 +190,10 @@ async function handler(
           FROM qfield_photo_validations
           WHERE workflow_status IN ('pending', 'in_review')
           GROUP BY priority
-        `;
+        `) as unknown as PriorityCountRow[];
 
     // Get recent activity
-    const recentActivity = await sql`
+    const recentActivity = (await sql`
       SELECT
         action_type,
         action_by,
@@ -191,7 +202,7 @@ async function handler(
       FROM qfield_qa_actions
       ORDER BY action_at DESC
       LIMIT 10
-    `;
+    `) as unknown as ActivityRow[];
 
     // Build response
     const stats = {
