@@ -9,7 +9,6 @@ import type {
   DayType,
   ClassifiedTrip,
   GPSTrip,
-  AuthorizedLocation,
 } from '../types';
 import { findNearestLocation, findMatchingLocation, type LocationWithRadius } from '../utils/geoUtils';
 import { getTimeCategory, getDayType, isWorkHours } from '../utils/dateUtils';

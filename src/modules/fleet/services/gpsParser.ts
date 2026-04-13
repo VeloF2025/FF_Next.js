@@ -12,7 +12,7 @@ import type {
   VehicleInfo,
   ColumnMapping,
 } from '../types';
-import { haversineDistance, calculateRouteDistance } from '../utils/geoUtils';
+import { calculateRouteDistance } from '../utils/geoUtils';
 import { parseExcelDate } from '../utils/excelDateParser';
 import { getDurationMinutes } from '../utils/dateUtils';
 

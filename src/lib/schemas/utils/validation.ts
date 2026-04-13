@@ -5,7 +5,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z, ZodError, ZodSchema } from 'zod';
-import { ApiErrorResponseSchema } from '../common';
 import { log } from '@/lib/logger';
 
 // ============================================================================

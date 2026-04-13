@@ -20,14 +20,6 @@ const QA_APPROVER_USER_IDS = new Set([
   '0525fbd2-eb77-419a-a989-47c0e641f06b', // Jacques White
 ]);
 
-/** Actions that require QA approval permission */
-const QA_ACTIONS = new Set([
-  'approve_qa',       // pending_qa → resolved
-  'customer_confirmed', // resolved → verified
-  'close',            // verified → closed
-  'approve_rejection', // wont_fix → closed
-]);
-
 /** Status transitions that are QA-gated (the "forward" action from these statuses) */
 const QA_FORWARD_STATUSES = new Set([
   'pending_qa',  // forward = Approve QA

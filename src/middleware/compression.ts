@@ -10,37 +10,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 /**
- * Check if response should be compressed
- */
-function shouldCompress(req: NextApiRequest, contentType?: string): boolean {
-  // Don't compress if client doesn't support it
-  const acceptEncoding = req.headers['accept-encoding'] || '';
-  if (!acceptEncoding.includes('gzip') && !acceptEncoding.includes('br')) {
-    return false;
-  }
-
-  // Don't compress small responses
-  // (compression overhead not worth it for < 1KB)
-
-  // Compress text-based content types
-  const compressibleTypes = [
-    'application/json',
-    'application/javascript',
-    'text/html',
-    'text/css',
-    'text/plain',
-    'text/xml',
-    'application/xml',
-  ];
-
-  if (contentType) {
-    return compressibleTypes.some((type) => contentType.includes(type));
-  }
-
-  return true; // Default to compress
-}
-
-/**
  * Add cache control headers
  */
 export function setCacheHeaders(

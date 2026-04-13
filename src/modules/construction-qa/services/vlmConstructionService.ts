@@ -16,7 +16,6 @@ import { VLM_API_URL, VLM_MODEL, VLM_MAX_TOKENS_OCR } from '@/lib/vlm';
 
 const sql = neon(process.env.DATABASE_URL!);
 const MODULE = 'cqa-vlm';
-const MAX_IMAGE_DIM = 1024;
 
 interface ValidateOptions {
   reviewId: string;
@@ -150,7 +149,7 @@ export async function validateReviewPhotos(opts: ValidateOptions): Promise<Valid
         // Record VLM learning metric (fire-and-forget)
         if (vlmResult.confidence >= 0.7) {
           recordCorrectExtraction('construction_qa', 'construction_photo_qa', vlmResult.confidence)
-            .catch(() => {});
+            .catch((e: unknown) => log.warn('Learning metric record failed (non-critical)', { error: e instanceof Error ? e.message : 'unknown' }, MODULE));
         }
       } catch (photoErr) {
         log.error('Photo VLM failed', { photoId: photo.id, error: (photoErr as Error).message }, MODULE);

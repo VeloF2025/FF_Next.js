@@ -156,7 +156,6 @@ export function rateLimit(config: RateLimitConfig) {
     }
 
     // Execute handler
-    const originalStatus = res.statusCode;
     await handler();
 
     // Optionally skip counting based on response

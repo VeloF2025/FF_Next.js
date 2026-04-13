@@ -11,7 +11,6 @@ import {
   AddressSchema,
   AuditFieldsSchema,
   PaginationParamsSchema,
-  StatusSchema,
 } from '../common';
 
 // ============================================================================

@@ -1,6 +1,6 @@
 'use client';
 
-import { Calendar, Clock, Users, User, Video, ExternalLink } from 'lucide-react';
+import { Calendar, Clock, Users, User, ExternalLink } from 'lucide-react';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import type { Meeting } from '@/modules/meetings/types/meeting.types';
 import { ActionItem } from '@/types/communications.types';
