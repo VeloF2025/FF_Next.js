@@ -1,6 +1,5 @@
 import { useState } from 'react';
 // xlsx is loaded dynamically inside downloadTemplate to avoid bundle cost at page load
-import { useSOWService } from '@/hooks/useSOW';
 import { sowDataProcessor } from '@/services/sowDataProcessor';
 import { neonSOWService } from '@/services/neonSOWService';
 import { SOWFile, FileTypeConfig } from '../types/sowUpload.types';
@@ -21,7 +20,6 @@ export function useSOWUpload(
 ) {
   const [files, setFiles] = useState<SOWFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const sowService = useSOWService();
 
   const updateFileStatus = (
     type: string,

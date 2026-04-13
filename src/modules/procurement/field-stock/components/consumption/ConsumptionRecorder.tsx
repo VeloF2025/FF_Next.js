@@ -132,7 +132,6 @@ export function ConsumptionRecorder({
     }
   };
 
-  const serialItems = stockItems.filter((item) => item.trackingType === 'serial');
   const quantityItems = stockItems.filter((item) => item.trackingType !== 'serial');
 
   return (

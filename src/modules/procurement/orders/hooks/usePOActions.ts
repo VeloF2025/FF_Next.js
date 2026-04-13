@@ -55,7 +55,7 @@ export const usePOActions = ({ po, onUpdated, onReload }: UsePOActionsProps) => 
     }
   }, [po, onReload, onUpdated]);
 
-  const handleApprove = useCallback(async (notes?: string) => {
+  const handleApprove = useCallback(async (_notes?: string) => {
     if (!po) return;
 
     try {

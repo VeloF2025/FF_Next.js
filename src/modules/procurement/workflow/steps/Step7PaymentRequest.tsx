@@ -301,12 +301,4 @@ const inputStyle = (hasError: boolean): React.CSSProperties => ({
   boxSizing: 'border-box',
 });
 
-const backBtnStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 6,
-  padding: '10px 16px',
-  border: '1px solid var(--ff-border-light)',
-  borderRadius: 8, cursor: 'pointer',
-  background: 'transparent',
-  color: 'var(--ff-text-secondary)',
-  fontSize: 14,
-};
+

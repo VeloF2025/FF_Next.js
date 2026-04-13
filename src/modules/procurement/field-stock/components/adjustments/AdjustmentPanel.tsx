@@ -65,11 +65,6 @@ export function AdjustmentPanel() {
     return match ? match[1] : '-';
   };
 
-  const parseNotes = (notes?: string): string => {
-    if (!notes) return '';
-    return notes.replace(/^\[[A-Z_]+\]\s*/, '');
-  };
-
   // Determine if adjustment is increase or decrease based on location names
   const isIncrease = (adj: typeof adjustments[0]): boolean => {
     return adj.from_location_name?.includes('Adjustment') ?? false;

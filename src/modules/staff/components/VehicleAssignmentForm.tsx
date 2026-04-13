@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Calendar, Car, Fuel, AlertTriangle, Search } from 'lucide-react';
 import { formatDateISO } from '@/utils/dateFormat';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import type { VehicleAssignment, VehicleAssignmentCreate } from '@/types/staff';
+import type { VehicleAssignment } from '@/types/staff';
 import { COMMON_VEHICLE_MAKES } from '@/types/staff/vehicle.types';
 import Link from 'next/link';
 import { log } from '@/lib/logger';
