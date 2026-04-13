@@ -1,4 +1,5 @@
 // Component tests for WorkflowEditor
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WorkflowEditor } from '../../components/editor/WorkflowEditor';
@@ -13,61 +14,61 @@ import {
 } from '../__mocks__/workflow.mocks';
 
 // Mock services
-jest.mock('../../services/WorkflowManagementService', () => ({
+vi.mock('../../services/WorkflowManagementService', () => ({
   workflowManagementService: {
-    getTemplateById: jest.fn(),
-    getPhases: jest.fn(),
-    getSteps: jest.fn(),
-    getTasks: jest.fn(),
-    validateTemplate: jest.fn()
+    getTemplateById: vi.fn(),
+    getPhases: vi.fn(),
+    getSteps: vi.fn(),
+    getTasks: vi.fn(),
+    validateTemplate: vi.fn()
   }
 }));
 
 // Mock child components to focus on WorkflowEditor logic
-jest.mock('../../components/editor/EditorCanvas', () => {
+vi.mock('../../components/editor/EditorCanvas', () => {
   return {
     EditorCanvas: () => <div data-testid="editor-canvas">Editor Canvas</div>
   };
 });
 
-jest.mock('../../components/editor/ComponentPalette', () => {
+vi.mock('../../components/editor/ComponentPalette', () => {
   return {
     ComponentPalette: () => <div data-testid="component-palette">Component Palette</div>
   };
 });
 
-jest.mock('../../components/editor/PropertiesPanel', () => {
+vi.mock('../../components/editor/PropertiesPanel', () => {
   return {
     PropertiesPanel: () => <div data-testid="properties-panel">Properties Panel</div>
   };
 });
 
-jest.mock('../../components/editor/EditorToolbar', () => {
+vi.mock('../../components/editor/EditorToolbar', () => {
   return {
     EditorToolbar: () => <div data-testid="editor-toolbar">Editor Toolbar</div>
   };
 });
 
-jest.mock('../../components/editor/ValidationPanel', () => {
+vi.mock('../../components/editor/ValidationPanel', () => {
   return {
     ValidationPanel: () => <div data-testid="validation-panel">Validation Panel</div>
   };
 });
 
-jest.mock('../../components/editor/EditorMinimap', () => {
+vi.mock('../../components/editor/EditorMinimap', () => {
   return {
     EditorMinimap: () => <div data-testid="editor-minimap">Editor Minimap</div>
   };
 });
 
-jest.mock('../../components/editor/forms', () => {
+vi.mock('../../components/editor/forms', () => {
   return {
     WorkflowEditorForms: () => <div data-testid="editor-forms">Editor Forms</div>
   };
 });
 
 // Mock timers for auto-save testing
-jest.useFakeTimers();
+vi.useFakeTimers();
 
 describe('WorkflowEditor Component', () => {
   const renderWithProvider = (templateId?: string) => {
@@ -79,21 +80,21 @@ describe('WorkflowEditor Component', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    jest.clearAllTimers();
-    
+    vi.clearAllMocks();
+    vi.clearAllTimers();
+
     // Setup default service mock responses
-    (workflowManagementService.getTemplateById as jest.Mock).mockResolvedValue(mockWorkflowTemplates[0]);
-    (workflowManagementService.getPhases as jest.Mock).mockResolvedValue(mockWorkflowPhases);
-    (workflowManagementService.getSteps as jest.Mock).mockResolvedValue(mockWorkflowSteps);
-    (workflowManagementService.getTasks as jest.Mock).mockResolvedValue(mockWorkflowTasks);
-    (workflowManagementService.validateTemplate as jest.Mock).mockResolvedValue(mockWorkflowValidationResult);
+    (workflowManagementService.getTemplateById as ReturnType<typeof vi.fn>).mockResolvedValue(mockWorkflowTemplates[0]);
+    (workflowManagementService.getPhases as ReturnType<typeof vi.fn>).mockResolvedValue(mockWorkflowPhases);
+    (workflowManagementService.getSteps as ReturnType<typeof vi.fn>).mockResolvedValue(mockWorkflowSteps);
+    (workflowManagementService.getTasks as ReturnType<typeof vi.fn>).mockResolvedValue(mockWorkflowTasks);
+    (workflowManagementService.validateTemplate as ReturnType<typeof vi.fn>).mockResolvedValue(mockWorkflowValidationResult);
   });
 
   afterEach(() => {
-    jest.runOnlyPendingTimers();
-    jest.useRealTimers();
-    jest.useFakeTimers();
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+    vi.useFakeTimers();
   });
 
   describe('Initial Rendering', () => {
@@ -132,7 +133,7 @@ describe('WorkflowEditor Component', () => {
   describe('Loading States', () => {
     it('should show loading overlay when loading template', async () => {
       // Make the service call slow to test loading state
-      (workflowManagementService.getTemplateById as jest.Mock).mockImplementation(
+      (workflowManagementService.getTemplateById as ReturnType<typeof vi.fn>).mockImplementation(
         () => new Promise(resolve => setTimeout(() => resolve(mockWorkflowTemplates[0]), 1000))
       );
 
@@ -153,7 +154,7 @@ describe('WorkflowEditor Component', () => {
 
   describe('Error Handling', () => {
     it('should display error message when template loading fails', async () => {
-      (workflowManagementService.getTemplateById as jest.Mock).mockRejectedValue(
+      (workflowManagementService.getTemplateById as ReturnType<typeof vi.fn>).mockRejectedValue(
         new Error('Failed to load template')
       );
 
@@ -167,7 +168,7 @@ describe('WorkflowEditor Component', () => {
 
     it('should clear error message when template loads successfully', async () => {
       // First render with error
-      (workflowManagementService.getTemplateById as jest.Mock).mockRejectedValue(
+      (workflowManagementService.getTemplateById as ReturnType<typeof vi.fn>).mockRejectedValue(
         new Error('Network error')
       );
 
@@ -178,7 +179,7 @@ describe('WorkflowEditor Component', () => {
       });
 
       // Then fix the service and re-render
-      (workflowManagementService.getTemplateById as jest.Mock).mockResolvedValue(mockWorkflowTemplates[0]);
+      (workflowManagementService.getTemplateById as ReturnType<typeof vi.fn>).mockResolvedValue(mockWorkflowTemplates[0]);
 
       rerender(
         <WorkflowEditorProvider>
@@ -226,7 +227,7 @@ describe('WorkflowEditor Component', () => {
     });
 
     it('should handle zoom in action', async () => {
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime.bind(vi) });
       renderWithProvider('template-1');
 
       await waitFor(() => {
@@ -241,7 +242,7 @@ describe('WorkflowEditor Component', () => {
     });
 
     it('should handle zoom out action', async () => {
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime.bind(vi) });
       renderWithProvider('template-1');
 
       await waitFor(() => {
@@ -255,7 +256,7 @@ describe('WorkflowEditor Component', () => {
     });
 
     it('should handle zoom reset action', async () => {
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime.bind(vi) });
       renderWithProvider('template-1');
 
       await waitFor(() => {
@@ -280,7 +281,7 @@ describe('WorkflowEditor Component', () => {
     });
 
     it('should toggle grid visibility', async () => {
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime.bind(vi) });
       renderWithProvider('template-1');
 
       await waitFor(() => {
@@ -304,7 +305,7 @@ describe('WorkflowEditor Component', () => {
     });
 
     it('should show/hide minimap when toggled', async () => {
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime.bind(vi) });
       renderWithProvider('template-1');
 
       await waitFor(() => {
@@ -351,7 +352,7 @@ describe('WorkflowEditor Component', () => {
     });
 
     it('should handle save button click', async () => {
-      const _user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const _user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime.bind(vi) });
       renderWithProvider('template-1');
 
       await waitFor(() => {
@@ -373,7 +374,7 @@ describe('WorkflowEditor Component', () => {
     });
 
     it('should toggle validation panel when validation button is clicked', async () => {
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime.bind(vi) });
       renderWithProvider('template-1');
 
       // Wait for component to load with validation results
@@ -424,7 +425,7 @@ describe('WorkflowEditor Component', () => {
       fireEvent.keyDown(window, {
         key: 's',
         ctrlKey: true,
-        preventDefault: jest.fn()
+        preventDefault: vi.fn()
       });
 
       // Save action should be triggered (would test actual save in integration test)
@@ -440,7 +441,7 @@ describe('WorkflowEditor Component', () => {
       // Simulate Escape key
       fireEvent.keyDown(window, {
         key: 'Escape',
-        preventDefault: jest.fn()
+        preventDefault: vi.fn()
       });
 
       // Selection should be cleared
@@ -456,7 +457,7 @@ describe('WorkflowEditor Component', () => {
       // Simulate Delete key
       fireEvent.keyDown(window, {
         key: 'Delete',
-        preventDefault: jest.fn()
+        preventDefault: vi.fn()
       });
 
       // Selected items should be deleted
@@ -487,7 +488,7 @@ describe('WorkflowEditor Component', () => {
 
   describe('Canvas Interaction', () => {
     it('should handle canvas click to clear selection', async () => {
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime.bind(vi) });
       renderWithProvider('template-1');
 
       await waitFor(() => {
@@ -509,7 +510,7 @@ describe('WorkflowEditor Component', () => {
 
       // Mock the beforeunload event
       const mockEvent = new Event('beforeunload') as BeforeUnloadEvent;
-      mockEvent.preventDefault = jest.fn();
+      mockEvent.preventDefault = vi.fn();
       
       // Simulate unsaved changes state
       // This would be set through user interactions in real scenario
@@ -523,7 +524,7 @@ describe('WorkflowEditor Component', () => {
       renderWithProvider('template-1');
 
       const mockEvent = new Event('beforeunload') as BeforeUnloadEvent;
-      mockEvent.preventDefault = jest.fn();
+      mockEvent.preventDefault = vi.fn();
 
       fireEvent(window, mockEvent);
 
@@ -568,7 +569,7 @@ describe('WorkflowEditor Component', () => {
     });
 
     it('should support keyboard navigation', async () => {
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime.bind(vi) });
       renderWithProvider('template-1');
 
       await waitFor(() => {
