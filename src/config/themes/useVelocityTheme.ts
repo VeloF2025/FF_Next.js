@@ -48,7 +48,7 @@ export const useVelocityTheme = (options: UseVelocityThemeOptions = {}) => {
     // Performance utilities
     getOptimizedStyle: optimizePerformance 
       ? velocityUtils.getPerformanceOptimizedStyle 
-      : (style: any) => style,
+      : (style: Record<string, unknown>) => style,
     
     // Animation utilities
     getHoverAnimation: respectReducedMotion 

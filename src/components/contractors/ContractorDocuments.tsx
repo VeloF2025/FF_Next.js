@@ -39,9 +39,9 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
 
       const data = await response.json();
       setDocuments(data.data || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error('Failed to fetch documents', { error: err }, 'ContractorDocuments');
-      setError(err.message || 'Failed to load documents');
+      setError(err instanceof Error ? (err.message || 'Failed to load documents') : 'Failed to load documents');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);

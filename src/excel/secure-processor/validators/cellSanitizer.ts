@@ -10,7 +10,7 @@ import { containsDangerousPattern, stripHTML } from './securityValidators';
  * Sanitize cell value with security checks
  */
 export function sanitizeCellValue(
-  value: any,
+  value: unknown,
   maxLength: number = MAX_CELL_LENGTH,
   allowHTML: boolean = false
 ): string {

@@ -41,8 +41,8 @@ export function ContractorOnboardingStages({ contractorId }: ContractorOnboardin
       const stagesData = data.data || data;
       setStages(stagesData);
       calculateProgress(stagesData);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
       log.error('Failed to fetch onboarding stages', { error: err, contractorId }, 'ContractorOnboardingStages');
     } finally {
       setIsLoading(false);

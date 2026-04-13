@@ -30,7 +30,7 @@ const mockLink = {
 };
 vi.spyOn(document, 'createElement').mockImplementation((tagName) => {
   if (tagName === 'a') {
-    return mockLink as any;
+    return mockLink as unknown as HTMLAnchorElement;
   }
   return document.createElement(tagName);
 });

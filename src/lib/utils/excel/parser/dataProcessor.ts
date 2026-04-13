@@ -206,11 +206,15 @@ export class DataProcessor {
   private addError(
     row: number,
     column: string,
-    value: any,
+    value: unknown,
     message: string,
     type: ParseError['type']
   ): void {
-    this.errors.push({ row, column, value, message, type });
+    const safeValue: string | number | boolean | null | undefined =
+      value === null || value === undefined || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+        ? value
+        : String(value);
+    this.errors.push({ row, column, value: safeValue, message, type });
   }
 
   /**

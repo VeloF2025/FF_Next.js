@@ -33,8 +33,8 @@ export function ActionItemsByAssignee() {
       const data = await actionItemsService.getActionItems();
       setItems(data);
       setError(null);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }

@@ -13,7 +13,7 @@ export interface SecureExcelOptions {
   useStreaming?: boolean;
 }
 
-export interface ExcelReadResult<T = any> {
+export interface ExcelReadResult<T = unknown> {
   data: T[];
   errors: Array<{ row: number; column?: string; message: string }>;
   metadata: {

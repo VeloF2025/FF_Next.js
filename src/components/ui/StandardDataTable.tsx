@@ -36,7 +36,7 @@ const StandardDataTableComponent = <T,>({
     if (column.render) {
       return column.render(item);
     }
-    const value = (item as any)[column.key];
+    const value = (item as Record<string, unknown>)[column.key as string];
     return value !== null && value !== undefined ? String(value) : '-';
   }, []);
 

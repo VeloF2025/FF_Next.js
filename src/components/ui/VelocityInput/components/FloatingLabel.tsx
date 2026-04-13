@@ -34,7 +34,7 @@ export const FloatingLabel: React.FC<FloatingLabelProps> = ({
     <label
       className={cn(
         velocityLabelVariants({
-          variant: variant as any,
+          variant: variant as 'glass' | 'glass-dark' | 'glass-intense' | 'neon' | 'neon-purple' | 'neon-pink' | 'neon-green' | 'holographic' | 'plasma' | 'aurora' | 'solid' | 'minimal' | undefined,
           size,
           state: currentState,
           floating: isFloating

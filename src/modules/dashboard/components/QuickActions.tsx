@@ -10,7 +10,8 @@ import {
   MapPin,
   Package,
   BarChart3,
-  ChevronRight
+  ChevronRight,
+  type LucideIcon
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Permission } from '@/types/auth.types';
@@ -20,7 +21,7 @@ interface QuickActionItem {
   id: string;
   title: string;
   description: string;
-  icon: any;
+  icon: LucideIcon;
   route: string;
   requiredPermissions: Permission[];
   iconColor: string;

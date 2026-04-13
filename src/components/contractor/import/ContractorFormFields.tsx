@@ -29,7 +29,7 @@ interface ServiceTemplate {
 const ServiceTemplateApiService = {
   getTemplates: async () => [] as ServiceTemplate[],
   getTemplate: async (id: string) => null as ServiceTemplate | null,
-  getServiceTemplates: async (_options: any) => ({ data: [] as ServiceTemplate[] }),
+  getServiceTemplates: async (_options: Record<string, unknown>) => ({ data: [] as ServiceTemplate[] }),
 };
 
 interface BusinessTypeSelectProps {

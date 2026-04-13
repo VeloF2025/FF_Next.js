@@ -223,7 +223,7 @@ export const VirtualizedTable = memo(<T,>({
         {columns.map((column, columnIndex) => {
           const value = column.render
             ? column.render(item, index)
-            : (item as any)[column.key];
+            : (item as Record<string, React.ReactNode>)[column.key as string];
 
           return (
             <div

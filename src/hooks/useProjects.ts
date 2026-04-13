@@ -162,7 +162,7 @@ export function useUpdateProjectProgress() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ projectId, data }: { projectId: string; data: any }) => projectService.update(projectId, data),
+    mutationFn: ({ projectId, data }: { projectId: string; data: Partial<ProjectFormData> }) => projectService.update(projectId, data),
     onSuccess: (_, variables) => {
       // Invalidate project data to show updated progress
       queryClient.invalidateQueries({ queryKey: projectKeys.detail(variables.projectId) });
