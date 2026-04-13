@@ -126,7 +126,7 @@ export class ProcurementErrorAggregator implements IErrorAggregator {
     mostCommon: Array<{ code: string; message: string; count: number; }>;
     bySeverity: Record<string, number>;
     recommendations: string[];
-    criticalIssues: Array<{ item: any; error: any }>;
+    criticalIssues: Array<{ item: unknown; error: { code: string; [key: string]: unknown } }>;
   } {
     const aggregation = this.aggregateErrors(errors);
     const mostCommon = this.getMostCommonErrors(errors);

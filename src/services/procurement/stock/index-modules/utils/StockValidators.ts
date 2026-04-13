@@ -6,7 +6,14 @@
 /**
  * Validate stock movement data
  */
-export function validateMovementData(movementData: any): { valid: boolean; errors: string[] } {
+interface MovementData {
+  projectId?: unknown;
+  movementType?: unknown;
+  referenceNumber?: unknown;
+  movementDate?: unknown;
+}
+
+export function validateMovementData(movementData: MovementData): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
   if (!movementData.projectId) errors.push('Project ID is required');
@@ -23,7 +30,16 @@ export function validateMovementData(movementData: any): { valid: boolean; error
 /**
  * Validate stock position data
  */
-export function validatePositionData(positionData: any): { valid: boolean; errors: string[] } {
+interface PositionData {
+  projectId?: unknown;
+  itemCode?: unknown;
+  itemName?: unknown;
+  uom?: unknown;
+  onHandQuantity?: number;
+  reorderLevel?: number;
+}
+
+export function validatePositionData(positionData: PositionData): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
   if (!positionData.projectId) errors.push('Project ID is required');

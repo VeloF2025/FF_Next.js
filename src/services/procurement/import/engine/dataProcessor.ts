@@ -19,7 +19,7 @@ export class DataProcessor {
    * Process a single row of data
    */
   processRow(
-    row: Record<string, any>,
+    row: Record<string, unknown>,
     rowIndex: number,
     columnMapping: ColumnMapping
   ): {
@@ -52,7 +52,7 @@ export class DataProcessor {
    * Process multiple rows sequentially
    */
   processRows(
-    rows: Record<string, any>[],
+    rows: Record<string, unknown>[],
     startIndex: number,
     columnMapping: ColumnMapping
   ): ChunkProcessingResult {

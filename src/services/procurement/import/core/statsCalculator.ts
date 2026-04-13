@@ -68,7 +68,7 @@ export class BOQImportStatsCalculator {
    * Get top failure reasons
    */
   private getTopFailureReasons(failed: ImportJob[]): Array<{ reason: string; count: number }> {
-    const reasonCounts = failed.reduce((reasons: any[], job) => {
+    const reasonCounts = failed.reduce((reasons: Array<{ reason: string; count: number }>, job) => {
       if (job.error) {
         const existing = reasons.find(r => r.reason === job.error);
         if (existing) {
@@ -95,7 +95,7 @@ export class BOQImportStatsCalculator {
       'completed', 'failed', 'cancelled'
     ];
 
-    const stats: Record<ImportJobStatus, number> = {} as any;
+    const stats = {} as Record<ImportJobStatus, number>;
     
     statuses.forEach(status => {
       stats[status] = allJobs.filter(job => job.status === status).length;

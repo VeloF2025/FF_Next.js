@@ -8,7 +8,7 @@
  * Created: 2026-01-17
  */
 
-import { neon } from '@/lib/db-neon';
+import { neon, NeonQueryFunction } from '@/lib/db-neon';
 import { TextProcessor } from '@/lib/utils/catalog/textProcessor';
 import type {
   MaterialCatalog,
@@ -50,7 +50,7 @@ export interface MatchOptions {
 }
 
 export class MaterialMatcher {
-  private sql: any;
+  private sql: NeonQueryFunction<false, false>;
 
   constructor(databaseUrl: string) {
     this.sql = neon(databaseUrl);
@@ -177,7 +177,7 @@ export class MaterialMatcher {
       LIMIT 1
     `;
 
-    return result.length > 0 ? this.mapToMaterial(result[0]) : null;
+    return result.length > 0 && result[0] ? this.mapToMaterial(result[0] as Record<string, unknown>) : null;
   }
 
   /**
@@ -397,7 +397,7 @@ export class MaterialMatcher {
       ORDER BY item_code
     `;
 
-    return result.map((row: any) => this.mapToMaterial(row));
+    return result.map((row: Record<string, unknown>) => this.mapToMaterial(row));
   }
 
   /**
@@ -439,7 +439,7 @@ export class MaterialMatcher {
       RETURNING *
     `;
 
-    return this.mapToMaterial(result[0]);
+    return this.mapToMaterial(result[0] as Record<string, unknown>);
   }
 
   /**

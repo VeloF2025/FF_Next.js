@@ -6,6 +6,11 @@
 import { ProcurementPermissionError } from '../../../procurementErrors';
 import { ProcurementPermission } from '../permissions';
 
+interface PermissionCheckResult {
+  success: boolean;
+  data?: boolean;
+}
+
 /**
  * Permission enforcement operations
  */
@@ -14,7 +19,7 @@ export class PermissionEnforcer {
    * Enforce permission requirement (throws error if not authorized)
    */
   static async enforcePermission(
-    checkPermissionFn: (userId: string, permission: ProcurementPermission | string, projectId: string) => Promise<any>,
+    checkPermissionFn: (userId: string, permission: ProcurementPermission | string, projectId: string) => Promise<PermissionCheckResult>,
     userId: string,
     permission: ProcurementPermission | string,
     projectId: string
@@ -38,7 +43,7 @@ export class PermissionEnforcer {
    * Enforce multiple permissions requirement
    */
   static async enforceAllPermissions(
-    checkAllPermissionsFn: (userId: string, permissions: (ProcurementPermission | string)[], projectId: string) => Promise<any>,
+    checkAllPermissionsFn: (userId: string, permissions: (ProcurementPermission | string)[], projectId: string) => Promise<PermissionCheckResult>,
     userId: string,
     permissions: (ProcurementPermission | string)[],
     projectId: string

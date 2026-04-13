@@ -4,14 +4,14 @@
  * UPDATED: Real database operations
  */
 
-import { neon } from '@/lib/db-neon';
+import { neon, NeonQueryFunction } from '@/lib/db-neon';
 import { ProcurementContext } from '../../../../types/procurement/base.types';
 import { ImportConfig, MappingResults, SaveResult } from './types';
 import { log } from '../../../../lib/logger';
 import { sanitizeText } from '@/lib/security/sanitization';
 
 // Initialize Neon client
-const sql: any = neon(process.env.DATABASE_URL!);
+const sql: NeonQueryFunction<false, false> = neon(process.env.DATABASE_URL!);
 
 export class BOQImportDatabaseSaver {
   /**
@@ -110,7 +110,7 @@ export class BOQImportDatabaseSaver {
       RETURNING id
     `;
 
-    return result[0].id;
+    return result[0]!.id;
   }
 
   /**
@@ -403,13 +403,13 @@ export class BOQImportDatabaseSaver {
       ORDER BY priority DESC, created_at ASC
     `;
 
-    return result.map((row: any) => ({
-      id: row.id,
-      itemCode: row.item_code,
-      description: row.description,
-      exceptionType: row.exception_type,
-      suggestions: row.suggestions || [],
-      priority: row.priority,
+    return result.map((row: Record<string, unknown>) => ({
+      id: row.id as string,
+      itemCode: row.item_code as string | null,
+      description: row.description as string,
+      exceptionType: row.exception_type as string,
+      suggestions: (row.suggestions as unknown[]) || [],
+      priority: row.priority as string,
     }));
   }
 

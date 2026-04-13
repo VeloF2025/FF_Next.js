@@ -8,7 +8,7 @@
  * Created: 2026-01-17
  */
 
-import { neon } from '@/lib/db-neon';
+import { neon, type NeonQueryFunction } from '@/lib/db-neon';
 import * as XLSX from 'xlsx';
 import { MaterialMatcher, MatchInput, MatchOptions } from './materialMatcher';
 import { CategoryMapper } from './categoryMapper';
@@ -69,7 +69,7 @@ const COLUMN_MAPPING = {
 } as const;
 
 export class BOQImportEnhanced {
-  private sql: any;
+  private sql: NeonQueryFunction<false, false>;
   private materialMatcher: MaterialMatcher;
   private categoryMapper: CategoryMapper;
 
@@ -253,7 +253,7 @@ export class BOQImportEnhanced {
               projectBudgetId,
               budgetCategoryId,
               materialCatalogId: matchResult.matchedMaterial?.id,
-              boqItemId: boqItemResult[0].id,
+              boqItemId: boqItemResult[0]!.id,
               row,
               budgetCategoryCode,
             });
@@ -406,7 +406,7 @@ export class BOQImportEnhanced {
     `;
     let version = '1.0';
     if (existing.length > 0) {
-      const lastVersion = parseFloat(existing[0].version) || 1.0;
+      const lastVersion = parseFloat(existing[0]!.version as string) || 1.0;
       version = (lastVersion + 1.0).toFixed(1);
     }
 
@@ -428,7 +428,7 @@ export class BOQImportEnhanced {
       )
       RETURNING id
     `;
-    return result[0].id;
+    return result[0]!.id;
   }
 
   /**
@@ -448,7 +448,7 @@ export class BOQImportEnhanced {
 
     if (oldBoqs.length === 0) return;
 
-    const oldBoqIds = oldBoqs.map((b: any) => b.id as string);
+    const oldBoqIds = (oldBoqs as Array<Record<string, unknown>>).map(b => b.id as string);
 
     log.info('Superseding previous BOQ versions', {
       data: { projectId, newBoqId, supersededCount: oldBoqIds.length, oldBoqIds }
@@ -527,7 +527,7 @@ export class BOQImportEnhanced {
       )
       RETURNING id
     `;
-    return result[0].id;
+    return result[0]!.id;
   }
 
   /**
@@ -547,7 +547,7 @@ export class BOQImportEnhanced {
     let budgetId: string;
 
     if (existing.length > 0) {
-      budgetId = existing[0].id;
+      budgetId = existing[0]!.id;
     } else {
       // Create new budget
       const result = await this.sql`
@@ -566,7 +566,7 @@ export class BOQImportEnhanced {
         )
         RETURNING id
       `;
-      budgetId = result[0].id;
+      budgetId = result[0]!.id;
 
       // Seed fiber categories
       await this.sql`SELECT seed_fiber_budget_categories(${budgetId}::uuid)`;
@@ -628,7 +628,7 @@ export class BOQImportEnhanced {
       )
       RETURNING id
     `;
-    return result[0].id;
+    return result[0]!.id;
   }
 
   /**

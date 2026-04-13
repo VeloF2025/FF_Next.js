@@ -235,7 +235,7 @@ export class ErrorRecoveryService {
    */
   static async executeRecovery(recoveryOption: RecoveryOption): Promise<{
     success: boolean;
-    result?: any;
+    result?: unknown;
     error?: string;
   }> {
     try {
@@ -264,7 +264,7 @@ export class ErrorRecoveryService {
    */
   static async executeRetry(retryStrategy: RetryStrategy, attemptNumber: number = 1): Promise<{
     success: boolean;
-    result?: any;
+    result?: unknown;
     error?: string;
     shouldRetry?: boolean;
   }> {

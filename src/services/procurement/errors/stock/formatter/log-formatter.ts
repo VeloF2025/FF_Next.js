@@ -102,8 +102,8 @@ export class LogFormatter {
     errorClass: string;
     message: string;
     stack: string | undefined;
-    details: Record<string, any>;
-    context: Record<string, any> | undefined;
+    details: Record<string, unknown>;
+    context: Record<string, unknown> | undefined;
     diagnostics: {
       errorChain: string[];
       possibleCauses: string[];

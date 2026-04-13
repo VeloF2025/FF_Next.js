@@ -62,8 +62,8 @@ export class BOQComparisonAnalyzer {
    * Generate BOQ variance analysis
    */
   static analyzeVariance(
-    baselineItems: any[],
-    actualItems: any[]
+    baselineItems: Array<Record<string, unknown>>,
+    actualItems: Array<Record<string, unknown>>
   ): {
     totalVariance: number;
     quantityVariance: number;
@@ -77,13 +77,17 @@ export class BOQComparisonAnalyzer {
       totalVariance: number;
     }>;
   } {
-    const baselineTotal = baselineItems.reduce((sum, item) => 
-      sum + (item.totalPrice || (item.quantity * item.unitPrice) || 0), 0
-    );
+    const baselineTotal = baselineItems.reduce((sum, item) => {
+      const qty = (item.quantity as number) || 0;
+      const price = (item.unitPrice as number) || 0;
+      return sum + ((item.totalPrice as number) || (qty * price) || 0);
+    }, 0);
 
-    const actualTotal = actualItems.reduce((sum, item) => 
-      sum + (item.totalPrice || (item.quantity * item.unitPrice) || 0), 0
-    );
+    const actualTotal = actualItems.reduce((sum, item) => {
+      const qty = (item.quantity as number) || 0;
+      const price = (item.unitPrice as number) || 0;
+      return sum + ((item.totalPrice as number) || (qty * price) || 0);
+    }, 0);
 
     const totalVariance = actualTotal - baselineTotal;
     const variancePercentage = baselineTotal > 0 ? 
@@ -116,14 +120,15 @@ export class BOQComparisonAnalyzer {
       const actualItem = actualMap.get(itemCode);
 
       if (baselineItem && actualItem) {
-        const quantityVariance = (actualItem.quantity || 0) - (baselineItem.quantity || 0);
-        const priceVariance = (actualItem.unitPrice || 0) - (baselineItem.unitPrice || 0);
-        const totalVariance = ((actualItem.totalPrice || (actualItem.quantity * actualItem.unitPrice)) || 0) -
-                             ((baselineItem.totalPrice || (baselineItem.quantity * baselineItem.unitPrice)) || 0);
+        const quantityVariance = ((actualItem.quantity as number) || 0) - ((baselineItem.quantity as number) || 0);
+        const priceVariance = ((actualItem.unitPrice as number) || 0) - ((baselineItem.unitPrice as number) || 0);
+        const aTotal = (actualItem.totalPrice as number) || (((actualItem.quantity as number) || 0) * ((actualItem.unitPrice as number) || 0));
+        const bTotal = (baselineItem.totalPrice as number) || (((baselineItem.quantity as number) || 0) * ((baselineItem.unitPrice as number) || 0));
+        const totalVariance = (aTotal || 0) - (bTotal || 0);
 
         itemVariances.push({
-          itemCode,
-          description: actualItem.description || baselineItem.description || 'No description',
+          itemCode: itemCode as string,
+          description: (actualItem.description || baselineItem.description || 'No description') as string,
           quantityVariance,
           priceVariance,
           totalVariance

@@ -98,14 +98,14 @@ export class ProcurementErrorProcessor implements IErrorHandler {
   /**
    * Create validation error
    */
-  createValidationError(field: string, message: string, value?: any) {
+  createValidationError(field: string, message: string, value?: unknown) {
     return ProcurementErrorFactory.createValidationError(field, message, value);
   }
 
   /**
    * Create not found error
    */
-  createNotFoundError(resourceType: string, resourceId: string, context?: Record<string, any>) {
+  createNotFoundError(resourceType: string, resourceId: string, context?: Record<string, unknown>) {
     return ProcurementErrorFactory.createNotFoundError(resourceType, resourceId, context);
   }
 

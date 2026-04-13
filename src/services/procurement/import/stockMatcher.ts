@@ -11,7 +11,7 @@
  * The matcher accounts for this by parsing technical codes into keywords.
  */
 
-import { neon } from '@/lib/db-neon';
+import { neon, NeonQueryFunction } from '@/lib/db-neon';
 import { TextProcessor } from '@/lib/utils/catalog/textProcessor';
 import { log } from '@/lib/logger';
 import { fiberDomainMatch } from './fiberDomainMatcher';
@@ -43,7 +43,7 @@ export interface StockMatchResult {
 }
 
 export class StockMatcher {
-  private sql: any;
+  private sql: NeonQueryFunction<false, false>;
 
   constructor(databaseUrl: string) {
     this.sql = neon(databaseUrl);
@@ -346,7 +346,7 @@ export class StockMatcher {
       ORDER BY name
     `;
 
-    return rows.map((r: any) => ({
+    return rows.map((r: Record<string, unknown>) => ({
       id: r.id as string,
       itemCode: (r.item_code || '') as string,
       name: (r.name || '') as string,
