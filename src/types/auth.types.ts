@@ -132,7 +132,8 @@ export enum Permission {
   // System Administration
   SYSTEM_ADMIN = 'system.admin',
   AUDIT_LOGS = 'audit.logs',
-  BACKUPS = 'backups.manage'
+  BACKUPS = 'backups.manage',
+  CAN_IMPERSONATE = 'can_impersonate'
 }
 
 export interface AuthState {

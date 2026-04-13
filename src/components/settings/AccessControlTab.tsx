@@ -15,6 +15,7 @@ import { ModulesAccessTab } from './ModulesAccessTab';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import { useAuth } from '@/contexts/AuthContext';
 import { createLogger } from '@/lib/logger';
+import { Permission } from '@/types/auth.types';
 
 const log = createLogger('AccessControlTab');
 
@@ -119,7 +120,7 @@ type SubTab = 'users' | 'roles' | 'permissions' | 'modules';
 
 export function AccessControlTab() {
   const { currentUser } = useAuth();
-  const canImpersonate = (currentUser?.permissions as unknown as string[] | undefined)?.includes('can_impersonate') ?? false;
+  const canImpersonate = currentUser?.permissions?.includes(Permission.CAN_IMPERSONATE) ?? false;
 
   const [subTab, setSubTab] = useState<SubTab>('users');
   const [loading, setLoading] = useState(true);
