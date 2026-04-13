@@ -20,7 +20,6 @@ import type {
   PonStagesResponse,
   PonStageRow,
   PonStageData,
-  BuildStage,
   ZoneStageNode,
 } from '@/types/pon-stages.types';
 import { BUILD_STAGES, BUILD_STAGE_META } from '@/types/pon-stages.types';
@@ -212,7 +211,7 @@ export function PonStageTracker({ projectId }: PonStageTrackerProps) {
   const [error, setError] = useState<string | null>(null);
   const [expandedZones, setExpandedZones] = useState<Set<number>>(new Set());
   const [hideInactive, setHideInactive] = useState(false);
-  const [syncing, setSyncing] = useState(false);
+  const [_syncing, _setSyncing] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {

@@ -3,7 +3,7 @@
  * Mock implementation for development mode
  */
 
-import { clerkAuth, User as ClerkUser } from '../mockAuth';
+import { clerkAuth } from '../mockAuth';
 import { authConfig } from '@/config/auth.config';
 import { LoginCredentials, RegisterCredentials, PasswordResetRequest, User } from '@/types/auth.types';
 import { createUserProfile, getUserProfile, updateLastLogin } from '../userService';
@@ -174,7 +174,7 @@ export class EmailAuthentication {
   /**
    * Change user password
    */
-  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  async changePassword(_currentPassword: string, _newPassword: string): Promise<void> {
     if (authConfig.isDevMode) {
       log.debug('emailAuth', { message: '🔧 DEV MODE: Mock password change' });
       return;

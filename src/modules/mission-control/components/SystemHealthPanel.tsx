@@ -17,11 +17,6 @@ function formatUptime(seconds: number): string {
   return `${m}m`;
 }
 
-function formatBytes(bytes: number): string {
-  const gb = bytes / (1024 * 1024 * 1024);
-  return `${gb.toFixed(1)} GB`;
-}
-
 function ProgressBar({ label, percent, icon: Icon }: { label: string; percent: number; icon: React.ElementType }) {
   const color = percent > 90 ? 'bg-red-500' : percent > 70 ? 'bg-yellow-500' : 'bg-emerald-500';
   return (

@@ -50,7 +50,7 @@ export function SubTabs({
             key={subTab.id}
             href={subTab.path}
             className={className}
-            onClick={(e) => {
+            onClick={(_e) => {
               if (onSubTabChange) {
                 onSubTabChange(subTab.id);
               }

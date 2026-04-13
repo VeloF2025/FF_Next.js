@@ -21,17 +21,14 @@ import { workflowManagementService } from '../../services/WorkflowManagementServ
 import { workflowTemplateService } from '../../services/WorkflowTemplateService';
 import { log } from '@/lib/logger';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import type { 
+import type {
   WorkflowTemplate,
   WorkflowTemplateQuery,
   WorkflowCategory,
   WorkflowStatus,
-  WorkflowType 
 } from '../../types/workflow.types';
-import type { 
-  TemplateFilter, 
-  TemplateSorting, 
-  TemplateListState 
+import type {
+  TemplateListState
 } from '../../types/portal.types';
 
 interface TemplateListProps {

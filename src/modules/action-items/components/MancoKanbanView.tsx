@@ -1,7 +1,7 @@
 'use client';
 
 import { MancoActionItem } from '@/types/manco-action-items.types';
-import { isOverdue, daysUntilEta, formatDate, truncateText } from './manco-grid-helpers';
+import { isOverdue, daysUntilEta, formatDate } from './manco-grid-helpers';
 
 interface MancoKanbanViewProps {
   items: MancoActionItem[];

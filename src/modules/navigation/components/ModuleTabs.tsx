@@ -106,7 +106,7 @@ export function ModuleTabs({
             key={tab.id}
             href={tab.path}
             className={tabClassName}
-            onClick={(e) => {
+            onClick={(_e) => {
               if (onTabChange) {
                 // If controlled, still navigate but also call callback
                 onTabChange(tab.id);

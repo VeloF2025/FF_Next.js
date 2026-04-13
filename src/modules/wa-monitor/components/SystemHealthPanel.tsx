@@ -20,7 +20,6 @@ import {
   AccordionDetails,
   CircularProgress,
   Alert,
-  Divider,
 } from '@mui/material';
 import {
   RefreshCw,
@@ -73,7 +72,7 @@ interface SystemHealthPanelProps {
 export function SystemHealthPanel({
   autoRefresh = true,
   refreshInterval = 30000,
-  compact = false,
+  compact: _compact = false,
 }: SystemHealthPanelProps) {
   const [healthData, setHealthData] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -113,22 +112,6 @@ export function SystemHealthPanel({
     const interval = setInterval(fetchHealthData, refreshInterval);
     return () => clearInterval(interval);
   }, [autoRefresh, refreshInterval]);
-
-  // Status icon and color
-  const getStatusIndicator = (status: HealthCheck['status']) => {
-    switch (status) {
-      case 'up':
-        return { icon: <CheckCircle2 size={20} />, color: 'success', label: 'UP' };
-      case 'degraded':
-        return { icon: <AlertCircle size={20} />, color: 'warning', label: 'DEGRADED' };
-      case 'stale':
-        return { icon: <Clock size={20} />, color: 'warning', label: 'STALE' };
-      case 'down':
-        return { icon: <XCircle size={20} />, color: 'error', label: 'DOWN' };
-      default:
-        return { icon: <AlertCircle size={20} />, color: 'default', label: 'UNKNOWN' };
-    }
-  };
 
   const getOverallStatusIndicator = (status: HealthData['overall_status']): { emoji: string; text: string; color: 'success' | 'warning' | 'error' } => {
     switch (status) {
