@@ -10,7 +10,7 @@
 #   bash scripts/ci-local.sh --pre-deploy # Lint gates only (deploy uses this)
 #
 # Baselines (ratchet down over time, never up):
-#   Lint warnings: 191    (react-hooks/exhaustive-deps, react-refresh/only-export-components)
+#   Lint warnings: 167    (react-hooks/exhaustive-deps, react-refresh/only-export-components)
 #   Lint errors:   12     (ts-ignore, prefer-const — pre-existing)
 #   Silent catches: 94    (catch blocks without logging)
 # =============================================================================
@@ -32,7 +32,7 @@ MODE="${1:---full}"
 START_TIME=$(date +%s)
 
 # --- Baselines (ratchet: lower these as you fix issues, never raise) ---
-MAX_LINT_WARNINGS=172
+MAX_LINT_WARNINGS=167
 MAX_LINT_ERRORS=13
 MAX_SILENT_CATCHES=84
 
