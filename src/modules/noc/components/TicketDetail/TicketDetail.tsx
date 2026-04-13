@@ -466,22 +466,41 @@ function BeforePhoto({ ticketId }: { ticketId: string }) {
   const [photos, setPhotos] = useState<Array<{ id: string; filename: string; storage_url: string }>>([]);
 
   useEffect(() => {
-    fetch(`/api/noc/tickets/${ticketId}/attachments`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data?.success && data.data?.attachments?.length > 0) {
-          const imageAttachments = data.data.attachments.filter(
-            (a: { file_type: string; mime_type: string; storage_url: string }) =>
-              a.file_type === 'photo' ||
-              a.file_type === 'image' ||
-              a.file_type?.startsWith('image/') ||
-              a.mime_type?.startsWith('image/') ||
-              /\.(jpg|jpeg|png|gif|webp)$/i.test(a.storage_url ?? '')
-          );
-          setPhotos(imageAttachments);
+    Promise.all([
+      fetch(`/api/noc/tickets/${ticketId}/attachments`).then(r => r.ok ? r.json() : null),
+      fetch(`/api/noc/tickets/${ticketId}/verification`).then(r => r.ok ? r.json() : null),
+    ]).then(([attachData, verifyData]) => {
+      const imageAttachments: Array<{ id: string; filename: string; storage_url: string }> = [];
+
+      // Pull images from maintenance_attachments
+      if (attachData?.success && attachData.data?.attachments?.length > 0) {
+        const filtered = attachData.data.attachments.filter(
+          (a: { file_type: string; mime_type: string; storage_url: string }) =>
+            a.file_type === 'photo' ||
+            a.file_type === 'image' ||
+            a.file_type?.startsWith('image/') ||
+            a.mime_type?.startsWith('image/') ||
+            /\.(jpg|jpeg|png|gif|webp)$/i.test(a.storage_url ?? '')
+        );
+        imageAttachments.push(...filtered);
+      }
+
+      // Also pull after photos from verification steps (stored separately)
+      const verifySteps = Array.isArray(verifyData?.data) ? verifyData.data : [];
+      if (verifyData?.success && verifySteps.length > 0) {
+        for (const step of verifySteps as Array<{ id: string; step_name: string; photo_url: string | null }>) {
+          if (step.photo_url && /after/i.test(step.step_name)) {
+            // Only add if not already present (same URL)
+            const alreadyPresent = imageAttachments.some(p => p.storage_url === step.photo_url);
+            if (!alreadyPresent) {
+              imageAttachments.push({ id: step.id, filename: 'snag-after-photo.jpg', storage_url: step.photo_url });
+            }
+          }
         }
-      })
-      .catch(() => {});
+      }
+
+      if (imageAttachments.length > 0) setPhotos(imageAttachments);
+    }).catch(() => {});
   }, [ticketId]);
 
   if (photos.length === 0) return null;
