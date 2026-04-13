@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { ConduitBaseline } from '../types';
 import type { ConduitProjectInputs } from '../types';
-import { calcConduit } from '../hooks/useConduitCalc';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

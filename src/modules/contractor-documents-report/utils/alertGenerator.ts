@@ -10,7 +10,7 @@ import type {
   DocumentAlert,
   ContractorDocumentSummary,
 } from '../types/documentReport.types';
-import { formatExpiryDate, calculateDaysUntilExpiry } from './documentStatusRules';
+import { formatExpiryDate } from './documentStatusRules';
 
 /**
  * Generate alerts for a contractor's document report

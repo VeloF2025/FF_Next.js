@@ -12,13 +12,6 @@
 import * as XLSX from 'xlsx';
 import { log } from '@/lib/logger';
 
-// ─── pdf-parse (CommonJS) ───────────────────────────────────────────────────
-
-/** Minimal type for pdf-parse result */
-interface PdfParseResult {
-  text: string;
-  numpages: number;
-}
 // ─── Public Interface Types ─────────────────────────────────────────────────
 
 export interface ParsedPaymentSummary {

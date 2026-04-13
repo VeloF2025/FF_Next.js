@@ -8,19 +8,6 @@ import { recordVlmCorrection } from '@/services/vlmLearningService';
 import { log } from '@/lib/logger';
 import type { EodVlmEntry } from '../types';
 
-interface CorrectionPair {
-  vlmEntry: EodVlmEntry;
-  correctedEntry: {
-    dr_number: string | null;
-    address: string | null;
-    gizzu_serial: string | null;
-    pon_number: string | null;
-    ont_serial: string | null;
-  };
-  sheetId: string;
-  rowNumber: number;
-}
-
 /**
  * Compare VLM extraction with user-corrected values and record differences.
  * Called when the user saves a sheet (POST /api/eod/sheets).
