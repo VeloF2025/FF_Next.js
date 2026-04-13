@@ -33,7 +33,7 @@ export function useCreatePole() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: Omit<PoleTracker, 'id'>) => poleTrackerService.create(data as any),
+    mutationFn: (data: Omit<PoleTracker, 'id'>) => poleTrackerService.create(data as Record<string, unknown>),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
     },
@@ -45,7 +45,7 @@ export function useUpdatePole() {
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<PoleTracker> }) =>
-      poleTrackerService.update(id, data as any),
+      poleTrackerService.update(id, data as Record<string, unknown>),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY, id] });

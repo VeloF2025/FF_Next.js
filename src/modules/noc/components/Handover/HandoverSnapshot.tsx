@@ -29,7 +29,7 @@ import {
   User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { HandoverSnapshot } from '../../types/handover';
+import type { HandoverSnapshot, EvidenceLink, HandoverDecision } from '../../types/handover';
 
 interface HandoverSnapshotProps {
   /** Handover snapshot to display */
@@ -299,7 +299,7 @@ export function HandoverSnapshot({
             defaultExpanded={expandedByDefault}
           >
             <div className="space-y-2">
-              {evidenceLinks.map((evidence: any, index: number) => (
+              {evidenceLinks.map((evidence: EvidenceLink, index: number) => (
                 <div
                   key={index}
                   className="flex items-center justify-between p-3 bg-[var(--ff-bg-secondary)] rounded-lg"
@@ -348,7 +348,7 @@ export function HandoverSnapshot({
             defaultExpanded={expandedByDefault}
           >
             <div className="space-y-3">
-              {decisions.map((decision: any, index: number) => (
+              {decisions.map((decision: HandoverDecision, index: number) => (
                 <div
                   key={index}
                   className={cn(

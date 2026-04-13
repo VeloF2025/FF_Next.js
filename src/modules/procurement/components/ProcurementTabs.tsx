@@ -1,5 +1,5 @@
 // 🟢 WORKING: Two-level procurement tabs with direct navigation to dedicated pages
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useRouter } from 'next/router';
 import {
   BarChart3,
@@ -35,7 +35,7 @@ type CategoryId = 'dashboard' | 'sourcing' | 'purchasing' | 'inventory' | 'field
 interface SubTab {
   id: ProcurementTabId;
   label: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   permission?: string;
   path?: string; // Direct navigation path (if different from inline)
 }
@@ -43,7 +43,7 @@ interface SubTab {
 interface Category {
   id: CategoryId;
   label: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   subTabs: SubTab[];
 }
 

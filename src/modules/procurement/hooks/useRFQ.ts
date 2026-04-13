@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { rfqService } from '@/services/procurement/rfqService';
-import { RFQFormData, RFQStatus, Quote } from '@/types/procurement.types';
+import { RFQ, RFQFormData, RFQStatus, Quote } from '@/types/procurement.types';
 import { notificationService } from '@/services/core/NotificationService';
 
 // Get all RFQs
@@ -163,13 +163,13 @@ export function useSelectRFQResponse() {
 }
 
 // Subscribe to RFQ updates
-export function useRFQSubscription(rfqId: string, callback: (rfq: any) => void) {
+export function useRFQSubscription(rfqId: string, callback: (rfq: RFQ) => void) {
   const queryClient = useQueryClient();
 
   useQuery({
     queryKey: ['rfq-subscription', rfqId],
     queryFn: () => {
-      const unsubscribe = rfqService.subscribeToRFQ(rfqId, (rfq: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+      const unsubscribe = rfqService.subscribeToRFQ(rfqId, (rfq: RFQ) => {
         queryClient.setQueryData(['rfqs', rfqId], rfq);
         callback(rfq);
       });
@@ -180,13 +180,13 @@ export function useRFQSubscription(rfqId: string, callback: (rfq: any) => void) 
 }
 
 // Subscribe to RFQ responses updates
-export function useRFQResponsesSubscription(rfqId: string, callback: (responses: any[]) => void) {
+export function useRFQResponsesSubscription(rfqId: string, callback: (responses: Quote[]) => void) {
   const queryClient = useQueryClient();
 
   useQuery({
     queryKey: ['rfq-responses-subscription', rfqId],
     queryFn: () => {
-      const unsubscribe = rfqService.subscribeToResponses(rfqId, (responses: any[]) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+      const unsubscribe = rfqService.subscribeToResponses(rfqId, (responses: Quote[]) => {
         queryClient.setQueryData(['rfq-responses', rfqId], responses);
         callback(responses);
       });

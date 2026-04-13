@@ -107,7 +107,7 @@ export function QuoteExtractionResults({
 
     // Parse numeric fields
     if (['quantity', 'unitPrice', 'totalPrice'].includes(editingItemField)) {
-      (item as any)[editingItemField] = editValue ? parseFloat(editValue) : null;
+      Object.assign(item, { [editingItemField]: editValue ? parseFloat(editValue) : null });
 
       // Recalculate total if quantity or unit price changed
       if (editingItemField === 'quantity' || editingItemField === 'unitPrice') {
@@ -116,7 +116,7 @@ export function QuoteExtractionResults({
         }
       }
     } else {
-      (item as any)[editingItemField] = editValue || null;
+      Object.assign(item, { [editingItemField]: editValue || null });
     }
 
     updatedItems[editingItemIndex] = item;

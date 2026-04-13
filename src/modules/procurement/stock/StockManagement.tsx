@@ -79,6 +79,27 @@ interface StockMetrics {
   warehouseUtilization: number;
 }
 
+interface RawStockItem {
+  id: string;
+  itemCode?: string;
+  name?: string;
+  itemName?: string;
+  description?: string;
+  category?: string;
+  unit?: string;
+  quantity?: number | string;
+  minQuantity?: number | string;
+  reorderLevel?: number | string;
+  maxQuantity?: number | string;
+  unitCost?: number | string;
+  totalValue?: number | string;
+  warehouse?: string;
+  location?: string;
+  supplier?: string;
+  lastRestocked?: string;
+  status?: string;
+}
+
 interface StockManagementProps {
   projectId?: string;
   projectName?: string;
@@ -131,7 +152,7 @@ export default function StockManagement({ projectId, projectName }: StockManagem
       const data = await response.json();
 
       // Transform items to display format
-      const stockItems: StockItemDisplay[] = (data.items || []).map((item: any) => ({
+      const stockItems: StockItemDisplay[] = (data.items || []).map((item: RawStockItem) => ({
         id: item.id,
         itemCode: item.itemCode || 'N/A',
         name: item.name || item.itemName || 'Unnamed Item',
@@ -178,7 +199,7 @@ export default function StockManagement({ projectId, projectName }: StockManagem
   }, [projectId]);
 
   // Helper to determine status from quantity
-  function determineStatus(item: any): 'in_stock' | 'low_stock' | 'out_of_stock' {
+  function determineStatus(item: RawStockItem): 'in_stock' | 'low_stock' | 'out_of_stock' {
     const qty = Number(item.quantity || 0);
     const minQty = Number(item.minQuantity || item.reorderLevel || 10);
     if (qty <= 0) return 'out_of_stock';

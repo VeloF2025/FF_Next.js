@@ -39,6 +39,7 @@ export interface DashboardSummary {
   };
   overdue_tickets: number;
   avg_resolution_hours: number | null;
+  active_escalations?: number;
 }
 
 /**

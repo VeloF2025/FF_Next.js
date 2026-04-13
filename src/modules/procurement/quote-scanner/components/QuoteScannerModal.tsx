@@ -246,7 +246,7 @@ export function QuoteScannerModal({
         if (suppliersRes.ok) {
           const suppliersData = await suppliersRes.json();
           // API returns { data: [...suppliers...] } directly
-          const suppliers = Array.isArray(suppliersData.data)
+          const suppliers: Array<{ id: string; name: string; company_name: string }> = Array.isArray(suppliersData.data)
             ? suppliersData.data
             : (suppliersData.data?.suppliers || suppliersData.suppliers || []);
           setExistingSuppliers(suppliers);
@@ -264,7 +264,7 @@ export function QuoteScannerModal({
             const normalizedExtracted = normalize(extractedName);
 
             // Find best match by checking if names contain each other
-            const match = suppliers.find((s: any) => {
+            const match = suppliers.find((s) => {
               const supplierName = normalize(s.company_name || s.name || '');
               if (!supplierName) return false;
 
@@ -779,7 +779,7 @@ export function QuoteScannerModal({
                         </tr>
                       </thead>
                       <tbody className="text-foreground">
-                        {result.extraction.lineItems.slice(0, 10).map((item: any, idx: number) => (
+                        {result.extraction.lineItems.slice(0, 10).map((item, idx: number) => (
                           <tr key={idx} className="border-t border-gray-200 dark:border-gray-600">
                             <td className="py-1 truncate max-w-[200px]">{item.description}</td>
                             <td className="py-1 text-right">{item.quantity}</td>
