@@ -8,7 +8,6 @@ import {
   Car,
   AlertTriangle,
   CheckCircle2,
-  TrendingUp,
   Award,
   RefreshCw,
 } from 'lucide-react';

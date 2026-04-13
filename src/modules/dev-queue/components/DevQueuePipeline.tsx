@@ -2,7 +2,7 @@
  * DevQueue Pipeline - Shows MVP build status for approved items
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   GitBranch,
   ExternalLink,

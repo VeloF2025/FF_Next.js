@@ -7,7 +7,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, Loader2, AlertCircle } from 'lucide-react';
+import { ChevronDown, AlertCircle } from 'lucide-react';
 import { useProjectDetailData, type MonthlyValues } from './useProjectDetailData';
 import { ReportTabLayout } from '../ReportTabLayout';
 import { ProjectDetailTable } from '../tables/ProjectDetailTable';

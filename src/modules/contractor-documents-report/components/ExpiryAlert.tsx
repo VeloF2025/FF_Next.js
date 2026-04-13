@@ -4,7 +4,7 @@
  * Displays important alerts for document issues
  */
 
-import { AlertTriangle, XCircle, Info, AlertCircle } from 'lucide-react';
+import { AlertTriangle, XCircle, Info } from 'lucide-react';
 import type { DocumentAlert } from '../types/documentReport.types';
 
 interface ExpiryAlertProps {

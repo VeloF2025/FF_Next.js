@@ -8,7 +8,6 @@ import {
   CheckTemplate,
   CheckItem,
   CheckRecord,
-  CheckResponse,
   CheckPhoto,
   CheckTemplateWithItems,
   CheckRecordWithDetails,

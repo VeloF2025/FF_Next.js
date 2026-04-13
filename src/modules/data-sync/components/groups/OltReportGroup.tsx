@@ -7,7 +7,7 @@
 
 import { Lock } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { useOltState, OLT_TABS } from '../../hooks/useOltState';
+import { useOltState } from '../../hooks/useOltState';
 import { OltAutoDetectBanner } from './olt/OltAutoDetectBanner';
 import { OltImportTab } from './olt/OltImportTab';
 import { OltFixableTab } from './olt/OltFixableTab';

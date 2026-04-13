@@ -12,7 +12,6 @@ import {
   Cloud,
   CloudOff,
   CheckCircle,
-  XCircle,
 } from 'lucide-react';
 import { useOnlineStatus } from './useOnlineStatus';
 import { useOfflineSync } from './useOfflineSync';

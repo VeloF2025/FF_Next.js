@@ -15,7 +15,6 @@
 import { useState, useCallback } from 'react';
 import {
   X,
-  Loader2,
   CheckCircle,
   AlertTriangle,
   ChevronDown,

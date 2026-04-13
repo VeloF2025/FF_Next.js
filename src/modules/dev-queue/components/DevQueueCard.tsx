@@ -2,7 +2,7 @@
  * DevQueue Card Component
  */
 
-import { ThumbsUp, MessageSquare, Trash2, Clock, Paperclip, Pencil } from 'lucide-react';
+import { ThumbsUp, MessageSquare, Trash2, Clock, Paperclip } from 'lucide-react';
 import type { DevQueueItem } from '../types/devQueue';
 
 interface DevQueueCardProps {

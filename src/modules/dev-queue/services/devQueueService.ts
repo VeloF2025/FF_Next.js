@@ -10,7 +10,6 @@ import type {
   CreateDevQueueItemInput,
   UpdateDevQueueItemInput,
   MoveDevQueueItemInput,
-  DevQueueApiResponse
 } from '../types/devQueue';
 
 class DevQueueService {

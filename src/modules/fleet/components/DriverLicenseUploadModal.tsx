@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { X, Upload, Search, User, FileText, AlertCircle } from 'lucide-react';
+import { X, Search, User, FileText, AlertCircle } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { DocumentUploadWizard } from '@/components/shared/DocumentUploadWizard';
 import { log } from '@/lib/logger';

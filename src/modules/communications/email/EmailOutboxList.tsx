@@ -5,7 +5,7 @@
 import { RefreshCw, Mail, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
-import type { EmailOutboxItem, EmailStatus } from '../types/email.types';
+import type { EmailStatus } from '../types/email.types';
 import { useEmailOutbox } from '../hooks/useEmailOutbox';
 
 const STATUS_CONFIG: Record<EmailStatus, { icon: React.ElementType; color: string; label: string }> = {
