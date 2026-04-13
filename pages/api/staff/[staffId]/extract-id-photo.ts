@@ -152,7 +152,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Build internal URL from storage path, not from public URL
     // Public URLs use /storage/ prefix (nginx proxy), internal VF Storage serves without it
     const storagePath = uploadResult.path || `staff/photos/id-photo-${staffId}.jpg`;
-    let facePhotoUrl = `${VF_STORAGE_URL}/${storagePath}`;
+    const facePhotoUrl = `${VF_STORAGE_URL}/${storagePath}`;
 
     logger.info('Face photo uploaded', { staffId, facePhotoUrl });
 

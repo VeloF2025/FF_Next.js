@@ -166,13 +166,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     };
 
     // Check for multi-file upload (driver's license front+back) or single file
-    let file: formidable.File | undefined;
     let fileFront: formidable.File | undefined;
     let fileBack: formidable.File | undefined;
 
     // First, check for single file upload (works for all document types including driver's license)
     const fileArray = Array.isArray(files.file) ? files.file : [files.file];
-    file = fileArray[0];
+    const file: formidable.File | undefined = fileArray[0];
 
     // If no single file and it's a driver's license, check for front+back (legacy support)
     const isMultiFile = documentType === 'drivers_license' && !file;
