@@ -4,7 +4,7 @@
  */
 
 import { useState, useMemo } from 'react';
-import type { ColumnMapping, ColumnDetectionResult } from '@/types/procurement/boq.types';
+import type { ColumnMapping, ColumnDetectionResult, BOQTargetField } from '@/types/procurement/boq.types';
 
 interface BOQColumnMapperProps {
   detection: ColumnDetectionResult;
@@ -97,7 +97,7 @@ export default function BOQColumnMapper({
     if (!fieldValue) return false;
     const currentMapping = mapping.find(m => m.sourceIndex === currentSourceIndex);
     if (currentMapping?.targetField === fieldValue) return false;
-    return usedFields.has(fieldValue as any);
+    return usedFields.has(fieldValue as BOQTargetField);
   };
 
   return (

@@ -8,6 +8,7 @@ import type {
   DocumentVerificationStatus,
   DocumentUrgencyLevel,
   DocumentDisplayStatus,
+  DocumentType,
 } from '../types/documentReport.types';
 import { getExpiryWarningDays } from '../types/documentCategories';
 import { formatDisplayDate } from '@/utils/dateFormat';
@@ -43,7 +44,7 @@ export function calculateUrgencyLevel(
   const daysUntilExpiry = calculateDaysUntilExpiry(expiryDate);
   if (daysUntilExpiry === null) return 'ok';
 
-  const warningDays = getExpiryWarningDays(documentType as any);
+  const warningDays = getExpiryWarningDays(documentType as DocumentType);
 
   if (daysUntilExpiry < 0) {
     return 'expired';

@@ -8,7 +8,7 @@ import type { DevQueueBoard, DevQueueItem } from '../types/devQueue';
 
 interface DevQueueKanbanProps {
   board: DevQueueBoard;
-  onVote: (itemId: string) => Promise<any>;
+  onVote: (itemId: string) => Promise<unknown>;
   onDelete: (itemId: string) => Promise<void>;
   onEdit?: (item: DevQueueItem) => void;
   onAttachments?: (item: DevQueueItem) => void;

@@ -36,7 +36,7 @@ class DevQueueService {
   /**
    * Get a single devQueue item with details
    */
-  async getItem(id: string): Promise<{ item: DevQueueItem; comments: any[] }> {
+  async getItem(id: string): Promise<{ item: DevQueueItem; comments: unknown[] }> {
     try {
       const response = await fetch(`${this.baseUrl}/${id}`);
       if (!response.ok) {

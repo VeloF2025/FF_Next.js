@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import { useQuery } from '@tanstack/react-query';
 import { 
@@ -67,7 +67,7 @@ async function fetchClientProjects(clientId: string) {
   return data.data;
 }
 
-const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
+const statusConfig: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   active: { label: 'Active', color: 'bg-green-500/20 text-green-400', icon: TrendingUp },
   planning: { label: 'Planning', color: 'bg-purple-500/20 text-purple-400', icon: Clock },
   on_hold: { label: 'On Hold', color: 'bg-yellow-500/20 text-yellow-400', icon: AlertCircle },

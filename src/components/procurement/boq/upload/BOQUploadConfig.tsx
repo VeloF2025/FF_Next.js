@@ -89,7 +89,7 @@ export function BOQUploadConfig({
               </label>
               <select
                 value={config.duplicateHandling}
-                onChange={(e) => onConfigChange({ ...config, duplicateHandling: e.target.value as any })}
+                onChange={(e) => onConfigChange({ ...config, duplicateHandling: e.target.value as 'skip' | 'replace' | 'merge' })}
                 className="mt-1 block w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-md bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               >
                 <option value="skip">Skip duplicates</option>

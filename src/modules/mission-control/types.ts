@@ -62,7 +62,7 @@ export interface MCDashboard {
   agents: MCAgent[];
   recentMessages: MCMessage[];
   tasks: MCTask[];
-  recentEvents: any[];
+  recentEvents: unknown[];
   system: MCSystemHealth;
   services: MCService[];
   stats: MCStats;

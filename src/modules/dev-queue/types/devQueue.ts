@@ -154,7 +154,7 @@ export interface MoveDevQueueItemInput {
 }
 
 // API Response types
-export interface DevQueueApiResponse<T = any> {
+export interface DevQueueApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;

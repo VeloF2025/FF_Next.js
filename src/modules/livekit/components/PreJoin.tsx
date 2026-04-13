@@ -78,8 +78,8 @@ export function PreJoin({ roomName, onJoin }: PreJoinProps) {
             } else {
                 setError(data.error || 'Failed to join meeting');
             }
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Unknown error');
         } finally {
             setIsLoading(false);
         }

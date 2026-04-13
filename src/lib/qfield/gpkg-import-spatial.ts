@@ -37,7 +37,6 @@ export interface LayerResult {
 type ImportMode = 'merge' | 'replace';
 
 /** Accept any neon sql tagged-template function */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SqlFn = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<Record<string, unknown>[]>;
 
 // ---------------------------------------------------------------------------

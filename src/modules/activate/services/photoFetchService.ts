@@ -91,6 +91,7 @@ async function tryFetchPhotos(dropNumber: string): Promise<{
     const data = await response.json();
     const localPhotos = data.local_photos || [];
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const photos: PhotoInput[] = localPhotos.map((photo: any) => ({
       filename: photo.filename,
       url: `/api/activate/photo/${dropNumber}/${photo.filename}`,

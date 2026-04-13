@@ -7,7 +7,7 @@ import type { DevQueueItem } from '../types/devQueue';
 
 interface DevQueueCardProps {
   item: DevQueueItem;
-  onVote: (itemId: string) => Promise<any>;
+  onVote: (itemId: string) => Promise<unknown>;
   onDelete: (itemId: string) => Promise<void>;
   onEdit?: (item: DevQueueItem) => void;
   onAttachments?: (item: DevQueueItem) => void;

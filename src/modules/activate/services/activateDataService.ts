@@ -279,6 +279,7 @@ export async function fetchDrops(filters: DropsFilters = {}): Promise<DropsApiRe
   }
 
   // Transform API response
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const transformedDrops: DrListItem[] = data.data.map((drop: any) => {
     const ontSerial = drop.ont_serial_scanned || null;
     const upsSerial = drop.ups_serial_scanned || null;

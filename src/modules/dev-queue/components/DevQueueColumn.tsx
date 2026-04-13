@@ -8,7 +8,7 @@ import type { DevQueueColumn as Column, DevQueueItem } from '../types/devQueue';
 
 interface DevQueueColumnProps {
   column: Column;
-  onVote: (itemId: string) => Promise<any>;
+  onVote: (itemId: string) => Promise<unknown>;
   onDelete: (itemId: string) => Promise<void>;
   onEdit?: (item: DevQueueItem) => void;
   onAttachments?: (item: DevQueueItem) => void;

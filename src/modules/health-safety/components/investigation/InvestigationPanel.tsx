@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import { FiveWhysForm, type WhyEntry } from './FiveWhysForm';
-import { CAPA_SEVERITY_CONFIG, type CAPASeverity } from '@/modules/health-safety/types/capa.types';
+import { CAPA_SEVERITY_CONFIG, type CAPASeverity, type CAPA } from '@/modules/health-safety/types/capa.types';
 
 interface InvestigationPanelProps {
   ticketId: string;
@@ -345,7 +345,7 @@ export function InvestigationPanel({ ticketId, onComplete }: InvestigationPanelP
           {existingCapas.length > 0 && (
             <div className="space-y-1">
               <p className="text-xs text-[var(--ff-text-tertiary)]">Existing CAPAs:</p>
-              {existingCapas.map((c: any) => (
+              {existingCapas.map((c: CAPA) => (
                 <div key={c.id} className="p-2 rounded bg-[var(--ff-bg-tertiary)] text-sm flex justify-between">
                   <span className="text-[var(--ff-text-primary)]">{c.title}</span>
                   <span className="text-xs text-[var(--ff-text-tertiary)]">{c.status}</span>

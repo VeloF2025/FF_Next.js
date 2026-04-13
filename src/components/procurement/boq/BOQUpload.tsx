@@ -274,7 +274,7 @@ export default function BOQUpload({
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 90_000);
 
-      let result: any;
+      let result: { boqId: string; itemsProcessed: number; stockItemsMatched: number; budgetItemsCreated: number; materialsMatched?: number; materialsCreated?: number; totalBudgetAmount?: number; errors?: unknown[] } | undefined;
       let fetchSucceeded = false;
 
       try {
@@ -347,26 +347,27 @@ export default function BOQUpload({
         );
       }
 
-      // Build success message
+      // Build success message (result is guaranteed set when fetchSucceeded is true)
+      const r = result!;
       const details = [];
-      if (result.materialsMatched > 0) details.push(`${result.materialsMatched} materials matched`);
-      if (result.materialsCreated > 0) details.push(`${result.materialsCreated} new materials`);
-      if (result.budgetItemsCreated > 0) details.push(`${result.budgetItemsCreated} budget items`);
-      if (result.stockItemsMatched > 0) details.push(`${result.stockItemsMatched} stock items linked`);
+      if ((r.materialsMatched ?? 0) > 0) details.push(`${r.materialsMatched} materials matched`);
+      if ((r.materialsCreated ?? 0) > 0) details.push(`${r.materialsCreated} new materials`);
+      if (r.budgetItemsCreated > 0) details.push(`${r.budgetItemsCreated} budget items`);
+      if (r.stockItemsMatched > 0) details.push(`${r.stockItemsMatched} stock items linked`);
 
       notificationService.success(
-        `BOQ imported! ${result.itemsProcessed} items${details.length ? ` (${details.join(', ')})` : ''}`
+        `BOQ imported! ${r.itemsProcessed} items${details.length ? ` (${details.join(', ')})` : ''}`
       );
 
       onUploadComplete?.({
-        boqId: result.boqId,
-        itemsCreated: result.itemsProcessed,
-        exceptionsCreated: result.errors?.length || 0,
-        materialsMatched: result.materialsMatched,
-        materialsCreated: result.materialsCreated,
-        budgetItemsCreated: result.budgetItemsCreated,
-        totalBudgetAmount: result.totalBudgetAmount,
-        stockItemsMatched: result.stockItemsMatched,
+        boqId: r.boqId,
+        itemsCreated: r.itemsProcessed,
+        exceptionsCreated: r.errors?.length || 0,
+        materialsMatched: r.materialsMatched,
+        materialsCreated: r.materialsCreated,
+        budgetItemsCreated: r.budgetItemsCreated,
+        totalBudgetAmount: r.totalBudgetAmount,
+        stockItemsMatched: r.stockItemsMatched,
       });
 
       setState(INITIAL_STATE);

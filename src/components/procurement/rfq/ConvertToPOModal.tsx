@@ -148,7 +148,7 @@ export function ConvertToPOModal({
         notificationService.error(data.error?.message || 'Failed to create Purchase Order');
       }
     } catch (err) {
-      log.error('Failed to convert RFQ to PO', err as any);
+      log.error('Failed to convert RFQ to PO', { err });
       setError('An unexpected error occurred');
       notificationService.operationError('create', err as Error, 'Purchase Order');
     } finally {

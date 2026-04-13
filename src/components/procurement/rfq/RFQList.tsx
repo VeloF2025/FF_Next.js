@@ -60,7 +60,7 @@ export default function RFQList({
       const data = await response.json();
 
       // Transform API response to match component's RFQ interface
-      const transformedRfqs: RFQ[] = (data.rfqs || []).map((rfq: any) => ({
+      const transformedRfqs: RFQ[] = (data.rfqs || []).map((rfq: Record<string, unknown>) => ({
         id: rfq.id,
         title: rfq.title,
         description: rfq.description || '',
@@ -68,7 +68,7 @@ export default function RFQList({
         createdAt: rfq.createdDate || rfq.createdAt,
         dueDate: rfq.dueDate,
         projectId: rfq.projectId,
-        supplierCount: rfq.suppliers?.length || 0,
+        supplierCount: (rfq.suppliers as unknown[])?.length || 0,
         responseCount: rfq.quotesReceived || 0
       }));
 

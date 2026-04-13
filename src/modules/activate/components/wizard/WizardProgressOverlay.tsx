@@ -141,7 +141,7 @@ export function WizardProgressOverlay({
               <ProgressStep
                 key={step.id}
                 label={step.label}
-                isActive={step.id === (phase as any)}
+                isActive={step.id === (phase as string)}
                 isComplete={index < currentStepIndex}
               />
             ))}

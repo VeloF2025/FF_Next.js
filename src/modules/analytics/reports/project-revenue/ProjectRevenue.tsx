@@ -49,7 +49,7 @@ const TOOLTIP_STYLE = {
 
 // ─── Table ─────────────────────────────────────────────────────────────────
 
-const ProfitabilityTable = ({ rows, totals }: { rows: ProjectProfitabilityRow[]; totals: any }) => (
+const ProfitabilityTable = ({ rows, totals }: { rows: ProjectProfitabilityRow[]; totals: { forecastRevenue: number; forecastCos: number; forecastGP: number; forecastMargin: number; actualRevenue: number; actualCos: number; actualGP: number; actualMargin: number } }) => (
   <div className="overflow-x-auto">
     <table className="w-full text-sm">
       <thead>

@@ -122,6 +122,7 @@ export function ClientForm() {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleInputChange = (field: keyof ClientFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };

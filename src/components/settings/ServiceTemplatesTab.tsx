@@ -367,7 +367,7 @@ export function ServiceTemplatesTab({
           {/* Category filter */}
           <select
             value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value as any)}
+            onChange={(e) => setSelectedCategory(e.target.value as 'deliverable' | 'service' | '')}
             className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="">All Categories</option>
