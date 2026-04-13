@@ -119,7 +119,7 @@ export async function trackFailure(
  */
 export async function getSuccessRate(actionId: string): Promise<number | null> {
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<{ success_count: number; failure_count: number }>(
     `
     SELECT success_count, failure_count
     FROM recovery_actions
@@ -130,7 +130,7 @@ export async function getSuccessRate(actionId: string): Promise<number | null> {
 
   if (result.rows.length === 0) return null;
 
-  const { success_count, failure_count } = result.rows[0];
+  const { success_count, failure_count } = result.rows[0]!;
   const total = success_count + failure_count;
 
   if (total === 0) return null;
@@ -147,7 +147,7 @@ export async function trackResolutionTime(
 ): Promise<void> {
   // Get incident creation time
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<{ created_at: string }>(
     `SELECT created_at FROM infrastructure_incidents WHERE id = $1`,
     [incidentId]
   );
@@ -176,7 +176,7 @@ export async function trackResolutionTime(
  */
 export async function trackAttempts(incidentId: string): Promise<{ attemptCount: number }> {
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<{ count: string }>(
     `SELECT COUNT(*) as count FROM incident_actions WHERE incident_id = $1`,
     [incidentId]
   );
@@ -193,7 +193,7 @@ export async function getResolutionMethod(incidentId: string): Promise<{
   attemptNumber: number;
 } | null> {
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<{ actionId: string; actionName: string; attemptNumber: number }>(
     `
     SELECT
       ia.action_id as "actionId",
@@ -220,7 +220,7 @@ export async function getResolutionMethod(incidentId: string): Promise<{
  */
 export async function getConsecutiveCounts(actionId: string): Promise<ConsecutiveCounts | null> {
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<ConsecutiveCounts>(
     `
     SELECT
       consecutive_success as "consecutiveSuccess",
@@ -409,7 +409,7 @@ export async function setAutoAdjustEnabled(actionId: string, enabled: boolean): 
  */
 export async function recordOverride(input: OverrideInput): Promise<RecoveryOverride> {
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<RecoveryOverride>(
     `
     INSERT INTO recovery_overrides (
       action_id,
@@ -441,6 +441,7 @@ export async function recordOverride(input: OverrideInput): Promise<RecoveryOver
   // Check if we should create a suggestion
   await checkForSuggestion(input.actionId);
 
+  if (!result.rows[0]) throw new Error('Override insert returned no row');
   return result.rows[0];
 }
 
@@ -449,7 +450,7 @@ export async function recordOverride(input: OverrideInput): Promise<RecoveryOver
  */
 export async function getOverrideHistory(actionId: string): Promise<OverrideHistory> {
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<{ approvals: string; rejections: string }>(
     `
     SELECT
       SUM(CASE WHEN override_type = 'approve' THEN 1 ELSE 0 END) as approvals,
@@ -461,8 +462,8 @@ export async function getOverrideHistory(actionId: string): Promise<OverrideHist
   );
 
   return {
-    approvals: parseInt(result.rows[0]?.approvals || 0, 10),
-    rejections: parseInt(result.rows[0]?.rejections || 0, 10),
+    approvals: parseInt(result.rows[0]?.approvals ?? '0', 10),
+    rejections: parseInt(result.rows[0]?.rejections ?? '0', 10),
   };
 }
 
@@ -534,7 +535,7 @@ export async function createClassificationSuggestion(
   }
 
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<Omit<ClassificationSuggestion, 'requiresConfirmation'>>(
     `
     INSERT INTO classification_suggestions (
       action_id,
@@ -567,7 +568,14 @@ export async function createClassificationSuggestion(
 
   log.info(`[IncidentLearning] Created ${input.type} suggestion for action ${input.actionId}`);
 
-  return { ...result.rows[0], requiresConfirmation: true };
+  const row = result.rows[0]!;
+  return {
+    ...row,
+    currentRiskLevel: row.currentLevel,
+    suggestedRiskLevel: row.suggestedLevel,
+    rationale: row.reason,
+    requiresConfirmation: true,
+  };
 }
 
 /**
@@ -575,7 +583,7 @@ export async function createClassificationSuggestion(
  */
 export async function getSuggestions(status?: string): Promise<ClassificationSuggestion[]> {
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<Omit<ClassificationSuggestion, 'requiresConfirmation'> & { status: string }>(
     `
     SELECT
       s.id,
@@ -610,7 +618,7 @@ export async function applySuggestion(
   appliedBy: string
 ): Promise<{ success: boolean; actionId: string; oldLevel: RiskLevel; newLevel: RiskLevel; appliedBy: string }> {
   const db = await getDb();
-  const suggestion = await db.query(
+  const suggestion = await db.query<{ action_id: string; current_level: RiskLevel; suggested_level: RiskLevel }>(
     `SELECT * FROM classification_suggestions WHERE id = $1 AND status = 'pending'`,
     [suggestionId]
   );
@@ -709,7 +717,7 @@ export async function exportIncidentToKB(incident: Incident): Promise<KBExportRe
 
     // Get actions attempted
     const db = await getDb();
-  const actionsResult = await db.query(
+  const actionsResult = await db.query<{ name: string; riskLevel: string; result: boolean; timestamp: string }>(
       `
       SELECT
         ra.action_name as name,
@@ -797,7 +805,7 @@ export async function exportIncidentToKB(incident: Incident): Promise<KBExportRe
       directoryCreated,
     };
   } catch (error) {
-    log.error('[IncidentLearning] Failed to export incident:', error);
+    log.error('[IncidentLearning] Failed to export incident:', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Export failed',
@@ -862,15 +870,15 @@ export async function updateIncidentIndex(incident: Incident): Promise<{
  */
 export async function getOverallSuccessRate(): Promise<SuccessRate> {
   const db = await getDb();
-  const result = await db.query(`
+  const result = await db.query<{ total_success: string; total_failure: string }>(`
     SELECT
       SUM(success_count) as total_success,
       SUM(failure_count) as total_failure
     FROM recovery_actions
   `);
 
-  const totalSuccess = parseInt(result.rows[0]?.total_success || 0, 10);
-  const totalFailure = parseInt(result.rows[0]?.total_failure || 0, 10);
+  const totalSuccess = parseInt(result.rows[0]?.total_success ?? '0', 10);
+  const totalFailure = parseInt(result.rows[0]?.total_failure ?? '0', 10);
   const total = totalSuccess + totalFailure;
 
   if (total === 0) {
@@ -894,7 +902,7 @@ export async function getServiceSuccessRate(serviceId: string): Promise<{
   const service = await serviceRegistry.getServiceById(serviceId);
 
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<{ total_success: string; total_failure: string }>(
     `
     SELECT
       SUM(success_count) as total_success,
@@ -905,8 +913,8 @@ export async function getServiceSuccessRate(serviceId: string): Promise<{
     [serviceId]
   );
 
-  const totalSuccess = parseInt(result.rows[0]?.total_success || 0, 10);
-  const totalFailure = parseInt(result.rows[0]?.total_failure || 0, 10);
+  const totalSuccess = parseInt(result.rows[0]?.total_success ?? '0', 10);
+  const totalFailure = parseInt(result.rows[0]?.total_failure ?? '0', 10);
   const total = totalSuccess + totalFailure;
 
   return {
@@ -922,7 +930,7 @@ export async function getServiceSuccessRate(serviceId: string): Promise<{
  */
 export async function getMTTR(): Promise<MTTR> {
   const db = await getDb();
-  const result = await db.query(`
+  const result = await db.query<{ avg_time: string; incident_count: string }>(`
     SELECT
       AVG(time_to_resolve_seconds) as avg_time,
       COUNT(*) as incident_count
@@ -930,8 +938,8 @@ export async function getMTTR(): Promise<MTTR> {
     WHERE resolved = true AND time_to_resolve_seconds IS NOT NULL
   `);
 
-  const avgSeconds = parseFloat(result.rows[0]?.avg_time) || 0;
-  const incidentCount = parseInt(result.rows[0]?.incident_count || 0, 10);
+  const avgSeconds = parseFloat(result.rows[0]?.avg_time ?? '0') || 0;
+  const incidentCount = parseInt(result.rows[0]?.incident_count ?? '0', 10);
 
   if (incidentCount === 0) {
     return { mttrSeconds: null, mttrFormatted: 'N/A', incidentCount: 0 };
@@ -950,7 +958,7 @@ export async function getMTTR(): Promise<MTTR> {
  */
 export async function getCommonFailures(limit: number = 5): Promise<CommonFailure[]> {
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<{ type: string; count: string }>(
     `
     SELECT
       issue_type as type,
@@ -979,7 +987,7 @@ export async function getCommonFailures(limit: number = 5): Promise<CommonFailur
 export async function getImprovingActions(): Promise<ActionTrend[]> {
   // Compare last 7 days vs previous 7 days
   const db = await getDb();
-  const result = await db.query(`
+  const result = await db.query<{ actionId: string; actionName: string; currentRate: number; previousRate: number | null }>(`
     WITH recent AS (
       SELECT action_id, COUNT(*) as total, SUM(CASE WHEN success THEN 1 ELSE 0 END) as successes
       FROM incident_actions
@@ -1008,7 +1016,7 @@ export async function getImprovingActions(): Promise<ActionTrend[]> {
     .map((r) => ({
       actionId: r.actionId,
       actionName: r.actionName,
-      improvement: Math.round((r.currentRate - r.previousRate) * 10) / 10,
+      improvement: Math.round((r.currentRate - (r.previousRate ?? 0)) * 10) / 10,
       currentRate: Math.round(r.currentRate * 10) / 10,
     }))
     .sort((a, b) => (b.improvement || 0) - (a.improvement || 0));
@@ -1019,7 +1027,7 @@ export async function getImprovingActions(): Promise<ActionTrend[]> {
  */
 export async function getDecliningActions(): Promise<ActionTrend[]> {
   const db = await getDb();
-  const result = await db.query(`
+  const result = await db.query<{ actionId: string; actionName: string; currentRate: number; previousRate: number | null }>(`
     WITH recent AS (
       SELECT action_id, COUNT(*) as total, SUM(CASE WHEN success THEN 1 ELSE 0 END) as successes
       FROM incident_actions
@@ -1048,7 +1056,7 @@ export async function getDecliningActions(): Promise<ActionTrend[]> {
     .map((r) => ({
       actionId: r.actionId,
       actionName: r.actionName,
-      decline: Math.round((r.currentRate - r.previousRate) * 10) / 10,
+      decline: Math.round((r.currentRate - (r.previousRate ?? 0)) * 10) / 10,
       currentRate: Math.round(r.currentRate * 10) / 10,
     }))
     .sort((a, b) => (a.decline || 0) - (b.decline || 0));
@@ -1059,7 +1067,7 @@ export async function getDecliningActions(): Promise<ActionTrend[]> {
  */
 export async function getStatsByTimeRange(from: Date, to: Date): Promise<TimeRangeStats> {
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<{ incident_count: string; avg_resolution: string }>(
     `
     SELECT
       COUNT(*) as incident_count,
@@ -1070,11 +1078,11 @@ export async function getStatsByTimeRange(from: Date, to: Date): Promise<TimeRan
     [from, to]
   );
 
-  const incidentCount = parseInt(result.rows[0]?.incident_count || 0, 10);
-  const mttrSeconds = Math.round(parseFloat(result.rows[0]?.avg_resolution) || 0);
+  const incidentCount = parseInt(result.rows[0]?.incident_count ?? '0', 10);
+  const mttrSeconds = Math.round(parseFloat(result.rows[0]?.avg_resolution ?? '0') || 0);
 
   // Get success rate for this period
-  const actionsResult = await db.query(
+  const actionsResult = await db.query<{ successes: string; total: string }>(
     `
     SELECT
       SUM(CASE WHEN success THEN 1 ELSE 0 END) as successes,
@@ -1085,8 +1093,8 @@ export async function getStatsByTimeRange(from: Date, to: Date): Promise<TimeRan
     [from, to]
   );
 
-  const successes = parseInt(actionsResult.rows[0]?.successes || 0, 10);
-  const total = parseInt(actionsResult.rows[0]?.total || 0, 10);
+  const successes = parseInt(actionsResult.rows[0]?.successes ?? '0', 10);
+  const total = parseInt(actionsResult.rows[0]?.total ?? '0', 10);
   const successRate = total > 0 ? Math.round((successes / total) * 100 * 10) / 10 : 0;
 
   return {
