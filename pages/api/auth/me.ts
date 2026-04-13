@@ -32,6 +32,7 @@ async function handler(
       permissions: user.permissions,
       profilePicture: user.profilePicture,
       department: user.department,
+      isImpersonation: user.isImpersonation,
     },
   });
 }
