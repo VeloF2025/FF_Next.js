@@ -18,6 +18,8 @@ export interface User {
   lastLoginAt: Date;
   createdAt: Date;
   profile?: UserProfile;
+  /** Set to true when this session was created via admin impersonation */
+  isImpersonation?: boolean;
 }
 
 export interface UserProfile {

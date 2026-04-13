@@ -360,6 +360,29 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
 
   return (
     <div className="flex h-screen bg-[var(--ff-background-primary)] overflow-hidden">
+      {/* Impersonation Banner — only shown during admin impersonation sessions */}
+      {currentUser?.isImpersonation && (
+        <div className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center gap-2 bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-lg">
+          <svg
+            className="h-4 w-4 flex-shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            />
+          </svg>
+          <span>
+            Impersonating: {currentUser.displayName} ({currentUser.email}) — Close this tab to end session
+          </span>
+        </div>
+      )}
+
       {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -401,7 +424,10 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
         {isSystem && <SystemNav />}
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-[var(--ff-background-primary)] relative z-10" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <main
+          className={`flex-1 overflow-y-auto overflow-x-hidden bg-[var(--ff-background-primary)] relative z-10${currentUser?.isImpersonation ? ' pt-10' : ''}`}
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        >
           <div className="min-h-full">
             {children}
           </div>
