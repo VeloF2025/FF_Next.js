@@ -13,7 +13,6 @@ import {
 import {
   SOWFileValidator,
   SOWUploadService,
-  SOWDocumentService,
   SOWDataExtractor,
   SOWDataValidator,
   SOWMetadata,
@@ -170,7 +169,7 @@ class SOWService {
   async updateDocumentMetadata(
     projectId: string,
     documentId: string,
-    metadata: SOWMetadata
+    _metadata: SOWMetadata
   ): Promise<void> {
     log.warn('updateDocumentMetadata is deprecated. Use API endpoints for document management.',
       { projectId, documentId }, 'sowService');

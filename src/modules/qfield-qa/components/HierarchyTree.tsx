@@ -184,7 +184,7 @@ interface PonRowProps {
   onSelect: (zoneNo?: number | null, ponNo?: number | null, featureType?: string, featureId?: string) => void;
 }
 
-function PonRow({ pon, zoneNo, expanded, selectedZone, selectedPon, selectedFeatureType, selectedFeatureId, onToggle, onSelect }: PonRowProps) {
+function PonRow({ pon, zoneNo, expanded, selectedZone, selectedPon, selectedFeatureType: _selectedFeatureType, selectedFeatureId, onToggle, onSelect }: PonRowProps) {
   const ponKey = `pon_${zoneNo}_${pon.pon_no}`;
   const isExpanded = expanded.has(ponKey);
   const isSelected = selectedZone === zoneNo && selectedPon === pon.pon_no && selectedFeatureId === undefined;
@@ -307,16 +307,6 @@ function StatusDots({ pending, approved, rejected }: { pending: number; approved
       {rejected > 0 && <span className="w-1.5 h-1.5 rounded-full bg-red-500" title={`${rejected} rejected`} />}
     </div>
   );
-}
-
-function formatWorkType(workType: string): string {
-  switch (workType) {
-    case 'pole_installation': return 'Poles';
-    case 'cable_stringing': return 'Cables';
-    case 'dome_joint': return 'Dome Joints';
-    case 'activation': return 'Activation';
-    default: return workType.charAt(0).toUpperCase() + workType.slice(1).replace(/_/g, ' ');
-  }
 }
 
 export default HierarchyTree;

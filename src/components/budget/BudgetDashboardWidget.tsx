@@ -24,15 +24,6 @@ interface BudgetDashboardWidgetProps {
   loading?: boolean;
 }
 
-const formatCurrency = (amount: number, currency = 'ZAR'): string => {
-  return new Intl.NumberFormat('en-ZA', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-};
-
 const formatCompact = (amount: number, currency = 'ZAR'): string => {
   const formatter = new Intl.NumberFormat('en-ZA', {
     style: 'currency',

@@ -347,10 +347,6 @@ export function PipelineDashboard() {
               ) : (
                 projects.map((project) => {
                   const statusStyle = STATUS_COLORS[project.pipeline_status];
-<<<<<<< HEAD
-                  const _priorityStyle = PRIORITY_COLORS[project.priority];
-=======
->>>>>>> ef48fbb44 (fix(lint): remove unused imports and vars — no-unused-vars batch #2)
                   const approvalPercent =
                     project.total_required_approvals > 0
                       ? Math.round(

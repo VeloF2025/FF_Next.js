@@ -69,7 +69,6 @@ import {
   verifyLicensePlate,
   extractFuelLevel,
   checkFleetVlmHealth,
-  type OdometerValidationResult,
 } from '../../../modules/fleet/services/fleetVlmService';
 
 // Real 1×1 JPEG that sharp can process (avoids native-addon mock issues)

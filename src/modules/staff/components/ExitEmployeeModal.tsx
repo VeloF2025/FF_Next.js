@@ -47,8 +47,8 @@ export function ExitEmployeeModal({
   onClose,
   onConfirm,
   staffName,
-  staffId,
-  currentStatus,
+  staffId: _staffId,
+  currentStatus: _currentStatus,
   targetStatus,
 }: ExitEmployeeModalProps) {
   const [exitType, setExitType] = useState<ExitType>(

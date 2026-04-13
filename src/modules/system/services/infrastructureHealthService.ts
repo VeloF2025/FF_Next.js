@@ -8,7 +8,6 @@ import { sql as poolSql } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 import type {
   ServiceStatus,
-  ServiceStatusValue,
   OverallStatus,
   DatabaseStatus,
   ContainerStatus,
@@ -126,7 +125,7 @@ async function checkDatabaseHealth(
 
   try {
     const sql = neon(connectionUrl);
-    const result = await sql`SELECT 1 as health, NOW() as server_time`;
+    await sql`SELECT 1 as health, NOW() as server_time`;
     const latencyMs = Date.now() - startTime;
 
     return {
