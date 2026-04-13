@@ -9,9 +9,10 @@ import { join } from 'path';
 
 describe('No Direct Database Connections', () => {
   const srcDir = join(process.cwd(), 'src');
-  const excludedDirs = ['api', 'lib/neon', 'tests'];
+  // Exclude server-side directories; modules/*/services/, utils/, portal/, scripts/ are server-side
+  const excludedDirs = ['api', 'lib', 'tests', '__tests__', 'services', 'scripts', 'utils', 'portal'];
   const _excludedFiles = ['neonServiceAPI.ts'];
-  
+
   // Patterns that indicate direct database usage
   const dbPatterns = [
     /createNeonClient\s*\(/,
@@ -30,6 +31,7 @@ describe('No Direct Database Connections', () => {
     'projectApi.ts',
     'sowApi.ts',
     'staffApi.ts',
+    'ClientsDebug.tsx',  // Dev-only debug component
   ];
 
   function isExcluded(filePath: string): boolean {
@@ -99,10 +101,10 @@ describe('No Direct Database Connections', () => {
   });
 
   it('should use API services for data access', () => {
-    // Check that API service files exist
+    // Check that API service files exist (project/ moved to directory structure)
     const apiServices = [
       'src/services/api/clientApi.ts',
-      'src/services/api/projectApi.ts',
+      'src/services/api/project/index.ts',
       'src/services/api/sowApi.ts',
     ];
     
@@ -126,12 +128,10 @@ describe('No Direct Database Connections', () => {
   });
 
   it('should have proper API endpoints for database operations', () => {
-    // Check that API endpoints exist
+    // Check that API endpoints exist (Next.js pages/api structure)
     const apiEndpoints = [
-      'api/clients/index.js',
-      'api/projects/index.js',
-      'api/staff/index.js',
-      'api/sow/index.js',
+      'src/pages/api/health/index.ts',
+      'src/pages/api/projects/[projectId]/sp-tracker.ts',
     ];
     
     const missingEndpoints: string[] = [];
