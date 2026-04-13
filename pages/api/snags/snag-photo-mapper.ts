@@ -107,10 +107,21 @@ export async function createSnagsPerPhoto(
 
         if (dropRows[0]) {
           const drop = dropRows[0];
+
+          // Resolve zone/PON UUIDs from zone_no/pon_no integers
+          const dropZoneId = drop.zone_no != null
+            ? (await sql`SELECT id FROM zone_boundaries WHERE project_id = ${projectId} AND zone_no = ${drop.zone_no} LIMIT 1`)[0]?.id ?? null
+            : null;
+          const dropPonId = drop.pon_no != null
+            ? (await sql`SELECT id FROM pon_boundaries WHERE project_id = ${projectId} AND pon_no = ${drop.pon_no} LIMIT 1`)[0]?.id ?? null
+            : null;
+
           await sql`
             UPDATE snags
             SET drop_id = ${drop.id},
-                pole_references = ARRAY[${drop.drop_number}]
+                pole_references = ARRAY[${drop.drop_number}],
+                zone_id = ${dropZoneId},
+                pon_id = ${dropPonId}
             WHERE id = ${snag.id}
           `;
           snag.pole_references = [drop.drop_number];
@@ -139,11 +150,20 @@ export async function createSnagsPerPhoto(
 
         if (poleRows[0]) {
           const pole = poleRows[0];
+
+          // Resolve zone/PON UUIDs from zone_no/pon_no integers
+          const poleZoneId = pole.zone_no != null
+            ? (await sql`SELECT id FROM zone_boundaries WHERE project_id = ${projectId} AND zone_no = ${pole.zone_no} LIMIT 1`)[0]?.id ?? null
+            : null;
+          const polePonId = pole.pon_no != null
+            ? (await sql`SELECT id FROM pon_boundaries WHERE project_id = ${projectId} AND pon_no = ${pole.pon_no} LIMIT 1`)[0]?.id ?? null
+            : null;
+
           await sql`
             UPDATE snags
             SET pole_ids = ARRAY[${pole.id}]::uuid[],
-                zone_id = (SELECT zone_id FROM poles WHERE id = ${pole.id}),
-                pon_id = (SELECT pon_id FROM poles WHERE id = ${pole.id}),
+                zone_id = ${poleZoneId},
+                pon_id = ${polePonId},
                 pole_references = ARRAY[${pole.pole_number}]
             WHERE id = ${snag.id}
           `;
