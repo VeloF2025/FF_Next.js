@@ -7,8 +7,8 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Users, Shield, Key, Search, ChevronRight, ChevronDown,
   Check, X, AlertCircle, Loader2, RefreshCw, UserCog, UserPlus, Settings,
-  Plus, Copy, Trash2, Lock, XCircle, Filter, ToggleLeft, ToggleRight,
-  ShieldCheck, ShieldOff, UserCheck, UserX, Save, RotateCcw
+  Plus, Copy, Trash2, Lock, XCircle, Filter,
+  ShieldCheck, UserCheck, UserX, Save, RotateCcw
 } from 'lucide-react';
 import { UserPermissionsModal } from './UserPermissionsModal';
 import { ModulesAccessTab } from './ModulesAccessTab';

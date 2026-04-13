@@ -3,7 +3,7 @@
  * Premium input with floating labels and glass effects using modular architecture
  */
 
-import React, { useRef } from 'react';
+import React from 'react';
 import { cn } from '@/lib/utils';
 import { VelocityInputProps } from './types';
 import { useVelocityInputState } from './hooks';
@@ -38,8 +38,6 @@ const VelocityInput = React.forwardRef<HTMLInputElement, VelocityInputProps>(
     style,
     ...props
   }, ref) => {
-    const inputRef = useRef<HTMLInputElement>(null);
-
     // Use our custom hook for state management
     const {
       focused,
@@ -49,8 +47,8 @@ const VelocityInput = React.forwardRef<HTMLInputElement, VelocityInputProps>(
       isPasswordInput,
       customNeonStyle,
       characterCount,
-      isNearLimit,
-      isAtLimit,
+      isNearLimit: _isNearLimit,
+      isAtLimit: _isAtLimit,
       togglePasswordVisibility,
       handleFocus,
       handleBlur,

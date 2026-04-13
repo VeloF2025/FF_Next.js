@@ -12,16 +12,12 @@ import {
   AlertTriangle,
   XCircle,
   Clock,
-  FileText,
   ChevronRight,
   Filter,
   ArrowUpDown,
 } from 'lucide-react';
-import type { ComplianceStatus, DocumentType } from '@/types/staff-document.types';
+import type { ComplianceStatus } from '@/types/staff-document.types';
 import { DOCUMENT_TYPE_LABELS } from '@/types/staff-document.types';
-import { createLogger } from '@/lib/logger';
-
-const logger = createLogger('ComplianceDashboard');
 
 interface StaffComplianceData extends ComplianceStatus {
   staffName: string;

@@ -20,10 +20,8 @@ import {
   AlertCircle,
   AlertTriangle,
   Clock,
-  Image as ImageIcon,
   Edit3,
   Database,
-  CreditCard,
   ShieldAlert,
   ShieldCheck,
 } from 'lucide-react';
@@ -152,7 +150,7 @@ export function DocumentVerificationPanel({
   const isPending = document.verificationStatus === 'pending';
   const isVerified = document.verificationStatus === 'verified';
   const isRejected = document.verificationStatus === 'rejected';
-  const canTakeAction = isAdmin && isPending && !isSubmitting;
+  const _canTakeAction = isAdmin && isPending && !isSubmitting;
   const hasOcrSupport = OCR_ENABLED_DOCUMENTS.includes(document.documentType);
   const ocrFields = OCR_FIELD_CONFIG[document.documentType] || [];
   const hasOcrData = document.ocrMetadata && Object.keys(document.ocrMetadata).length > 0;

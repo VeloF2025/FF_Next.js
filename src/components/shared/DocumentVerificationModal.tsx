@@ -17,9 +17,6 @@ import {
   XCircle,
   FileText,
   AlertCircle,
-  User,
-  Calendar,
-  Hash,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { log } from '@/lib/logger';

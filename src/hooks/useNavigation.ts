@@ -37,7 +37,7 @@ export function useNavigation(): NavigationHook {
   const router = useRouter()
 
   const navigate = useCallback(
-    async (path: string, options: NavigationOptions = {}): Promise<boolean> => {
+    async (path: string, _options: NavigationOptions = {}): Promise<boolean> => {
       router.push(path)
       return true
     },
@@ -57,7 +57,7 @@ export function useNavigation(): NavigationHook {
   }, [router])
 
   const push = useCallback(
-    async (path: string, as?: string, options: NavigationOptions = {}): Promise<boolean> => {
+    async (path: string, _as?: string, _options: NavigationOptions = {}): Promise<boolean> => {
       router.push(path)
       return true
     },
@@ -65,7 +65,7 @@ export function useNavigation(): NavigationHook {
   )
 
   const replace = useCallback(
-    async (path: string, as?: string, options: NavigationOptions = {}): Promise<boolean> => {
+    async (path: string, _as?: string, _options: NavigationOptions = {}): Promise<boolean> => {
       router.push(path)
       return true
     },
