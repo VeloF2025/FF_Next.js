@@ -174,7 +174,8 @@ export async function generateSnagResolutionPdf(
     const afterPhotos  = row.photos.filter((p) => p.phase === 'after');
     const hasPhotos    = beforePhotos.length > 0 || afterPhotos.length > 0;
     const noteLines    = row.notes.reduce((acc, n) => acc + Math.ceil(n.content.length / 70) + 1, 0);
-    const estimatedH   = 10 + 18 + (hasPhotos ? 56 : 0) + (noteLines > 0 ? noteLines * 4 + 8 : 0) + 6;
+    const estDescH     = Math.min(Math.ceil(row.description.length / 70) + 1, 4) * 4 + 6;
+    const estimatedH   = 9 + estDescH + 18 + (hasPhotos ? 56 : 0) + (noteLines > 0 ? noteLines * 4 + 8 : 0) + 6;
 
     checkPageBreak(estimatedH);
 
@@ -201,13 +202,21 @@ export async function generateSnagResolutionPdf(
     doc.text(cap(row.status), PW - MR - 3, y + 6, { align: 'right' });
     y += 12;
 
-    // ── Description ───────────────────────────────────────────────────────
-    doc.setFontSize(8.5);
+    // ── Description (dark bg so white text is visible) ────────────────────
+    const descLines = doc.splitTextToSize(row.description, CW - 6);
+    const descLineCount = Math.min(descLines.length, 4);
+    const descH = descLineCount * 4 + 5;
+    doc.setFillColor(...B.dark);
+    doc.rect(ML, y, CW, descH, 'F');
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...B.grey);
+    doc.text('ISSUE', ML + 3, y + 3.5);
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...B.white);
-    const descLines = doc.splitTextToSize(row.description, CW - 4);
-    doc.text(descLines, ML + 2, y);
-    y += Math.min(descLines.length, 3) * 4 + 3;
+    doc.text(descLines.slice(0, 4), ML + 3, y + 8);
+    y += descH + 1;
 
     // ── Metadata strip ────────────────────────────────────────────────────
     doc.setFillColor(...B.bgLight);
@@ -307,23 +316,29 @@ export async function generateSnagResolutionPdf(
 
       if (row.verification_notes) {
         checkPageBreak(10);
+        const vLines = doc.splitTextToSize(`Verification: ${row.verification_notes}`, CW - 6);
+        const vH = vLines.length * 4 + 4;
+        doc.setFillColor(...B.mid);
+        doc.rect(ML, y, CW, vH, 'F');
         doc.setFontSize(7.5);
         doc.setFont('helvetica', 'italic');
-        doc.setTextColor(...B.grey);
-        const vLines = doc.splitTextToSize(`Verification: ${row.verification_notes}`, CW - 6);
-        doc.text(vLines, ML + 3, y);
-        y += vLines.length * 4 + 2;
+        doc.setTextColor(...B.green);
+        doc.text(vLines, ML + 3, y + 3.5);
+        y += vH + 1;
       }
 
       for (const note of row.notes) {
         checkPageBreak(10);
         const noteText = `[${cap(note.note_type)}] ${note.created_by_name ?? 'Unknown'}  ${fmt(note.created_at)}: ${note.content}`;
         const nLines = doc.splitTextToSize(noteText, CW - 6);
+        const noteH = nLines.length * 4 + 4;
+        doc.setFillColor(...B.dark);
+        doc.rect(ML, y, CW, noteH, 'F');
         doc.setFontSize(7.5);
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(...B.white);
-        doc.text(nLines, ML + 3, y);
-        y += nLines.length * 4 + 2;
+        doc.setTextColor(...B.grey);
+        doc.text(nLines, ML + 3, y + 3.5);
+        y += noteH + 1;
       }
     }
 
