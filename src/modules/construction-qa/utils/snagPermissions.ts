@@ -24,8 +24,8 @@ const QA_APPROVER_USER_IDS = new Set([
 const QA_FORWARD_STATUSES = new Set([
   'pending_qa',  // forward = Approve QA
   'fixed',       // forward = Approve QA (legacy)
-  'resolved',    // forward = Customer Confirmed
-  'verified',    // forward = Close
+  'resolved',    // forward = Close Ticket
+  'verified',    // forward = Close Ticket (legacy)
   'wont_fix',    // forward = Approve Rejection
 ]);
 
