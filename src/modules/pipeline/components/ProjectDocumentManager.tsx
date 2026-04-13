@@ -137,7 +137,7 @@ function getDocumentViewUrl(fileUrl: string | null, filePath: string | null): st
 
 export function ProjectDocumentManager({
   projectId,
-  projectName,
+  projectName: _projectName,
   currentUserId,
   readonly = false,
 }: ProjectDocumentManagerProps) {

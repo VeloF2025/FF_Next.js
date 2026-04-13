@@ -239,7 +239,7 @@ function SyncResultDisplay({ result }: { result: FullSyncResult }) {
 /**
  * 🟢 WORKING: Sync trigger component
  */
-export function SyncTrigger({ onTriggerSync, disabled = false, compact = false }: SyncTriggerProps) {
+export function SyncTrigger({ onTriggerSync, disabled = false, compact: _compact = false }: SyncTriggerProps) {
   const [syncDirection, setSyncDirection] = useState<SyncDirectionOption>('bidirectional');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [forceResync, setForceResync] = useState(false);

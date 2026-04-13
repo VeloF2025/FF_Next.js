@@ -231,14 +231,6 @@ async function generateTicketUID(forDate?: Date, prefix = 'VF'): Promise<string>
   return `${prefix}-${formattedDate}-${paddedSeq}`;
 }
 
-/**
- * Legacy function for backward compatibility
- * @deprecated Use generateTicketUID() instead
- */
-function generateLegacyTicketUID(): string {
-  const randomDigits = Math.floor(100000 + Math.random() * 900000);
-  return `FF${randomDigits}`;
-}
 
 /**
  * Validate ticket source enum

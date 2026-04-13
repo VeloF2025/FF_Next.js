@@ -62,7 +62,7 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
   const generateFeedbackMessage = (result: EvaluationResult) => {
     // Handle both old format (results.results) and new format (step_results)
     const stepResults = result.step_results || result.results?.results || [];
-    const passed = stepResults.filter((r: StepResultItem) => r.passed === true || r.status === 'PASS');
+    const _passed = stepResults.filter((r: StepResultItem) => r.passed === true || r.status === 'PASS');
     const failed = stepResults.filter((r: StepResultItem) => r.passed === false || r.status === 'FAIL');
 
     let message = `${drop.dr_number}\n`;

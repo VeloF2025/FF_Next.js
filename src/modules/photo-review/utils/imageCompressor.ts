@@ -41,7 +41,7 @@ export const COMPRESSION_CONFIG = {
  */
 export async function compressImage(
   imageBuffer: Buffer,
-  mimeType?: string
+  _mimeType?: string
 ): Promise<Buffer> {
   if (!COMPRESSION_CONFIG.enabled) {
     log.debug('ImageCompressor', 'Compression disabled, returning original image');

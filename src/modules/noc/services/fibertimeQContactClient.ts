@@ -419,7 +419,7 @@ export class FiberTimeQContactClient {
       // Extract tokens from response headers (QContact uses headers for auth tokens)
       const accessToken = response.headers.get('access-token');
       const clientToken = response.headers.get('client');
-      const uid = response.headers.get('uid');
+      const _uid = response.headers.get('uid');
 
       if (accessToken && clientToken) {
         this.accessToken = accessToken;
