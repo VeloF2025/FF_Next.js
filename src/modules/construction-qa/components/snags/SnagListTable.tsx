@@ -102,7 +102,7 @@ export function SnagListTable({
                 'Category',
                 'Severity',
                 'Description',
-                'Poles',
+                'Ref',
                 'Status',
                 'NOC Ticket',
                 'Assigned To',
@@ -192,7 +192,7 @@ export function SnagListTable({
                     <td className="px-3 py-3 text-xs text-zinc-300 max-w-[220px]">
                       <p className="line-clamp-2 leading-snug">{snag.description}</p>
                     </td>
-                    {/* Poles */}
+                    {/* Ref */}
                     <td className="px-3 py-3 text-xs text-zinc-400 whitespace-nowrap max-w-[120px] truncate">
                       {poles}
                     </td>

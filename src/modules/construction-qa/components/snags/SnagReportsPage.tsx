@@ -22,6 +22,20 @@ import { log } from '@/lib/logger';
 // Types (inlined to avoid cross-boundary imports)
 // ============================================================
 
+interface ReportRowPhoto {
+  id: string;
+  phase: string;
+  photo_url: string;
+  thumbnail_url: string | null;
+}
+
+interface ReportRowNote {
+  content: string;
+  note_type: string;
+  created_by_name: string | null;
+  created_at: string;
+}
+
 interface ReportRow {
   id: string;
   project_name: string;
@@ -38,6 +52,8 @@ interface ReportRow {
   resolved_date: string | null;
   assigned_to_name: string | null;
   noc_ticket_uid: string | null;
+  photos: ReportRowPhoto[];
+  notes: ReportRowNote[];
 }
 
 // ============================================================
@@ -113,7 +129,7 @@ export function SnagReportsPage() {
     const ws = wb.addWorksheet('Snag Resolution Report');
 
     // Title rows
-    ws.mergeCells('A1:N1');
+    ws.mergeCells('A1:P1');
     const titleCell = ws.getCell('A1');
     titleCell.value = `VelocityFibre — Snag Resolution Report`;
     titleCell.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
@@ -121,7 +137,7 @@ export function SnagReportsPage() {
     titleCell.alignment = { horizontal: 'left', vertical: 'middle' };
     ws.getRow(1).height = 28;
 
-    ws.mergeCells('A2:N2');
+    ws.mergeCells('A2:P2');
     const subCell = ws.getCell('A2');
     subCell.value = `Period: ${fmt(dateFrom)} — ${fmt(dateTo)}   |   Generated: ${fmt(today)}   |   Total snags: ${filteredRows.length}`;
     subCell.font = { size: 10, color: { argb: 'FF9CA3AF' } };
@@ -130,7 +146,7 @@ export function SnagReportsPage() {
     ws.getRow(2).height = 18;
 
     // Header row
-    const headers = ['#', 'Project', 'Report', 'Snag #', 'Category', 'Severity', 'Description', 'Pole', 'Zone', 'PON', 'Status', 'Date Opened', 'Date Resolved', 'Assigned To'];
+    const headers = ['#', 'Project', 'Report', 'Snag #', 'Category', 'Severity', 'Description', 'Ref', 'Zone', 'PON', 'Status', 'Date Opened', 'Date Resolved', 'Assigned To', 'Photos (B/A)', 'Notes'];
     ws.addRow(headers);
     const headerRow = ws.getRow(3);
     headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
@@ -140,6 +156,8 @@ export function SnagReportsPage() {
 
     // Data rows
     filteredRows.forEach((r, i) => {
+      const beforeCount = r.photos.filter(p => p.phase === 'before').length;
+      const afterCount  = r.photos.filter(p => p.phase === 'after').length;
       ws.addRow([
         i + 1,
         r.project_name,
@@ -155,6 +173,8 @@ export function SnagReportsPage() {
         fmt(r.opened_date),
         fmt(r.resolved_date),
         r.assigned_to_name ?? '—',
+        `${beforeCount}B / ${afterCount}A`,
+        r.notes.length > 0 ? r.notes.map(n => `[${n.note_type}] ${n.created_by_name ?? 'Unknown'}: ${n.content}`).join(' | ') : '—',
       ]);
     });
 
@@ -184,13 +204,15 @@ export function SnagReportsPage() {
       { key: 'category', width: 12 },
       { key: 'severity', width: 10 },
       { key: 'description', width: 40 },
-      { key: 'pole', width: 14 },
+      { key: 'ref', width: 14 },
       { key: 'zone', width: 8 },
       { key: 'pon', width: 8 },
       { key: 'status', width: 14 },
       { key: 'opened', width: 14 },
       { key: 'resolved', width: 14 },
       { key: 'assigned', width: 20 },
+      { key: 'photos', width: 12 },
+      { key: 'notes', width: 50 },
     ];
 
     const buffer = await wb.xlsx.writeBuffer();
@@ -208,99 +230,19 @@ export function SnagReportsPage() {
     if (filteredRows.length === 0) return;
     setExportingPdf(true);
     try {
-      const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
-        import('jspdf'),
-        import('jspdf-autotable'),
-      ]);
-
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-      const pageW = doc.internal.pageSize.getWidth();
-
-      // ── Header ──────────────────────────────────────────────
-      doc.setFillColor(26, 31, 46);
-      doc.rect(0, 0, pageW, 28, 'F');
-
-      doc.setFontSize(16);
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.text('VelocityFibre — Snag Resolution Report', 12, 12);
-
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(156, 163, 175);
-      doc.text(`Period: ${fmt(dateFrom)} — ${fmt(dateTo)}`, 12, 20);
-      doc.text(`Generated: ${fmt(today)}   |   Total: ${filteredRows.length} snags`, 12, 25);
-
-      // ── Table ────────────────────────────────────────────────
-      autoTable(doc, {
-        startY: 32,
-        head: [[
-          '#', 'Project', 'Report', 'Snag #', 'Category', 'Description',
-          'Pole', 'Zone', 'PON', 'Status', 'Date Opened', 'Date Resolved', 'Assigned To',
-        ]],
-        body: filteredRows.map((r, i) => [
-          i + 1,
-          r.project_name,
-          r.report_number,
-          r.snag_number,
-          r.category,
-          r.description.length > 60 ? r.description.slice(0, 57) + '…' : r.description,
-          r.pole_reference ?? '—',
-          r.zone_no ?? '—',
-          r.pon_no ?? '—',
-          statusLabel(r.status),
-          fmt(r.opened_date),
-          fmt(r.resolved_date),
-          r.assigned_to_name ?? '—',
-        ]),
-        styles: {
-          fontSize: 7,
-          cellPadding: 2,
-          textColor: [229, 231, 235],
-          fillColor: [17, 24, 39],
-          lineColor: [55, 65, 81],
-          lineWidth: 0.1,
-          overflow: 'linebreak',
-        },
-        headStyles: {
-          fillColor: [31, 41, 55],
-          textColor: [255, 255, 255],
-          fontStyle: 'bold',
-          fontSize: 7.5,
-          halign: 'center',
-        },
-        alternateRowStyles: { fillColor: [26, 31, 46] },
-        columnStyles: {
-          0: { cellWidth: 8,  halign: 'center' },
-          1: { cellWidth: 22 },
-          2: { cellWidth: 22 },
-          3: { cellWidth: 10, halign: 'center' },
-          4: { cellWidth: 16 },
-          5: { cellWidth: 'auto' },
-          6: { cellWidth: 18 },
-          7: { cellWidth: 10, halign: 'center' },
-          8: { cellWidth: 10, halign: 'center' },
-          9: { cellWidth: 18 },
-          10: { cellWidth: 20 },
-          11: { cellWidth: 20 },
-          12: { cellWidth: 24 },
-        },
-        margin: { left: 8, right: 8 },
-        didDrawPage: (data) => {
-          // Footer
-          const pageCount = (doc as unknown as { internal: { getNumberOfPages: () => number } }).internal.getNumberOfPages();
-          doc.setFontSize(7);
-          doc.setTextColor(107, 114, 128);
-          doc.text(
-            `Page ${data.pageNumber} of ${pageCount}  |  Confidential — VelocityFibre`,
-            pageW / 2,
-            doc.internal.pageSize.getHeight() - 5,
-            { align: 'center' }
-          );
-        },
-      });
-
-      doc.save(`snag-resolution-report-${dateFrom}-to-${dateTo}.pdf`);
+      const { generateSnagResolutionPdf } = await import('../../utils/snagResolutionPdf');
+      const blob = await generateSnagResolutionPdf(
+        // Cast matches ResolutionReportRow shape — photos/notes already present
+        filteredRows as Parameters<typeof generateSnagResolutionPdf>[0],
+        dateFrom,
+        dateTo
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `snag-resolution-report-${dateFrom}-to-${dateTo}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
       toast.success(`PDF exported — ${filteredRows.length} snags`);
     } catch (err) {
       log.error('SnagReportsPage: PDF export failed', { err });
@@ -396,7 +338,7 @@ export function SnagReportsPage() {
           <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
             <thead className="sticky top-0 z-10 bg-[var(--ff-bg-tertiary)]">
               <tr>
-                {['#', 'Project', 'Report', 'Snag #', 'Category', 'Description', 'Pole', 'Zone', 'PON', 'Status', 'Date Opened', 'Date Resolved', 'Assigned To'].map(h => (
+                {['#', 'Project', 'Report', 'Snag #', 'Category', 'Description', 'Ref', 'Zone', 'PON', 'Status', 'Date Opened', 'Date Resolved', 'Assigned To', 'Photos', 'Notes'].map(h => (
                   <th key={h} className="px-3 py-2 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide whitespace-nowrap">
                     {h}
                   </th>
@@ -406,7 +348,7 @@ export function SnagReportsPage() {
             <tbody className="bg-[var(--ff-bg-secondary)] divide-y divide-[var(--ff-border-light)]">
               {isLoading && Array.from({ length: 8 }).map((_, i) => (
                 <tr key={i} className="animate-pulse">
-                  {Array.from({ length: 13 }).map((__, j) => (
+                  {Array.from({ length: 15 }).map((__, j) => (
                     <td key={j} className="px-3 py-3">
                       <div className="h-3 bg-zinc-700 rounded w-full" />
                     </td>
@@ -416,7 +358,7 @@ export function SnagReportsPage() {
 
               {!isLoading && hasQueried && filteredRows.length === 0 && (
                 <tr>
-                  <td colSpan={13} className="px-4 py-12 text-center text-sm text-zinc-500">
+                  <td colSpan={15} className="px-4 py-12 text-center text-sm text-zinc-500">
                     No resolved snags found in this period
                   </td>
                 </tr>
@@ -424,7 +366,7 @@ export function SnagReportsPage() {
 
               {!isLoading && !hasQueried && (
                 <tr>
-                  <td colSpan={13} className="px-4 py-12 text-center text-sm text-zinc-500">
+                  <td colSpan={15} className="px-4 py-12 text-center text-sm text-zinc-500">
                     Select a date range and click <span className="text-zinc-300 font-medium">Run Report</span>
                   </td>
                 </tr>
@@ -453,6 +395,29 @@ export function SnagReportsPage() {
                   <td className="px-3 py-2.5 text-xs text-zinc-400 whitespace-nowrap">{fmt(r.opened_date)}</td>
                   <td className="px-3 py-2.5 text-xs text-zinc-400 whitespace-nowrap">{fmt(r.resolved_date)}</td>
                   <td className="px-3 py-2.5 text-xs text-zinc-400 whitespace-nowrap">{r.assigned_to_name ?? '—'}</td>
+                  <td className="px-3 py-2.5 text-xs text-zinc-400 whitespace-nowrap">
+                    {r.photos.length > 0 ? (
+                      <span className="flex items-center gap-1">
+                        {r.photos.filter(p => p.phase === 'before').length > 0 && (
+                          <span className="px-1 py-0.5 rounded text-[10px] bg-zinc-700 text-zinc-300">
+                            {r.photos.filter(p => p.phase === 'before').length}B
+                          </span>
+                        )}
+                        {r.photos.filter(p => p.phase === 'after').length > 0 && (
+                          <span className="px-1 py-0.5 rounded text-[10px] bg-blue-900/60 text-blue-300">
+                            {r.photos.filter(p => p.phase === 'after').length}A
+                          </span>
+                        )}
+                      </span>
+                    ) : <span className="text-zinc-600">—</span>}
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-zinc-400 whitespace-nowrap">
+                    {r.notes.length > 0 ? (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-700 text-zinc-300">
+                        {r.notes.length}
+                      </span>
+                    ) : <span className="text-zinc-600">—</span>}
+                  </td>
                 </tr>
               ))}
             </tbody>
