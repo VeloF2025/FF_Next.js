@@ -32,6 +32,7 @@ async function getDb() {
     }
   };
 }
+import net from 'net';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import type {
@@ -189,7 +190,6 @@ export async function checkTcpHealth(
   const checkedAt = new Date();
 
   return new Promise((resolve) => {
-    const net = require('net');
     const socket = new net.Socket();
 
     socket.setTimeout(service.timeoutMs);
@@ -275,10 +275,11 @@ export async function checkServiceHealth(service: ServiceDefinition): Promise<He
     case 'systemd':
       // Extract SSH details from health endpoint or use defaults
       return checkSystemdHealth(service, '100.96.203.105', 'velo');
-    case 'tcp':
+    case 'tcp': {
       // Parse host:port from health endpoint
       const [tcpHost, tcpPort] = (service.healthEndpoint || 'localhost:5432').split(':');
       return checkTcpHealth(service, tcpHost || 'localhost', parseInt(tcpPort || '5432', 10));
+    }
     case 'custom':
       // For database, use custom check
       if (service.category === 'database') {

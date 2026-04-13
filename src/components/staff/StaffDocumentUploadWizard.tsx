@@ -597,7 +597,7 @@ export function StaffDocumentUploadWizard({
           </div>
         );
 
-      case 'file_upload':
+      case 'file_upload': {
         // All document types use single file upload (including driver's license - front only)
         const documentLabel = state.selectedDocumentType
           ? DOCUMENT_TYPE_LABELS[state.selectedDocumentType]
@@ -664,6 +664,7 @@ export function StaffDocumentUploadWizard({
             )}
           </div>
         );
+      }
 
       case 'ocr_processing':
         return (

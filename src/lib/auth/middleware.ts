@@ -8,6 +8,7 @@
  * 3. Removed redundant user.isActive check after DB validation
  */
 
+import crypto from 'crypto';
 import type { NextApiRequest, NextApiResponse, NextApiHandler } from 'next';
 import { neon } from '@/lib/db-neon';
 import { verifyToken } from './jwt';
@@ -22,7 +23,6 @@ const sql = neon(process.env.DATABASE_URL!);
  * Format: base64(payload).hmac_signature
  */
 export function signPortalToken(sessionData: Record<string, unknown>): string {
-  const crypto = require('crypto');
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error('JWT_SECRET required for portal token signing');
 
@@ -37,7 +37,6 @@ export function signPortalToken(sessionData: Record<string, unknown>): string {
  * Also accepts legacy unsigned base64 tokens for backward compatibility (logged as warning)
  */
 function verifyPortalToken(token: string): Record<string, unknown> | null {
-  const crypto = require('crypto');
   // Portal sessions are signed with PORTAL_SESSION_SECRET (not JWT_SECRET)
   // These are distinct secrets — using JWT_SECRET here was the root cause of the
   // "Invalid or tampered portal session" bug (fixed 2026-02-24)

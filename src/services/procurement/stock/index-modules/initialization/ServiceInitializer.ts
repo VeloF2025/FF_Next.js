@@ -82,13 +82,15 @@ export const initializeStockServices = async (): Promise<{
 /**
  * Create a stock service instance with default configuration
  */
-export const createStockService = () => {
-  return new (require('../../StockService')).default();
+export const createStockService = async () => {
+  const { default: StockService } = await import('../../StockService');
+  return new StockService();
 };
 
 /**
  * Create stock operations instance for API use
  */
-export const createStockOperations = () => {
-  return new (require('../../../api/stockOperations')).StockOperations();
+export const createStockOperations = async () => {
+  const { StockOperations } = await import('../../../api/stockOperations');
+  return new StockOperations();
 };

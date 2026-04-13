@@ -378,7 +378,7 @@ export class OcrService {
       case 'extractDOBFromSAID':
         return extractDOBFromSAID(value);
 
-      case 'parseDate':
+      case 'parseDate': {
         // Try to parse common date formats
         const datePatterns = [
           /(\d{4})-(\d{2})-(\d{2})/, // YYYY-MM-DD
@@ -397,6 +397,7 @@ export class OcrService {
           }
         }
         return value;
+      }
 
       default:
         return value;

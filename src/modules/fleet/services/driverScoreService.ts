@@ -416,14 +416,15 @@ export async function calculateDriverScore(
       startDate = date;
       endDate = new Date(new Date(date).getTime() + 86400000).toISOString().split('T')[0]!;
       break;
-    case 'weekly':
+    case 'weekly': {
       const weekStart = new Date(date);
       weekStart.setDate(weekStart.getDate() - weekStart.getDay());
       startDate = weekStart.toISOString().split('T')[0]!;
       endDate = new Date(weekStart.getTime() + 7 * 86400000).toISOString().split('T')[0]!;
       break;
+    }
     case 'monthly':
-    default:
+    default: {
       const monthStart = new Date(date);
       monthStart.setDate(1);
       startDate = monthStart.toISOString().split('T')[0]!;
@@ -431,6 +432,7 @@ export async function calculateDriverScore(
       nextMonth.setMonth(nextMonth.getMonth() + 1);
       endDate = nextMonth.toISOString().split('T')[0]!;
       break;
+    }
   }
 
   try {
