@@ -200,26 +200,26 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     let snagRows: RawSnagRow[];
 
     if (project_id && typeof project_id === 'string') {
-      snagRows = await sql.unsafe(`
-        SELECT ${SNAG_QUERY_FIELDS}
+      snagRows = await sql`
+        SELECT ${sql.unsafe(SNAG_QUERY_FIELDS)}
         FROM snags s
-        ${SNAG_JOINS}
-        WHERE s.project_id = $1
+        ${sql.unsafe(SNAG_JOINS)}
+        WHERE s.project_id = ${project_id}
           AND s.status IN ('pending_qa', 'resolved', 'verified', 'closed')
-          AND sr.audit_date >= $2
-          AND sr.audit_date <= $3
+          AND sr.audit_date >= ${fromStr}
+          AND sr.audit_date <= ${toStr}
         ORDER BY sr.audit_date ASC, s.snag_number ASC
-      `, [project_id, fromStr, toStr]) as RawSnagRow[];
+      ` as RawSnagRow[];
     } else {
-      snagRows = await sql.unsafe(`
-        SELECT ${SNAG_QUERY_FIELDS}
+      snagRows = await sql`
+        SELECT ${sql.unsafe(SNAG_QUERY_FIELDS)}
         FROM snags s
-        ${SNAG_JOINS}
+        ${sql.unsafe(SNAG_JOINS)}
         WHERE s.status IN ('pending_qa', 'resolved', 'verified', 'closed')
-          AND sr.audit_date >= $1
-          AND sr.audit_date <= $2
+          AND sr.audit_date >= ${fromStr}
+          AND sr.audit_date <= ${toStr}
         ORDER BY p.project_name ASC, sr.audit_date ASC, s.snag_number ASC
-      `, [fromStr, toStr]) as RawSnagRow[];
+      ` as RawSnagRow[];
     }
 
     const rows = await attachPhotosAndNotes(snagRows);
