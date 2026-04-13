@@ -198,7 +198,7 @@ export function validateDataset(
   });
 
   // Check for required fields
-  const requiredFields = getRequiredFields(dataType);
+  const _requiredFields = getRequiredFields(dataType);
   const mappedHeaders = mappings
     .filter(m => m.status === 'mapped')
     .map(m => m.excelHeader.toLowerCase());

@@ -142,7 +142,7 @@ const StepNode = memo(({ data, isSelected, isDragging }: {
   isSelected: boolean; 
   isDragging: boolean;
 }) => {
-  const { classes, icon: Icon } = getNodeStyle('step', isSelected, isDragging);
+  const { classes, icon: _Icon } = getNodeStyle('step', isSelected, isDragging);
   
   const getStepTypeIcon = (stepType: string) => {
     switch (stepType) {

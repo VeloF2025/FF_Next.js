@@ -10,7 +10,7 @@ import { join } from 'path';
 describe('No Direct Database Connections', () => {
   const srcDir = join(process.cwd(), 'src');
   const excludedDirs = ['api', 'lib/neon', 'tests'];
-  const excludedFiles = ['neonServiceAPI.ts'];
+  const _excludedFiles = ['neonServiceAPI.ts'];
   
   // Patterns that indicate direct database usage
   const dbPatterns = [

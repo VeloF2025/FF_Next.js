@@ -10,11 +10,10 @@ import type {
   ProjectWorkflowStats,
   WorkflowTabBadge
 } from '../types/portal.types';
-import type { 
-  WorkflowTemplate, 
+import type {
+  WorkflowTemplate,
   ProjectWorkflow,
   CreateProjectWorkflowRequest,
-  ProjectWorkflowQuery
 } from '../types/workflow.types';
 
 // Initial state

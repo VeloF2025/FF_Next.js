@@ -74,7 +74,7 @@ const generateId = () => Math.random().toString(36).substr(2, 9);
 // Create the store with middleware
 export const useStore = create<AppState>()(
   persist(
-    subscribeWithSelector((set, get) => ({
+    subscribeWithSelector((set, _get) => ({
       // Initial state
       selectedProject: null,
       projectFilters: {},

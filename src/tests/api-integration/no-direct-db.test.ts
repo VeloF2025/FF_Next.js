@@ -1,5 +1,4 @@
 import fs from 'fs';
-import path from 'path';
 import { glob } from 'glob';
 
 describe('No Direct Database Connections', () => {

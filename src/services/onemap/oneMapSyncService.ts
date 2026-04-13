@@ -270,7 +270,7 @@ export async function syncSite(
     logger.info(`Starting sync for ${site.site_name} (${site.site_code})`);
 
     // Get existing checksums for incremental sync
-    const existingChecksums = fullSync
+    const _existingChecksums = fullSync
       ? new Map<string, string>()
       : await getExistingChecksums(sql, site.id);
 

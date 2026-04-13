@@ -36,7 +36,7 @@ interface CheckoutModalProps {
   onSuccess: () => void;
 }
 
-export function CheckoutModal({ stockItemId, stockItemName, serials, onClose, onSuccess }: CheckoutModalProps) {
+export function CheckoutModal({ stockItemId: _stockItemId, stockItemName, serials, onClose, onSuccess }: CheckoutModalProps) {
   const availableSerials = serials.filter(s => s.status === 'available');
   const [selectedSerialId, setSelectedSerialId] = useState(availableSerials[0]?.id || '');
   const [projectId, setProjectId] = useState('');

@@ -134,7 +134,7 @@ export function subscribeToClients(callback: (clients: Client[]) => void): () =>
   // Subscribe to all client changes
   const unsubscribe = socketIOAdapter.subscribeToAll(
     'client',
-    async (event: RealtimeEvent) => {
+    async (_event: RealtimeEvent) => {
       // Re-fetch the entire list on any change
       try {
         const clients = await getAllClients();

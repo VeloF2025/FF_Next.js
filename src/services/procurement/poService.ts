@@ -512,7 +512,7 @@ class POService {
     return this.createPO(createRequest);
   }
 
-  async getPOsRequiringAction(userId: string): Promise<POListItem[]> {
+  async getPOsRequiringAction(_userId: string): Promise<POListItem[]> {
     const allPOs = await this.getAllPOs();
     return allPOs.filter(po =>
       po.approvalStatus === POApprovalStatus.PENDING ||
