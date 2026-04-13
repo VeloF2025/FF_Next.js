@@ -277,7 +277,7 @@ describe('Database Connection Utility', () => {
         .mockResolvedValueOnce([{}]); // ROLLBACK
 
       await expect(async () => {
-        await transaction(async (txn) => {
+        await transaction(async (_txn) => {
           throw new Error('Business logic error');
         });
       }).rejects.toThrow('Business logic error');

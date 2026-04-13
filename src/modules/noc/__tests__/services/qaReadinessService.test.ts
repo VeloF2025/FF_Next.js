@@ -12,7 +12,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as qaReadinessService from '../../services/qaReadinessService';
 import * as db from '../../utils/db';
 import * as validator from '../../utils/qaReadinessValidator';
-import type { QAReadinessCheck } from '../../types/verification';
 
 // Mock dependencies
 vi.mock('../../utils/db');

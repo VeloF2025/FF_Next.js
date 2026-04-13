@@ -307,7 +307,7 @@ describe('HandoverWizard Component', () => {
       // Arrange
       const validation = createMockGateValidation(true);
       let fetchCallCount = 0;
-      (global.fetch as Mock).mockImplementation((url: string) => {
+      (global.fetch as Mock).mockImplementation((_url: string) => {
         fetchCallCount++;
         // First call: gate validation
         if (fetchCallCount === 1) {

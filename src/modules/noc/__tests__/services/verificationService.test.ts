@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as verificationService from '../../services/verificationService';
 import * as db from '../../utils/db';
-import { VerificationStep, VerificationStepNumber, VerificationProgress } from '../../types/verification';
+import { VerificationStep, VerificationStepNumber } from '../../types/verification';
 import { TOTAL_VERIFICATION_STEPS, VERIFICATION_STEP_TEMPLATES } from '../../constants/verificationSteps';
 
 // Mock dependencies

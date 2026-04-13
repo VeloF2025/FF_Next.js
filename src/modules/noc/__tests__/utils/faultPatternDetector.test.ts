@@ -297,7 +297,7 @@ describe('Fault Pattern Detector (TDD)', () => {
       const poleNumber = 'POLE-TIME-001';
       const now = new Date();
       const within30Days = new Date(now.getTime() - 20 * 86400000); // 20 days ago
-      const beyond30Days = new Date(now.getTime() - 40 * 86400000); // 40 days ago
+      const _beyond30Days = new Date(now.getTime() - 40 * 86400000); // 40 days ago
 
       // Only tickets within 30 days should be returned by query
       const mockTickets = [

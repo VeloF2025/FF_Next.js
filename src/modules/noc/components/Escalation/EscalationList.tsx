@@ -38,7 +38,6 @@ import type {
   RepeatFaultEscalation,
   EscalationScopeType,
   EscalationStatus,
-  EscalationType,
 } from '../../types/escalation';
 
 interface EscalationListProps {
