@@ -395,7 +395,13 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
 
           {/* Verification Tab */}
           {activeTab === 'verification' && (
-            <VerificationChecklist ticketId={ticketId} editable groupByCategory />
+            <VerificationChecklist
+              ticketId={ticketId}
+              editable
+              groupByCategory
+              ticketStatus={ticket.status}
+              onStatusChange={(s) => { void handleStatusChange(s); }}
+            />
           )}
         </div>
 

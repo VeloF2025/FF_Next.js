@@ -22,9 +22,14 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useAuth } from '@/contexts/AuthContext';
 import { VerificationStep } from './VerificationStep';
 import { useVerification, useUpdateVerificationStep } from '../../hooks/useVerification';
+import { canApproveQA } from '@/modules/construction-qa/utils/snagPermissions';
 import { cn } from '@/lib/utils';
 import type { VerificationStepNumber } from '../../types/verification';
+import { TicketStatus } from '../../types/ticket';
 import { VERIFICATION_STEPS_BY_CATEGORY } from '../../constants/verificationSteps';
+
+/** Statuses where QA approve/reject actions are shown in the checklist */
+const QA_REVIEW_STATUSES = new Set<TicketStatus>([TicketStatus.PENDING_QA, TicketStatus.QA_IN_PROGRESS]);
 
 interface VerificationChecklistProps {
   /** Ticket ID to load verification steps for */
@@ -37,6 +42,10 @@ interface VerificationChecklistProps {
   compact?: boolean;
   /** Callback when all steps are complete */
   onAllComplete?: () => void;
+  /** Current ticket status — used to show QA approve/reject actions */
+  ticketStatus?: TicketStatus;
+  /** Called when a QA action moves the ticket to a new status */
+  onStatusChange?: (newStatus: string) => void;
 }
 
 /**
@@ -48,8 +57,16 @@ export function VerificationChecklist({
   groupByCategory = false,
   compact = false,
   onAllComplete,
+  ticketStatus,
+  onStatusChange,
 }: VerificationChecklistProps) {
-  const { user } = useAuth();
+  const { user, currentUser } = useAuth();
+  const isQAApprover = canApproveQA({
+    userId: currentUser?.id ?? null,
+    userRole: currentUser?.role ?? null,
+    ticketAssignedTo: null,
+  });
+  const showQAActions = !!ticketStatus && QA_REVIEW_STATUSES.has(ticketStatus) && isQAApprover;
   const { steps, progress, isLoading, isError, error } = useVerification(ticketId);
   const updateStep = useUpdateVerificationStep();
 
@@ -101,7 +118,7 @@ export function VerificationChecklist({
         ticketId,
         stepNumber,
         payload: {
-          photo_url: null,
+          photo_url: undefined,
           photo_verified: false,
         },
       });
@@ -231,6 +248,26 @@ export function VerificationChecklist({
             />
           ))}
         </ul>
+      )}
+
+      {/* QA approve / reject actions — only for QA approvers on pending_qa/qa_in_progress tickets */}
+      {showQAActions && onStatusChange && (
+        <div className="flex items-center gap-3 pt-2 border-t border-[var(--ff-border-light)]">
+          <button
+            type="button"
+            onClick={() => onStatusChange('in_progress')}
+            className="text-sm bg-zinc-700 hover:bg-zinc-600 text-zinc-200 px-4 py-2.5 rounded font-medium transition-colors"
+          >
+            ← Reject QA
+          </button>
+          <button
+            type="button"
+            onClick={() => onStatusChange('resolved')}
+            className="text-sm bg-green-800 hover:bg-green-700 text-green-100 px-4 py-2.5 rounded font-medium transition-colors"
+          >
+            Approve QA →
+          </button>
+        </div>
       )}
     </div>
   );
