@@ -13,7 +13,6 @@ import {
   CheckCircle,
   AlertTriangle,
   ArrowRight,
-  RotateCcw,
   Loader2,
   Check,
   ChevronDown,

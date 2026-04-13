@@ -12,7 +12,6 @@ import {
   Trash2,
   Calendar,
   User,
-  ChevronDown,
   AlertCircle,
   CheckCircle,
 } from 'lucide-react';

@@ -60,7 +60,7 @@ export function ContractorImport({
   isOpen,
   onClose,
   onComplete,
-  className = ''
+  className: _className = ''
 }: ContractorImportProps) {
   const [step, setStep] = useState<'upload' | 'preview' | 'importing' | 'results'>('upload');
   const [, setFile] = useState<File | null>(null);

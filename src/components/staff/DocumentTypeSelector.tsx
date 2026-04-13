@@ -60,7 +60,7 @@ export function DocumentTypeSelector({
   onSelect,
   existingDocumentTypes = [],
 }: DocumentTypeSelectorProps) {
-  const renderDocumentOption = (type: DocumentType, isOcrEnabled: boolean) => {
+  const renderDocumentOption = (type: DocumentType, _isOcrEnabled: boolean) => {
     const isSelected = selectedType === type;
     const isRequired = REQUIRED_DOCUMENTS.includes(type);
     const hasExisting = existingDocumentTypes.includes(type);

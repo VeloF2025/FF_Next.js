@@ -189,7 +189,7 @@ export function BOQStockView({ selectedProject }: BOQStockViewProps) {
 
     const totalRows = dataRows.length; // includes totals row
     const colCount = headers.length;
-    const lastDataRow = totalRows; // 1-indexed, header is row 1
+    // lastDataRow = totalRows (1-indexed, header is row 1)
 
     // Apply header styles
     for (let c = 0; c < colCount; c++) {

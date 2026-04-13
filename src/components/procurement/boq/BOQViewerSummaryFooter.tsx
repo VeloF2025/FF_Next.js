@@ -15,7 +15,6 @@ export default function BOQViewerSummaryFooter({
   filteredItems
 }: BOQViewerSummaryFooterProps) {
   // Calculate totals
-  const totalValue = boqData.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
   const filteredValue = filteredItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
   const percentage = boqData.items.length > 0 
     ? ((filteredItems.length / boqData.items.length) * 100).toFixed(1)

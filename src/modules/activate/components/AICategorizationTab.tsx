@@ -57,7 +57,7 @@ export function AICategorizationTab({
   // Track if new photos have been detected
   const [newPhotosDetected, setNewPhotosDetected] = useState(false);
   const [oneMapPhotoCount, setOneMapPhotoCount] = useState<number | null>(null);
-  const [isCheckingForNewPhotos, setIsCheckingForNewPhotos] = useState(false);
+  const [, setIsCheckingForNewPhotos] = useState(false);
 
   // Track expanded state for approved view
   const [showAllPhotos, setShowAllPhotos] = useState(false);
