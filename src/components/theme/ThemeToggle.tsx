@@ -250,7 +250,7 @@ export function ThemeToggle({
                   System
                 </div>
                 <div className="text-xs text-[var(--ff-text-tertiary)]">
-                  Use your system's theme preference
+                  Use your system&apos;s theme preference
                 </div>
               </div>
               {isSystemTheme && (

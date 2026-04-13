@@ -50,7 +50,7 @@ export function NeonSOWEmptyState() {
       <Database className="h-12 w-12 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
       <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">No SOW Data Found</h3>
       <p className="text-[var(--ff-text-secondary)] mb-4">
-        This project doesn't have any Scope of Work data in the Neon database yet.
+        This project doesn&apos;t have any Scope of Work data in the Neon database yet.
       </p>
       <div className="text-sm text-[var(--ff-text-tertiary)] space-y-1">
         <p>To import SOW data, use the import scripts:</p>

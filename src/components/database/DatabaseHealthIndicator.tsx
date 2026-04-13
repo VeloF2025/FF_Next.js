@@ -86,7 +86,7 @@ export const DatabaseHealthIndicator: React.FC<DatabaseHealthIndicatorProps> = (
             </h2>
 
             <p className="text-[var(--ff-text-secondary)] mb-6">
-              We're having trouble connecting to the database. This may be due to network issues or server maintenance.
+              We&apos;re having trouble connecting to the database. This may be due to network issues or server maintenance.
             </p>
 
             <div className="space-y-4">

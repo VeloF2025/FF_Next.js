@@ -140,7 +140,7 @@ export function Dashboard() {
               {getGreeting()}
             </h1>
             <p className="text-primary-100">
-              Welcome to your FibreFlow dashboard. Here's what's happening with your projects.
+              Welcome to your FibreFlow dashboard. Here&apos;s what&apos;s happening with your projects.
             </p>
           </div>
           <div className="hidden lg:flex items-center space-x-4 text-right">

@@ -24,7 +24,7 @@ export function MeetingsSidebar({ upcomingMeetings, meetings }: MeetingsSidebarP
           <div className="p-6">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Clock className="w-5 h-5 text-blue-500" />
-              Today's Schedule
+              Today&apos;s Schedule
             </h3>
             <div className="space-y-3">
               {upcomingMeetings.map((meeting) => (

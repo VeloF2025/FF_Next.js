@@ -283,7 +283,7 @@ export function RemindersTab() {
         {/* Reminders List */}
         {reminders.length === 0 ? (
           <div className="text-center py-8 text-[var(--ff-text-tertiary)]">
-            No pending reminders. Click "Add Reminder" to create one.
+            No pending reminders. Click &quot;Add Reminder&quot; to create one.
           </div>
         ) : (
           <div className="space-y-3">

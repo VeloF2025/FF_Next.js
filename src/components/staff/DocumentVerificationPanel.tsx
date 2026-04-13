@@ -404,7 +404,7 @@ export function DocumentVerificationPanel({
                 </div>
                 {validation.mismatches.filter(m => m.severity === 'critical').map((m, i) => (
                   <div key={i} className="ml-7 text-sm text-red-300 mb-1">
-                    <strong>{m.label}:</strong> Document shows "{m.documentValue || 'N/A'}" but staff record has "{m.recordValue || 'N/A'}"
+                    <strong>{m.label}:</strong> Document shows &quot;{m.documentValue || 'N/A'}&quot; but staff record has &quot;{m.recordValue || 'N/A'}&quot;
                   </div>
                 ))}
                 <p className="ml-7 text-xs text-red-400/80 mt-2">
@@ -424,7 +424,7 @@ export function DocumentVerificationPanel({
                 </div>
                 {validation.mismatches.filter(m => m.severity === 'warning').map((m, i) => (
                   <div key={i} className="ml-7 text-sm text-amber-300 mb-1">
-                    <strong>{m.label}:</strong> Document shows "{m.documentValue || 'N/A'}", record has "{m.recordValue || 'N/A'}"
+                    <strong>{m.label}:</strong> Document shows &quot;{m.documentValue || 'N/A'}&quot;, record has &quot;{m.recordValue || 'N/A'}&quot;
                   </div>
                 ))}
               </div>

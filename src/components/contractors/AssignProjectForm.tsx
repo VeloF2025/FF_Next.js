@@ -241,7 +241,7 @@ export function AssignProjectForm({ contractorId, onSuccess, onCancel }: AssignP
               max="100"
               disabled={submitting}
             />
-            <p className="text-xs text-muted-foreground mt-1">0-100% of contractor's capacity</p>
+            <p className="text-xs text-muted-foreground mt-1">0-100% of contractor&apos;s capacity</p>
           </div>
 
           <div>
