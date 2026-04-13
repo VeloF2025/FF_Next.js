@@ -13,6 +13,10 @@ import {
 import { UserPermissionsModal } from './UserPermissionsModal';
 import { ModulesAccessTab } from './ModulesAccessTab';
 import { formatDisplayDate } from '@/utils/dateFormat';
+import { useAuth } from '@/contexts/AuthContext';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('AccessControlTab');
 
 // Custom Toggle Switch Component
 function ToggleSwitch({
@@ -114,6 +118,9 @@ type ActionFlags = { view: boolean; create: boolean; edit: boolean; delete: bool
 type SubTab = 'users' | 'roles' | 'permissions' | 'modules';
 
 export function AccessControlTab() {
+  const { currentUser } = useAuth();
+  const canImpersonate = (currentUser?.permissions as unknown as string[] | undefined)?.includes('can_impersonate') ?? false;
+
   const [subTab, setSubTab] = useState<SubTab>('users');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -128,6 +135,7 @@ export function AccessControlTab() {
   const [showFiltersPanel, setShowFiltersPanel] = useState(false);
   const [provisioning, setProvisioning] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [impersonatingUserId, setImpersonatingUserId] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Keyboard shortcut for search (Ctrl+K)
@@ -455,6 +463,30 @@ export function AccessControlTab() {
       setError('Failed to grant access');
     } finally {
       setUpdatingUserId(null);
+    }
+  };
+
+  // Impersonate user — opens a new tab with a short-lived impersonation session
+  const impersonateUser = async (userId: string) => {
+    try {
+      setImpersonatingUserId(userId);
+      const res = await fetch('/api/admin/impersonate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId: userId }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data?.error?.message || 'Failed to create impersonation session');
+        return;
+      }
+      const data = await res.json();
+      window.open(data.data.url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setError('Failed to create impersonation session');
+      log.error('Impersonation failed', { userId, err });
+    } finally {
+      setImpersonatingUserId(null);
     }
   };
 
@@ -1019,6 +1051,24 @@ export function AccessControlTab() {
                         <Settings className="w-3.5 h-3.5 inline mr-1" />
                         Permissions
                       </button>
+                      {/* Impersonate — only for users with can_impersonate permission, hidden on super_admin rows */}
+                      {canImpersonate && user.role !== 'super_admin' && (
+                        <button
+                          onClick={() => impersonateUser(user.id)}
+                          disabled={impersonatingUserId === user.id}
+                          className="text-xs px-2 py-1.5 rounded bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 disabled:opacity-50"
+                          title={`Impersonate ${user.fullName}`}
+                        >
+                          {impersonatingUserId === user.id ? (
+                            <Loader2 className="w-3.5 h-3.5 inline animate-spin" />
+                          ) : (
+                            <>
+                              <UserCog className="w-3.5 h-3.5 inline mr-1" />
+                              Impersonate
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
