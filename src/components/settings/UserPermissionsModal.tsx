@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  X, Loader2, Shield, Plus, Trash2, Check, AlertCircle,
+  X, Loader2, Shield, Plus, Check, AlertCircle,
   ChevronRight, ChevronDown, Search, Save, RotateCcw, Download, Upload
 } from 'lucide-react';
 
@@ -546,7 +546,7 @@ export function UserPermissionsModal({
                   });
 
                   // Check if module has any enabled permissions locally
-                  const moduleEnabled = allPerms.some(p => {
+                  const _moduleEnabled = allPerms.some(p => {
                     const local = localActions.get(p.key);
                     return local && (local.view || local.create || local.edit || local.delete);
                   });

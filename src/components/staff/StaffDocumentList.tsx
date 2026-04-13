@@ -26,11 +26,9 @@ import {
 } from 'lucide-react';
 import {
   StaffDocument,
-  DocumentType,
   VerificationStatus,
   DOCUMENT_TYPE_LABELS,
   VERIFICATION_STATUS_LABELS,
-  VERIFICATION_STATUS_COLORS,
   DOCUMENT_CATEGORIES,
   DOCUMENT_CATEGORY_LABELS,
 } from '@/types/staff-document.types';
@@ -372,7 +370,6 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
 
   // Get status badge
   const getStatusBadge = (status: VerificationStatus) => {
-    const color = VERIFICATION_STATUS_COLORS[status];
     const label = VERIFICATION_STATUS_LABELS[status];
 
     const colorClasses: Record<string, string> = {

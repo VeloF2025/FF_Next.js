@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Upload, FileText, AlertCircle, CheckCircle, Clock, Zap } from 'lucide-react';
+import { Upload, AlertCircle, CheckCircle, Clock, Zap } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
 
 interface ImportResult {
@@ -20,7 +20,7 @@ interface FileAnalysis {
 export const ImportWizard: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [analysis, setAnalysis] = useState<FileAnalysis | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [_isUploading, setIsUploading] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [currentStep, setCurrentStep] = useState<'select' | 'analyze' | 'confirm' | 'import' | 'complete'>('select');
 

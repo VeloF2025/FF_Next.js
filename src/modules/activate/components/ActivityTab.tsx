@@ -340,7 +340,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
               <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-secondary" />
 
               {/* Timeline Events */}
-              {timeline.map((entry, index) => {
+              {timeline.map((entry, _index) => {
                 const meta = entry.metadata as Record<string, unknown> | undefined;
                 return (
                 <div key={entry.id} className="relative pl-10 pb-6">
@@ -680,7 +680,6 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
               <h4 className="font-medium text-foreground">Change History</h4>
               {serialHistory.map((entry: SerialHistoryEntry) => {
                 const safeEntry = entry as SerialHistoryEntry;
-                const meta = safeEntry.metadata as Record<string, unknown>;
                 const isOnt = safeEntry.change_type === 'ont_serial';
                 const sourceLabel: Record<string, string> = {
                   onemap_sync: '1Map Sync',

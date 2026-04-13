@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Search, Link2, CheckCircle, AlertCircle, Loader2,
-  X, ChevronDown, Package, ArrowRight, Save,
+  X, Package, ArrowRight, Save,
 } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
 
@@ -36,7 +36,7 @@ interface StockItemMapperProps {
   onMappingComplete?: () => void;
 }
 
-export default function StockItemMapper({ boqId, items, onMappingComplete }: StockItemMapperProps) {
+export default function StockItemMapper({ boqId: _boqId, items, onMappingComplete }: StockItemMapperProps) {
   const unmatchedItems = items.filter(i => !i.stockItemId);
   const matchedItems = items.filter(i => i.stockItemId);
 

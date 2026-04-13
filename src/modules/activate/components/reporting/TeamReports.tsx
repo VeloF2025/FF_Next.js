@@ -13,8 +13,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Trophy, Users, CheckCircle, Medal } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { Trophy, Users, CheckCircle } from 'lucide-react';
 import type {
   ReportFilters,
   TeamPerformanceResponse,

@@ -4,10 +4,10 @@ import {
   projectSection,
   nocSection,
   peopleSection,
-  clientsSection,
   procurementSection,
   // accountingSection,   // DECOMMISSIONED 2026-04-01 — module disabled, routes blocked in middleware
-  contractorsSection,
+  // clientsSection,      // merged into projectSection
+  // contractorsSection,  // merged into projectSection
   assetsSection,
   fleetSection,
   analyticsSection,

@@ -13,7 +13,7 @@ interface SOWStatisticsProps {
   totalDrops: number;  // Actual count from API (not limited array)
 }
 
-export function SOWStatistics({ poles, drops, totalPoles, totalDrops }: SOWStatisticsProps) {
+export function SOWStatistics({ poles: _poles, drops: _drops, totalPoles, totalDrops }: SOWStatisticsProps) {
   if (totalPoles === 0) {
     return null;
   }

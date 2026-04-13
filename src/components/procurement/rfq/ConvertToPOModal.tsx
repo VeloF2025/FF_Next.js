@@ -66,10 +66,10 @@ export function ConvertToPOModal({
   rfqId,
   rfqNumber,
   rfqTitle,
-  projectId,
+  projectId: _projectId,
   suppliers,
   items,
-  totalValue,
+  totalValue: _totalValue,
   onSuccess,
 }: ConvertToPOModalProps) {
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');

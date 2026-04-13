@@ -74,11 +74,11 @@ interface ReviewTabProps {
 // ============================================================================
 
 export function ReviewTab({
-  dropNumber,
+  dropNumber: _dropNumber,
   photos,
   qaResults,
   humanOverrides = {},
-  userId,
+  userId: _userId,
   onStepReview,
   onReviewComplete,
   isLocked = false,

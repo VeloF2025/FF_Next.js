@@ -51,8 +51,8 @@ interface ExtractDataResult {
 
 export function DataValidationPhase({
   dropNumber,
-  state,
-  onemapOntSerial,
+  state: _state,
+  onemapOntSerial: _onemapOntSerial,
   onComplete,
   onBack,
 }: DataValidationPhaseProps) {

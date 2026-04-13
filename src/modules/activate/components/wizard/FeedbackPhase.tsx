@@ -15,9 +15,7 @@ import {
   getTechnicianIssueDescription,
   detectSwappedSerials,
   formatSerialFeedback,
-  maskSerial,
   getSerialStatus,
-  type TechnicianIssue,
 } from '../../services/qaAutoFailService';
 import { STEP_LABELS } from '../../utils/stepMapper';
 import { Button } from '@/components/ui/button';

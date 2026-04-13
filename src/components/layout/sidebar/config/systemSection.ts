@@ -7,10 +7,6 @@ import { Settings, HeartPulse, Server, Database, Brain, Rocket, Grid3x3, TablePr
 import type { NavSection } from './types';
 import { Permission } from '@/types/auth.types';
 
-// Server monitoring URLs (Velocity server)
-const XYOPS_URL = 'http://100.96.203.105:5522';
-const GRAFANA_URL = 'http://100.96.203.105:3030';
-
 export const systemSection: NavSection = {
   section: 'SYSTEM',
   sectionId: 'system',
@@ -56,9 +52,9 @@ export const systemSection: NavSection = {
       permissions: [Permission.SYSTEM_ADMIN],
       rbacKey: 'system.vlm-learning',
     },
-    // Hidden for now - uncomment when ready
+    // Hidden for now - uncomment when ready (add XYOPS_URL/GRAFANA_URL consts back)
     // {
-    //   to: XYOPS_URL,
+    //   to: 'http://100.96.203.105:5522',
     //   icon: Activity,
     //   label: 'xyOps Monitor',
     //   shortLabel: 'xyOps',
@@ -67,7 +63,7 @@ export const systemSection: NavSection = {
     //   external: true,
     // },
     // {
-    //   to: GRAFANA_URL,
+    //   to: 'http://100.96.203.105:3030',
     //   icon: BarChart3,
     //   label: 'Grafana',
     //   shortLabel: 'Grafana',

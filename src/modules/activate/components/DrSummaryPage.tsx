@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
+// import { useRouter } from 'next/router'; // unused
 import { log } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
 import type { DRSummary, DRState } from '../types/summary.types';
@@ -326,7 +326,7 @@ export function DrSummaryPage({
             </Button>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-2">
-            {summary.photoPreview.map((photo, idx) => (
+            {summary.photoPreview.map((photo, _idx) => (
               <div
                 key={photo.filename}
                 className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-secondary relative"

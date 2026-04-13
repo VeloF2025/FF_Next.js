@@ -8,7 +8,6 @@
 
 import {
   type DocumentTypeConfig,
-  type FieldMapping,
   type ValidationRule,
   OcrEntityType,
 } from '@/types/ocr.types';
@@ -56,7 +55,7 @@ export function validateSAID(id: string): { valid: boolean; message: string } {
   }
 
   // Validate date portion
-  const year = parseInt(cleanId.substring(0, 2), 10);
+  const _year = parseInt(cleanId.substring(0, 2), 10);
   const month = parseInt(cleanId.substring(2, 4), 10);
   const day = parseInt(cleanId.substring(4, 6), 10);
 
