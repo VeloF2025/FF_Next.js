@@ -14,6 +14,7 @@ import {
   XCircle,
   AlertTriangle,
   ExternalLink,
+  Shield,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
