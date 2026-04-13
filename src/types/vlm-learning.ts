@@ -29,6 +29,7 @@ export type VlmAnalysisType =
   | 'dr_qa_validation'
   | 'green_lights_check'
   | 'wa_photo_serial'
+  | 'wa_serial_recheck'
   // Fleet module
   | 'odometer'
   | 'license_plate'
@@ -70,6 +71,7 @@ export const ANALYSIS_TYPES_BY_MODULE: Record<VlmModule, VlmAnalysisType[]> = {
     'dr_qa_validation',
     'green_lights_check',
     'wa_photo_serial',
+    'wa_serial_recheck',
   ],
   fleet: ['odometer', 'license_plate', 'fuel_gauge', 'fuel_receipt', 'license_disk'],
   procurement: ['quote_supplier', 'quote_line_item', 'quote_totals', 'po_header', 'po_quantity', 'po_pricing'],
