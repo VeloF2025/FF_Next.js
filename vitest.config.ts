@@ -27,6 +27,7 @@ export default defineConfig({
       { find: '@/lib/db-pool', replacement: path.resolve(__dirname, './src/lib/db-pool') },
       { find: '@/lib/vlm', replacement: path.resolve(__dirname, './src/lib/vlm') },
       { find: '@/lib/arcjet', replacement: path.resolve(__dirname, './src/lib/arcjet') },
+      { find: '@/lib/dbCircuitBreaker', replacement: path.resolve(__dirname, './src/lib/dbCircuitBreaker') },
       { find: '@/lib/auth', replacement: path.resolve(__dirname, './src/lib/auth') },
       { find: '@/lib/permissions', replacement: path.resolve(__dirname, './src/lib/permissions') },
       { find: '@/lib/logger', replacement: path.resolve(__dirname, './src/lib/logger') },
