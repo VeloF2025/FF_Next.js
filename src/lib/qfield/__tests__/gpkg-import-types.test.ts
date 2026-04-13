@@ -12,8 +12,6 @@ import type {
   ZoneBoundaryProperties,
   PonBoundaryProperties,
   PopProperties,
-  GeoJSONPoint,
-  GeoJSONLineString,
 } from '../gpkg-import-types';
 
 /**
@@ -39,7 +37,7 @@ const testPoleProperties: PoleProperties = {
 /**
  * Test: PoleFeature with full GeoJSON
  */
-const testPoleFeature: PoleFeature = {
+const _testPoleFeature: PoleFeature = {
   type: 'Feature',
   geometry: {
     type: 'Point',

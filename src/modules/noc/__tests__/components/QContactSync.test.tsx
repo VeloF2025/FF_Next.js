@@ -19,7 +19,6 @@ import { SyncAuditLog } from '../../components/QContact/SyncAuditLog';
 import type {
   SyncStatusOverview,
   QContactSyncLog,
-  FullSyncResult,
   SyncLogListResponse
 } from '../../types/qcontact';
 
@@ -61,7 +60,7 @@ vi.mock('../../hooks/useQContactSync', () => ({
 }));
 
 // Import the mocked hook for modification in tests
-import { useQContactSyncStatus, useQContactSyncLogs, useTriggerQContactSync } from '../../hooks/useQContactSync';
+import { useQContactSyncStatus } from '../../hooks/useQContactSync';
 
 // Helper to create wrapper with QueryClient
 function createWrapper() {

@@ -21,9 +21,6 @@ import {
 import {
   validateOntSerial,
   validateUpsSerial,
-  looksLikeOntSerial,
-  looksLikeGizzuSerial,
-  detectSwappedSerials,
   fuzzySerialMatch,
 } from './serialValidator';
 

@@ -11,10 +11,7 @@ import type {
   CheckRecord,
   CheckPhotoType,
   CheckType,
-  VlmPhotoResult,
   VlmAnalysisType,
-  DAILY_REQUIRED_PHOTOS,
-  WEEKLY_REQUIRED_PHOTOS,
 } from '../../types/check-in.types';
 import { offlineStorage } from '../utils/offlineStorage';
 import { log } from '@/lib/logger';

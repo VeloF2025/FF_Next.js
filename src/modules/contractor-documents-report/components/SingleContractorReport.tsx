@@ -18,7 +18,6 @@ import {
   DocumentStatusTable,
   CompletionProgressBar,
   ExpiryAlert,
-  DocumentStatusBadge,
 } from './index';
 import type { DocumentInfo } from '../types/documentReport.types';
 
@@ -32,7 +31,7 @@ export default function SingleContractorReport({
   showBackButton = false,
 }: SingleContractorReportProps) {
   const { data, loading, error } = useContractorDocumentReport(contractorId);
-  const [viewingDocument, setViewingDocument] = useState<DocumentInfo | null>(null);
+  const [_viewingDocument, _setViewingDocument] = useState<DocumentInfo | null>(null);
 
   if (loading) {
     return (

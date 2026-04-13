@@ -20,15 +20,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   BarChart3,
-  Users,
   TrendingUp,
   Target,
   RefreshCw,
-  Calendar,
   Award,
   AlertTriangle,
   CheckCircle,
-  XCircle,
 } from 'lucide-react';
 import { useKPIDashboardData } from '@/hooks/useDashboardData';
 import { TrendChart, FunnelChart, GaugeChart } from '@/components/ui/charts';

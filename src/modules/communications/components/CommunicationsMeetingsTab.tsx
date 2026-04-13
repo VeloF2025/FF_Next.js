@@ -34,8 +34,8 @@ type SourceFilter = 'all' | 'teams' | 'fireflies';
 
 export function CommunicationsMeetingsTab({
   meetings,
-  getStatusColor,
-  onRefresh,
+  getStatusColor: _getStatusColor,
+  onRefresh: _onRefresh,
   totalMeetings,
   hasMore,
   isLoadingMore,
@@ -133,7 +133,7 @@ export function CommunicationsMeetingsTab({
   };
 
   // Handle delete (no-op for now since Fireflies meetings are read-only)
-  const handleDeleteMeeting = (meetingId: string) => {
+  const handleDeleteMeeting = (_meetingId: string) => {
     // Future: implement delete functionality
   };
 

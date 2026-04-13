@@ -15,7 +15,6 @@ import type {
   AnomalyDetectionResult,
   DetectedAnomaly,
   AnomalyThresholds,
-  AnomalyType,
   AnomalySeverity,
   AnomalyStatus,
   FuelTransactionRow,
@@ -732,7 +731,7 @@ export async function getFuelAnomalies(options: {
   limit?: number;
   offset?: number;
 } = {}): Promise<{ anomalies: FuelAnomalyWithVehicle[]; total: number }> {
-  const { vehicleId, status, severity, startDate, endDate, limit = 50, offset = 0 } = options;
+  const { vehicleId, status, severity, startDate: _startDate, endDate: _endDate, limit = 50, offset = 0 } = options;
 
   try {
     let rows: FuelAnomalyRow[];

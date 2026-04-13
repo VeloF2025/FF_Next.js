@@ -5,17 +5,14 @@
 
 import type {
     DRSession,
-    DRDetails,
     DRStepPhoto,
     PhotoEvaluation,
     DREvaluationResult,
     VLMStatus,
-    DR_PHOTO_STEPS,
 } from '../types';
 
 // Use local API proxy to avoid CORS issues
 const API_BASE = '/api/dr-dashboard';
-const BACKEND_BASE = 'http://100.96.203.105:8082/api/v1/dr-dashboard';
 const DEFAULT_PROJECT = 'VPS';
 
 /**

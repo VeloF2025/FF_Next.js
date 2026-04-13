@@ -5,12 +5,9 @@
 
 import {
   Users,
-  UserPlus,
   Bell,
   Upload,
-  BarChart3,
   Cake,
-  FileWarning,
   ShieldCheck,
   Building2,
 } from 'lucide-react';
