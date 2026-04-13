@@ -6,7 +6,6 @@
 import { createLogger } from '@/lib/logger';
 import type {
   StaffDocument,
-  StaffDocumentCreate,
   StaffDocumentUpdate,
   ComplianceStatus,
 } from '@/types/staff-document.types';

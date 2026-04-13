@@ -14,7 +14,7 @@
 
 import { neon, NeonQueryFunction } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
-import { OdooClient, OdooAttachment } from '../odooClient';
+import { OdooClient } from '../odooClient';
 import { VFStorageService } from '@/services/vfStorageAdapter';
 
 const logger = createLogger('odooAttachmentSync');

@@ -1,7 +1,7 @@
 // ============= PO Form Hook =============
 
 import { useState, useMemo } from 'react';
-import type { POFormData, POTotals, POCreateModalProps } from './types';
+import type { POFormData, POTotals } from './types';
 import type { CreatePOItemRequest, CreatePORequest } from '../../../../../types/procurement/po.types';
 
 interface UsePOFormProps {

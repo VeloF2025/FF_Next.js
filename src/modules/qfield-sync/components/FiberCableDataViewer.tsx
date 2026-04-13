@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Cable, MapPin, Activity, CheckCircle, Clock, AlertCircle, RefreshCw, Download } from 'lucide-react';
+import { Cable, MapPin, CheckCircle, Clock, AlertCircle, RefreshCw, Download } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 

@@ -11,7 +11,6 @@ import { Step6QuoteAward } from './steps/Step6QuoteAward';
 import { Step7CreatePO } from './steps/Step7CreatePO';
 import { Step6Receive } from './steps/Step6Receive';
 import { Step7PaymentRequest } from './steps/Step7PaymentRequest';
-import { Step8PaymentApproval } from './steps/Step8PaymentApproval';
 import { Step9Complete } from './steps/Step9Complete';
 import { log } from '@/lib/logger';
 

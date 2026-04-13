@@ -13,7 +13,6 @@ import { TextProcessor } from '@/lib/utils/catalog/textProcessor';
 import type {
   FiberBudgetCategoryCode,
   BOQCategoryMapping,
-  FIBER_BUDGET_CATEGORIES,
 } from '@/types/procurement/material-catalog.types';
 
 // Default category when no match found

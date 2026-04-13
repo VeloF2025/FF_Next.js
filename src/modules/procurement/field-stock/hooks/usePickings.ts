@@ -6,7 +6,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import type {
   StockPicking,
-  StockPickingLine,
   CreatePickingInput,
   SignPickingInput,
   PickingFilters,

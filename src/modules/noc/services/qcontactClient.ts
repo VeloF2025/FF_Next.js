@@ -49,12 +49,6 @@ export enum QContactErrorCode {
  */
 const RETRYABLE_STATUS_CODES = [500, 502, 503, 504, 429];
 
-/**
- * HTTP status codes that should NOT trigger retry
- * 🟢 WORKING: Defines which errors are permanent and non-retryable
- */
-const NON_RETRYABLE_STATUS_CODES = [400, 401, 403, 404, 422];
-
 // ============================================================================
 // Error Classes
 // ============================================================================

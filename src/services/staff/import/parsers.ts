@@ -3,7 +3,7 @@
  * Utility functions for parsing import data
  */
 
-import { Skill, ContractType } from '@/types/staff/enums.types';
+import { Skill } from '@/types/staff/enums.types';
 import { SAContractType } from '@/types/staff/compliance.types';
 
 /**

@@ -9,7 +9,6 @@ import { useState } from 'react';
 import { X, Package, CheckCircle2, AlertCircle, Wrench, Trash2 } from 'lucide-react';
 import type {
   StockReturn,
-  StockReturnLine,
   SerialCondition,
   Disposition,
   ReturnLineDisposition

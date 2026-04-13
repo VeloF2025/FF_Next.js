@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import type { CustomerInvoice, CustomerInvoiceItem } from '@/types/finance';
+import type { CustomerInvoice } from '@/types/finance';
 import { log } from '@/lib/logger';
 import { formatDisplayDate } from '@/utils/dateFormat';
 

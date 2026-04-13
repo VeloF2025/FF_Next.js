@@ -3,7 +3,7 @@
  * Displays synchronization statistics
  */
 
-import { Activity, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Activity, Clock, CheckCircle } from 'lucide-react';
 import { SyncStats } from '../types/qfield-sync.types';
 
 interface SyncStatsCardProps {

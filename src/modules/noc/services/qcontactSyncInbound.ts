@@ -449,7 +449,7 @@ export async function syncSingleInboundTicket(
         RETURNING id, status
       `;
 
-      const updateResult = await queryOne<{ id: string; status: string }>(
+      await queryOne<{ id: string; status: string }>(
         updateSql,
         [
           statusToSet, mappedType,

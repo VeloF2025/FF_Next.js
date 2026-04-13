@@ -16,7 +16,7 @@ interface CustomerInvoiceListProps {
   onRefresh: () => void;
 }
 
-export function CustomerInvoiceList({ projectId, invoices, summary, onRefresh }: CustomerInvoiceListProps) {
+export function CustomerInvoiceList({ projectId, invoices, summary: _summary, onRefresh }: CustomerInvoiceListProps) {
   const [selectedInvoice, setSelectedInvoice] = useState<CustomerInvoice | null>(null);
 
   const formatDate = (dateStr: string | undefined) => formatDisplayDate(dateStr, '-');
