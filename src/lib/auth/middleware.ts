@@ -125,7 +125,8 @@ async function getUserAndValidateSession(
       u.is_active,
       u.profile_picture,
       u.department,
-      s.id as session_id
+      s.id as session_id,
+      s.is_impersonation
     FROM users u
     INNER JOIN user_sessions s ON s.user_id = u.id
     WHERE u.id = ${userId}
@@ -154,6 +155,7 @@ async function getUserAndValidateSession(
     isActive: row.is_active as boolean,
     profilePicture: row.profile_picture as string | undefined,
     department: row.department as string | undefined,
+    isImpersonation: (row.is_impersonation as boolean) || undefined,
   };
 }
 

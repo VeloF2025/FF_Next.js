@@ -19,20 +19,39 @@ const getJWTSecret = (): Uint8Array => {
 const ACCESS_TOKEN_EXPIRY = '24h'; // 24 hours
 
 /**
- * Sign a JWT token for a user
+ * Parameters for creating an impersonation JWT.
+ */
+export interface ImpersonationParams {
+  /** Must be true to flag this token as an impersonation session */
+  isImpersonation: boolean;
+  /** User ID of the admin who initiated the impersonation */
+  impersonatedBy: string;
+}
+
+/**
+ * Sign a JWT token for a user.
+ * Optionally accepts impersonation params to embed impersonation claims.
  */
 export async function signToken(
   user: AuthUser,
   sessionId: string,
-  expiresIn: string = ACCESS_TOKEN_EXPIRY
+  expiresIn: string = ACCESS_TOKEN_EXPIRY,
+  impersonation?: ImpersonationParams
 ): Promise<string> {
   const secret = getJWTSecret();
 
-  const token = await new SignJWT({
+  const claims: Record<string, unknown> = {
     email: user.email,
     role: user.role,
     sessionId,
-  })
+  };
+
+  if (impersonation) {
+    claims.isImpersonation = impersonation.isImpersonation;
+    claims.impersonatedBy = impersonation.impersonatedBy;
+  }
+
+  const token = await new SignJWT(claims)
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(user.id)
     .setIssuedAt()
@@ -55,7 +74,7 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
       return null;
     }
 
-    return {
+    const result: JWTPayload = {
       sub: payload.sub as string,
       email: payload.email as string,
       role: payload.role as AuthRole,
@@ -64,6 +83,13 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
       iat: payload.iat || 0,
       exp: payload.exp || 0,
     };
+
+    if (payload.isImpersonation === true) {
+      result.isImpersonation = true;
+      result.impersonatedBy = payload.impersonatedBy as string;
+    }
+
+    return result;
   } catch (error) {
     // Token invalid or expired
     return null;

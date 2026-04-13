@@ -52,6 +52,45 @@ export async function createSession(
 }
 
 /**
+ * Create an impersonation session for a target user.
+ * Sessions expire in 1 hour and are flagged with is_impersonation=true.
+ * Follows the same pattern as createSession.
+ */
+export async function createImpersonationSession(
+  targetUserId: string,
+  token: string,
+  impersonatedBy: string,
+  ipAddress?: string,
+  userAgent?: string
+): Promise<Session> {
+  const sessionId = uuidv4();
+  const tokenHash = hashToken(token);
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  await sql`
+    INSERT INTO user_sessions (
+      id, user_id, token_hash, expires_at, ip_address, user_agent,
+      is_impersonation, impersonated_by
+    )
+    VALUES (
+      ${sessionId}, ${targetUserId}, ${tokenHash}, ${expiresAt.toISOString()},
+      ${ipAddress || null}, ${userAgent || null},
+      TRUE, ${impersonatedBy}
+    )
+  `;
+
+  return {
+    id: sessionId,
+    userId: targetUserId,
+    tokenHash,
+    expiresAt,
+    createdAt: new Date(),
+    ipAddress,
+    userAgent,
+  };
+}
+
+/**
  * Validate a session exists and is not expired
  */
 export async function validateSession(

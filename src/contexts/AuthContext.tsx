@@ -71,6 +71,7 @@ function mapApiUser(apiUser: {
   role: string;
   permissions: string[];
   profilePicture?: string | null;
+  isImpersonation?: boolean;
 }): { user: User; authUser: AuthUser } {
   const role = mapRole(apiUser.role);
   const permissions = apiUser.permissions.includes('all')
@@ -80,7 +81,7 @@ function mapApiUser(apiUser: {
   // Build display name from firstName/lastName or fall back to name or email
   const displayName = apiUser.firstName && apiUser.lastName
     ? `${apiUser.firstName} ${apiUser.lastName}`
-    : apiUser.name || apiUser.email.split('@')[0];
+    : apiUser.name ?? apiUser.email;
 
   const user: User = {
     id: apiUser.id,
@@ -92,6 +93,7 @@ function mapApiUser(apiUser: {
     isEmailVerified: true,
     lastLoginAt: new Date(),
     createdAt: new Date(),
+    isImpersonation: apiUser.isImpersonation ?? false,
   };
 
   const authUser: AuthUser = {
