@@ -212,7 +212,7 @@ export interface TimelineEntry {
   content: string;
   author_name?: string;
   author_id?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   icon?: string; // Icon identifier for UI
   color?: string; // Color for UI
 }

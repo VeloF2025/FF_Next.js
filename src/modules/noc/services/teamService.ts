@@ -39,7 +39,7 @@ export async function listTeams(filters: TeamFilters = {}): Promise<Team[]> {
 
   try {
     const whereClauses: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
     let paramCounter = 1;
 
     if (filters.team_type) {
@@ -190,7 +190,7 @@ export async function updateTeam(id: string, payload: UpdateTeamPayload): Promis
 
   try {
     const updateFields: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
     let paramCounter = 1;
 
     const fieldMap: Record<string, string> = {

@@ -5,9 +5,22 @@
 
 import { UseFormRegister, FieldErrors } from 'react-hook-form';
 
+// MeetingFormValues covers the fields used in this component.
+// Using a specific record type instead of `any` for form field names.
+type MeetingFormValues = {
+  title: string;
+  type: string;
+  status: string;
+  date: string;
+  time: string;
+  duration?: string;
+  organizer?: string;
+  [key: string]: unknown;
+};
+
 interface BasicMeetingFieldsProps {
-  register: UseFormRegister<any>;
-  errors: FieldErrors<any>;
+  register: UseFormRegister<MeetingFormValues>;
+  errors: FieldErrors<MeetingFormValues>;
 }
 
 export function BasicMeetingFields({ register, errors }: BasicMeetingFieldsProps) {

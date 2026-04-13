@@ -304,8 +304,8 @@ async function createSyncLog(
   ticketId: string | null,
   syncType: SyncType,
   status: SyncStatus,
-  requestPayload: Record<string, any> | null,
-  responsePayload: Record<string, any> | null,
+  requestPayload: Record<string, unknown> | object | null,
+  responsePayload: Record<string, unknown> | object | null,
   errorMessage: string | null
 ): Promise<string> {
   const sql = `

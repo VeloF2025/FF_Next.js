@@ -18,8 +18,8 @@ const PRIORITY_STYLES: Record<string, { bg: string; text: string }> = {
 interface TaskBoardTabProps {
   tasks: MCTask[];
   agents: MCAgent[];
-  onCreateTask: (task: { title: string; description?: string; assigned_to?: string; priority?: string }) => Promise<any>;
-  onUpdateTask: (id: number, updates: Partial<MCTask>) => Promise<any>;
+  onCreateTask: (task: { title: string; description?: string; assigned_to?: string; priority?: string }) => Promise<unknown>;
+  onUpdateTask: (id: number, updates: Partial<MCTask>) => Promise<unknown>;
   onDeleteTask: (id: number) => Promise<boolean>;
 }
 

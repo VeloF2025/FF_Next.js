@@ -10,7 +10,8 @@ import {
   AlertTriangle,
   Plus,
   BarChart3,
-  Settings
+  Settings,
+  type LucideIcon
 } from 'lucide-react';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { QuickActionCard } from '@/components/dashboard/QuickActionCard';
@@ -24,7 +25,7 @@ interface StatCardData {
   subtitle: string;
   value: string | number;
   subValue: string;
-  icon: any;
+  icon: LucideIcon;
   color: string;
   route?: string;
 }
@@ -32,7 +33,7 @@ interface StatCardData {
 interface QuickActionData {
   title: string;
   description: string;
-  icon: any;
+  icon: LucideIcon;
   color: string;
   route?: string;
 }

@@ -139,7 +139,7 @@ class CSSPerformanceMonitor {
     }
   }
 
-  private recordMetric(key: string, data: any): void {
+  private recordMetric(key: string, data: Partial<CSSMetrics> & { lastUpdated?: number }): void {
     const existing = this.metrics.get(key) || {
       loadTime: 0,
       renderTime: 0,
@@ -238,7 +238,7 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   cssMonitor = new CSSPerformanceMonitor();
   
   // Add to window for debugging
-  (window as any).__cssPerformanceMonitor = cssMonitor;
+  (window as Window & { __cssPerformanceMonitor?: CSSPerformanceMonitor }).__cssPerformanceMonitor = cssMonitor;
   
   // Auto-report after 5 seconds
   setTimeout(() => {

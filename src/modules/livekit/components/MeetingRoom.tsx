@@ -89,8 +89,8 @@ export function MeetingRoom({ roomName, token, serverUrl, onDisconnect }: Meetin
             } else {
                 setRecordingError(data.error);
             }
-        } catch (error: any) {
-            setRecordingError(error.message);
+        } catch (error: unknown) {
+            setRecordingError(error instanceof Error ? error.message : String(error));
         }
     };
 
@@ -112,8 +112,8 @@ export function MeetingRoom({ roomName, token, serverUrl, onDisconnect }: Meetin
             } else {
                 setRecordingError(data.error);
             }
-        } catch (error: any) {
-            setRecordingError(error.message);
+        } catch (error: unknown) {
+            setRecordingError(error instanceof Error ? error.message : String(error));
         }
     };
 

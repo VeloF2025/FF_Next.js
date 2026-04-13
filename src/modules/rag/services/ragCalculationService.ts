@@ -58,7 +58,24 @@ export function calculateContractorRag(input: RagCalculationInput, companyName?:
 /**
  * Gather data needed for RAG calculation from database row
  */
-export function prepareRagInputFromDbRow(row: any): RagCalculationInput {
+interface RagDbRow {
+  credit_rating?: string;
+  expired_documents_count?: number;
+  expiring_soon_count?: number;
+  total_required_documents?: number;
+  missing_documents?: string[];
+  total_projects?: number;
+  completed_projects?: number;
+  cancelled_projects?: number;
+  quality_score?: number;
+  timeliness_score?: number;
+  safety_incidents_12m?: number;
+  last_safety_audit_date?: string;
+  id: string;
+  company_name?: string;
+}
+
+export function prepareRagInputFromDbRow(row: RagDbRow): RagCalculationInput {
   // Extract financial data
   const financial: FinancialData = {
     overduePayments: 0, // TODO: Calculate from actual payment data
@@ -106,7 +123,7 @@ export function prepareRagInputFromDbRow(row: any): RagCalculationInput {
 /**
  * Calculate RAG status for multiple contractors efficiently
  */
-export function calculateBulkRag(contractors: any[]): ContractorRagStatus[] {
+export function calculateBulkRag(contractors: RagDbRow[]): ContractorRagStatus[] {
   return contractors.map(contractor => {
     const input = prepareRagInputFromDbRow(contractor);
     return calculateContractorRag(input, contractor.company_name);

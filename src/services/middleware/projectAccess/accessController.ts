@@ -176,13 +176,13 @@ export class ProjectAccessController {
       // Validate project access
       const accessCheck = await this.checkProjectAccess(userId, projectId);
       if (!accessCheck.success || !accessCheck.data) {
-        return accessCheck as any;
+        return { success: false, error: accessCheck.error, code: accessCheck.code };
       }
 
       // Get project information
       const projectResult = await ProjectAccessDataService.getProjectInfo(projectId);
       if (!projectResult.success || !projectResult.data) {
-        return projectResult as any;
+        return { success: false, error: projectResult.error, code: projectResult.code };
       }
 
       return {

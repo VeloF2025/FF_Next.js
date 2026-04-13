@@ -98,7 +98,7 @@ export async function detectFaultPattern(
         AND created_at >= NOW() - INTERVAL '1 day' * $2
     `;
 
-    const params: any[] = [scope_value, time_window_days.toString()];
+    const params: (string | number)[] = [scope_value, time_window_days.toString()];
 
     // Add project filter if provided
     if (project_id) {
@@ -109,7 +109,7 @@ export async function detectFaultPattern(
     queryText += ` ORDER BY created_at DESC`;
 
     // Execute query to get contributing tickets
-    const tickets = await query<any>(queryText, params);
+    const tickets = await query<ContributingTicket>(queryText, params);
 
     const fault_count = tickets.length;
     const pattern_detected = fault_count >= threshold;

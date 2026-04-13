@@ -14,7 +14,7 @@ interface PythonEvaluationResponse {
   overall_score?: number;
   total_steps?: number;
   passed_steps?: number;
-  results?: any;
+  results?: unknown;
   summary?: string;
   report_path?: string;
 }

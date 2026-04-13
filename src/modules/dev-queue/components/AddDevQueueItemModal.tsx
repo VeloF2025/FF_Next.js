@@ -10,8 +10,8 @@ import type { CreateDevQueueItemInput, UpdateDevQueueItemInput, DevQueuePriority
 interface AddDevQueueItemModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (input: CreateDevQueueItemInput) => Promise<any>;
-  onUpdate?: (id: string, input: UpdateDevQueueItemInput) => Promise<any>;
+  onSubmit: (input: CreateDevQueueItemInput) => Promise<unknown>;
+  onUpdate?: (id: string, input: UpdateDevQueueItemInput) => Promise<unknown>;
   editItem?: DevQueueItem | null;
 }
 

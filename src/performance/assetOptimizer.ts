@@ -171,7 +171,7 @@ export const preloadCriticalChunks = () => {
 export const preloadRouteModules = (currentRoute: string) => {
   if ('requestIdleCallback' in window) {
     requestIdleCallback(() => {
-      const preloadMap: Record<string, () => Promise<any>[]> = {
+      const preloadMap: Record<string, () => Promise<unknown>[]> = {
         '/app/procurement': () => [
           import('@/modules/procurement'),
           loadProcurementServices(),
@@ -223,7 +223,7 @@ export const monitorChunkLoading = () => {
     window.__webpack_require__ = (id: string) => {
       const startTime = performance.now();
       
-      return originalImport(id).then((module: any) => {
+      return originalImport(id).then((module: unknown) => {
         const loadTime = performance.now() - startTime;
         chunkLoadTimes.set(id, loadTime);
         
