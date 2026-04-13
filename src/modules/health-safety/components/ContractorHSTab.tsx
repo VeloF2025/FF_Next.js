@@ -5,22 +5,19 @@
  * Used in contractor detail pages.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import useSWR from 'swr';
 import {
   Shield,
   AlertTriangle,
   CheckCircle,
   XCircle,
-  Clock,
   FileText,
   Upload,
   ChevronRight,
-  Calendar,
   GraduationCap,
   AlertOctagon,
   Info,
-  Loader2,
 } from 'lucide-react';
 import { DOCUMENT_TYPES, REQUIRED_DOCUMENTS } from '../types/compliance.types';
 import { formatDisplayDate } from '@/utils/dateFormat';
@@ -70,7 +67,7 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export function ContractorHSTab({
   contractorId,
-  contractorName,
+  contractorName: _contractorName,
   onUploadDocument,
 }: ContractorHSTabProps) {
   const [activeSection, setActiveSection] = useState<'overview' | 'documents' | 'incidents'>('overview');
@@ -208,7 +205,7 @@ export function ContractorHSTab({
 
 function GateStatusBanner({
   gate,
-  breakdown,
+  breakdown: _breakdown,
 }: {
   gate?: { passed: boolean; blocking_reasons?: string[] };
   breakdown?: GateBreakdown;
@@ -473,7 +470,7 @@ function DocumentsSection({
   contractorId,
   documents,
   onUpload,
-  mutate,
+  mutate: _mutate,
 }: {
   contractorId: string | number;
   documents?: ComplianceData['documents'];

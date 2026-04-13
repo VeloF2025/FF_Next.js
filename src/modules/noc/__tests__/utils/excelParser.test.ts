@@ -15,7 +15,7 @@
  * 🟢 WORKING: Comprehensive test suite with 32 tests, 100% passing, 97.66% coverage
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import * as XLSX from 'xlsx';
 import {
   parseExcelFile,
@@ -24,15 +24,10 @@ import {
   generatePreview,
   createDefaultColumnMapping,
   mapRowToTicket,
-  type ExcelParseOptions,
-  type ExcelParseResult,
-  type ValidationResult
 } from '../../utils/excelParser';
 import {
   ImportRow,
   ExcelColumnMapping,
-  ImportPreviewResult,
-  ImportValidationError
 } from '../../types/weeklyReport';
 
 // Helper function to create a test Excel file buffer
