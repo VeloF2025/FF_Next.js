@@ -74,12 +74,12 @@ async function handler(
   try {
     const { validationIds, photoKeys, workType } = req.body as ValidationRequest;
 
-    log.info({
+    log.info('Validation request received', {
       module: 'qfield-qa-validate',
       validationIdCount: validationIds?.length || 0,
       photoKeyCount: photoKeys?.length || 0,
       workType
-    }, 'Validation request received');
+    }, 'qfield-qa-validate');
 
     if (!validationIds?.length && !photoKeys?.length) {
       return apiResponse.badRequest(res, 'Either validationIds or photoKeys required');
@@ -135,7 +135,7 @@ async function handler(
 
     // For bulk validation, process in background and return immediately
     if (validations.length > BATCH_THRESHOLD) {
-      log.info({ module: 'qfield-qa-validate', count: validations.length }, 'Starting background validation');
+      log.info('Starting background validation', { count: validations.length }, 'qfield-qa-validate');
 
       // Mark all as "validating" in DB
       const ids = validations.map(v => v.id);
@@ -147,7 +147,7 @@ async function handler(
 
       // Process in background (fire-and-forget)
       processValidationsInBackground(validations, workType).catch(err => {
-        log.error({ module: 'qfield-qa-validate', error: err instanceof Error ? err.message : String(err) }, 'Background validation failed');
+        log.error('Background validation failed', { error: err instanceof Error ? err.message : String(err) }, 'qfield-qa-validate');
       });
 
       return apiResponse.success(res, {
@@ -171,7 +171,7 @@ async function handler(
       results: processedResults,
     }, `Validated ${successCount}/${processedResults.length} photos`);
   } catch (error) {
-    log.error({ module: 'qfield-qa-validate', ...(error instanceof Error ? { message: error.message } : { error }) }, 'Handler error');
+    log.error('Handler error', { error: error instanceof Error ? error.message : String(error) }, 'qfield-qa-validate');
     return apiResponse.internalError(res, error);
   }
 }
@@ -194,7 +194,7 @@ async function fetchPhotoAsBase64(photoKey: string): Promise<string> {
     const escapedPath = `local/${MINIO_BUCKET}/${objectPath}`.replace(/'/g, "'\\''");
     const command = `docker exec qfieldcloud-minio-1 mc cat '${escapedPath}' 2>/dev/null | base64 -w 0`;
 
-    log.info({ module: 'qfield-qa-validate', photoKey: photoKey.substring(0, 80) }, 'Fetching photo via Docker mc');
+    log.info('Fetching photo via Docker mc', { photoKey: photoKey.substring(0, 80) }, 'qfield-qa-validate');
 
     const base64Data = execSync(command, {
       maxBuffer: 50 * 1024 * 1024, // 50MB buffer
@@ -203,21 +203,21 @@ async function fetchPhotoAsBase64(photoKey: string): Promise<string> {
     }).trim();
 
     if (!base64Data || base64Data.length < 100) {
-      log.error({ module: 'qfield-qa-validate', photoKey, dataLen: base64Data?.length || 0 }, 'Empty or invalid image data');
+      log.error('Empty or invalid image data', { photoKey, dataLen: base64Data?.length || 0 }, 'qfield-qa-validate');
       throw new Error('Empty or invalid image data returned');
     }
 
     // Check for mc error messages in output
     if (base64Data.startsWith('mc:') || base64Data.includes('ERROR') || base64Data.includes('does not exist')) {
-      log.error({ module: 'qfield-qa-validate', photoKey, error: base64Data.substring(0, 200) }, 'mc command returned error');
+      log.error('mc command returned error', { photoKey, error: base64Data.substring(0, 200) }, 'qfield-qa-validate');
       throw new Error(`MinIO error: ${base64Data.substring(0, 200)}`);
     }
 
-    log.info({ module: 'qfield-qa-validate', size: Math.round(base64Data.length / 1024) + 'KB' }, 'Photo fetched successfully');
+    log.info('Photo fetched successfully', { size: Math.round(base64Data.length / 1024) + 'KB' }, 'qfield-qa-validate');
     return base64Data;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.error({ module: 'qfield-qa-validate', photoKey: photoKey.substring(0, 80), error: message.substring(0, 200) }, 'Failed to fetch photo');
+    log.error('Failed to fetch photo', { photoKey: photoKey.substring(0, 80), error: message.substring(0, 200) }, 'qfield-qa-validate');
     throw new Error(`Failed to fetch photo: ${message}`);
   }
 }
@@ -279,8 +279,8 @@ async function validatePhoto(photoKey: string, workType: string): Promise<VLMRes
     } else {
       throw new Error('No JSON found in VLM response');
     }
-  } catch {
-    log.error('QaValidateApi', 'Operation failed', { error });
+  } catch (parseError) {
+    log.error('Failed to parse VLM response JSON', { error: parseError instanceof Error ? parseError.message : String(parseError) }, 'qfield-qa-validate');
     // If parsing fails, create a default response
     vlmData = {
       valid: false,
@@ -313,12 +313,11 @@ async function processOneValidation(
   error?: string;
 }> {
   const effectiveWorkType = validation.work_type || workType || 'pole_installation';
-  log.info({
-    module: 'qfield-qa-validate',
+  log.info('Processing single validation', {
     id: validation.id,
     photoKey: validation.photo_key?.substring(0, 60),
     workType: effectiveWorkType
-  }, 'Processing single validation');
+  }, 'qfield-qa-validate');
 
   try {
     const vlmResult = await validatePhoto(
@@ -340,12 +339,11 @@ async function processOneValidation(
       WHERE id = ${validation.id}::uuid
     `;
 
-    log.debug({
-      module: 'qfield-qa-validate',
+    log.debug('Validation completed', {
       id: validation.id,
       confidence: vlmResult.confidence,
       needsRetake,
-    }, 'Validation completed');
+    }, 'qfield-qa-validate');
 
     // Record VLM learning metric (fire-and-forget, but log failures)
     if (vlmResult.confidence >= 0.7) {
@@ -362,7 +360,7 @@ async function processOneValidation(
       feedback: vlmResult.feedback,
     };
   } catch (error) {
-    log.error('qfield-qa-validate', { error: error instanceof Error ? error.message : String(error) });
+    log.error('Validation error', { error: error instanceof Error ? error.message : String(error) }, 'qfield-qa-validate');
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
     // Update record with error
@@ -374,7 +372,7 @@ async function processOneValidation(
       WHERE id = ${validation.id}::uuid
     `.catch((e) => log.warn('DB operation failed (non-critical)', { error: e instanceof Error ? e.message : 'unknown' }, 'qfield')); // Non-critical DB update
 
-    log.error({ module: 'qfield-qa-validate', id: validation.id, error: errorMessage }, 'Validation failed');
+    log.error('Validation failed', { id: validation.id, error: errorMessage }, 'qfield-qa-validate');
 
     return {
       id: validation.id,
@@ -432,7 +430,7 @@ async function processValidationsInBackground(
   let successCount = 0;
   let failCount = 0;
 
-  log.info({ module: 'qfield-qa-validate', total: validations.length }, 'Background validation started');
+  log.info('Background validation started', { total: validations.length }, 'qfield-qa-validate');
 
   // Process with concurrency
   for (let i = 0; i < validations.length; i += CONCURRENT_VALIDATIONS) {
@@ -448,24 +446,22 @@ async function processValidationsInBackground(
 
     // Log progress every 10 photos
     if ((i + chunk.length) % 10 === 0 || i + chunk.length === validations.length) {
-      log.info({
-        module: 'qfield-qa-validate',
+      log.info('Background validation progress', {
         processed: i + chunk.length,
         total: validations.length,
         success: successCount,
         failed: failCount,
-      }, 'Background validation progress');
+      }, 'qfield-qa-validate');
     }
   }
 
   const duration = Math.round((Date.now() - startTime) / 1000);
-  log.info({
-    module: 'qfield-qa-validate',
+  log.info('Background validation completed', {
     total: validations.length,
     success: successCount,
     failed: failCount,
     durationSeconds: duration,
-  }, 'Background validation completed');
+  }, 'qfield-qa-validate');
 }
 
 export default withAuth(handler);

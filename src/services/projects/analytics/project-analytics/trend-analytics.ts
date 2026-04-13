@@ -28,10 +28,10 @@ export class ProjectTrendAnalytics {
         endDate
       });
       
-      return trends.trends?.map((t: Record<string, unknown>) => ({
-        month: t.month,
-        completed: t.completedProjects || 0,
-        started: t.newProjects || 0
+      return (trends.trends as Record<string, unknown>[] | undefined)?.map((t: Record<string, unknown>) => ({
+        month: t.month as string,
+        completed: (t.completedProjects as number) || 0,
+        started: (t.newProjects as number) || 0
       })) || [];
     } catch (error) {
       log.error('Error fetching monthly completion trends:', { data: error }, 'trend-analytics');
@@ -51,9 +51,9 @@ export class ProjectTrendAnalytics {
       );
       
       return {
-        totalBudget: budgetData.totalBudget || 0,
-        averageBudget: budgetData.averageBudget || 0,
-        budgetByStatus: budgetData.budgetByStatus || []
+        totalBudget: (budgetData.totalBudget as number) || 0,
+        averageBudget: (budgetData.averageBudget as number) || 0,
+        budgetByStatus: (budgetData.budgetByStatus as { status: string; totalBudget: number }[]) || []
       };
     } catch (error) {
       log.error('Error fetching budget analysis:', { data: error }, 'trend-analytics');
@@ -80,11 +80,11 @@ export class ProjectTrendAnalytics {
       });
       
       // Transform API response to timeline data
-      return trendsData.timeline?.map((item: Record<string, unknown>) => ({
-        date: item.date,
-        projectsStarting: item.projectsStarting || 0,
-        projectsEnding: item.projectsEnding || 0,
-        milestones: item.milestones || 0
+      return (trendsData.timeline as Record<string, unknown>[] | undefined)?.map((item: Record<string, unknown>) => ({
+        date: item.date as string,
+        projectsStarting: (item.projectsStarting as number) || 0,
+        projectsEnding: (item.projectsEnding as number) || 0,
+        milestones: (item.milestones as number) || 0
       })) || [];
     } catch (error) {
       log.error('Error fetching project timeline:', { data: error }, 'trend-analytics');
@@ -112,12 +112,12 @@ export class ProjectTrendAnalytics {
         endDate: new Date().toISOString()
       });
       
-      return trendsData.quarters?.map((q: Record<string, unknown>) => ({
-        quarter: q.quarter,
-        projectsCompleted: q.projectsCompleted || 0,
-        totalBudget: q.totalBudget || 0,
-        averageProgress: q.averageProgress || 0,
-        clientCount: q.clientCount || 0
+      return (trendsData.quarters as Record<string, unknown>[] | undefined)?.map((q: Record<string, unknown>) => ({
+        quarter: q.quarter as string,
+        projectsCompleted: (q.projectsCompleted as number) || 0,
+        totalBudget: (q.totalBudget as number) || 0,
+        averageProgress: (q.averageProgress as number) || 0,
+        clientCount: (q.clientCount as number) || 0
       })) || [];
     } catch (error) {
       log.error('Error fetching quarterly trends:', { data: error }, 'trend-analytics');
@@ -163,16 +163,19 @@ export class ProjectTrendAnalytics {
         endDate: `${previousYear}-12-31`
       });
 
+      const currentSummary = currentYearData.summary as Record<string, unknown> | undefined;
+      const previousSummary = previousYearData.summary as Record<string, unknown> | undefined;
+
       const current = {
-        projects: currentYearData.summary?.totalProjects || 0,
-        budget: currentYearData.summary?.totalBudget || 0,
-        completed: currentYearData.summary?.completedProjects || 0
+        projects: (currentSummary?.totalProjects as number) || 0,
+        budget: (currentSummary?.totalBudget as number) || 0,
+        completed: (currentSummary?.completedProjects as number) || 0
       };
 
       const previous = {
-        projects: previousYearData.summary?.totalProjects || 0,
-        budget: previousYearData.summary?.totalBudget || 0,
-        completed: previousYearData.summary?.completedProjects || 0
+        projects: (previousSummary?.totalProjects as number) || 0,
+        budget: (previousSummary?.totalBudget as number) || 0,
+        completed: (previousSummary?.completedProjects as number) || 0
       };
 
       return {
@@ -222,18 +225,18 @@ export class ProjectTrendAnalytics {
         'Fall': { projects: [], budgets: [], completed: [] }
       };
       
-      trendsData.trends?.forEach((month: Record<string, unknown>) => {
-        const monthNum = new Date(month.month).getMonth() + 1;
+      (trendsData.trends as Record<string, unknown>[] | undefined)?.forEach((month: Record<string, unknown>) => {
+        const monthNum = new Date(month.month as string).getMonth() + 1;
         let season = '';
-        
+
         if ([12, 1, 2].includes(monthNum)) season = 'Winter';
         else if ([3, 4, 5].includes(monthNum)) season = 'Spring';
         else if ([6, 7, 8].includes(monthNum)) season = 'Summer';
         else season = 'Fall';
-        
-        seasonalData[season]!.projects.push(month.totalProjects || 0);
-        seasonalData[season]!.budgets.push(month.averageBudget || 0);
-        seasonalData[season]!.completed.push(month.completedProjects || 0);
+
+        seasonalData[season]!.projects.push((month.totalProjects as number) || 0);
+        seasonalData[season]!.budgets.push((month.averageBudget as number) || 0);
+        seasonalData[season]!.completed.push((month.completedProjects as number) || 0);
       });
       
       return Object.entries(seasonalData).map(([season, data]) => {
