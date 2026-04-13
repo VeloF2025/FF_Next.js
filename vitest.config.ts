@@ -61,6 +61,9 @@ export default defineConfig({
       { find: '@/modules', replacement: path.resolve(__dirname, './src/modules') },
       { find: '@/pages', replacement: path.resolve(__dirname, './pages') },
       { find: '@/config', replacement: path.resolve(__dirname, './src/config') },
+      // @/app → root-level app/ directory (App Router routes, e.g. app/api/noc/...)
+      // Must come before generic '@' → './src' to prevent incorrect resolution.
+      { find: '@/app', replacement: path.resolve(__dirname, './app') },
       { find: '@', replacement: path.resolve(__dirname, './src') },
     ],
   },
