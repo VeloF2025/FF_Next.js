@@ -154,14 +154,31 @@ export async function getRelevantExamples(
     const totalAvailable = parseInt(totalResult.rows[0]?.count || '0', 10);
 
     const duration = Date.now() - startTime;
-    log.debug('FewShotService', {
-      action: 'getRelevantExamples',
-      workflowType,
-      selected: selectedExamples.length,
-      totalAvailable,
-      selectionCriteria,
-      duration,
-    });
+
+    if (selectedExamples.length === 0) {
+      log.warn('FewShotService', {
+        action: 'getRelevantExamples_empty',
+        workflowType,
+        totalAvailable,
+        selectionCriteria,
+        queryParams: {
+          maxExamples,
+          includeConfusionPairs,
+          canonicalOnly,
+          minConfidenceForMistake,
+        },
+        duration,
+      });
+    } else {
+      log.debug('FewShotService', {
+        action: 'getRelevantExamples',
+        workflowType,
+        selected: selectedExamples.length,
+        totalAvailable,
+        selectionCriteria,
+        duration,
+      });
+    }
 
     return {
       examples: selectedExamples,

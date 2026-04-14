@@ -354,7 +354,14 @@ export async function categorizePhotos(
   try {
     // Quick check to avoid unnecessary queries
     const hasCorrectionData = await hasCorrections('dr_photo');
-    if (hasCorrectionData) {
+    if (!hasCorrectionData) {
+      log.warn('Few-shot learning inactive: no corrections available', {
+        action: 'fewShotSkipped',
+        reason: 'no_corrections_available',
+        workflowType: 'dr_photo',
+        drNumber,
+      }, 'CategorizationVlm');
+    } else {
       const selectionResult = await getRelevantExamples({
         workflowType: 'dr_photo',
         maxExamples: 5,
@@ -362,7 +369,14 @@ export async function categorizePhotos(
       });
       fewShotExamples = selectionResult.examples;
 
-      if (fewShotExamples.length > 0) {
+      if (fewShotExamples.length === 0) {
+        log.warn('Few-shot learning inactive: getRelevantExamples returned empty', {
+          action: 'fewShotEmpty',
+          workflowType: 'dr_photo',
+          drNumber,
+          selectionCriteria: selectionResult.selectionCriteria,
+        }, 'CategorizationVlm');
+      } else {
         log.info('Few-shot examples loaded for categorization', {
           action: 'fewShotLoaded',
           drNumber,
@@ -384,7 +398,14 @@ export async function categorizePhotos(
   let positiveExamples: PositiveExample[] = [];
   try {
     const hasPositiveData = await hasConfirmedCorrect('dr_photo');
-    if (hasPositiveData) {
+    if (!hasPositiveData) {
+      log.warn('Positive examples inactive: no confirmed-correct data available', {
+        action: 'positiveExamplesSkipped',
+        reason: 'no_confirmed_correct_available',
+        workflowType: 'dr_photo',
+        drNumber,
+      }, 'CategorizationVlm');
+    } else {
       const positiveResult = await getPositiveExamples({
         workflowType: 'dr_photo',
         maxExamples: 3,
@@ -392,7 +413,13 @@ export async function categorizePhotos(
       });
       positiveExamples = positiveResult.examples;
 
-      if (positiveExamples.length > 0) {
+      if (positiveExamples.length === 0) {
+        log.warn('Positive examples inactive: getPositiveExamples returned empty', {
+          action: 'positiveExamplesEmpty',
+          workflowType: 'dr_photo',
+          drNumber,
+        }, 'CategorizationVlm');
+      } else {
         log.info('Positive examples loaded for categorization', {
           action: 'positiveExamplesLoaded',
           drNumber,
