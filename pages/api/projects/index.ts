@@ -21,7 +21,7 @@ async function handler(
 ) {
   // Handle OPTIONS request for CORS
   if (req.method === 'OPTIONS') {
-    return apiResponse.handleOptions(req, res);
+    return apiResponse.handleOptions(res);
   }
 
   // Check authentication
@@ -81,7 +81,7 @@ async function handler(
         }, 'projects/index.ts');
 
         // Build query based on filters
-        let projects;
+        let projects: Record<string, unknown>[] | undefined;
 
         if (status && clientId && search) {
           const searchPattern = `%${search}%`;
@@ -440,7 +440,7 @@ async function handler(
     }
   } catch (error: any) {
     log.error('Projects API error:', { data: error }, 'projects/index.ts');
-    return apiResponse.serverError(res, error);
+    return apiResponse.internalError(res, error);
   }
 }
 

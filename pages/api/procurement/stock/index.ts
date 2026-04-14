@@ -40,7 +40,7 @@ export default withAuth(withErrorHandler(async (
   if (req.method === 'GET') {
     try {
       // Query stock_items table (Odoo synced data)
-      let movements = [];
+      let movements: Record<string, unknown>[] = [];
 
       // Get all stock items from Odoo sync
       const stockData = await sql`
@@ -93,8 +93,8 @@ export default withAuth(withErrorHandler(async (
           ORDER BY sm.movement_date DESC
           LIMIT 50
         `;
-      } catch {
-        log.error('IndexApi', 'Operation failed', { error });
+      } catch (movErr) {
+        log.error('Failed to fetch stock movements', { error: movErr });
         // stock_movements table might not have data yet
         movements = [];
       }

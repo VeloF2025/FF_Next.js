@@ -8,7 +8,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
 
@@ -47,9 +47,9 @@ async function handleGet(res: NextApiResponse) {
       ORDER BY feature_key
     `;
 
-    return apiResponse.success(res, features as FeatureSetting[]);
+    return apiResponse.success(res, features as unknown as FeatureSetting[]);
   } catch (error) {
-    log.error('SystemFeatures', 'Failed to fetch system feature settings', { error });
+    log.error('Failed to fetch system feature settings', { error });
     return apiResponse.databaseError(res, error, 'Failed to fetch feature settings');
   }
 }
@@ -67,7 +67,7 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Get user ID from request if available
-    const userId = req.user?.id || null;
+    const userId = (req as AuthenticatedNextApiRequest).user?.id ?? null;
 
     // Upsert the feature setting
     const result = await sql`
@@ -87,7 +87,7 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse) {
       RETURNING id, feature_key, enabled, config, updated_at
     `;
 
-    log.info('SystemFeatures', 'Feature setting updated', {
+    log.info('Feature setting updated', {
       feature_key,
       enabled,
       updated_by: userId,
@@ -95,7 +95,7 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, result[0]);
   } catch (error) {
-    log.error('SystemFeatures', 'Failed to update system feature setting', { error });
+    log.error('Failed to update system feature setting', { error });
     return apiResponse.databaseError(res, error, 'Failed to update feature setting');
   }
 }
