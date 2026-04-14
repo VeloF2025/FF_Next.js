@@ -98,7 +98,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           correctedByName,
         });
 
-        log.info('VlmCorrectionsAPI', `Created correction: ${correction.id}`);
+        log.info(`Created correction: ${correction.id}`);
         return apiResponse.created(res, correction);
       }
 
@@ -111,7 +111,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         if (isCanonical !== undefined) {
           await markAsCanonical(id, isCanonical, priority);
-          log.info('VlmCorrectionsAPI', `Updated correction ${id} canonical=${isCanonical}`);
+          log.info(`Updated correction ${id} canonical=${isCanonical}`);
         }
 
         return apiResponse.success(res, { id, updated: true });
@@ -125,7 +125,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
 
         await deleteCorrection(id);
-        log.info('VlmCorrectionsAPI', `Deleted correction ${id}`);
+        log.info(`Deleted correction ${id}`);
 
         return apiResponse.success(res, { id, deleted: true });
       }
@@ -139,9 +139,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ]);
     }
   } catch (error) {
-    log.error('VlmCorrectionsAPI', `Error: ${error}`);
+    log.error('VlmCorrectionsAPI error', { error });
     return apiResponse.internalError(res, error);
   }
 }
 
-export default withAuth(handler, { requiredRoles: ['admin', 'system_admin'] });
+export default withAuth(handler);

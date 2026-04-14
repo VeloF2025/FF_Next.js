@@ -160,7 +160,7 @@ export default function RequisitionDetailPage() {
           setSuppliers(data.data);
         }
       } catch (err) {
-        log.error('Failed to fetch suppliers', err);
+        log.error('Failed to fetch suppliers', { error: err });
       }
     };
     fetchSuppliers();
@@ -181,7 +181,7 @@ export default function RequisitionDetailPage() {
         setError(data.error?.message || 'Failed to fetch requisition');
       }
     } catch (err) {
-      log.error('Failed to fetch requisition', err);
+      log.error('Failed to fetch requisition', { error: err });
       setError('Failed to load requisition');
     } finally {
       setIsLoading(false);
@@ -264,7 +264,7 @@ export default function RequisitionDetailPage() {
         setError(data.error?.message || `Failed to ${action} requisition`);
       }
     } catch (err) {
-      log.error(`Failed to ${action} requisition`, err);
+      log.error(`Failed to ${action} requisition`, { error: err });
       setError(`Failed to ${action} requisition`);
     } finally {
       setActionLoading(null);
@@ -290,7 +290,7 @@ export default function RequisitionDetailPage() {
         setError(data.error?.message || 'Failed to reject requisition');
       }
     } catch (err) {
-      log.error('Failed to reject requisition', err);
+      log.error('Failed to reject requisition', { error: err });
       setError('Failed to reject requisition');
     } finally {
       setActionLoading(null);
@@ -329,7 +329,7 @@ export default function RequisitionDetailPage() {
         setConvertError(data.error?.message || 'Failed to convert to PO');
       }
     } catch (err) {
-      log.error('Failed to convert to PO', err);
+      log.error('Failed to convert to PO', { error: err });
       setConvertError('Failed to convert to PO');
     } finally {
       setConvertLoading(false);

@@ -200,8 +200,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
     let quoteComparison = null;
     try {
       quoteComparison = await poApprovalService.getQuoteComparisonForApproval(id);
-    } catch {
-      log.error('Quote comparison fetch failed (optional)');
+    } catch (err) {
+      log.error('Failed to fetch quote comparison (optional)', { error: err });
       // Quote comparison is optional
     }
 
