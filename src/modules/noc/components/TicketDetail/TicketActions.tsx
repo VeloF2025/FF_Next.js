@@ -25,7 +25,8 @@ import {
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import { useUpdateTicket, useDeleteTicket } from '../../hooks/useTicket';
-import type { EnrichedTicket, TicketStatus } from '../../types/ticket';
+import { TicketStatus } from '../../types/ticket';
+import type { EnrichedTicket } from '../../types/ticket';
 
 interface TicketActionsProps {
   /** Ticket data */
@@ -80,47 +81,47 @@ export function TicketActions({ ticket, compact = false, onActionComplete }: Tic
     const actions = [];
 
     // Status-specific actions
-    if (ticket.status === 'open') {
+    if (ticket.status === TicketStatus.OPEN) {
       actions.push({
         label: 'Start Work',
         icon: Clock,
-        onClick: () => handleStatusChange('in_progress'),
+        onClick: () => handleStatusChange(TicketStatus.IN_PROGRESS),
         variant: 'primary' as const,
       });
     }
 
-    if (ticket.status === 'in_progress') {
+    if (ticket.status === TicketStatus.IN_PROGRESS) {
       actions.push({
         label: 'Submit for QA',
         icon: ArrowRight,
-        onClick: () => handleStatusChange('pending_qa'),
+        onClick: () => handleStatusChange(TicketStatus.PENDING_QA),
         variant: 'primary' as const,
       });
     }
 
-    if (ticket.status === 'qa_approved') {
+    if (ticket.status === TicketStatus.QA_APPROVED) {
       actions.push({
         label: 'Ready for Handover',
         icon: CheckCircle2,
-        onClick: () => handleStatusChange('pending_handover'),
+        onClick: () => handleStatusChange(TicketStatus.PENDING_HANDOVER),
         variant: 'primary' as const,
       });
     }
 
-    if (ticket.status === 'qa_rejected') {
+    if (ticket.status === TicketStatus.QA_REJECTED) {
       actions.push({
         label: 'Resume Work',
         icon: Clock,
-        onClick: () => handleStatusChange('in_progress'),
+        onClick: () => handleStatusChange(TicketStatus.IN_PROGRESS),
         variant: 'primary' as const,
       });
     }
 
-    if (ticket.status === 'resolved') {
+    if (ticket.status === TicketStatus.RESOLVED) {
       actions.push({
         label: ticket.ticket_type === 'dev_ops' ? 'Verify Fix' : 'Verify Resolution',
         icon: ShieldCheck,
-        onClick: () => handleStatusChange('verified'),
+        onClick: () => handleStatusChange(TicketStatus.VERIFIED),
         variant: 'success' as const,
       });
     }

@@ -27,10 +27,42 @@
 // Constants are client-safe (no server dependencies)
 
 // Re-export client-safe modules
+// Types (all interfaces and enums)
 export * from './types';
-export * from './components';
+// Hooks
 export * from './hooks';
-export * from './constants';
+// Constants (explicit to avoid VerificationStepTemplate clash with types/verification.ts)
+export * from './constants/ticketStatus';
+export * from './constants/ticketTypes';
+export * from './constants/faultCauses';
+// Components (explicit to avoid VerificationStep, QAReadinessCheck, HandoverSnapshot,
+// TicketFilters clashing with same-named interfaces from ./types)
+export { VerificationChecklist, PhotoUpload } from './components/Verification';
+export { ReadinessResults, ReadinessBlocker } from './components/QAReadiness';
+export { FaultCauseSelector } from './components/FaultAttribution/FaultCauseSelector';
+export { FaultTrendAnalysis } from './components/FaultAttribution/FaultTrendAnalysis';
+export { HandoverWizard, HandoverHistory } from './components/Handover';
+export { EscalationAlert, EscalationList, RepeatFaultMap } from './components/Escalation';
+export { SyncDashboard, SyncTrigger, SyncAuditLog } from './components/QContact';
+export type { AuditLogFilters } from './components/QContact';
+export { WeeklyImportWizard, ImportPreview, ImportResults } from './components/WeeklyImport';
+export { TicketingDashboard } from './components/Dashboard/TicketingDashboard';
+export { SLAComplianceCard } from './components/Dashboard/SLAComplianceCard';
+export { WorkloadChart } from './components/Dashboard/WorkloadChart';
+export { RecentTickets } from './components/Dashboard/RecentTickets';
+export { TicketList } from './components/TicketList/TicketList';
+export { TicketListItem } from './components/TicketList/TicketListItem';
+export { TicketStatusBadge } from './components/TicketList/TicketStatusBadge';
+export { TicketDetail } from './components/TicketDetail/TicketDetail';
+export { TicketHeader } from './components/TicketDetail/TicketHeader';
+export { TicketTimeline } from './components/TicketDetail/TicketTimeline';
+export { TicketActions } from './components/TicketDetail/TicketActions';
+export { RelatedTickets } from './components/TicketDetail/RelatedTickets';
+export { DRLookup } from './components/common/DRLookup';
+export { GuaranteeIndicator } from './components/common/GuaranteeIndicator';
+export { SLACountdown } from './components/common/SLACountdown';
+export { UserSelector, TeamSelector, AssignmentPanel } from './components/Assignment';
+export { KanbanBoard } from './components/KanbanBoard/KanbanBoard';
 
 // NOTE: Do NOT export:
 // - services (may contain server-side database code)

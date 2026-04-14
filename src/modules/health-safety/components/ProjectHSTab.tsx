@@ -545,7 +545,7 @@ function DueDateCard({
 }
 
 function AuditRow({ audit }: { audit: HSProjectAudit }) {
-  const statusConfig = AUDIT_STATUS_CONFIG[audit.status] || AUDIT_STATUS_CONFIG.draft;
+  const statusConfig = AUDIT_STATUS_CONFIG[audit.status] || AUDIT_STATUS_CONFIG['in_progress'];
   const ragColors = {
     green: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
     amber: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
@@ -558,7 +558,7 @@ function AuditRow({ audit }: { audit: HSProjectAudit }) {
       className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors"
     >
       <div className="flex items-center gap-4">
-        <div className={`p-2 rounded-lg ${ragColors[audit.rag_status] || 'bg-secondary'}`}>
+        <div className={`p-2 rounded-lg ${audit.rag_status ? ragColors[audit.rag_status] : 'bg-secondary'}`}>
           <BarChart3 className="w-5 h-5" />
         </div>
         <div>
@@ -567,14 +567,14 @@ function AuditRow({ audit }: { audit: HSProjectAudit }) {
           </p>
           <p className="text-sm text-muted-foreground">
             {formatDisplayDate(audit.audit_date)}
-            {audit.auditor_name && ` • ${audit.auditor_name}`}
+            {audit.auditor?.full_name && ` • ${audit.auditor.full_name}`}
           </p>
         </div>
       </div>
 
       <div className="flex items-center gap-3">
         {audit.overall_score !== null && (
-          <span className={`text-lg font-semibold ${ragColors[audit.rag_status]?.split(' ')[1] || 'text-muted-foreground'}`}>
+          <span className={`text-lg font-semibold ${audit.rag_status ? ragColors[audit.rag_status]?.split(' ')[1] : 'text-muted-foreground'}`}>
             {audit.overall_score}%
           </span>
         )}
