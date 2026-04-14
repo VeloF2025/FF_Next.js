@@ -126,7 +126,7 @@ export default function RequisitionDetailPage() {
 
   // Convert to PO modal state
   const [showConvertModal, setShowConvertModal] = useState(false);
-  const [suppliers, setSuppliers] = useState<{ id: string; companyName: string }[]>([]);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string; companyName?: string }[]>([]);
   const [convertForm, setConvertForm] = useState({
     supplierId: '',
     deliveryAddress: '',
@@ -809,7 +809,7 @@ export default function RequisitionDetailPage() {
                     <option value="" className="bg-[#1e1e2e] text-white">Select supplier...</option>
                     {suppliers.map((s) => (
                       <option key={s.id} value={s.id} className="bg-[#1e1e2e] text-white">
-                        {s.companyName}
+                        {s.companyName || s.name}
                       </option>
                     ))}
                   </select>
