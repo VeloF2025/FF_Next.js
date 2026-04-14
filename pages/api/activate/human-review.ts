@@ -74,7 +74,7 @@ async function handleStartReview(
   userId: string,
   res: NextApiResponse
 ): Promise<void> {
-  log.info('HumanReview', `Starting review for ${dropNumber} by ${userId}`);
+  log.info(`Starting review for ${dropNumber} by ${userId}`, undefined, 'HumanReview');
 
   // Check if already being reviewed
   const lockResult = await pool.query(
@@ -139,7 +139,7 @@ async function handleStepReview(
   const { step, action, reason, overrideVlm, vlmOriginalStep, vlmConfidence, photoFilename, photoDescription } = stepReview;
   const stepLabel = STEP_LABELS[step] || `Step ${step}`;
 
-  log.info('HumanReview', `${action} step ${step} for ${dropNumber}`, { reason, overrideVlm });
+  log.info(`${action} step ${step} for ${dropNumber}`, { reason, overrideVlm }, 'HumanReview');
 
   // Verify the user has the lock
   const lockResult = await pool.query(
@@ -206,7 +206,7 @@ async function handleStepReview(
       correctionReason: reason || `Human review override: Step ${vlmOriginalStep} → Step ${step}`,
       correctedBy: userId,
     }).catch((err) => {
-      log.warn('HumanReview', 'Failed to record HITL correction (non-critical)', err);
+      log.warn('Failed to record HITL correction (non-critical)', { error: err }, 'HumanReview');
     });
   }
 
@@ -229,7 +229,7 @@ async function handleCompleteReview(
   userId: string,
   res: NextApiResponse
 ): Promise<void> {
-  log.info('HumanReview', `Completing review for ${dropNumber} by ${userId}`);
+  log.info(`Completing review for ${dropNumber} by ${userId}`, undefined, 'HumanReview');
 
   // Verify the user has the lock
   const lockResult = await pool.query(
@@ -323,7 +323,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Invalid action');
     }
   } catch (error) {
-    log.error('HumanReview', 'Error during human review', error);
+    log.error('Error during human review', { error }, 'HumanReview');
     return apiResponse.internalError(res, error);
   }
 }
@@ -391,7 +391,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       },
     });
   } catch (error) {
-    log.error('HumanReview', 'Error getting review status', error);
+    log.error('Error getting review status', { error }, 'HumanReview');
     return apiResponse.internalError(res, error);
   }
 }
@@ -450,7 +450,7 @@ async function handleDelete(req: NextApiRequest, res: NextApiResponse): Promise<
       message: 'Review lock released',
     });
   } catch (error) {
-    log.error('HumanReview', 'Error releasing lock', error);
+    log.error('Error releasing lock', { error }, 'HumanReview');
     return apiResponse.internalError(res, error);
   }
 }

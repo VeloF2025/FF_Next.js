@@ -30,7 +30,7 @@ interface WAPhoto {
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return apiResponse.methodNotAllowed(res, ['GET']);
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
   }
 
   const { dropNumber } = req.query;
@@ -41,7 +41,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     // Query wa_photos table for this DR
-    const photos = await sql<WAPhoto[]>`
+    const photos = (await sql`
       SELECT
         id,
         wa_message_id,
@@ -60,7 +60,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       WHERE drop_number = ${dropNumber.toUpperCase()}
         AND purpose = 'activation'
       ORDER BY message_timestamp DESC, photo_index ASC
-    `;
+    `) as unknown as WAPhoto[];
 
     // Build URLs for photo proxy
     const photosWithUrls = photos.map((photo: Record<string, any>) => { // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -101,8 +101,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       photos: photosWithUrls,
     });
   } catch (error) {
-    log.error('Error fetching WA photos:', error);
-    return apiResponse.serverError(res, 'Failed to fetch WhatsApp photos');
+    log.error('Error fetching WA photos', { error });
+    return apiResponse.internalError(res, error);
   }
 }
 

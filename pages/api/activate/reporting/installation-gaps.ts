@@ -84,19 +84,19 @@ async function handler(
     } = req.query;
 
     const projectFilter = project ? (Array.isArray(project) ? project[0] : project) : null;
-    const minDaysNum = parseInt(Array.isArray(minDays) ? minDays[0] : minDays, 10) || 0;
-    const maxDaysNum = maxDays ? parseInt(Array.isArray(maxDays) ? maxDays[0] : maxDays, 10) : null;
-    const pageNum = parseInt(Array.isArray(page) ? page[0] : page, 10) || 1;
-    const limitNum = Math.min(parseInt(Array.isArray(limit) ? limit[0] : limit, 10) || 50, 100);
+    const minDaysNum = parseInt(Array.isArray(minDays) ? (minDays[0] ?? '0') : (minDays ?? '0'), 10) || 0;
+    const maxDaysNum = maxDays ? parseInt(Array.isArray(maxDays) ? (maxDays[0] ?? '0') : (maxDays ?? '0'), 10) : null;
+    const pageNum = parseInt(Array.isArray(page) ? (page[0] ?? '1') : (page ?? '1'), 10) || 1;
+    const limitNum = Math.min(parseInt(Array.isArray(limit) ? (limit[0] ?? '50') : (limit ?? '50'), 10) || 50, 100);
     const offset = (pageNum - 1) * limitNum;
 
-    log.info('InstallationGapsAPI', 'Fetching installation gaps report', {
+    log.info('Fetching installation gaps report', {
       project: projectFilter,
       minDays: minDaysNum,
       maxDays: maxDaysNum,
       page: pageNum,
       limit: limitNum,
-    });
+    }, 'InstallationGapsAPI');
 
     // Build WHERE clause
     const conditions: string[] = [
@@ -212,14 +212,14 @@ async function handler(
       },
     };
 
-    log.info('InstallationGapsAPI', 'Report generated', {
+    log.info('Report generated', {
       totalGaps: response.summary.total_gaps,
       projectsAffected: response.summary.by_project.length,
-    });
+    }, 'InstallationGapsAPI');
 
     return res.status(200).json(response);
   } catch (error) {
-    log.error('InstallationGapsAPI', 'Failed to fetch installation gaps report', { error });
+    log.error('Failed to fetch installation gaps report', { error }, 'InstallationGapsAPI');
     return apiResponse.internalError(res, error);
   }
 }

@@ -67,7 +67,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber is required');
     }
 
-    log.info('ExtractData', `Starting data extraction for ${dropNumber}`, { force });
+    log.info(`Starting data extraction for ${dropNumber}`, { force }, 'ExtractData');
 
     // Get categorized photos and VLM results from unified table (after migration 127)
     const reviewResult = await pool.query(
@@ -100,7 +100,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         review.vlm_ont_serial_step6 !== null ||
         review.vlm_ont_serial_step9 !== null)
     ) {
-      log.info('ExtractData', `Extraction already done for ${dropNumber}, returning cached results`);
+      log.info(`Extraction already done for ${dropNumber}, returning cached results`, undefined, 'ExtractData');
 
       // Return cached results
       const cachedValidation = buildValidationFromCached(review, dropNumber);
@@ -157,7 +157,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         };
       });
     } catch (e) {
-      log.warn('ExtractData', `Failed to parse photos for ${dropNumber}: ${e}`);
+      log.warn(`Failed to parse photos for ${dropNumber}: ${e}`, undefined, 'ExtractData');
     }
 
     // Find ALL photos for each extraction step - VLM will try each to find best result
@@ -169,15 +169,15 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';
     const makeOneMapUrl = (filename: string) => `${ONEMAP_HOST}/api/photo/${dropNumber}/${filename}`;
 
-    log.info('ExtractData', `Found photos: Step6=${step6Photos.length}, Step7=${step7Photos.length}, Step9=${step9Photos.length}`);
+    log.info(`Found photos: Step6=${step6Photos.length}, Step7=${step7Photos.length}, Step9=${step9Photos.length}`, undefined, 'ExtractData');
 
     // Run VLM extraction with multiple photos per step
     // SMART MODE: If OneMap has serial, use CONFIRMATION mode (more accurate)
     // Otherwise use EXTRACTION mode (fallback)
     const onemapOntSerial = review.onemap_ont_serial;
-    log.info('ExtractData', onemapOntSerial
+    log.info(onemapOntSerial
       ? `Using CONFIRMATION mode with OneMap serial: ${onemapOntSerial}`
-      : 'Using EXTRACTION mode (no OneMap serial)');
+      : 'Using EXTRACTION mode (no OneMap serial)', undefined, 'ExtractData');
 
     const extraction = await runFullExtraction(
       dropNumber,
@@ -260,11 +260,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
     const processingTimeMs = Date.now() - startTime;
 
-    log.info('ExtractData', `Data extraction complete for ${dropNumber}`, {
+    log.info(`Data extraction complete for ${dropNumber}`, {
       processingTimeMs,
       powerMeter: powerMeterResult.status,
       serialStatus: serialResult.status,
-    });
+    }, 'ExtractData');
 
     const response: ExtractDataResponse = {
       drNumber: dropNumber,
@@ -280,7 +280,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
     return apiResponse.success(res, response);
   } catch (error) {
-    log.error('ExtractData', 'Error extracting data', error);
+    log.error('Error extracting data', { error }, 'ExtractData');
     return apiResponse.internalError(res, error);
   }
 }
