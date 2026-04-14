@@ -222,19 +222,37 @@ if [[ "$BUILD_SUCCESS" != true ]]; then
   exit 1
 fi
 
-# --- Step 7: Validate build ---
-if ! sudo -u velo test -f "$DIR/.next/BUILD_ID"; then
-  echo -e "${RED}[$(date +%H:%M:%S)] ERROR:${NC} BUILD_ID missing after build — build is incomplete"
+# --- Step 7: Validate build (all critical Next.js files, not just BUILD_ID) ---
+CRITICAL_FILES=(
+  ".next/BUILD_ID"
+  ".next/prerender-manifest.json"
+  ".next/routes-manifest.json"
+  ".next/build-manifest.json"
+  ".next/required-server-files.json"
+)
+BUILD_VALID=true
+for cf in "${CRITICAL_FILES[@]}"; do
+  if ! sudo -u velo test -f "$DIR/$cf"; then
+    echo -e "${RED}[$(date +%H:%M:%S)] ERROR:${NC} Missing: $cf — build is incomplete"
+    BUILD_VALID=false
+  fi
+done
+if ! sudo -u velo test -d "$DIR/.next/server"; then
+  echo -e "${RED}[$(date +%H:%M:%S)] ERROR:${NC} Missing: .next/server/ — build is incomplete"
+  BUILD_VALID=false
+fi
+
+if [[ "$BUILD_VALID" != true ]]; then
   if sudo -u velo test -d "$DIR/.next-backup-$TIMESTAMP"; then
     log "Restoring .next from backup..."
-    sudo -u velo bash -c "cd $DIR && mv .next-backup-$TIMESTAMP .next"
+    sudo -u velo bash -c "cd $DIR && rm -rf .next && mv .next-backup-$TIMESTAMP .next"
   fi
   log "Starting $SVC on previous build..."
   sudo /usr/bin/systemctl start "$SVC" 2>/dev/null || true
   exit 1
 fi
 BUILD_ID=$(sudo -u velo cat "$DIR/.next/BUILD_ID")
-log "Build validated (BUILD_ID: $BUILD_ID)"
+log "Build validated (BUILD_ID: $BUILD_ID, all ${#CRITICAL_FILES[@]} critical files present)"
 
 # --- Step 8: Start service ---
 log "Starting $SVC..."
