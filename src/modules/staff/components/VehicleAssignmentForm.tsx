@@ -100,7 +100,7 @@ export function VehicleAssignmentForm({
           setFleetVehicles(vehicles);
         }
       } catch (err) {
-        log.error('Failed to fetch fleet vehicles', err, 'VehicleAssignmentForm');
+        log.error('Failed to fetch fleet vehicles', { error: err }, 'VehicleAssignmentForm');
       } finally {
         setLoadingFleet(false);
       }

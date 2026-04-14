@@ -27,7 +27,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       case 'PUT':
         return handlePut(auditId, req, res);
       default:
-        return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+        return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
     }
   } catch (error) {
     log.error('HSAuditDetail', { error, auditId });

@@ -134,7 +134,7 @@ async function handler(
   }
 
   try {
-    log.info('DRSummary', `Fetching summary for ${dropNumber}`);
+    log.info(`Fetching summary for ${dropNumber}`, undefined, 'DRSummary');
 
     // UNIFIED ARCHITECTURE: All data from database tables only - NO live API calls
     const [unifiedResult, oesResult, dropsResult, qaResult, swapResult] = await Promise.all([
@@ -350,16 +350,17 @@ async function handler(
       feedback_message: unified?.feedback_message || null,
     };
 
-    log.info('DRSummary', `Summary fetched for ${dropNumber}`, {
+    log.info(`Summary fetched for ${dropNumber}`, {
       state: currentState,
       photoCount,
       stepsComplete,
       isResubmission: (unified?.submission_count || 1) > 1,
-    });
+    }, 'DRSummary');
+
 
     return apiResponse.success(res, summary);
   } catch (error) {
-    log.error('DRSummary', `Error fetching summary for ${dropNumber}`, error);
+    log.error(`Error fetching summary for ${dropNumber}`, { error: error }, 'DRSummary');
     return apiResponse.internalError(res, error);
   }
 }

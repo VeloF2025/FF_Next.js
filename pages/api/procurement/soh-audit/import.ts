@@ -2,7 +2,7 @@
  * POST /api/procurement/soh-audit/import
  * Multipart Excel upload — creates a new version-stamped SOH audit.
  */
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import * as XLSX from 'xlsx';
 import formidable from 'formidable';
 import fs from 'fs';
@@ -18,7 +18,8 @@ const sql = neon(process.env.DATABASE_URL!);
 
 const FIXED_COLS = ['Item Code', 'Description', 'Category', 'UOM', 'BOQ Rate'];
 
-export default withAuth(async (req: AuthenticatedNextApiRequest, res: NextApiResponse) => {
+export default withAuth(async (req: NextApiRequest, res: NextApiResponse) => {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
 
   try {

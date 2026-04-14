@@ -38,7 +38,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       })),
     });
   } catch (error) {
-    log.error('OltReportAdminUsers', 'Failed to fetch admin users', { error });
+    log.error('Failed to fetch admin users', { error: { error } }, 'OltReportAdminUsers');
     return apiResponse.internalError(res, error);
   } finally {
     client.release();

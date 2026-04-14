@@ -53,7 +53,7 @@ export function useEmailOutbox(filters?: EmailOutboxFilters): UseEmailOutboxRetu
         setHasMore(items.length === (filters?.limit || PAGE_SIZE));
       }
     } catch (err) {
-      log.error('Failed to fetch email outbox:', err);
+      log.error('Failed to fetch email outbox:', { error: err });
     } finally {
       setIsLoading(false);
     }

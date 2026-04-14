@@ -140,7 +140,8 @@ export async function pullPaymentsFromSage(
       )
     `;
 
-    logger.info('Payment sync completed', result);
+    logger.info('Payment sync completed', { data: result });
+
   } catch (error) {
     result.success = false;
     logger.error('Payment sync failed', { error });

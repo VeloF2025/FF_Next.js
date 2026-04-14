@@ -50,7 +50,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       })),
     });
   } catch (error) {
-    log.error('Failed to fetch BOQ versions', error);
+    log.error('Failed to fetch BOQ versions', { error: error });
     return apiResponse.internalError(res, error);
   }
 }

@@ -36,7 +36,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       return apiResponse.success(res, result);
     } catch (error) {
-      log.error('FleetFuelAnomaliesApi', 'Failed to fetch fuel anomalies', { error });
+      log.error('Failed to fetch fuel anomalies', { error: { error } }, 'FleetFuelAnomaliesApi');
       return apiResponse.internalError(res, error);
     }
   }
@@ -53,12 +53,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       return apiResponse.success(res, result);
     } catch (error) {
-      log.error('FleetFuelAnomaliesApi', 'Failed to run anomaly detection', { error });
+      log.error('Failed to run anomaly detection', { error: { error } }, 'FleetFuelAnomaliesApi');
       return apiResponse.internalError(res, error);
     }
   }
 
-  return apiResponse.methodNotAllowed(res, req.method || 'unknown');
+  return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET', 'POST']);
 }
 
 export default withAuth(handler);

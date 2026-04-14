@@ -2,7 +2,7 @@
  * GET /api/procurement/soh-audit/template
  * Returns an Excel (.xlsx) template pre-populated with BOQ items and warehouse columns.
  */
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import * as XLSX from 'xlsx';
 import { neon } from '@neondatabase/serverless';
 import { withAuth } from '@/lib/auth';
@@ -11,7 +11,8 @@ import type { AuthenticatedNextApiRequest } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default withAuth(async (req: AuthenticatedNextApiRequest, res: NextApiResponse) => {
+export default withAuth(async (req: NextApiRequest, res: NextApiResponse) => {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
     return res.status(405).json({ error: 'Method not allowed' });

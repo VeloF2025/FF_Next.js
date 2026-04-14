@@ -92,7 +92,7 @@ async function handler(
       ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectFilter)
       : false;
 
-    log.info('PenetrationCurve', 'Fetching penetration curve', { dateFrom: dateFromStr, dateTo: dateToStr, groupBy: groupByMode, granularity: granularityMode });
+    log.info('Fetching penetration curve', { error: { dateFrom: dateFromStr, dateTo: dateToStr, groupBy: groupByMode, granularity: granularityMode } }, 'PenetrationCurve');
 
     const client = await pool.connect();
 
@@ -460,14 +460,14 @@ async function handler(
         dates: sortedDates,
       };
 
-      log.info('PenetrationCurve', 'Report generated', { seriesCount: series.length, dateCount: sortedDates.length });
+      log.info('Report generated', { error: { seriesCount: series.length, dateCount: sortedDates.length } }, 'PenetrationCurve');
 
       return res.status(200).json(response);
     } finally {
       client.release();
     }
   } catch (error) {
-    log.error('PenetrationCurve', 'Failed to generate report', { error });
+    log.error('Failed to generate report', { error: { error } }, 'PenetrationCurve');
     return apiResponse.internalError(res, error);
   }
 }

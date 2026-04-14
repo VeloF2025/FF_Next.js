@@ -62,7 +62,7 @@ async function handler(
         : project
       : undefined;
 
-    log.info('PendingAgingAPI', 'Fetching pending aging report', { project: projectStr });
+    log.info('Fetching pending aging report', { error: { project: projectStr } }, 'PendingAgingAPI');
 
     // Explicit branches to avoid conditional SQL fragments inside CTEs (Neon rule)
     const bucketsResult = projectStr
@@ -154,7 +154,7 @@ async function handler(
       records: sortedRecords.slice(0, 100),
     });
   } catch (error) {
-    log.error('PendingAgingAPI', 'Failed to fetch pending aging report', { error });
+    log.error('Failed to fetch pending aging report', { error: { error } }, 'PendingAgingAPI');
     return apiResponse.internalError(res, error);
   }
 }

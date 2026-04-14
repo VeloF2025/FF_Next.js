@@ -282,7 +282,7 @@ export class ApiResponseHelper {
     message = 'An internal error occurred'
   ): void {
     // Log the actual error for debugging
-    log.error('Internal Server Error', error, 'ApiResponseHelper');
+    log.error('Internal Server Error', { error: error }, 'ApiResponseHelper');
 
     // In production, don't expose internal error details
     const isDevelopment = process.env.NODE_ENV === 'development';
@@ -302,7 +302,7 @@ export class ApiResponseHelper {
     message = 'A database error occurred'
   ): void {
     // Log the actual error for debugging
-    log.error('Database Error', error, 'ApiResponseHelper');
+    log.error('Database Error', { error: error }, 'ApiResponseHelper');
 
     // In production, don't expose database error details
     const isDevelopment = process.env.NODE_ENV === 'development';

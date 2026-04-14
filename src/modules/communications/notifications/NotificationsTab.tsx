@@ -57,7 +57,7 @@ export function NotificationsTab() {
         setHasMore(items.length === PAGE_SIZE);
       }
     } catch (err) {
-      log.error('Failed to fetch notifications:', err);
+      log.error('Failed to fetch notifications:', { error: err });
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +82,7 @@ export function NotificationsTab() {
         prev.map(n => (n.id === id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n))
       );
     } catch (err) {
-      log.error('Failed to mark notification as read:', err);
+      log.error('Failed to mark notification as read:', { error: err });
     }
   };
 
@@ -96,7 +96,7 @@ export function NotificationsTab() {
         prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() }))
       );
     } catch (err) {
-      log.error('Failed to mark all notifications as read:', err);
+      log.error('Failed to mark all notifications as read:', { error: err });
     }
   };
 

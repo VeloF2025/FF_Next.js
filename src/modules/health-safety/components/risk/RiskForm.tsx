@@ -59,7 +59,7 @@ export function RiskForm({ projectId, onSuccess, onCancel }: RiskFormProps) {
     fetch('/api/projects', { credentials: 'include' })
       .then((r) => r.json())
       .then((d) => setProjects(d.data || []))
-      .catch((err) => log.error('Failed to load projects', err as Error));
+      .catch((err) => log.error('Failed to load projects', { error: err }));
   }, []);
 
   // Focus trap + Escape close

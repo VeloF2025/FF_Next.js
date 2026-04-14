@@ -10,7 +10,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const schedules = await safeArrayQuery(async () => [], { logError: false });
       return apiResponse.success(res, { schedules, total: 0, taskCounts: [] }, 'Schedules functionality is being migrated');
     } catch (error) {
-      log.error('FieldSchedules', `Error fetching schedules: ${error}`);
+      log.error(`Error fetching schedules: ${error}`, undefined, 'FieldSchedules');
       return apiResponse.internalError(res, error);
     }
   } else if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {

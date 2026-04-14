@@ -51,7 +51,7 @@ export async function recordCorrection(input: RecordCorrectionInput): Promise<Co
 
   // Don't record if human agreed with VLM
   if (input.vlmPredictedStep === input.correctStep) {
-    log.debug('CorrectionService', 'Skipping correction - human agreed with VLM');
+    log.debug('Skipping correction - human agreed with VLM', undefined, 'CorrectionService');
     throw new CorrectionServiceError(
       'Cannot record correction when VLM was correct',
       'NO_CORRECTION_NEEDED'

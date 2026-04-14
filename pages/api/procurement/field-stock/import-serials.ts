@@ -47,7 +47,7 @@ interface ImportResult {
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res, req.method || '');
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
   }
 
   const action = req.query.action as string;

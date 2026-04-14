@@ -402,7 +402,7 @@ async function handler(
         duration_ms: durationMs,
       };
 
-      log.info('Stage sync complete', result, 'SyncStages');
+      log.info('Stage sync complete', { data: result }, 'SyncStages');
 
       return res.status(200).json({ success: true, data: result });
     } finally {

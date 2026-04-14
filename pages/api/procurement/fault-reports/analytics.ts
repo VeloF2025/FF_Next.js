@@ -161,7 +161,7 @@ export default withAuth(withErrorHandler(async (
 
     return apiResponse.success(res, analytics);
   } catch (error) {
-    log.error('AnalyticsApi', 'Failed to fetch fault analytics', { error });
+    log.error('Failed to fetch fault analytics', { error: { error } }, 'AnalyticsApi');
     return apiResponse.databaseError(res, error, 'Failed to fetch fault analytics');
   }
 }));

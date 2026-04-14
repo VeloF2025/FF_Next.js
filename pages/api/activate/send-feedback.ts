@@ -353,7 +353,7 @@ async function handlePost(
     try {
       await logFeedbackSent(dropNumber, groupId || 'private', sentMessageId || undefined);
     } catch (activityError) {
-      log.warn('SendFeedback', `Failed to log activity for ${dropNumber}`, activityError);
+      log.warn(`Failed to log activity for ${dropNumber}`, { error: activityError }, 'SendFeedback');
     }
 
     return apiResponse.success(res, {
@@ -375,7 +375,7 @@ async function handlePost(
       task: taskId ? { id: taskId, created: true } : null,
     });
   } catch (error) {
-    log.error('Error sending feedback:', error);
+    log.error('Error sending feedback:', { error: error });
     return apiResponse.internalError(res, error);
   }
 }

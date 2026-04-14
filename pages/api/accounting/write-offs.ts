@@ -4,14 +4,15 @@
  * POST — create write-off
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { getWriteOffs, createWriteOff } from '@/modules/accounting/services/writeOffService';
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method === 'GET') {
     const { status, clientId, limit, offset } = req.query;
     const result = await getWriteOffs({
@@ -24,7 +25,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   }
 
   if (req.method === 'POST') {
-    const userId = req.user.id;
+    const userId = authReq.user.id;
     try {
       const item = await createWriteOff(req.body, userId);
       return apiResponse.success(res, item);

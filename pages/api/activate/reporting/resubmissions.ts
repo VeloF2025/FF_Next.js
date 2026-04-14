@@ -40,11 +40,12 @@ async function handler(
         : project
       : undefined;
 
-    log.info('ResubmissionsAPI', 'Fetching resubmission report', {
+    log.info('Fetching resubmission report', {
       dateFrom: dateFromStr,
       dateTo: dateToStr,
       project: projectStr,
-    });
+    }, 'ResubmissionsAPI');
+
 
     const data = await getResubmissionReport(
       dateFromStr as string,
@@ -54,7 +55,7 @@ async function handler(
 
     return res.status(200).json(data);
   } catch (error) {
-    log.error('ResubmissionsAPI', 'Failed to fetch resubmission report', { error });
+    log.error('Failed to fetch resubmission report', { error: { error } }, 'ResubmissionsAPI');
     return apiResponse.internalError(res, error);
   }
 }

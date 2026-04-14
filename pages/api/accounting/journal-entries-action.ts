@@ -4,7 +4,7 @@
  * Body: { id, action: 'post' | 'reverse', userId }
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
@@ -14,14 +14,15 @@ import {
   reverseJournalEntry,
 } from '@/modules/accounting/services/journalEntryService';
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
   try {
     const { id, action } = req.body;
-    const userId = req.user.id;
+    const userId = authReq.user.id;
     if (!id || !action) {
       return apiResponse.badRequest(res, 'id and action are required');
     }

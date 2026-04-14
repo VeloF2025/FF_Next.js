@@ -64,17 +64,18 @@ async function triggerBuild(
   request: TriggerBuildRequest
 ): Promise<TriggerBuildResponse> {
   if (!HARNESS_TRIGGER_SECRET) {
-    log.warn('HARNESS_TRIGGER_SECRET not configured', 'HarnessTrigger');
+    log.warn('HARNESS_TRIGGER_SECRET not configured', { error: 'HarnessTrigger' });
     return { success: false, error: 'Harness trigger not configured' };
   }
 
   const stageLabel = request.stage === 'poc' ? 'POC validation' : 'harness build';
 
   try {
-    log.info(
-      `Triggering ${stageLabel} for item ${request.item_id} (${request.work_type})`,
-      'HarnessTrigger'
-    );
+    log.info(`Triggering ${stageLabel} for item ${request.item_id} (${request.work_type})`, undefined, 'HarnessTrigger');
+
+
+
+
 
     // Transform to format expected by mvp_pipeline.py
     const serverPayload = {
@@ -113,7 +114,7 @@ async function triggerBuild(
       const errorText = await response.text();
       log.error(
         `${stageLabel} trigger failed: ${response.status} - ${errorText}`,
-        null,
+        undefined,
         'HarnessTrigger'
       );
       return {
@@ -124,10 +125,11 @@ async function triggerBuild(
 
     const result: TriggerBuildResponse = await response.json();
 
-    log.info(
-      `${stageLabel} triggered: ${result.run_id || 'no run ID'}`,
-      'HarnessTrigger'
-    );
+    log.info(`${stageLabel} triggered: ${result.run_id || 'no run ID'}`, undefined, 'HarnessTrigger');
+
+
+
+
 
     return result;
   } catch (error: unknown) {

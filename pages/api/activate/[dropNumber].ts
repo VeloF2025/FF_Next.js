@@ -288,7 +288,7 @@ async function handleGet(
       _dataQuality: qualityInfo,
     });
   } catch (error) {
-    log.error('Error fetching unified review:', error);
+    log.error('Error fetching unified review:', { error: error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -399,7 +399,7 @@ async function handlePatch(
     log.info(`Successfully updated unified review: ${dropNumber}`);
     return apiResponse.success(res, updatedReview);
   } catch (error) {
-    log.error('Error updating unified review:', error);
+    log.error('Error updating unified review:', { error: error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -426,7 +426,7 @@ async function handler(
       return handlePatch(req, res, dropNumber);
 
     default:
-      return apiResponse.methodNotAllowed(res);
+      return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET', 'PATCH']);
   }
 }
 

@@ -46,12 +46,13 @@ async function handler(
 
     const cacheKey = `team-performance:${dateFromStr}:${dateToStr}:${projectStr ?? 'all'}`;
 
-    log.info('TeamPerformanceAPI', 'Fetching team performance report', {
+    log.info('Fetching team performance report', {
       dateFrom: dateFromStr,
       dateTo: dateToStr,
       project: projectStr,
       cacheKey,
-    });
+    }, 'TeamPerformanceAPI');
+
 
     const data = await cachedQuery(
       'reporting',
@@ -69,7 +70,7 @@ async function handler(
 
     return res.status(200).json(data);
   } catch (error) {
-    log.error('TeamPerformanceAPI', 'Failed to fetch team performance report', { error });
+    log.error('Failed to fetch team performance report', { error: { error } }, 'TeamPerformanceAPI');
     return apiResponse.internalError(res, error);
   }
 }

@@ -5,14 +5,14 @@
  * Query params: active=true to filter active teams only
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 
 async function handler(
-  req: AuthenticatedNextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'GET') {

@@ -98,7 +98,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       stats,
     });
   } catch (error) {
-    log.error('OltReportDetail', 'Failed to fetch import details', { error, importId });
+    log.error('Failed to fetch import details', { error: { error, importId } }, 'OltReportDetail');
     return apiResponse.internalError(res, error);
   } finally {
     client.release();

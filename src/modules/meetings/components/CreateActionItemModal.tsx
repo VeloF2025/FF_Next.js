@@ -66,7 +66,7 @@ export function CreateActionItemModal({ isOpen, onClose, onCreated }: CreateActi
       onCreated?.();
       onClose();
     } catch (err) {
-      log.error('Failed to create action item:', err);
+      log.error('Failed to create action item:', { error: err });
     } finally {
       setIsSubmitting(false);
     }

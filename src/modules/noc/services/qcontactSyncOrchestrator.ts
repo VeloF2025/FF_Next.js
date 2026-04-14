@@ -318,7 +318,8 @@ export async function runFullSync(
 ): Promise<FullSyncResult> {
   const started_at = new Date();
 
-  logger.info('Starting bidirectional sync', request);
+  logger.info('Starting bidirectional sync', { data: request });
+
 
   try {
     // Run inbound sync (FiberTime QContact -> FibreFlow)
@@ -410,7 +411,8 @@ export async function runInboundOnlySync(
 ): Promise<FullSyncResult> {
   const started_at = new Date();
 
-  logger.info('Starting inbound-only sync', request);
+  logger.info('Starting inbound-only sync', { data: request });
+
 
   try {
     // Run inbound sync from FiberTime QContact
@@ -484,7 +486,8 @@ export async function runOutboundOnlySync(
 ): Promise<FullSyncResult> {
   const started_at = new Date();
 
-  logger.info('Starting outbound-only sync', request);
+  logger.info('Starting outbound-only sync', { data: request });
+
 
   try {
     const outboundTickets = await fetchTicketsForOutboundSync(request);
@@ -579,7 +582,8 @@ export async function getSyncProgress(): Promise<SyncProgress> {
       success_rate,
     };
 
-    logger.debug('Sync progress retrieved', progress);
+    logger.debug('Sync progress retrieved', { data: progress });
+
 
     return progress;
   } catch (error) {

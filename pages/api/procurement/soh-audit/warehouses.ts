@@ -2,7 +2,7 @@
  * GET  /api/procurement/soh-audit/warehouses — list active warehouses
  * POST /api/procurement/soh-audit/warehouses — add new warehouse
  */
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
@@ -19,7 +19,8 @@ export interface SOHWarehouse {
   sort_order: number;
 }
 
-export default withAuth(async (req: AuthenticatedNextApiRequest, res: NextApiResponse) => {
+export default withAuth(async (req: NextApiRequest, res: NextApiResponse) => {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method === 'GET') {
     try {
       const rows = await sql`

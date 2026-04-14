@@ -92,7 +92,7 @@ async function handler(
 
     return res.status(200).send(buffer);
   } catch (error) {
-    log.error('[PhotoProxy] Error proxying photo:', error);
+    log.error('[PhotoProxy] Error proxying photo:', { error: error });
     return apiResponse.internalError(res, error);
   }
 }

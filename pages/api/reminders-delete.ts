@@ -32,7 +32,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, { id }, 'Reminder deleted successfully');
   } catch (error) {
-    log.error('RemindersDelete', `Error deleting reminder: ${error}`);
+    log.error(`Error deleting reminder: ${error}`, undefined, 'RemindersDelete');
     return apiResponse.internalError(res, error);
   }
 }

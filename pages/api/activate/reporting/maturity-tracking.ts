@@ -85,11 +85,12 @@ async function handler(
       : false;
     const viewMode = (Array.isArray(view) ? view[0] : view) as 'hierarchy' | 'flat';
 
-    log.info('MaturityTracking', 'Fetching maturity data', {
+    log.info('Fetching maturity data', {
       project: projectFilter,
       isUuid,
       view: viewMode,
-    });
+    }, 'MaturityTracking');
+
 
     const client = await pool.connect();
 
@@ -520,19 +521,20 @@ async function handler(
         flat: flatRows,
       };
 
-      log.info('MaturityTracking', 'Report generated', {
+      log.info('Report generated', {
         totalProjects: hierarchy.length,
         totalScope,
         totalActivated,
         avgCompletionPercent,
-      });
+      }, 'MaturityTracking');
+
 
       return res.status(200).json(response);
     } finally {
       client.release();
     }
   } catch (error) {
-    log.error('MaturityTracking', 'Failed to generate report', { error });
+    log.error('Failed to generate report', { error: { error } }, 'MaturityTracking');
     return apiResponse.internalError(res, error);
   }
 }

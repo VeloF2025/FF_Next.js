@@ -58,7 +58,7 @@ export function IncidentPhotoUpload({
         };
         onPhotosChange([...photos, newPhoto]);
       } catch (err) {
-        log.error('Photo upload error', err as Error);
+        log.error('Photo upload error', { error: err as Error });
       }
     }
 

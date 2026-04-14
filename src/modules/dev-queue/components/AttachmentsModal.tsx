@@ -56,7 +56,7 @@ export function AttachmentsModal({ isOpen, onClose, itemId, itemTitle }: Attachm
         setAttachments(data.data || []);
       }
     } catch (err) {
-      log.error('Failed to fetch attachments', err, 'AttachmentsModal');
+      log.error('Failed to fetch attachments', { error: err }, 'AttachmentsModal');
     } finally {
       setLoading(false);
     }
@@ -144,7 +144,7 @@ export function AttachmentsModal({ isOpen, onClose, itemId, itemTitle }: Attachm
         setAttachments(prev => prev.filter(a => a.id !== attachmentId));
       }
     } catch (err) {
-      log.error('Failed to delete attachment', err, 'AttachmentsModal');
+      log.error('Failed to delete attachment', { error: err }, 'AttachmentsModal');
     }
   };
 

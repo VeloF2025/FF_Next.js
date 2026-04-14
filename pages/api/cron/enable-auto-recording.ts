@@ -53,7 +53,8 @@ export default async function handler(
     const hoursAhead = typeof req.body?.hours === 'number' ? req.body.hours : 24;
     const result = await enableAutoRecordingForUpcomingMeetings(hoursAhead);
 
-    log.info('Auto-recording cron complete', result, LOGGER);
+    log.info('Auto-recording cron complete', { data: result }, LOGGER);
+
 
     res.status(200).json({ success: true, ...result });
   } catch (error: unknown) {

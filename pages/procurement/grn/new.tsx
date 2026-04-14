@@ -141,7 +141,7 @@ export default function NewGRNPage() {
           setSelectedPOId(purchaseOrderId);
         }
       } catch (err) {
-        log.error('Failed to load reference data', err);
+        log.error('Failed to load reference data', { error: err });
       } finally {
         setIsLoadingData(false);
       }
@@ -312,7 +312,7 @@ export default function NewGRNPage() {
         setError(data.error?.message || 'Failed to create GRN');
       }
     } catch (err) {
-      log.error('Failed to create GRN', err);
+      log.error('Failed to create GRN', { error: err });
       setError('An unexpected error occurred');
     } finally {
       setIsSubmitting(false);

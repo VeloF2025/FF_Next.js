@@ -9,7 +9,7 @@
  * Requires auth.
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
@@ -20,7 +20,7 @@ import type { SpTrackerConfig } from '@/lib/sharepoint-sync/types';
 const sql = neon(process.env.DATABASE_URL || '');
 
 async function handler(
-  req: AuthenticatedNextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'POST') {

@@ -38,9 +38,9 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       }
 
       // Get full timeline
-      log.info('ActivityLog', `Getting timeline for ${dropNumber}, limit ${limitNum}`);
+      log.info(`Getting timeline for ${dropNumber}, limit ${limitNum}`, undefined, 'ActivityLog');
       const timeline = await getActivityTimeline(dropNumber, limitNum);
-      log.info('ActivityLog', `Got ${timeline.length} events for ${dropNumber}`);
+      log.info(`Got ${timeline.length} events for ${dropNumber}`, undefined, 'ActivityLog');
 
       return apiResponse.success(res, {
         dropNumber,
@@ -67,7 +67,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       })),
     });
   } catch (error) {
-    log.error('ActivityLog', 'Error getting activity', error);
+    log.error('Error getting activity', { error: error }, 'ActivityLog');
     return apiResponse.internalError(res, error);
   }
 }

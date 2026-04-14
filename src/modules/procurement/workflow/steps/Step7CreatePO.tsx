@@ -73,7 +73,7 @@ export const Step7CreatePO: React.FC<Step7Props> = ({ state, onComplete, onBack 
       setPhase('done');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to create Purchase Order';
-      log.error('Step7CreatePO', 'PO creation failed', { error: err });
+      log.error('PO creation failed', { error: { error: err } }, 'Step7CreatePO');
       setSubmitError(msg);
       setPhase('form');
     }

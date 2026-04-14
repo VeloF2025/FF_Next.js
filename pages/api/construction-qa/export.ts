@@ -182,14 +182,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const rows = await sql.query(query, params);
 
-    log.info('CQA export', `Exporting ${rows.length} rows for ${projectName}`, {
+    log.info(`Exporting ${rows.length} rows for ${projectName}`, {
       module: 'construction-qa',
       projectId,
       discipline,
       dateFrom,
       dateTo,
       approval,
-    });
+    }, 'CQA export');
 
     const excel = toExcel(rows, projectName, approval);
 

@@ -98,7 +98,7 @@ async function handlePost(
           photos = [];
         }
       } catch (fetchError) {
-        log.warn(`Photo fetch error for ${dropNumber}:`, fetchError);
+        log.warn(`Photo fetch error for ${dropNumber}:`, { error: fetchError });
         photos = [];
       }
     }
@@ -123,14 +123,14 @@ async function handlePost(
       evaluation: aiResult,
     });
   } catch (error) {
-    log.error('Error during AI evaluation:', error);
+    log.error('Error during AI evaluation:', { error: error });
 
     // Update status to 'failed' if we have a dropNumber
     if (req.body?.dropNumber) {
       try {
         await updateEvaluationStatus(req.body.dropNumber, 'failed');
       } catch (updateError) {
-        log.error('Failed to update evaluation status to failed:', updateError);
+        log.error('Failed to update evaluation status to failed:', { error: updateError });
       }
     }
 
@@ -401,7 +401,7 @@ async function handler(
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res);
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
   }
 
   return handlePost(req, res);

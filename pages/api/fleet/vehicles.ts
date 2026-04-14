@@ -521,7 +521,7 @@ export default withFleetAuth(withErrorHandler(async (req: NextApiRequest, res: N
         const newVehicleArr = newVehicle as Record<string, unknown>[];
         return apiResponse.created(res, newVehicleArr[0], 'Vehicle created successfully');
       } catch (error: any) {
-        log.error('FleetVehiclesApi', 'Failed to create vehicle', { error, registration: body.registration });
+        log.error('Failed to create vehicle', { error: { error, registration: body.registration } }, 'FleetVehiclesApi');
         if (error.message?.includes('fleet_vehicles_registration_key') || error.code === '23505') {
           return apiResponse.error(
             res,
@@ -625,7 +625,7 @@ export default withFleetAuth(withErrorHandler(async (req: NextApiRequest, res: N
 
         return apiResponse.success(res, updatedVehicleArr[0], 'Vehicle updated successfully');
       } catch (error: any) {
-        log.error('FleetVehiclesApi', 'Failed to update vehicle', { error, id, registration: body.registration });
+        log.error('Failed to update vehicle', { error: { error, id, registration: body.registration } }, 'FleetVehiclesApi');
         if (error.message?.includes('fleet_vehicles_registration_key') || error.code === '23505') {
           return apiResponse.error(
             res,

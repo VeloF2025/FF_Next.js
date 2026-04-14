@@ -3,7 +3,7 @@
  * GET /api/admin/users - List all users with roles
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
@@ -12,11 +12,12 @@ import { log } from '@/lib/logger';
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(
-  req: AuthenticatedNextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'GET') {
-    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
   }
 
   try {

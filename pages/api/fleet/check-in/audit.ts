@@ -244,7 +244,7 @@ async function handler(
       sql.query(discrepancyStatsQuery, discrepancyParams) as Promise<Record<string, unknown>[]>,
     ]);
 
-    log.info('FleetAuditApi', `Fetched ${filteredRecords.length} audit records (page ${pageNum})`);
+    log.info(`Fetched ${filteredRecords.length} audit records (page ${pageNum})`, undefined, 'FleetAuditApi');
 
     return apiResponse.success(res, {
       records: filteredRecords,
@@ -258,7 +258,7 @@ async function handler(
       discrepancyStats: discrepancyStats[0],
     });
   } catch (error) {
-    log.error('FleetAuditApi', `Audit fetch failed: ${error}`);
+    log.error(`Audit fetch failed: ${error}`, undefined, 'FleetAuditApi');
     return apiResponse.internalError(res, error);
   }
 }

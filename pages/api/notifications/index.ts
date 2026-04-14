@@ -25,7 +25,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const notifications = await getNotifications(authReq.user.id, limit, offset, unreadOnly);
     return apiResponse.success(res, notifications);
   } catch (error) {
-    log.error('IndexApi', 'Internal error', { error });
+    log.error('Internal error', { error: { error } }, 'IndexApi');
     return apiResponse.internalError(res, error);
   }
 }

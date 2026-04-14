@@ -87,7 +87,7 @@ async function handler(
       ? Math.min(parseInt(Array.isArray(pageSize) ? pageSize[0] : pageSize, 10), 500)
       : 100;
 
-    log.info('OfflineDevicesAPI', 'Fetching offline devices report', {
+    log.info('Fetching offline devices report', {
       dateFrom: dateFromStr,
       dateTo: dateToStr,
       project: projectStr,
@@ -98,7 +98,8 @@ async function handler(
       lastDownReason: lastDownReasonStr,
       page: pageNum,
       pageSize: pageSizeNum,
-    });
+    }, 'OfflineDevicesAPI');
+
 
     const data = await getOfflineDevicesReport(
       dateFromStr as string,
@@ -117,7 +118,7 @@ async function handler(
 
     return res.status(200).json(data);
   } catch (error) {
-    log.error('OfflineDevicesAPI', 'Failed to fetch offline devices report', { error });
+    log.error('Failed to fetch offline devices report', { error: { error } }, 'OfflineDevicesAPI');
     return apiResponse.internalError(res, error);
   }
 }

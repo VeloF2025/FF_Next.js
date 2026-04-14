@@ -61,7 +61,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           return apiResponse.notFound(res, 'Check-in record', recordId);
         }
 
-        log.info('FleetCheckInApi', `Check-in record ${recordId} deleted by admin`);
+        log.info(`Check-in record ${recordId} deleted by admin`, undefined, 'FleetCheckInApi');
         return apiResponse.success(res, { deleted: true });
       }
 
@@ -69,7 +69,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PUT', 'DELETE']);
     }
   } catch (error) {
-    log.error('RecordidApi', 'Internal error', { error });
+    log.error('Internal error', { error: { error } }, 'RecordidApi');
     return apiResponse.internalError(res, error);
   }
 }

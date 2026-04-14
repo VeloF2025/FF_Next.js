@@ -134,7 +134,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(200).send(content);
     }
   } catch (error) {
-    log.error('Export error:', error);
+    log.error('Export error:', { error: error });
     return apiResponse.internalError(res, new Error('Export failed'));
   }
 }

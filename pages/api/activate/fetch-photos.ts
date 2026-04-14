@@ -125,7 +125,7 @@ async function handlePost(
 
     return apiResponse.success(res, result);
   } catch (error) {
-    log.error('Error fetching photos:', error);
+    log.error('Error fetching photos:', { error: error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -399,7 +399,7 @@ async function handler(
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res);
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
   }
 
   return handlePost(req, res);

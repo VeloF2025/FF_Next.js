@@ -40,11 +40,12 @@ async function handler(
         : project
       : undefined;
 
-    log.info('FunnelAPI', 'Fetching QA funnel report', {
+    log.info('Fetching QA funnel report', {
       dateFrom: dateFromStr,
       dateTo: dateToStr,
       project: projectStr,
-    });
+    }, 'FunnelAPI');
+
 
     const data = await getQAFunnelReport(
       dateFromStr as string,
@@ -54,7 +55,7 @@ async function handler(
 
     return res.status(200).json(data);
   } catch (error) {
-    log.error('FunnelAPI', 'Failed to fetch QA funnel report', { error });
+    log.error('Failed to fetch QA funnel report', { error: { error } }, 'FunnelAPI');
     return apiResponse.internalError(res, error);
   }
 }

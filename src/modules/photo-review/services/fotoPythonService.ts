@@ -44,7 +44,7 @@ export async function executePythonEvaluation(
   const pythonPath = process.env.PYTHON_PATH || 'python3';
 
   return new Promise((resolve, reject) => {
-    log.info('PythonService', `Executing: ${pythonPath} ${pythonScriptPath} ${drNumber}`);
+    log.info(`Executing: ${pythonPath} ${pythonScriptPath} ${drNumber}`, undefined, 'PythonService');
 
     const pythonProcess = spawn(pythonPath, [pythonScriptPath, drNumber], {
       env: {
@@ -67,7 +67,7 @@ export async function executePythonEvaluation(
     pythonProcess.stdout.on('data', (data) => {
       const output = data.toString();
       stdout += output;
-      log.debug('PythonService', `stdout: ${output.trim()}`);
+      log.debug(`stdout: ${output.trim()}`, undefined, 'PythonService');
 
       // Try to parse JSON from stdout
       try {
@@ -89,7 +89,7 @@ export async function executePythonEvaluation(
     });
 
     pythonProcess.on('close', (code) => {
-      log.info('PythonService', `Process exited with code ${code}`);
+      log.info(`Process exited with code ${code}`, undefined, 'PythonService');
 
       if (code !== 0) {
         reject(

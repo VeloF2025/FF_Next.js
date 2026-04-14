@@ -84,7 +84,7 @@ async function handler(
 
     return apiResponse.success(res, summaries);
   } catch (error) {
-    log.error('Error fetching project summaries:', error);
+    log.error('Error fetching project summaries:', { error: error });
     return apiResponse.internalError(res, error);
   }
 }

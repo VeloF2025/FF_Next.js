@@ -36,7 +36,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
 
       default:
-        return apiResponse.methodNotAllowed(res, ['GET', 'POST', 'PUT']);
+        return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET', 'POST', 'PUT']);
     }
   } catch (error) {
    log.error('smartsheet-config', { error: error instanceof Error ? error.message : String(error) });

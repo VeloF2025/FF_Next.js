@@ -64,7 +64,8 @@ export default async function handler(
 
     const result = await scrapeOneDriveRecordings(sql, { lookbackDays, limit });
 
-    log.info('OneDrive scrape cron complete', result, LOGGER);
+    log.info('OneDrive scrape cron complete', { data: result }, LOGGER);
+
 
     res.status(200).json({ success: true, ...result });
   } catch (error: unknown) {

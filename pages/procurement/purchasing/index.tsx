@@ -168,7 +168,7 @@ function RequisitionsTabContent() {
         setTotalCount(data.pagination?.total || items.length);
       }
     } catch (err) {
-      log.error('Failed to fetch requisitions', err);
+      log.error('Failed to fetch requisitions', { error: err });
     } finally {
       setIsLoading(false);
       setIsLoadingMore(false);
@@ -300,7 +300,7 @@ function PurchaseOrdersTabContent() {
         setTotalCount(data.pagination?.total || items.length);
       }
     } catch (err) {
-      log.error('Failed to fetch purchase orders', err);
+      log.error('Failed to fetch purchase orders', { error: err });
     } finally {
       setIsLoading(false);
       setIsLoadingMore(false);
@@ -446,7 +446,7 @@ function GRNTabContent() {
         setTotalCount(data.pagination?.total || items.length);
       }
     } catch (err) {
-      log.error('Failed to fetch GRNs', err);
+      log.error('Failed to fetch GRNs', { error: err });
     } finally {
       setIsLoading(false);
       setIsLoadingMore(false);

@@ -167,7 +167,7 @@ export default function ProcurementReportsPage() {
         },
       });
     } catch (error) {
-      log.error('Failed to fetch report data', error);
+      log.error('Failed to fetch report data', { error: error });
     } finally {
       setIsLoading(false);
     }

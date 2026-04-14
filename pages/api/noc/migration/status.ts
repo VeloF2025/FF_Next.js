@@ -18,7 +18,7 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return apiResponse.methodNotAllowed(res, req.method || 'unknown');
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
   }
 
   try {

@@ -77,14 +77,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     }
 
-    log.info('CheckDisplaced', `Checked ${toCheck.length} serials, ${lookup.rows.length} activated`, {
+    log.info(`Checked ${toCheck.length} serials, ${lookup.rows.length} activated`, {
       checked: toCheck.length,
       activated: lookup.rows.length,
-    });
+    }, 'CheckDisplaced');
+
 
     return apiResponse.success(res, results);
   } catch (error) {
-    log.error('CheckDisplaced', 'Failed to check displaced serials', { error });
+    log.error('Failed to check displaced serials', { error: { error } }, 'CheckDisplaced');
     return apiResponse.internalError(res, error);
   } finally {
     client.release();

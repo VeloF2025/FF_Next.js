@@ -129,7 +129,8 @@ export async function pullChartOfAccounts(
       )
     `;
 
-    logger.info('Chart of accounts sync completed', result);
+    logger.info('Chart of accounts sync completed', { data: result });
+
   } catch (error) {
     result.success = false;
     logger.error('Chart of accounts sync failed', { error });

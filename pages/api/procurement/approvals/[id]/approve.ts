@@ -166,7 +166,7 @@ export default withAuth(withErrorHandler(async (
 
     return apiResponse.success(res, updated[0], 'Approval granted successfully');
   } catch (error) {
-    log.error('ApproveApi', 'Failed to approve request', { error });
+    log.error('Failed to approve request', { error: { error } }, 'ApproveApi');
     return apiResponse.databaseError(res, error, 'Failed to approve request');
   }
 }));

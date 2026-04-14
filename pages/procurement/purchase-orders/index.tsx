@@ -83,7 +83,7 @@ export default function PurchaseOrdersPage() {
         setError(data.error?.message || 'Failed to fetch purchase orders');
       }
     } catch (err) {
-      log.error('Failed to fetch purchase orders', err);
+      log.error('Failed to fetch purchase orders', { error: err });
       setError('Failed to load purchase orders');
     } finally {
       setIsLoading(false);

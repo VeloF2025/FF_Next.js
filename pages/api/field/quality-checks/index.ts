@@ -14,7 +14,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         stats: { totalChecks: 0, passed: 0, failed: 0, averageScore: 0, byType: {} },
       }, 'Quality checks functionality is being migrated');
     } catch (error) {
-      log.error('FieldQualityChecks', `Error fetching quality checks: ${error}`);
+      log.error(`Error fetching quality checks: ${error}`, undefined, 'FieldQualityChecks');
       return apiResponse.internalError(res, error);
     }
   } else if (req.method === 'POST' || req.method === 'PUT') {

@@ -12,7 +12,7 @@ import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
 export default withAuth(async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res);
+  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
 
   try {
     const from = (req.query.from as string) || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
@@ -59,6 +59,6 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     log.error('sales-by-customer report error', { error: message });
-    return apiResponse.error(res, 'Failed to generate report');
+    return apiResponse.internalError(res, err, 'Failed to generate report');
   }
 });

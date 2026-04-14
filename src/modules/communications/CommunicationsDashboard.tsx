@@ -96,7 +96,7 @@ const CommunicationsDashboard: React.FC = () => {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       setSyncMessage(`✗ Sync failed: ${message}`);
-      log.error('Fireflies sync failed:', error);
+      log.error('Fireflies sync failed:', { error: error });
     } finally {
       setIsSyncing(false);
       // Clear message after 5 seconds
@@ -127,7 +127,7 @@ const CommunicationsDashboard: React.FC = () => {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       setSyncMessage(`Teams sync failed: ${message}`);
-      log.error('Teams sync failed:', error);
+      log.error('Teams sync failed:', { error: error });
     } finally {
       setIsSyncingTeams(false);
       setTimeout(() => setSyncMessage(null), 8000);

@@ -1,4 +1,4 @@
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
@@ -7,7 +7,8 @@ import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
@@ -68,7 +69,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
       categories: categories.map(c => c.category),
     });
   } catch (error) {
-    log.error('Failed to search stock items', error);
+    log.error('Failed to search stock items', { error: error });
     return apiResponse.internalError(res, error);
   }
 }

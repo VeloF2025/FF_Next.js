@@ -150,7 +150,8 @@ export async function pullAnalysisData(
       )
     `;
 
-    logger.info('Analysis sync completed', result);
+    logger.info('Analysis sync completed', { data: result });
+
   } catch (error) {
     result.success = false;
     logger.error('Analysis sync failed', { error });

@@ -57,7 +57,7 @@ export function EmailComposeForm({ onSent }: EmailComposeFormProps) {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
-      log.error('Email compose failed:', err);
+      log.error('Email compose failed:', { error: err });
       setStatus({ type: 'error', message: msg });
     } finally {
       setIsSending(false);

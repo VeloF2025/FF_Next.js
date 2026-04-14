@@ -286,6 +286,7 @@ export async function enableAutoRecordingForUpcomingMeetings(
     }
   }
 
-  log.info('Auto-recording scan complete', result, LOGGER);
+  log.info('Auto-recording scan complete', { data: result }, LOGGER);
+
   return result;
 }

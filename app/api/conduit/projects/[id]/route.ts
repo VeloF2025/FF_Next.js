@@ -36,7 +36,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ data: row as ConduitProject });
   } catch (error) {
-    log.error('[conduit/projects/[id] GET]', error);
+    log.error('[conduit/projects/[id] GET]', { error: error });
     return NextResponse.json({ error: 'Failed to fetch project' }, { status: 500 });
   }
 }
@@ -70,7 +70,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ data: updated as ConduitProject });
   } catch (error) {
-    log.error('[conduit/projects/[id] PATCH]', error);
+    log.error('[conduit/projects/[id] PATCH]', { error: error });
     return NextResponse.json({ error: 'Failed to update project status' }, { status: 500 });
   }
 }
@@ -126,7 +126,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ data: updated as ConduitProject });
   } catch (error) {
-    log.error('[conduit/projects/[id] PUT]', error);
+    log.error('[conduit/projects/[id] PUT]', { error: error });
     return NextResponse.json({ error: 'Failed to update project' }, { status: 500 });
   }
 }
@@ -152,7 +152,7 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
     await sql`DELETE FROM conduit_projects WHERE id = ${params.id}`;
     return NextResponse.json({ success: true });
   } catch (error) {
-    log.error('[conduit/projects/[id] DELETE]', error);
+    log.error('[conduit/projects/[id] DELETE]', { error: error });
     return NextResponse.json({ error: 'Failed to delete project' }, { status: 500 });
   }
 }

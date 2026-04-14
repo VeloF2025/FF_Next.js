@@ -97,7 +97,7 @@ async function handler(
       source: 'all_staff_fallback',
     });
   } catch (error) {
-    log.error('Error fetching staff by project:', error);
+    log.error('Error fetching staff by project:', { error: error });
     return apiResponse.internalError(res, error);
   }
 }

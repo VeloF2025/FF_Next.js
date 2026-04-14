@@ -6,7 +6,7 @@
  * Users are created with "pending_setup" status - they need to set a password to activate.
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { v4 as uuidv4 } from 'uuid';
 import { withAuth, withRole, AuthenticatedNextApiRequest, type AuthRole } from '@/lib/auth';
@@ -37,11 +37,12 @@ function mapPositionToAuthRole(position: string | null): AuthRole {
 }
 
 async function handler(
-  req: AuthenticatedNextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
   }
 
   try {
@@ -150,7 +151,7 @@ async function handler(
       created,
       skipped,
       errors: errors.length,
-      by: req.user.email,
+      by: authReq.user.email,
     });
 
     return apiResponse.success(res, {

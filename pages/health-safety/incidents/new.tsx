@@ -78,7 +78,7 @@ function NewIncidentContent() {
         if (projData.success) setProjects(projData.data || []);
         if (contData.success) setContractors(contData.data || []);
       } catch (err) {
-        log.error('Failed to load form data', err as Error);
+        log.error('Failed to load form data', { error: err as Error });
       }
     };
     load();
@@ -129,7 +129,7 @@ function NewIncidentContent() {
       router.push('/projects/health-safety/incidents');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to create incident';
-      log.error('Failed to create incident:', err as Error);
+      log.error('Failed to create incident:', { error: err as Error });
       setError(msg);
     } finally {
       setIsSubmitting(false);

@@ -230,4 +230,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   });
 }
 
-export default withAuth(fetchSerialDataFromApi);
+export default withAuth(handler);

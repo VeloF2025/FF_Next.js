@@ -50,14 +50,14 @@ async function handler(
     // Strip data URL prefix if present
     const base64Image = image.replace(/^data:image\/[a-z]+;base64,/, '');
 
-    log.info(MODULE, 'Processing licence disk image...');
+    log.info('Processing licence disk image...', undefined, MODULE);
 
     const result = await extractLicenseDiskDetails(base64Image);
 
     if (result.error) {
-      log.warn(MODULE, `Extraction completed with error: ${result.error}`);
+      log.warn(`Extraction completed with error: ${result.error}`, undefined, MODULE);
     } else {
-      log.info(MODULE, `Extraction successful, confidence: ${result.confidence}`);
+      log.info(`Extraction successful, confidence: ${result.confidence}`, undefined, MODULE);
     }
 
     return res.status(200).json({
@@ -65,7 +65,7 @@ async function handler(
       data: result,
     });
   } catch (error) {
-    log.error(MODULE, `Failed to extract licence disk details: ${error}`);
+    log.error(`Failed to extract licence disk details: ${error instanceof Error ? error.message : String(error)}`, { error }, MODULE);
     return apiResponse.internalError(res, error);
   }
 }

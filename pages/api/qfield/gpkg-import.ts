@@ -118,7 +118,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
       parsedOutput = JSON.parse(stdout.trim());
     } catch {
-      log.error('GpkgImportApi', 'Operation failed', { error });
+      log.error('Operation failed', { error: { error } }, 'GpkgImportApi');
       await updateJobStatus(sql, jobId, 'failed', {}, ['Failed to parse GPKG reader output']);
       return apiResponse.internalError(res, new Error('Invalid JSON from GPKG reader'), 'Failed to parse GPKG data');
     }

@@ -183,15 +183,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       canAutoSwap,
     };
 
-    log.info('CrossDRLookup', 'Lookup complete', {
+    log.info('Lookup complete', {
       drA: drNumber,
       drB: belongsToDr,
       scenario,
-    });
+    }, 'CrossDRLookup');
+
 
     return apiResponse.success(res, result);
   } catch (error) {
-    log.error('CrossDRLookup', 'Lookup failed', { error });
+    log.error('Lookup failed', { error: { error } }, 'CrossDRLookup');
     return apiResponse.internalError(res, error);
   } finally {
     client.release();

@@ -117,7 +117,7 @@ export function ExitEmployeeModal({
       });
       onClose();
     } catch (error) {
-      log.error('Error processing exit', error, 'ExitEmployeeModal');
+      log.error('Error processing exit', { error: error }, 'ExitEmployeeModal');
     } finally {
       setIsSubmitting(false);
     }

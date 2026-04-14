@@ -331,12 +331,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       is_complete: isComplete(row),
     }));
 
-    log.info('ActivateExportAPI', `Exporting ${rows.length} rows`, {
+    log.info(`Exporting ${rows.length} rows`, {
       dateFrom,
       dateTo,
       project,
       status,
-    });
+    }, 'ActivateExportAPI');
+
 
     // Return as JSON if format=json requested
     if (format === 'json') {
@@ -370,7 +371,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     res.setHeader('X-Export-Count', String(rows.length));
     return res.status(200).send(excel);
   } catch (error: any) {
-    log.error('ActivateExportAPI', 'Error exporting data', error);
+    log.error('Error exporting data', { error: error }, 'ActivateExportAPI');
     return apiResponse.internalError(res, error);
   }
 }

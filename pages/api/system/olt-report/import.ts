@@ -223,12 +223,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       : fields.project || null;
 
     // Parse Excel file with validation
-    log.info('OltReportImport', 'Parsing Excel file', { filename: file.originalFilename });
+    log.info('Parsing Excel file', { error: { filename: file.originalFilename } }, 'OltReportImport');
     const { records, warnings, headerMismatch } = await parseExcelFile(file.filepath);
 
     // Log warnings if any
     if (warnings.length > 0) {
-      log.warn('OltReportImport', 'Format validation warnings detected', { warnings, headerMismatch });
+      log.warn('Format validation warnings detected', { error: { warnings, headerMismatch } }, 'OltReportImport');
     }
 
     // Clean up temp file
@@ -454,15 +454,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       warnings: warnings.length > 0 ? warnings : undefined,
     };
 
-    log.info('OltReportImport', 'Import completed', {
+    log.info('Import completed', {
       importId,
       stats: response.stats,
-    });
+    }, 'OltReportImport');
+
 
     return apiResponse.success(res, response);
   } catch (error) {
     await client.query('ROLLBACK');
-    log.error('OltReportImport', 'Import failed', { error });
+    log.error('Import failed', { error: { error } }, 'OltReportImport');
     return apiResponse.internalError(res, error);
   } finally {
     client.release();

@@ -130,7 +130,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
 
     return apiResponse.success(res, transformedRFQ);
   } catch (error) {
-    log.error('Failed to fetch RFQ', error);
+    log.error('Failed to fetch RFQ', { error: error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -218,7 +218,7 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse, id: string) 
     log.info('RFQ updated', { rfqId: id });
     return apiResponse.success(res, { id, message: 'RFQ updated successfully' });
   } catch (error) {
-    log.error('Failed to update RFQ', error);
+    log.error('Failed to update RFQ', { error: error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -242,7 +242,7 @@ async function handleDelete(req: NextApiRequest, res: NextApiResponse, id: strin
     log.info('RFQ deleted', { rfqId: id });
     return apiResponse.success(res, { message: 'RFQ deleted successfully' });
   } catch (error) {
-    log.error('Failed to delete RFQ', error);
+    log.error('Failed to delete RFQ', { error: error });
     return apiResponse.internalError(res, error);
   }
 }

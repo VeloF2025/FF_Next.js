@@ -11,7 +11,7 @@ import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return apiResponse.methodNotAllowed(res, req.method || 'unknown');
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
   }
 
   try {
@@ -33,7 +33,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, result);
   } catch (error) {
-    log.error('TransactionsApi', 'Internal error', { error });
+    log.error('Internal error', { error: { error } }, 'TransactionsApi');
     return apiResponse.internalError(res, error);
   }
 }

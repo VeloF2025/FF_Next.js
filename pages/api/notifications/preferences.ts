@@ -68,7 +68,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, merged);
   } catch (error) {
-    log.error('PreferencesApi', 'Internal error', { error });
+    log.error('Internal error', { error: { error } }, 'PreferencesApi');
     return apiResponse.internalError(res, error);
   }
 }
@@ -109,7 +109,7 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, { updated: preferences.length });
   } catch (error) {
-    log.error('PreferencesApi', 'Operation failed', { error });
+    log.error('Operation failed', { error: { error } }, 'PreferencesApi');
     return apiResponse.internalError(res, error);
   }
 }

@@ -4,7 +4,7 @@
  * PATCH /api/admin/users/[userId] - Update user (role, status)
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import { getUserEffectivePermissions, getUserPermissionOverrides } from '@/lib/permissions';
@@ -14,9 +14,10 @@ import { log } from '@/lib/logger';
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(
-  req: AuthenticatedNextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
+  const authReq = req as AuthenticatedNextApiRequest;
   const { userId } = req.query;
 
   if (!userId || typeof userId !== 'string') {
@@ -24,14 +25,14 @@ async function handler(
   }
 
   if (req.method === 'GET') {
-    return handleGet(req, res, userId);
+    return handleGet(authReq, res, userId);
   }
 
   if (req.method === 'PATCH') {
-    return handlePatch(req, res, userId);
+    return handlePatch(authReq, res, userId);
   }
 
-  return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+  return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET', 'PATCH']);
 }
 
 async function handleGet(

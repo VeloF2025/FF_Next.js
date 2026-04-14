@@ -157,7 +157,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
       status: request.status as string,
     });
   } catch (error) {
-    log.error('PaymentRequestsApi', 'Failed to create payment request', { error });
+    log.error('Failed to create payment request', { error: { error } }, 'PaymentRequestsApi');
     return apiResponse.databaseError(res, error, 'Failed to create payment request');
   }
 }));

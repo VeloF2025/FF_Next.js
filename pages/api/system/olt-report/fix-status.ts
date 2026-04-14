@@ -90,12 +90,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ]
       );
 
-      log.info('FixStatus', 'Status updated', { drNumber, propId, oldStatus: result.oldStatus, newStatus: INSTALLED_STATUS });
+      log.info('Status updated', { error: { drNumber, propId, oldStatus: result.oldStatus, newStatus: INSTALLED_STATUS } }, 'FixStatus');
     }
 
     return apiResponse.success(res, result);
   } catch (error) {
-    log.error('FixStatus', 'Status fix failed', { error, drNumber, propId });
+    log.error('Status fix failed', { error: { error, drNumber, propId } }, 'FixStatus');
     return apiResponse.internalError(res, error);
   } finally {
     client.release();

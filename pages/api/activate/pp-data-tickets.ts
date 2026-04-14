@@ -10,7 +10,7 @@
  * - projects table: project UUID from project name
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
@@ -131,7 +131,7 @@ async function getProjectId(projectName?: string): Promise<EnrichmentData> {
 }
 
 async function handler(
-  req: AuthenticatedNextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
   if (req.method === 'POST') {
@@ -233,7 +233,7 @@ async function handleCreate(
         description,
         dr_number: dr || undefined,
         ont_serial: serial,
-        created_by: req.user.id,
+        created_by: authReq.user.id,
         assigned_team_id: assigned_team_id || undefined,
         status: assigned_team_id ? 'assigned' : undefined,
         project_id: enrichment.project_id || undefined,

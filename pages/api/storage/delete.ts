@@ -20,10 +20,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     await vfStorage.deleteFile(type, category, fileName);
-    log.info('StorageDelete', `Deleted file: ${type}/${category}/${fileName}`);
+    log.info(`Deleted file: ${type}/${category}/${fileName}`, undefined, 'StorageDelete');
     return apiResponse.success(res, { deleted: true });
   } catch (error) {
-    log.error('StorageDelete', `Error deleting file: ${error}`);
+    log.error(`Error deleting file: ${error}`, undefined, 'StorageDelete');
     return apiResponse.internalError(res, error);
   }
 }

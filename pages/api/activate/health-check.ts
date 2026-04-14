@@ -392,7 +392,7 @@ async function getRecentActivity() {
       failedCategorization: parseInt(failed.rows[0]?.count || '0'),
     };
   } catch (error) {
-    log.error('HealthCheck', 'Failed to get recent activity', error);
+    log.error('Failed to get recent activity', { error: error }, 'HealthCheck');
     return {
       lastDRProcessed: null,
       drsLast24h: 0,
@@ -445,7 +445,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
 
     return apiResponse.success(res, response);
   } catch (error) {
-    log.error('HealthCheck', 'Error during health check', error);
+    log.error('Error during health check', { error: error }, 'HealthCheck');
     return apiResponse.internalError(res, error);
   }
 }

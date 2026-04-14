@@ -28,7 +28,7 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res, ['POST']);
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
   }
 
   try {
@@ -68,10 +68,11 @@ async function handler(
       return apiResponse.notFound(res, 'Serial swap record', dropNumber);
     }
 
-    log.info('SerialSwapUpdate', `Updated swap status for ${dropNumber}`, {
+    log.info(`Updated swap status for ${dropNumber}`, {
       dropNumber,
       newStatus: status,
-    });
+    }, 'SerialSwapUpdate');
+
 
     // Also update unified table (after migration 127)
     await pool.query(`
@@ -96,7 +97,7 @@ async function handler(
       message: `Swap status updated to ${status}`,
     });
   } catch (error) {
-    log.error('SerialSwapUpdate', 'Failed to update swap status', { error });
+    log.error('Failed to update swap status', { error: { error } }, 'SerialSwapUpdate');
     return apiResponse.internalError(res, error);
   }
 }

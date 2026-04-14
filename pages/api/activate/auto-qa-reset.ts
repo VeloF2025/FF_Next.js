@@ -43,10 +43,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       reason: 'Human operator rejected auto-QA, requesting manual review',
     }, 'system');
 
-    log.info('AutoQaReset', `Reset auto-QA for ${dropNumber}`);
+    log.info(`Reset auto-QA for ${dropNumber}`, undefined, 'AutoQaReset');
     return apiResponse.success(res, { dropNumber, reset: true });
   } catch (error) {
-    log.error('AutoQaReset', 'Error resetting auto-QA', error instanceof Error ? error : undefined);
+    log.error('Error resetting auto-QA', { error: error instanceof Error ? error : undefined }, 'AutoQaReset');
     return apiResponse.internalError(res, error);
   }
 }

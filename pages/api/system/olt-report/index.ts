@@ -212,7 +212,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       pageSize: pageSizeNum,
     });
   } catch (error) {
-    log.error('OltReportList', 'Failed to fetch OLT report data', { error });
+    log.error('Failed to fetch OLT report data', { error: { error } }, 'OltReportList');
     return apiResponse.internalError(res, error);
   } finally {
     client.release();

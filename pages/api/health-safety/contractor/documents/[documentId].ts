@@ -31,7 +31,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       case 'DELETE':
         return handleDelete(documentId, res);
       default:
-        return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+        return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
     }
   } catch (error) {
     log.error('[H&S Document Detail API] Error', { error });

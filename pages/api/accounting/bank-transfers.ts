@@ -24,9 +24,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   if (!fromAccountId || !toAccountId || !amount) {
     return apiResponse.validationError(res, {
-      fromAccountId: !fromAccountId ? 'Required' : undefined,
-      toAccountId: !toAccountId ? 'Required' : undefined,
-      amount: !amount ? 'Required' : undefined,
+      fromAccountId: !fromAccountId ? 'Required' : '',
+      toAccountId: !toAccountId ? 'Required' : '',
+      amount: !amount ? 'Required' : '',
     });
   }
 

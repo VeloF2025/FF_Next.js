@@ -55,7 +55,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'newStep must be between 0 and 10');
     }
 
-    log.info('UpdatePhotoStep', `Updating ${photoFilename} in ${dropNumber} to step ${newStep}`);
+    log.info(`Updating ${photoFilename} in ${dropNumber} to step ${newStep}`, undefined, 'UpdatePhotoStep');
 
     // Get current data
     const result = await pool.query(
@@ -112,10 +112,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       [JSON.stringify(updatedResults), JSON.stringify(updatedPhotos), dropNumber]
     );
 
-    log.info('UpdatePhotoStep', `Updated ${photoFilename} from step ${previousStep} to ${newStep}`, {
+    log.info(`Updated ${photoFilename} from step ${previousStep} to ${newStep}`, {
       dropNumber,
       updatedBy,
-    });
+    }, 'UpdatePhotoStep');
+
 
     // Record correction for HITL learning if step changed from VLM prediction
     if (newStep !== catResult.vlm_predicted_step) {
@@ -134,10 +135,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       };
 
       recordCorrection(correction).catch((err) => {
-        log.warn('UpdatePhotoStep', 'Failed to record correction for HITL learning', {
+        log.warn('Failed to record correction for HITL learning', {
           photoFilename,
           error: err instanceof Error ? err.message : String(err),
-        });
+        }, 'UpdatePhotoStep');
+
       });
     }
 
@@ -151,7 +153,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
     return apiResponse.success(res, response);
   } catch (error) {
-    log.error('UpdatePhotoStep', 'Error updating photo step', error);
+    log.error('Error updating photo step', { error: error }, 'UpdatePhotoStep');
     return apiResponse.internalError(res, error);
   }
 }

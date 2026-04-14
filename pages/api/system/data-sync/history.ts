@@ -46,11 +46,11 @@ async function autoCompleteStaleOperations(): Promise<void> {
       RETURNING id
     `;
     if (result.length > 0) {
-      log.info('DataSyncHistory', `Auto-completed ${result.length} stale QField sync(s)`);
+      log.info(`Auto-completed ${result.length} stale QField sync(s)`, undefined, 'DataSyncHistory');
     }
   } catch (err) {
     // Non-fatal - just log and continue
-    log.warn('DataSyncHistory', 'Failed to auto-complete stale operations', err);
+    log.warn('Failed to auto-complete stale operations', { error: err }, 'DataSyncHistory');
   }
 }
 

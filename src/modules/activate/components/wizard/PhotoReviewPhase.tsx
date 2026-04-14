@@ -209,7 +209,7 @@ export function PhotoReviewPhase({
         });
         // Pre-approve auto_approved tier photos
         setApprovals(initAutoApprovals(results, tiersMap, new Map()));
-        log.info('PhotoReviewPhase', `Categorization complete for ${dropNumber}`);
+        log.info(`Categorization complete for ${dropNumber}`, undefined, 'PhotoReviewPhase');
       } else {
         setError(data.error?.message || data.message || 'Categorization failed');
       }

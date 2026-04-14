@@ -285,4 +285,4 @@ async function handler(
     return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST', 'DELETE']);
 }
 
-export default withAuth(sendMeetingInvite);
+export default withAuth(handler);

@@ -89,7 +89,7 @@ export function useStockItems(options: UseStockItemsOptions = {}): UseStockItems
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch stock items';
       setError(message);
-      log.error('Failed to fetch stock items', err, 'useStockItems');
+      log.error('Failed to fetch stock items', { error: err }, 'useStockItems');
     } finally {
       setLoading(false);
     }
@@ -114,7 +114,7 @@ export function useStockItems(options: UseStockItemsOptions = {}): UseStockItems
 
       return result.data;
     } catch (err) {
-      log.error('Failed to create stock item', err, 'useStockItems');
+      log.error('Failed to create stock item', { error: err }, 'useStockItems');
       throw err;
     }
   }, [fetchItems]);

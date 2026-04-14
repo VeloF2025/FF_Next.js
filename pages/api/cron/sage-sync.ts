@@ -26,7 +26,7 @@ export default async function handler(
 ) {
   // Only accept POST requests
   if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res, ['POST']);
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
   }
 
   // Verify cron secret (mandatory — fail closed if not configured)

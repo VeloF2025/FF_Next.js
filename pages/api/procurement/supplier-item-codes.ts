@@ -1,4 +1,4 @@
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
@@ -7,7 +7,8 @@ import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const authReq = req as AuthenticatedNextApiRequest;
   switch (req.method) {
     case 'GET':
       return handleGet(req, res);
@@ -71,7 +72,7 @@ async function handleGet(req: AuthenticatedNextApiRequest, res: NextApiResponse)
 
     return apiResponse.success(res, { mappings: rows, count: rows.length });
   } catch (error) {
-    log.error('Failed to fetch supplier item codes', error);
+    log.error('Failed to fetch supplier item codes', { error: error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -92,7 +93,7 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
     return apiResponse.badRequest(res, 'stockItemId and supplierItemCode are required');
   }
 
-  const userName = req.user?.name || 'Unknown';
+  const userName = authReq.user?.name || 'Unknown';
 
   try {
     // Upsert: if mapping already exists for this supplier+code, update it
@@ -148,7 +149,7 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
       isUpdate: existing.length > 0,
     });
   } catch (error) {
-    log.error('Failed to save supplier item code mapping', error);
+    log.error('Failed to save supplier item code mapping', { error: error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -170,7 +171,7 @@ async function handleDelete(req: AuthenticatedNextApiRequest, res: NextApiRespon
 
     return apiResponse.success(res, { deleted: true });
   } catch (error) {
-    log.error('Failed to delete supplier item code mapping', error);
+    log.error('Failed to delete supplier item code mapping', { error: error });
     return apiResponse.internalError(res, error);
   }
 }

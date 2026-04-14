@@ -43,12 +43,13 @@ async function handler(
     const mismatchesOnlyBool =
       mismatchesOnly === 'true' || mismatchesOnly === '1';
 
-    log.info('SerialValidationAPI', 'Fetching serial validation report', {
+    log.info('Fetching serial validation report', {
       dateFrom: dateFromStr,
       dateTo: dateToStr,
       project: projectStr,
       mismatchesOnly: mismatchesOnlyBool,
-    });
+    }, 'SerialValidationAPI');
+
 
     const data = await getSerialValidationReport(
       dateFromStr,
@@ -59,9 +60,10 @@ async function handler(
 
     return res.status(200).json(data);
   } catch (error) {
-    log.error('SerialValidationAPI', 'Failed to fetch serial validation report', {
+    log.error('Failed to fetch serial validation report', {
       error,
-    });
+    }, 'SerialValidationAPI');
+
     return apiResponse.internalError(res, error);
   }
 }

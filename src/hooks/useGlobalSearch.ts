@@ -57,7 +57,7 @@ export function useGlobalSearch(initialQuery = '') {
         throw new Error(data.error || 'Search failed');
       }
     } catch (err) {
-      log.error('Search error', err, 'useGlobalSearch');
+      log.error('Search error', { error: err }, 'useGlobalSearch');
       setError(err instanceof Error ? err.message : 'Search failed');
       setResults([]);
     } finally {

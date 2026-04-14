@@ -101,10 +101,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const weeks = Array.from(weekMap.values());
 
-    log.info('WeeklyActivationsAPI', 'Fetched weekly activations', { weekCount: weeks.length });
+    log.info('Fetched weekly activations', { error: { weekCount: weeks.length } }, 'WeeklyActivationsAPI');
     return apiResponse.success(res, { weeks } as WeeklyActivationsResponse);
   } catch (error) {
-    log.error('WeeklyActivationsAPI', 'Failed to fetch weekly activations', { error });
+    log.error('Failed to fetch weekly activations', { error: { error } }, 'WeeklyActivationsAPI');
     return apiResponse.internalError(res, error);
   } finally {
     client.release();

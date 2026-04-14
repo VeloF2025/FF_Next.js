@@ -62,7 +62,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
       columnMapping = JSON.parse(columnMappingJson as string);
     } catch {
-      log.error('ImportMappedApi', 'Operation failed', { error });
+      log.error('Operation failed', { error: { error } }, 'ImportMappedApi');
       return apiResponse.badRequest(res, 'Invalid columnMapping JSON');
     }
 
@@ -196,7 +196,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Clean up temp file
-    try { fs.unlinkSync(file.filepath); } catch (e) { log.error('ImportMappedApi', 'Failed to cleanup temp file', { error: e }); }
+    try { fs.unlinkSync(file.filepath); } catch (e) { log.error('Failed to cleanup temp file', { error: e }, 'ImportMappedApi'); }
 
     return apiResponse.success(res, {
       ...result,

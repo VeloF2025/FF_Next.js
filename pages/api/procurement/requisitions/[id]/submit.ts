@@ -220,7 +220,7 @@ export default withAuth(withErrorHandler(async (
         : 'Requisition submitted for approval',
     });
   } catch (error) {
-    log.error('SubmitApi', 'Failed to submit requisition', { error });
+    log.error('Failed to submit requisition', { error: { error } }, 'SubmitApi');
     return apiResponse.databaseError(res, error, 'Failed to submit requisition');
   }
 }));

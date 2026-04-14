@@ -131,7 +131,7 @@ async function handler(
 
     return apiResponse.success(res, metrics);
   } catch (error) {
-    log.error('Error fetching aggregate metrics:', error);
+    log.error('Error fetching aggregate metrics:', { error: error });
     return apiResponse.internalError(res, error);
   }
 }

@@ -64,7 +64,7 @@ export const Step5Order: React.FC<Step5OrderProps> = ({ state, onComplete, onBac
       setSuppliers(json.data ?? []);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load suppliers';
-      log.error('Step5Order', 'Supplier fetch failed', { error: err });
+      log.error('Supplier fetch failed', { error: { error: err } }, 'Step5Order');
       setSupplierError(msg);
     } finally {
       setLoadingSuppliers(false);
@@ -93,7 +93,7 @@ export const Step5Order: React.FC<Step5OrderProps> = ({ state, onComplete, onBac
       setPhase('done');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to create RFQ';
-      log.error('Step5Order', 'RFQ creation failed', { error: err });
+      log.error('RFQ creation failed', { error: { error: err } }, 'Step5Order');
       setSubmitError(msg);
       setPhase('select');
     }

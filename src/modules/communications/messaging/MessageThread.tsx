@@ -49,7 +49,7 @@ export function MessageThread({ threadId, onBack }: MessageThreadProps) {
         setData(json.data);
       }
     } catch (err) {
-      log.error('Failed to fetch thread:', err);
+      log.error('Failed to fetch thread:', { error: err });
     } finally {
       setIsLoading(false);
     }
@@ -88,7 +88,7 @@ export function MessageThread({ threadId, onBack }: MessageThreadProps) {
         await fetchThread();
       }
     } catch (err) {
-      log.error('Failed to send reply:', err);
+      log.error('Failed to send reply:', { error: err });
     } finally {
       setIsSending(false);
     }

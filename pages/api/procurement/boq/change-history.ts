@@ -67,7 +67,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       total: countResult[0]?.total || 0,
     });
   } catch (error) {
-    log.error('Failed to fetch BOQ change history', error);
+    log.error('Failed to fetch BOQ change history', { error: error });
     return apiResponse.internalError(res, error);
   }
 }

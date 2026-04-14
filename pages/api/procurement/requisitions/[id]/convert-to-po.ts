@@ -284,7 +284,7 @@ export default withAuth(withErrorHandler(async (
       },
     }, `Purchase Order ${poNumber} created successfully`);
   } catch (error) {
-    log.error('Failed to convert requisition to PO', error);
+    log.error('Failed to convert requisition to PO', { error: error });
     return apiResponse.databaseError(res, error, 'Failed to convert requisition to PO');
   }
 }));

@@ -82,10 +82,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       threshold_days: thresholdDays,
     };
 
-    log.info('StaleProjects', `Found ${projects.length} stale projects (threshold: ${thresholdDays}d)`);
+    log.info(`Found ${projects.length} stale projects (threshold: ${thresholdDays}d)`, undefined, 'StaleProjects');
     return apiResponse.success(res, response);
   } catch (error) {
-    log.error('StaleProjects', 'Failed to fetch stale projects', { error });
+    log.error('Failed to fetch stale projects', { error: { error } }, 'StaleProjects');
     return apiResponse.internalError(res, error);
   }
 }

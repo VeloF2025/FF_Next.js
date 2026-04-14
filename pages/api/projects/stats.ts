@@ -32,7 +32,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const result = await response.json();
     return apiResponse.success(res, result);
   } catch (error) {
-    log.error('ProjectStats', `Error fetching stats: ${error}`);
+    log.error(`Error fetching stats: ${error}`, undefined, 'ProjectStats');
     return apiResponse.internalError(res, error);
   }
 }

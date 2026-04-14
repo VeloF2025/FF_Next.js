@@ -61,7 +61,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
   } catch (error) {
-    log.error('Field stock locations API error', error, 'field-stock/locations');
+    log.error('Field stock locations API error', { error: error }, 'field-stock/locations');
     return apiResponse.internalError(res, error);
   }
 }

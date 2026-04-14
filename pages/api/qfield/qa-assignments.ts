@@ -156,7 +156,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
 
         results.push({ id: validationId, success: true });
       } catch (error) {
-        log.error('QaAssignmentsApi', 'Operation failed', { error });
+        log.error('Operation failed', { error: { error } }, 'QaAssignmentsApi');
         results.push({
           id: validationId,
           success: false,

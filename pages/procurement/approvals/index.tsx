@@ -42,7 +42,7 @@ export default function ApprovalsPage() {
         setCounts(json.data.counts);
       }
     } catch (err) {
-      log.error('Failed to fetch approvals', err);
+      log.error('Failed to fetch approvals', { error: err });
       setError('Failed to load approvals');
     } finally {
       setLoading(false);
@@ -64,7 +64,7 @@ export default function ApprovalsPage() {
         setError(data.error?.message || 'Failed to approve');
       }
     } catch (err) {
-      log.error('Failed to approve', err);
+      log.error('Failed to approve', { error: err });
       setError('Failed to approve');
     } finally {
       setActioningId(null);
@@ -87,7 +87,7 @@ export default function ApprovalsPage() {
         setError(data.error?.message || 'Failed to reject');
       }
     } catch (err) {
-      log.error('Failed to reject', err);
+      log.error('Failed to reject', { error: err });
       setError('Failed to reject');
     } finally {
       setActioningId(null);

@@ -63,7 +63,7 @@ export default function GRNDetailPage() {
           setError(data.error?.message || 'Failed to fetch GRN');
         }
       } catch (err) {
-        log.error('Failed to fetch GRN', err);
+        log.error('Failed to fetch GRN', { error: err });
         setError('Failed to load goods receipt note');
       } finally {
         setIsLoading(false);
@@ -100,7 +100,7 @@ export default function GRNDetailPage() {
         alert(`Failed to confirm GRN: ${data.error?.message || 'Unknown error'}`);
       }
     } catch (err) {
-      log.error('Failed to confirm GRN', err);
+      log.error('Failed to confirm GRN', { error: err });
       alert('Failed to confirm GRN. Please try again.');
     } finally {
       setIsConfirming(false);

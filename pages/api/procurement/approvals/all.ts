@@ -159,7 +159,7 @@ export default withAuth(withErrorHandler(async (
       counts: { ...counts, total },
     });
   } catch (error) {
-    log.error('AllApi', 'Failed to fetch approvals', { error });
+    log.error('Failed to fetch approvals', { error: { error } }, 'AllApi');
     return apiResponse.databaseError(res, error, 'Failed to fetch approvals');
   }
 }));

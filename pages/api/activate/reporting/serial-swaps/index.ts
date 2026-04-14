@@ -31,7 +31,7 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return apiResponse.methodNotAllowed(res, ['GET']);
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
   }
 
   try {
@@ -248,17 +248,18 @@ async function handler(
       available_statuses: ['pending_correction', 'corrected_in_1map', 'false_positive'],
     };
 
-    log.info('SerialSwapsReport', `Fetched ${records.length} swap records`, {
+    log.info(`Fetched ${records.length} swap records`, {
       dateFrom,
       dateTo,
       project,
       status,
       totalCount,
-    });
+    }, 'SerialSwapsReport');
+
 
     return res.status(200).json(response);
   } catch (error) {
-    log.error('SerialSwapsReport', 'Failed to fetch serial swaps report', { error });
+    log.error('Failed to fetch serial swaps report', { error: { error } }, 'SerialSwapsReport');
     return apiResponse.internalError(res, error);
   }
 }

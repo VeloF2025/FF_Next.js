@@ -62,7 +62,7 @@ export default function GRNListPage() {
         setError(data.error?.message || 'Failed to fetch GRNs');
       }
     } catch (err) {
-      log.error('Failed to fetch GRNs', err);
+      log.error('Failed to fetch GRNs', { error: err });
       setError('Failed to load goods receipt notes');
     } finally {
       setIsLoading(false);

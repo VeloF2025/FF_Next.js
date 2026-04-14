@@ -40,11 +40,12 @@ async function handler(
         : project
       : undefined;
 
-    log.info('UserAttributionAPI', 'Fetching user/team attribution report', {
+    log.info('Fetching user/team attribution report', {
       dateFrom: dateFromStr,
       dateTo: dateToStr,
       project: projectStr,
-    });
+    }, 'UserAttributionAPI');
+
 
     const data = await getUserTeamAttributionReport(
       dateFromStr,
@@ -54,9 +55,10 @@ async function handler(
 
     return res.status(200).json(data);
   } catch (error) {
-    log.error('UserAttributionAPI', 'Failed to fetch user/team attribution report', {
+    log.error('Failed to fetch user/team attribution report', {
       error,
-    });
+    }, 'UserAttributionAPI');
+
     return apiResponse.internalError(res, error);
   }
 }

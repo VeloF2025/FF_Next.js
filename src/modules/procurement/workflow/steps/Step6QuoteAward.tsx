@@ -60,7 +60,7 @@ export const Step6QuoteAward: React.FC<Step6Props> = ({ state, onComplete, onBac
         }
       })
       .catch((err) => {
-        log.error('Step6QuoteAward', 'Failed to load RFQ suppliers', { error: err });
+        log.error('Failed to load RFQ suppliers', { error: { error: err } }, 'Step6QuoteAward');
       })
       .finally(() => setLoadingSuppliers(false));
   }, [isRfq, state.rfqId]);

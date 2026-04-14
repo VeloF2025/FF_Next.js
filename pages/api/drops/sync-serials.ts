@@ -284,4 +284,4 @@ async function handler(
   return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
 }
 
-export default withAuth(fetch1MapData);
+export default withAuth(handler);

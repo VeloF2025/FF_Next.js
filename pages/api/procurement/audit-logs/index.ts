@@ -43,7 +43,7 @@ export default withAuth(withErrorHandler(async (
       total,
     });
   } catch (error) {
-    log.error('IndexApi', 'Failed to fetch audit logs', { error });
+    log.error('Failed to fetch audit logs', { error: { error } }, 'IndexApi');
     return apiResponse.databaseError(res, error, 'Failed to fetch audit logs');
   }
 }));

@@ -3,18 +3,19 @@
  * GET /api/admin/permissions - List all permissions
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import { getPermissions, getPermissionTree } from '@/lib/permissions';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 
 async function handler(
-  req: AuthenticatedNextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'GET') {
-    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
   }
 
   try {
@@ -40,7 +41,7 @@ async function handler(
     }
 
     // Return flat list (optionally filtered by type)
-    const permissions = await getPermissions(type as string | undefined);
+    const permissions = await getPermissions(type as import('@/lib/permissions').PermissionType | undefined);
 
     // Group by category for easier frontend consumption
     const grouped: Record<string, typeof permissions> = {};

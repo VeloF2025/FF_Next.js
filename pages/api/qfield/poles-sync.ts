@@ -104,7 +104,7 @@ async function handler(
       res.end();
     });
   } catch (error: any) {
-    log.error('PolesSyncApi', 'Operation failed', { error });
+    log.error('Operation failed', { error: { error } }, 'PolesSyncApi');
     sendLog('error', `Error: ${error.message}`);
     sendLog('complete', 'Poles sync failed', {
       success: false,

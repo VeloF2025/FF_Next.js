@@ -59,7 +59,7 @@ export function CAPAForm({
     fetch('/api/users?limit=200', { credentials: 'include' })
       .then((r) => r.json())
       .then((d) => setUsers(d.data || d.users || []))
-      .catch((err) => log.error('Failed to load users', err as Error));
+      .catch((err) => log.error('Failed to load users', { error: err }));
   }, []);
 
   // Focus trap + Escape close

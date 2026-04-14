@@ -34,7 +34,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber query param is required');
     }
 
-    log.debug('CheckPhotos', `Checking photo availability for ${dropNumber}`);
+    log.debug(`Checking photo availability for ${dropNumber}`, undefined, 'CheckPhotos');
 
     const result = await checkPhotosExist(dropNumber);
 
@@ -57,7 +57,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
 
     return apiResponse.success(res, response);
   } catch (error) {
-    log.error('CheckPhotos', 'Error checking photos', error);
+    log.error('Error checking photos', { error: error }, 'CheckPhotos');
     return apiResponse.internalError(res, error);
   }
 }

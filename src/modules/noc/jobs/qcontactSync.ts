@@ -320,7 +320,8 @@ export async function getSyncJobHistory(
 ): Promise<SyncJobHistoryEntry[]> {
   const { limit = 50, status, start_date, end_date } = options;
 
-  logger.debug('Fetching sync job history', options);
+  logger.debug('Fetching sync job history', { data: options });
+
 
   const conditions: string[] = [];
   const values: unknown[] = [];

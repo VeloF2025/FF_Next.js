@@ -4,7 +4,7 @@
  * POST /api/accounting/journal-entries - Create draft entry with lines
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
@@ -15,7 +15,8 @@ import {
 } from '@/modules/accounting/services/journalEntryService';
 import type { GLEntryStatus, GLEntrySource } from '@/modules/accounting/types/gl.types';
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method === 'GET') {
     try {
       const { status, source, fiscal_period_id, limit, offset } = req.query;
@@ -41,8 +42,8 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
         return apiResponse.badRequest(res, 'entryDate and lines (non-empty array) are required');
       }
 
-      // User identity comes from JWT (req.user), never from client request body
-      const userId = req.user.id;
+      // User identity comes from JWT (authReq.user), never from client request body
+      const userId = authReq.user.id;
 
       const entry = await createJournalEntry({
         entryDate,

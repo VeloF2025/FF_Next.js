@@ -76,7 +76,7 @@ export function useUnifiedFeed(channels?: Channel[]): UseUnifiedFeedReturn {
         setHasMore(newItems.length === PAGE_SIZE);
       }
     } catch (err) {
-      log.error('Failed to fetch unified feed:', err);
+      log.error('Failed to fetch unified feed:', { error: err });
     } finally {
       setIsLoading(false);
     }

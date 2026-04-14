@@ -11,7 +11,7 @@ import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return apiResponse.methodNotAllowed(res, req.method || 'unknown');
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
   }
 
   try {
@@ -21,7 +21,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, breakdown);
   } catch (error) {
-    log.error('CostBreakdownApi', 'Internal error', { error });
+    log.error('Internal error', { error: { error } }, 'CostBreakdownApi');
     return apiResponse.internalError(res, error);
   }
 }

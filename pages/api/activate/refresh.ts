@@ -227,7 +227,7 @@ async function handler(
       contactUpdated: result.contactUpdated,
     });
   } catch (error) {
-    log.error(`Refresh error for ${dropNumber}`, error);
+    log.error(`Refresh error for ${dropNumber}`, { error: error });
     return apiResponse.internalError(res, error);
   }
 }

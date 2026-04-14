@@ -4,7 +4,7 @@
  * Returns the currently authenticated user
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import {
   withAuth,
   type AuthenticatedNextApiRequest,
@@ -12,9 +12,10 @@ import {
 import { apiResponse } from '@/lib/apiResponse';
 
 async function handler(
-  req: AuthenticatedNextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }

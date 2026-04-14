@@ -54,7 +54,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PUT', 'DELETE']);
     }
   } catch (error) {
-    log.error('TemplateidApi', 'Internal error', { error });
+    log.error('Internal error', { error: { error } }, 'TemplateidApi');
     return apiResponse.internalError(res, error);
   }
 }

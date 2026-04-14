@@ -125,7 +125,7 @@ export default function NewPurchaseOrderPage() {
         setSuppliers(data.data || []);
       }
     } catch (err) {
-      log.error('Failed to fetch suppliers', err);
+      log.error('Failed to fetch suppliers', { error: err });
     }
   };
 
@@ -142,7 +142,7 @@ export default function NewPurchaseOrderPage() {
         setProjects(eligible);
       }
     } catch (err) {
-      log.error('Failed to fetch projects', err);
+      log.error('Failed to fetch projects', { error: err });
     }
   };
 
@@ -170,7 +170,7 @@ export default function NewPurchaseOrderPage() {
         setError(data.error || 'Failed to upload quote');
       }
     } catch (err) {
-      log.error('Failed to upload quote attachment', err);
+      log.error('Failed to upload quote attachment', { error: err });
       setError('Failed to upload quote attachment');
     } finally {
       setIsUploading(false);
@@ -277,7 +277,7 @@ export default function NewPurchaseOrderPage() {
         setError(data.error?.message || 'Failed to create purchase order');
       }
     } catch (err) {
-      log.error('Failed to create purchase order', err);
+      log.error('Failed to create purchase order', { error: err });
       setError('Failed to create purchase order');
     } finally {
       setIsSubmitting(false);

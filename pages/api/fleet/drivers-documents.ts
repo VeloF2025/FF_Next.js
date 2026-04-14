@@ -133,7 +133,7 @@ async function handler(
       summary,
     });
   } catch (error) {
-    log.error('DriversDocumentsApi', 'Internal error', { error });
+    log.error('Internal error', { error: { error } }, 'DriversDocumentsApi');
     return apiResponse.internalError(res, error);
   }
 }

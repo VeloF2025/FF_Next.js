@@ -72,7 +72,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, records);
   } catch (error) {
-    log.error('VehicleidApi', 'Internal error', { error });
+    log.error('Internal error', { error: { error } }, 'VehicleidApi');
     return apiResponse.internalError(res, error);
   }
 }

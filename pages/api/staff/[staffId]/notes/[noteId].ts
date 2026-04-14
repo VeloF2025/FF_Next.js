@@ -109,7 +109,7 @@ async function handler(
       return apiResponse.success(res, { deleted: true });
     }
 
-    return apiResponse.methodNotAllowed(res, ['GET', 'PUT', 'DELETE']);
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET', 'PUT', 'DELETE']);
   } catch (error: any) {
     log.error('Staff note detail API error', { staffId, noteId, method: req.method, error });
     return apiResponse.internalError(res, error);

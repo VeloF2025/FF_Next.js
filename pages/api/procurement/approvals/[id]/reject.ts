@@ -135,7 +135,7 @@ export default withAuth(withErrorHandler(async (
 
     return apiResponse.success(res, updated[0], 'Request rejected');
   } catch (error) {
-    log.error('RejectApi', 'Failed to reject request', { error });
+    log.error('Failed to reject request', { error: { error } }, 'RejectApi');
     return apiResponse.databaseError(res, error, 'Failed to reject request');
   }
 }));

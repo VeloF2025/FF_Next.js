@@ -156,7 +156,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, summary);
   } catch (error) {
-    log.error('Field stock dashboard API error', error, 'field-stock/dashboard');
+    log.error('Field stock dashboard API error', { error: error }, 'field-stock/dashboard');
     return apiResponse.internalError(res, error);
   }
 }

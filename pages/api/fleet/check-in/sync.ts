@@ -83,7 +83,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
     }
   } catch (error) {
-    log.error('SyncApi', 'Internal error', { error });
+    log.error('Internal error', { error: { error } }, 'SyncApi');
     return apiResponse.internalError(res, error);
   }
 }

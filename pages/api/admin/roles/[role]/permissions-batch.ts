@@ -3,7 +3,7 @@
  * PUT /api/admin/roles/[role]/permissions-batch - Replace all permissions for a role
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import { batchUpdateRolePermissions } from '@/lib/permissions';
@@ -23,11 +23,12 @@ interface PermissionEntry {
 }
 
 async function handler(
-  req: AuthenticatedNextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'PUT') {
-    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['PUT']);
   }
 
   const { role } = req.query;
@@ -80,7 +81,7 @@ async function handler(
     await sql`
       INSERT INTO user_audit_log (user_id, action, resource_type, resource_id, details, ip_address)
       VALUES (
-        ${req.user.id},
+        ${authReq.user.id},
         'role_permissions_batch_update',
         'role',
         ${roleData[0]!.id}::uuid,
@@ -88,20 +89,20 @@ async function handler(
           role,
           permissionsUpdated: permissions.length,
           permissionsInserted: insertedCount,
-          changedBy: req.user.email,
+          changedBy: authReq.user.email,
         })}::jsonb,
         ${(req.headers['x-forwarded-for'] as string)?.split(',')[0] || null}
       )
     `;
 
-    log.info({ role, count: insertedCount }, 'Role permissions batch updated');
+    log.info('Role permissions batch updated', { role, count: insertedCount });
 
     return apiResponse.success(res, {
       message: `Role "${role}" permissions updated`,
       permissionsSet: insertedCount,
     });
   } catch (error) {
-    log.error({ error, role }, 'Error batch updating role permissions');
+    log.error('Error batch updating role permissions', { error, role });
     return apiResponse.internalError(res, error);
   }
 }

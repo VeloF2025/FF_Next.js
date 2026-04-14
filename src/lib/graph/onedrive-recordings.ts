@@ -319,6 +319,7 @@ export async function scrapeOneDriveRecordings(
     }
   }
 
-  log.info('OneDrive scrape complete', result, LOGGER);
+  log.info('OneDrive scrape complete', { data: result }, LOGGER);
+
   return result;
 }

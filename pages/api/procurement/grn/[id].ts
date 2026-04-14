@@ -132,7 +132,7 @@ export default withAuth(withErrorHandler(async (
 
       return apiResponse.success(res, result);
     } catch (error) {
-      log.error('ProcurementGrnDetailApi', 'Failed to fetch GRN', { error, id });
+      log.error('Failed to fetch GRN', { error: { error, id } }, 'ProcurementGrnDetailApi');
       return apiResponse.databaseError(res, error, 'Failed to fetch GRN');
     }
   } else if (req.method === 'PATCH') {
@@ -182,7 +182,7 @@ export default withAuth(withErrorHandler(async (
 
       return apiResponse.success(res, updated, 'GRN updated successfully');
     } catch (error) {
-      log.error('ProcurementGrnDetailApi', 'Failed to update GRN', { error, id });
+      log.error('Failed to update GRN', { error: { error, id } }, 'ProcurementGrnDetailApi');
       return apiResponse.databaseError(res, error, 'Failed to update GRN');
     }
   } else if (req.method === 'DELETE') {
@@ -215,7 +215,7 @@ export default withAuth(withErrorHandler(async (
 
       return apiResponse.noContent(res);
     } catch (error) {
-      log.error('ProcurementGrnDetailApi', 'Failed to delete GRN', { error, id });
+      log.error('Failed to delete GRN', { error: { error, id } }, 'ProcurementGrnDetailApi');
       return apiResponse.databaseError(res, error, 'Failed to delete GRN');
     }
   } else {

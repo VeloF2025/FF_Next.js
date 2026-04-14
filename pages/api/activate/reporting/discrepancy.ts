@@ -44,17 +44,18 @@ async function handler(
         : project
       : undefined;
 
-    log.info('DiscrepancyAPI', 'Fetching discrepancy report', {
+    log.info('Fetching discrepancy report', {
       waDate: waDateStr,
       oesDate: oesDateStr,
       project: projectStr,
-    });
+    }, 'DiscrepancyAPI');
+
 
     const data = await getDiscrepancyReport(waDateStr, oesDateStr || undefined, projectStr || undefined);
 
     return res.status(200).json(data);
   } catch (error) {
-    log.error('DiscrepancyAPI', 'Failed to fetch discrepancy report', { error });
+    log.error('Failed to fetch discrepancy report', { error: { error } }, 'DiscrepancyAPI');
     return apiResponse.internalError(res, error);
   }
 }

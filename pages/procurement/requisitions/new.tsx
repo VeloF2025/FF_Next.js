@@ -90,7 +90,7 @@ export default function NewRequisitionPage() {
           setProjects(data.data || []);
         }
       } catch (err) {
-        log.error('Failed to load projects', err);
+        log.error('Failed to load projects', { error: err });
       } finally {
         setIsLoadingProjects(false);
       }
@@ -106,7 +106,7 @@ export default function NewRequisitionPage() {
         const json = await res.json() as { success: boolean; data?: { id: string; name: string }[] };
         if (json.success && json.data) setDepartments(json.data);
       } catch (err) {
-        log.error('Failed to load departments', err);
+        log.error('Failed to load departments', { error: err });
       }
     };
     load();
@@ -235,7 +235,7 @@ export default function NewRequisitionPage() {
         setError(data.error?.message || 'Failed to create requisition');
       }
     } catch (err) {
-      log.error('Failed to create requisition', err);
+      log.error('Failed to create requisition', { error: err });
       setError('An error occurred while creating the requisition');
     } finally {
       setIsSubmitting(false);

@@ -211,7 +211,7 @@ export default withAuth(withErrorHandler(async (
         );
       }
     } catch (error) {
-      log.error('IndexApi', 'Failed to fetch RFQs', { error });
+      log.error('Failed to fetch RFQs', { error: { error } }, 'IndexApi');
       return apiResponse.databaseError(res, error, 'Failed to fetch RFQs');
     }
   } else if (req.method === 'POST') {
@@ -376,7 +376,7 @@ export default withAuth(withErrorHandler(async (
       
       return apiResponse.created(res, createdRFQ, 'RFQ created successfully');
     } catch (error: any) {
-      log.error('IndexApi', 'Operation failed', { error });
+      log.error('Operation failed', { error: { error } }, 'IndexApi');
       // Check for specific database errors
       if (error.code === '23505') { // Unique constraint violation
         return apiResponse.error(

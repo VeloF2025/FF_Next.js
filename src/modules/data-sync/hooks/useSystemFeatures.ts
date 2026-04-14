@@ -68,7 +68,7 @@ export function useSystemFeatures(): UseSystemFeaturesReturn {
         throw new Error('Failed to fetch feature settings');
       }
     } catch (err) {
-      log.error('useSystemFeatures', 'Failed to fetch features', err);
+      log.error('Failed to fetch features', { error: err }, 'useSystemFeatures');
       setError(err instanceof Error ? err.message : 'Failed to fetch features');
       // On error, default to all features enabled
       setFeatures([]);

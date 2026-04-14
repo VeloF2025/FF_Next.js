@@ -126,7 +126,8 @@ export async function pullCustomersFromSage(
       )
     `;
 
-    logger.info('Customer pull completed', result);
+    logger.info('Customer pull completed', { data: result });
+
   } catch (error) {
     result.success = false;
     logger.error('Customer sync failed', { error });

@@ -86,7 +86,7 @@ async function handleGetStatus(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.success(res, status);
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    log.error('SharePointSync', 'Failed to get sync status', { error: errorMessage });
+    log.error('Failed to get sync status', { error: { error: errorMessage } }, 'SharePointSync');
     return apiResponse.internalError(res, error);
   }
 }
@@ -117,7 +117,7 @@ async function handleSync(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.badRequest(res, 'action must be one of: create_folder, sync_photos, full');
     }
 
-    log.info('SharePointSync', `Starting ${action} for ${dropNumber}`);
+    log.info(`Starting ${action} for ${dropNumber}`, undefined, 'SharePointSync');
 
     // Get or create sync record
     const syncRecord = await getOrCreateSyncRecord(dropNumber, 'manual');
@@ -187,7 +187,7 @@ async function handleSync(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, 'Invalid action');
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    log.error('SharePointSync', 'Sync failed', { error: errorMessage });
+    log.error('Sync failed', { error: { error: errorMessage } }, 'SharePointSync');
     return apiResponse.internalError(res, error);
   }
 }

@@ -11,7 +11,7 @@ import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return apiResponse.methodNotAllowed(res, req.method || '');
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
   }
 
   const date = req.query.date as string;

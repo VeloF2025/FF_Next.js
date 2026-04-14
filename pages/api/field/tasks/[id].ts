@@ -89,7 +89,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       return apiResponse.success(res, result);
     } catch (error) {
-      log.error('FieldTasksApi', `Error fetching task ${id}: ${error}`);
+      log.error(`Error fetching task ${id}: ${error}`, undefined, 'FieldTasksApi');
       return apiResponse.internalError(res, error);
     }
 
@@ -144,7 +144,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
 
       const updated = updatedRows[0]!;
-      log.info('FieldTasksApi', `Task ${id} updated: status=${updated.status}`);
+      log.info(`Task ${id} updated: status=${updated.status}`, undefined, 'FieldTasksApi');
 
       return apiResponse.success(res, {
         id: updated.id,
@@ -153,14 +153,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         syncStatus: syncStatus || (currentMeta.syncStatus as string) || 'synced',
       }, 'Task updated successfully');
     } catch (error) {
-      log.error('FieldTasksApi', `Error updating task ${id}: ${error}`);
+      log.error(`Error updating task ${id}: ${error}`, undefined, 'FieldTasksApi');
       return apiResponse.internalError(res, error);
     }
 
   // ─── DELETE /api/field/tasks/[id] ────────────────────────────────────────
   } else if (req.method === 'DELETE') {
     // Phase 2: DB delete — stub (field app doesn't delete tasks, just cancels)
-    log.info('FieldTasksApi', `DELETE task ${id} — use PATCH status=cancelled instead`);
+    log.info(`DELETE task ${id} — use PATCH status=cancelled instead`, undefined, 'FieldTasksApi');
     return apiResponse.error(res, ErrorCode.METHOD_NOT_ALLOWED,
       'Tasks cannot be deleted. Use PATCH with status=cancelled.');
 

@@ -99,7 +99,7 @@ export function POItemsTable({ poId, items, canEdit = false, onItemsUpdated }: P
         setError(data.error?.message || 'Failed to save');
       }
     } catch (err) {
-      log.error('Failed to save PO items', err);
+      log.error('Failed to save PO items', { error: err });
       setError('Failed to save items');
     } finally {
       setSaving(false);

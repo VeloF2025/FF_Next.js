@@ -82,7 +82,7 @@ export default withAuth(withErrorHandler(async (
         }
       );
     } catch (error) {
-      log.error('IndexApi', 'Failed to fetch requisitions', { error });
+      log.error('Failed to fetch requisitions', { error: { error } }, 'IndexApi');
       return apiResponse.databaseError(res, error, 'Failed to fetch requisitions');
     }
   } else if (req.method === 'POST') {
@@ -233,7 +233,7 @@ export default withAuth(withErrorHandler(async (
 
       return apiResponse.created(res, result, 'Purchase requisition created successfully');
     } catch (error) {
-      log.error('IndexApi', 'Failed to create requisition', { error });
+      log.error('Failed to create requisition', { error: { error } }, 'IndexApi');
       return apiResponse.databaseError(res, error, 'Failed to create requisition');
     }
   } else {

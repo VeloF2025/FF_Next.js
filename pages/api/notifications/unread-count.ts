@@ -21,7 +21,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const count = await getUnreadCount(authReq.user.id);
     return apiResponse.success(res, count);
   } catch (error) {
-    log.error('UnreadCountApi', 'Internal error', { error });
+    log.error('Internal error', { error: { error } }, 'UnreadCountApi');
     return apiResponse.internalError(res, error);
   }
 }

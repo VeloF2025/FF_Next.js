@@ -131,7 +131,7 @@ export class RfqNotificationService {
       // or webhook service
 
       // For now, just log the notification
-      log.info('Sending notification', notification, 'RfqNotificationService');
+      log.info('Sending notification', { notification }, 'RfqNotificationService');
 
       // Update notification status
       if (notification.id) {

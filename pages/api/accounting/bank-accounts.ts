@@ -72,7 +72,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       ORDER BY ga.account_code
     `;
 
-    const accounts = rows.map((r: Record<string, any>) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const accounts = (rows as Record<string, any>[]).map((r) => ({
       id: r.id,
       accountCode: r.account_code,
       accountName: r.account_name,

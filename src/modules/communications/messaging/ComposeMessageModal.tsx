@@ -79,7 +79,7 @@ export function ComposeMessageModal({
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
-      log.error('Compose message failed:', err);
+      log.error('Compose message failed:', { error: err });
       setError(msg);
     } finally {
       setIsSending(false);

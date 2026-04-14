@@ -70,7 +70,7 @@ async function handler(
     // Default: activator performance
     return getActivatorPerformance(res, tech, dateFromStr, dateToStr);
   } catch (error) {
-    log.error('TechnicianPerformanceAPI', 'Failed to fetch performance', { error, id });
+    log.error('Failed to fetch performance', { error: { error, id } }, 'TechnicianPerformanceAPI');
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Internal server error',
     });

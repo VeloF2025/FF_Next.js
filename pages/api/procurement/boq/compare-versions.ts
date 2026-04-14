@@ -145,7 +145,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       modified,
     });
   } catch (error) {
-    log.error('Failed to compare BOQ versions', error);
+    log.error('Failed to compare BOQ versions', { error: error });
     return apiResponse.internalError(res, error);
   }
 }

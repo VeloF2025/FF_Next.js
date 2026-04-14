@@ -42,7 +42,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     case 'POST':
       return handlePost(req, res);
     default:
-      return apiResponse.methodNotAllowed(res, ['GET', 'POST']);
+      return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET', 'POST']);
   }
 }
 

@@ -3,7 +3,7 @@
  * Excel export of all pipeline projects with approval statuses pivoted into columns
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
@@ -47,7 +47,8 @@ const PIPELINE_STATUS_LABELS: Record<string, string> = {
   lost: 'Lost',
 };
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -335,7 +336,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
     log.info('Pipeline export generated', {
       projects: projects.length,
       approvalTypes: approvalTypes.length,
-      user: req.user.email,
+      user: authReq.user.email,
     }, 'pipeline-export');
 
   } catch (error) {

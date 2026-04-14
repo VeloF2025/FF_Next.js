@@ -41,7 +41,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, { sent: true, to: authReq.user.id });
   } catch (error) {
-    log.error('TestApi', 'Internal error', { error });
+    log.error('Internal error', { error: { error } }, 'TestApi');
     return apiResponse.internalError(res, error);
   }
 }

@@ -56,7 +56,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber query param is required');
     }
 
-    log.info('ValidatePrerequisites', `Checking prerequisites for ${dropNumber}`);
+    log.info(`Checking prerequisites for ${dropNumber}`, undefined, 'ValidatePrerequisites');
 
     // 1. Check if photos exist
     const photosCheck = await checkPhotosExist(dropNumber);
@@ -138,16 +138,17 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       [prerequisites.passed, ontSerial, upsSerial, newPhase, dropNumber]
     );
 
-    log.info('ValidatePrerequisites', `Prerequisites ${canProceed ? 'PASSED' : 'FAILED'} for ${dropNumber}`, {
+    log.info(`Prerequisites ${canProceed ? 'PASSED' : 'FAILED'} for ${dropNumber}`, {
       photosExist: photosCheck.exists,
       photoCount: photosCheck.count,
       ontSerial: !!ontSerial,
       upsSerial: !!upsSerial,
-    });
+    }, 'ValidatePrerequisites');
+
 
     return apiResponse.success(res, response);
   } catch (error) {
-    log.error('ValidatePrerequisites', 'Error checking prerequisites', error);
+    log.error('Error checking prerequisites', { error: error }, 'ValidatePrerequisites');
     return apiResponse.internalError(res, error);
   }
 }

@@ -39,7 +39,8 @@ interface QFieldSyncPayload {
  * Returns true if the webhook was accepted.
  */
 export function triggerQFieldSync(payload: QFieldSyncPayload): boolean {
-  logger.info('Triggering QField sync webhook (fire-and-forget)', payload);
+  logger.info('Triggering QField sync webhook (fire-and-forget)', { data: payload });
+
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10_000);
@@ -136,7 +137,8 @@ export async function triggerOltAutoDetect(batchId: string): Promise<boolean> {
     const { processLookupQueue } = await import('@/modules/data-sync/services/oltQueueProcessorService');
     runAutoDetect(batchId)
       .then(async (result) => {
-        logger.info('OLT auto-detect completed', result);
+        logger.info('OLT auto-detect completed', { data: result });
+
         if (result.apiLookupsQueued > 0) {
           await processLookupQueue(result.runId);
         }

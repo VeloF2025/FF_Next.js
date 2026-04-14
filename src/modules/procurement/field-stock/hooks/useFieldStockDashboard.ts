@@ -69,7 +69,7 @@ export function useFieldStockDashboard(): UseFieldStockDashboardReturn {
       const message = err instanceof Error ? err.message : 'Failed to fetch dashboard data';
       setError(message);
       setSummary(defaultSummary);
-      log.error('Failed to fetch dashboard', err, 'useFieldStockDashboard');
+      log.error('Failed to fetch dashboard', { error: err }, 'useFieldStockDashboard');
     } finally {
       setLoading(false);
     }

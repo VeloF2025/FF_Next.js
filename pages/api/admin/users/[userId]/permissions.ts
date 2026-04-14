@@ -5,7 +5,7 @@
  * DELETE /api/admin/users/[userId]/permissions - Remove permission override
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import {
@@ -23,9 +23,10 @@ import { log } from '@/lib/logger';
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(
-  req: AuthenticatedNextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
+  const authReq = req as AuthenticatedNextApiRequest;
   const { userId } = req.query;
 
   if (!userId || typeof userId !== 'string') {
@@ -40,18 +41,18 @@ async function handler(
   const user = userResult[0]!;
 
   if (req.method === 'GET') {
-    return handleGet(req, res, userId, user.role);
+    return handleGet(authReq, res, userId, user.role as string);
   }
 
   if (req.method === 'POST') {
-    return handlePost(req, res, userId);
+    return handlePost(authReq, res, userId);
   }
 
   if (req.method === 'DELETE') {
-    return handleDelete(req, res, userId);
+    return handleDelete(authReq, res, userId);
   }
 
-  return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+  return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET', 'POST', 'DELETE']);
 }
 
 async function handleGet(

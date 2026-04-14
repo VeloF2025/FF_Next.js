@@ -6,7 +6,7 @@
  * Ordered by status priority, then due_date, then created_at.
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
@@ -14,12 +14,13 @@ import { ActionItem } from '@/types/action-items.types';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
   }
 
-  const authUser = req.user;
+  const authUser = authReq.user;
   const userId = authUser.id;
   const userEmail = authUser.email?.toLowerCase() ?? '';
 

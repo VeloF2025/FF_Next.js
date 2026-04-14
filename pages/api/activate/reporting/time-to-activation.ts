@@ -67,11 +67,12 @@ async function handler(
         : project
       : undefined;
 
-    log.info('TimeToActivationAPI', 'Fetching time-to-activation report', {
+    log.info('Fetching time-to-activation report', {
       dateFrom: dateFromStr,
       dateTo: dateToStr,
       project: projectStr,
-    });
+    }, 'TimeToActivationAPI');
+
 
     // Explicit branches to avoid conditional SQL fragments inside CTEs (Neon rule)
     const bucketsResult = projectStr
@@ -191,7 +192,7 @@ async function handler(
       })),
     });
   } catch (error) {
-    log.error('TimeToActivationAPI', 'Failed to fetch time-to-activation report', { error });
+    log.error('Failed to fetch time-to-activation report', { error: { error } }, 'TimeToActivationAPI');
     return apiResponse.internalError(res, error);
   }
 }

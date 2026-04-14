@@ -82,14 +82,15 @@ async function handler(
     const viewMode = (Array.isArray(view) ? view[0] : view) as ActivationProgressView;
     const granularityMode = (Array.isArray(granularity) ? granularity[0] : granularity) as ActivationProgressGranularity;
 
-    log.info('ActivationProgress', 'Fetching activation progress', {
+    log.info('Fetching activation progress', {
       dateFrom: dateFromStr,
       dateTo: dateToStr,
       project: projectFilter,
       isUuid,
       view: viewMode,
       granularity: granularityMode,
-    });
+    }, 'ActivationProgress');
+
 
     const client = await pool.connect();
 
@@ -394,19 +395,20 @@ async function handler(
         time_series: timeSeries,
       };
 
-      log.info('ActivationProgress', 'Report generated', {
+      log.info('Report generated', {
         totalScope,
         totalActivated,
         completionPercent,
         projectCount: hierarchy.length,
-      });
+      }, 'ActivationProgress');
+
 
       return res.status(200).json(response);
     } finally {
       client.release();
     }
   } catch (error) {
-    log.error('ActivationProgress', 'Failed to generate report', { error });
+    log.error('Failed to generate report', { error: { error } }, 'ActivationProgress');
     return apiResponse.internalError(res, error);
   }
 }

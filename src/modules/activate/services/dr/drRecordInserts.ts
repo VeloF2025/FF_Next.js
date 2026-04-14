@@ -59,11 +59,12 @@ export async function insertFromQARecord(p: {
   const originalCreatedAt = qaRecord.created_at;
   const c = flattenContact(contact);
 
-  log.info('DrRecordInserts', `Inserting from QA record for ${dropNumber} in ${qaRecord.project}`, {
+  log.info(`Inserting from QA record for ${dropNumber} in ${qaRecord.project}`, {
     whatsapp_message_date: qaRecord.whatsapp_message_date,
     using_date: qaSubmittedDateStr,
     original_created_at: originalCreatedAt,
-  });
+  }, 'DrRecordInserts');
+
 
   const initialHistory = JSON.stringify([
     {

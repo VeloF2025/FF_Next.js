@@ -301,7 +301,8 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
       }
     }
 
-    log.info('QField ingestion complete', result, MODULE);
+    log.info('QField ingestion complete', { data: result }, MODULE);
+
     return result;
   } catch (err) {
     const msg = `Ingestion failed: ${(err as Error).message}`;

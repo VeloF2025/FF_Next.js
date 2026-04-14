@@ -50,7 +50,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ runId: result.runId }),
       }).catch(err => {
-        log.warn('OltAutoDetect', 'Failed to trigger queue processor', err);
+        log.warn('Failed to trigger queue processor', { error: err }, 'OltAutoDetect');
       });
     }
 
@@ -64,7 +64,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       runId: result.runId,
     });
   } catch (error) {
-    log.error('OltAutoDetect', 'Auto-detect endpoint failed', { error });
+    log.error('Auto-detect endpoint failed', { error: { error } }, 'OltAutoDetect');
     return apiResponse.internalError(res, error);
   }
 }

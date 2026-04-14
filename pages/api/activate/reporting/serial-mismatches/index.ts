@@ -333,16 +333,17 @@ async function handler(
       available_zones: Object.keys(byZone),
     };
 
-    log.info('SerialMismatchReport', `Fetched ${records.length} mismatch records`, {
+    log.info(`Fetched ${records.length} mismatch records`, {
       zone,
       team,
       status,
       totalCount,
-    });
+    }, 'SerialMismatchReport');
+
 
     return res.status(200).json(response);
   } catch (error) {
-    log.error('SerialMismatchReport', 'Failed to fetch serial mismatch report', { error });
+    log.error('Failed to fetch serial mismatch report', { error: { error } }, 'SerialMismatchReport');
     return apiResponse.internalError(res, error);
   } finally {
     client.release();

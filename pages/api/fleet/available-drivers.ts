@@ -104,7 +104,7 @@ async function handler(
       },
     });
   } catch (error) {
-    log.error('AvailableDriversApi', 'Internal error', { error });
+    log.error('Internal error', { error: { error } }, 'AvailableDriversApi');
     return apiResponse.internalError(res, error);
   }
 }

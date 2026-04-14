@@ -113,7 +113,7 @@ async function handler(
       return apiResponse.created(res, { note: result[0] });
     }
 
-    return apiResponse.methodNotAllowed(res, ['GET', 'POST']);
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET', 'POST']);
   } catch (error: any) {
     // Check if it's a missing table error
     if (error.message?.includes('relation "staff_notes" does not exist')) {

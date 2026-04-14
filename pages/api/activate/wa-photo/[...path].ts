@@ -77,7 +77,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     res.setHeader('Content-Length', buffer.length);
     return res.send(buffer);
   } catch (error) {
-    log.error(`[WaPhotoProxy] Error proxying photo ${drNumber}/${filename}:`, error);
+    log.error(`[WaPhotoProxy] Error proxying photo ${drNumber}/${filename}:`, { error: error });
     return apiResponse.internalError(res, error);
   }
 }

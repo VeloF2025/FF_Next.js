@@ -164,7 +164,7 @@ async function handler(
       cleanup();
       const err = ocrError instanceof Error ? ocrError : new Error(String(ocrError));
       if (err.name === 'AbortError' || err.message.includes('timeout')) {
-        log.error('OCR timeout after 120 seconds', err, 'OcrPreviewAPI');
+        log.error('OCR timeout after 120 seconds', { error: err }, 'OcrPreviewAPI');
         return res.status(504).json({ error: 'OCR processing timed out after 120 seconds. Please try manual entry.' });
       }
       throw ocrError;
@@ -172,7 +172,7 @@ async function handler(
 
   } catch (error: unknown) {
     const err = error instanceof Error ? error : new Error(String(error));
-    log.error('OCR Preview failed', err, 'OcrPreviewAPI');
+    log.error('OCR Preview failed', { error: err }, 'OcrPreviewAPI');
     return res.status(500).json({ error: err.message || 'OCR preview failed' });
   }
 }

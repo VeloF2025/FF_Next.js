@@ -230,7 +230,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       imports: importsResult.rows,
     });
   } catch (error) {
-    log.error('OltReportReporting', 'Failed to fetch reporting data', { error });
+    log.error('Failed to fetch reporting data', { error: { error } }, 'OltReportReporting');
     return apiResponse.internalError(res, error);
   }
 }

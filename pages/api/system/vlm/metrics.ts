@@ -38,7 +38,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const metrics = await getVlmMetrics(options);
     return apiResponse.success(res, metrics);
   } catch (error) {
-    log.error('VlmMetricsAPI', `Error: ${error}`);
+    log.error(`Error: ${error}`, undefined, 'VlmMetricsAPI');
     return apiResponse.internalError(res, error);
   }
 }

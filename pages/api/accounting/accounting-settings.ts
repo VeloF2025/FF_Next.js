@@ -4,13 +4,14 @@
  * PUT  { key, value } — update setting
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { getSetting, setSetting } from '@/modules/accounting/services/currencyService';
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method === 'GET') {
     const { key } = req.query;
     if (!key) return apiResponse.badRequest(res, 'key is required');
@@ -19,7 +20,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   }
 
   if (req.method === 'PUT') {
-    const userId = req.user.id;
+    const userId = authReq.user.id;
     const { key, value } = req.body;
     if (!key || !value) return apiResponse.badRequest(res, 'key and value required');
     await setSetting(key, value, userId);

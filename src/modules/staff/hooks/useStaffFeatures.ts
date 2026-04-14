@@ -72,7 +72,7 @@ export function useStaffFeatures(): UseStaffFeaturesReturn {
         throw new Error('Failed to fetch feature settings');
       }
     } catch (err) {
-      log.error('useStaffFeatures', 'Failed to fetch features', err);
+      log.error('Failed to fetch features', { error: err }, 'useStaffFeatures');
       setError(err instanceof Error ? err.message : 'Failed to fetch features');
       // On error, default to all features enabled
       setFeatures([]);

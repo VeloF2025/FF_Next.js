@@ -1,4 +1,4 @@
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
@@ -7,7 +7,8 @@ import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
@@ -24,7 +25,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, 'boqItemId and stockItemId are required');
   }
 
-  const userName = req.user?.name || 'Unknown';
+  const userName = authReq.user?.name || 'Unknown';
 
   try {
     // Verify both records exist
@@ -116,7 +117,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
       savedSupplierMapping: saveAsSupplierMapping && boqItem[0]!.item_code ? true : false,
     });
   } catch (error) {
-    log.error('Failed to map BOQ item to stock item', error);
+    log.error('Failed to map BOQ item to stock item', { error: error });
     return apiResponse.internalError(res, error);
   }
 }

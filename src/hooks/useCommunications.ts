@@ -95,7 +95,7 @@ export function useCommunications() {
       setActionItems([]);
       setNotifications([]);
     } catch (error) {
-      log.error('Failed to load communications data:', error);
+      log.error('Failed to load communications data:', { error: error });
       if (!append) {
         setMeetings([]);
         setActionItems([]);

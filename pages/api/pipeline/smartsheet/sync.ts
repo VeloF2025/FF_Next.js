@@ -24,7 +24,8 @@ const DEFAULT_SHEET_ID = '8735086443712388';
 // Track whether a sync is in progress to prevent concurrent runs
 let _syncRunning = false;
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
@@ -39,7 +40,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   const { sheetId } = req.body;
   const targetSheetId = sheetId || DEFAULT_SHEET_ID;
 
-  log.info('Smartsheet sync triggered', { sheetId: targetSheetId, userId: req.user?.id });
+  log.info('Smartsheet sync triggered', { sheetId: targetSheetId, userId: authReq.user?.id });
 
   // Send 202 immediately — res.json() flushes the response
   res.status(202).json({

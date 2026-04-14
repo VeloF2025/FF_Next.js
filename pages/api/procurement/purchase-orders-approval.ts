@@ -56,7 +56,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.badRequest(res, 'poId or pending parameter required');
   } catch (error) {
-    log.error('Failed to get PO approval status', error);
+    log.error('Failed to get PO approval status', { error: error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -121,7 +121,7 @@ async function handleGetPendingPOs(res: NextApiResponse) {
       pendingPOs,
     });
   } catch (error) {
-    log.error('Failed to get pending POs', error);
+    log.error('Failed to get pending POs', { error: error });
     throw error;
   }
 }

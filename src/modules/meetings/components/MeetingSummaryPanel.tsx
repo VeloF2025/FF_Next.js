@@ -43,7 +43,7 @@ export function MeetingSummaryPanel({ meeting }: MeetingSummaryPanelProps) {
         setSaveStatus('error');
       }
     } catch (err) {
-      log.error('Failed to save meeting notes:', err);
+      log.error('Failed to save meeting notes:', { error: err });
       setSaveStatus('error');
     } finally {
       setIsSaving(false);

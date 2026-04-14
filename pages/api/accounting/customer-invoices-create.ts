@@ -3,7 +3,7 @@
  * POST — create invoice with line items
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
@@ -13,14 +13,15 @@ import { sql } from '@/lib/neon';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = any;
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
 
   const { clientId, invoiceDate, dueDate, billingPeriodStart, billingPeriodEnd, taxRate, notes, items } = req.body;
   if (!clientId) return apiResponse.badRequest(res, 'clientId is required');
   if (!items || !Array.isArray(items) || items.length === 0) return apiResponse.badRequest(res, 'items required');
 
-  const userId = req.user.id;
+  const userId = authReq.user.id;
 
   // Auto-generate invoice number
   const maxRows = (await sql`

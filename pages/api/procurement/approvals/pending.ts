@@ -138,7 +138,7 @@ export default withAuth(withErrorHandler(async (
       summary,
     });
   } catch (error) {
-    log.error('PendingApi', 'Failed to fetch pending approvals', { error });
+    log.error('Failed to fetch pending approvals', { error: { error } }, 'PendingApi');
     return apiResponse.databaseError(res, error, 'Failed to fetch pending approvals');
   }
 }));

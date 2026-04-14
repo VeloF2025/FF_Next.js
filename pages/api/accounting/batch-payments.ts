@@ -4,14 +4,15 @@
  * POST — create batch
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { getBatches, getBatchById, createBatch } from '@/modules/accounting/services/batchPaymentService';
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method === 'GET') {
     const { id, status, limit, offset } = req.query;
 
@@ -31,7 +32,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   }
 
   if (req.method === 'POST') {
-    const userId = req.user.id;  // User identity from JWT only
+    const userId = authReq.user.id;  // User identity from JWT only
     try {
       const item = await createBatch(req.body, userId);
       return apiResponse.success(res, item);

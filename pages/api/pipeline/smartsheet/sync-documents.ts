@@ -5,15 +5,16 @@
  * Protected: super_admin role required
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';import { apiResponse } from '@/lib/apiResponse';
 import { syncDocumentsFromSmartsheet } from '@/modules/pipeline/services';
 import { withAuth, withRole, type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 
 async function handler(
-  req: AuthenticatedNextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }

@@ -121,7 +121,7 @@ export default function RFQDetailPage() {
         setError(data.error?.message || 'Failed to load RFQ');
       }
     } catch (err) {
-      log.error('Failed to fetch RFQ', err);
+      log.error('Failed to fetch RFQ', { error: err });
       setError('Failed to load RFQ details');
     } finally {
       setIsLoading(false);

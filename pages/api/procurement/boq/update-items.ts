@@ -1,4 +1,4 @@
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
@@ -23,7 +23,8 @@ interface FieldChange {
   summary: string;
 }
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'PUT') {
     return apiResponse.methodNotAllowed(res, req.method!, ['PUT']);
   }
@@ -34,7 +35,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, 'boqId and items array are required');
   }
 
-  const user = req.user;
+  const user = authReq.user;
   const userId = user?.id || null;
   const userName = user?.name || 'Unknown';
 
@@ -152,7 +153,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
       boqId,
     });
   } catch (error) {
-    log.error('Failed to update BOQ items', error);
+    log.error('Failed to update BOQ items', { error: error });
     return apiResponse.internalError(res, error);
   }
 }

@@ -76,7 +76,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
     }
   } catch (error) {
-    log.error('RecordsApi', 'Internal error', { error });
+    log.error('Internal error', { error: { error } }, 'RecordsApi');
     return apiResponse.internalError(res, error);
   }
 }

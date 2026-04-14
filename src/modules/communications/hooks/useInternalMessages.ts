@@ -63,7 +63,7 @@ export function useInternalMessages(view: MessageView, searchTerm?: string): Use
         setHasMore(items.length === PAGE_SIZE);
       }
     } catch (err) {
-      log.error('Failed to fetch messages:', err);
+      log.error('Failed to fetch messages:', { error: err });
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +99,7 @@ export function useInternalMessages(view: MessageView, searchTerm?: string): Use
       );
       setUnreadCount(prev => Math.max(0, prev - messageIds.length));
     } catch (err) {
-      log.error('Failed to mark messages as read:', err);
+      log.error('Failed to mark messages as read:', { error: err });
     }
   }, []);
 
@@ -121,7 +121,7 @@ export function useInternalMessages(view: MessageView, searchTerm?: string): Use
       setMessages(prev => prev.filter(m => !messageIds.includes(m.id)));
       setTotal(prev => prev - messageIds.length);
     } catch (err) {
-      log.error('Failed to archive messages:', err);
+      log.error('Failed to archive messages:', { error: err });
     }
   }, []);
 

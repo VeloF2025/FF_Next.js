@@ -24,7 +24,7 @@ export async function POST(
     // Verify webhook secret
     const secret = req.headers.get('x-webhook-secret');
     if (secret !== process.env.HARNESS_TRIGGER_SECRET) {
-      log.warn(`Invalid webhook secret for item ${itemId}`, 'DevQueueProgress');
+      log.warn(`Invalid webhook secret for item ${itemId}`, { error: 'DevQueueProgress' });
       return NextResponse.json({ error: 'Invalid secret' }, { status: 401 });
     }
 
@@ -117,10 +117,11 @@ export async function POST(
       });
     }
 
-    log.info(
-      `Build progress updated for ${itemId}: ${status} (${progress}%)`,
-      'DevQueueProgress'
-    );
+    log.info(`Build progress updated for ${itemId}: ${status} (${progress}%)`, undefined, 'DevQueueProgress');
+
+
+
+
 
     return NextResponse.json({
       success: true,

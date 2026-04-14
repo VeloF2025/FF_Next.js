@@ -60,7 +60,7 @@ export default function RequisitionsPage() {
         setError(data.error?.message || 'Failed to fetch requisitions');
       }
     } catch (err) {
-      log.error('Failed to fetch requisitions', err);
+      log.error('Failed to fetch requisitions', { error: err });
       setError('Failed to load requisitions');
     } finally {
       setIsLoading(false);

@@ -49,12 +49,13 @@ async function handler(
         : project
       : undefined;
 
-    log.info('TrendsAPI', 'Fetching trend analysis report', {
+    log.info('Fetching trend analysis report', {
       dateFrom: dateFromStr,
       dateTo: dateToStr,
       groupBy: groupByStr,
       project: projectStr,
-    });
+    }, 'TrendsAPI');
+
 
     const data = await getTrendAnalysisReport(
       dateFromStr as string,
@@ -65,7 +66,7 @@ async function handler(
 
     return res.status(200).json(data);
   } catch (error) {
-    log.error('TrendsAPI', 'Failed to fetch trend analysis report', { error });
+    log.error('Failed to fetch trend analysis report', { error: { error } }, 'TrendsAPI');
     return apiResponse.internalError(res, error);
   }
 }

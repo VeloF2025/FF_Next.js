@@ -28,7 +28,7 @@ async function fetchSubscriberContact(dropNumber: string): Promise<SubscriberCon
     });
 
     if (!response.ok) {
-      log.warn('DrContactService', `BOSS API returned ${response.status} for ${dropNumber}`);
+      log.warn(`BOSS API returned ${response.status} for ${dropNumber}`, undefined, 'DrContactService');
       return null;
     }
 
@@ -47,7 +47,7 @@ async function fetchSubscriberContact(dropNumber: string): Promise<SubscriberCon
       installer_name: data.installer_name ?? null,
     };
   } catch (error) {
-    log.warn('DrContactService', `BOSS API fetch failed for ${dropNumber}`, error);
+    log.warn(`BOSS API fetch failed for ${dropNumber}`, { error: error }, 'DrContactService');
     return null;
   }
 }
@@ -78,7 +78,7 @@ async function fetchQContactInfo(dropNumber: string): Promise<QContactInfo | nul
       qcontact_email: row.client_email ?? null,
     };
   } catch (error) {
-    log.warn('DrContactService', `QContact fetch failed for ${dropNumber}`, error);
+    log.warn(`QContact fetch failed for ${dropNumber}`, { error: error }, 'DrContactService');
     return null;
   }
 }
@@ -93,12 +93,13 @@ export async function fetchContactData(dropNumber: string): Promise<ContactData>
     fetchQContactInfo(dropNumber),
   ]);
 
-  log.info('DrContactService', `Contact info for ${dropNumber}`, {
+  log.info(`Contact info for ${dropNumber}`, {
     hasSubscriberContact: !!subscriberContact,
     hasQContactInfo: !!qContactInfo,
     subscriberName: subscriberContact?.subscriber_name ?? null,
     qcontactName: qContactInfo?.qcontact_name ?? null,
-  });
+  }, 'DrContactService');
+
 
   return { subscriberContact, qContactInfo };
 }

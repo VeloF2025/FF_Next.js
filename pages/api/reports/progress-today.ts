@@ -110,10 +110,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       },
     };
 
-    log.info('ProgressTodayAPI', 'Fetched progress metrics', response.metrics);
+    log.info('Fetched progress metrics', { error: response.metrics }, 'ProgressTodayAPI');
     return res.status(200).json(response);
   } catch (error) {
-    log.error('ProgressTodayAPI', 'Failed to fetch progress metrics', { error });
+    log.error('Failed to fetch progress metrics', { error: { error } }, 'ProgressTodayAPI');
     return apiResponse.internalError(res, error);
   }
 }

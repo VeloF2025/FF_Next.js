@@ -131,7 +131,8 @@ export async function pullInvoicesFromSage(
       )
     `;
 
-    logger.info('Invoice sync completed', result);
+    logger.info('Invoice sync completed', { data: result });
+
   } catch (error) {
     result.success = false;
     logger.error('Invoice sync failed', { error });

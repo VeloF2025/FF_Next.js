@@ -18,7 +18,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   if (req.method !== 'PUT') {
-    return apiResponse.methodNotAllowed(res, req.method || 'unknown');
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
   }
 
   try {
@@ -37,7 +37,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, anomaly);
   } catch (error) {
-    log.error('IdApi', 'Operation failed', { error });
+    log.error('Operation failed', { error: { error } }, 'IdApi');
     if (error instanceof Error && error.message === 'Anomaly not found') {
       return apiResponse.notFound(res, 'Anomaly', id);
     }

@@ -27,7 +27,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const updated = await markAsRead(notification_ids, authReq.user.id);
     return apiResponse.success(res, { updated });
   } catch (error) {
-    log.error('MarkReadApi', 'Internal error', { error });
+    log.error('Internal error', { error: { error } }, 'MarkReadApi');
     return apiResponse.internalError(res, error);
   }
 }

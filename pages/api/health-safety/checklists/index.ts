@@ -21,7 +21,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       case 'POST':
         return handlePost(req, res);
       default:
-        return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+        return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
     }
   } catch (error) {
     log.error('[H&S Checklists API] Error', { error });

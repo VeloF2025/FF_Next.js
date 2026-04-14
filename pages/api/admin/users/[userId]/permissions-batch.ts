@@ -5,7 +5,7 @@
  * computes overrides by diffing against role defaults
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import { batchSetUserPermissions } from '@/lib/permissions';
@@ -25,11 +25,12 @@ interface DesiredPermission {
 }
 
 async function handler(
-  req: AuthenticatedNextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'PUT') {
-    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['PUT']);
   }
 
   const { userId } = req.query;
@@ -56,14 +57,14 @@ async function handler(
     const result = await batchSetUserPermissions(
       userId,
       desiredPermissions,
-      req.user.id
+      authReq.user.id
     );
 
     // Log audit event
     await sql`
       INSERT INTO user_audit_log (user_id, action, resource_type, resource_id, details, ip_address)
       VALUES (
-        ${req.user.id},
+        ${authReq.user.id},
         'user_permissions_batch_update',
         'user_permission',
         ${userId},
@@ -73,16 +74,13 @@ async function handler(
           overridesCreated: result.overridesCreated,
           overridesRemoved: result.overridesRemoved,
           totalPermissions: desiredPermissions.length,
-          changedBy: req.user.email,
+          changedBy: authReq.user.email,
         })}::jsonb,
         ${(req.headers['x-forwarded-for'] as string)?.split(',')[0] || null}
       )
     `;
 
-    log.info(
-      { userId, overridesCreated: result.overridesCreated },
-      'User permissions batch updated'
-    );
+    log.info('User permissions batch updated', { userId, overridesCreated: result.overridesCreated });
 
     return apiResponse.success(res, {
       message: 'User permissions updated',
@@ -90,7 +88,7 @@ async function handler(
       overridesRemoved: result.overridesRemoved,
     });
   } catch (error) {
-    log.error({ error, userId }, 'Error batch updating user permissions');
+    log.error('Error batch updating user permissions', { error, userId });
     return apiResponse.internalError(res, error);
   }
 }

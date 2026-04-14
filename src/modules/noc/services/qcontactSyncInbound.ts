@@ -659,7 +659,8 @@ export async function syncInboundTickets(
   const startTime = Date.now();
   const started_at = new Date();
 
-  logger.info('Starting inbound sync from QContact', options);
+  logger.info('Starting inbound sync from QContact', { data: options });
+
 
   const stats: SyncStats = {
     total_processed: 0,

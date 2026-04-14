@@ -4,7 +4,7 @@
  * POST /api/accounting/customer-payments - Create payment with allocations
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
@@ -16,7 +16,8 @@ import {
 } from '@/modules/accounting/services/customerPaymentService';
 import type { CustomerPaymentStatus } from '@/modules/accounting/types/ar.types';
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method === 'GET') {
     try {
       const { id, status, client_id, limit, offset } = req.query;
@@ -50,8 +51,8 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
         return apiResponse.badRequest(res, 'clientId, paymentDate, totalAmount, and allocations are required');
       }
 
-      // User identity comes from JWT (req.user), never from client request body
-      const userId = req.user.id;
+      // User identity comes from JWT (authReq.user), never from client request body
+      const userId = authReq.user.id;
 
       const payment = await createCustomerPayment({
         clientId: String(clientId),

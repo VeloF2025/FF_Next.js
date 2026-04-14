@@ -4,7 +4,7 @@
  * POST — create VAT adjustment
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
@@ -14,7 +14,8 @@ import {
   createVATAdjustment,
 } from '@/modules/accounting/services/vatAdjustmentService';
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method === 'GET') {
     const { status, limit, offset } = req.query;
     const result = await getVATAdjustments({
@@ -26,7 +27,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   }
 
   if (req.method === 'POST') {
-    const userId = req.user.id;
+    const userId = authReq.user.id;
     try {
       const item = await createVATAdjustment(req.body, userId);
       return apiResponse.success(res, item);

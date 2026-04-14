@@ -3,7 +3,7 @@
  * POST /api/admin/roles/clone - Clone an existing role with all its permissions
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
@@ -12,11 +12,12 @@ import log from '@/lib/logger';
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(
-  req: AuthenticatedNextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
   }
 
   try {
@@ -67,7 +68,7 @@ async function handler(
         ${newName},
         ${newDisplayName},
         ${description || `Cloned from ${sourceRoleData[0]!.display_name}`},
-        ${req.user.id}
+        ${authReq.user.id}
       ) as new_role_id
     `;
 
@@ -89,7 +90,7 @@ async function handler(
     await sql`
       INSERT INTO user_audit_log (user_id, action, resource_type, resource_id, details, ip_address)
       VALUES (
-        ${req.user.id},
+        ${authReq.user.id},
         'role_clone',
         'role',
         ${newRoleId},
@@ -98,13 +99,13 @@ async function handler(
           newName,
           newDisplayName,
           permissionsCloned: parseInt(permCount[0]!.count),
-          clonedBy: req.user.email,
+          clonedBy: authReq.user.email,
         })}::jsonb,
         ${(req.headers['x-forwarded-for'] as string)?.split(',')[0] || null}
       )
     `;
 
-    log.info({ newRoleId, sourceRole, newName }, 'Role cloned successfully');
+    log.info('Role cloned successfully', { newRoleId, sourceRole, newName });
 
     return apiResponse.created(res, {
       id: newRoleData[0]!.id,
@@ -120,7 +121,7 @@ async function handler(
       clonedFrom: sourceRole,
     });
   } catch (error) {
-    log.error('roles-clone', { error: error instanceof Error ? error.message : String(error) });
+    log.error('roles-clone error', { error: error instanceof Error ? error.message : String(error) });
     // Handle specific PostgreSQL errors from the clone_role function
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     if (errorMessage.includes('does not exist')) {
@@ -130,7 +131,7 @@ async function handler(
       return apiResponse.badRequest(res, `Role "${req.body.newName}" already exists`);
     }
 
-    log.error({ error }, 'Error cloning role');
+    log.error('Error cloning role', { error });
     return apiResponse.internalError(res, error);
   }
 }

@@ -196,7 +196,8 @@ export async function pullSuppliersFromSage(
       )
     `;
 
-    logger.info('Supplier pull completed', result);
+    logger.info('Supplier pull completed', { data: result });
+
   } catch (error) {
     result.success = false;
     logger.error('Supplier sync failed', { error });

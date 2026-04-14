@@ -62,7 +62,7 @@ async function handler(
   }
 
   if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res, req.method || 'unknown');
+    return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['DELETE', 'GET']);
   }
 
   try {

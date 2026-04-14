@@ -99,12 +99,13 @@ async function handler(
       return apiResponse.notFound(res, 'Serial mismatch record', id);
     }
 
-    log.info('SerialMismatchUpdate', `Updated mismatch status for ${updated.drop_number}`, {
+    log.info(`Updated mismatch status for ${updated.drop_number}`, {
       id,
       dropNumber: updated.drop_number,
       newStatus: status,
       resolution,
-    });
+    }, 'SerialMismatchUpdate');
+
 
     return apiResponse.success(res, {
       id,
@@ -114,7 +115,7 @@ async function handler(
       message: `Mismatch status updated to ${status}`,
     });
   } catch (error) {
-    log.error('SerialMismatchUpdate', 'Failed to update mismatch status', { error });
+    log.error('Failed to update mismatch status', { error: { error } }, 'SerialMismatchUpdate');
     return apiResponse.internalError(res, error);
   }
 }

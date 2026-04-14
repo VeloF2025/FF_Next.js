@@ -40,11 +40,12 @@ async function handler(
         : project
       : undefined;
 
-    log.info('DailyCountsAPI', 'Fetching daily counts', {
+    log.info('Fetching daily counts', {
       dateFrom: dateFromStr,
       dateTo: dateToStr,
       project: projectStr,
-    });
+    }, 'DailyCountsAPI');
+
 
     const data = await getDailyCountsWithBreakdown(
       dateFromStr,
@@ -54,7 +55,7 @@ async function handler(
 
     return res.status(200).json(data);
   } catch (error) {
-    log.error('DailyCountsAPI', 'Failed to fetch daily counts', { error });
+    log.error('Failed to fetch daily counts', { error: { error } }, 'DailyCountsAPI');
     return apiResponse.internalError(res, error);
   }
 }

@@ -37,7 +37,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       case 'POST':
         return handlePost(ticketId, req, res);
       default:
-        return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+        return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
     }
   } catch (error) {
     log.error('[H&S Ticket Details API] Error', { error });

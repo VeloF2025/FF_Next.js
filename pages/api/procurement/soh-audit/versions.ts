@@ -3,7 +3,7 @@
  * GET  /api/procurement/soh-audit/versions?id=X   — fetch version + entries
  * POST /api/procurement/soh-audit/versions        — create version + entries
  */
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
@@ -33,7 +33,8 @@ export interface SOHAuditVersion {
   entries?: SOHAuditEntry[];
 }
 
-export default withAuth(async (req: AuthenticatedNextApiRequest, res: NextApiResponse) => {
+export default withAuth(async (req: NextApiRequest, res: NextApiResponse) => {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method === 'GET') {
     const { id } = req.query;
 

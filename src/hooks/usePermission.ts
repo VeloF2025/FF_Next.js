@@ -110,7 +110,7 @@ export function usePermission(): UsePermissionReturn {
         setPermissions([]);
       }
     } catch (error) {
-      log.error('Failed to fetch permissions', error, 'usePermission');
+      log.error('Failed to fetch permissions', { error: error }, 'usePermission');
       setPermissions([]);
     } finally {
       setIsLoading(false);

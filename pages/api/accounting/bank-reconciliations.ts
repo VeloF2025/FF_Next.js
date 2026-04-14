@@ -4,7 +4,7 @@
  * POST /api/accounting/bank-reconciliations - Start new reconciliation
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
@@ -15,7 +15,8 @@ import {
   startReconciliation,
 } from '@/modules/accounting/services/bankReconciliationService';
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method === 'GET') {
     try {
       const { bank_account_id, id } = req.query;
@@ -39,8 +40,8 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   if (req.method === 'POST') {
     try {
       const { bankAccountId, statementDate, statementBalance } = req.body;
-      // User identity comes from JWT (req.user), never from client request body
-      const userId = req.user.id;
+      // User identity comes from JWT (authReq.user), never from client request body
+      const userId = authReq.user.id;
 
       if (!bankAccountId || !statementDate || statementBalance === undefined) {
         return apiResponse.badRequest(res, 'bankAccountId, statementDate, and statementBalance are required');

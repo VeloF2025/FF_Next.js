@@ -52,10 +52,11 @@ interface UserProfile {
 }
 
 async function handler(
-  req: NextApiRequest & AuthenticatedRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const userId = req.user?.id;
+  const authReq = req as NextApiRequest & AuthenticatedRequest;
+  const userId = authReq.user?.id;
 
   if (!userId) {
     return res.status(401).json({

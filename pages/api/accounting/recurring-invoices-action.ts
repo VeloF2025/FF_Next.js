@@ -3,7 +3,7 @@
  * POST — pause, resume, cancel, generate
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
@@ -13,14 +13,15 @@ import {
   generateInvoiceFromRecurring,
 } from '@/modules/accounting/services/recurringInvoiceService';
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
   try {
     const { action, id } = req.body;
-    const userId = req.user.id;
+    const userId = authReq.user.id;
     if (!action || !id) return apiResponse.badRequest(res, 'action and id are required');
 
     switch (action) {

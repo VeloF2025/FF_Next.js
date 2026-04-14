@@ -62,18 +62,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     RETURNING id, (SELECT name FROM pipeline_approval_types WHERE id = approval_type_id) as type_name
   `) as Record<string, unknown>[];
 
-  log.info('BulkInternalApprove', `Bulk approved ${result.length} approvals for project ${id}`, {
+  log.info(`Bulk approved ${result.length} approvals for project ${id}`, {
     projectId: id,
     count: result.length,
     approvedBy: approved_by,
-  });
+  }, 'BulkInternalApprove');
+
 
   // Check if all approvals are now complete and auto-transition
   const status = await pipelineApprovalService.checkAllApprovalsComplete(id);
 
   if (status.complete && project.pipeline_status === 'approvals_in_progress') {
     await pipelineProjectService.updateStatus(id, 'approvals_complete', approved_by);
-    log.info('BulkInternalApprove', `Auto-transitioned project ${id} to approvals_complete`);
+    log.info(`Auto-transitioned project ${id} to approvals_complete`, undefined, 'BulkInternalApprove');
   }
 
   return apiResponse.success(res, {

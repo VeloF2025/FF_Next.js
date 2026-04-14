@@ -133,13 +133,14 @@ ${notes ?? 'Please investigate the serial number discrepancy. Possible causes: O
       [ticket.id, id]
     );
 
-    log.info('SerialMismatchTicket', `Created ticket for mismatch ${device.drop_number}`, {
+    log.info(`Created ticket for mismatch ${device.drop_number}`, {
       deviceId: id,
       dropNumber: device.drop_number,
       ticketId: ticket.id,
       ticketUid: ticket.ticket_uid,
       priority,
-    });
+    }, 'SerialMismatchTicket');
+
 
     return apiResponse.success(res, {
       ticket_id: ticket.id,
@@ -151,7 +152,7 @@ ${notes ?? 'Please investigate the serial number discrepancy. Possible causes: O
       message: `Maintenance ticket created for ${device.drop_number}`,
     });
   } catch (error) {
-    log.error('SerialMismatchTicket', 'Failed to create ticket', { error });
+    log.error('Failed to create ticket', { error: { error } }, 'SerialMismatchTicket');
     return apiResponse.internalError(res, error);
   }
 }

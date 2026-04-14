@@ -307,4 +307,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(getAccessToken);
+export default withAuth(handler);

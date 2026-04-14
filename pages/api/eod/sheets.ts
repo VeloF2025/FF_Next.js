@@ -18,7 +18,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'POST') {
     return handlePost(req, res);
   }
-  return apiResponse.methodNotAllowed(res, req.method || '');
+  return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET', 'POST']);
 }
 
 async function handleGet(req: NextApiRequest, res: NextApiResponse) {
