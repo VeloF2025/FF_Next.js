@@ -158,18 +158,18 @@ function TrackerRowDetails({ item }: { item: TrackerItem }) {
           {item.type === 'pole' && (
             <div className="flex justify-between">
               <dt className="text-[var(--ff-text-secondary)]">Drop Count:</dt>
-              <dd className="font-medium text-[var(--ff-text-primary)]">{item.metadata?.dropCount || 0}/12</dd>
+              <dd className="font-medium text-[var(--ff-text-primary)]">{item.dropCount ?? 0}/12</dd>
             </div>
           )}
           {item.type === 'drop' && (
             <>
               <div className="flex justify-between">
                 <dt className="text-[var(--ff-text-secondary)]">Pole Number:</dt>
-                <dd className="font-medium text-[var(--ff-text-primary)]">{item.metadata?.poleNumber || 'N/A'}</dd>
+                <dd className="font-medium text-[var(--ff-text-primary)]">{(item.metadata?.poleNumber as string | undefined) ?? 'N/A'}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-[var(--ff-text-secondary)]">Home Owner:</dt>
-                <dd className="font-medium text-[var(--ff-text-primary)]">{item.metadata?.homeOwner || 'N/A'}</dd>
+                <dd className="font-medium text-[var(--ff-text-primary)]">{item.customerName ?? 'N/A'}</dd>
               </div>
             </>
           )}
@@ -177,11 +177,11 @@ function TrackerRowDetails({ item }: { item: TrackerItem }) {
             <>
               <div className="flex justify-between">
                 <dt className="text-[var(--ff-text-secondary)]">Length:</dt>
-                <dd className="font-medium text-[var(--ff-text-primary)]">{item.metadata?.length || 0}m</dd>
+                <dd className="font-medium text-[var(--ff-text-primary)]">{item.cableLength ?? 0}m</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-[var(--ff-text-secondary)]">Cable Type:</dt>
-                <dd className="font-medium text-[var(--ff-text-primary)]">{item.metadata?.cableType || 'N/A'}</dd>
+                <dd className="font-medium text-[var(--ff-text-primary)]">{(item.metadata?.cableType as string | undefined) ?? 'N/A'}</dd>
               </div>
             </>
           )}

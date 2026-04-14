@@ -47,6 +47,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { canEditDescription } from '@/modules/construction-qa/utils/snagPermissions';
 import { PhotoLightbox } from '@/components/PhotoLightbox';
 import type { LightboxPhoto } from '@/components/PhotoLightbox';
+import type { TicketStatus } from '../../types/ticket';
 
 interface TicketDetailProps {
   /** Ticket ID to display */
@@ -104,7 +105,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
   // Handle workflow button status changes (Approve QA, Reject QA, etc.)
   const handleStatusChange = async (newStatus: string) => {
     try {
-      await updateTicket.mutateAsync({ id: ticketId, payload: { status: newStatus } });
+      await updateTicket.mutateAsync({ id: ticketId, payload: { status: newStatus as TicketStatus } });
       refetch();
     } catch (err) {
       log.error('Failed to update ticket status', { err, ticketId, newStatus });
@@ -116,10 +117,16 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
   const timelineEvents = React.useMemo(() => {
     if (!ticket) return [];
 
-    const events = [
+    const events: Array<{
+      id: string;
+      type: 'status_change' | 'assignment' | 'note' | 'created';
+      description: string;
+      timestamp: Date;
+      user?: { id: string; name: string };
+    }> = [
       {
         id: '1',
-        type: 'created' as const,
+        type: 'created',
         description: 'Ticket created',
         timestamp: new Date(ticket.created_at),
         user: ticket.created_by
@@ -131,7 +138,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
     if (ticket.assigned_to) {
       events.push({
         id: '2',
-        type: 'assignment' as const,
+        type: 'assignment',
         description: 'Ticket assigned',
         timestamp: new Date(ticket.updated_at || ticket.created_at),
         user: { id: ticket.assigned_to, name: 'Assigned User' },
@@ -141,7 +148,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
     if (ticket.status !== 'open') {
       events.push({
         id: '3',
-        type: 'status_change' as const,
+        type: 'status_change',
         description: `Status changed to ${ticket.status.replace(/_/g, ' ')}`,
         timestamp: new Date(ticket.updated_at || ticket.created_at),
       });
@@ -307,7 +314,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
               <BeforePhoto ticketId={ticketId} />
 
               {/* QA Readiness Check (on overview) — only for field tickets, not dev_ops */}
-              {ticket.type !== 'dev_ops' &&
+              {ticket.ticket_type !== 'dev_ops' &&
                 (ticket.status === 'in_progress' ||
                 ticket.status === 'pending_qa' ||
                 ticket.status === 'qa_in_progress') && (
@@ -481,7 +488,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
             currentUserId={ticket.assigned_to}
             currentUserName={ticket.assigned_user?.name}
             currentTeamId={ticket.assigned_team_id}
-            currentTeamName={ticket.assigned_team_info?.name || ticket.assigned_team}
+            currentTeamName={ticket.assigned_team_name ?? ticket.assigned_team}
             onAssignmentSaved={handleActionComplete}
           />
 

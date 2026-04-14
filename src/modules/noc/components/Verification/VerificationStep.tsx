@@ -49,38 +49,40 @@ export function VerificationStep({
   editable,
   compact = false,
 }: VerificationStepProps) {
-  const template = VERIFICATION_STEP_TEMPLATES[step.step_number];
+  const stepNumber = step.step_number as VerificationStepNumber;
+  const template = VERIFICATION_STEP_TEMPLATES[stepNumber];
 
   // 🟢 WORKING: Handle checkbox toggle
   const handleToggle = useCallback(() => {
     if (editable) {
-      onToggle(step.step_number, !step.is_complete);
+      onToggle(stepNumber, !step.is_complete);
     }
-  }, [editable, onToggle, step.step_number, step.is_complete]);
+  }, [editable, onToggle, stepNumber, step.is_complete]);
 
   // 🟢 WORKING: Handle photo upload
   const handlePhotoUploaded = useCallback(
     (photoUrl: string) => {
-      onPhotoUpload(step.step_number, photoUrl);
+      onPhotoUpload(stepNumber, photoUrl);
     },
-    [onPhotoUpload, step.step_number]
+    [onPhotoUpload, stepNumber]
   );
 
   // 🟢 WORKING: Handle photo delete
   const handlePhotoDeleted = useCallback(() => {
     if (onPhotoDelete) {
-      onPhotoDelete(step.step_number);
+      onPhotoDelete(stepNumber);
     }
-  }, [onPhotoDelete, step.step_number]);
+  }, [onPhotoDelete, stepNumber]);
 
   // Get category color
   const categoryColor = getStepCategoryColor(template.category);
-  const categoryBgColor = {
+  const categoryBgColor = ({
     primary: 'bg-blue-500/20 text-blue-400',
     secondary: 'bg-purple-500/20 text-purple-400',
     success: 'bg-green-500/20 text-green-400',
     info: 'bg-cyan-500/20 text-cyan-400',
-  }[categoryColor];
+    warning: 'bg-yellow-500/20 text-yellow-400',
+  } as Record<string, string>)[categoryColor];
 
   return (
     <li
