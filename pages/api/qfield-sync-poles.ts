@@ -12,6 +12,23 @@ import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+interface QFieldPoleRow {
+  pole_number: string | null;
+  pole_type: string | null;
+  height: string | null;
+  material: string | null;
+  status: string | null;
+  installation_date: string | null;
+  latitude: string | null;
+  longitude: string | null;
+  address: string | null;
+  notes: string | null;
+  image_count: number;
+  created_at: string | null;
+  updated_at: string | null;
+  source: string;
+}
+
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -74,7 +91,7 @@ async function handler(
     }
 
     // Fetch real QFieldCloud data
-    let qfieldData = [];
+    let qfieldData: QFieldPoleRow[] = [];
     try {
       const qfieldPoles = await getQFieldPoles(projectId as string | undefined);
       qfieldData = qfieldPoles.map(pole => ({
@@ -119,7 +136,7 @@ async function handler(
       qfieldData.some(qfPole =>
         qfPole.pole_number === ffPole.pole_number &&
         (qfPole.status !== ffPole.status ||
-         Math.abs(parseFloat(qfPole.latitude || 0) - parseFloat(ffPole.latitude || 0)) > 0.00001)
+         Math.abs(parseFloat(qfPole.latitude ?? '0') - parseFloat(String(ffPole.latitude ?? '0'))) > 0.00001)
       )
     );
 

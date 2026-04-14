@@ -100,7 +100,7 @@ async function fixSingleDR(
 
     // Use dual update if UPS serial detected, otherwise single update
     if (hasUpsSerial) {
-      log.info('FixOneMap', 'UPS serial detected - will update both ph_ont and ph_ups', {
+      log.info('UPS serial detected - will update both ph_ont and ph_ups', {
         drNumber,
         ontSerial: correctSerial,
         upsSerial: wrongSerial,
@@ -202,7 +202,7 @@ async function fixSingleDR(
           userId || 'system'
         );
 
-        log.info('FixOneMap', 'DR already correct on all records', {
+        log.info('DR already correct on all records', {
           drNumber,
           totalRecords,
           propIds: propIdSummary,
@@ -238,7 +238,7 @@ async function fixSingleDR(
           userId || 'system'
         );
 
-        log.info('FixOneMap', `Fixed ${updatedCount}/${totalRecords} records for DR`, {
+        log.info(`Fixed ${updatedCount}/${totalRecords} records for DR`, {
           drNumber,
           updatedCount,
           alreadyCorrectCount,
@@ -352,7 +352,7 @@ async function fixSingleDR(
           userId || 'system'
         );
 
-        log.info('FixOneMap', 'DR not found in 1Map - moved to investigate', { drNumber });
+        log.info('DR not found in 1Map - moved to investigate', { drNumber });
 
         return {
           drNumber,
@@ -405,7 +405,7 @@ async function fixSingleDR(
       };
     }
   } catch (error) {
-    log.error('FixOneMap', 'Error fixing DR', { drNumber, error });
+    log.error('Error fixing DR', { drNumber, error });
     return {
       drNumber,
       success: false,
@@ -443,7 +443,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const successCount = results.filter((r) => r.success).length;
       const failCount = results.filter((r) => !r.success).length;
 
-      log.info('FixOneMap', 'Bulk fix completed', { successCount, failCount });
+      log.info('Bulk fix completed', { successCount, failCount });
 
       return apiResponse.success(res, {
         bulk: true,
@@ -471,7 +471,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.success(res, result); // Still 200 but success: false in result
     }
   } catch (error) {
-    log.error('FixOneMap', 'API error', { error });
+    log.error('API error', { error });
     return apiResponse.internalError(res, error);
   } finally {
     client.release();

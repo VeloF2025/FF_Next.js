@@ -86,11 +86,11 @@ async function handler(
   const today = new Date();
   const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
   
-  const dateFromStr = typeof dateFrom === 'string' ? dateFrom : thirtyDaysAgo.toISOString().split('T')[0];
-  const dateToStr = typeof dateTo === 'string' ? dateTo : today.toISOString().split('T')[0];
+  const dateFromStr = typeof dateFrom === 'string' ? dateFrom : (thirtyDaysAgo.toISOString().split('T')[0] ?? '');
+  const dateToStr = typeof dateTo === 'string' ? dateTo : (today.toISOString().split('T')[0] ?? '');
 
   try {
-    log.info('StaffPerformanceAPI', `Fetching performance for staff ${staffId}`, {
+    log.info(`Fetching performance for staff ${staffId}`, {
       dateFrom: dateFromStr,
       dateTo: dateToStr,
     });
@@ -348,11 +348,11 @@ async function handler(
       ],
     };
 
-    log.info('StaffPerformanceAPI', `Found ${totalSubmissions} submissions for ${staff.name}`);
+    log.info(`Found ${totalSubmissions} submissions for ${staff.name as string}`);
 
     return res.status(200).json(response);
   } catch (error) {
-    log.error('StaffPerformanceAPI', 'Failed to fetch staff performance', { error, staffId });
+    log.error('Failed to fetch staff performance', { error, staffId });
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Internal server error',
     });
