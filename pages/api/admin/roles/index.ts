@@ -4,7 +4,7 @@
  * POST /api/admin/roles - Create a new custom role
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import type { RolePermissionWithLabel } from '@/lib/permissions';
@@ -25,7 +25,7 @@ async function handler(
     return handlePost(req, res);
   }
 
-  return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+  return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
 }
 
 async function handleGet(
@@ -102,7 +102,7 @@ async function handleGet(
       total: rolesWithPermissions.length,
     });
   } catch (error) {
-    log.error({ error }, 'Error fetching roles');
+    log.error('Error fetching roles', { error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -167,7 +167,7 @@ async function handlePost(
       )
     `;
 
-    log.info({ roleId: newRole[0]!.id, name }, 'Custom role created');
+    log.info('Custom role created', { roleId: newRole[0]!.id, name });
 
     return apiResponse.created(res, {
       id: newRole[0]!.id,
@@ -181,9 +181,9 @@ async function handlePost(
       createdAt: newRole[0]!.created_at,
     });
   } catch (error) {
-    log.error({ error }, 'Error creating role');
+    log.error('Error creating role', { error });
     return apiResponse.internalError(res, error);
   }
 }
 
-export default withAuth(withRole('admin')(handler));
+export default withAuth(withRole('admin')(handler as (req: NextApiRequest, res: NextApiResponse) => Promise<void>));

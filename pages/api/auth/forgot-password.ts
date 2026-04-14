@@ -9,8 +9,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { generateResetToken } from '@/lib/auth';
-import logger from '@/lib/logger';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('forgot-password');
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -57,17 +58,16 @@ async function sendResetEmail(
 ): Promise<boolean> {
   // For now, log the reset link (in production, send via email)
   logger.info(
-    { email, resetLink: resetLink.substring(0, 50) + '...' },
-    'Password reset requested'
+    'Password reset requested',
+    { email, resetLink: resetLink.substring(0, 50) + '...' }
   );
 
   if (!SMTP_ENABLED) {
     // In development, log the full link
-    log.debug('forgot-password', {
+    logger.debug('Password reset link generated in dev mode', {
       action: 'devModeResetLink',
       email,
       resetLink,
-      message: 'Password reset link generated in dev mode'
     });
     return true;
   }
@@ -131,10 +131,10 @@ async function sendResetEmail(
       `,
     });
 
-    logger.info({ email }, 'Password reset email sent');
+    logger.info('Password reset email sent', { email });
     return true;
   } catch (error) {
-    logger.error({ error, email }, 'Failed to send password reset email');
+    logger.error('Failed to send password reset email', { error, email });
     return false;
   }
 }
@@ -153,7 +153,7 @@ export default async function handler(
   // Rate limit by IP
   const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
   if (isRateLimited(clientIp)) {
-    log.warn('forgot-password', { ip: clientIp, message: 'Rate limited' });
+    logger.warn('Rate limited', { ip: clientIp });
     return res.status(429).json({
       success: false,
       error: { code: 'RATE_LIMITED', message: 'Too many password reset attempts. Please try again later.' },
@@ -189,7 +189,7 @@ export default async function handler(
 
     if (users.length === 0) {
       // User doesn't exist, but don't reveal this
-      logger.info({ email: normalizedEmail }, 'Password reset requested for non-existent email');
+      logger.info('Password reset requested for non-existent email', { email: normalizedEmail });
       return res.status(200).json(successResponse);
     }
 
@@ -215,7 +215,7 @@ export default async function handler(
 
     return res.status(200).json(successResponse);
   } catch (error) {
-    logger.error({ error }, 'Forgot password error');
+    logger.error('Forgot password error', { error });
     return res.status(500).json({
       success: false,
       error: { code: 'SERVER_ERROR', message: 'An error occurred' },

@@ -8,10 +8,16 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
-import { apiResponse } from '@/lib/apiResponse';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/neon';
 import { generateInvoiceFromRecurring } from '@/modules/accounting/services/recurringInvoiceService';
+
+interface RecurringInvoiceRow {
+  id: string;
+  template_name: string;
+  client_id: string;
+}
 
 const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -25,7 +31,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const expectedSecret = process.env.CRON_SECRET;
   if (!expectedSecret) {
     log.error('CRON_SECRET not configured — rejecting cron request');
-    return apiResponse.error(res, 'Cron endpoint misconfigured', 503);
+    return apiResponse.error(res, ErrorCode.SERVICE_UNAVAILABLE, 'Cron endpoint misconfigured');
   }
   if (cronSecret !== expectedSecret && !req.headers.cookie) {
     return apiResponse.unauthorized(res, 'Invalid cron secret');
@@ -39,7 +45,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       WHERE status = 'active'
         AND next_run_date <= CURRENT_DATE
       ORDER BY next_run_date ASC
-    `;
+    ` as unknown as RecurringInvoiceRow[];
 
     if (dueItems.length === 0) {
       return apiResponse.success(res, { processed: 0, message: 'No recurring invoices due' });
