@@ -15,7 +15,7 @@ Two nightly SharePoint pulls from Fibertime into FibreFlow:
 | What | Detail |
 |------|--------|
 | **Sites** | LAW, MAM, MOA, TEM (ETW excluded) |
-| **Auth** | Playwright cookie file (refreshed every 30–90 days) |
+| **Auth** | Playwright cookie file (auto-refreshed nightly at 22:00 SAST) |
 | **Cookie file** | `/home/velo/.fibertime-sp-cookies.json` |
 | **Login email** | `reporting@velocityfibre.co.za` |
 | **SharePoint** | `isizweprojects.sharepoint.com/sites/FibertimeReports` |
@@ -123,11 +123,47 @@ FIBERTIME_SP_COOKIE_FILE=/home/velo/.fibertime-sp-cookies.json \
 
 ---
 
-## Cookie Refresh (Auth Expired)
+## Cookie Refresh
 
-Both syncs use the same cookie file. When expired the API returns HTTP 503.
+Both syncs use the same cookie file. Cookies are refreshed automatically every night.
 
-**Must run headed (requires display) on Velocity:**
+### Automatic Refresh (Nightly Cron)
+
+Runs at **22:00 SAST** (before OES at 22:30 and Offline at 22:45).
+
+| What | Detail |
+|------|--------|
+| **Script** | `scripts/fibertime-sp-auto-refresh.ts` |
+| **Cron** | `0 20 * * *` (velo crontab, wraps with `xvfb-run`) |
+| **Log** | `/home/velo/logs/fibertime-cookie-refresh.log` |
+| **IMAP env vars** | `FIBERTIME_IMAP_HOST`, `FIBERTIME_IMAP_USER`, `FIBERTIME_IMAP_PASSWORD` |
+
+Flow:
+1. Launches headed Chromium via `xvfb-run` (virtual display — Microsoft rejects headless)
+2. Navigates to `fibertime.com/contractor-reports` → Microsoft login
+3. Enters email, triggers OTP
+4. Polls IMAP for OTP email, enters code in browser
+5. Waits for SharePoint redirect, saves cookies
+
+**Key implementation details (learned 2026-04-14):**
+- Microsoft uses **8-digit** verification codes for the Fibertime tenant, not 6-digit
+- OTP extraction searches plain text body for `verification code: XXXXXXXX` pattern first
+- IMAP `SINCE` is date-granularity only — script also filters by `parsed.date` to skip stale OTPs
+- Used OTP emails are marked as `\Seen` to prevent reuse by future runs
+
+### Manual Refresh
+
+If auto-refresh fails, run manually from the deploy dir:
+
+```bash
+sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && \
+  xvfb-run -a /home/velo/.nvm/versions/node/v22.21.1/bin/node \
+  node_modules/.bin/tsx scripts/fibertime-sp-auto-refresh.ts'
+```
+
+### Legacy Manual Refresh (Interactive)
+
+For debugging, the interactive login script still exists:
 
 ```bash
 DISPLAY=:1 FIBERTIME_SP_COOKIE_FILE=/tmp/fibertime-sp-cookies.json \
@@ -145,7 +181,8 @@ sudo chown velo:velo /home/velo/.fibertime-sp-cookies.json
 rm /tmp/fibertime-sp-cookies.json
 ```
 
-**Verify:**
+### Verify Cookies
+
 ```bash
 python3 -c "
 import json
@@ -202,23 +239,33 @@ FROM oes_pp_import_batches ORDER BY created_at DESC LIMIT 10;
 ## Cron Configuration
 
 ```bash
-sudo -u velo crontab -l | grep -E "oes-sync|offline-sync"
+sudo -u velo crontab -l | grep -i fibertime
 ```
 
-Current schedule:
+Current schedule (all in velo's crontab):
 ```
-30 20 * * *   /api/fibertime/oes-sync         # 22:30 SAST
-45 20 * * *   /api/fibertime/offline-sync      # 22:45 SAST
+ 0 20 * * *   cookie refresh (xvfb-run tsx)    # 22:00 SAST
+30 20 * * *   /api/fibertime/oes-sync          # 22:30 SAST
+45 20 * * *   /api/fibertime/offline-sync       # 22:45 SAST
 ```
 
-Logs: `/home/velo/logs/fibertime-offline-sync.log`
+Logs:
+- `/home/velo/logs/fibertime-cookie-refresh.log`
+- `/home/velo/logs/fibertime-oes-sync.log`
+- `/home/velo/logs/fibertime-offline-sync.log`
 
 ---
 
 ## Troubleshooting
 
 ### Auth expired (503 response)
-→ Run cookie refresh (see above).
+→ Check `/home/velo/logs/fibertime-cookie-refresh.log` for last night's auto-refresh result.
+→ If it failed, run manual refresh (see Cookie Refresh section above).
+
+### OTP rejected ("That code didn't work")
+→ Check log for `code:` value — verify it's 8 digits, not a URL fragment like `521839`.
+→ If stale OTP was used, check that `parsed.date` filter and `\Seen` marking are working.
+→ If two rapid login attempts occurred, wait 2+ minutes before retrying.
 
 ### File not available
 Nokia uploads files in the evening. Re-trigger manually next morning with the correct date.
@@ -247,4 +294,5 @@ for c in key: print(c['name'], 'expires:', c['expires'])
 - `/oes` — manual OES Excel import via UI
 - `/activate/data-sync?group=non_invoiceables` — billing crossref with dispute flags
 - `src/lib/sharepoint/fibertime-sp-client.ts` — SP REST client
-- `.env.local` keys: `FIBERTIME_SP_COOKIE_FILE`, `CRON_SECRET`
+- `scripts/fibertime-sp-auto-refresh.ts` — automated cookie refresh with IMAP OTP
+- `.env.local` keys: `FIBERTIME_SP_COOKIE_FILE`, `CRON_SECRET`, `FIBERTIME_IMAP_HOST`, `FIBERTIME_IMAP_USER`, `FIBERTIME_IMAP_PASSWORD`
