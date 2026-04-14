@@ -116,7 +116,7 @@ export async function parseExcelFile(
     // Get sheet (use provided name or first sheet)
     const sheet = sheetName
       ? workbook.Sheets[sheetName]
-      : workbook.Sheets[workbook.SheetNames[0]];
+      : workbook.Sheets[workbook.SheetNames[0] ?? ''];
 
     if (!sheet) {
       result.errors.push('Excel file is empty');
@@ -147,7 +147,7 @@ export async function parseExcelFile(
 
     // Extract headers if present
     if (hasHeaders) {
-      result.headers = Object.keys(rawData[0]);
+      result.headers = Object.keys(rawData[0]!);
     }
 
     // Create column mapping if not provided
@@ -262,9 +262,10 @@ export function detectDuplicates(
       continue;
     }
 
-    const rowNumbers = valueMap.get(value) || [];
+    const mapKey = value as string | number;
+    const rowNumbers = valueMap.get(mapKey) || [];
     rowNumbers.push(row.row_number);
-    valueMap.set(value, rowNumbers);
+    valueMap.set(mapKey, rowNumbers);
   }
 
   // Find duplicates (values that appear more than once)
@@ -442,12 +443,13 @@ export function mapRowToTicket(
   };
 
   for (const mapping of columnMapping) {
-    let value = excelRow[mapping.excel_column];
+    const rawValue = excelRow[mapping.excel_column];
 
     // Apply transform function if provided
-    if (value !== undefined && value !== null && mapping.transform) {
-      value = mapping.transform(value);
-    }
+    const value: string | number | boolean | null | undefined =
+      rawValue !== undefined && rawValue !== null && mapping.transform
+        ? mapping.transform(rawValue)
+        : rawValue;
 
     // Assign to import row
     (importRow as Record<string, unknown>)[mapping.ticket_field] = value;

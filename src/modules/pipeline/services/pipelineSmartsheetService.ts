@@ -340,7 +340,9 @@ export async function getSyncHistory(
 
 function getCellValue(row: SmartsheetRow, columnId: number): string | number | null {
   const cell = row.cells.find(c => c.columnId === columnId);
-  return cell?.value ?? null;
+  const val = cell?.value ?? null;
+  if (typeof val === 'boolean') return null;
+  return val;
 }
 
 function parseCoordinates(coordStr: string | null): { lat: number; lng: number } | null {
@@ -351,8 +353,8 @@ function parseCoordinates(coordStr: string | null): { lat: number; lng: number }
   const parts = cleaned.split(/[,\s]+/).filter(p => p);
 
   if (parts.length >= 2) {
-    const lng = parseFloat(parts[0]);
-    const lat = parseFloat(parts[1]);
+    const lng = parseFloat(parts[0] ?? '');
+    const lat = parseFloat(parts[1] ?? '');
     if (!isNaN(lat) && !isNaN(lng)) {
       return { lat, lng };
     }
@@ -568,7 +570,7 @@ export async function syncFromSmartsheet(
 
         // Create approvals for received stakeholders (status: approved)
         for (const stakeholder of receivedStakeholders) {
-          const typeCode = STAKEHOLDER_TO_CODE[stakeholder];
+          const typeCode = STAKEHOLDER_TO_CODE[stakeholder] ?? '';
           const typeId = approvalTypeMap.get(typeCode);
 
           if (typeId) {
@@ -604,7 +606,7 @@ export async function syncFromSmartsheet(
 
         // Create approvals for outstanding stakeholders (status: submitted/pending)
         for (const stakeholder of outstandingStakeholders) {
-          const typeCode = STAKEHOLDER_TO_CODE[stakeholder];
+          const typeCode = STAKEHOLDER_TO_CODE[stakeholder] ?? '';
           const typeId = approvalTypeMap.get(typeCode);
 
           if (typeId) {

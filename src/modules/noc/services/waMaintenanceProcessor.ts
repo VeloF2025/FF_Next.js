@@ -282,8 +282,8 @@ export async function processMaintenanceMessage(
   // Validate group
   if (!MAINTENANCE_GROUP_JIDS.has(message.group_jid)) {
     logger.warn(
-      { groupJid: message.group_jid, allowedGroups: [...MAINTENANCE_GROUP_JIDS] },
-      'Message from unexpected group, ignoring'
+      'Message from unexpected group, ignoring',
+      { groupJid: message.group_jid, allowedGroups: [...MAINTENANCE_GROUP_JIDS] }
     );
     throw new Error(`Message from unexpected group: ${message.group_jid}`);
   }
@@ -310,8 +310,8 @@ export async function processMaintenanceMessage(
     );
 
     logger.info(
-      { dropNumber, sender: message.sender_jid },
-      'DR mentioned directly in message'
+      'DR mentioned directly in message',
+      { dropNumber, sender: message.sender_jid }
     );
   } else if (message.has_media) {
     // No DR in text but has media - check sender context
@@ -323,19 +323,19 @@ export async function processMaintenanceMessage(
     if (context?.last_drop_number) {
       dropNumber = context.last_drop_number;
       logger.info(
+        'Photo associated with DR via sender context',
         {
           dropNumber,
           sender: message.sender_jid,
           contextAge: Math.round(
             (Date.now() - (context.last_drop_timestamp?.getTime() || 0)) / 1000
           ),
-        },
-        'Photo associated with DR via sender context'
+        }
       );
     } else {
       logger.warn(
-        { sender: message.sender_jid },
-        'Photo received with no DR context - storing as unassociated'
+        'Photo received with no DR context - storing as unassociated',
+        { sender: message.sender_jid }
       );
     }
   }
@@ -364,14 +364,14 @@ export async function processMaintenanceMessage(
   // the dr_maintenance_flags record
 
   logger.info(
+    'Maintenance message processed',
     {
       messageId,
       dropNumber,
       drMentionedDirectly,
       photosCount,
       sender: message.sender_name || message.sender_jid,
-    },
-    'Maintenance message processed'
+    }
   );
 
   return {
