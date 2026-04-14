@@ -87,7 +87,7 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return apiResponse.methodNotAllowed(res, ['GET']);
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 
   try {
@@ -115,7 +115,7 @@ async function handler(
         completed_count: number;
         on_hold_count: number;
       }>(
-        async () => sql`
+        async () => (await sql`
           SELECT
             COUNT(*)::int as total_projects,
             COUNT(*) FILTER (WHERE status = 'pipeline')::int as pipeline_count,
@@ -124,7 +124,14 @@ async function handler(
             COUNT(*) FILTER (WHERE status IN ('completed', 'complete'))::int as completed_count,
             COUNT(*) FILTER (WHERE status = 'on_hold')::int as on_hold_count
           FROM projects
-        `
+        `) as unknown as {
+          total_projects: number;
+          pipeline_count: number;
+          planned_count: number;
+          active_count: number;
+          completed_count: number;
+          on_hold_count: number;
+        }[]
       ).catch(() => [{
         total_projects: 0,
         pipeline_count: 0,
@@ -140,14 +147,18 @@ async function handler(
         total_committed: number;
         total_actual: number;
       }>(
-        async () => sql`
+        async () => (await sql`
           SELECT
             COALESCE(SUM(budget), 0)::numeric as total_budget,
             0::numeric as total_committed,
             COALESCE(SUM(actual_cost), 0)::numeric as total_actual
           FROM projects
           WHERE status IN ('active', 'in_progress', 'planning', 'planned')
-        `
+        `) as unknown as {
+          total_budget: number;
+          total_committed: number;
+          total_actual: number;
+        }[]
       ).catch(() => [{
         total_budget: 0,
         total_committed: 0,
@@ -159,12 +170,12 @@ async function handler(
         total_drops: number;
         completed_drops: number;
       }>(
-        async () => sql`
+        async () => (await sql`
           SELECT
             COUNT(*)::int as total_drops,
             COUNT(*) FILTER (WHERE status IN ('completed', 'activated', 'installed'))::int as completed_drops
           FROM drops
-        `
+        `) as unknown as { total_drops: number; completed_drops: number }[]
       ).catch(() => [{
         total_drops: 0,
         completed_drops: 0,
@@ -175,12 +186,12 @@ async function handler(
         open_tickets: number;
         critical_tickets: number;
       }>(
-        async () => sql`
+        async () => (await sql`
           SELECT
             COUNT(*) FILTER (WHERE status NOT IN ('resolved', 'closed'))::int as open_tickets,
             COUNT(*) FILTER (WHERE status NOT IN ('resolved', 'closed') AND priority IN ('critical', 'high'))::int as critical_tickets
           FROM maintenance_tickets
-        `
+        `) as unknown as { open_tickets: number; critical_tickets: number }[]
       ).catch(() => [{
         open_tickets: 0,
         critical_tickets: 0,
@@ -192,14 +203,14 @@ async function handler(
         count_60_days: number;
         count_90_days: number;
       }>(
-        async () => sql`
+        async () => (await sql`
           SELECT
             COUNT(*) FILTER (WHERE expiry_date BETWEEN CURRENT_DATE + INTERVAL '1 day' AND CURRENT_DATE + INTERVAL '30 days')::int as count_30_days,
             COUNT(*) FILTER (WHERE expiry_date BETWEEN CURRENT_DATE + INTERVAL '1 day' AND CURRENT_DATE + INTERVAL '60 days')::int as count_60_days,
             COUNT(*) FILTER (WHERE expiry_date BETWEEN CURRENT_DATE + INTERVAL '1 day' AND CURRENT_DATE + INTERVAL '90 days')::int as count_90_days
           FROM document_expiry_tracking
           WHERE status != 'renewed'
-        `
+        `) as unknown as { count_30_days: number; count_60_days: number; count_90_days: number }[]
       ).catch(() => [{
         count_30_days: 0,
         count_60_days: 0,
@@ -217,7 +228,7 @@ async function handler(
         total_drops: number;
         completed_drops: number;
       }>(
-        async () => sql`
+        async () => (await sql`
           WITH project_drops AS (
             SELECT
               project_id,
@@ -245,12 +256,21 @@ async function handler(
           LEFT JOIN project_drops pd ON pd.project_id = p.id
           ORDER BY p.updated_at DESC NULLS LAST, p.created_at DESC
           LIMIT 10
-        `
+        `) as unknown as {
+          id: string;
+          project_name: string;
+          client_name: string | null;
+          status: string;
+          progress: number;
+          manager_name: string | null;
+          total_drops: number;
+          completed_drops: number;
+        }[]
       ).catch(() => []),
 
       // 7. Calculate at-risk projects (active with low progress or budget issues)
       safeArrayQuery<{ at_risk_count: number }>(
-        async () => sql`
+        async () => (await sql`
           SELECT COUNT(*)::int as at_risk_count
           FROM projects
           WHERE status IN ('active', 'in_progress')
@@ -258,7 +278,7 @@ async function handler(
               (budget > 0 AND actual_cost > budget)
               OR (progress < 25 AND created_at < CURRENT_DATE - INTERVAL '30 days')
             )
-        `
+        `) as unknown as { at_risk_count: number }[]
       ).catch(() => [{ at_risk_count: 0 }]),
     ]);
 

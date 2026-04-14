@@ -14,7 +14,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('ApproveCategorization');
 import {
   ApproveCategorizeRequest,
   ApproveCategorizeResponse,
@@ -46,7 +48,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber is required');
     }
 
-    log.info('ApproveCategorization', `Processing approval for ${dropNumber}`, {
+    log.info(`Processing approval for ${dropNumber}`, {
       approve_all,
       confirm_auto,
       approvalCount: approvals?.length || 0,
@@ -200,12 +202,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
               crossDRDuplicateCount++;
             }
           }
-          log.info('ApproveCategorization', `Auto-flagged ${crossDRDuplicateCount} cross-DR duplicate(s) for ${dropNumber}`);
+          log.info(`Auto-flagged ${crossDRDuplicateCount} cross-DR duplicate(s) for ${dropNumber}`);
         }
       }
     } catch (hashError) {
       // Non-fatal: if hashing fails, continue without cross-DR detection
-      log.warn('ApproveCategorization', 'Cross-DR duplicate detection failed (non-fatal)', {
+      log.warn('Cross-DR duplicate detection failed (non-fatal)', {
         dropNumber,
         error: hashError instanceof Error ? hashError.message : String(hashError),
       });
@@ -228,7 +230,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       [JSON.stringify(updatedResults), approvedBy, JSON.stringify(photosToStore), dropNumber]
     );
 
-    log.info('ApproveCategorization', `Approved categorization for ${dropNumber}`, {
+    log.info(`Approved categorization for ${dropNumber}`, {
       approvedCount,
       overriddenCount,
       crossDRDuplicateCount,
@@ -266,7 +268,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       Promise.all(
         correctionsToRecord.map((correction) =>
           recordCorrection(correction).catch((err) => {
-            log.warn('ApproveCategorization', 'Failed to record correction for few-shot learning', {
+            log.warn('Failed to record correction for few-shot learning', {
               photoFilename: correction.photoFilename,
               error: err instanceof Error ? err.message : String(err),
             });
@@ -274,7 +276,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         )
       ).then((results) => {
         const successCount = results.filter((r) => r !== undefined).length;
-        log.info('ApproveCategorization', `Recorded ${successCount}/${correctionsToRecord.length} corrections for HITL learning`);
+        log.info(`Recorded ${successCount}/${correctionsToRecord.length} corrections for HITL learning`);
       });
     }
 
@@ -283,7 +285,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     for (const catResult of updatedResults) {
       if (catResult.human_override_step === -1) {
         recordHumanDuplicateDecision(dropNumber, catResult.photo_filename, approvedBy).catch((err) => {
-          log.warn('ApproveCategorization', 'Failed to record duplicate photo hash', {
+          log.warn('Failed to record duplicate photo hash', {
             photoFilename: catResult.photo_filename,
             error: err instanceof Error ? err.message : String(err),
           });
@@ -302,7 +304,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
     return apiResponse.success(res, response);
   } catch (error) {
-    log.error('ApproveCategorization', 'Error during approval', error);
+    log.error('Error during approval', { error });
     return apiResponse.internalError(res, error);
   }
 }

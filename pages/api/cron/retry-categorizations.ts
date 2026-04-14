@@ -14,7 +14,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('RetryCategorizations');
 
 const MAX_RETRY_ATTEMPTS = 5;
 const API_BASE = process.env.NEXTAUTH_URL || 'http://localhost:3005';
@@ -38,19 +40,19 @@ export default async function handler(
   // Require CRON_SECRET bearer token
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
-    log.error('RetryCategorizations', 'CRON_SECRET not configured');
+    log.error('CRON_SECRET not configured');
     return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Server misconfigured: CRON_SECRET not set');
   }
 
   const authHeader = req.headers.authorization;
   if (authHeader !== `Bearer ${cronSecret}`) {
-    log.error('RetryCategorizations', 'Unauthorized request');
+    log.error('Unauthorized request');
     return apiResponse.unauthorized(res, 'Invalid or missing cron secret');
   }
 
   const limit = Number(req.query.limit) || Number(req.body?.limit) || 10;
 
-  log.info('RetryCategorizations', `Starting retry scan (limit: ${limit})`);
+  log.info(`Starting retry scan (limit: ${limit})`);
 
   try {
     // 1. Find DRs with status='failed' or stuck 'processing' eligible for retry
@@ -96,7 +98,7 @@ export default async function handler(
     }).slice(0, limit);
 
     if (allDRs.length === 0) {
-      log.info('RetryCategorizations', 'No DRs need re-categorization');
+      log.info('No DRs need re-categorization');
       return apiResponse.success(res, {
         processed: 0,
         succeeded: 0,
@@ -106,7 +108,7 @@ export default async function handler(
       });
     }
 
-    log.info('RetryCategorizations', `Found ${failedDRs.length} failed + ${badDRs.length} bad-categorized DRs to retry`);
+    log.info(`Found ${failedDRs.length} failed + ${badDRs.length} bad-categorized DRs to retry`);
 
     const results: RetryResult[] = [];
 
@@ -170,7 +172,7 @@ export default async function handler(
           });
         }
       } catch (error) {
-        log.error('RetryCategorizations', `Error retrying ${dr.drop_number}`, error);
+        log.error(`Error retrying ${dr.drop_number}`, { error });
 
         // Restore to 'failed' so it gets retried next cycle
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -198,7 +200,7 @@ export default async function handler(
 
     const succeeded = results.filter((r) => r.success).length;
 
-    log.info('RetryCategorizations', `Completed: ${succeeded}/${results.length} successful`);
+    log.info(`Completed: ${succeeded}/${results.length} successful`);
 
     return apiResponse.success(res, {
       processed: results.length,
@@ -208,7 +210,7 @@ export default async function handler(
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    log.error('RetryCategorizations', `Fatal error: ${error instanceof Error ? error.message : String(error)}`);
+    log.error(`Fatal error: ${error instanceof Error ? error.message : String(error)}`);
     return apiResponse.internalError(res, error);
   }
 }
