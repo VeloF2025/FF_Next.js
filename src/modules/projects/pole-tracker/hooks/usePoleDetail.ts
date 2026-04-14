@@ -15,8 +15,9 @@ import { TabConfig, PoleDetail } from '../types/pole-detail.types';
 export function usePoleDetail(poleId?: string) {
   const [activeTab, setActiveTab] = useState<string>('overview');
 
-  const pole: PoleDetail | null = useMemo(() => {
+  const pole = useMemo<PoleDetail | null>(() => {
     // TODO: Fetch pole data from API based on poleId
+    void poleId;
     return null;
   }, [poleId]);
 

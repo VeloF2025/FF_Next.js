@@ -6,7 +6,7 @@ import { useState, useCallback } from 'react';
 
 export type PnLViewMode = 'bu' | 'site';
 
-interface PnLRow {
+export interface PnLRow {
   accountName: string;
   accountId: string;
   categoryGroup: string;

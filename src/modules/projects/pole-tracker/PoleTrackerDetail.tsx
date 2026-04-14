@@ -23,7 +23,8 @@ import { usePoleDetail } from './hooks/usePoleDetail';
 export function PoleTrackerDetail() {
   const router = useRouter();
   const { id } = router.query;
-  const { pole, tabs, activeTab, handleTabChange } = usePoleDetail(id);
+  const poleId = Array.isArray(id) ? id[0] : id;
+  const { pole, tabs, activeTab, handleTabChange } = usePoleDetail(poleId);
 
   // Handle loading state while pole data is being fetched
   if (!pole) {

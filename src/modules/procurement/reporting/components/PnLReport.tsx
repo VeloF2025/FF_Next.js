@@ -15,7 +15,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { usePnLReport, PnLViewMode } from '../hooks/usePnLReport';
+import { usePnLReport, PnLViewMode, PnLRow } from '../hooks/usePnLReport';
 
 const SECTION_ORDER = ['Revenue', 'Cost of Sales', 'Other Income', 'Expenses', 'Other Expenses', 'Other'];
 
@@ -75,7 +75,7 @@ export function PnLReport() {
   };
 
   // Group rows by section
-  const sections = new Map<string, typeof data extends { rows: infer R } ? R : never>();
+  const sections = new Map<string, PnLRow[]>();
   if (data) {
     for (const row of data.rows) {
       const group = row.categoryGroup || 'Other';
@@ -215,7 +215,7 @@ export function PnLReport() {
                     </tr>
 
                     {/* Section Rows */}
-                    {isExpanded && sectionRows.map((row: { accountId: string; accountName: string; category: string; amounts: Record<string, number>; total: number }) => (
+                    {isExpanded && sectionRows.map((row) => (
                       <tr
                         key={row.accountId}
                         className="hover:bg-[var(--ff-bg-tertiary)]"

@@ -72,7 +72,11 @@ const TICKET_WORKFLOW_ACTIONS: Record<string, {
 };
 
 /** DevOps tickets are internal — skip verified, close directly */
-const DEVOPS_RESOLVED_ACTIONS = {
+const DEVOPS_RESOLVED_ACTIONS: {
+  forward?: { status: string; label: string };
+  backward?: { status: string; label: string };
+  reject?: { status: string; label: string };
+} = {
   forward: { status: 'closed', label: 'Close Ticket' },
   backward: { status: 'in_progress', label: 'Fix Not Working' },
 };
@@ -103,7 +107,8 @@ export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange
   // Get GPS coordinates from enrichment or ticket
   const gps = ticket.fibreflow_enrichment?.fibreflow_gps
     || ticket.fibreflow_enrichment?.onemap_gps
-    || (ticket.gps_coordinates ? parseGPSString(ticket.gps_coordinates) : null);
+    || ticket.gps_coordinates
+    || null;
 
   return (
     <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4 sm:p-6">
@@ -437,8 +442,8 @@ function parseGPSString(gpsString: string): { latitude: number; longitude: numbe
   const parts = gpsString.split(',').map(p => p.trim());
   if (parts.length !== 2) return null;
 
-  const lat = parseFloat(parts[0]);
-  const lng = parseFloat(parts[1]);
+  const lat = parseFloat(parts[0] ?? '');
+  const lng = parseFloat(parts[1] ?? '');
 
   if (isNaN(lat) || isNaN(lng)) return null;
 
