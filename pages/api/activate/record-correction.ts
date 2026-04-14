@@ -80,9 +80,17 @@ async function handler(
 
     return apiResponse.success(res, { recorded: true, correctionId: correction.id });
   } catch (error) {
-    // Don't fail the request if correction recording fails — it's non-critical
+    // Don't fail the request — but surface the error so silent data loss is visible
     const msg = error instanceof Error ? error.message : String(error);
-    log.warn('RecordCorrection', { action: 'failed', error: msg });
+    const body = req.body as Partial<RecordCorrectionBody>;
+    log.error('RecordCorrection', {
+      action: 'save_failed',
+      error: msg,
+      dropNumber: body.dropNumber,
+      photoFilename: body.photoFilename,
+      vlmPredictedStep: body.vlmPredictedStep,
+      correctStep: body.correctStep,
+    });
     return apiResponse.success(res, { recorded: false, reason: msg });
   }
 }

@@ -276,7 +276,11 @@ async function handlePost(
       try {
         await saveConfirmedCorrectExamples(dropNumber, reviewerUserId || 'unknown');
       } catch (err) {
-        log.warn('Failed to save confirmed-correct examples (non-fatal)', { dropNumber, err });
+        log.error('Failed to save confirmed-correct examples', {
+          action: 'save_failed',
+          dropNumber,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 

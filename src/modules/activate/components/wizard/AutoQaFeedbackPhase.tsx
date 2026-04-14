@@ -173,9 +173,21 @@ export function AutoQaFeedbackPhase({
             correctCategory: isDuplicate ? 'Duplicate Photo' : (STEP_LABELS[newStep] || `Step ${newStep}`),
             correctionReason: isDuplicate ? 'Photo is a duplicate of another photo in this DR' : undefined,
           }),
-        }).catch((err) => {
-          log.warn('Failed to record HITL correction', { error: err }, 'AutoQaFeedback');
-        });
+        })
+          .then(async (fetchRes) => {
+            const data = await fetchRes.json() as { recorded: boolean; reason?: string };
+            if (!data.recorded) {
+              log.warn('HITL correction was NOT saved', {
+                reason: data.reason,
+                photoFilename: currentPhoto.filename,
+                vlmPredictedStep: originalStep,
+                correctStep: isDuplicate ? 0 : newStep,
+              }, 'AutoQaFeedback');
+            }
+          })
+          .catch((err) => {
+            log.error('Failed to record HITL correction', { error: err }, 'AutoQaFeedback');
+          });
 
         // Persist step override to vlm_categorization_results + photos_metadata (fire-and-forget)
         fetch('/api/activate/update-photo-step', {
