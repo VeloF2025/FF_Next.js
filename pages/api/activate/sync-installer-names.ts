@@ -14,7 +14,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth, withRole } from '@/lib/auth';
 import pool from '@/lib/db';
 
 const BOSS_API_URL = process.env.BOSS_API_URL || 'http://100.96.203.105:8003';
@@ -104,7 +104,7 @@ async function updateInstallerName(
   return (result.rowCount ?? 0) > 0;
 }
 
-async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   const { limit = 100, project, force = false } = req.body;
 
   log.info('Starting installer name sync', { limit, project, force });
@@ -183,11 +183,11 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
     });
   } catch (error) {
     log.error('Installer sync failed', { error });
-    return apiResponse.serverError(res, 'Sync failed');
+    return apiResponse.internalError(res, new Error('Sync failed'));
   }
 }
 
-async function handleGet(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   try {
     // Get sync status
     const statsResult = await pool.query(`
@@ -224,19 +224,19 @@ async function handleGet(req: AuthenticatedNextApiRequest, res: NextApiResponse)
     });
   } catch (error) {
     log.error('Failed to get sync status', { error });
-    return apiResponse.serverError(res, 'Failed to get status');
+    return apiResponse.internalError(res, new Error('Failed to get status'));
   }
 }
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   switch (req.method) {
     case 'GET':
       return handleGet(req, res);
     case 'POST':
       return handlePost(req, res);
     default:
-      return apiResponse.methodNotAllowed(res, ['GET', 'POST']);
+      return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET', 'POST']);
   }
 }
 
-export default withAuth(withRole(['admin', 'manager'], handler));
+export default withAuth(withRole('manager')(handler));

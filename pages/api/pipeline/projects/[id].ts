@@ -11,7 +11,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { pipelineProjectService } from '@/modules/pipeline/services/pipelineProjectService';
 import type { UpdatePipelineProjectInput } from '@/modules/pipeline/types';
 import { withAuth } from '@/lib/auth';
-import sql from '@/lib/db';
+import { sql } from '@/lib/db';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
@@ -125,11 +125,11 @@ async function handleDelete(
   return apiResponse.success(res, {
     message: 'Project deleted successfully',
     deleted: {
-      projects_unlinked: unlinkResult.count ?? 0,
-      pipeline_links: linksResult.count ?? 0,
-      approval_documents: docsResult.count ?? 0,
-      approvals: approvalsResult.count ?? 0,
-      project: projectResult.count ?? 0,
+      projects_unlinked: unlinkResult.length,
+      pipeline_links: linksResult.length,
+      approval_documents: docsResult.length,
+      approvals: approvalsResult.length,
+      project: projectResult.length,
     },
   });
 }

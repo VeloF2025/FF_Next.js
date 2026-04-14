@@ -67,7 +67,7 @@ async function handler(
       return apiResponse.badRequest(res, 'action must be one of: verify_folders, sync_photos, full');
     }
 
-    log.info('SharePointBatchSync', `Starting batch ${action}`, {
+    log.info(`Starting batch ${action}`, {
       dropNumbersCount: dropNumbers?.length,
       project,
       date,
@@ -94,13 +94,13 @@ async function handler(
         failed: 0,
         errors: [],
         message: 'No DRs to process',
-      } as SharePointBatchSyncResponse);
+      } as unknown as SharePointBatchSyncResponse);
     }
 
     // Process DRs based on action
     const result = await processBatch(drsToProcess, action, config);
 
-    log.info('SharePointBatchSync', `Batch ${action} complete`, {
+    log.info(`Batch ${action} complete`, {
       processed: result.processed,
       succeeded: result.succeeded,
       failed: result.failed,
@@ -109,7 +109,7 @@ async function handler(
     return apiResponse.success(res, result);
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    log.error('SharePointBatchSync', 'Batch sync failed', { error: errorMessage });
+    log.error('Batch sync failed', { error: errorMessage });
     return apiResponse.internalError(res, error);
   }
 }
@@ -223,7 +223,7 @@ async function processBatch(
       const errorMessage = error instanceof Error ? error.message : String(error);
       errors.push({ dropNumber, error: errorMessage });
       failed++;
-      log.warn('SharePointBatchSync', `Failed to process ${dropNumber}`, { error: errorMessage });
+      log.warn(`Failed to process ${dropNumber}`, { error: errorMessage });
     }
   }
 
