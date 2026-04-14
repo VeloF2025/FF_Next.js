@@ -29,8 +29,10 @@
  * ```
  */
 
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
 import db from '@/lib/db';
+
+const log = createLogger('OcrLearningService');
 
 // ============================================================================
 // TYPES
@@ -185,7 +187,7 @@ export async function recordOcrCorrection(
 
   // Skip if VLM was correct
   if (input.vlmExtractedValue === input.correctedValue) {
-    log.debug('OcrLearningService', 'Skipping correction - VLM was correct', {
+    log.debug('Skipping correction - VLM was correct', {
       moduleName: input.moduleName,
       documentType: input.documentType,
       fieldName: input.fieldName,
@@ -195,7 +197,7 @@ export async function recordOcrCorrection(
 
   // Skip if no meaningful correction
   if (!input.correctedValue || input.correctedValue.trim() === '') {
-    log.debug('OcrLearningService', 'Skipping correction - empty corrected value');
+    log.debug('Skipping correction - empty corrected value');
     return null;
   }
 
@@ -232,10 +234,12 @@ export async function recordOcrCorrection(
       ]
     );
 
-    const correction = rowToOcrCorrection(result.rows[0]);
+    const row = result.rows[0];
+    if (!row) throw new OcrLearningError('INSERT returned no rows', 'DB_INSERT_FAILED');
+    const correction = rowToOcrCorrection(row);
     const duration = Date.now() - startTime;
 
-    log.info('OcrLearningService', 'Recorded OCR correction', {
+    log.info('Recorded OCR correction', {
       moduleName: input.moduleName,
       documentType: input.documentType,
       fieldName: input.fieldName,
@@ -246,7 +250,7 @@ export async function recordOcrCorrection(
 
     return correction;
   } catch (error) {
-    log.error('OcrLearningService', 'Failed to record correction', {
+    log.error('Failed to record correction', {
       error: error instanceof Error ? error.message : String(error),
       input: { ...input, correctedValue: input.correctedValue.substring(0, 20) },
     });
@@ -277,7 +281,7 @@ export async function recordOcrCorrections(
         results.push(result);
       }
     } catch (error) {
-      log.warn('OcrLearningService', 'Failed to record one correction in batch', {
+      log.warn('Failed to record one correction in batch', {
         fieldName: correction.fieldName,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -362,7 +366,7 @@ export async function getOcrFewShotExamples(
       correctionReason: row.correction_reason,
     }));
   } catch (error) {
-    log.error('OcrLearningService', 'Failed to get few-shot examples', {
+    log.error('Failed to get few-shot examples', {
       moduleName,
       documentType,
       error: error instanceof Error ? error.message : String(error),
@@ -475,7 +479,7 @@ export async function getOcrFieldDefinitions(
       commonMistakes: row.common_mistakes,
     }));
   } catch (error) {
-    log.error('OcrLearningService', 'Failed to get field definitions', {
+    log.error('Failed to get field definitions', {
       moduleName,
       documentType,
       error: error instanceof Error ? error.message : String(error),
@@ -572,7 +576,7 @@ export async function getOcrCorrectionStats(
       })),
     };
   } catch (error) {
-    log.error('OcrLearningService', 'Failed to get correction stats', {
+    log.error('Failed to get correction stats', {
       moduleName,
       documentType,
       error: error instanceof Error ? error.message : String(error),

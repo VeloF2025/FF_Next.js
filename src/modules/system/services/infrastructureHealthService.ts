@@ -177,9 +177,9 @@ async function checkDockerContainers(): Promise<ContainerStatus[]> {
           method: 'HEAD',
           signal: AbortSignal.timeout(5000),
         });
-        status = response.ok ? 'running' : 'unhealthy';
+        status = response.ok ? 'running' : 'stopped';
       } catch {
-        status = 'down';
+        status = 'stopped';
       }
     }
 
@@ -297,7 +297,19 @@ async function getRecentRecoveryActions(limit: number = 10): Promise<RecoveryAct
   if (!DATABASE_URL) return [];
 
   try {
-    const results = await poolSql`
+    interface RecoveryActionRow {
+      id: string;
+      timestamp: string;
+      service_name: string;
+      service_type: string;
+      action_taken: string;
+      previous_status: string;
+      result_status: string;
+      error_message?: string;
+      alert_sent: boolean;
+      minutes_ago: number;
+    }
+    const results = (await poolSql`
       SELECT
         id,
         timestamp,
@@ -313,16 +325,16 @@ async function getRecentRecoveryActions(limit: number = 10): Promise<RecoveryAct
       WHERE timestamp > NOW() - INTERVAL '24 hours'
       ORDER BY timestamp DESC
       LIMIT ${limit}
-    `;
+    `) as unknown as RecoveryActionRow[];
 
     return results.map(r => ({
       id: r.id,
       timestamp: r.timestamp,
       serviceName: r.service_name,
-      serviceType: r.service_type,
+      serviceType: r.service_type as RecoveryAction['serviceType'],
       actionTaken: r.action_taken,
-      previousStatus: r.previous_status,
-      resultStatus: r.result_status,
+      previousStatus: r.previous_status as RecoveryAction['previousStatus'],
+      resultStatus: r.result_status as RecoveryAction['resultStatus'],
       errorMessage: r.error_message,
       alertSent: r.alert_sent,
       minutesAgo: Math.round(r.minutes_ago),
@@ -369,7 +381,7 @@ async function saveHealthSnapshot(health: SystemHealthResponse): Promise<void> {
       )
     `;
   } catch (error) {
-    log.error('Failed to save health snapshot', error, 'infrastructureHealthService');
+    log.error('Failed to save health snapshot', { error }, 'infrastructureHealthService');
   }
 }
 
@@ -574,7 +586,15 @@ export async function getHealthHistory(
   }
 
   try {
-    const results = await poolSql`
+    interface HealthLogRow {
+      timestamp: string;
+      overall_status: string;
+      total_services: number;
+      healthy_count: number;
+      degraded_count: number;
+      down_count: number;
+    }
+    const results = (await poolSql`
       SELECT
         timestamp,
         overall_status,
@@ -586,7 +606,7 @@ export async function getHealthHistory(
       WHERE timestamp > NOW() - (${hours} * INTERVAL '1 hour')
       ORDER BY timestamp DESC
       LIMIT ${limit}
-    `;
+    `) as unknown as HealthLogRow[];
 
     const entries = results.map(r => ({
       totalServices: r.total_services,
@@ -594,7 +614,7 @@ export async function getHealthHistory(
       degradedCount: r.degraded_count,
       downCount: r.down_count,
       healthPercentage: Math.round((r.healthy_count / r.total_services) * 100),
-      criticalServicesDown: [],
+      criticalServicesDown: [] as string[],
     }));
 
     const timestamps = results.map(r => r.timestamp);

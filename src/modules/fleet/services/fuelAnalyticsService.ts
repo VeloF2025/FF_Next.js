@@ -57,7 +57,7 @@ export async function getFuelTransactions(options: {
 
   try {
     let rows: FuelTransactionRow[];
-    let countResult: { total: number }[];
+    let countResult: Record<string, unknown>[];
 
     if (vehicleId && startDate && endDate) {
       rows = await sql`
@@ -735,7 +735,7 @@ export async function getFuelAnomalies(options: {
 
   try {
     let rows: FuelAnomalyRow[];
-    let countResult: { total: number }[];
+    let countResult: Record<string, unknown>[];
 
     // Explicit query branches to avoid conditional SQL fragments (Neon requirement)
     if (vehicleId && status) {
