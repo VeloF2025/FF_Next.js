@@ -312,34 +312,34 @@ export default function CostCentersPage() {
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <StatCard
-            title="Total Centers"
+            label="Total Centers"
             value={stats.total}
             icon={Building2}
-            colorType="blue"
+            colorType="total"
           />
           <StatCard
-            title="Total Budget"
+            label="Total Budget"
             value={formatCurrency(stats.totalBudget)}
             icon={DollarSign}
-            colorType="green"
+            colorType="success"
           />
           <StatCard
-            title="Committed"
+            label="Committed"
             value={formatCurrency(stats.totalCommitted)}
             icon={TrendingUp}
-            colorType="yellow"
+            colorType="warning"
           />
           <StatCard
-            title="Actual Spend"
+            label="Actual Spend"
             value={formatCurrency(stats.totalActual)}
             icon={DollarSign}
-            colorType="purple"
+            colorType="financial"
           />
           <StatCard
-            title="Over Budget"
+            label="Over Budget"
             value={stats.overBudgetCount}
             icon={AlertTriangle}
-            colorType="red"
+            colorType="error"
           />
         </div>
 
@@ -498,7 +498,7 @@ export default function CostCentersPage() {
                       <td className="p-4 text-center">
                         <div className="flex items-center justify-center gap-1">
                           {center.is_locked && (
-                            <Lock className="w-4 h-4 text-yellow-400" title="Locked" />
+                            <Lock className="w-4 h-4 text-yellow-400" aria-label="Locked" />
                           )}
                           {!center.is_active && (
                             <span className="px-2 py-0.5 rounded text-xs bg-red-500/20 text-red-400">

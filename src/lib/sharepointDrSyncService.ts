@@ -145,7 +145,7 @@ async function retryWithBackoff<T>(
       if (attempt === maxRetries) break;
 
       const delay = Math.min(baseDelay * Math.pow(2, attempt), RETRY_CONFIG.maxDelayMs);
-      log.debug('SharePointDrSync', `Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`);
+      log.debug(`Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`, undefined, 'SharePointDrSync');
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -329,10 +329,10 @@ export async function createDrFolderHierarchy(
 
     const folderPath = `/${folderNames.project}/${folderNames.zone}/${folderNames.pon}/${folderNames.pole}/${folderNames.dr}`;
 
-    log.info('SharePointDrSync', `Created folder hierarchy for ${info.dropNumber}`, {
+    log.info(`Created folder hierarchy for ${info.dropNumber}`, {
       folderPath,
       folderId: drFolder.id,
-    });
+    }, 'SharePointDrSync');
 
     return {
       success: true,
@@ -343,7 +343,7 @@ export async function createDrFolderHierarchy(
     };
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    log.error('SharePointDrSync', `Failed to create folder hierarchy for ${info.dropNumber}`, { error: errorMessage });
+    log.error(`Failed to create folder hierarchy for ${info.dropNumber}`, { error: errorMessage }, 'SharePointDrSync');
     return {
       success: false,
       dropNumber: info.dropNumber,
@@ -464,7 +464,7 @@ export async function syncDrPhotos(
       }
     }
 
-    log.info('SharePointDrSync', `Photo sync complete for ${dropNumber}`, { uploaded, failed, total: photos.length });
+    log.info(`Photo sync complete for ${dropNumber}`, { uploaded, failed, total: photos.length }, 'SharePointDrSync');
 
     return {
       success: failed === 0,
@@ -475,7 +475,7 @@ export async function syncDrPhotos(
     };
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    log.error('SharePointDrSync', `Photo sync failed for ${dropNumber}`, { error: errorMessage });
+    log.error(`Photo sync failed for ${dropNumber}`, { error: errorMessage }, 'SharePointDrSync');
     return {
       success: false,
       dropNumber,
@@ -541,7 +541,7 @@ export async function getOrCreateSyncRecord(
   // Get folder info from drops table
   const folderInfo = await getDrFolderInfoFromDb(dropNumber);
   if (!folderInfo) {
-    log.warn('SharePointDrSync', `DR ${dropNumber} not found in drops table`);
+    log.warn(`DR ${dropNumber} not found in drops table`, undefined, 'SharePointDrSync');
     return null;
   }
 
