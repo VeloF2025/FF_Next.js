@@ -10,6 +10,22 @@ import { getQFieldCables } from '@/modules/qfield-sync/services/qfieldcloudApiSe
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 
+interface QFieldCableRow {
+  cable_id: string | null;
+  cable_type: string | null;
+  cable_size: string | null;
+  from_chamber: string | null;
+  to_chamber: string | null;
+  length_m: number | null;
+  installation_date: string | null;
+  installation_status: string | null;
+  contractor: string | null;
+  route_geometry: unknown;
+  created_at: string | null;
+  updated_at: string | null;
+  source: string;
+}
+
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(
@@ -70,7 +86,7 @@ async function handler(
     }
 
     // Fetch real QFieldCloud data
-    let qfieldData = [];
+    let qfieldData: QFieldCableRow[] = [];
     try {
       const qfieldCables = await getQFieldCables(projectId as string | undefined);
       qfieldData = qfieldCables.map(cable => ({
@@ -91,7 +107,7 @@ async function handler(
     } catch (error) {
       log.error('Error fetching QFieldCloud cables', { error });
       // If QFieldCloud fails, continue with empty array
-      qfieldData = [];
+      qfieldData = [] as QFieldCableRow[];
     }
 
     // Identify synchronized cables (exist in both with same updated_at)

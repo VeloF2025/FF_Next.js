@@ -7,14 +7,14 @@
  * Auth: Required (withAuth)
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
-import { logger } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
 import { neon } from '@neondatabase/serverless';
 
-const COMPONENT = 'KYCDocumentsAPI';
+const log = createLogger('KYCDocumentsAPI');
 
 interface KYCDocumentRow {
   id: string;
@@ -36,8 +36,9 @@ interface KYCDocumentRow {
   updated_at: string;
 }
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
-  const userId = req.user.id;
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const authReq = req as AuthenticatedNextApiRequest;
+  const userId = authReq.user?.id ?? '';
   const { id: clientId } = req.query;
 
   if (!clientId || typeof clientId !== 'string') {
@@ -50,13 +51,13 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
     }
 
     if (req.method === 'POST') {
-      return await handleUploadDocument(req, res, clientId, userId);
+      return await handleUploadDocument(authReq, res, clientId, userId);
     }
 
-    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
   } catch (error) {
-    logger.error('KYC documents request failed', { error, clientId, method: req.method }, COMPONENT);
-    return apiResponse.internalError(res);
+    log.error('KYC documents request failed', { error, clientId, method: req.method });
+    return apiResponse.internalError(res, error);
   }
 }
 
@@ -70,12 +71,12 @@ async function handleGetDocuments(res: NextApiResponse, clientId: string, userId
     `;
 
     if (clientCheck.length === 0) {
-      logger.warn('Client not found', { clientId, userId }, COMPONENT);
+      log.warn('Client not found', { clientId, userId });
       return apiResponse.notFound(res, 'Client not found');
     }
 
     // Fetch all KYC documents for this client
-    const documents = await sql<KYCDocumentRow[]>`
+    const documents = (await sql`
       SELECT 
         id,
         client_id,
@@ -97,9 +98,9 @@ async function handleGetDocuments(res: NextApiResponse, clientId: string, userId
       FROM kyc_documents
       WHERE client_id = ${clientId}
       ORDER BY created_at DESC
-    `;
+    `) as unknown as KYCDocumentRow[];
 
-    logger.info('KYC documents retrieved', { clientId, count: documents.length }, COMPONENT);
+    log.info('KYC documents retrieved', { clientId, count: documents.length });
 
     return apiResponse.success(res, {
       documents: documents.map((doc) => ({
@@ -123,7 +124,7 @@ async function handleGetDocuments(res: NextApiResponse, clientId: string, userId
       })),
     });
   } catch (error) {
-    logger.error('Failed to fetch KYC documents', { error, clientId }, COMPONENT);
+    log.error('Failed to fetch KYC documents', { error, clientId });
     throw error;
   }
 }
@@ -162,7 +163,7 @@ async function handleUploadDocument(
     `;
 
     if (clientCheck.length === 0) {
-      logger.warn('Client not found', { clientId, userId }, COMPONENT);
+      log.warn('Client not found', { clientId, userId });
       return apiResponse.notFound(res, 'Client not found');
     }
 
@@ -182,7 +183,7 @@ async function handleUploadDocument(
     }
 
     // Insert new document
-    const newDoc = await sql<KYCDocumentRow[]>`
+    const newDoc = (await sql`
       INSERT INTO kyc_documents (
         client_id,
         document_type,
@@ -205,9 +206,9 @@ async function handleUploadDocument(
         ${notes || null}
       )
       RETURNING *
-    `;
+    `) as unknown as KYCDocumentRow[];
 
-    logger.info('KYC document uploaded', { clientId, documentType, userId }, COMPONENT);
+    log.info('KYC document uploaded', { clientId, documentType, userId });
 
     return apiResponse.success(res, {
       document: {
@@ -225,7 +226,7 @@ async function handleUploadDocument(
       },
     });
   } catch (error) {
-    logger.error('Failed to upload KYC document', { error, clientId, documentType }, COMPONENT);
+    log.error('Failed to upload KYC document', { error, clientId, documentType });
     throw error;
   }
 }

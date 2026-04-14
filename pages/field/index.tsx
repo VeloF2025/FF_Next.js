@@ -293,8 +293,7 @@ export default function FieldAppPage({
                 <TaskCard
                   key={task.id}
                   task={task}
-                  onStatusUpdate={handleTaskStatusUpdate}
-                  onClick={() => handleTaskSelect(task)}
+                  onSelect={() => handleTaskSelect(task)}
                 />
               ))}
               {tasks.length === 0 && (
@@ -311,7 +310,7 @@ export default function FieldAppPage({
                 <TechnicianCard
                   key={technician.id}
                   technician={technician}
-                  onClick={() => handleTechnicianSelect(technician)}
+                  onSelect={() => handleTechnicianSelect(technician)}
                 />
               ))}
               {technicians.length === 0 && (
@@ -353,21 +352,21 @@ export default function FieldAppPage({
                   <h4 className="font-medium text-[var(--ff-text-primary)] mb-2">Technician Status</h4>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-[var(--ff-text-secondary)]">Available</span>
+                      <span className="text-sm text-[var(--ff-text-secondary)]">Active</span>
                       <span className="text-sm font-medium text-[var(--ff-text-primary)]">
-                        {technicians.filter(t => t.status === 'available').length}
+                        {technicians.filter(t => t.status === 'active').length}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-[var(--ff-text-secondary)]">On Task</span>
+                      <span className="text-sm text-[var(--ff-text-secondary)]">Busy</span>
                       <span className="text-sm font-medium text-[var(--ff-text-primary)]">
-                        {technicians.filter(t => t.status === 'on_task').length}
+                        {technicians.filter(t => t.status === 'busy').length}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-[var(--ff-text-secondary)]">On Break</span>
+                      <span className="text-sm text-[var(--ff-text-secondary)]">Offline</span>
                       <span className="text-sm font-medium text-[var(--ff-text-primary)]">
-                        {technicians.filter(t => t.status === 'on_break').length}
+                        {technicians.filter(t => t.status === 'offline').length}
                       </span>
                     </div>
                   </div>
@@ -382,6 +381,7 @@ export default function FieldAppPage({
       {showTaskDialog && selectedTask && (
         <TaskDialog
           task={selectedTask}
+          isOpen={showTaskDialog}
           onClose={() => {
             setShowTaskDialog(false);
             setSelectedTask(null);
