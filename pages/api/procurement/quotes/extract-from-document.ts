@@ -17,7 +17,7 @@ import os from 'os';
 import { execSync } from 'child_process';
 import { withAuth } from '@/lib/auth';
 import { withErrorHandler } from '@/lib/api-error-handler';
-import { apiResponse } from '@/lib/apiResponse';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { vfStorage, isVFStorageAvailable } from '@/services/vfStorageAdapter';
 import {
@@ -117,7 +117,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const images = await convertToImages(tempFilePath, mimeType);
 
     if (images.length === 0) {
-      return apiResponse.error(res, 'PROCESSING_ERROR', 'Failed to process document');
+      return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Failed to process document');
     }
 
     // Upload document to VF Storage
@@ -134,9 +134,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Extract quote data from images
     const startTime = Date.now();
+    const docName = file.originalFilename ?? undefined;
     const extraction = images.length === 1
-      ? await extractQuoteFromImage(images[0], file.originalFilename || undefined)
-      : await extractQuoteFromMultipleImages(images, file.originalFilename || undefined);
+      ? await extractQuoteFromImage(images[0] ?? '', docName)
+      : await extractQuoteFromMultipleImages(images, docName);
 
     if (!extraction.success) {
       // Save failed extraction record
@@ -153,14 +154,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         processingTimeMs: extraction.processingTimeMs,
       });
 
-      return apiResponse.error(res, 'EXTRACTION_FAILED', extraction.error || 'Failed to extract quote data');
+      return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, extraction.error || 'Failed to extract quote data');
     }
 
     // Validate extraction has minimum data
     if (!isValidExtraction(extraction)) {
       return apiResponse.error(
         res,
-        'INVALID_EXTRACTION',
+        ErrorCode.BAD_REQUEST,
         'Could not extract sufficient data from document. Please check the image quality.'
       );
     }
@@ -227,14 +228,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     log.error('[QuoteExtract] Error', {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
-    return apiResponse.error(res, 'PROCESSING_ERROR', 'Failed to process document');
+    return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Failed to process document');
   } finally {
     // Cleanup temp file
     if (tempFilePath && fs.existsSync(tempFilePath)) {
       try {
         fs.unlinkSync(tempFilePath);
-      } catch {
-        log.error('ExtractFromDocumentApi', 'Operation failed', { error });
+      } catch (cleanupErr) {
+        log.error('Temp file cleanup failed', { error: cleanupErr }, 'QuoteExtract');
         // Ignore cleanup errors
       }
     }

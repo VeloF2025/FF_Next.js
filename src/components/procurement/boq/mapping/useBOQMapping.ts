@@ -5,7 +5,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { BOQ, BOQItemMappingStatusType } from '@/types/procurement/boq.types';
 import { procurementApiService } from '@/services/procurement/boqApiExtensions';
+import type { ProcurementApiContext } from '@/services/procurement/index';
 import { useProcurementContext } from '@/hooks/procurement/useProcurementContext';
+import type { ProcurementContext } from '@/types/procurement/base.types';
 import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 import {
@@ -15,6 +17,15 @@ import {
   SortDirection,
   INITIAL_FILTERS
 } from './BOQMappingTypes';
+
+function toApiContext(ctx: ProcurementContext): ProcurementApiContext {
+  return {
+    userId: ctx.userId,
+    userName: ctx.userName,
+    projectId: ctx.projectId,
+    permissions: [],
+  };
+}
 
 export function useBOQMapping(boqId: string, onMappingComplete?: (count: number) => void) {
   const { context } = useProcurementContext();
@@ -40,16 +51,16 @@ export function useBOQMapping(boqId: string, onMappingComplete?: (count: number)
       setIsLoading(true);
       
       // Load BOQ details
-      const boqData = await procurementApiService.getBOQ(context, boqId);
-      setBOQ(boqData);
+      const boqData = await procurementApiService.getBOQ(toApiContext(context), boqId);
+      setBOQ(boqData as unknown as BOQ);
 
       // Load exceptions with related BOQ items
-      const exceptionsData = await procurementApiService.getBOQExceptions(context, boqId);
+      const exceptionsData = await procurementApiService.getBOQExceptions(toApiContext(context), boqId);
       
       // Enhance exceptions with BOQ item data and suggestions
       const enhancedExceptions: ExceptionWithItem[] = await Promise.all(
         exceptionsData.map(async (exception) => {
-          const boqItem = await procurementApiService.getBOQItem(context, exception.boqItemId);
+          const boqItem = await procurementApiService.getBOQItem(toApiContext(context), exception.boqItemId);
           
           // Generate fresh suggestions if none exist
           let suggestions = exception.systemSuggestions || [];
@@ -148,7 +159,7 @@ export function useBOQMapping(boqId: string, onMappingComplete?: (count: number)
       if (!suggestion) return;
       
       // Update BOQ item with selected mapping
-      await procurementApiService.updateBOQItem(context, exception.boqItemId, {
+      await procurementApiService.updateBOQItem(toApiContext(context), exception.boqItemId, {
         catalogItemId: suggestion.catalogItemId,
         catalogItemCode: suggestion.catalogItemCode,
         catalogItemName: suggestion.catalogItemName,
@@ -157,7 +168,7 @@ export function useBOQMapping(boqId: string, onMappingComplete?: (count: number)
       });
 
       // Resolve exception
-      await procurementApiService.updateBOQException(context, exceptionId, {
+      await procurementApiService.updateBOQException(toApiContext(context), exceptionId, {
         status: 'resolved',
         resolvedBy: context.userId,
         resolvedAt: new Date(),
@@ -190,7 +201,7 @@ export function useBOQMapping(boqId: string, onMappingComplete?: (count: number)
     try {
       setIsProcessing(true);
       
-      await procurementApiService.updateBOQException(context, exceptionId, {
+      await procurementApiService.updateBOQException(toApiContext(context), exceptionId, {
         status: 'ignored',
         resolvedBy: context.userId,
         resolvedAt: new Date(),

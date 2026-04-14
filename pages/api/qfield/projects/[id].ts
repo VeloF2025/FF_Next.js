@@ -51,7 +51,7 @@ async function handleGet(id: string, res: NextApiResponse) {
 
     return res.status(200).json({ success: true, data: result.rows[0] });
   } catch (error: any) {
-    log.error('QFieldProjectAPI', 'Failed to get project', error);
+    log.error('Failed to get QField project', { error }, 'QFieldProjectAPI');
     return res.status(500).json({ success: false, error: error.message });
   }
 }
@@ -103,17 +103,17 @@ async function handlePut(id: string, req: NextApiRequest, res: NextApiResponse) 
       }
 
       await client.query('COMMIT');
-      log.info('QFieldProjectAPI', `Updated QField project: ${id}`);
+      log.info(`Updated QField project: ${id}`, undefined, 'QFieldProjectAPI');
       return res.status(200).json({ success: true, data: updateResult.rows[0] });
     } catch (err) {
-      log.error('IdApi', 'Operation failed', { error });
+      log.error('Operation failed', { error: err }, 'QFieldProjectAPI');
       await client.query('ROLLBACK');
       throw err;
     } finally {
       client.release();
     }
   } catch (error: any) {
-    log.error('QFieldProjectAPI', 'Failed to update project', error);
+    log.error('Failed to update QField project', { error }, 'QFieldProjectAPI');
     return res.status(500).json({ success: false, error: error.message });
   }
 }
@@ -129,10 +129,10 @@ async function handleDelete(id: string, res: NextApiResponse) {
       return res.status(404).json({ success: false, error: 'QField project not found' });
     }
 
-    log.info('QFieldProjectAPI', `Deactivated QField project: ${id}`);
+    log.info(`Deactivated QField project: ${id}`, undefined, 'QFieldProjectAPI');
     return res.status(200).json({ success: true, data: result.rows[0] });
   } catch (error: any) {
-    log.error('QFieldProjectAPI', 'Failed to delete project', error);
+    log.error('Failed to delete QField project', { error }, 'QFieldProjectAPI');
     return res.status(500).json({ success: false, error: error.message });
   }
 }
