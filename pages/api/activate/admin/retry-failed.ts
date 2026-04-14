@@ -13,7 +13,7 @@ import { neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth, withRole } from '@/lib/auth';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -88,7 +88,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       failedDRs,
     });
   } catch (error) {
-    log.error('RetryFailed', 'Error fetching failed DRs', error);
+    log.error('Error fetching failed DRs', { error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -135,7 +135,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       });
     }
 
-    log.info('RetryFailed', `Retrying ${drsToRetry.length} failed DR(s)`);
+    log.info(`Retrying ${drsToRetry.length} failed DR(s)`);
 
     const results: RetryResult[] = [];
 
@@ -180,7 +180,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
           });
         }
       } catch (error) {
-        log.error('RetryFailed', `Error retrying ${dr}`, error);
+        log.error(`Error retrying ${dr}`, { error });
         results.push({
           dropNumber: dr,
           success: false,
@@ -202,7 +202,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       results,
     });
   } catch (error) {
-    log.error('RetryFailed', 'Error in retry handler', error);
+    log.error('Error in retry handler', { error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -211,7 +211,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
  * Main handler
  */
 async function handler(
-  req: AuthenticatedNextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
   if (req.method === 'GET') {

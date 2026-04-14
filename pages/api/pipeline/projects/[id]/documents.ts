@@ -32,7 +32,7 @@ async function handler(
     case 'DELETE':
       return handleDelete(req, res, projectId, docId as string);
     default:
-      return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+      return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST', 'PATCH', 'DELETE']);
   }
 }
 
@@ -77,7 +77,7 @@ async function handleGet(
       WHERE d.pipeline_project_id = ${projectId}
         AND d.is_active = true
       ORDER BY d.created_at DESC
-    `;
+    ` as unknown as any[];
 
     // Group documents for display
     const byApproval: Record<string, typeof documents> = {};
@@ -181,7 +181,7 @@ async function handlePost(
       RETURNING id
     ` as any[];
 
-    return apiResponse.success(res, { id: result[0].id }, 201);
+    return apiResponse.success(res, { id: result[0].id }, 'Document created', 201);
   } catch (error) {
     log.error('[id]-documents', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, error);

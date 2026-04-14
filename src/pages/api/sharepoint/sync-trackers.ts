@@ -12,46 +12,34 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
-import { apiResponse } from '@/lib/api-response';
-import { requireAdmin } from '@/lib/auth-server';
+import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 import { syncTrackerForProject } from '@/lib/sharepoint-sync/sync';
 import type { SpTrackerConfig } from '@/lib/sharepoint-sync/types';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'POST') {
-    res.status(405).json(apiResponse(false, 'Method not allowed'));
-    return;
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   try {
-    await requireAdmin(req);
-  } catch (err) {
-    log.warn('Unauthorized tracker sync attempt', { err }, 'sharepoint/sync-trackers');
-    res.status(403).json(apiResponse(false, 'Unauthorized'));
-    return;
-  }
-
-  try {
-    const configs = await sql<SpTrackerConfig[]>`
+    const configs = await sql`
       SELECT id, project_id, project_name, drive_id, item_id, sheet_name
       FROM sp_tracker_config
       WHERE enabled = true
-    `;
+    ` as unknown as SpTrackerConfig[];
 
     if (!configs.length) {
-      res.status(200).json(
-        apiResponse(true, 'No trackers enabled', {
-          synced: 0,
-          projects: [],
-          errors: [],
-        })
-      );
-      return;
+      return apiResponse.success(res, {
+        synced: 0,
+        projects: [],
+        errors: [],
+      });
     }
 
     let totalSynced = 0;
@@ -68,15 +56,15 @@ export default async function handler(
       }
     }
 
-    res.status(200).json(
-      apiResponse(true, 'Sync complete', {
-        synced: totalSynced,
-        projects: syncedProjects,
-        errors,
-      })
-    );
+    return apiResponse.success(res, {
+      synced: totalSynced,
+      projects: syncedProjects,
+      errors,
+    });
   } catch (err) {
-    log.error('Tracker sync failed', { err }, 'sharepoint/sync-trackers');
-    res.status(500).json(apiResponse(false, 'Sync failed'));
+    log.error('Tracker sync failed', { error: err });
+    return apiResponse.internalError(res, 'Sync failed');
   }
 }
+
+export default withAuth(handler);
