@@ -41,24 +41,25 @@ export function BarcodeScannerModal({
       const lookup = await lookupAssetByCode(result.decodedText);
 
       if (lookup.found && lookup.asset) {
+        const asset = lookup.asset as unknown as Asset;
         // Check if asset matches status filter
         if (filterByStatus && filterByStatus.length > 0) {
-          if (!filterByStatus.includes(lookup.asset.status)) {
+          if (!filterByStatus.includes(asset.status)) {
             setLookupState('not-found');
             setLookupResult({
               found: false,
               scannedCode: result.decodedText,
-              error: `Asset found but status is "${lookup.asset.status}". Expected: ${filterByStatus.join(' or ')}.`,
+              error: `Asset found but status is "${asset.status}". Expected: ${filterByStatus.join(' or ')}.`,
             });
             return;
           }
         }
 
-        setFoundAsset(lookup.asset);
+        setFoundAsset(asset);
         setLookupState('found');
         setLookupResult({
           found: true,
-          asset: lookup.asset,
+          asset,
           scannedCode: result.decodedText,
           matchedBy: lookup.matchedBy,
         });

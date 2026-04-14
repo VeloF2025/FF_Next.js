@@ -76,12 +76,10 @@ async function handler(
 
     // Update database to remove photo URL
     const columnName = `photo_${photoType}`;
-    await sql`
-      UPDATE poles
-      SET ${sql(columnName)} = NULL,
-          updated_at = NOW()
-      WHERE id = ${parseInt(poleId)}
-    `;
+    await sql.query(
+      `UPDATE poles SET "${columnName}" = NULL, updated_at = NOW() WHERE id = $1`,
+      [parseInt(poleId)]
+    );
 
     log.info(`Pole photo deleted: ${poleId}/${photoType}`, {}, 'pole-photos-delete');
 

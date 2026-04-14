@@ -198,7 +198,6 @@ export function InfrastructureHealthDashboard() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <ServiceStatusCard name="Production" status={health.apps.production} isCritical />
-              <ServiceStatusCard name="Staging" status={health.apps.staging} />
               <ServiceStatusCard name="Dev" status={health.apps.dev} />
               <ServiceStatusCard name="Backup (VPS)" status={health.apps.backup} />
             </div>

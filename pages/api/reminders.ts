@@ -40,7 +40,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
       params.push(parseInt(limit as string));
 
-      const reminders = await sql(query, params);
+      const reminders = await sql.query(query, params);
 
       return res.status(200).json({
         success: true,

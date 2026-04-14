@@ -30,7 +30,7 @@ export function createLoggedSql(databaseUrl: string): NeonQueryFunction<false, f
       
       try {
         // Execute the query
-        const result = await target.apply(thisArg, argumentsList);
+        const result = await target.apply(thisArg, argumentsList as [strings: TemplateStringsArray, ...params: unknown[]]);
         const duration = Date.now() - startTime;
         
         // Log query details

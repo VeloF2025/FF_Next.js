@@ -119,7 +119,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
           if (filename) {
             // Extract staffId from filename prefix (format: {staffId}_{originalFilename})
-            const staffIdFromFilename = filename.split('_')[0];
+            const staffIdFromFilename = filename.split('_')[0] ?? '';
             const deleted = await deleteStaffDocument(staffIdFromFilename, filename);
             if (deleted) {
               logger.info('Deleted file from VF Storage', { filename });

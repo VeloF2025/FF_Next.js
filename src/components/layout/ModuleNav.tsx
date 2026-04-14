@@ -86,6 +86,8 @@ export interface ModuleNavProps {
   tabs: Tab[];
   getActiveTabId: (pathname: string, query: Record<string, string | string[] | undefined>) => string;
   accentColor: AccentColor;
+  /** Optional accessible label for the nav landmark. */
+  navLabel?: string;
 }
 
 // ─── Shared static classes ────────────────────────────────────────────────────
@@ -274,7 +276,7 @@ function FlyoutDropdown({ tab, asPath, onClose, accent }: FlyoutDropdownProps) {
  * @param getActiveTabId  Route-to-tab resolver for the owning module
  * @param accentColor     Tailwind color token used for active-state highlights
  */
-export function ModuleNav({ tabs, getActiveTabId, accentColor }: ModuleNavProps) {
+export function ModuleNav({ tabs, getActiveTabId, accentColor, navLabel: _navLabel }: ModuleNavProps) {
   const router = useRouter();
   const [openTab, setOpenTab] = useState<string | null>(null);
   const navRef = useRef<HTMLDivElement>(null);

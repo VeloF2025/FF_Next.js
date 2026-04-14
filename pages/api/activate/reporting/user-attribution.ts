@@ -48,8 +48,8 @@ async function handler(
 
 
     const data = await getUserTeamAttributionReport(
-      dateFromStr,
-      dateToStr,
+      dateFromStr ?? '',
+      dateToStr ?? '',
       projectStr || undefined
     );
 

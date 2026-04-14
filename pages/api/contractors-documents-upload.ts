@@ -188,7 +188,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         // Parse storage path: contractors/documents/{filename}
         const pathParts = storagePath.split('/');
         if (pathParts.length >= 3) {
-          const filename = pathParts[pathParts.length - 1];
+          const filename = pathParts[pathParts.length - 1] ?? '';
           await vfStorage.deleteFile('contractors', 'documents', filename);
           log.debug('contractors-documents-upload', {
             action: 'cleanupStorage',

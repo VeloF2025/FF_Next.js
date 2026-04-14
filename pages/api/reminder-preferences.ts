@@ -82,7 +82,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         RETURNING id, user_id, email, enabled, send_time, timezone, created_at, updated_at
       `;
 
-      const result = await sql(query, params);
+      const result = await sql.query(query, params);
 
       return res.status(200).json({
         success: true,

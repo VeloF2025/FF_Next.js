@@ -212,7 +212,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // 1. Get drop details from database
-    const drops = await sql<QAReview[]>`
+    const drops = await sql`
       SELECT
         drop_number,
         submitted_by,
@@ -232,7 +232,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       FROM qa_photo_reviews
       WHERE id = ${dropId}
       LIMIT 1
-    `;
+    ` as unknown as QAReview[];
 
     if (drops.length === 0) {
       return res.status(404).json({

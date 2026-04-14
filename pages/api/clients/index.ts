@@ -98,7 +98,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
             });
           }
           
-          res.status(200).json({ success: true, data: transformClient(client[0]) });
+          res.status(200).json({ success: true, data: transformClient(client[0] as Record<string, unknown>) });
         } else {
           // Build query with filters (using safe parameterized queries)
           const clients = await safeArrayQuery(

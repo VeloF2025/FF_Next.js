@@ -22,8 +22,8 @@ async function getVerifierName(verifierId: string): Promise<string> {
   try {
     const [verifier] = await sql`SELECT name FROM staff WHERE id = ${verifierId}`;
     return (verifier?.name as string) || 'Unknown';
-  } catch {
-    log.error('Operation failed', { error: { error } }, 'VerifyApi');
+  } catch (err) {
+    log.error('Operation failed', { error: err }, 'VerifyApi');
     return 'Unknown';
   }
 }

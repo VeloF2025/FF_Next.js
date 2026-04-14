@@ -49,7 +49,7 @@ async function handler(
     // Get hierarchy grouped by zone, PON, and work type
     // Join to drops for zone_no/pon_no (drops table has the zone/PON data, poles table doesn't)
     // Use a subquery to get one zone/pon per pole_number to avoid inflated counts from multiple drops
-    const rows: HierarchyRow[] = await sql`
+    const rows = await sql`
       SELECT
         dz.zone_no,
         dz.pon_no,
@@ -74,10 +74,10 @@ async function handler(
       )
       GROUP BY dz.zone_no, dz.pon_no, v.work_type
       ORDER BY dz.zone_no NULLS LAST, dz.pon_no NULLS LAST, v.work_type
-    `;
+    ` as unknown as HierarchyRow[];
 
     // Get individual features (poles/joints) per zone/PON
-    const featureRows: FeatureRow[] = await sql`
+    const featureRows = await sql`
       SELECT
         dz.zone_no,
         dz.pon_no,
@@ -104,7 +104,7 @@ async function handler(
       AND v.feature_id IS NOT NULL
       GROUP BY dz.zone_no, dz.pon_no, v.feature_id, v.work_type
       ORDER BY dz.zone_no NULLS LAST, dz.pon_no NULLS LAST, v.feature_id
-    `;
+    ` as unknown as FeatureRow[];
 
     // Index features by zone_no + pon_no key
     const featuresByPon = new Map<string, Array<{

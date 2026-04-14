@@ -119,17 +119,37 @@ async function handleGet(contractorId: string, res: NextApiResponse) {
 
   // Calculate overall score
   const scoreInput: HSScoreInput = {
-    documentScore: totalRequiredDocs > 0 ? (validDocs / totalRequiredDocs) * 100 : 0,
-    incidentScore: calculateIncidentScore(incidentStats),
-    trainingScore: totalTraining > 0 ? (validTraining / totalTraining) * 100 : 0,
-    correctiveActionScore: calculateCAScore(caStats),
-    auditScore: auditStats?.average_audit_score || 100,
+    contractor_id: 0,
+    document_compliance: {
+      total: totalRequiredDocs,
+      valid: validDocs,
+      expired: 0,
+      pending: 0,
+    },
+    incidents: {
+      minor: 0,
+      moderate: 0,
+      major: incidentStats?.critical_incidents || 0,
+      fatal: 0,
+    },
+    training_records: {
+      total: totalTraining,
+      current: validTraining,
+      expired: 0,
+    },
+    corrective_actions: {
+      total: (caStats?.open_actions || 0) + (caStats?.closed_actions || 0),
+      completed: caStats?.closed_actions || 0,
+      overdue: 0,
+      in_progress: caStats?.open_actions || 0,
+    },
+    last_audit_score: auditStats?.average_audit_score || null,
   };
 
   const scoreResult = calculateContractorHSScore(scoreInput);
 
   // Determine overall status
-  const overallStatus = scoreResult.ragStatus;
+  const overallStatus = scoreResult.rag_status;
 
   return apiResponse.success(res, {
     contractor: {
@@ -139,7 +159,7 @@ async function handleGet(contractorId: string, res: NextApiResponse) {
     },
     compliance: compliance || {
       contractor_id: contractorId,
-      overall_score: scoreResult.overallScore,
+      overall_score: scoreResult.overall_score,
       rag_status: overallStatus,
       last_audit_date: null,
       next_audit_due: null,

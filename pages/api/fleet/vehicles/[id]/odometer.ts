@@ -81,7 +81,7 @@ async function handleGet(
       return apiResponse.success(res, null);
     }
 
-    return apiResponse.success(res, rowToOdometerHistory(rows[0]));
+    return apiResponse.success(res, rowToOdometerHistory(rows[0]!));
   }
 
   // Get paginated history

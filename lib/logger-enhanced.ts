@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { 
-  generateCorrelationId, 
-  generateRequestId, 
+import {
+  generateCorrelationId,
+  generateRequestId,
+  getCorrelationId,
+  getRequestId,
   withCorrelation,
   CORRELATION_ID_HEADER,
   REQUEST_ID_HEADER

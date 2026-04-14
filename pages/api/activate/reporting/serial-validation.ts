@@ -52,8 +52,8 @@ async function handler(
 
 
     const data = await getSerialValidationReport(
-      dateFromStr,
-      dateToStr,
+      dateFromStr ?? '',
+      dateToStr ?? '',
       projectStr || undefined,
       mismatchesOnlyBool
     );

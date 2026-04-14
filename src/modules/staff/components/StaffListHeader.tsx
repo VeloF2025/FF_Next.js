@@ -32,7 +32,7 @@ export function StaffListHeader({
   filter
 }: StaffListHeaderProps) {
   // Build export label based on active filters
-  const hasFilters = filter?.status || filter?.department || filter?.position || filter?.searchTerm;
+  const hasFilters = filter?.status || filter?.department || filter?.searchTerm;
   const exportLabel = hasFilters
     ? `Export ${filter?.status || 'Filtered'}`
     : 'Export All';

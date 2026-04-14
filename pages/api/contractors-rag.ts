@@ -91,8 +91,9 @@ async function getContractorRag(contractorId: string): Promise<ContractorRagStat
   if (!contractor) return null;
 
   // Prepare input and calculate RAG
-  const input = prepareRagInputFromDbRow(contractor);
-  return calculateContractorRag(input, contractor.company_name);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const input = prepareRagInputFromDbRow(contractor as any);
+  return calculateContractorRag(input, contractor.company_name as string);
 }
 
 async function getAllContractorsRag(): Promise<ContractorRagStatus[]> {
@@ -126,7 +127,8 @@ async function getAllContractorsRag(): Promise<ContractorRagStatus[]> {
     ORDER BY c.company_name
   `;
 
-  return calculateBulkRag(contractors);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return calculateBulkRag(contractors as any);
 }
 
 function calculateSummary(ragStatuses: ContractorRagStatus[]) {

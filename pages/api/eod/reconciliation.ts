@@ -24,7 +24,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.success(res, result);
   } catch (err) {
     log.error('[EOD-Recon] Error', { error: err, date });
-    return apiResponse.error(res, 'Reconciliation failed', 500);
+    return apiResponse.internalError(res, err, 'Reconciliation failed');
   }
 }
 

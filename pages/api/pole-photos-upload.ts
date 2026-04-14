@@ -144,12 +144,10 @@ async function handler(
 
     // Update database with photo URL
     const columnName = `photo_${photoType}`;
-    await sql`
-      UPDATE poles
-      SET ${sql(columnName)} = ${result.url},
-          updated_at = NOW()
-      WHERE id = ${parseInt(poleId)}
-    `;
+    await sql.query(
+      `UPDATE poles SET "${columnName}" = $1, updated_at = NOW() WHERE id = $2`,
+      [result.url, parseInt(poleId)]
+    );
 
     // Clean up temp file
     await fs.promises.unlink(file.filepath).catch((e) => log.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }, 'pole-photos-upload'));

@@ -24,7 +24,7 @@ async function handler(
     // Calculate statistics
     const stats = {
       total: suppliers.length,
-      active: suppliers.filter(s => s.status === 'ACTIVE').length,
+      active: suppliers.filter(s => s.status === 'active').length,
       preferred: suppliers.filter(s => s.isPreferred).length,
       averageRating: suppliers.length > 0
         ? suppliers.reduce((sum, s) => {

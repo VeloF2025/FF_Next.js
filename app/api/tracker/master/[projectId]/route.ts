@@ -119,7 +119,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const values = columns.map((col) => body[col] ?? (col === 'project_id' ? projectId : null));
     const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
 
-    const rows = await sql(
+    const rows = await sql.query(
       `INSERT INTO master_tracker (${columns.join(', ')}) VALUES (${placeholders}) RETURNING *`,
       values
     );

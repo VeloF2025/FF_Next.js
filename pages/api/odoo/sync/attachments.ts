@@ -20,7 +20,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { createLogger } from '@/lib/logger';
 
-const logger = createLogger({ module: 'api/odoo/sync/attachments' });
+const logger = createLogger('api/odoo/sync/attachments');
 
 const DATABASE_URL = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
 const ODOO_URL = process.env.ODOO_URL || 'https://velocityfibre.odoo.com';

@@ -108,7 +108,7 @@ export default function NewRFQPage() {
   useEffect(() => {
     const defaultDeadline = new Date();
     defaultDeadline.setDate(defaultDeadline.getDate() + 30);
-    setResponseDeadline(defaultDeadline.toISOString().split('T')[0]);
+    setResponseDeadline(defaultDeadline.toISOString().split('T')[0] ?? '');
   }, []);
 
   // Import items from BOQ if boqId is provided
@@ -190,7 +190,7 @@ export default function NewRFQPage() {
 
   const updateItem = (index: number, field: keyof RFQItem, value: string | number) => {
     const newItems = [...items];
-    newItems[index] = { ...newItems[index], [field]: value };
+    newItems[index] = { ...newItems[index]!, [field]: value };
     setItems(newItems);
   };
 
@@ -212,7 +212,7 @@ export default function NewRFQPage() {
     if (stockSelectorItemIndex !== null) {
       const newItems = [...items];
       newItems[stockSelectorItemIndex] = {
-        ...newItems[stockSelectorItemIndex],
+        ...newItems[stockSelectorItemIndex]!,
         description: stockItem.description,
         unit: stockItem.unit,
         estimatedUnitPrice: stockItem.estimatedUnitPrice,

@@ -32,7 +32,7 @@ const STEP_LABELS: Record<string, { label: string; critical: boolean; step: numb
 function extractStepInfo(filename: string): { step: number; label: string; critical: boolean } {
     const match = filename.match(/step(\d+)_(.+?)_\d{8}/);
     if (match) {
-        const stepNum = parseInt(match[1], 10);
+        const stepNum = parseInt(match[1] ?? '0', 10);
         const stepKey = match[2]!;
         const info = STEP_LABELS[stepKey];
         if (info) {

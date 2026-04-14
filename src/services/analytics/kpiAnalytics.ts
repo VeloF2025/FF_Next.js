@@ -66,7 +66,8 @@ export class KPIAnalyticsService {
       
       // For now, return a single data point as API doesn't provide historical trends
       // In a real implementation, the API would return time-series data
-      const kpi = calculatedKPIs.data?.find((k: { id: string }) => k.id === metricType);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const kpi = (calculatedKPIs.data as any[])?.find((k: { id: string }) => k.id === metricType);
       
       if (kpi) {
         return [{

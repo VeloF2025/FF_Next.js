@@ -40,7 +40,6 @@ function validateMagicBytes(buffer: Buffer): { valid: boolean; detectedType: str
 const VALID_DOCUMENT_TYPES: DocumentType[] = [
   'sa_id',
   'passport',
-  'id_document',
   'drivers_license',
   'employment_contract',
   'certification',

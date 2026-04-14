@@ -180,9 +180,9 @@ function parseStats(output: string): any {
   const errorMatch = output.match(/❌/g);
   const warningMatch = output.match(/⚠️/g);
 
-  if (extractedMatch) stats.extracted = parseInt(extractedMatch[1]);
-  if (matchedMatch) stats.matched = parseInt(matchedMatch[1]);
-  if (uploadedMatch) stats.uploaded = parseInt(uploadedMatch[1]);
+  if (extractedMatch) stats.extracted = parseInt(extractedMatch[1] ?? '0');
+  if (matchedMatch) stats.matched = parseInt(matchedMatch[1] ?? '0');
+  if (uploadedMatch) stats.uploaded = parseInt(uploadedMatch[1] ?? '0');
   if (errorMatch) stats.errors = errorMatch.length;
   if (warningMatch) stats.warnings = warningMatch.length;
 

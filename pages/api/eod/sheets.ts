@@ -35,7 +35,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.success(res, data);
   } catch (err) {
     log.error('[EOD-Sheets] List error', { error: err });
-    return apiResponse.error(res, 'Failed to list sheets', 500);
+    return apiResponse.internalError(res, err, 'Failed to list sheets');
   }
 }
 
@@ -78,10 +78,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       ).catch((err) => log.warn('[EOD-Learning] Background recording failed', { error: err }));
     }
 
-    return apiResponse.success(res, sheet, 201);
+    return apiResponse.created(res, sheet);
   } catch (err) {
     log.error('[EOD-Sheets] Create error', { error: err });
-    return apiResponse.error(res, 'Failed to create sheet', 500);
+    return apiResponse.internalError(res, err, 'Failed to create sheet');
   }
 }
 

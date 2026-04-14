@@ -103,7 +103,7 @@ async function handler(
 
         return res.status(200).json({ 
           success: true, 
-          data: transformClient(client[0]) 
+          data: transformClient(client[0] as Record<string, unknown>)
         });
       }
 

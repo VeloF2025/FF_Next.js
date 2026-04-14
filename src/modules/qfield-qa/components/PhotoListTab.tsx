@@ -708,6 +708,7 @@ function PriorityBadge({ priority }: { priority: Priority }) {
   const config = {
     urgent: { label: 'Urgent', classes: 'bg-red-600 text-white' },
     high: { label: 'High', classes: 'bg-orange-500 text-white' },
+    normal: { label: 'Normal', classes: 'bg-blue-500 text-white' },
     low: { label: 'Low', classes: 'bg-gray-500 text-white' },
   }[priority];
 

@@ -46,7 +46,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
   } catch (err) {
     log.error('[Serial-Recon] Error', { error: err });
-    return apiResponse.error(res, 'Reconciliation failed', 500);
+    return apiResponse.internalError(res, err, 'Reconciliation failed');
   }
 }
 

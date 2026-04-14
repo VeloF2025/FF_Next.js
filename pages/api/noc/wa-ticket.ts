@@ -162,14 +162,11 @@ async function handler(
     // Update maintenance flag with ticket ID
     await updateMaintenanceFlagStatus(body.drop_number, 'ticket_created', ticket.id);
 
-    logger.info(
-      {
-        ticketId: ticket.id,
-        ticketUid: ticket.ticket_uid,
-        dropNumber: body.drop_number,
-      },
-      'Maintenance ticket created from WA tracking'
-    );
+    logger.info('Maintenance ticket created from WA tracking', {
+      ticketId: ticket.id,
+      ticketUid: ticket.ticket_uid,
+      dropNumber: body.drop_number,
+    });
 
     return res.status(201).json({
       success: true,
@@ -183,7 +180,7 @@ async function handler(
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
 
-    logger.error({ error: errorMessage }, 'Failed to create WA maintenance ticket');
+    logger.error('Failed to create WA maintenance ticket', { error: errorMessage });
 
     return res.status(500).json({
       success: false,

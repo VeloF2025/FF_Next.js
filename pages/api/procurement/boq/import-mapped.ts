@@ -61,8 +61,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     let columnMapping: ColumnMapping[];
     try {
       columnMapping = JSON.parse(columnMappingJson as string);
-    } catch {
-      log.error('Operation failed', { error: { error } }, 'ImportMappedApi');
+    } catch (parseErr) {
+      log.error('Invalid columnMapping JSON', { error: parseErr }, 'ImportMappedApi');
       return apiResponse.badRequest(res, 'Invalid columnMapping JSON');
     }
 
@@ -170,8 +170,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         const headers = (data[headerRow] as unknown[]).map(h => String(h || ''));
         const columnMappingRecord: Record<string, BOQTargetField> = {};
         for (const m of columnMapping) {
-          if (m.targetField && headers[m.sourceIndex]) {
-            columnMappingRecord[headers[m.sourceIndex]] = m.targetField;
+          const hdr = headers[m.sourceIndex];
+          if (m.targetField && hdr) {
+            columnMappingRecord[hdr] = m.targetField;
           }
         }
 

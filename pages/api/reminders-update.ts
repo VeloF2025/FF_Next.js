@@ -66,7 +66,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       RETURNING *
     `;
 
-    const result = await sql(query, params);
+    const result = await sql.query(query, params);
 
     if (result.length === 0) {
       return res.status(404).json({

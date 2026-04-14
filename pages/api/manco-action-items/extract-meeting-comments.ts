@@ -35,7 +35,7 @@ function parseWebVTT(transcript: string, keywords: string[]): TranscriptCue[] {
         let text = '';
 
         if (speakerMatch) {
-          speaker = speakerMatch[1];
+          speaker = speakerMatch[1] ?? '';
           text = nextLine.replace(/<v\s+[^>]+>\s*/, '').replace(/<\/v>\s*/, '');
         } else {
           text = nextLine;

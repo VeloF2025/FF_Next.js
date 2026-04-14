@@ -16,7 +16,7 @@ import { queryOne } from '../utils/db';
 import { DRLookupResult, DRLookupData } from '../types/ticket';
 import { createLogger } from '@/lib/logger';
 
-const logger = createLogger({ module: 'drLookupService' });
+const logger = createLogger('drLookupService');
 
 /**
  * In-memory cache for DR lookup results

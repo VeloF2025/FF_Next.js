@@ -30,7 +30,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const expectedSecret = process.env.CRON_SECRET;
   if (!expectedSecret) {
     log.error('CRON_SECRET not configured — rejecting cron request');
-    return apiResponse.error(res, 'Cron endpoint misconfigured', 503);
+    return res.status(503).json({ success: false, error: 'Cron endpoint misconfigured' });
   }
   if (cronSecret !== expectedSecret) {
     return apiResponse.unauthorized(res, 'Invalid cron secret');

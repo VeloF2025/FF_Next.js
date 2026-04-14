@@ -48,7 +48,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
   } catch (err) {
     log.error('[EOD-Barcode] Scan error', { error: err });
-    return apiResponse.error(res, 'Barcode scan failed', 500);
+    return apiResponse.internalError(res, err, 'Barcode scan failed');
   }
 }
 

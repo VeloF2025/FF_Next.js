@@ -97,9 +97,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       data: {
         date: date || new Date().toISOString().split('T')[0],
         stats: {
-          total: parseInt(stats.total) || 0,
-          valid: parseInt(stats.valid) || 0,
-          invalid: parseInt(stats.invalid) || 0
+          total: parseInt(String(stats.total)) || 0,
+          valid: parseInt(String(stats.valid)) || 0,
+          invalid: parseInt(String(stats.invalid)) || 0
         },
         submissions: submissions.map(sub => ({
           dropNumber: sub.drop_number,

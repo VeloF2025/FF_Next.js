@@ -80,7 +80,7 @@ async function handleGet(
       return apiResponse.success(res, null);
     }
 
-    return apiResponse.success(res, rowToFuelHistory(rows[0]));
+    return apiResponse.success(res, rowToFuelHistory(rows[0]!));
   }
 
   // Get paginated history

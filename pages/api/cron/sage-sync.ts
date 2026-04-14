@@ -18,7 +18,7 @@ import { createSageClientFromConfig } from '@/services/sage';
 import { pullInvoicesFromSage } from '@/services/sage/entities/invoiceSync';
 import { pullPaymentsFromSage } from '@/services/sage/entities/paymentSync';
 
-const logger = createLogger({ module: 'api:cron:sage-sync' });
+const logger = createLogger('api:cron:sage-sync');
 
 export default async function handler(
   req: NextApiRequest,

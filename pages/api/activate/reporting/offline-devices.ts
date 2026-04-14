@@ -81,10 +81,10 @@ async function handler(
         : lastDownReason
       : undefined;
     const pageNum = page
-      ? parseInt(Array.isArray(page) ? page[0] : page, 10)
+      ? parseInt(Array.isArray(page) ? (page[0] ?? '1') : page, 10)
       : 1;
     const pageSizeNum = pageSize
-      ? Math.min(parseInt(Array.isArray(pageSize) ? pageSize[0] : pageSize, 10), 500)
+      ? Math.min(parseInt(Array.isArray(pageSize) ? (pageSize[0] ?? '100') : pageSize, 10), 500)
       : 100;
 
     log.info('Fetching offline devices report', {

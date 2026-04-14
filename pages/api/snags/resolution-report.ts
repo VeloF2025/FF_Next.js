@@ -81,7 +81,7 @@ async function attachPhotosAndNotes(snagRows: RawSnagRow[]): Promise<ResolutionR
       WHERE snag_id = ANY(${snagIds})
         AND phase IN ('before', 'after')
       ORDER BY phase ASC, created_at ASC
-    ` as Array<{ id: string; snag_id: string; phase: string; photo_url: string; thumbnail_url: string | null }>,
+    ` as unknown as Array<{ id: string; snag_id: string; phase: string; photo_url: string; thumbnail_url: string | null }>,
     ticketIds.length > 0
       ? sql`
           SELECT id, ticket_id, filename, COALESCE(storage_url, file_url) AS url
@@ -89,7 +89,7 @@ async function attachPhotosAndNotes(snagRows: RawSnagRow[]): Promise<ResolutionR
           WHERE ticket_id = ANY(${ticketIds})
             AND (file_type IN ('image', 'photo') OR mime_type LIKE 'image/%')
           ORDER BY uploaded_at ASC
-        ` as Array<{ id: string; ticket_id: string; filename: string; url: string }>
+        ` as unknown as Array<{ id: string; ticket_id: string; filename: string; url: string }>
       : Promise.resolve([]),
     ticketIds.length > 0
       ? sql`
@@ -100,7 +100,7 @@ async function attachPhotosAndNotes(snagRows: RawSnagRow[]): Promise<ResolutionR
           WHERE mn.ticket_id = ANY(${ticketIds})
             AND mn.note_type IN ('internal', 'external')
           ORDER BY mn.created_at ASC
-        ` as Array<{ ticket_id: string; content: string; note_type: string; created_at: string; created_by_name: string | null }>
+        ` as unknown as Array<{ ticket_id: string; content: string; note_type: string; created_at: string; created_by_name: string | null }>
       : Promise.resolve([]),
   ]);
 

@@ -72,7 +72,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return handleImport(res, workbook, XLSX);
   } catch (err) {
     log.error('[Serial-Import] Error', { error: err });
-    return apiResponse.error(res, 'Import failed', 500);
+    return apiResponse.internalError(res, err, 'Import failed');
   }
 }
 

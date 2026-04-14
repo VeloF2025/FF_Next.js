@@ -261,7 +261,7 @@ async function syncToSharePoint(
 
   // Update database with last row written (for next sync)
   if (succeeded > 0) {
-    await updateLastRow(config.worksheetName, lastWrittenRow, syncDate);
+    await updateLastRow(config.worksheetName ?? '', lastWrittenRow, syncDate);
     log.debug('waMonitor', { action: 'updateLastRowSuccess', worksheetName: config.worksheetName, lastWrittenRow, syncDate });
   }
 

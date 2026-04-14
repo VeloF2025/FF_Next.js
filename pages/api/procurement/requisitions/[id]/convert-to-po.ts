@@ -254,7 +254,7 @@ export default withAuth(withErrorHandler(async (
       WHERE id = ${id}
     `;
 
-    log.info({
+    log.info('requisition_converted_to_po', {
       module: 'procurement',
       action: 'requisition_converted_to_po',
       requisitionId: id,

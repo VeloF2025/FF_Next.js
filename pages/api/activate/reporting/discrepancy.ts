@@ -51,7 +51,7 @@ async function handler(
     }, 'DiscrepancyAPI');
 
 
-    const data = await getDiscrepancyReport(waDateStr, oesDateStr || undefined, projectStr || undefined);
+    const data = await getDiscrepancyReport(waDateStr ?? '', oesDateStr || undefined, projectStr || undefined);
 
     return res.status(200).json(data);
   } catch (error) {

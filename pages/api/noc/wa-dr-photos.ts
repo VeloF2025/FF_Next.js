@@ -69,7 +69,7 @@ async function handler(
       };
     });
 
-    logger.info({ dropNumber, count: photosWithUrls.length }, 'Fetched photos for DR');
+    logger.info('Fetched photos for DR', { dropNumber, count: photosWithUrls.length });
 
     return res.status(200).json({
       success: true,
@@ -79,7 +79,7 @@ async function handler(
       },
     });
   } catch (error) {
-    logger.error({ error }, 'Error fetching DR photos');
+    logger.error('Error fetching DR photos', { error });
     return apiResponse.internalError(res, new Error('Failed to fetch photos'));
   }
 }

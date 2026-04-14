@@ -284,7 +284,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       const [statsResult, trendResult] = await Promise.all([statsQuery, trendQuery]);
 
-      incidentStats = statsResult[0] || incidentStats;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      incidentStats = (statsResult[0] as any) || incidentStats;
       incidentTrend = trendResult;
     }
     const greenProjects = latestAuditPerProject.filter((p: any) => p.rag_status === 'green').length;

@@ -91,7 +91,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     ]);
 
     const response: ProgressTodayResponse = {
-      asOfDate: new Date().toISOString().split('T')[0],
+      asOfDate: new Date().toISOString().split('T')[0] ?? '',
       metrics: {
         polesPlanted: Number(polesToday[0]!.count),
         stringingCompleted: Number(stringingToday[0]!.count),

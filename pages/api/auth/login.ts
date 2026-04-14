@@ -64,7 +64,7 @@ export default async function handler(
   // Rate limit by IP
   const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
   if (isRateLimited(clientIp)) {
-    log.warn({ ip: clientIp }, 'Login rate limited');
+    log.warn('Login rate limited', { ip: clientIp });
     return res.status(429).json({
       success: false,
       error: { code: 'RATE_LIMITED', message: 'Too many login attempts. Please try again later.' },
@@ -119,11 +119,15 @@ export default async function handler(
     }
 
     // Build user object
+    const firstName = dbUser.first_name || '';
+    const lastName = dbUser.last_name || '';
     const user: AuthUser = {
       id: dbUser.id,
+      userId: dbUser.id,
       email: dbUser.email,
-      firstName: dbUser.first_name || '',
-      lastName: dbUser.last_name || '',
+      firstName,
+      lastName,
+      name: `${firstName} ${lastName}`.trim(),
       role: dbUser.role as AuthRole,
       permissions: dbUser.permissions || [],
       isActive: dbUser.is_active,
@@ -182,7 +186,7 @@ export default async function handler(
       },
     });
   } catch (error) {
-    log.error({ error }, 'Login error');
+    log.error('Login error', { error });
     return res.status(500).json({
       success: false,
       error: { code: 'LOGIN_ERROR', message: 'An error occurred during login' },

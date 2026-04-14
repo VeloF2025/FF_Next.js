@@ -23,13 +23,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const result = await extractEodSheet(image);
 
     if (!result.success) {
-      return apiResponse.error(res, result.error || 'VLM extraction failed', 500);
+      return apiResponse.internalError(res, new Error(result.error || 'VLM extraction failed'));
     }
 
     return apiResponse.success(res, result.data);
   } catch (err) {
     log.error('[EOD-Extract] Unexpected error', { error: err });
-    return apiResponse.error(res, 'Extraction failed', 500);
+    return apiResponse.internalError(res, err, 'Extraction failed');
   }
 }
 

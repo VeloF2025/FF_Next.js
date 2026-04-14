@@ -48,12 +48,12 @@ async function handler(
     // For now, we'll proxy through an nginx endpoint on VPS
     const vpsUrl = `http://${VPS_HOST}:8084/photos/${groupJid}/${filename}`;
 
-    logger.info({ groupJid, filename }, 'Fetching maintenance photo from VPS');
+    logger.info('Fetching maintenance photo from VPS', { groupJid, filename });
 
     const response = await fetch(vpsUrl);
 
     if (!response.ok) {
-      logger.error({ status: response.status, groupJid, filename }, 'Failed to fetch photo from VPS');
+      logger.error('Failed to fetch photo from VPS', { status: response.status, groupJid, filename });
       return apiResponse.notFound(res, 'Photo not found');
     }
 
@@ -64,7 +64,7 @@ async function handler(
     res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
     res.send(Buffer.from(buffer));
   } catch (error) {
-    logger.error({ error }, 'Error serving maintenance photo');
+    logger.error('Error serving maintenance photo', { error });
     return apiResponse.internalError(res, new Error('Failed to fetch photo'));
   }
 }

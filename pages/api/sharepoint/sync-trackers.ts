@@ -28,11 +28,11 @@ async function handler(
   }
 
   try {
-    const configs = await sql<SpTrackerConfig[]>`
+    const configs = await sql`
       SELECT id, project_id, project_name, drive_id, item_id, sheet_name
       FROM sp_tracker_config
       WHERE enabled = true
-    `;
+    ` as unknown as SpTrackerConfig[];
 
     if (!configs.length) {
       return apiResponse.success(res, {

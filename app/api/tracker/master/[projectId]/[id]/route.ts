@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     values.push(projectId);
     values.push(id);
 
-    const rows = await sql(
+    const rows = await sql.query(
       `UPDATE master_tracker SET ${setClauses.join(', ')} WHERE project_id = $${paramCount} AND id = $${paramCount + 1} RETURNING *`,
       values
     );
