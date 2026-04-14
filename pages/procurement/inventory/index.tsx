@@ -145,7 +145,7 @@ function CategoriesTabContent() {
         setCategories(data.data || []);
       }
     } catch (err) {
-      log.error('Failed to fetch categories', err);
+      log.error('Failed to fetch categories', { error: err });
     } finally {
       setIsLoading(false);
     }
@@ -203,7 +203,7 @@ function CategoriesTabContent() {
       }
     } catch (err) {
       notificationService.error('Failed to save category');
-      log.error('Failed to save category', err);
+      log.error('Failed to save category', { error: err });
     } finally {
       setIsSaving(false);
     }
@@ -224,7 +224,7 @@ function CategoriesTabContent() {
       }
     } catch (err) {
       notificationService.error('Failed to delete category');
-      log.error('Failed to delete category', err);
+      log.error('Failed to delete category', { error: err });
     }
   };
 
@@ -455,7 +455,7 @@ function BundlesTabContent() {
         notificationService.error(data.error?.message || 'Failed to load bundles');
       }
     } catch (err) {
-      log.error('Failed to fetch bundles', err);
+      log.error('Failed to fetch bundles', { error: err });
     } finally {
       setIsLoading(false);
     }
@@ -513,7 +513,7 @@ function BundlesTabContent() {
       }
     } catch (err) {
       notificationService.error('Failed to save bundle');
-      log.error('Failed to save bundle', err);
+      log.error('Failed to save bundle', { error: err });
     } finally {
       setIsSaving(false);
     }
@@ -534,7 +534,7 @@ function BundlesTabContent() {
       }
     } catch (err) {
       notificationService.error('Failed to delete bundle');
-      log.error('Failed to delete bundle', err);
+      log.error('Failed to delete bundle', { error: err });
     }
   };
 
@@ -771,7 +771,7 @@ function StockTakesTabContent() {
         setStockTakes(data.data || []);
       }
     } catch (err) {
-      log.error('Failed to fetch stock takes', err);
+      log.error('Failed to fetch stock takes', { error: err });
     } finally {
       setIsLoading(false);
     }
@@ -805,7 +805,7 @@ function StockTakesTabContent() {
       }
     } catch (err) {
       notificationService.error('Failed to create stock take');
-      log.error('Failed to create stock take', err);
+      log.error('Failed to create stock take', { error: err });
     } finally {
       setIsSaving(false);
     }
@@ -830,7 +830,7 @@ function StockTakesTabContent() {
       }
     } catch (err) {
       notificationService.error('Failed to delete stock take');
-      log.error('Failed to delete stock take', err);
+      log.error('Failed to delete stock take', { error: err });
     }
   };
 
@@ -1019,7 +1019,7 @@ function BundleReportsTabContent() {
           setProjects(data.data || []);
         }
       } catch (err) {
-        log.error('Failed to fetch projects', err);
+        log.error('Failed to fetch projects', { error: err });
       }
     };
     fetchProjects();
@@ -1045,7 +1045,7 @@ function BundleReportsTabContent() {
         setReportData(null);
       }
     } catch (err) {
-      log.error('Failed to fetch report', err);
+      log.error('Failed to fetch report', { error: err });
       notificationService.error('Failed to load report');
       setReportData(null);
     } finally {

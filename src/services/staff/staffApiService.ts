@@ -113,25 +113,6 @@ interface TimestampLike {
   toDate(): Date;
 }
 
-/**
- * Create a timestamp-like object from a date
- */
-function createTimestamp(date: Date): TimestampLike {
-  const seconds = Math.floor(date.getTime() / 1000);
-  const nanoseconds = (date.getTime() % 1000) * 1000000;
-  return {
-    seconds,
-    nanoseconds,
-    toDate: () => date,
-  };
-}
-
-/**
- * Create a timestamp-like object for the current time
- */
-function timestampNow(): TimestampLike {
-  return createTimestamp(new Date());
-}
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -144,11 +125,11 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 /**
- * Convert ISO date string to TimestampLike
+ * Convert ISO date string to Date (matches Timestamp = string | Date)
  */
-function toTimestamp(dateStr?: string): TimestampLike {
-  if (!dateStr) return timestampNow();
-  return createTimestamp(new Date(dateStr));
+function toTimestamp(dateStr?: string): Date {
+  if (!dateStr) return new Date();
+  return new Date(dateStr);
 }
 
 /**
@@ -353,7 +334,7 @@ function transformStaffMemberToDb(staff: Partial<StaffMember>): Partial<DbStaff>
   if ('taxStatus' in staff) result.taxStatus = staff.taxStatus;
   if ('taxNumber' in staff) result.taxNumber = staff.taxNumber;
   if ('probationStatus' in staff) result.probationStatus = staff.probationStatus;
-  if ('probationEndDate' in staff) result.probationEndDate = toDateStringOrNull(staff.probationEndDate);
+  if ('probationEndDate' in staff) result.probationEndDate = toDateStringOrNull(staff.probationEndDate) ?? undefined;
   if ('probationExtended' in staff) result.probationExtended = staff.probationExtended;
   if ('probationExtensionReason' in staff) result.probationExtensionReason = staff.probationExtensionReason;
   if ('noticePeriod' in staff) result.noticePeriod = staff.noticePeriod;
@@ -361,7 +342,7 @@ function transformStaffMemberToDb(staff: Partial<StaffMember>): Partial<DbStaff>
   if ('weeklyHours' in staff) result.weeklyHours = staff.weeklyHours;
   if ('idNumber' in staff) result.idNumber = staff.idNumber;
   if ('workPermitNumber' in staff) result.workPermitNumber = staff.workPermitNumber;
-  if ('workPermitExpiry' in staff) result.workPermitExpiry = toDateStringOrNull(staff.workPermitExpiry);
+  if ('workPermitExpiry' in staff) result.workPermitExpiry = toDateStringOrNull(staff.workPermitExpiry) ?? undefined;
   if ('salaryGrade' in staff) result.salaryGrade = staff.salaryGrade;
   if ('benefitsPackage' in staff) result.benefitsPackage = staff.benefitsPackage;
   if ('bio' in staff) result.bio = staff.bio;

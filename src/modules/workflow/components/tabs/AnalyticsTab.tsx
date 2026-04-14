@@ -35,30 +35,34 @@ interface DateRange {
   label: string;
 }
 
+function toDateStr(d: Date): string {
+  return d.toISOString().split('T')[0] ?? d.toISOString().substring(0, 10);
+}
+
 const DATE_RANGES: DateRange[] = [
   {
-    from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    to: new Date().toISOString().split('T')[0],
+    from: toDateStr(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)),
+    to: toDateStr(new Date()),
     label: 'Last 7 days'
   },
   {
-    from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    to: new Date().toISOString().split('T')[0],
+    from: toDateStr(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)),
+    to: toDateStr(new Date()),
     label: 'Last 30 days'
   },
   {
-    from: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    to: new Date().toISOString().split('T')[0],
+    from: toDateStr(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)),
+    to: toDateStr(new Date()),
     label: 'Last 90 days'
   },
   {
-    from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    to: new Date().toISOString().split('T')[0],
+    from: toDateStr(new Date(new Date().getFullYear(), 0, 1)),
+    to: toDateStr(new Date()),
     label: 'Year to date'
   },
   {
-    from: new Date(new Date().getFullYear() - 1, 0, 1).toISOString().split('T')[0],
-    to: new Date(new Date().getFullYear() - 1, 11, 31).toISOString().split('T')[0],
+    from: toDateStr(new Date(new Date().getFullYear() - 1, 0, 1)),
+    to: toDateStr(new Date(new Date().getFullYear() - 1, 11, 31)),
     label: 'Last year'
   }
 ];
@@ -68,7 +72,7 @@ export function AnalyticsTab() {
   const [analytics, setAnalytics] = useState<WorkflowAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState<DateRange>(DATE_RANGES[1]); // Default to last 30 days
+  const [dateRange, setDateRange] = useState<DateRange>(DATE_RANGES[1] ?? DATE_RANGES[0]!); // Default to last 30 days
   const [activeTab, setActiveTab] = useState('overview');
   const [refreshing, setRefreshing] = useState(false);
 
