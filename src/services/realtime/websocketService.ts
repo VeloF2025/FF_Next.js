@@ -159,11 +159,11 @@ class WebSocketService extends EventEmitter {
 
     if (message.type === 'event') {
       const event: RealtimeEvent = {
-        type: message.eventType,
-        entityType: message.entityType,
-        entityId: message.entityId,
-        data: message.data,
-        timestamp: new Date(message.timestamp)
+        type: message.eventType as EventType,
+        entityType: message.entityType as EntityType,
+        entityId: message.entityId as string,
+        data: message.data as Record<string, unknown> | undefined,
+        timestamp: new Date(message.timestamp as string)
       };
 
       this.emit('event', event);
@@ -305,7 +305,9 @@ class WebSocketService extends EventEmitter {
   private flushMessageQueue(): void {
     while (this.messageQueue.length > 0) {
       const message = this.messageQueue.shift();
-      this.send(message);
+      if (message !== undefined) {
+        this.send(message);
+      }
     }
   }
 

@@ -87,8 +87,10 @@ export class WorkflowTemplateService {
     `;
 
     const params = [dateFrom || '1900-01-01', dateTo || new Date().toISOString()];
-    const result = await workflowManagementService['client'].query(sql, params);
-    
+    type DbClient = { query: (sql: string, params: unknown[]) => Promise<{ rows: Array<{ analytics: WorkflowAnalytics }> }> };
+    const svc = workflowManagementService as unknown as Record<string, DbClient>;
+    const result = await svc['client']!.query(sql, params);
+
     return result.rows[0]?.analytics || {
       templateUsage: [],
       phaseMetrics: [],
@@ -307,7 +309,7 @@ export class WorkflowTemplateService {
         if (newPhaseId && phase.dependencies.length > 0) {
           const newDependencies = phase.dependencies
             .map(depId => phaseIdMap.get(depId))
-            .filter(Boolean);
+            .filter((d): d is string => d !== undefined);
 
           if (newDependencies.length > 0) {
             try {
@@ -327,7 +329,7 @@ export class WorkflowTemplateService {
         if (newStepId && step.dependencies.length > 0) {
           const newDependencies = step.dependencies
             .map(depId => stepIdMap.get(depId))
-            .filter(Boolean);
+            .filter((d): d is string => d !== undefined);
 
           if (newDependencies.length > 0) {
             try {
@@ -378,7 +380,7 @@ export class WorkflowTemplateService {
         ...newTemplate.metadata,
         previousVersion: template.version,
         versionHistory: [
-          ...(template.metadata?.versionHistory || []),
+          ...((template.metadata?.versionHistory as unknown[]) || []),
           {
             version: template.version,
             createdAt: template.updatedAt,
@@ -552,9 +554,9 @@ export class WorkflowTemplateService {
         avgStepsPerPhase: { template1: avgStepsPerPhase1, template2: avgStepsPerPhase2 },
         avgTasksPerStep: { template1: avgTasksPerStep1, template2: avgTasksPerStep2 },
         estimatedDuration: { template1: estimatedDuration1, template2: estimatedDuration2 },
-        complexity: { 
-          template1: template1.metadata?.complexity || 'unknown', 
-          template2: template2.metadata?.complexity || 'unknown' 
+        complexity: {
+          template1: (template1.metadata?.complexity as string | undefined) ?? 'unknown',
+          template2: (template2.metadata?.complexity as string | undefined) ?? 'unknown'
         },
         similarities,
         differences
