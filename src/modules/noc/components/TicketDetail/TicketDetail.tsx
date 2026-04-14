@@ -557,11 +557,11 @@ function BeforePhoto({ ticketId }: { ticketId: string }) {
         imageAttachments.push(...filtered);
       }
 
-      // Also pull after photos from verification steps (stored separately)
+      // Pull photos from verification steps — all verification photos are "after" evidence
       const verifySteps = Array.isArray(verifyData?.data) ? verifyData.data : [];
       if (verifyData?.success && verifySteps.length > 0) {
         for (const step of verifySteps as Array<{ id: string; step_name: string; photo_url: string | null }>) {
-          if (step.photo_url && /after/i.test(step.step_name)) {
+          if (step.photo_url) {
             // Only add if not already present (same URL)
             const alreadyPresent = imageAttachments.some(p => p.storage_url === step.photo_url);
             if (!alreadyPresent) {

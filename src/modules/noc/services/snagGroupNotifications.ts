@@ -84,19 +84,32 @@ async function fetchSnagBeforePhotoUrl(ticketId: string): Promise<string | null>
   }
 }
 
-/** Fetch all attachment photo URLs for a ticket, excluding the original before-photo */
+/** Fetch all after photo URLs for a ticket — from attachments and verification steps */
 async function fetchAfterPhotoUrls(ticketId: string): Promise<string[]> {
   try {
-    const rows = await sql`
-      SELECT storage_url
-      FROM maintenance_attachments
-      WHERE ticket_id = ${ticketId}::uuid
-        AND mime_type LIKE 'image/%'
-        AND storage_url IS NOT NULL
-        AND filename != 'snag-before-photo.jpg'
-      ORDER BY uploaded_at ASC
-    ` as Array<{ storage_url: string }>;
-    return rows.map(r => r.storage_url);
+    const [attachRows, stepRows] = await Promise.all([
+      sql`
+        SELECT storage_url
+        FROM maintenance_attachments
+        WHERE ticket_id = ${ticketId}::uuid
+          AND mime_type LIKE 'image/%'
+          AND storage_url IS NOT NULL
+          AND filename != 'snag-before-photo.jpg'
+        ORDER BY uploaded_at ASC
+      `,
+      sql`
+        SELECT photo_url AS storage_url
+        FROM maintenance_verification_steps
+        WHERE ticket_id = ${ticketId}::uuid
+          AND photo_url IS NOT NULL
+        ORDER BY step_number ASC
+      `,
+    ]) as [Array<{ storage_url: string }>, Array<{ storage_url: string }>];
+    const urls = new Set<string>();
+    for (const r of [...attachRows, ...stepRows]) {
+      if (r.storage_url) urls.add(r.storage_url);
+    }
+    return [...urls];
   } catch {
     return [];
   }
