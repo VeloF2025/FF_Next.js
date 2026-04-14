@@ -10,7 +10,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('FinalDecision');
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
 import {
@@ -96,7 +98,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     const userId = authReq.user?.id || 'system';
     const reviewerName = authReq.user?.name || 'unknown';
 
-    log.info('FinalDecision', `Recording decision ${decision} for ${dropNumber}`, {
+    log.info(`Recording decision ${decision} for ${dropNumber}`, {
       userId,
       hasNotes: !!notes,
       hasOverride: !!overrideReason,
@@ -147,7 +149,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         };
       });
     } catch (e) {
-      log.warn('FinalDecision', `Failed to parse photos for ${dropNumber}: ${e}`);
+      log.warn(`Failed to parse photos for ${dropNumber}: ${e}`);
     }
 
     // Build validation data
@@ -292,7 +294,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       review.onemap_ont_serial
     );
 
-    log.info('FinalDecision', `Decision ${decision} saved for ${dropNumber}`, {
+    log.info(`Decision ${decision} saved for ${dropNumber}`, {
       reasons,
       userId,
     });
@@ -319,32 +321,32 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
           userId || 'system'
         );
       } catch (activityError) {
-        log.warn('FinalDecision', `Failed to log activity for ${dropNumber}`, activityError);
+        log.warn(`Failed to log activity for ${dropNumber}`, { error: activityError });
       }
 
       // Trigger SharePoint sync on first QA completion (fire-and-forget)
       // This creates the folder hierarchy and syncs photos to SharePoint
       if (isSharePointDrSyncEnabled()) {
-        log.info('FinalDecision', `Triggering SharePoint sync for ${dropNumber}`);
+        log.info(`Triggering SharePoint sync for ${dropNumber}`);
         fullDrSync(dropNumber, 'qa_completion')
           .then(result => {
             if (result.folderResult.success) {
-              log.info('FinalDecision', `SharePoint folder created for ${dropNumber}`, {
+              log.info(`SharePoint folder created for ${dropNumber}`, {
                 folderPath: result.folderResult.folderPath,
                 photosUploaded: result.photoResult?.photosUploaded || 0,
               });
             } else {
-              log.warn('FinalDecision', `SharePoint sync failed for ${dropNumber}`, {
+              log.warn(`SharePoint sync failed for ${dropNumber}`, {
                 error: result.folderResult.error,
               });
             }
           })
           .catch(err => {
-            log.warn('FinalDecision', `SharePoint sync error for ${dropNumber}`, err);
+            log.warn(`SharePoint sync error for ${dropNumber}`, { error: err });
           });
       }
     } else {
-      log.info('FinalDecision', `Draft saved for ${dropNumber} - skipping activity log`);
+      log.info(`Draft saved for ${dropNumber} - skipping activity log`);
     }
 
     const response: FinalDecisionResponse = {
@@ -361,7 +363,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
     return apiResponse.success(res, response);
   } catch (error) {
-    log.error('FinalDecision', 'Error saving decision', error);
+    log.error('Error saving decision', { error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -459,7 +461,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       issueClassification: review.qa_issue_classification ? JSON.parse(review.qa_issue_classification) : null,
     });
   } catch (error) {
-    log.error('FinalDecision', 'Error getting decision', error);
+    log.error('Error getting decision', { error });
     return apiResponse.internalError(res, error);
   }
 }

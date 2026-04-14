@@ -9,7 +9,9 @@
  */
 
 import sharp from 'sharp';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('ImageCompressor');
 
 /**
  * Compression settings configurable via environment variables
@@ -44,7 +46,7 @@ export async function compressImage(
   _mimeType?: string
 ): Promise<Buffer> {
   if (!COMPRESSION_CONFIG.enabled) {
-    log.debug('ImageCompressor', 'Compression disabled, returning original image');
+    log.debug('Compression disabled, returning original image');
     return imageBuffer;
   }
 
@@ -59,7 +61,7 @@ export async function compressImage(
     const metadata = await pipeline.metadata();
     const { width, height } = metadata;
 
-    log.debug('ImageCompressor', `Original image: ${width}x${height}, ${Math.round(originalSize / 1024)}KB`);
+    log.debug(`Original image: ${width}x${height}, ${Math.round(originalSize / 1024)}KB`);
 
     // Only resize if image exceeds max dimensions
     if (width && height) {
@@ -75,9 +77,9 @@ export async function compressImage(
         };
 
         pipeline = pipeline.resize(resizeOptions);
-        log.debug('ImageCompressor', `Resizing to max ${COMPRESSION_CONFIG.maxWidth}x${COMPRESSION_CONFIG.maxHeight}`);
+        log.debug(`Resizing to max ${COMPRESSION_CONFIG.maxWidth}x${COMPRESSION_CONFIG.maxHeight}`);
       } else {
-        log.debug('ImageCompressor', 'Image within size limits, skipping resize');
+        log.debug('Image within size limits, skipping resize');
       }
     }
 
@@ -95,14 +97,14 @@ export async function compressImage(
     const compressionRatio = (1 - compressedSize / originalSize) * 100;
     const processingTime = Date.now() - startTime;
 
-    log.info('ImageCompressor',
+    log.info(
       `Compressed image: ${Math.round(originalSize / 1024)}KB → ${Math.round(compressedSize / 1024)}KB ` +
       `(${compressionRatio.toFixed(1)}% reduction) in ${processingTime}ms`
     );
 
     return compressedBuffer;
   } catch (error) {
-    log.error('ImageCompressor', `Failed to compress image: ${error}`);
+    log.error(`Failed to compress image: ${error}`);
     // Return original buffer if compression fails
     return imageBuffer;
   }
@@ -131,14 +133,14 @@ export async function fetchAndCompressImage(imageUrl: string): Promise<Buffer> {
     const buffer = Buffer.from(arrayBuffer);
 
     const fetchTime = Date.now() - fetchStart;
-    log.debug('ImageCompressor', `Fetched image from ${imageUrl} in ${fetchTime}ms`);
+    log.debug(`Fetched image from ${imageUrl} in ${fetchTime}ms`);
 
     // Compress the image
     const compressedBuffer = await compressImage(buffer, contentType || undefined);
 
     return compressedBuffer;
   } catch (error) {
-    log.error('ImageCompressor', `Failed to fetch/compress image ${imageUrl}: ${error}`);
+    log.error(`Failed to fetch/compress image ${imageUrl}: ${error}`);
     throw error;
   }
 }
@@ -152,16 +154,16 @@ export async function fetchAndCompressImage(imageUrl: string): Promise<Buffer> {
  */
 export async function batchCompressImages(imageUrls: string[]): Promise<Buffer[]> {
   const startTime = Date.now();
-  log.info('ImageCompressor', `Starting batch compression of ${imageUrls.length} images`);
+  log.info(`Starting batch compression of ${imageUrls.length} images`);
 
   // Process all images in parallel for maximum speed
   const compressionPromises = imageUrls.map(async (url, index) => {
     try {
       const buffer = await fetchAndCompressImage(url);
-      log.debug('ImageCompressor', `Image ${index + 1}/${imageUrls.length} compressed`);
+      log.debug(`Image ${index + 1}/${imageUrls.length} compressed`);
       return buffer;
     } catch (error) {
-      log.warn('ImageCompressor', `Failed to compress image ${index + 1}: ${error}`);
+      log.warn(`Failed to compress image ${index + 1}: ${error}`);
       // Return null for failed images (will be filtered out)
       return null;
     }
@@ -175,7 +177,7 @@ export async function batchCompressImages(imageUrls: string[]): Promise<Buffer[]
   const totalTime = Date.now() - startTime;
   const avgTimePerImage = Math.round(totalTime / imageUrls.length);
 
-  log.info('ImageCompressor',
+  log.info(
     `Batch compression complete: ${compressedImages.length}/${imageUrls.length} images in ${totalTime}ms ` +
     `(avg ${avgTimePerImage}ms per image)`
   );

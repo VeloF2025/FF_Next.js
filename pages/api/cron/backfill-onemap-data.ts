@@ -15,7 +15,9 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('BackfillOneMap');
 import { photoTypeToStep } from '@/modules/activate/utils/stepMapper';
 import { apiResponse } from '@/lib/apiResponse';
 
@@ -59,7 +61,7 @@ async function fetchAndUpdateFromOneMap(dropNumber: string): Promise<BackfillRes
 
     // If 404, try to trigger download
     if (response.status === 404 || response.status === 422) {
-      log.info('BackfillOneMap', `Record not found, triggering download for ${dropNumber}`);
+      log.info(`Record not found, triggering download for ${dropNumber}`);
 
       const downloadResponse = await fetch(`${ONEMAP_HOST}/api/download/${dropNumber}`, {
         method: 'POST',
@@ -87,7 +89,7 @@ async function fetchAndUpdateFromOneMap(dropNumber: string): Promise<BackfillRes
 
     // If record exists but no local photos, try downloading
     if (localPhotos.length === 0 && data.photo_count > 0) {
-      log.info('BackfillOneMap', `Photos on cloud but not local for ${dropNumber}, triggering download`);
+      log.info(`Photos on cloud but not local for ${dropNumber}, triggering download`);
 
       await fetch(`${ONEMAP_HOST}/api/download/${dropNumber}`, {
         method: 'POST',
@@ -143,7 +145,7 @@ async function fetchAndUpdateFromOneMap(dropNumber: string): Promise<BackfillRes
     result.ontSerial = ontSerial;
     result.upsSerial = upsSerial;
 
-    log.info('BackfillOneMap', `Updated ${dropNumber}`, {
+    log.info(`Updated ${dropNumber}`, {
       photoCount: photos.length,
       ontSerial,
       upsSerial,
@@ -152,7 +154,7 @@ async function fetchAndUpdateFromOneMap(dropNumber: string): Promise<BackfillRes
     return result;
   } catch (error) {
     result.error = error instanceof Error ? error.message : 'Unknown error';
-    log.error('BackfillOneMap', `Error processing ${dropNumber}`, { error: result.error });
+    log.error(`Error processing ${dropNumber}`, { error: result.error });
     return result;
   }
 }
@@ -196,18 +198,18 @@ export default async function handler(
   const cronSecret = process.env.CRON_SECRET;
 
   if (!cronSecret) {
-    log.error('BackfillOneMap', 'CRON_SECRET not configured');
-    return apiResponse.serverError(res, new Error('CRON_SECRET not configured'));
+    log.error('CRON_SECRET not configured');
+    return apiResponse.internalError(res, new Error('CRON_SECRET not configured'));
   }
   if (authHeader !== `Bearer ${cronSecret}`) {
-    log.error('BackfillOneMap', 'Unauthorized request');
+    log.error('Unauthorized request');
     return apiResponse.unauthorized(res);
   }
 
   const limit = Number(req.query.limit) || Number(req.body?.limit) || 20;
   const mode = (req.query.mode as string) || (req.body?.mode as string) || 'missing_photos';
 
-  log.info('BackfillOneMap', `Starting backfill job (limit: ${limit}, mode: ${mode})`);
+  log.info(`Starting backfill job (limit: ${limit}, mode: ${mode})`);
 
   try {
     // Find DRs that need backfill
@@ -259,7 +261,7 @@ export default async function handler(
     const pendingDRs = pendingResult.rows;
 
     if (pendingDRs.length === 0) {
-      log.info('BackfillOneMap', 'No DRs need backfill');
+      log.info('No DRs need backfill');
       return res.status(200).json({
         success: true,
         processed: 0,
@@ -270,7 +272,7 @@ export default async function handler(
       });
     }
 
-    log.info('BackfillOneMap', `Found ${pendingDRs.length} DRs to process`);
+    log.info(`Found ${pendingDRs.length} DRs to process`);
 
     const results: BackfillResult[] = [];
     let succeeded = 0;
@@ -291,7 +293,7 @@ export default async function handler(
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
-    log.info('BackfillOneMap', `Completed: ${succeeded}/${pendingDRs.length} succeeded`, {
+    log.info(`Completed: ${succeeded}/${pendingDRs.length} succeeded`, {
       failed,
       results: results.slice(0, 5), // Log first 5 for brevity
     });
@@ -305,7 +307,7 @@ export default async function handler(
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    log.error('BackfillOneMap', 'Fatal error during backfill', { error });
+    log.error('Fatal error during backfill', { error });
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to run backfill',
     });
