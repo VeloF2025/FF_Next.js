@@ -7,6 +7,7 @@ import {
   ClientFilter,
   ClientDropdownOption
 } from '@/types/client.types';
+import type { Client } from '@/types/client/core.types';
 import type { ClientSummary } from '@/types/client/summary.types';
 
 // Query Keys
@@ -49,9 +50,9 @@ export function useActiveClients() {
  * Hook to fetch a single client by ID
  */
 export function useClient(id: string) {
-  return useQuery({
+  return useQuery<Client | null>({
     queryKey: clientKeys.detail(id),
-    queryFn: () => clientService.getById(id),
+    queryFn: () => clientService.getById(id) as Promise<Client | null>,
     enabled: !!id,
   });
 }

@@ -8,7 +8,9 @@
  * NLNH Confidence: HIGH
  */
 
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('FleetVlmService');
 import sharp from 'sharp';
 import { neon } from '@/lib/db-neon';
 import { VlmAnalysisType } from '../types/check-in.types';
@@ -65,14 +67,12 @@ export async function resizeImageForVlm(base64Image: string): Promise<string> {
 
     if (!needsResize && !needsConvert) {
       log.info(
-        'FleetVlmService',
         `Image ${width}x${height} JPEG already within limits, skipping`
       );
       return base64Image;
     }
 
     log.info(
-      'FleetVlmService',
       `Processing image ${width}x${height} ${format} (resize: ${needsResize}, convert: ${needsConvert})`
     );
 
@@ -92,13 +92,12 @@ export async function resizeImageForVlm(base64Image: string): Promise<string> {
     const originalSize = Math.round(inputBuffer.length / 1024);
     const outputSize = Math.round(outputBuffer.length / 1024);
     log.info(
-      'FleetVlmService',
       `Image processed: ${originalSize}KB -> ${outputSize}KB (${format} -> jpeg)`
     );
 
     return outputBase64;
   } catch (error) {
-    log.error('FleetVlmService', `Image processing failed: ${error}`);
+    log.error(`Image processing failed: ${error}`);
     throw new FleetVlmError(
       `Failed to process image for VLM: ${error instanceof Error ? error.message : 'Unknown error'}`,
       'IMAGE_PROCESSING_ERROR',
@@ -170,7 +169,6 @@ export async function callVlmApi(
     const processingTime = Date.now() - startTime;
 
     log.info(
-      'FleetVlmService',
       `${analysisType} VLM call completed in ${processingTime}ms`
     );
 
@@ -213,7 +211,7 @@ export function parseVlmJson<T>(content: string): T {
   try {
     return JSON.parse(jsonStr);
   } catch {
-    log.error('FleetVlmService', `Failed to parse VLM JSON: ${content}`);
+    log.error(`Failed to parse VLM JSON: ${content}`);
     throw new FleetVlmError('Invalid JSON in VLM response', 'PARSE_ERROR');
   }
 }
@@ -270,7 +268,7 @@ export async function getVehicleCalibration(
       vlmLearningStatus: row.vlm_learning_status || 'pending',
     };
   } catch (error) {
-    log.error('FleetVlmService', `Failed to fetch calibration: ${error}`);
+    log.error(`Failed to fetch calibration: ${error}`);
     return null;
   }
 }
@@ -295,7 +293,6 @@ export async function fetchCalibrationPhotoBase64(
 
     if (!response.ok) {
       log.warn(
-        'FleetVlmService',
         `Failed to fetch calibration photo: ${response.status}`
       );
       return null;
@@ -304,7 +301,7 @@ export async function fetchCalibrationPhotoBase64(
     const buffer = Buffer.from(await response.arrayBuffer());
     return buffer.toString('base64');
   } catch (error) {
-    log.error('FleetVlmService', `Error fetching calibration photo: ${error}`);
+    log.error(`Error fetching calibration photo: ${error}`);
     return null;
   }
 }
@@ -324,12 +321,10 @@ export async function updateCalibrationLearningStatus(
       WHERE id = ${calibrationId}
     `;
     log.info(
-      'FleetVlmService',
       `Updated calibration ${calibrationId} learning status to ${status}`
     );
   } catch (error) {
     log.error(
-      'FleetVlmService',
       `Failed to update calibration status: ${error}`
     );
   }
@@ -361,12 +356,12 @@ export async function checkFleetVlmHealth(): Promise<boolean> {
     );
 
     if (!hasModel) {
-      log.warn('FleetVlmService', `${VLM_FLEET_MODEL} model not found in vLLM`);
+      log.warn(`${VLM_FLEET_MODEL} model not found in vLLM`);
     }
 
     return hasModel;
   } catch (error) {
-    log.error('FleetVlmService', `VLM health check failed: ${error}`);
+    log.error(`VLM health check failed: ${error}`);
     return false;
   }
 }
