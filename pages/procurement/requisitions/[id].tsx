@@ -806,9 +806,9 @@ export default function RequisitionDetailPage() {
                     onChange={(e) => setConvertForm({ ...convertForm, supplierId: e.target.value })}
                     className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                   >
-                    <option value="">Select supplier...</option>
+                    <option value="" className="bg-[#1e1e2e] text-white">Select supplier...</option>
                     {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>
+                      <option key={s.id} value={s.id} className="bg-[#1e1e2e] text-white">
                         {s.companyName}
                       </option>
                     ))}
@@ -849,13 +849,13 @@ export default function RequisitionDetailPage() {
                       onChange={(e) => setConvertForm({ ...convertForm, paymentTerms: e.target.value })}
                       className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                     >
-                      <option value="COD">COD</option>
-                      <option value="Net 7">Net 7</option>
-                      <option value="Net 14">Net 14</option>
-                      <option value="Net 30">Net 30</option>
-                      <option value="Net 45">Net 45</option>
-                      <option value="Net 60">Net 60</option>
-                      <option value="Prepaid">Prepaid</option>
+                      <option value="COD" className="bg-[#1e1e2e] text-white">COD</option>
+                      <option value="Net 7" className="bg-[#1e1e2e] text-white">Net 7</option>
+                      <option value="Net 14" className="bg-[#1e1e2e] text-white">Net 14</option>
+                      <option value="Net 30" className="bg-[#1e1e2e] text-white">Net 30</option>
+                      <option value="Net 45" className="bg-[#1e1e2e] text-white">Net 45</option>
+                      <option value="Net 60" className="bg-[#1e1e2e] text-white">Net 60</option>
+                      <option value="Prepaid" className="bg-[#1e1e2e] text-white">Prepaid</option>
                     </select>
                   </div>
                 </div>
