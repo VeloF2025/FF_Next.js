@@ -306,19 +306,22 @@ export async function notifySnagGroupOnStatusChange(
 
     const isResolution = newStatus === 'resolved' || newStatus === 'closed';
 
-    // For resolution/closure, fetch technician notes and after photos
-    const [resolutionNote, afterPhotoUrls, shareUrl] = isResolution
-      ? await Promise.all([fetchResolutionNote(ticket.id), fetchAfterPhotoUrls(ticket.id), getOrCreateShareUrl(ticket.id)])
-      : [null, [] as string[], await getOrCreateShareUrl(ticket.id)];
+    // Fetch context in parallel:
+    // - Resolution: technician notes + after photos
+    // - Other statuses: before photo (so the group always sees what the snag looks like)
+    const [resolutionNote, afterPhotoUrls, beforePhotoUrl, shareUrl] = await Promise.all([
+      isResolution ? fetchResolutionNote(ticket.id) : Promise.resolve(null),
+      isResolution ? fetchAfterPhotoUrls(ticket.id) : Promise.resolve([] as string[]),
+      !isResolution ? fetchSnagBeforePhotoUrl(ticket.id) : Promise.resolve(null),
+      getOrCreateShareUrl(ticket.id),
+    ]);
 
     const message = buildStatusUpdateMessage(ticket, oldStatus, newStatus, resolutionNote, shareUrl);
 
-    // Send with after photos for resolved/closed
+    // Resolution/closure: send with after photos
     if (afterPhotoUrls && afterPhotoUrls.length > 0 && isResolution) {
       try {
-        // First photo gets the full message caption
         await sendWhatsAppGroupImage(groupJid, message, afterPhotoUrls[0]);
-        // Additional photos sent with short caption
         for (let i = 1; i < afterPhotoUrls.length; i++) {
           await sendWhatsAppGroupImage(
             groupJid,
@@ -332,6 +335,21 @@ export async function notifySnagGroupOnStatusChange(
         return;
       } catch (imgErr) {
         logger.warn('After photo send failed, falling back to text', {
+          ticketId: ticket.id, error: imgErr instanceof Error ? imgErr.message : String(imgErr),
+        });
+      }
+    }
+
+    // Non-resolution statuses: send with before photo so the group sees the snag
+    if (beforePhotoUrl && !isResolution) {
+      try {
+        await sendWhatsAppGroupImage(groupJid, message, beforePhotoUrl);
+        logger.info('Snag ticket status update with before photo sent to WA group', {
+          ticketId: ticket.id, ticketUid: ticket.ticket_uid, oldStatus, newStatus, groupJid,
+        });
+        return;
+      } catch (imgErr) {
+        logger.warn('Before photo send failed, falling back to text', {
           ticketId: ticket.id, error: imgErr instanceof Error ? imgErr.message : String(imgErr),
         });
       }
