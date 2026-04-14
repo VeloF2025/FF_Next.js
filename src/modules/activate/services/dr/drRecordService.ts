@@ -15,7 +15,9 @@
  */
 
 import pool from '@/lib/db';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('DrRecordService');
 import type { ContactData, RecordResolutionResult } from './drProcessTypes';
 import { createSubmissionSnapshot, flattenContact } from './drRecordHelpers';
 import { insertFromQARecord, insertNewRecord } from './drRecordInserts';
@@ -88,10 +90,7 @@ export async function resolveSenderPhone(
   );
 
   if (waDropResult.rows[0]?.sender_phone) {
-    log.info(
-      'DrRecordService',
-      `Resolved sender_phone from wa_monitor_drops for ${dropNumber}: ${waDropResult.rows[0].sender_phone}`
-    );
+    log.info(`Resolved sender_phone from wa_monitor_drops for ${dropNumber}: ${waDropResult.rows[0].sender_phone}`);
     return waDropResult.rows[0].sender_phone;
   }
 
@@ -183,7 +182,7 @@ export async function resolveUnifiedRecord(params: {
   }
 
   await insertNewRecord({ dropNumber, submittedDateStr, project, senderPhone, wa, contact });
-  log.info('DrRecordService', `Created/updated record for ${dropNumber}`, {
+  log.info(`Created/updated record for ${dropNumber}`, {
     hasWaContext: !!(wa.waMessageId && wa.waSenderJid),
     hasContactInfo: !!(contact.subscriberContact || contact.qContactInfo),
   });
@@ -209,11 +208,9 @@ async function handleExistingUnified(p: {
 
   // Idempotency guard: < 60 s → not a real resubmission
   if (ageSeconds < 60) {
-    log.info(
-      'DrRecordService',
-      `Idempotency guard: ${dropNumber} unified record is only ${ageSeconds.toFixed(1)}s old`,
-      { submissionCount: record.submission_count, createdAt: record.created_at }
-    );
+    log.info(`Idempotency guard: ${dropNumber} unified record is only ${ageSeconds.toFixed(1)}s old`, {
+      submissionCount: record.submission_count, createdAt: record.created_at,
+    });
     await updateUnifiedRecordNonDestructive(
       dropNumber, submittedDateStr, project ?? expectedProject ?? null, senderPhone, wa, contact
     );
@@ -222,7 +219,7 @@ async function handleExistingUnified(p: {
 
   // First real WA submission on a pre-existing (OES/ack-created) record
   if (!record.wa_message_id && !record.wa_received_at) {
-    log.info('DrRecordService', `First WA submission for pre-existing record ${dropNumber}`, {
+    log.info(`First WA submission for pre-existing record ${dropNumber}`, {
       ageSeconds: ageSeconds.toFixed(1),
       createdBy: record.onemap_status ? 'dr-acknowledgment' : 'oes-import',
       submissionCount: record.submission_count,
@@ -277,7 +274,7 @@ async function handleExistingUnified(p: {
     ]
   );
 
-  log.info('DrRecordService', `Resubmission detected for ${dropNumber}`, {
+  log.info(`Resubmission detected for ${dropNumber}`, {
     submissionCount,
     previousPhotoCount: previousSubmission.photo_count,
     hadFeedback: previousSubmission.feedback_sent,

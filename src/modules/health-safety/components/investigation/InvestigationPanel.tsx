@@ -17,7 +17,9 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('InvestigationPanel');
 import { FiveWhysForm, type WhyEntry } from './FiveWhysForm';
 import { CAPA_SEVERITY_CONFIG, type CAPASeverity, type CAPA } from '@/modules/health-safety/types/capa.types';
 
@@ -78,7 +80,7 @@ export function InvestigationPanel({ ticketId, onComplete }: InvestigationPanelP
     fetch('/api/users?limit=200', { credentials: 'include' })
       .then((r) => r.json())
       .then((d) => setUsers(d.data || d.users || []))
-      .catch((err) => log.error('Failed to load users', err as Error));
+      .catch((err) => log.error('Failed to load users', { error: err }));
   }, []);
 
   // Hydrate from existing data
@@ -111,7 +113,7 @@ export function InvestigationPanel({ ticketId, onComplete }: InvestigationPanelP
       mutate();
       setStep(1);
     } catch (err) {
-      log.error('Failed to assign investigator', err as Error);
+      log.error('Failed to assign investigator', { error: err });
     } finally {
       setSaving(false);
     }
@@ -138,7 +140,7 @@ export function InvestigationPanel({ ticketId, onComplete }: InvestigationPanelP
       mutate();
       if (complete) onComplete?.();
     } catch (err) {
-      log.error('Failed to save investigation', err as Error);
+      log.error('Failed to save investigation', { error: err });
     } finally {
       setSaving(false);
     }
@@ -151,7 +153,7 @@ export function InvestigationPanel({ ticketId, onComplete }: InvestigationPanelP
       title: '',
       description: '',
       severity: 'medium',
-      due_date: d.toISOString().split('T')[0],
+      due_date: d.toISOString().split('T')[0] ?? '',
     }]);
   };
 

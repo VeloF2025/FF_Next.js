@@ -10,7 +10,7 @@
  */
 
 import { log } from '@/lib/logger';
-import type { ResolutionReportRow } from '@/pages/api/snags/resolution-report';
+import type { ResolutionReportRow } from '@/modules/construction-qa/types/snag.types';
 
 // ─── Colour palette ───────────────────────────────────────────────────────────
 const B = {

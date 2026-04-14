@@ -353,3 +353,43 @@ export interface SnagReportListResponse {
   page: number;
   pageSize: number;
 }
+
+// ── Resolution Report types (shared between API + PDF util) ──────────────────
+
+export interface ResolutionPhoto {
+  id: string;
+  phase: string;            // 'before' | 'after' | 'during'
+  photo_url: string;
+  thumbnail_url: string | null;
+}
+
+export interface ResolutionNote {
+  content: string;
+  note_type: string;
+  created_by_name: string | null;
+  created_at: string;
+}
+
+export interface ResolutionReportRow {
+  id: string;
+  project_id: string;
+  project_name: string;
+  report_number: string;
+  audit_date: string;
+  description: string;
+  pole_reference: string | null;
+  zone_no: number | null;
+  pon_no: number | null;
+  category: string;
+  severity: string;
+  status: string;
+  snag_number: number;
+  opened_date: string;
+  resolved_date: string | null;
+  assigned_to_name: string | null;
+  noc_ticket_uid: string | null;
+  noc_ticket_id: string | null;
+  verification_notes: string | null;
+  photos: ResolutionPhoto[];
+  notes: ResolutionNote[];
+}
