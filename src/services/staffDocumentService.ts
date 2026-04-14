@@ -8,6 +8,8 @@ import type {
   StaffDocument,
   StaffDocumentUpdate,
   ComplianceStatus,
+  DocumentType,
+  VerificationStatus,
 } from '@/types/staff-document.types';
 
 const logger = createLogger('StaffDocumentService');

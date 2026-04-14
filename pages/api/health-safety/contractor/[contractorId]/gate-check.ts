@@ -25,7 +25,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   if (req.method !== 'GET') {
-    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 
   try {
@@ -51,17 +51,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         status: contractor.status,
       },
       gate: {
-        passed: gateResult.passed,
-        overall_score: gateResult.score,
-        rag_status: gateResult.ragStatus,
-        blocking_reasons: gateResult.blockingReasons,
-        expires_at: gateResult.expiresAt,
+        passed: gateResult.can_assign,
+        overall_score: gateResult.overall_score,
+        rag_status: gateResult.rag_status,
+        blocking_reasons: gateResult.blockers,
       },
       breakdown,
-      can_assign_to_projects: gateResult.passed,
-      message: gateResult.passed
+      can_assign_to_projects: gateResult.can_assign,
+      message: gateResult.can_assign
         ? 'Contractor meets all H&S requirements and can be assigned to projects'
-        : `Contractor cannot be assigned to projects: ${gateResult.blockingReasons.join(', ')}`,
+        : `Contractor cannot be assigned to projects: ${gateResult.blockers.join(', ')}`,
     });
   } catch (error) {
     log.error('[H&S Gate Check API] Error', { error });

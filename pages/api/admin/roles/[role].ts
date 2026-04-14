@@ -5,12 +5,14 @@
  * DELETE /api/admin/roles/[role] - Delete a custom role
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import { getRolePermissions, updateRolePermission } from '@/lib/permissions';
 import { apiResponse } from '@/lib/apiResponse';
-import log from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('RolesAPI');
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -35,19 +37,21 @@ async function handler(
     return apiResponse.notFound(res, 'Role', role);
   }
 
+  const roleRecord = roleData[0] as unknown as RoleRecord;
+
   if (req.method === 'GET') {
-    return handleGet(req, res, role, roleData[0]);
+    return handleGet(req, res, role, roleRecord);
   }
 
   if (req.method === 'PATCH') {
-    return handlePatch(req, res, role, roleData[0]);
+    return handlePatch(req, res, role, roleRecord);
   }
 
   if (req.method === 'DELETE') {
-    return handleDelete(req, res, role, roleData[0]);
+    return handleDelete(req, res, role, roleRecord);
   }
 
-  return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+  return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PATCH', 'DELETE']);
 }
 
 interface RoleRecord {
@@ -87,7 +91,7 @@ async function handleGet(
       userCount,
     });
   } catch (error) {
-    log.error({ error, role }, 'Error fetching role');
+    log.error('Error fetching role', { error, role });
     return apiResponse.internalError(res, error);
   }
 }
@@ -169,7 +173,7 @@ async function handlePatch(
       actions,
     });
   } catch (error) {
-    log.error({ error, role }, 'Error updating role');
+    log.error('Error updating role', { error, role });
     return apiResponse.internalError(res, error);
   }
 }
@@ -218,15 +222,15 @@ async function handleDelete(
       )
     `;
 
-    log.info({ roleId: roleRecord.id, role }, 'Custom role deleted');
+    log.info('Custom role deleted', { roleId: roleRecord.id, role });
 
     return apiResponse.success(res, {
       message: `Role "${role}" deleted successfully`,
     });
   } catch (error) {
-    log.error({ error, role }, 'Error deleting role');
+    log.error('Error deleting role', { error, role });
     return apiResponse.internalError(res, error);
   }
 }
 
-export default withAuth(withRole('admin')(handler));
+export default withAuth(withRole('admin')(handler as (req: NextApiRequest, res: NextApiResponse) => Promise<void>));
