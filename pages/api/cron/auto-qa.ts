@@ -28,25 +28,25 @@ export default async function handler(
   const cronSecret = process.env.CRON_SECRET;
 
   if (!cronSecret) {
-    log.error('AutoQaCron', 'CRON_SECRET environment variable not configured');
+    log.error('CRON_SECRET environment variable not configured', undefined, 'AutoQaCron');
     return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Server misconfigured: CRON_SECRET not set');
   }
 
   const authHeader = req.headers.authorization;
   if (authHeader !== `Bearer ${cronSecret}`) {
-    log.error('AutoQaCron', 'Unauthorized request');
+    log.error('Unauthorized request', undefined, 'AutoQaCron');
     return apiResponse.unauthorized(res, 'Invalid or missing cron secret');
   }
 
   const limit = Number(req.query.limit) || Number(req.body?.limit) || 10;
 
-  log.info('AutoQaCron', `Starting auto-QA processing (limit: ${limit})`);
+  log.info(`Starting auto-QA processing (limit: ${limit})`, undefined, 'AutoQaCron');
 
   try {
     const eligibleDRs = await findEligibleDRs(limit);
 
     if (eligibleDRs.length === 0) {
-      log.info('AutoQaCron', 'No DRs eligible for auto-QA');
+      log.info('No DRs eligible for auto-QA', undefined, 'AutoQaCron');
       return apiResponse.success(res, {
         processed: 0,
         succeeded: 0,
@@ -57,7 +57,7 @@ export default async function handler(
       });
     }
 
-    log.info('AutoQaCron', `Found ${eligibleDRs.length} eligible DRs`);
+    log.info(`Found ${eligibleDRs.length} eligible DRs`, undefined, 'AutoQaCron');
 
     const results: AutoQaProcessResult[] = [];
     let succeeded = 0;
@@ -78,7 +78,7 @@ export default async function handler(
       }
     }
 
-    log.info('AutoQaCron', `Completed: ${succeeded} succeeded, ${skipped} skipped, ${failed} failed`);
+    log.info(`Completed: ${succeeded} succeeded, ${skipped} skipped, ${failed} failed`, undefined, 'AutoQaCron');
 
     return apiResponse.success(res, {
       processed: eligibleDRs.length,
@@ -89,7 +89,7 @@ export default async function handler(
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    log.error('AutoQaCron', `Fatal error: ${error instanceof Error ? error.message : String(error)}`);
+    log.error(`Fatal error: ${error instanceof Error ? error.message : String(error)}`, undefined, 'AutoQaCron');
     return apiResponse.internalError(res, error);
   }
 }

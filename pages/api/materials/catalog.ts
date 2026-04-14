@@ -43,7 +43,7 @@ async function handler(
 async function handleGet(
   req: NextApiRequest,
   res: NextApiResponse,
-  sql: ReturnType<typeof neon>
+  sql: ReturnType<typeof neon<false, false>>
 ) {
   try {
     const {
@@ -94,16 +94,17 @@ async function handleGet(
 
     // Validate sort column
     const validSortColumns = ['item_code', 'description', 'category', 'created_at', 'budget_category'];
-    const sortColumn = sortBy === 'itemCode' ? 'item_code' :
-      sortBy === 'createdAt' ? 'created_at' :
-      sortBy === 'budgetCategory' ? 'budget_category' :
-      validSortColumns.includes(sortBy as string) ? sortBy : 'item_code';
+    const sortByStr = sortBy as string;
+    const sortColumn = sortByStr === 'itemCode' ? 'item_code' :
+      sortByStr === 'createdAt' ? 'created_at' :
+      sortByStr === 'budgetCategory' ? 'budget_category' :
+      validSortColumns.includes(sortByStr) ? sortByStr : 'item_code';
     const sortDir = sortOrder === 'desc' ? 'DESC' : 'ASC';
 
     // Get total count
     const countQuery = `SELECT COUNT(*) as total FROM material_catalog ${whereClause}`;
-    const countResult = await sql.unsafe(countQuery, params);
-    const total = parseInt(countResult[0].total, 10);
+    const countResult = await sql.query(countQuery, params) as unknown as { total: string }[];
+    const total = parseInt(countResult[0]?.total ?? '0', 10);
 
     // Get materials
     const dataQuery = `
@@ -117,7 +118,7 @@ async function handleGet(
     `;
     params.push(limitNum, offsetNum);
 
-    const materials = await sql.unsafe(dataQuery, params);
+    const materials = await sql.query(dataQuery, params) as unknown as Record<string, unknown>[];
 
     const mappedMaterials: MaterialCatalog[] = materials.map(mapRowToMaterial);
 
@@ -127,7 +128,7 @@ async function handleGet(
       total,
     });
   } catch (error) {
-    log.error('materials-catalog', { error: error instanceof Error ? error.message : String(error) });
+    log.error('Failed to fetch materials', { error: error instanceof Error ? error.message : String(error) }, 'materials-catalog');
     return apiResponse.databaseError(res, error, 'Failed to fetch materials');
   }
 }
@@ -139,7 +140,7 @@ async function handleGet(
 async function handlePost(
   req: NextApiRequest,
   res: NextApiResponse,
-  sql: ReturnType<typeof neon>
+  sql: ReturnType<typeof neon<false, false>>
 ) {
   try {
     const body = req.body as CreateMaterialRequest;

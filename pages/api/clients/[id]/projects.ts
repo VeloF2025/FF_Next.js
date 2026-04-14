@@ -106,25 +106,23 @@ async function handler(
           ELSE 5 
         END,
         p.updated_at DESC
-    `;
+    ` as unknown as ClientProject[];
 
     // Calculate summary
     const summary: ClientProjectsSummary = {
       totalProjects: projects.length,
-      activeProjects: projects.filter((p: any) => p.status === 'active').length,
-      completedProjects: projects.filter((p: any) => p.status === 'completed').length,
-      totalValue: projects.reduce((sum: number, p: any) => sum + Number(p.budget || 0), 0),
-      totalPoValue: projects.reduce((sum: number, p: any) => sum + Number(p.totalPoValue || 0), 0),
-      pendingPoValue: projects.reduce((sum: number, p: any) => sum + Number(p.pendingPoValue || 0), 0),
+      activeProjects: projects.filter((p) => p.status === 'active').length,
+      completedProjects: projects.filter((p) => p.status === 'completed').length,
+      totalValue: projects.reduce((sum: number, p) => sum + Number(p.budget || 0), 0),
+      totalPoValue: projects.reduce((sum: number, p) => sum + Number(p.totalPoValue || 0), 0),
+      pendingPoValue: projects.reduce((sum: number, p) => sum + Number(p.pendingPoValue || 0), 0),
       outstandingBalance: 0, // Would need invoices data to calculate
     };
 
     // Note: outstanding_balance would need invoices/payments tables to calculate
     // For now, we leave it at 0 as set above
 
-    log.info('Fetched client projects', { 
-      data: { id, projectCount: projects.length } 
-    }, 'ClientProjectsAPI');
+    log.info('Fetched client projects', { id, projectCount: projects.length }, 'ClientProjectsAPI');
 
     return res.status(200).json({
       success: true,
@@ -135,9 +133,7 @@ async function handler(
     });
 
   } catch (error) {
-    log.error('Failed to fetch client projects', { 
-      data: { id, error: error instanceof Error ? error.message : 'Unknown error' } 
-    }, 'ClientProjectsAPI');
+    log.error('Failed to fetch client projects', { id, error: error instanceof Error ? error.message : 'Unknown error' }, 'ClientProjectsAPI');
 
     return res.status(500).json({
       error: 'Failed to fetch client projects',
