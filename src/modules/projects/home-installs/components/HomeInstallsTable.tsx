@@ -1,7 +1,7 @@
 import React from 'react';
 import { ChevronDown, ChevronRight, Eye, Edit, MapPin, Phone, Clock, User, Package } from 'lucide-react';
 import { HomeInstall } from '../types/home-install.types';
-import { cn } from '@/src/utils/cn';
+import { cn } from '@/utils/cn';
 import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface HomeInstallsTableProps {

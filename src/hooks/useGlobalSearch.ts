@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useDebounce } from './useDebounce';
 import { log } from '@/lib/logger';
 
 export interface SearchResult {

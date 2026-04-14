@@ -1,7 +1,4 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-ignore — firebase not in project dependencies
 import { collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, Timestamp, Unsubscribe } from 'firebase/firestore';
-// @ts-ignore — firebase config not available
 import { db } from '@/config/firebase';
 import { log } from '@/lib/logger';
 import { 

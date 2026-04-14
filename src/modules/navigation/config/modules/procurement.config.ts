@@ -18,7 +18,7 @@ import {
   DollarSign,
   CheckCircle,
 } from 'lucide-react';
-import type { ModuleNavigationConfig } from '../types';
+import type { ModuleNavigationConfig } from '../../types';
 
 export const procurementConfig: ModuleNavigationConfig = {
   moduleId: 'procurement',

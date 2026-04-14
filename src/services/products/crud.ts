@@ -3,9 +3,7 @@
  * Core create, read, update, delete operations for products
  */
 
-// @ts-expect-error — firebase not installed
 import { collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy, Timestamp } from 'firebase/firestore';
-// @ts-expect-error — firebase config
 import { db } from '@/config/firebase';
 import { Product, ProductFormData, ProductFilter } from './types';
 import { log } from '@/lib/logger';

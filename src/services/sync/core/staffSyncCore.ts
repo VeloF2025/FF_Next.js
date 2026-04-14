@@ -4,9 +4,7 @@
  */
 
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-ignore — firebase not in project dependencies
 import { collection, getDocs } from 'firebase/firestore';
-// @ts-ignore — firebase config not available
 import { db } from '@/config/firebase';
 import { neonDb } from '@/lib/neon/connection';
 // @ts-ignore — table not yet defined in schema

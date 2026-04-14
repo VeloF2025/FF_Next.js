@@ -6,7 +6,7 @@ import { useClientSelection } from '@/hooks/useClients';
 import { useProjectManagerSelection } from '@/hooks/useStaff';
 import { ProjectFormData, ProjectStatus, ProjectType, Priority } from '@/types/project.types';
 import { SOWUploadWizard } from '@/components/sow/SOWUploadWizard';
-import { safeToISOString } from '@/src/utils/dateHelpers';
+import { safeToISOString } from '@/utils/dateHelpers';
 
 // Import form sections
 import { ProjectBasicInfo } from './forms/ProjectBasicInfo';

@@ -3,10 +3,7 @@
  * Handles database queries for project access information
  */
 
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-ignore — firebase config not available
 import { db as firestoreDb } from '@/config/firebase';
-// @ts-ignore — firebase not in project dependencies
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { UserProjectAccess, ProjectInfo } from './types';
 import { ProjectAccessValidator } from './validator';
