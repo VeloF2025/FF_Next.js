@@ -7,6 +7,7 @@
  * Lookup: projects.project_name → wa_group_config.project_name → group_jid
  */
 
+import crypto from 'crypto';
 import { neon } from '@neondatabase/serverless';
 import { createLogger } from '@/lib/logger';
 import { sendWhatsAppGroup, sendWhatsAppGroupImage } from '@/modules/notifications/services/whatsappDelivery';
@@ -133,13 +134,46 @@ async function fetchSnagDescription(ticketId: string): Promise<string | null> {
 }
 
 // =============================================================================
+// Share Link
+// =============================================================================
+
+/** Get or create a share token for a ticket so technicians can access it without auth */
+async function getOrCreateShareUrl(ticketId: string): Promise<string | null> {
+  try {
+    const existing = await sql`
+      SELECT token FROM snag_share_tokens
+      WHERE ticket_id = ${ticketId}::uuid AND is_active = true
+      LIMIT 1
+    ` as Array<{ token: string }>;
+
+    if (existing[0]) {
+      return `${APP_URL}/snag/resolve/${existing[0].token}`;
+    }
+
+    const token = crypto.randomBytes(24).toString('hex');
+    await sql`
+      INSERT INTO snag_share_tokens (token, ticket_id, created_by)
+      VALUES (${token}, ${ticketId}::uuid, NULL)
+    `;
+    return `${APP_URL}/snag/resolve/${token}`;
+  } catch (err) {
+    logger.warn('Failed to create share token for WA message', {
+      ticketId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
+// =============================================================================
 // Message Builders
 // =============================================================================
 
 function buildTicketCreatedMessage(
   ticket: Ticket,
   assigneeName: string,
-  snagDescription?: string | null
+  snagDescription?: string | null,
+  shareUrl?: string | null
 ): string {
   const lines = [
     `🔧 *New Snag Ticket Created*`,
@@ -156,15 +190,17 @@ function buildTicketCreatedMessage(
     `Assigned to: ${assigneeName}`,
   );
   if (ticket.dr_number) lines.push(`DR: ${ticket.dr_number}`);
-  lines.push('', `${APP_URL}/noc/tickets/${ticket.id}`);
+  lines.push('', `📋 Ticket: ${APP_URL}/noc/tickets/${ticket.id}`);
+  if (shareUrl) lines.push(`🔗 Technician link: ${shareUrl}`);
   return lines.join('\n');
 }
 
 function buildStatusUpdateMessage(
   ticket: Ticket,
-  oldStatus: string,
+  _oldStatus: string,
   newStatus: string,
-  resolutionNote?: string | null
+  resolutionNote?: string | null,
+  shareUrl?: string | null
 ): string {
   const statusLabel = newStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   const emoji = STATUS_EMOJI[newStatus] || '📋';
@@ -179,7 +215,8 @@ function buildStatusUpdateMessage(
     lines.push('', `🔧 *Technician notes:*`, resolutionNote);
   }
   if (ticket.dr_number) lines.push(`DR: ${ticket.dr_number}`);
-  lines.push('', `${APP_URL}/noc/tickets/${ticket.id}`);
+  lines.push('', `📋 Ticket: ${APP_URL}/noc/tickets/${ticket.id}`);
+  if (shareUrl) lines.push(`🔗 Technician link: ${shareUrl}`);
   return lines.join('\n');
 }
 
@@ -215,13 +252,14 @@ export async function notifySnagGroupOnCreate(ticket: Ticket): Promise<void> {
       return;
     }
 
-    const [assigneeName, snagDescription, beforePhotoUrl] = await Promise.all([
+    const [assigneeName, snagDescription, beforePhotoUrl, shareUrl] = await Promise.all([
       ticket.assigned_to ? resolveAssigneeName(ticket.assigned_to) : Promise.resolve('Unassigned'),
       fetchSnagDescription(ticket.id),
       fetchSnagBeforePhotoUrl(ticket.id),
+      getOrCreateShareUrl(ticket.id),
     ]);
 
-    const message = buildTicketCreatedMessage(ticket, assigneeName, snagDescription);
+    const message = buildTicketCreatedMessage(ticket, assigneeName, snagDescription, shareUrl);
 
     // Send with photo if available, fallback to text-only
     if (beforePhotoUrl) {
@@ -269,11 +307,11 @@ export async function notifySnagGroupOnStatusChange(
     const isResolution = newStatus === 'resolved' || newStatus === 'closed';
 
     // For resolution/closure, fetch technician notes and after photos
-    const [resolutionNote, afterPhotoUrls] = isResolution
-      ? await Promise.all([fetchResolutionNote(ticket.id), fetchAfterPhotoUrls(ticket.id)])
-      : [null, [] as string[]];
+    const [resolutionNote, afterPhotoUrls, shareUrl] = isResolution
+      ? await Promise.all([fetchResolutionNote(ticket.id), fetchAfterPhotoUrls(ticket.id), getOrCreateShareUrl(ticket.id)])
+      : [null, [] as string[], await getOrCreateShareUrl(ticket.id)];
 
-    const message = buildStatusUpdateMessage(ticket, oldStatus, newStatus, resolutionNote);
+    const message = buildStatusUpdateMessage(ticket, oldStatus, newStatus, resolutionNote, shareUrl);
 
     // Send with after photos for resolved/closed
     if (afterPhotoUrls && afterPhotoUrls.length > 0 && isResolution) {
