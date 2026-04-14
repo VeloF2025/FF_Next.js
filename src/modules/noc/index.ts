@@ -40,7 +40,10 @@
 // Background jobs will be exported from jobs/index.ts
 
 // Re-export everything from sub-modules
-export * from './types';
+// NOTE: './types' is intentionally NOT star-exported here because several
+// sub-modules (components, utils, constants) define identically-named symbols
+// that would cause TS2308 "already exported" ambiguity errors.
+// Types remain accessible via their canonical sub-module paths or client.ts.
 export * from './services';
 export * from './components';
 export * from './hooks';

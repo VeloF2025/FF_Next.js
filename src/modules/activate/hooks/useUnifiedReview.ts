@@ -71,7 +71,7 @@ export function useUnifiedReview({
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error');
       setError(error);
-      log.error(`Error fetching unified review for ${dropNumber}:`, error);
+      log.error(`Error fetching unified review for ${dropNumber}:`, { error });
     } finally {
       setIsLoading(false);
     }
@@ -108,7 +108,7 @@ export function useUnifiedReview({
         log.info(`Updated step ${step} for ${dropNumber} to ${value}`);
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Unknown error');
-        log.error(`Error updating step ${step}:`, error);
+        log.error(`Error updating step ${step}:`, { error });
         throw error;
       }
     },
@@ -146,7 +146,7 @@ export function useUnifiedReview({
         log.info(`Marked steps ${steps.join(', ')} as incorrect for ${dropNumber}`);
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Unknown error');
-        log.error('Error marking incorrect steps:', error);
+        log.error('Error marking incorrect steps:', { error });
         throw error;
       }
     },
@@ -180,7 +180,7 @@ export function useUnifiedReview({
       log.info(`AI evaluation triggered for ${dropNumber}`);
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error');
-      log.error('Error triggering AI evaluation:', error);
+      log.error('Error triggering AI evaluation:', { error });
       throw error;
     }
   }, [dropNumber, review, fetchReview]);
@@ -253,7 +253,7 @@ export function useUnifiedReview({
         log.info(`Feedback sent for ${dropNumber}`);
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Unknown error');
-        log.error('Error sending feedback:', error);
+        log.error('Error sending feedback:', { error });
         throw error;
       }
     },
@@ -288,7 +288,7 @@ export function useUnifiedReview({
       log.info(`Locked review for ${dropNumber}`);
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error');
-      log.error('Error locking review:', error);
+      log.error('Error locking review:', { error });
       throw error;
     }
   }, [dropNumber, review, fetchReview]);
@@ -315,7 +315,7 @@ export function useUnifiedReview({
       log.info(`Unlocked review for ${dropNumber}`);
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error');
-      log.error('Error unlocking review:', error);
+      log.error('Error unlocking review:', { error });
       throw error;
     }
   }, [dropNumber, review, fetchReview]);
