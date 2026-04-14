@@ -30,7 +30,9 @@ import {
   MoreVertical,
 } from 'lucide-react';
 import Link from 'next/link';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('FinancialPage');
 
 interface FinancialPageProps {
   projectId?: string;
@@ -135,7 +137,7 @@ function BudgetTabContent() {
         setProjectBudgets(budgetsData.data || []);
       }
     } catch (err) {
-      log.error('Failed to fetch budget data', err);
+      log.error('Failed to fetch budget data', { error: err });
     } finally {
       setIsLoading(false);
     }
@@ -159,25 +161,25 @@ function BudgetTabContent() {
           label="Total Budget"
           value={formatCurrency(totalBudget)}
           icon={DollarSign}
-          colorType="blue"
+          colorType="total"
         />
         <StatCard
           label="Total Spent"
           value={formatCurrency(totalSpent)}
           icon={TrendingUp}
-          colorType="green"
+          colorType="success"
         />
         <StatCard
           label="Templates"
           value={templates.length}
           icon={LayoutTemplate}
-          colorType="purple"
+          colorType="financial"
         />
         <StatCard
           label="Over Budget"
           value={overBudgetCount}
           icon={AlertTriangle}
-          colorType="red"
+          colorType="error"
         />
       </StatCardGrid>
 
@@ -311,7 +313,7 @@ function CostCentersTabContent() {
         setCostCenters(data.data?.cost_centers || []);
       }
     } catch (err) {
-      log.error('Failed to fetch cost centers', err);
+      log.error('Failed to fetch cost centers', { error: err });
     } finally {
       setIsLoading(false);
     }
@@ -417,25 +419,25 @@ function CostCentersTabContent() {
           label="Total Cost Centers"
           value={totalCostCenters}
           icon={Building2}
-          colorType="blue"
+          colorType="total"
         />
         <StatCard
           label="Active"
           value={activeCostCenters}
           icon={CheckCircle}
-          colorType="green"
+          colorType="active"
         />
         <StatCard
           label="Total Budget"
           value={formatCurrency(totalBudget)}
           icon={DollarSign}
-          colorType="purple"
+          colorType="financial"
         />
         <StatCard
           label="Total Spent"
           value={formatCurrency(totalSpent)}
           icon={TrendingUp}
-          colorType="amber"
+          colorType="pending"
         />
       </StatCardGrid>
 

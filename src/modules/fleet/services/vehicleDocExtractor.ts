@@ -10,7 +10,9 @@
  * NLNH Confidence: HIGH
  */
 
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('FleetVlmService');
 import {
   LicensePlateExtractionResult,
   LicenseDiskExtractionResult,
@@ -128,10 +130,7 @@ export async function verifyLicensePlate(
   expectedPlate: string
 ): Promise<LicensePlateExtractionResult> {
   try {
-    log.info(
-      'FleetVlmService',
-      `Verifying license plate (expected: ${expectedPlate})...`
-    );
+    log.info(`Verifying license plate (expected: ${expectedPlate})...`);
 
     // Inject HITL few-shot examples from past corrections (non-blocking on failure)
     let prompt = LICENSE_PLATE_PROMPT;
@@ -145,10 +144,10 @@ export async function verifyLicensePlate(
       const fewShotSection = buildVlmFewShotPrompt(examples);
       if (fewShotSection) {
         prompt = `${fewShotSection}\n\n${LICENSE_PLATE_PROMPT}`;
-        log.info('FleetVlmService', `Injecting ${examples.length} few-shot examples for license_plate`);
+        log.info(`Injecting ${examples.length} few-shot examples for license_plate`);
       }
     } catch (fewShotError) {
-      log.warn('FleetVlmService', `Few-shot retrieval failed (continuing without): ${fewShotError}`);
+      log.warn(`Few-shot retrieval failed (continuing without): ${fewShotError}`);
     }
 
     const content = await callVlmApi(
@@ -179,10 +178,7 @@ export async function verifyLicensePlate(
       expectedPlate,
     };
   } catch (error) {
-    log.error(
-      'FleetVlmService',
-      `License plate verification failed: ${error}`
-    );
+    log.error(`License plate verification failed: ${error}`);
     return {
       plateText: null,
       matches: false,
@@ -207,7 +203,7 @@ export async function extractLicenseDiskDetails(
   base64Image: string
 ): Promise<LicenseDiskExtractionResult> {
   try {
-    log.info('FleetVlmService', 'Extracting licence disk details...');
+    log.info('Extracting licence disk details...');
 
     // Inject HITL few-shot examples from past corrections (non-blocking on failure)
     let prompt = LICENSE_DISK_PROMPT;
@@ -221,10 +217,10 @@ export async function extractLicenseDiskDetails(
       const fewShotSection = buildVlmFewShotPrompt(examples);
       if (fewShotSection) {
         prompt = `${fewShotSection}\n\n${LICENSE_DISK_PROMPT}`;
-        log.info('FleetVlmService', `Injecting ${examples.length} few-shot examples for license_disk`);
+        log.info(`Injecting ${examples.length} few-shot examples for license_disk`);
       }
     } catch (fewShotError) {
-      log.warn('FleetVlmService', `Few-shot retrieval failed (continuing without): ${fewShotError}`);
+      log.warn(`Few-shot retrieval failed (continuing without): ${fewShotError}`);
     }
 
     const content = await callVlmApi(
@@ -250,10 +246,7 @@ export async function extractLicenseDiskDetails(
 
     const vin = result.vin;
     if (vin && vin.length !== 17) {
-      log.warn(
-        'FleetVlmService',
-        `VIN length invalid (${vin.length}), expected 17 characters`
-      );
+      log.warn(`VIN length invalid (${vin.length}), expected 17 characters`);
     }
 
     return {
@@ -272,7 +265,7 @@ export async function extractLicenseDiskDetails(
       rawText: result.raw_text || '',
     };
   } catch (error) {
-    log.error('FleetVlmService', `Licence disk extraction failed: ${error}`);
+    log.error(`Licence disk extraction failed: ${error}`);
     return {
       discNumber: null,
       registration: null,
@@ -329,7 +322,7 @@ export async function processCheckInPhoto(
       // Damage photos don't need VLM analysis — they're documentation only
       return null;
     default:
-      log.warn('FleetVlmService', `Unknown analysis type: ${analysisType}`);
+      log.warn(`Unknown analysis type: ${analysisType}`);
       return null;
   }
 }

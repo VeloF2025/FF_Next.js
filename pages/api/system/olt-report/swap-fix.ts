@@ -27,7 +27,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole, getAuthUser } from '@/lib/auth';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('SwapFix');
 import { oneMapApi } from '@/modules/system/services/oneMapApiService';
 import { logActivity } from '@/modules/activate/services/activityLogService';
 
@@ -91,7 +93,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           wrongRecordPhotos.push({ type: key, id: value });
         }
       }
-      log.info('SwapFix', 'Identified wrong-serial prop record for photo copy', {
+      log.info('Identified wrong-serial prop record for photo copy', {
         drA: drANumber, wrongPropId, photoCount: wrongRecordPhotos.length,
       });
     }
@@ -107,7 +109,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    const drAOldValue = 'ont' in drAResult ? drAResult.ont.oldValue : drAResult.oldValue;
+    const drAOldValue = drAResult.oldValue;
 
     // Update DR A's mismatch record
     await client.query(
@@ -198,7 +200,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       drBFixResult = await oneMapApi.fixDrOntSerial(drBNumber, drBCorrectSerial, drBWrongSerial || undefined);
 
       if (drBFixResult.success) {
-        const drBOldValue = 'ont' in drBFixResult ? drBFixResult.ont.oldValue : drBFixResult.oldValue;
+        const drBOldValue = drBFixResult.oldValue;
 
         // Update DR B's mismatch record if it exists
         await client.query(
@@ -415,7 +417,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           upsTransferResult = { success: false, error: 'Failed to set UPS on DR B' };
         }
       } catch (upsErr) {
-        log.error('SwapFix', 'UPS transfer failed (non-fatal)', { error: upsErr, drB: drBNumber });
+        log.error('UPS transfer failed (non-fatal)', { error: upsErr, drB: drBNumber });
         upsTransferResult = { success: false, error: 'UPS transfer failed' };
       }
     }
@@ -453,7 +455,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         const toAdd = newPhotos.filter(p => {
           const m = p.filename.match(/_(\d+)\.jpg$/);
-          return m && !existingIds.has(m[1]);
+          return m != null && !existingIds.has(m[1] ?? '');
         });
 
         if (toAdd.length > 0) {
@@ -467,21 +469,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           );
           photoCopyResult = { success: true, count: toAdd.length, propId: wrongPropId };
 
-          log.info('SwapFix', 'Photos built from 1Map and added to DR B', {
+          log.info('Photos built from 1Map and added to DR B', {
             drA: drANumber, drB: drBNumber, propId: wrongPropId,
             newPhotos: toAdd.length, existingPhotos: existingPhotos.length, totalPhotos: allPhotos.length,
           });
         } else {
           photoCopyResult = { success: true, count: 0, propId: wrongPropId };
-          log.info('SwapFix', 'All photos already exist on DR B', { drB: drBNumber });
+          log.info('All photos already exist on DR B', { drB: drBNumber });
         }
       } catch (photoErr) {
-        log.error('SwapFix', 'Photo copy failed (non-fatal)', { error: photoErr, drB: drBNumber });
+        log.error('Photo copy failed (non-fatal)', { error: photoErr, drB: drBNumber });
         photoCopyResult = { success: false, error: 'Photo copy failed' };
       }
     }
 
-    log.info('SwapFix', 'Cross-DR swap completed', {
+    log.info('Cross-DR swap completed', {
       drA: drANumber,
       drB: drBNumber,
       scenario,
@@ -505,7 +507,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       photoCopy: photoCopyResult,
     });
   } catch (error) {
-    log.error('SwapFix', 'Swap fix failed', { error, drA: drANumber, drB: drBNumber });
+    log.error('Swap fix failed', { error, drA: drANumber, drB: drBNumber });
     return apiResponse.internalError(res, error);
   } finally {
     client.release();
