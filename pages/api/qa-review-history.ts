@@ -13,7 +13,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('QAReviewHistory');
 
 interface QAReviewRecord {
   id: string;
@@ -70,7 +72,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const reviews: QAReviewRecord[] = [];
 
     // 1. Fetch historic reviews from qa_review_history table
-    log.info('QAReviewHistory', `Fetching Excel reviews for ${dropNumber}`);
+    log.info(`Fetching Excel reviews for ${dropNumber}`);
     const excelReviews = await sql`
       SELECT
         id, drop_number, project, review_date, reviewer,
@@ -126,7 +128,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // 2. Fetch desktop QA wizard review from dr_photo_unified_reviews
-    log.info('QAReviewHistory', `Fetching desktop QA review for ${dropNumber}`);
+    log.info(`Fetching desktop QA review for ${dropNumber}`);
     const desktopReviews = await sql`
       SELECT
         u.id,
@@ -202,16 +204,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         project: row.project,
         review_date: row.qa_decision_at || row.human_review_completed_at,
         reviewer: row.reviewer_name || 'Unknown',
-        step_01_house_photo: stepData[1],
-        step_02_cable_from_pole: stepData[2],
-        step_03_cable_entry_outside: stepData[3],
-        step_04_cable_entry_inside: stepData[4],
-        step_05_wall_installation: stepData[5],
-        step_06_ont_back: stepData[6],
-        step_07_power_meter: stepData[7],
-        step_08_final_installation: stepData[8],
-        step_09_green_lights: stepData[9],
-        step_10_signature: stepData[10],
+        step_01_house_photo: stepData[1] ?? false,
+        step_02_cable_from_pole: stepData[2] ?? false,
+        step_03_cable_entry_outside: stepData[3] ?? false,
+        step_04_cable_entry_inside: stepData[4] ?? false,
+        step_05_wall_installation: stepData[5] ?? false,
+        step_06_ont_back: stepData[6] ?? false,
+        step_07_power_meter: stepData[7] ?? false,
+        step_08_final_installation: stepData[8] ?? false,
+        step_09_green_lights: stepData[9] ?? false,
+        step_10_signature: stepData[10] ?? false,
         completed_photos: row.photo_count,
         outstanding_photos: null,
         pass_fail: passFail,
@@ -232,7 +234,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return dateB - dateA;
     });
 
-    log.info('QAReviewHistory', `Found ${reviews.length} reviews for ${dropNumber} (${excelReviews.length} Excel, ${desktopReviews.length} desktop)`);
+    log.info(`Found ${reviews.length} reviews for ${dropNumber} (${excelReviews.length} Excel, ${desktopReviews.length} desktop)`);
 
     return res.status(200).json({
       success: true,
@@ -245,7 +247,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       _v: '2026-01-27-v2',
     });
   } catch (error) {
-    log.error('QAReviewHistory', `Error fetching reviews for ${dropNumber}:`, error);
+    log.error(`Error fetching reviews for ${dropNumber}`, { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, error);
   }
 }

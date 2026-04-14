@@ -15,7 +15,9 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('ProcessVlmQueue');
 import {
   categorizePhotos,
   PhotoInput,
@@ -109,7 +111,7 @@ async function processVlmForDr(dropNumber: string): Promise<ProcessResult> {
     let categorization = dr.categorization ? JSON.parse(dr.categorization) : [];
 
     if (dr.vlm_categorization_status !== 'categorized' && dr.vlm_categorization_status !== 'approved') {
-      log.info('ProcessVlmQueue', `Categorizing photos for ${dropNumber}`);
+      log.info(`Categorizing photos for ${dropNumber}`);
 
       // Prepare photos for categorization - pass URLs, categorizePhotos will fetch them
       const photoInputs: PhotoInput[] = photos.map((photo) => ({
@@ -138,7 +140,7 @@ async function processVlmForDr(dropNumber: string): Promise<ProcessResult> {
         );
 
         result.categorized = true;
-        log.info('ProcessVlmQueue', `Categorized ${photoInputs.length} photos for ${dropNumber}`);
+        log.info(`Categorized ${photoInputs.length} photos for ${dropNumber}`);
       }
     } else {
       result.categorized = true;
@@ -164,7 +166,7 @@ async function processVlmForDr(dropNumber: string): Promise<ProcessResult> {
 
     // Only run extraction if we have at least one of these photos
     if (step6Photos.length > 0 || step7Photos.length > 0 || step9Photos.length > 0) {
-      log.info('ProcessVlmQueue', `Extracting data for ${dropNumber}`, {
+      log.info(`Extracting data for ${dropNumber}`, {
         step6Count: step6Photos.length,
         step7Count: step7Photos.length,
         step9Count: step9Photos.length,
@@ -242,14 +244,14 @@ async function processVlmForDr(dropNumber: string): Promise<ProcessResult> {
       result.ontSerial = extraction.ontSerialStep6?.serial ?? extraction.step9?.ontSerial.serial ?? null;
       result.drNumber = extraction.step9?.drNumber.drNumber ?? null;
 
-      log.info('ProcessVlmQueue', `Extraction complete for ${dropNumber}`, {
+      log.info(`Extraction complete for ${dropNumber}`, {
         powerMeter: result.powerMeter,
         ontSerial: result.ontSerial,
         drNumber: result.drNumber,
       });
     } else {
       // No step 6/7/9 photos found — mark as done so cron doesn't re-process
-      log.info('ProcessVlmQueue', `No step 6/7/9 photos for ${dropNumber}, marking extraction complete`);
+      log.info(`No step 6/7/9 photos for ${dropNumber}, marking extraction complete`);
       await pool.query(
         `UPDATE dr_photo_unified_reviews SET
            data_validation_completed = true,
@@ -269,7 +271,7 @@ async function processVlmForDr(dropNumber: string): Promise<ProcessResult> {
     return result;
   } catch (error) {
     result.error = error instanceof Error ? error.message : 'Unknown error';
-    log.error('ProcessVlmQueue', `Error processing ${dropNumber}`, { error: result.error });
+    log.error(`Error processing ${dropNumber}`, { error: result.error });
     return result;
   }
 }
@@ -291,18 +293,18 @@ export default async function handler(
   const cronSecret = process.env.CRON_SECRET;
 
   if (!cronSecret) {
-    log.error('ProcessVlmQueue', 'CRON_SECRET not configured');
-    return apiResponse.serverError(res, new Error('CRON_SECRET not configured'));
+    log.error('CRON_SECRET not configured');
+    return apiResponse.internalError(res, new Error('CRON_SECRET not configured'));
   }
   if (authHeader !== `Bearer ${cronSecret}`) {
-    log.error('ProcessVlmQueue', 'Unauthorized request');
+    log.error('Unauthorized request');
     return apiResponse.unauthorized(res);
   }
 
   const limit = Number(req.query.limit) || Number(req.body?.limit) || 20;
   const concurrency = Number(req.query.concurrency) || Number(req.body?.concurrency) || 3;
 
-  log.info('ProcessVlmQueue', `Starting VLM queue processing (limit: ${limit}, concurrency: ${concurrency})`);
+  log.info(`Starting VLM queue processing (limit: ${limit}, concurrency: ${concurrency})`);
 
   try {
     // Find DRs that need VLM processing:
@@ -334,7 +336,7 @@ export default async function handler(
     const pendingDRs = pendingResult.rows;
 
     if (pendingDRs.length === 0) {
-      log.info('ProcessVlmQueue', 'No DRs need VLM processing');
+      log.info('No DRs need VLM processing');
       return res.status(200).json({
         success: true,
         processed: 0,
@@ -345,7 +347,7 @@ export default async function handler(
       });
     }
 
-    log.info('ProcessVlmQueue', `Found ${pendingDRs.length} DRs to process (${concurrency} concurrent)`);
+    log.info(`Found ${pendingDRs.length} DRs to process (${concurrency} concurrent)`);
 
     const results: ProcessResult[] = [];
     let succeeded = 0;
@@ -384,7 +386,7 @@ export default async function handler(
       }
     }
 
-    log.info('ProcessVlmQueue', `Completed: ${succeeded}/${pendingDRs.length} succeeded`, {
+    log.info(`Completed: ${succeeded}/${pendingDRs.length} succeeded`, {
       failed,
     });
 
@@ -399,7 +401,7 @@ export default async function handler(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
-    log.error('ProcessVlmQueue', `Fatal error: ${errorMessage}`, { stack: errorStack });
+    log.error(`Fatal error: ${errorMessage}`, { stack: errorStack });
     return res.status(500).json({
       error: errorMessage || 'Failed to process VLM queue',
     });
