@@ -12,6 +12,25 @@ import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+interface QFieldDropEntry {
+  drop_number: string | null;
+  pole_number: string | null;
+  address: string | null;
+  customer_name: string | null;
+  cable_length: number | null;
+  installation_date: string | null;
+  status: string | null;
+  qc_status: string | null;
+  notes: string | null;
+  metadata: Record<string, unknown>;
+  latitude: number | null;
+  longitude: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  qc_updated_at: string | null;
+  source: string;
+}
+
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -72,7 +91,7 @@ async function handler(
     }
 
     // Fetch real QFieldCloud data
-    let qfieldData = [];
+    let qfieldData: QFieldDropEntry[] = [];
     try {
       const qfieldDrops = await getQFieldDrops(projectId as string | undefined);
       qfieldData = qfieldDrops.map(drop => ({

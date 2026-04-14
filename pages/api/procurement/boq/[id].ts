@@ -97,7 +97,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
 
     return res.status(200).json(transformedBoq);
   } catch (error) {
-    log.error('Failed to fetch BOQ', error);
+    log.error('Failed to fetch BOQ', { error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -124,7 +124,7 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse, id: string) 
     log.info('BOQ updated', { boqId: id });
     return apiResponse.success(res, { id, message: 'BOQ updated successfully' });
   } catch (error) {
-    log.error('Failed to update BOQ', error);
+    log.error('Failed to update BOQ', { error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -147,7 +147,7 @@ async function handleDelete(req: NextApiRequest, res: NextApiResponse, id: strin
     log.info('BOQ deleted', { boqId: id });
     return apiResponse.success(res, { message: 'BOQ deleted successfully' });
   } catch (error) {
-    log.error('Failed to delete BOQ', error);
+    log.error('Failed to delete BOQ', { error });
     return apiResponse.internalError(res, error);
   }
 }

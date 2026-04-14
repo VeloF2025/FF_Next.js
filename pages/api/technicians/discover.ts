@@ -18,21 +18,22 @@ import { apiResponse } from '@/lib/apiResponse';
 import type { DiscoveredTechnician } from '@/types/technician.types';
 
 async function handler(
-  req: AuthenticatedNextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
+  const authReq = req as AuthenticatedNextApiRequest;
   try {
     switch (req.method) {
       case 'GET':
-        return handleDiscover(req, res);
+        return handleDiscover(authReq, res);
       case 'POST':
-        return handleImport(req, res);
+        return handleImport(authReq, res);
       default:
-        return apiResponse.methodNotAllowed(res, ['GET', 'POST']);
+        return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET', 'POST']);
     }
   } catch (error) {
-    log.error('TechniciansDiscoverAPI', 'Request failed', { error });
-    return apiResponse.serverError(res, 'Internal server error');
+    log.error('Request failed', { error }, 'TechniciansDiscoverAPI');
+    return apiResponse.internalError(res, error, 'Internal server error');
   }
 }
 
@@ -106,7 +107,7 @@ async function handleImport(req: AuthenticatedNextApiRequest, res: NextApiRespon
           name || null,
           type || 'activator',
           projects || [],
-          req.user?.username || 'api',
+          req.user?.email || 'api',
         ]
       );
 
@@ -119,10 +120,10 @@ async function handleImport(req: AuthenticatedNextApiRequest, res: NextApiRespon
     }
   }
 
-  log.info('TechniciansDiscoverAPI', `Imported ${imported.length} technicians`, {
+  log.info(`Imported ${imported.length} technicians`, {
     total: technicians.length,
     errors: errors.length,
-  });
+  }, 'TechniciansDiscoverAPI');
 
   return apiResponse.success(res, {
     imported,

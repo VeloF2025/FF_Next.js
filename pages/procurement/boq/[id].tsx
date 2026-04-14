@@ -189,7 +189,7 @@ export default function BOQDetailPage() {
         setError(data.error?.message || 'Failed to load BOQ');
       }
     } catch (err) {
-      log.error('Failed to fetch BOQ', err);
+      log.error('Failed to fetch BOQ', { error: err });
       setError('Failed to load BOQ details');
     } finally {
       setIsLoading(false);
@@ -202,7 +202,7 @@ export default function BOQDetailPage() {
       const data = await res.json();
       if (data.data?.versions) setVersions(data.data.versions);
     } catch (err) {
-      log.error('Failed to fetch versions', err);
+      log.error('Failed to fetch versions', { error: err });
     }
   };
 
@@ -215,7 +215,7 @@ export default function BOQDetailPage() {
         setChangeCount(data.data.total || 0);
       }
     } catch (err) {
-      log.error('Failed to fetch change history', err);
+      log.error('Failed to fetch change history', { error: err });
     }
   };
 
@@ -232,7 +232,7 @@ export default function BOQDetailPage() {
         notificationService.error(data.error?.message || 'Failed to compare versions');
       }
     } catch (err) {
-      log.error('Failed to compare versions', err);
+      log.error('Failed to compare versions', { error: err });
       notificationService.error('Failed to compare versions');
     } finally {
       setIsComparing(false);
@@ -258,7 +258,7 @@ export default function BOQDetailPage() {
         notificationService.error(data.error?.message || 'Failed to restore version');
       }
     } catch (err) {
-      log.error('Failed to rollback BOQ', err);
+      log.error('Failed to rollback BOQ', { error: err });
       notificationService.error('Failed to restore version');
     } finally {
       setIsRollingBack(false);
@@ -277,7 +277,7 @@ export default function BOQDetailPage() {
         notificationService.error(json.error?.message || 'Failed to load procurement data');
       }
     } catch (err) {
-      log.error('Failed to fetch lifecycle', err);
+      log.error('Failed to fetch lifecycle', { error: err });
       notificationService.error('Failed to load procurement data');
     } finally {
       setLifecycleLoading(false);
