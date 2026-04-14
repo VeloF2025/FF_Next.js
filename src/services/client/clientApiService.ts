@@ -4,6 +4,7 @@
  */
 
 import { log } from '@/lib/logger';
+import type { ClientFilter } from '@/types/client.types';
 
 const API_BASE = '/api';
 
@@ -143,12 +144,11 @@ function transformClientToDb(client: Partial<Client>): Partial<DbClient> {
 }
 
 export const clientApiService = {
-  async getAll(filter?: { search?: string; searchTerm?: string; status?: string; type?: string }): Promise<Client[]> {
+  async getAll(filter?: ClientFilter): Promise<Client[]> {
     const params = new URLSearchParams();
     if (filter) {
-      if (filter.search || filter.searchTerm) params.append('search', filter.search ?? filter.searchTerm ?? '');
-      if (filter.status) params.append('status', filter.status);
-      if (filter.type) params.append('type', filter.type);
+      if (filter.searchTerm) params.append('search', filter.searchTerm);
+      if (filter.status?.length) params.append('status', filter.status[0] as string);
     }
     const queryString = params.toString() ? `?${params.toString()}` : '';
     const response = await fetch(`${API_BASE}/clients${queryString}`);

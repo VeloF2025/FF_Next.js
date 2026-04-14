@@ -16,9 +16,9 @@ export function ClientListHeader({ onImport, onExport, clientCount, filter }: Cl
   const router = useRouter();
 
   // Build export label based on active filters
-  const hasFilters = filter?.status || filter?.type || filter?.searchTerm;
+  const hasFilters = filter?.status?.length || filter?.searchTerm;
   const exportLabel = hasFilters
-    ? `Export ${filter?.status || 'Filtered'}`
+    ? `Export ${filter?.status?.[0] ?? 'Filtered'}`
     : 'Export All';
 
   return (

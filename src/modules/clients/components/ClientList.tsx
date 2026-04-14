@@ -6,9 +6,12 @@ import { notificationService } from '@/services/core/NotificationService';
 import { ClientImport } from '@/components/clients/ClientImport';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ClientFilter } from '@/types/client.types';
+import type { ClientSummary } from '@/types/client/summary.types';
 import { ClientListHeader } from './ClientListHeader';
 import { ClientSummaryCards } from './ClientSummaryCards';
 import { ClientTable } from './ClientTable';
+
+type ClientRow = Awaited<ReturnType<typeof clientService.getAll>>[number];
 
 export function ClientList() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -17,25 +20,27 @@ export function ClientList() {
   const [showFilters, setShowFilters] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
-  const { data: clients, isLoading, error, refetch } = useQuery({
+  const { data: clients, isLoading, error, refetch } = useQuery<ClientRow[]>({
     queryKey: ['clients', filter],
-    queryFn: () => clientService.getAll(filter)
+    queryFn: () => clientService.getAll(filter) as Promise<ClientRow[]>
   });
 
-  const { data: summary } = useQuery({
+  const { data: summary } = useQuery<ClientSummary>({
     queryKey: ['client-summary'],
-    queryFn: () => clientService.getClientSummary()
+    queryFn: () => clientService.getClientSummary() as Promise<ClientSummary>
   });
 
   // Filter clients locally for instant search (more responsive than API-only)
   const filteredClients = clients?.filter((client) => {
     if (!searchTerm) return true;
     const search = searchTerm.toLowerCase();
+    const companyName = (client as ClientRow & { company?: string; companyName?: string }).company
+      ?? (client as ClientRow & { companyName?: string }).companyName;
     return (
       client.name?.toLowerCase().includes(search) ||
       client.email?.toLowerCase().includes(search) ||
       client.phone?.toLowerCase().includes(search) ||
-      client.company?.toLowerCase().includes(search)
+      companyName?.toLowerCase().includes(search)
     );
   });
 
@@ -65,14 +70,13 @@ export function ClientList() {
 
   const handleExport = async () => {
     try {
-      const blob = await clientService.export.exportToExcel(filteredClients);
+      const blob = await clientService.export.exportToExcel(filteredClients as Parameters<typeof clientService.export.exportToExcel>[0]);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       // Build descriptive filename with active filters
       const filterParts: string[] = [];
-      if (filter.status) filterParts.push(filter.status);
-      if (filter.type) filterParts.push(filter.type);
+      if (filter.status?.length) filterParts.push(String(filter.status[0]));
       if (filter.searchTerm) filterParts.push('search');
       const filterSuffix = filterParts.length > 0 ? `-${filterParts.join('-')}` : '-all';
       a.download = `clients${filterSuffix}-${new Date().toISOString().split('T')[0]}.xlsx`;
@@ -141,7 +145,7 @@ export function ClientList() {
       </div>
 
       <ClientTable
-        clients={filteredClients}
+        clients={filteredClients as import('@/types/client.types').Client[] | undefined}
         isLoading={isLoading}
         error={error}
         onDelete={handleDelete}

@@ -10,6 +10,9 @@ import {
 import type { Client } from '@/types/client/core.types';
 import type { ClientSummary } from '@/types/client/summary.types';
 
+// Local client shape returned by clientApiService (looser than core Client)
+type ApiClient = Awaited<ReturnType<typeof clientService.getAll>>[number];
+
 // Query Keys
 export const clientKeys = {
   all: ['clients'] as const,
@@ -28,7 +31,7 @@ export const clientKeys = {
  * Hook to fetch all clients with optional filtering
  */
 export function useClients(filter?: ClientFilter) {
-  return useQuery({
+  return useQuery<ApiClient[]>({
     queryKey: clientKeys.list(filter),
     queryFn: () => clientService.getAll(filter),
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -39,7 +42,7 @@ export function useClients(filter?: ClientFilter) {
  * Hook to fetch active clients for dropdowns
  */
 export function useActiveClients() {
-  return useQuery({
+  return useQuery<ApiClient[]>({
     queryKey: clientKeys.active(),
     queryFn: () => clientService.getActiveClients(),
     staleTime: 10 * 60 * 1000, // 10 minutes
@@ -87,8 +90,9 @@ export function useContactHistory(clientId: string) {
 export function useCreateClient() {
   const queryClient = useQueryClient();
   
-  return useMutation({
-    mutationFn: (data: ClientFormData) => clientService.create(data),
+  const createFn = clientService.create as unknown as (data: ClientFormData) => Promise<ApiClient>;
+  return useMutation<ApiClient, Error, ClientFormData>({
+    mutationFn: createFn,
     onSuccess: () => {
       // Invalidate and refetch client queries
       queryClient.invalidateQueries({ queryKey: clientKeys.all });
@@ -106,9 +110,9 @@ export function useCreateClient() {
 export function useUpdateClient() {
   const queryClient = useQueryClient();
   
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<ClientFormData> }) => 
-      clientService.update(id, data),
+  const updateFn = clientService.update as (id: string, data: Partial<ClientFormData>) => Promise<ApiClient>;
+  return useMutation<ApiClient, Error, { id: string; data: Partial<ClientFormData> }>({
+    mutationFn: ({ id, data }) => updateFn(id, data),
     onSuccess: (_, { id }) => {
       // Invalidate specific client and list queries
       queryClient.invalidateQueries({ queryKey: clientKeys.detail(id) });
@@ -129,8 +133,9 @@ export function useUpdateClient() {
 export function useDeleteClient() {
   const queryClient = useQueryClient();
   
-  return useMutation({
-    mutationFn: (id: string) => clientService.delete(id),
+  const deleteFn = clientService.delete as (id: string) => Promise<{ success: boolean; message: string }>;
+  return useMutation<{ success: boolean; message: string }, Error, string>({
+    mutationFn: deleteFn,
     onSuccess: (_, id) => {
       // Remove client from cache and invalidate lists
       queryClient.removeQueries({ queryKey: clientKeys.detail(id) });
@@ -216,19 +221,19 @@ export function useClientFilters() {
 
 // Helper hook for client selection in forms
 export function useClientSelection() {
-  const { data: activeClients = [], isLoading } = useActiveClients();
-  
-  // Convert Client[] to ClientDropdownOption[] by filtering out clients without ids
+  const { data: activeClients = [] as ApiClient[], isLoading } = useActiveClients();
+
+  // Convert ApiClient[] to ClientDropdownOption[] by filtering out clients without ids
   const dropdownOptions: ClientDropdownOption[] = activeClients
     .filter((client): client is typeof client & { id: string } => !!client.id)
     .map(client => ({
       id: client.id,
       name: client.name,
-      contactPerson: client.contactPerson,
-      email: client.email,
-      phone: client.phone,
-      status: client.status,
-      category: client.category
+      contactPerson: (client as ApiClient & { contactPerson?: string }).contactPerson ?? '',
+      email: client.email ?? '',
+      phone: client.phone ?? '',
+      status: (client.status ?? 'ACTIVE') as import('@/types/client/enums').ClientStatus,
+      category: (client.category ?? 'SME') as import('@/types/client/enums').ClientCategory,
     }));
   
   const getClientById = (id: string): ClientDropdownOption | undefined => {
