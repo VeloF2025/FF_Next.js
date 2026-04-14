@@ -108,7 +108,7 @@ export function prepareRagInputFromDbRow(row: RagDbRow): RagCalculationInput {
     majorIncidents: 0, // TODO: Track major vs minor incidents
     minorIncidents: row.safety_incidents_12m || 0,
     safetyTrainingCurrent: true, // TODO: Check certification dates
-    lastSafetyAuditDate: row.last_safety_audit_date,
+    lastSafetyAuditDate: row.last_safety_audit_date ? new Date(row.last_safety_audit_date) : undefined,
   };
 
   return {

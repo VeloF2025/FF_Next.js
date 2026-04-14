@@ -46,7 +46,7 @@ export class SOWFiberImportService {
             continue;
           }
 
-          const fiberRef = doc(collection(db, 'fiberSections'));
+          const fiberRef = doc(collection(db, 'fiberSections'), crypto.randomUUID());
           const fiberData = {
             projectId,
             projectCode,

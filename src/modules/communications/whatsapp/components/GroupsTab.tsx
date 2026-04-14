@@ -270,12 +270,14 @@ const GroupsTab: React.FC = () => {
 };
 
 const GroupTypeBadge: React.FC<{ type: WaGroupType }> = ({ type }) => {
-  const config = {
+  const config: Record<WaGroupType, { label: string; bg: string; text: string; border: string }> = {
     dr_submission: { label: 'DR', bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/30' },
     maintenance: { label: 'Maint', bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/30' },
     admin: { label: 'Admin', bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/30' },
+    civil: { label: 'Civil', bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/30' },
+    optical: { label: 'Optical', bg: 'bg-cyan-500/20', text: 'text-cyan-400', border: 'border-cyan-500/30' },
   };
-  const c = config[type] || config.dr_submission;
+  const c = config[type] ?? config.dr_submission;
 
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${c.bg} ${c.text} border ${c.border}`}>

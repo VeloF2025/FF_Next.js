@@ -176,7 +176,6 @@ export function PhotoListTab({
       await onAssign(selectedIds, assignee, {
         dueDate: assignDueDate || undefined,
         priority: assignPriority,
-        notes: assignNotes || undefined,
       });
       setShowAssignModal(false);
     } finally {

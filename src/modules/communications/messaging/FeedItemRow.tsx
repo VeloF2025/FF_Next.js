@@ -151,11 +151,11 @@ export function FeedItemRow({ item, onClick }: FeedItemRowProps) {
             )}
 
             {/* Email status */}
-            {item.channel === 'email' && Boolean(meta.status) && (
+            {item.channel === 'email' && meta.status != null ? (
               <span className="text-[10px] text-[var(--ff-text-tertiary)] capitalize">
                 {String(meta.status)}
               </span>
-            )}
+            ) : null}
 
             {/* Action item due date */}
             {item.channel === 'meeting' && meta.due_date && (

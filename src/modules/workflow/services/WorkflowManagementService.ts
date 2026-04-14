@@ -326,7 +326,7 @@ export class WorkflowManagementService {
     if (!template) {
       return {
         isValid: false,
-        errors: [{ type: 'missing', level: 'template', itemId: templateId, message: 'Template not found' }],
+        errors: [{ type: 'missing_required', level: 'template', itemId: templateId, message: 'Template not found' }],
         warnings: []
       };
     }

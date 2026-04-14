@@ -213,7 +213,7 @@ function findBestMatch(
   if (candidates.length === 0) return null;
 
   candidates.sort((a, b) => b.score - a.score);
-  return candidates[0];
+  return candidates[0] ?? null;
 }
 
 /**

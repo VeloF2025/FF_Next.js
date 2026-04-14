@@ -46,7 +46,7 @@ export class SOWPoleImportService {
             continue;
           }
 
-          const poleRef = doc(collection(db, 'poles'));
+          const poleRef = doc(collection(db, 'poles'), crypto.randomUUID());
           const poleData = {
             projectId,
             projectCode,

@@ -210,7 +210,8 @@ async function getProjectWhatsAppConfig(projectId?: string): Promise<{
         AND wg.enabled = true
     `;
 
-    return result[0] || null;
+    const row = result[0];
+    return row ? { group_jid: String(row.group_jid), project_name: String(row.project_name) } : null;
   } catch {
     return null;
   }
@@ -230,7 +231,8 @@ async function getMessageTemplate(templateKey: string): Promise<{
         AND enabled = true
     `;
 
-    return result[0] || null;
+    const row = result[0];
+    return row ? { template_content: String(row.template_content) } : null;
   } catch {
     return null;
   }

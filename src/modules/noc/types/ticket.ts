@@ -291,6 +291,8 @@ export interface CreateTicketPayload {
    * maintenance_tickets.ticket_category (added by migration 277).
    */
   ticket_category?: TicketCategory | string;
+  /** Fault cause attribution (optional at creation, typically set during investigation) */
+  fault_cause?: FaultCause;
 }
 
 /**

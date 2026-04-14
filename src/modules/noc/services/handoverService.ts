@@ -461,8 +461,8 @@ export async function createHandoverSnapshot(
       // Map to decisions
       const decisions: HandoverDecision[] = risks.map((risk: RiskAcceptanceRow) => ({
         decision_type: 'risk_acceptance' as const,
-        decision_by: risk.accepted_by,
-        decision_at: risk.accepted_at,
+        decision_by: risk.accepted_by ?? 'unknown',
+        decision_at: risk.accepted_at ?? new Date(),
         notes: risk.risk_description,
         metadata: {
           risk_id: risk.id,
@@ -491,7 +491,7 @@ export async function createHandoverSnapshot(
         assigned_to: ticket.assigned_to,
         assigned_contractor_id: ticket.assigned_contractor_id,
         assigned_team: ticket.assigned_team,
-        qa_ready: ticket.qa_ready,
+        qa_ready: ticket.qa_ready ?? false,
         qa_readiness_check_at: ticket.qa_readiness_check_at,
         fault_cause: ticket.fault_cause,
         fault_cause_details: ticket.fault_cause_details,

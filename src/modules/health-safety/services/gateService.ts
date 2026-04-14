@@ -252,7 +252,7 @@ export async function quickGateCheck(contractorId: number): Promise<boolean> {
 export async function getBlockedContractors(): Promise<
   { contractor_id: number; company_name: string; blockers: string[] }[]
 > {
-  return await sql`
+  const rows = await sql`
     SELECT
       hcc.contractor_id,
       c.company_name,
@@ -262,4 +262,9 @@ export async function getBlockedContractors(): Promise<
     WHERE hcc.is_gate_approved = false
     ORDER BY c.company_name
   `;
+  return rows.map(r => ({
+    contractor_id: Number(r.contractor_id),
+    company_name: String(r.company_name),
+    blockers: Array.isArray(r.blockers) ? r.blockers.map(String) : [],
+  }));
 }

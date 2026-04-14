@@ -84,7 +84,7 @@ export class PoleStatusService {
    */
   static async getLatestStatusChange(id: string): Promise<PoleStatusHistory | null> {
     const history = await this.getStatusHistory(id);
-    return history.length > 0 ? history[history.length - 1] : null;
+    return history.length > 0 ? (history[history.length - 1] ?? null) : null;
   }
 
   /**

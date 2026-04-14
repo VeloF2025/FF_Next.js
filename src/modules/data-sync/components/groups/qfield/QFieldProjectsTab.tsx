@@ -183,7 +183,7 @@ export function QFieldProjectsTab() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       {project.is_default && (
-                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0" title="Default project" />
+                        <span title="Default project"><Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0" /></span>
                       )}
                       <div>
                         <div className="font-medium text-[var(--ff-text-primary)]">{project.name}</div>

@@ -90,7 +90,7 @@ export function FaultCauseSelector({
       success: 'text-green-400 bg-green-500/10 border-green-500/20',
       default: 'text-[var(--ff-text-secondary)] bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)]',
     };
-    return colorMap[metadata.color ?? 'default'] || colorMap.default;
+    return colorMap[metadata.color ?? 'default'] ?? colorMap.default ?? '';
   };
 
   return (

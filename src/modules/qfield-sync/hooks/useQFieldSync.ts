@@ -22,7 +22,7 @@ interface UseQFieldSyncReturn {
   error: string | null;
   startSync: (type: SyncJob['type'], direction: SyncDirection) => Promise<void>;
   cancelSync: () => Promise<void>;
-  resolveConflict: (conflictId: string, resolution: SyncConflict['resolution']) => Promise<void>;
+  resolveConflict: (conflictId: string, resolution: 'skip' | 'use_qfield' | 'use_fibreflow' | 'merge') => Promise<void>;
   refreshData: () => void;
   updateConfig: (config: QFieldSyncConfig) => Promise<void>;
 }

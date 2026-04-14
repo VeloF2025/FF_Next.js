@@ -88,8 +88,8 @@ export async function recordEodCorrections(
   return { recorded, skipped };
 }
 
-function classifyError(vlm: string | null, correct: string): 'digit_confusion' | 'wrong_field' | 'partial_extraction' | 'totally_wrong' | 'other' {
-  if (!vlm) return 'totally_wrong';
+function classifyError(vlm: string | null, correct: string): 'digit_confusion' | 'wrong_field' | 'partial_extraction' | 'hallucination' | 'other' {
+  if (!vlm) return 'hallucination';
 
   const v = vlm.toUpperCase();
   const c = correct.toUpperCase();
@@ -103,6 +103,6 @@ function classifyError(vlm: string | null, correct: string): 'digit_confusion' |
 
   if (diffs <= 2) return 'digit_confusion';
   if (v.length !== c.length) return 'partial_extraction';
-  if (diffs > maxLen * 0.5) return 'totally_wrong';
+  if (diffs > maxLen * 0.5) return 'hallucination';
   return 'other';
 }

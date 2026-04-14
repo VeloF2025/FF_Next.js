@@ -60,8 +60,8 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
 
   // Generate feedback message from evaluation results (similar to WA Monitor format)
   const generateFeedbackMessage = (result: EvaluationResult) => {
-    // Handle both old format (results.results) and new format (step_results)
-    const stepResults = result.step_results || result.results?.results || [];
+    // Use canonical step_results from EvaluationResult
+    const stepResults = result.step_results || [];
     const _passed = stepResults.filter((r: StepResultItem) => r.passed === true || r.status === 'PASS');
     const failed = stepResults.filter((r: StepResultItem) => r.passed === false || r.status === 'FAIL');
 
@@ -176,7 +176,7 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
               )}
               <div>
                 <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
-                  {evaluation.overall_score}%
+                  {evaluation.average_score}%
                 </p>
                 <p className="text-sm text-[var(--ff-text-secondary)]">
                   {evaluation.passed_steps} of {evaluation.total_steps} steps passed

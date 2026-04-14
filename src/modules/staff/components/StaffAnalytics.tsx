@@ -75,9 +75,9 @@ export function StaffAnalytics() {
         )}
       </div>
 
-      <TopPerformersTable topPerformers={summary.topPerformers ?? []} />
+      <TopPerformersTable topPerformers={summary.topPerformers as never[] ?? []} />
 
-      <SkillsOverview topSkills={summary.topSkills ?? []} />
+      <SkillsOverview topSkills={summary.topSkills as never[] ?? []} />
     </div>
   );
 }

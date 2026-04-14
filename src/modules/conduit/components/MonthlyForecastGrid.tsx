@@ -620,7 +620,7 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
                   <td key={m} className="px-0.5 py-0.5">
                     <OpexCell
                       override={e[field]}
-                      defaultVal={(mo as Record<string, number>)[totField.replace('opex_', '')] ?? 0}
+                      defaultVal={(mo as unknown as Record<string, number>)[totField.replace('opex_', '')] ?? 0}
                       onChange={v => setOpex(m, field, v)}
                     />
                   </td>

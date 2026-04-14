@@ -21,7 +21,7 @@ export function PhasePerformanceCard({ phaseMetrics }: PhasePerformanceCardProps
           <div key={index} className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className={`w-2 h-2 rounded-full ${
-                (phase.bottleneckRisk as string) === 'high' ? 'bg-red-500' : 'bg-green-500'
+                phase.bottleneckRisk > 0.7 ? 'bg-red-500' : 'bg-green-500'
               }`} />
               <span className="text-sm font-medium text-foreground">
                 {phase.phaseName}
@@ -40,7 +40,7 @@ export function PhasePerformanceCard({ phaseMetrics }: PhasePerformanceCardProps
         <div className="flex items-center text-sm text-muted-foreground">
           <AlertTriangle className="w-4 h-4 text-yellow-600 mr-2" />
           <span>
-            {phaseMetrics.filter(p => (p.bottleneckRisk as string) === 'high').length} phases need attention
+            {phaseMetrics.filter(p => p.bottleneckRisk > 0.7).length} phases need attention
           </span>
         </div>
       </div>

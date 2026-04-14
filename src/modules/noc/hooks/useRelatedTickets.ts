@@ -59,9 +59,9 @@ async function fetchRelatedTickets(
       id: t.id,
       ticket_uid: t.ticket_uid,
       title: t.title,
-      status: t.status,
-      created_at: t.created_at,
-      external_id: t.external_id,
+      status: t.status as string,
+      created_at: t.created_at instanceof Date ? t.created_at.toISOString() : String(t.created_at),
+      external_id: t.external_id ?? undefined,
     }));
 }
 

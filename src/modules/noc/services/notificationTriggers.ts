@@ -244,8 +244,8 @@ export class NotificationTriggerService {
         };
       }
 
-      // Send notification
-      const notification = await this.sendNotification(event, recipient);
+      // Send notification (phone is guaranteed non-null by guard above)
+      const notification = await this.sendNotification(event, { ...recipient, phone: recipient.phone! });
 
       logger.info('Notification sent successfully', {
         notification_id: notification.id,
@@ -852,7 +852,7 @@ async function resolveResolutionRecipient(ticket: Ticket): Promise<UserLookup | 
       ticketId: ticket.id, assignedTo: ticket.assigned_to,
     });
   }
-  return lookupCreator(ticket.created_by);
+  return ticket.created_by ? lookupCreator(ticket.created_by) : null;
 }
 
 export async function triggerOnTicketResolution(ticket: Ticket): Promise<TriggerResult> {

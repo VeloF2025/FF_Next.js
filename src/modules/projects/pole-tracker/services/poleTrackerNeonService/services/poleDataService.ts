@@ -22,7 +22,7 @@ export class PoleDataService {
     const result = await neonService.query<NeonPole>(POLE_QUERIES.getPoleById, [id]);
     
     if (result.success && result.data.length > 0) {
-      return result.data[0];
+      return result.data[0] ?? null;
     }
     return null;
   }

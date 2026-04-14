@@ -39,8 +39,8 @@ export function useBasicInfoForm(form: UseFormReturn<FormData>) {
     async function populateLocation() {
       if (!gpsLatitude || !gpsLongitude) return;
       
-      const lat = parseFloat(gpsLatitude);
-      const lng = parseFloat(gpsLongitude);
+      const lat = parseFloat(String(gpsLatitude));
+      const lng = parseFloat(String(gpsLongitude));
       
       if (isNaN(lat) || isNaN(lng)) return;
       

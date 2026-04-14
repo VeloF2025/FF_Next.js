@@ -65,7 +65,7 @@ export function SupplierListRow({ supplier }: Props) {
           <p className="text-[11px] text-[var(--ff-text-tertiary)]">Reg: {reg}</p>
         </div>
         {supplier.isPreferred && (
-          <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400 shrink-0" title="Preferred supplier" />
+          <span title="Preferred supplier"><Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400 shrink-0" /></span>
         )}
       </div>
 

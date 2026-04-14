@@ -111,7 +111,7 @@ export function MasterTrackerPage({ projectId }: Props) {
           const row = emptyMasterRow(projectId);
           for (const [header, val] of Object.entries(r)) {
             const key = labelToKey[header];
-            if (key) (row as Record<string, unknown>)[key] = val === '' ? null : val;
+            if (key) (row as unknown as Record<string, unknown>)[key] = val === '' ? null : val;
           }
           return row;
         });

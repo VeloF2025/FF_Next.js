@@ -38,6 +38,13 @@ export function getBOQStatusInfo(status: BOQStatus): StatusDisplayInfo {
       bgColor: 'bg-purple-100',
       textColor: 'text-purple-800',
       borderColor: 'border-purple-200'
+    },
+    'superseded': {
+      label: 'Superseded',
+      color: 'orange',
+      bgColor: 'bg-orange-100',
+      textColor: 'text-orange-800',
+      borderColor: 'border-orange-200'
     }
   };
 

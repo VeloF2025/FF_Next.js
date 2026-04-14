@@ -196,8 +196,8 @@ export function UnifiedTrackerGrid({ projectId: projectIdProp }: { projectId?: s
         setSelectedStatus={setSelectedStatus}
         sortBy={sortBy}
         sortOrder={sortOrder}
-        setSortBy={setSortBy}
-        setSortOrder={setSortOrder}
+        setSortBy={(v: string) => setSortBy(v as typeof sortBy)}
+        setSortOrder={(v: string) => setSortOrder(v as typeof sortOrder)}
         phases={phases}
       />
 

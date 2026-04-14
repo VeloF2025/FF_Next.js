@@ -124,7 +124,7 @@ export function KanbanColumn({ status, tickets, totalCount, isDraggingOver, isUp
                 className={snapshot.isDragging ? 'z-50' : ''}
               >
                 <KanbanCard
-                  ticket={ticket}
+                  ticket={ticket as Ticket & { category?: string | null; status_changed_at?: string | null; asset_id?: string | null }}
                   isDragging={snapshot.isDragging}
                   onQuickMove={onQuickMove}
                   canMoveForward={canMoveForward}

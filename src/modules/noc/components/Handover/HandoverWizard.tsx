@@ -143,8 +143,8 @@ export function HandoverWizard({
   const getHandoverTypeName = (type: HandoverType): string => {
     const typeMap: Record<HandoverType, string> = {
       build_to_qa: 'Build to QA',
-      qa_to_maintenance: 'QA to Maintenance',
-      maintenance_complete: 'Maintenance Complete',
+      qa_to_ops: 'QA to Ops',
+      ops_complete: 'Ops Complete',
     };
     return typeMap[type] || type;
   };
@@ -154,7 +154,7 @@ export function HandoverWizard({
     const typeMap: Record<OwnerType, string> = {
       build: 'Build',
       qa: 'QA',
-      maintenance: 'Maintenance',
+      ops: 'Ops',
     };
     return typeMap[type] || type;
   };

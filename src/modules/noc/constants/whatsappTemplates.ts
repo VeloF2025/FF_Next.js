@@ -160,6 +160,22 @@ All documentation and evidence have been transferred and locked.`,
     variables: ['ticket_uid', 'handover_type', 'from_owner', 'to_owner'],
     use_case: NotificationUseCase.HANDOVER_COMPLETE,
   },
+
+  // ========================================================================
+  // Ticket Resolved
+  // ========================================================================
+  [NotificationUseCase.TICKET_RESOLVED]: {
+    id: NotificationUseCase.TICKET_RESOLVED,
+    name: 'Ticket Resolved',
+    description: 'Notification sent when a ticket is resolved (work completed, pending formal closure)',
+    template: `Hi {{assignee_name}},
+
+Ticket {{ticket_uid}} has been resolved.
+
+The work has been completed and the ticket is now pending formal closure.`,
+    variables: ['assignee_name', 'ticket_uid'],
+    use_case: NotificationUseCase.TICKET_RESOLVED,
+  },
 };
 
 // ============================================================================

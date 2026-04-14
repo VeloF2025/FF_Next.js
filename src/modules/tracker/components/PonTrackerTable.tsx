@@ -53,7 +53,7 @@ export function PonTrackerTable({ rows, editMode, onChange, filters, onFiltersCh
     COLS.every((col) => {
       const f = filters[col.key];
       if (!f || f.size === 0) return true;
-      const val = String((row as Record<string, unknown>)[col.key] ?? '');
+      const val = String((row as unknown as Record<string, unknown>)[col.key] ?? '');
       return !f.has(val);
     })
   );

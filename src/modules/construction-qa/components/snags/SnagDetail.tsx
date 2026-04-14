@@ -87,8 +87,8 @@ export function SnagDetail({ snag: initialSnag, photos, onClose, onUpdated, onPh
       const { snag: updatedSnag, ticket } = await createNocTicket(snag.id);
       setSnag(updatedSnag);
       onUpdated(updatedSnag);
-      const uid = ticket?.ticket_uid ?? updatedSnag.noc_ticket_uid ?? 'Ticket';
-      const ticketId = ticket?.id ?? updatedSnag.noc_ticket_id ?? '';
+      const uid = String(ticket?.ticket_uid ?? updatedSnag.noc_ticket_uid ?? 'Ticket');
+      const ticketId = String(ticket?.id ?? updatedSnag.noc_ticket_id ?? '');
       toast.success(
         (t) => (
           <span>

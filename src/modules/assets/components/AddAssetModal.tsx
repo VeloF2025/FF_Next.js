@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  X, ScanLine, ScanLine, PenLine,
+  X, ScanLine, PenLine,
   PackagePlus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';

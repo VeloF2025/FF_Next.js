@@ -85,9 +85,19 @@ function getStatusConfig(status: TicketStatus) {
       label: 'Pending Handover',
       Icon: AlertCircle,
     },
-    handed_to_maintenance: {
+    handed_to_ops: {
       style: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
-      label: 'Handed to Maintenance',
+      label: 'Handed to Ops',
+      Icon: CheckCircle2,
+    },
+    resolved: {
+      style: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+      label: 'Resolved',
+      Icon: CheckCircle2,
+    },
+    verified: {
+      style: 'bg-green-600/20 text-green-400 border-green-600/30',
+      label: 'Verified',
       Icon: CheckCircle2,
     },
     closed: {

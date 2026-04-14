@@ -208,7 +208,7 @@ export function StaffDetail() {
     await refetch();
   };
 
-  const handleCvDelete = () => {
+  const handleCvDelete = async () => {
     setConfirmAction('deleteCv');
   };
 
@@ -242,7 +242,7 @@ export function StaffDetail() {
     await refetch();
   };
 
-  const handleProfilePhotoDelete = () => {
+  const handleProfilePhotoDelete = async () => {
     setConfirmAction('deletePhoto');
   };
 

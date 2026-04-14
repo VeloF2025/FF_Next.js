@@ -24,7 +24,7 @@ export default async function handler(
     // 4. Return top 10 errors
 
     // Demo data structure - would be populated from actual error tracking
-    const errors = [
+    const errors: { message: string; count: number; severity: string }[] = [
       // In production, this would show real errors if any exist
       // Empty array means no errors (healthy state)
     ];

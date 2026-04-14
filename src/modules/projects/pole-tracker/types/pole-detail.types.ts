@@ -69,6 +69,6 @@ export interface StatConfig {
   subtitle: string;
   value: string | number;
   subValue: string;
-  icon: React.ElementType;
+  icon: React.ComponentType<{ className?: string }>;
   color: string;
 }

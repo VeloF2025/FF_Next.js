@@ -63,7 +63,7 @@ export class RecommendationPriorityAnalyzer {
     }
 
     // Medium priority recommendations
-    if (performanceMetrics?.onTimeDelivery < 90) {
+    if ((performanceMetrics?.onTimeDelivery ?? 100) < 90) {
       recommendations.push({
         recommendation: 'Improve delivery time consistency and logistics',
         priority: 'medium',
@@ -87,7 +87,7 @@ export class RecommendationPriorityAnalyzer {
       });
     }
 
-    if (performanceMetrics?.qualityScore < 85) {
+    if ((performanceMetrics?.qualityScore ?? 100) < 85) {
       recommendations.push({
         recommendation: 'Implement quality improvement initiatives',
         priority: 'medium',

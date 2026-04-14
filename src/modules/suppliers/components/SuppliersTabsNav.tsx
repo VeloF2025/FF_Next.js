@@ -1,6 +1,5 @@
-import { } from 'react';
+import React from 'react';
 import Link from 'next/link';
-import { LucideIcon } from 'lucide-react';
 import { useSuppliersPortal, type Supplier, type SupplierTabId } from '../context/SuppliersPortalContext';
 import { cn } from '@/lib/utils';
 
@@ -38,7 +37,7 @@ function TabBadge({ count, type = 'info', className }: BadgeProps) {
 interface TabItemProps {
   id: string;
   label: string;
-  icon: LucideIcon;
+  icon: React.ComponentType<{ className?: string }>;
   path: string;
   isActive: boolean;
   isDisabled: boolean;

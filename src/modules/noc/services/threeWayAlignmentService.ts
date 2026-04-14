@@ -173,7 +173,8 @@ async function getFibreFlowTickets(): Promise<FibreFlowTicketSummary[]> {
 async function getQContactTickets(): Promise<QContactTicketSummary[]> {
   try {
     const client = createFiberTimeQContactClient();
-    const cases = await client.listAllCases(500); // Get up to 500 cases
+    const response = await client.listCases({ pageSize: 500 }); // Get up to 500 cases
+    const cases = response.results;
 
     return (cases as unknown[]).map((c) => {
       const cas = c as { id?: number; fields?: { status?: string; subject?: string } };

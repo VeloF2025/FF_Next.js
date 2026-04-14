@@ -18,7 +18,7 @@ export interface OcrDocumentData {
   idNumber?: string;
   jobTitle?: string;
   position?: string;
-  startDate?: string | Date;
+  startDate?: string;
   department?: string;
   // SA ID fields
   saIdNumber?: string;

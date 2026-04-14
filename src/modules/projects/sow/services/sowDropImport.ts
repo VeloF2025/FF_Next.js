@@ -46,7 +46,7 @@ export class SOWDropImportService {
             continue;
           }
 
-          const dropRef = doc(collection(db, 'drops'));
+          const dropRef = doc(collection(db, 'drops'), crypto.randomUUID());
           const dropData = {
             projectId,
             projectCode,

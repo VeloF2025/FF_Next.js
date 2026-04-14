@@ -65,7 +65,7 @@ export async function queryOne<T = Record<string, unknown>>(
   params: unknown[] = []
 ): Promise<T | null> {
   const rows = await query<T>(queryText, params);
-  return rows.length > 0 ? rows[0] : null;
+  return rows.length > 0 ? (rows[0] ?? null) : null;
 }
 
 export async function transaction<T>(
