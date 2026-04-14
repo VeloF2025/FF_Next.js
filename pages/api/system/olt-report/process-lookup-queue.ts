@@ -6,7 +6,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
-import type { Pool } from 'pg';
+import type { PoolClient } from 'pg';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
@@ -54,7 +54,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.success(res, { processed: 0, remaining: 0, message: 'Queue empty' });
     }
 
-    log.info('OltQueueProcessor', `Processing ${items.length} queue items`);
+    log.info(`Processing ${items.length} queue items`, undefined, 'OltQueueProcessor');
 
     // Get import_id for the batch (created by auto-detect)
     const firstBatchId = items[0].oes_batch_id;
@@ -97,7 +97,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (remaining > 0) {
       import('@/modules/data-sync/services/oltQueueProcessorService')
         .then(({ processLookupQueue }) => processLookupQueue(runId))
-        .catch(err => log.warn('OltQueueProcessor', 'Service continuation failed', err));
+        .catch(err => log.warn('Service continuation failed', { error: err }, 'OltQueueProcessor'));
     } else if (runId) {
       // Queue fully processed - mark run complete
       await client.query(
@@ -108,9 +108,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       );
     }
 
-    log.info('OltQueueProcessor', `Processed ${processed} items (${CONCURRENCY} concurrent)`, {
+    log.info(`Processed ${processed} items (${CONCURRENCY} concurrent)`, {
       errorsCount, remaining,
-    });
+    }, 'OltQueueProcessor');
 
     return apiResponse.success(res, {
       processed,
@@ -118,7 +118,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       remaining,
     });
   } catch (error) {
-    log.error('OltQueueProcessor', 'Queue processing failed', { error });
+    log.error('Queue processing failed', { error }, 'OltQueueProcessor');
     return apiResponse.internalError(res, error);
   } finally {
     client.release();
@@ -287,7 +287,7 @@ async function processOneQueueItem(client: any, item: any, importId: string | un
  * Insert a mismatch record with duplicate checking.
  */
 async function insertMismatchIfNew(
-  client: ReturnType<Pool['connect']> extends Promise<infer T> ? T : never,
+  client: PoolClient,
   data: {
     importId: string;
     dropNumber: string;

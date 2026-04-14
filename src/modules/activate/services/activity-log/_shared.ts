@@ -42,7 +42,9 @@ export type ActivityEventType =
   | 'ONT_SWAP_REPORTED'
   | 'AUTO_QA_COMPLETED'
   | 'AUTO_QA_RESET'
-  | 'HITL_STEP_CORRECTION';
+  | 'HITL_STEP_CORRECTION'
+  | 'INVESTIGATION_RESOLVED'
+  | 'ESCALATED_TO_ADMIN';
 
 /**
  * Serial change source types
@@ -269,6 +271,16 @@ export const EVENT_METADATA: Record<ActivityEventType, { title: string; icon: st
     title: 'Step Correction (HITL)',
     icon: '✏️',
     iconColor: 'text-purple-500',
+  },
+  INVESTIGATION_RESOLVED: {
+    title: 'Investigation Resolved',
+    icon: '✅',
+    iconColor: 'text-green-500',
+  },
+  ESCALATED_TO_ADMIN: {
+    title: 'Escalated to Admin',
+    icon: '⬆️',
+    iconColor: 'text-orange-500',
   },
 };
 

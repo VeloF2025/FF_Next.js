@@ -117,15 +117,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           user?.id || 'system'
         );
       } catch (activityError) {
-        log.warn('OltReportResolve', 'Failed to log activity (non-blocking)', { activityError, drNumber });
+        log.warn('Failed to log activity (non-blocking)', { activityError, drNumber }, 'OltReportResolve');
       }
 
-      log.info('OltReportResolve', 'Investigation resolved', {
+      log.info('Investigation resolved', {
         recordId,
         drNumber,
         resolutionType,
         resolvedBy: user?.email,
-      });
+      }, 'OltReportResolve');
 
       return apiResponse.success(res, {
         action: 'resolved',
@@ -186,7 +186,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           user?.id || 'system'
         );
       } catch (activityError) {
-        log.warn('OltReportResolve', 'Failed to log escalation activity (non-blocking)', { activityError, drNumber });
+        log.warn('Failed to log escalation activity (non-blocking)', { activityError, drNumber }, 'OltReportResolve');
       }
 
       // Send email notification to the admin
@@ -206,22 +206,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           },
         });
 
-        log.info('OltReportResolve', 'Escalation email sent', {
+        log.info('Escalation email sent', {
           recordId,
           drNumber,
           escalatedTo: targetUser.email,
-        });
+        }, 'OltReportResolve');
       } catch (emailError) {
         // Log but don't fail the request if email fails
-        log.error('OltReportResolve', 'Failed to send escalation email', { emailError });
+        log.error('Failed to send escalation email', { emailError }, 'OltReportResolve');
       }
 
-      log.info('OltReportResolve', 'Investigation escalated', {
+      log.info('Investigation escalated', {
         recordId,
         drNumber,
         escalatedTo: targetUser.email,
         escalatedBy: user?.email,
-      });
+      }, 'OltReportResolve');
 
       return apiResponse.success(res, {
         action: 'escalated',
@@ -233,7 +233,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.badRequest(res, 'Invalid action');
   } catch (error) {
-    log.error('OltReportResolve', 'API error', { error });
+    log.error('API error', { error }, 'OltReportResolve');
     return apiResponse.internalError(res, error);
   } finally {
     client.release();

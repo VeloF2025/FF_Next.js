@@ -25,23 +25,24 @@ import type {
 } from '@/types/technician.types';
 
 async function handler(
-  req: AuthenticatedNextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
+  const authReq = req as AuthenticatedNextApiRequest;
   try {
     switch (req.method) {
       case 'GET':
-        return handleGet(req, res);
+        return handleGet(authReq, res);
       case 'POST':
-        return handlePost(req, res);
+        return handlePost(authReq, res);
       case 'PUT':
-        return handlePut(req, res);
+        return handlePut(authReq, res);
       default:
-        return apiResponse.methodNotAllowed(res, ['GET', 'POST', 'PUT']);
+        return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST', 'PUT']);
     }
   } catch (error) {
-    log.error('TechniciansAPI', 'Request failed', { error });
-    return apiResponse.serverError(res, 'Internal server error');
+    log.error('Request failed', { error }, 'TechniciansAPI');
+    return apiResponse.internalError(res, error);
   }
 }
 
@@ -351,11 +352,11 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
       contractor || null,
       projects || [],
       notes || null,
-      req.user?.username || 'api',
+      req.user?.email || 'api',
     ]
   );
 
-  log.info('TechniciansAPI', `Created technician: ${name || phone}`, { type, phone });
+  log.info(`Created technician: ${name || phone}`, { type, phone }, 'TechniciansAPI');
 
   return apiResponse.created(res, { id: result.rows[0].id });
 }
@@ -401,7 +402,7 @@ async function handlePut(req: AuthenticatedNextApiRequest, res: NextApiResponse)
   }
 
   updates.push(`updated_by = $${paramIndex++}`);
-  values.push(req.user?.username || 'api');
+  values.push(req.user?.email || 'api');
 
   values.push(id);
 
@@ -414,7 +415,7 @@ async function handlePut(req: AuthenticatedNextApiRequest, res: NextApiResponse)
     return apiResponse.notFound(res, 'Technician', id);
   }
 
-  log.info('TechniciansAPI', `Updated technician: ${id}`, { by: req.user?.username });
+  log.info(`Updated technician: ${id}`, { by: req.user?.email }, 'TechniciansAPI');
 
   return apiResponse.success(res, { updated: true, id });
 }
