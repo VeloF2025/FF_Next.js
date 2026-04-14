@@ -2,7 +2,6 @@
 // Following FibreFlow Universal Module Structure
 
 // Main Layout and Navigation
-export { ProcurementLayout } from './components/layout/ProcurementLayout';
 export { ProcurementDashboard } from './components/ProcurementDashboard';
 
 // BOQ Management
@@ -53,11 +52,12 @@ export {
 
 // Stock Management
 export {
-  StockManagementDashboard,
-  StockDashboard,
-  GoodsReceipt,
-  StockMovements,
-  DrumTracking
+  StatusBadge,
+  StockStatsCards,
+  StockFilters,
+  StockItemCard,
+  MovementsTab,
+  TransfersTab
 } from './stock/components';
 
 // Purchase Orders
@@ -72,12 +72,9 @@ export {
 
 // Reporting
 export {
-  ProcurementReporting,
-  ProcurementKPIDashboard,
-  KPIDashboard,
-  CostAnalysis,
-  SupplierPerformance,
-  ComplianceReports
+  PnLReport,
+  CostBreakdownMatrix,
+  ProjectFinancialSummary
 } from './reporting/components';
 
 // Shared Components

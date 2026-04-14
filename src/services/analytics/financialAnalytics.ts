@@ -7,17 +7,49 @@ import { analyticsApi } from '@/services/api/analyticsApi';
 import type { FinancialOverview, CashFlowTrend } from './types';
 import { log } from '@/lib/logger';
 
+// Local types for the financial summary API response shape
+interface FinancialSummaryOverview {
+  totalInvoices: number;
+  totalRevenue: number;
+  totalExpenses: number;
+  netProfit: number;
+  profitMargin: number;
+  budgetUtilization: number;
+}
+
+interface FinancialSummaryCashFlow {
+  collectedRevenue: number;
+  pendingRevenue: number;
+  overdueInvoices: number;
+  netCashFlow: number;
+}
+
+interface FinancialSummaryResponse {
+  overview: FinancialSummaryOverview;
+  cashFlow: FinancialSummaryCashFlow;
+}
+
+interface RevenueTrendItem {
+  period: string;
+  collected: number;
+}
+
+interface TrendsResponse {
+  revenue?: { data?: RevenueTrendItem[] };
+}
+
 export class FinancialAnalyticsService {
   /**
    * Get financial overview
    */
   async getFinancialOverview(projectId?: string): Promise<FinancialOverview[]> {
     try {
-      const summary = await analyticsApi.getFinancialSummary(
+      const summaryRaw = await analyticsApi.getFinancialSummary(
         { type: 'monthly' },
         projectId
       );
-      
+      const summary = summaryRaw as unknown as FinancialSummaryResponse;
+
       // Transform API response to match FinancialOverview interface
       return [{
         totalInvoices: summary.overview.totalInvoices,
@@ -59,21 +91,22 @@ export class FinancialAnalyticsService {
       const endDate = new Date().toISOString();
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - months);
-      
-      const trends = await analyticsApi.getDashboardTrends(
+
+      const trendsRaw = await analyticsApi.getDashboardTrends(
         startDate.toISOString(),
         endDate,
         'month'
       );
-      
+      const trends = trendsRaw as unknown as TrendsResponse;
+
       // Extract revenue trends from API response
-      const revenueData = trends.revenue?.data || [];
-      
-      return revenueData.map((item: Record<string, unknown>) => ({
+      const revenueData = trends.revenue?.data ?? [];
+
+      return revenueData.map((item: RevenueTrendItem) => ({
         month: item.period,
-        income: item.collected || 0,
+        income: item.collected ?? 0,
         expenses: 0, // Not provided by current API
-        netFlow: item.collected || 0
+        netFlow: item.collected ?? 0
       }));
     } catch (error) {
       log.error('Failed to get cash flow trends:', { data: error }, 'financialAnalytics');

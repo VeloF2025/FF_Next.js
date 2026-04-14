@@ -1,7 +1,7 @@
 // SQL Helper Functions - Typed wrappers for common database queries
 // Uses the existing Neon SQL configuration from lib/db.js
 
-import { sql } from './pool.js';
+import { sql, query as dbQuery } from './pool.js';
 import type {
   Project,
   Client,
@@ -68,7 +68,7 @@ function safeDirection(dir: string): 'ASC' | 'DESC' {
 export async function getById<T>(table: string, id: string): Promise<SingleResult<T>> {
   assertValidTable(table);
   const result = await sql`
-    SELECT * FROM ${sql(table)}
+    SELECT * FROM ${sql.unsafe(table)}
     WHERE id = ${id}
     LIMIT 1
   `;
@@ -78,10 +78,10 @@ export async function getById<T>(table: string, id: string): Promise<SingleResul
 export async function deleteById(table: string, id: string): Promise<boolean> {
   assertValidTable(table);
   const result = await sql`
-    DELETE FROM ${sql(table)}
+    DELETE FROM ${sql.unsafe(table)}
     WHERE id = ${id}
   `;
-  return result.count > 0;
+  return (result as unknown as { count: number }).count > 0;
 }
 
 export async function count(table: string, filters?: FilterOptions): Promise<number> {
@@ -99,7 +99,7 @@ export async function count(table: string, filters?: FilterOptions): Promise<num
   }
 
   const values = filters ? Object.values(filters).filter(v => v !== undefined && v !== null) : [];
-  const result = await sql(query, values);
+  const result = await dbQuery(query, values);
   return (result as any[])[0]?.count || 0;
 }
 
@@ -115,7 +115,7 @@ export async function getClients(options?: QueryOptions): Promise<QueryResult<Cl
 
   return await sql`
     SELECT * FROM clients
-    ORDER BY ${sql(orderBy)} ${sql(orderDirection)}
+    ORDER BY ${sql.unsafe(orderBy)} ${sql.unsafe(orderDirection)}
     LIMIT ${limit}
     OFFSET ${offset}
   ` as QueryResult<Client>;
@@ -158,14 +158,14 @@ export async function updateClient(id: string, updates: Partial<Client>): Promis
   const setClause = safeFields.map((field, i) => `"${field}" = $${i + 2}`).join(', ');
   const values = [id, ...safeFields.map(f => updates[f as keyof Client])];
 
-  const query = `
+  const updateQuery = `
     UPDATE clients
     SET ${setClause}, updated_at = NOW()
     WHERE id = $1
     RETURNING *
   `;
 
-  const result = await sql(query, values);
+  const result = await dbQuery(updateQuery, values);
   return (result as any[])[0] as Client || null;
 }
 
@@ -229,14 +229,14 @@ export async function updateProject(id: string, updates: Partial<Project>): Prom
   const setClause = safeFields.map((field, i) => `"${field}" = $${i + 2}`).join(', ');
   const values = [id, ...safeFields.map(f => updates[f as keyof Project])];
 
-  const query = `
+  const updateQuery = `
     UPDATE projects
     SET ${setClause}, updated_at = NOW()
     WHERE id = $1
     RETURNING *
   `;
 
-  const result = await sql(query, values);
+  const result = await dbQuery(updateQuery, values);
   return (result as any[])[0] as Project || null;
 }
 
@@ -328,7 +328,7 @@ export async function updateSOWPoleStatus(id: string, status: string): Promise<b
     SET status = ${status}, updated_at = NOW()
     WHERE id = ${id}
   `;
-  return result.count > 0;
+  return (result as unknown as { count: number }).count > 0;
 }
 
 export async function updateSOWDropStatus(id: string, status: string): Promise<boolean> {
@@ -337,7 +337,7 @@ export async function updateSOWDropStatus(id: string, status: string): Promise<b
     SET status = ${status}, updated_at = NOW()
     WHERE id = ${id}
   `;
-  return result.count > 0;
+  return (result as unknown as { count: number }).count > 0;
 }
 
 // ============================================
@@ -500,7 +500,7 @@ export async function getKPIMetrics(
     LIMIT 1000
   `;
   
-  return await sql(query, values) as QueryResult<KpiMetrics>;
+  return await dbQuery(query, values) as QueryResult<KpiMetrics>;
 }
 
 // ============================================
@@ -604,7 +604,7 @@ export async function getPaginated<T>(
   }
 
   const countQuery = `SELECT COUNT(*) as total FROM ${table} ${whereClause}`;
-  const countResult = await sql(countQuery, values) as any[];
+  const countResult = await dbQuery(countQuery, values) as any[];
   const total = countResult[0]?.total || 0;
 
   values.push(pageSize, offset);
@@ -616,7 +616,7 @@ export async function getPaginated<T>(
     OFFSET $${paramIndex}
   `;
 
-  const data = await sql(dataQuery, values) as T[];
+  const data = await dbQuery(dataQuery, values) as T[];
 
   return {
     data,
@@ -638,7 +638,7 @@ export { transaction } from './pool.js';
 // ============================================
 
 export async function rawQuery<T>(query: string, values?: any[]): Promise<QueryResult<T>> {
-  return await sql(query, values) as QueryResult<T>;
+  return await dbQuery(query, values) as QueryResult<T>;
 }
 
 // Export the sql template tag for direct use when needed
