@@ -9,7 +9,9 @@
  */
 
 import pool from '@/lib/db';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('DrCategorizationService');
 import {
   categorizePhotos,
 } from '@/modules/activate/services/categorizationVlmService';
@@ -93,7 +95,7 @@ export async function runCategorizationPipeline(
   dropNumber: string,
   photos: PhotoInput[]
 ): Promise<CategorizationResult> {
-  log.info('DrCategorizationService', `Running VLM categorization for ${dropNumber}`);
+  log.info(`Running VLM categorization for ${dropNumber}`);
 
   await pool.query(
     `UPDATE dr_photo_unified_reviews
@@ -112,7 +114,6 @@ export async function runCategorizationPipeline(
 
     if (allErrors) {
       log.warn(
-        'DrCategorizationService',
         `All ${categorizations.length} categorizations are errors for ${dropNumber} — marking as failed`
       );
       await pool.query(
@@ -140,7 +141,7 @@ export async function runCategorizationPipeline(
       );
     }
 
-    log.info('DrCategorizationService', `Categorization complete for ${dropNumber}`, {
+    log.info(`Categorization complete for ${dropNumber}`, {
       photoCount: categorizations.length,
       errorCount,
       allErrors,
@@ -150,7 +151,7 @@ export async function runCategorizationPipeline(
 
     return { categorizationStatus: allErrors ? 'failed' : 'categorized' };
   } catch (catError) {
-    log.error('DrCategorizationService', `Categorization failed for ${dropNumber}`, catError);
+    log.error(`Categorization failed for ${dropNumber}`, { error: catError });
 
     const errorMessage = catError instanceof Error ? catError.message : 'Unknown error';
     await pool.query(
@@ -174,6 +175,6 @@ export async function runCategorizationPipeline(
 /** Fire-and-forget: compute 4-way serial verification badge */
 function fireSerialVerification(dropNumber: string): void {
   computeAndPersistVerification(dropNumber).catch((err) =>
-    log.error('DrCategorizationService', `Serial verification failed for ${dropNumber}`, err)
+    log.error(`Serial verification failed for ${dropNumber}`, { error: err })
   );
 }

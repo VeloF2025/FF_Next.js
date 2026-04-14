@@ -10,7 +10,9 @@
  */
 
 import pool from '@/lib/db';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('AutoQA');
 import {
   checkPrerequisites,
   checkStepCoverage,
@@ -105,7 +107,7 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
   const startTime = Date.now();
 
   try {
-    log.info('AutoQA', `Processing ${dropNumber}`);
+    log.info(`Processing ${dropNumber}`);
 
     // Fetch all needed data in one query
     const drResult = await pool.query(
@@ -218,7 +220,7 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
     }
 
     if (autoDiscardedCount > 0) {
-      log.info('AutoQA', `Auto-discarded ${autoDiscardedCount} within-DR duplicate(s) for ${dropNumber}`);
+      log.info(`Auto-discarded ${autoDiscardedCount} within-DR duplicate(s) for ${dropNumber}`);
     }
 
     // --- DATE MISMATCH CHECK: discard photos taken >2 days from DR submission ---
@@ -247,7 +249,7 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
 
       if (discardedPhotos.some((d) => d.reason.startsWith('Date mismatch'))) {
         const dateMismatchCount = discardedPhotos.filter((d) => d.reason.startsWith('Date mismatch')).length;
-        log.info('AutoQA', `Auto-discarded ${dateMismatchCount} photo(s) for date mismatch on ${dropNumber}`);
+        log.info(`Auto-discarded ${dateMismatchCount} photo(s) for date mismatch on ${dropNumber}`);
       }
     }
 
@@ -305,7 +307,7 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
       hasHumanRequired,
     }, 'system:auto-qa');
 
-    log.info('AutoQA', `Completed ${dropNumber}: ${decision}`, {
+    log.info(`Completed ${dropNumber}: ${decision}`, {
       passed, failed, reasons: autoFailResult.reasons,
     });
 
@@ -314,7 +316,7 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
     });
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
-    log.error('AutoQA', `Error processing ${dropNumber}: ${errMsg}`);
+    log.error(`Error processing ${dropNumber}: ${errMsg}`);
     return makeResult(dropNumber, startTime, { success: false, error: errMsg });
   }
 }

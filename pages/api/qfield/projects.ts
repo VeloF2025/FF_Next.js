@@ -6,7 +6,9 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('QFieldProjectsAPI');
 import { withAuth, withRole } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 
@@ -50,7 +52,7 @@ async function handleGet(_req: NextApiRequest, res: NextApiResponse) {
 
     return res.status(200).json({ success: true, data: result.rows });
   } catch (error: any) {
-    log.error('QFieldProjectsAPI', 'Failed to list projects', error);
+    log.error('Failed to list projects', { error });
     return res.status(500).json({ success: false, error: error.message });
   }
 }
@@ -93,17 +95,17 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       }
 
       await client.query('COMMIT');
-      log.info('QFieldProjectsAPI', `Created QField project: ${name}`, { qfield_project_id });
+      log.info(`Created QField project: ${name}`, { qfield_project_id });
       return res.status(201).json({ success: true, data: newProject });
     } catch (err) {
-      log.error('ProjectsApi', 'Operation failed', { error });
+      log.error('Operation failed', { error: err });
       await client.query('ROLLBACK');
       throw err;
     } finally {
       client.release();
     }
   } catch (error: any) {
-    log.error('QFieldProjectsAPI', 'Failed to create project', error);
+    log.error('Failed to create project', { error });
     if (error.code === '23505') {
       return res.status(409).json({ success: false, error: 'QField project with this ID already exists' });
     }

@@ -5,7 +5,9 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('QFieldDiscoverAPI');
 import { withAuth, withRole } from '@/lib/auth';
 import { getProjects } from '@/modules/qfield-sync/services/qfieldcloudApiService';
 import { apiResponse } from '@/lib/apiResponse';
@@ -17,7 +19,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     // Fetch all projects from QFieldCloud
-    const qfieldProjects = await getProjects();
+    const qfieldProjects = (await getProjects()) as Array<{
+      id: string;
+      name: string;
+      owner_id: string;
+      created_at: string;
+      updated_at: string;
+    }>;
 
     // Fetch already registered project IDs
     const registered = await pool.query('SELECT qfield_project_id FROM qfield_projects');
@@ -35,7 +43,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return res.status(200).json({ success: true, data: projects });
   } catch (error: any) {
-    log.error('QFieldDiscoverAPI', 'Failed to discover QFieldCloud projects', error);
+    log.error('Failed to discover QFieldCloud projects', { error });
     return res.status(500).json({ success: false, error: error.message });
   }
 }
