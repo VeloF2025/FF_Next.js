@@ -1,5 +1,5 @@
 // Check if we're in Edge Runtime (middleware)
-const isEdgeRuntime = typeof globalThis.EdgeRuntime !== 'undefined';
+const isEdgeRuntime = typeof (globalThis as Record<string, unknown>).EdgeRuntime !== 'undefined';
 
 // Check if we're in browser
 const isBrowser = typeof window !== 'undefined';

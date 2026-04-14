@@ -30,7 +30,7 @@ export default function MarketingActivationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
+    new Date().toISOString().split('T')[0] ?? ''
   );
 
   useEffect(() => {

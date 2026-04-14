@@ -69,7 +69,7 @@ export function CheckoutModal({ stockItemId: _stockItemId, stockItemName, serial
   useEffect(() => {
     const d = new Date();
     d.setDate(d.getDate() + 7);
-    setExpectedReturnDate(d.toISOString().split('T')[0]);
+    setExpectedReturnDate(d.toISOString().split('T')[0] ?? '');
   }, []);
 
   const filteredProjects = projects.filter(p =>

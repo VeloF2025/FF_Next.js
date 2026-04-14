@@ -74,7 +74,7 @@ export function validateSaId(idNumber: string): SaIdValidationResult {
   const gender: 'male' | 'female' = genderDigits >= 5000 ? 'male' : 'female';
 
   // Extract citizenship (digit 11, 0-based index 10)
-  const citizenshipDigit = parseInt(cleaned[10], 10);
+  const citizenshipDigit = parseInt(cleaned[10]!, 10);
   let citizenship: 'sa_citizen' | 'permanent_resident' | null = null;
   if (citizenshipDigit === 0) {
     citizenship = 'sa_citizen';
@@ -101,7 +101,7 @@ export function validateSaId(idNumber: string): SaIdValidationResult {
 function luhnCheck(idNumber: string): boolean {
   let sum = 0;
   for (let i = 0; i < 13; i++) {
-    let digit = parseInt(idNumber[i], 10);
+    let digit = parseInt(idNumber[i]!, 10);
     // Double every second digit from the right (0-indexed: positions 11, 9, 7, 5, 3, 1)
     if ((13 - i) % 2 === 0) {
       digit *= 2;

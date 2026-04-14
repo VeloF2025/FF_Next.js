@@ -139,7 +139,7 @@ export class PoleStatisticsService {
     for (let i = 0; i < days; i++) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      const dateKey = date.toISOString().split('T')[0];
+      const dateKey = date.toISOString().split('T')[0] ?? '';
       const stats = dailyStats.get(dateKey) || { completed: 0, started: 0 };
       
       result.unshift({

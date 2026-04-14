@@ -62,7 +62,7 @@ export function AdjustmentPanel() {
   const parseReason = (notes?: string): string => {
     if (!notes) return '-';
     const match = notes.match(/^\[([A-Z_]+)\]/);
-    return match ? match[1] : '-';
+    return match ? (match[1] ?? '-') : '-';
   };
 
   // Determine if adjustment is increase or decrease based on location names

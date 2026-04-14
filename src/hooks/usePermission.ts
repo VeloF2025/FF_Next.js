@@ -226,7 +226,7 @@ export function useAccessibleModules(): string[] {
     if (isLoading) return [];
 
     // Super admin can access all modules
-    if (currentUser?.permissions?.includes('all') || currentUser?.role === 'super_admin') {
+    if ((currentUser?.permissions as string[] | undefined)?.includes('all') || currentUser?.role === 'super_admin') {
       return [
         'dashboard',
         'projects',

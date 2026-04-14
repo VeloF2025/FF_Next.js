@@ -76,7 +76,7 @@ async function handler(
 
     const dateFromStr = Array.isArray(dateFrom) ? dateFrom[0] : dateFrom;
     const dateToStr = Array.isArray(dateTo) ? dateTo[0] : dateTo;
-    const projectFilter = project ? (Array.isArray(project) ? project[0] : project) : null;
+    const projectFilter = project ? (Array.isArray(project) ? (project[0] ?? null) : project) : null;
     // Check if projectFilter is a UUID or a project name
     const isUuid = projectFilter ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectFilter) : false;
     const viewMode = (Array.isArray(view) ? view[0] : view) as ActivationProgressView;

@@ -25,7 +25,7 @@ export const TableOfContents: React.FC<TableOfContentsProps> = ({
   className
 }) => {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set([currentSectionId])
+    new Set(currentSectionId ? [currentSectionId] : [])
   );
 
   const toggleSection = (sectionId: string) => {

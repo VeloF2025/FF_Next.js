@@ -148,8 +148,8 @@ export class MovementExecutor {
       success: true,
       result: {
         batchTransferId: `BTX-${Date.now()}`,
-        batches: retryStrategy.data.numberOfBatches,
-        batchInterval: `${retryStrategy.data.batchInterval / 1000} seconds`,
+        batches: retryStrategy.data.numberOfBatches as number,
+        batchInterval: `${(retryStrategy.data.batchInterval as number) / 1000} seconds`,
         totalEstimatedTime: retryStrategy.estimatedTime,
         monitoringEnabled: true
       },

@@ -66,7 +66,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     // Auto-mark all thread messages as read for this user
-    const allMessageIds = [threadId, ...replies.map((r: { id: string }) => r.id)];
+    const allMessageIds = [threadId, ...replies.map((r: Record<string, any>) => r.id as string)];
     await sql`
       UPDATE internal_message_recipients
       SET is_read = TRUE, read_at = NOW()

@@ -193,7 +193,7 @@ export class ApiResponseHelper {
       error: {
         code,
         message,
-        ...(details && { details }),
+        ...(details ? { details } : {}),
       },
       meta: this.generateMeta(meta),
     };

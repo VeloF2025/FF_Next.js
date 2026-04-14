@@ -138,7 +138,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         const fileBuffer = fs.readFileSync(uploadedFile.filepath);
         const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
         const firstSheetName = workbook.SheetNames[0]!;
-        const worksheet = workbook.Sheets[firstSheetName];
+        const worksheet = workbook.Sheets[firstSheetName]!;
 
         // Get raw array data (includes row 0 with project names, row 1 with headers)
         const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
@@ -336,7 +336,7 @@ function extractProjectDataFromExcel(rawData: any[][], projectName: string): any
   if (rawData.length < 2) return []; // Need at least headers and one data row
 
   // Detect format by checking if row 0 contains headers or project names
-  const firstRow = rawData[0];
+  const firstRow = rawData[0] ?? [];
   const isSimpleFormat = isHeaderRow(firstRow);
 
   if (isSimpleFormat) {

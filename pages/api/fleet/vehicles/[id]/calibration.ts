@@ -56,8 +56,8 @@ async function uploadCalibrationPhoto(
     throw new Error('Invalid image data URL');
   }
 
-  const extension = matches[1] === 'jpeg' ? 'jpg' : matches[1];
-  const base64Data = matches[2];
+  const extension = matches[1] === 'jpeg' ? 'jpg' : matches[1]!;
+  const base64Data = matches[2]!;
   const buffer = Buffer.from(base64Data, 'base64');
 
   const filename = `calibration-${vehicleId}-${Date.now()}.${extension}`;

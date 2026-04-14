@@ -57,10 +57,7 @@ const AuthoritiesPage: NextPage = () => {
   const { currentUser } = useAuth();
 
   return (
-    <AppLayout
-      title="Service Authorities"
-      description="Manage contact information for approval authorities"
-    >
+    <AppLayout>
       <div className="p-6">
         <div className="max-w-7xl mx-auto">
           <AuthorityManager currentUserId={currentUser?.id} />

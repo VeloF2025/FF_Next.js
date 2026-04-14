@@ -30,7 +30,7 @@ interface RelatedTicketsProps {
 function formatDate(dateString: string): string {
   try {
     const date = new Date(dateString);
-    return date.toISOString().split('T')[0];
+    return date.toISOString().split('T')[0] ?? '';
   } catch {
     return dateString;
   }

@@ -43,7 +43,7 @@ function getTopPatterns(grepCmd: string, limit: number = 15): Array<{ pattern: s
       .slice(0, limit)
       .map((line) => {
         const match = line.trim().match(/^\s*(\d+)\s+(.+)$/);
-        if (match) return { count: parseInt(match[1], 10), pattern: match[2] };
+        if (match) return { count: parseInt(match[1]!, 10), pattern: match[2]! };
         return { count: 0, pattern: line.trim() };
       })
       .filter((r) => r.count > 0);

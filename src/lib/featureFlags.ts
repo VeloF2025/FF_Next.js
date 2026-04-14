@@ -79,7 +79,7 @@ export function updateFeatureFlag(
   FEATURE_FLAGS[flagName] = {
     ...FEATURE_FLAGS[flagName],
     ...updates,
-  };
+  } as FeatureFlag;
 }
 
 /**

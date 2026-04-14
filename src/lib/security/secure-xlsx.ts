@@ -156,12 +156,12 @@ export class SecureXLSX {
       };
       
       workbook.SheetNames.forEach(sheetName => {
-        sanitizedWorkbook.Sheets[sheetName] = this.sanitizeWorksheet(
-          workbook.Sheets[sheetName],
-          options
-        );
+        const sheet = workbook.Sheets[sheetName];
+        if (sheet) {
+          sanitizedWorkbook.Sheets[sheetName] = this.sanitizeWorksheet(sheet, options);
+        }
       });
-      
+
       return sanitizedWorkbook;
     } catch (error) {
       log.error('Secure XLSX read failed:', { data: error }, 'secure-xlsx');
@@ -200,12 +200,12 @@ export class SecureXLSX {
       };
       
       workbook.SheetNames.forEach(sheetName => {
-        sanitizedWorkbook.Sheets[sheetName] = this.sanitizeWorksheet(
-          workbook.Sheets[sheetName],
-          options
-        );
+        const sheet = workbook.Sheets[sheetName];
+        if (sheet) {
+          sanitizedWorkbook.Sheets[sheetName] = this.sanitizeWorksheet(sheet, options);
+        }
       });
-      
+
       return XLSX.write(sanitizedWorkbook, {
         type: 'array',
         bookType: 'xlsx',

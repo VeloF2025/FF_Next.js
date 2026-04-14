@@ -80,6 +80,7 @@ const QUERIES: QueryDef[] = [
     format: 'table',
   },
   {
+    id: 'qa_summary',
     name: 'QA Summary',
     description: 'Get QA decision counts (total PASS/FAIL/REWORK)',
     sql: `SELECT qa_decision, COUNT(*) as count FROM dr_photo_unified_reviews WHERE qa_decision IS NOT NULL GROUP BY qa_decision ORDER BY count DESC`,

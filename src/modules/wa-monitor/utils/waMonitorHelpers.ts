@@ -259,7 +259,7 @@ export function parseDropNumber(dropNumber: string): { prefix: string; number: s
   if (!match) return null;
 
   return {
-    prefix: match[1],
-    number: match[2]
+    prefix: match[1]!,
+    number: match[2]!
   };
 }

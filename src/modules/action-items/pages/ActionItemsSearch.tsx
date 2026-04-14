@@ -168,7 +168,7 @@ export function ActionItemsSearch() {
               Found <span className="font-semibold">{items.length}</span> action items
             </p>
           </div>
-          <ActionItemsList items={items} onItemUpdated={handleSearch} />
+          <ActionItemsList items={items} onItemUpdated={() => handleSearch({ preventDefault: () => {} } as React.FormEvent)} />
         </>
       )}
 

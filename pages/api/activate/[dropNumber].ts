@@ -256,7 +256,7 @@ async function handleGet(
         }
         // Update stepCoverage in validations to match corrected photos
         if (review.auto_qa_results.validations?.stepCoverage) {
-          const covered = Array.from(coveredSteps).sort((a: number, b: number) => a - b);
+          const covered = Array.from(coveredSteps).sort((a, b) => (a as number) - (b as number));
           const missing = Array.from({ length: 10 }, (_, i) => i + 1).filter((s) => !coveredSteps.has(s));
           review.auto_qa_results.validations.stepCoverage = {
             covered,

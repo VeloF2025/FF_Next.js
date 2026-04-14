@@ -43,4 +43,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(withRole(['admin', 'system_admin'])(handler));
+export default withAuth(withRole('admin')(handler));

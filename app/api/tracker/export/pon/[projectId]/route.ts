@@ -88,7 +88,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
     }
 
     const buffer = await wb.xlsx.writeBuffer();
-    return new NextResponse(buffer as unknown as Buffer, {
+    return new NextResponse(new Uint8Array(buffer as ArrayBuffer), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="pon-tracker-${projectId}.xlsx"`,

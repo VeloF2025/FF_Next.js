@@ -128,11 +128,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         linkedToOneMap: velocityData.filter((r: any) => r.has_onemap).length,
 
         // Weekly velocity
-        weekEnding: velocityData[0]?.week_ending || null
+        weekEnding: velocityData[0]?.week_ending || null,
+
+        // Completion percentage
+        completionRate: 0 as number,
       };
 
-      // Calculate completion percentage
-      stats['completionRate'] = stats.total > 0
+      stats.completionRate = stats.total > 0
         ? Math.round((stats.completed / stats.total) * 100)
         : 0;
 

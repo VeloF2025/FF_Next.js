@@ -236,7 +236,7 @@ async function syncToSharePoint(
   let succeeded = 0;
   let failed = 0;
   let lastWrittenRow = nextRow - 1;
-  const syncDate = drops[0]?.date || new Date().toISOString().split('T')[0];
+  const syncDate = drops[0]?.date || (new Date().toISOString().split('T')[0] ?? '');
 
   // Write each project's data with retry
   for (let i = 0; i < drops.length; i++) {

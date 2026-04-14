@@ -72,8 +72,8 @@ export async function extractExifFromBuffer(buffer: Buffer): Promise<ExifResult>
     if (exif?.GPSInfo) {
       const gps = exif.GPSInfo;
       if (gps.GPSLatitude != null && gps.GPSLongitude != null) {
-        result.gpsLat = gps.GPSLatitude as number;
-        result.gpsLon = gps.GPSLongitude as number;
+        result.gpsLat = gps.GPSLatitude as unknown as number;
+        result.gpsLon = gps.GPSLongitude as unknown as number;
       }
     }
   } catch (err) {

@@ -101,7 +101,7 @@ export default async function handler(
       accessToken: config.access_token,
       refreshToken: config.refresh_token,
       expiresAt: config.token_expires_at ? new Date(config.token_expires_at) : undefined,
-    });
+    } as any);
 
     // Calculate since date (last sync or 24 hours ago)
     const sinceDate = config.last_sync_at

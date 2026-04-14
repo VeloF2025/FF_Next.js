@@ -105,8 +105,8 @@ export function useHelpCenter(): UseHelpCenterReturn {
     );
   }, [flatNav, currentSectionId, currentSubsectionId]);
 
-  const prevItem = currentNavIndex > 0 ? flatNav[currentNavIndex - 1] : null;
-  const nextItem = currentNavIndex >= 0 && currentNavIndex < flatNav.length - 1 ? flatNav[currentNavIndex + 1] : null;
+  const prevItem = currentNavIndex > 0 ? (flatNav[currentNavIndex - 1] ?? null) : null;
+  const nextItem = currentNavIndex >= 0 && currentNavIndex < flatNav.length - 1 ? (flatNav[currentNavIndex + 1] ?? null) : null;
 
   const goBack = () => {
     if (prevItem) setCurrentSection(prevItem.sectionId, prevItem.subsectionId);

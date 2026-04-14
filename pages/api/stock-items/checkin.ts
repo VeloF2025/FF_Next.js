@@ -86,4 +86,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(withArcjetProtection(withErrorHandler(handler), aj));
+export default withAuth(withArcjetProtection(withErrorHandler(handler) as any, aj));

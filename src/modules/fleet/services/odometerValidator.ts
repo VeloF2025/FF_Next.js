@@ -90,7 +90,7 @@ function detectDigitConfusionValidation(
   const diffPositions: { pos: number; extracted: string; previous: string }[] = [];
   for (let i = 0; i < extractedStr.length; i++) {
     if (extractedStr[i] !== previousStr[i]) {
-      diffPositions.push({ pos: i, extracted: extractedStr[i], previous: previousStr[i] });
+      diffPositions.push({ pos: i, extracted: extractedStr[i]!, previous: previousStr[i]! });
     }
   }
 

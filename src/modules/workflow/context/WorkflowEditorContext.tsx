@@ -779,7 +779,7 @@ export function WorkflowEditorProvider({ children }: WorkflowEditorProviderProps
 
   const getSelectedNode = useCallback((): EditorNode | undefined => {
     if (state.selectedNodes.length === 1) {
-      return getNodeById(state.selectedNodes[0]);
+      return getNodeById(state.selectedNodes[0]!);
     }
     return undefined;
   }, [state.selectedNodes, getNodeById]);

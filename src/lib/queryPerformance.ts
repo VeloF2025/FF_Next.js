@@ -28,7 +28,7 @@ interface QueryStats {
 class QueryPerformanceMonitor {
   private metrics: QueryMetric[] = [];
   private readonly maxMetrics = 1000; // Keep last 1000 queries
-  private readonly slowQueryThreshold = 100; // 100ms
+  private slowQueryThreshold = 100; // 100ms
   private enabled: boolean = false;
 
   constructor() {

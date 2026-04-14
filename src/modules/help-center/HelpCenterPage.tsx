@@ -135,7 +135,7 @@ export const HelpCenterPage: React.FC = () => {
           <TableOfContents
             sections={sections}
             currentSectionId={currentSection?.id}
-            currentSubsectionId={currentSubsection}
+            currentSubsectionId={currentSubsection ?? undefined}
             onSectionClick={handleSectionSelect}
             className="h-full"
           />
@@ -222,7 +222,7 @@ export const HelpCenterPage: React.FC = () => {
                     {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-[var(--ff-text-tertiary)] flex-shrink-0" />}
                     {i < breadcrumbs.length - 1 ? (
                       <button
-                        onClick={() => crumb.sectionId ? setCurrentSection(crumb.sectionId, crumb.subsectionId) : setCurrentSection(sections[0]?.id)}
+                        onClick={() => crumb.sectionId ? setCurrentSection(crumb.sectionId, crumb.subsectionId) : setCurrentSection(sections[0]?.id ?? '')}
                         className="text-[var(--ff-primary)] hover:underline truncate max-w-[200px]"
                       >
                         {i === 0 ? <Home className="w-3.5 h-3.5 inline -mt-0.5 mr-1" /> : null}

@@ -205,4 +205,4 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
 }
 
-export default withAuth(withArcjetProtection(handler, aj));
+export default withAuth(withArcjetProtection(handler as any, aj));

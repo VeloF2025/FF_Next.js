@@ -8,6 +8,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { qfieldApiRequest } from '@/modules/qfield-sync/services/qfieldcloudApiService';
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {

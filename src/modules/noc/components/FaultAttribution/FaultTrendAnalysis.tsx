@@ -142,7 +142,7 @@ export function FaultTrendAnalysis({
       success: 'bg-green-500',
       default: 'bg-[var(--ff-bg-tertiary)]',
     };
-    return colorMap[metadata.color] || colorMap.default;
+    return colorMap[metadata.color ?? 'default'] || colorMap.default;
   };
 
   // 🟢 WORKING: Loading state

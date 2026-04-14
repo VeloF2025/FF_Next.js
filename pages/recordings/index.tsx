@@ -243,7 +243,6 @@ export default function RecordingsPage() {
                                             aria-label={`Download recording: ${recording.roomName}`}
                                             className="px-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"
                                             title="Download"
-                                            aria-label="Download recording"
                                         >
                                             <Download className="w-4 h-4" />
                                         </button>

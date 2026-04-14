@@ -334,12 +334,12 @@ export async function notifySnagGroupOnStatusChange(
     // Resolution/closure: send with after photos
     if (afterPhotoUrls && afterPhotoUrls.length > 0 && isResolution) {
       try {
-        await sendWhatsAppGroupImage(groupJid, message, afterPhotoUrls[0]);
+        await sendWhatsAppGroupImage(groupJid, message, afterPhotoUrls[0]!);
         for (let i = 1; i < afterPhotoUrls.length; i++) {
           await sendWhatsAppGroupImage(
             groupJid,
             `📷 ${ticket.ticket_uid} — photo ${i + 1}/${afterPhotoUrls.length}`,
-            afterPhotoUrls[i]
+            afterPhotoUrls[i]!
           );
         }
         logger.info('Snag ticket resolution with photos sent to WA group', {

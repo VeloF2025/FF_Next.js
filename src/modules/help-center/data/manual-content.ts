@@ -4678,9 +4678,9 @@ export function searchManual(query: string, sections: ManualSection[]): SearchRe
     const matchesSection = searchTerms.every(term => sectionContent.includes(term));
     
     if (matchesSection && section.content.trim()) {
-      const matchIndex = sectionContent.indexOf(searchTerms[0]);
+      const matchIndex = sectionContent.indexOf(searchTerms[0] ?? '');
       const context = extractContext(section.content, matchIndex, 200);
-      
+
       results.push({
         sectionId: section.id,
         sectionTitle: section.title,
@@ -4688,14 +4688,14 @@ export function searchManual(query: string, sections: ManualSection[]): SearchRe
         matchedText: context
       });
     }
-    
+
     // Search in subsections
     section.subsections.forEach(subsection => {
       const subsectionContent = subsection.content.toLowerCase();
       const matchesSubsection = searchTerms.every(term => subsectionContent.includes(term));
-      
+
       if (matchesSubsection && subsection.content.trim()) {
-        const matchIndex = subsectionContent.indexOf(searchTerms[0]);
+        const matchIndex = subsectionContent.indexOf(searchTerms[0] ?? '');
         const context = extractContext(subsection.content, matchIndex, 200);
         
         results.push({

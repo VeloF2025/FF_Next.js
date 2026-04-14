@@ -292,7 +292,7 @@ export default function GRNListPage() {
                               {grn.grnNumber}
                             </span>
                             {grn.hasDiscrepancy && (
-                              <AlertCircle className="h-4 w-4 text-red-400" title="Has discrepancy" />
+                              <AlertCircle className="h-4 w-4 text-red-400" aria-label="Has discrepancy" />
                             )}
                           </div>
                         </td>

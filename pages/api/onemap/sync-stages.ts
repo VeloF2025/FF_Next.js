@@ -97,7 +97,7 @@ async function handler(
 
   const errors: string[] = [];
   const stagesUpdated: Record<BuildStage, number> = {
-    permissions: 0, poles: 0, cwc: 0, optical: 0, atp: 0, activation: 0,
+    permissions: 0, poles: 0, cwc: 0, optical: 0, atp: 0, activation: 0, maintenance: 0,
   };
 
   try {

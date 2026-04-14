@@ -40,7 +40,7 @@ export function excelDateToISO(val: unknown): string | null {
   if (!val || val === 0) return null;
   if (typeof val === 'number' && val > 1000) {
     const d = new Date(Date.UTC(1899, 11, 30) + val * 86400000);
-    return d.toISOString().split('T')[0];
+    return d.toISOString().split('T')[0] ?? null;
   }
   if (typeof val === 'string' && val.match(/^\d{4}-\d{2}/)) {
     return val.substring(0, 10);
@@ -81,7 +81,7 @@ export function mapRowData(rowData: unknown[], headerMap: Map<number, keyof SpPo
     } else if (dbCol === 'blockage') {
       row[dbCol] = rawVal ? String(rawVal).trim() || null : null;
     } else {
-      row[dbCol] = coerceNumber(rawVal);
+      (row as Record<string, unknown>)[dbCol] = coerceNumber(rawVal);
     }
   }
   return row;

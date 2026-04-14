@@ -44,7 +44,7 @@ function ChecklistsContent() {
   });
 
   // Extract unique categories for filter
-  const categories = [...new Set(templates.map((t: any) => t.category).filter(Boolean))];
+  const categories = [...new Set(templates.map((t: any) => t.category as string).filter(Boolean))];
 
   if (isLoading) {
     return (

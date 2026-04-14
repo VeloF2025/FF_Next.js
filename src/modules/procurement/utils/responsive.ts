@@ -106,9 +106,9 @@ export const mobileUtils = {
     const currentIndex = availableTabs.indexOf(currentTab);
     
     if (direction === 'left' && currentIndex < availableTabs.length - 1) {
-      onTabChange(availableTabs[currentIndex + 1]);
+      onTabChange(availableTabs[currentIndex + 1]!);
     } else if (direction === 'right' && currentIndex > 0) {
-      onTabChange(availableTabs[currentIndex - 1]);
+      onTabChange(availableTabs[currentIndex - 1]!);
     }
   },
   

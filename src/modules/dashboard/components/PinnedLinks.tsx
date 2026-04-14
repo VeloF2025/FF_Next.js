@@ -93,7 +93,7 @@ export function PinnedLinks() {
     if (dragIndex !== null && dragOverIndex !== null && dragIndex !== dragOverIndex) {
       const reordered = [...pins];
       const [moved] = reordered.splice(dragIndex, 1);
-      reordered.splice(dragOverIndex, 0, moved);
+      if (moved) reordered.splice(dragOverIndex, 0, moved);
       setPins(reordered);
       saveOrder(reordered);
     }

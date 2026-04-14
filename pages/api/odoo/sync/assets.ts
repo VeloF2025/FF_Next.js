@@ -136,4 +136,4 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
   });
 }
 
-export default withAuth(withErrorHandler(handler));
+export default withAuth(withErrorHandler(handler as any));

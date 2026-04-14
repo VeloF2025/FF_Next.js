@@ -657,7 +657,7 @@ export default function VehiclePortalPage() {
           fuelLevelAfter: fuelForm.fuelLevelAfter
             ? parseInt(fuelForm.fuelLevelAfter, 10)
             : undefined,
-          driverName: portalDriver?.name || session?.driverName,
+          driverName: portalDriver?.name || session?.driverName || undefined,
           receiptPhoto: receiptPhotoFile
             ? { file: receiptPhotoFile, previewUrl: receiptPhotoUrl || '' }
             : undefined,
@@ -761,7 +761,7 @@ export default function VehiclePortalPage() {
           fuelLevelAfter: fuelForm.fuelLevelAfter
             ? parseInt(fuelForm.fuelLevelAfter, 10)
             : undefined,
-          driverName: portalDriver?.name || session?.driverName,
+          driverName: portalDriver?.name || session?.driverName || undefined,
           receiptPhoto: receiptPhotoFile
             ? { file: receiptPhotoFile, previewUrl: receiptPhotoUrl || '' }
             : undefined,

@@ -327,7 +327,7 @@ async function handler(
         UPDATE onemap_imports 
         SET 
           status = 'failed',
-          error_message = ${error.message},
+          error_message = ${error instanceof Error ? error.message : String(error)},
           completed_at = NOW()
         WHERE id = ${importId}
       `;

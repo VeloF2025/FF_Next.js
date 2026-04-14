@@ -198,7 +198,7 @@ export const MOTIVATIONAL_QUOTES: MotivationalQuote[] = [
  */
 export function getRandomQuote(): MotivationalQuote {
   const index = Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length);
-  return MOTIVATIONAL_QUOTES[index];
+  return MOTIVATIONAL_QUOTES[index]!;
 }
 
 /**

@@ -135,7 +135,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Step 5: Upload cropped face to VF Storage
     const formData = new FormData();
-    const blob = new Blob([croppedBuffer], { type: 'image/jpeg' });
+    const blob = new Blob([new Uint8Array(croppedBuffer)], { type: 'image/jpeg' });
     formData.append('file', blob, `id-photo-${staffId}.jpg`);
 
     const uploadResponse = await fetch(`${VF_STORAGE_URL}/upload/staff/photos`, {

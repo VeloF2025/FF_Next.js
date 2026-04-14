@@ -568,7 +568,7 @@ export default function RFQDetailPage() {
                                 )}
                                 <div className="pt-4 border-t border-[var(--ff-border-light)] space-y-2">
                                   <Button
-                                    variant="default"
+                                    variant="secondary"
                                     className="w-full"
                                     onClick={() => router.push(`/procurement/quotes/${selectedQuote.id}`)}
                                   >

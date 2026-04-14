@@ -195,13 +195,6 @@ async function handleGet(
     page: Math.floor(offsetNum / limitNum) + 1,
     pageSize: limitNum,
     total,
-    meta: {
-      summary: {
-        unresolved: parseInt(summaryRows[0]?.unresolved || '0', 10),
-        criticalUnresolved: parseInt(summaryRows[0]?.critical_unresolved || '0', 10),
-        warningUnresolved: parseInt(summaryRows[0]?.warning_unresolved || '0', 10),
-      },
-    },
   });
 }
 

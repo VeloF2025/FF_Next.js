@@ -9,13 +9,13 @@ import {
   DropManagement 
 } from './components/index';
 
-interface PoleCaptureMobileProps {
-  projectId: string;
-  onSave: (data: Partial<PoleData>) => Promise<void>;
-  onCancel: () => void;
+export interface PoleCaptureMobileProps {
+  projectId?: string;
+  onSave?: (data: Partial<PoleData>) => Promise<void>;
+  onCancel?: () => void;
 }
 
-export function PoleCaptureMobile({ projectId, onSave, onCancel }: PoleCaptureMobileProps) {
+export function PoleCaptureMobile({ projectId = '', onSave, onCancel }: PoleCaptureMobileProps) {
   const {
     formData,
     setFormData,
@@ -34,14 +34,14 @@ export function PoleCaptureMobile({ projectId, onSave, onCancel }: PoleCaptureMo
 
   const handleSubmit = async () => {
     const poleData = validateAndPrepareSaveData();
-    if (poleData) {
+    if (poleData && onSave) {
       await onSave(poleData);
     }
   };
 
   return (
     <div className="min-h-screen bg-[var(--ff-bg-tertiary)] pb-20">
-      <PoleFormHeader onCancel={onCancel} />
+      <PoleFormHeader onCancel={onCancel ?? (() => {})} />
 
       <div className="p-4 space-y-4">
         {/* Pole Number */}

@@ -119,7 +119,7 @@ export class TextProcessor {
     while ((match = specRegex.exec(text)) !== null) {
       specs.push({
         value: parseFloat(match[1]),
-        unit: match[2]!.toLowerCase()
+        unit: (match[2] ?? '').toLowerCase()
       });
     }
     

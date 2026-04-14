@@ -133,7 +133,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
 
       // Calculate statistics
-      const stats = {
+      const stats: { total: number; linked: number; unlinked: number; linkingRate: number; matchTypes?: Record<string, number> } = {
         total: properties.length,
         linked: properties.filter(p => p.sow_pole_number || p.sow_drop_number).length,
         unlinked: properties.filter(p => !p.sow_pole_number && !p.sow_drop_number).length,
@@ -146,13 +146,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       // Add match type breakdown if enhanced mode
       if (matchingMode === 'enhanced') {
-        const matchTypes = properties.reduce((acc: any, p: any) => {
+        const matchTypes = properties.reduce((acc: Record<string, number>, p: any) => {
           if (p.match_type) {
             acc[p.match_type] = (acc[p.match_type] || 0) + 1;
           }
           return acc;
         }, {});
-        stats['matchTypes'] = matchTypes;
+        stats.matchTypes = matchTypes;
       }
 
       return res.status(200).json({

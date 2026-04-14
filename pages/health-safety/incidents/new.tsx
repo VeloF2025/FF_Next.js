@@ -54,7 +54,7 @@ function NewIncidentContent() {
   const [form, setForm] = useState<FormState>({
     incident_type: 'injury',
     severity: 'moderate',
-    incident_date: new Date().toISOString().split('T')[0],
+    incident_date: new Date().toISOString().split('T')[0] ?? '',
     incident_time: '',
     title: '',
     description: '',

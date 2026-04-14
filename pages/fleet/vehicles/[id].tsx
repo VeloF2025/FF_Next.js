@@ -2909,7 +2909,7 @@ function FuelSpendTab({
                     if (file) {
                       const reader = new FileReader();
                       reader.onload = async () => {
-                        const base64 = (reader.result as string).split(',')[1];
+                        const base64 = (reader.result as string).split(',')[1] ?? '';
                         await handleScanReceipt(base64);
                       };
                       reader.readAsDataURL(file);

@@ -177,7 +177,7 @@ export function EmploymentEditSection({ formData, handleInputChange, toggleSkill
               <SelectContent>
                 <SelectItem value="__none__">No Direct Manager</SelectItem>
                 {potentialManagers.map(manager => (
-                  <SelectItem key={manager.id} value={manager.id}>
+                  <SelectItem key={manager.id} value={manager.id ?? ''}>
                     {manager.name} - {manager.position}
                   </SelectItem>
                 ))}

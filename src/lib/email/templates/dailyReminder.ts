@@ -168,7 +168,7 @@ function escapeHtml(text: string): string {
     '"': '&quot;',
     "'": '&#039;'
   };
-  return text.replace(/[&<>"']/g, m => map[m]);
+  return text.replace(/[&<>"']/g, m => map[m as keyof typeof map] ?? m);
 }
 
 function formatDate(dateString: string): string {
@@ -187,8 +187,8 @@ function formatDate(dateString: string): string {
   } else if (date.getTime() === tomorrow.getTime()) {
     return 'Tomorrow';
   } else if (date < today) {
-    return `Overdue (${date.toISOString().split('T')[0]})`;
+    return `Overdue (${date.toISOString().split('T')[0] ?? ''})`;
   } else {
-    return date.toISOString().split('T')[0];
+    return date.toISOString().split('T')[0] ?? '';
   }
 }

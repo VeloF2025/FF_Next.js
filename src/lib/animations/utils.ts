@@ -16,11 +16,11 @@ export const reduceMotionVariants = (variants: Variants): Variants => {
         ...variant,
         transition: { duration: 0.01, ease: 'linear' }
       };
-    } else {
+    } else if (variant !== undefined) {
       reducedVariants[key] = variant;
     }
   });
-  
+
   return reducedVariants;
 };
 
@@ -58,10 +58,10 @@ export const withDelay = (variants: Variants, delay: number): Variants => {
           delay
         }
       };
-    } else {
+    } else if (variant !== undefined) {
       delayedVariants[key] = variant;
     }
   });
-  
+
   return delayedVariants;
 };

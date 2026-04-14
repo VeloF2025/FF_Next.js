@@ -164,7 +164,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     ];
 
     // Group 6: Approval columns (dynamic)
-    const approvalCols: Partial<ExcelJS.Column>[] = approvalTypes.map((at: { id: string; name: string }) => ({
+    const approvalCols: Partial<ExcelJS.Column>[] = approvalTypes.map((at: Record<string, any>) => ({
       header: at.name,
       key: `approval_${at.id}`,
       width: 16,
