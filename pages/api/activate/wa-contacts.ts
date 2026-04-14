@@ -14,9 +14,11 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
+
+const log = createLogger('WAContacts');
 
 export interface WAContact {
   id: string;
@@ -129,7 +131,7 @@ async function getContacts(req: AuthenticatedNextApiRequest, res: NextApiRespons
     });
   } catch (error) {
     log.error('Failed to fetch WA contacts', { error });
-    return apiResponse.serverError(res, 'Failed to fetch contacts');
+    return apiResponse.internalError(res, error,'Failed to fetch contacts');
   }
 }
 
@@ -168,19 +170,19 @@ async function createContact(req: AuthenticatedNextApiRequest, res: NextApiRespo
         input.staff_id || null,
         input.is_active !== false,
         input.notes || null,
-        req.user?.username || 'api',
+        req.user?.email || 'api',
       ]
     );
 
     log.info('WA contact created', {
       phone: input.sender_phone,
-      by: req.user?.username,
+      by: req.user?.email,
     });
 
     return apiResponse.created(res, result.rows[0]);
   } catch (error) {
     log.error('Failed to create WA contact', { error, input });
-    return apiResponse.serverError(res, 'Failed to create contact');
+    return apiResponse.internalError(res, error,'Failed to create contact');
   }
 }
 
@@ -221,7 +223,7 @@ async function updateContact(req: AuthenticatedNextApiRequest, res: NextApiRespo
     }
 
     updates.push(`updated_by = $${paramIndex++}`);
-    values.push(req.user?.username || 'api');
+    values.push(req.user?.email || 'api');
 
     values.push(input.id);
 
@@ -234,12 +236,12 @@ async function updateContact(req: AuthenticatedNextApiRequest, res: NextApiRespo
       return apiResponse.notFound(res, 'WAContact', input.id);
     }
 
-    log.info('WA contact updated', { id: input.id, by: req.user?.username });
+    log.info('WA contact updated', { id: input.id, by: req.user?.email });
 
     return apiResponse.success(res, result.rows[0]);
   } catch (error) {
     log.error('Failed to update WA contact', { error, input });
-    return apiResponse.serverError(res, 'Failed to update contact');
+    return apiResponse.internalError(res, error,'Failed to update contact');
   }
 }
 
@@ -263,13 +265,13 @@ async function deleteContact(req: AuthenticatedNextApiRequest, res: NextApiRespo
     log.info('WA contact deleted', {
       id,
       phone: result.rows[0].sender_phone,
-      by: req.user?.username,
+      by: req.user?.email,
     });
 
     return apiResponse.success(res, { deleted: true, id });
   } catch (error) {
     log.error('Failed to delete WA contact', { error, id });
-    return apiResponse.serverError(res, 'Failed to delete contact');
+    return apiResponse.internalError(res, error,'Failed to delete contact');
   }
 }
 
@@ -298,31 +300,32 @@ async function getUnmappedPhones(res: NextApiResponse) {
     });
   } catch (error) {
     log.error('Failed to fetch unmapped phones', { error });
-    return apiResponse.serverError(res, 'Failed to fetch unmapped phones');
+    return apiResponse.internalError(res, error,'Failed to fetch unmapped phones');
   }
 }
 
 async function handler(
-  req: AuthenticatedNextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
+  const authReq = req as AuthenticatedNextApiRequest;
   // Special endpoint for unmapped phones
-  if (req.query.unmapped === 'true' && req.method === 'GET') {
+  if (authReq.query.unmapped === 'true' && authReq.method === 'GET') {
     return getUnmappedPhones(res);
   }
 
-  switch (req.method) {
+  switch (authReq.method) {
     case 'GET':
-      return getContacts(req, res);
+      return getContacts(authReq, res);
     case 'POST':
-      return createContact(req, res);
+      return createContact(authReq, res);
     case 'PUT':
-      return updateContact(req, res);
+      return updateContact(authReq, res);
     case 'DELETE':
-      return deleteContact(req, res);
+      return deleteContact(authReq, res);
     default:
-      return apiResponse.methodNotAllowed(res, ['GET', 'POST', 'PUT', 'DELETE']);
+      return apiResponse.methodNotAllowed(res, authReq.method || 'UNKNOWN', ['GET', 'POST', 'PUT', 'DELETE']);
   }
 }
 
-export default withAuth(withRole(['admin', 'manager'], handler));
+export default withAuth(withRole('manager')(handler));

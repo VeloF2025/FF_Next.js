@@ -15,7 +15,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import pool from '@/lib/db';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('CategorizePhotos');
 import {
   categorizePhotos,
   PhotoInput,
@@ -50,7 +52,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber is required');
     }
 
-    log.info('CategorizePhotos', `Starting categorization for ${dropNumber}`, { force, batchSize });
+    log.info(`Starting categorization for ${dropNumber}`, { force, batchSize });
 
     // Check if already categorized (skip unless forced)
     if (!force) {
@@ -66,7 +68,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
         if (existing.vlm_categorization_status === 'categorized' ||
             existing.vlm_categorization_status === 'approved') {
-          log.info('CategorizePhotos', `Already categorized for ${dropNumber}, skipping`);
+          log.info(`Already categorized for ${dropNumber}, skipping`);
 
           return apiResponse.success(res, {
             dropNumber,
@@ -89,12 +91,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     );
 
     // Fetch photos from OneMap with robust retry logic
-    log.info('CategorizePhotos', `Fetching photos for ${dropNumber} with retry`);
+    log.info(`Fetching photos for ${dropNumber} with retry`);
     const fetchResult = await fetchPhotosWithRetry(dropNumber, {
       maxRetries: 5,
       initialDelayMs: 2000,
       onStatusUpdate: (status) => {
-        log.debug('CategorizePhotos', `Photo fetch status: ${status.message}`, {
+        log.debug(`Photo fetch status: ${status.message}`, {
           dropNumber,
           attempt: status.attempt,
           status: status.status,
@@ -104,7 +106,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
     const { photos, ont_barcode, ups_serial, fetchAttempts, downloadTriggered, totalWaitTimeMs } = fetchResult;
 
-    log.info('CategorizePhotos', `Photo fetch complete for ${dropNumber}`, {
+    log.info(`Photo fetch complete for ${dropNumber}`, {
       photoCount: photos.length,
       fetchAttempts,
       downloadTriggered,
@@ -122,7 +124,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       return apiResponse.error(res, ErrorCode.NOT_FOUND, `No photos found for ${dropNumber}`);
     }
 
-    log.info('CategorizePhotos', `Found ${photos.length} photos for ${dropNumber}`);
+    log.info(`Found ${photos.length} photos for ${dropNumber}`);
 
     // Run VLM categorization
     const categorizations = await categorizePhotos(dropNumber, photos, batchSize);
@@ -149,7 +151,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       autoApprovalTiers = assignTiers(categorizations, stepAccuracy);
       autoApprovalSummary = buildSummary(autoApprovalTiers, stepAccuracy);
 
-      log.info('CategorizePhotos', `Auto-approval tiers for ${dropNumber}`, {
+      log.info(`Auto-approval tiers for ${dropNumber}`, {
         auto: autoApprovalSummary.autoApproved,
         review: autoApprovalSummary.reviewRecommended,
         human: autoApprovalSummary.humanRequired,
@@ -158,12 +160,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
           : 'N/A',
       });
     } catch (tierError) {
-      log.warn('CategorizePhotos', 'Auto-approval tier assignment failed, falling back', tierError);
+      log.warn('Auto-approval tier assignment failed, falling back', { tierError });
     }
 
     const processingTimeMs = Date.now() - startTime;
 
-    log.info('CategorizePhotos', `Categorization complete for ${dropNumber}`, {
+    log.info(`Categorization complete for ${dropNumber}`, {
       photoCount: categorizations.length,
       processingTimeMs,
     });
@@ -180,7 +182,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
     return apiResponse.success(res, response);
   } catch (error) {
-    log.error('CategorizePhotos', 'Error during categorization', error);
+    log.error('Error during categorization', { error });
 
     // Try to update status to failed
     try {
@@ -194,7 +196,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         );
       }
     } catch (dbError) {
-      log.error('CategorizePhotos', 'Failed to update status to failed', dbError);
+      log.error('Failed to update status to failed', { error: dbError });
     }
 
     return apiResponse.internalError(res, error);
@@ -236,7 +238,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       categorizations.length > 0 &&
       categorizations.every((c: Record<string, unknown>) => !c.vlm_predicted_step && !c.photo_filename)
     ) {
-      log.warn('CategorizePhotos', `Detected corrupted VLM results for ${dropNumber}, resetting to pending`);
+      log.warn(`Detected corrupted VLM results for ${dropNumber}, resetting to pending`);
       status = 'pending';
       categorizations = [];
     }
@@ -250,7 +252,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
         autoApprovalTiers = assignTiers(categorizations, stepAccuracy);
         autoApprovalSummary = buildSummary(autoApprovalTiers, stepAccuracy);
       } catch (tierError) {
-        log.warn('CategorizePhotos', 'Failed to compute auto-approval tiers for GET', tierError);
+        log.warn('Failed to compute auto-approval tiers for GET', { error: tierError });
       }
     }
 
@@ -265,7 +267,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       autoApprovalSummary,
     });
   } catch (error) {
-    log.error('CategorizePhotos', 'Error getting categorization', error);
+    log.error('Error getting categorization', { error });
     return apiResponse.internalError(res, error);
   }
 }

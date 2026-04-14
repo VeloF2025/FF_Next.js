@@ -213,6 +213,16 @@ export class ApiResponseHelper {
   }
 
   /**
+   * Send conflict error response (409)
+   */
+  static conflict(
+    res: NextApiResponse,
+    message = 'Resource already exists'
+  ): void {
+    this.error(res, ErrorCode.CONFLICT, message);
+  }
+
+  /**
    * Send validation error response
    */
   static validationError(
@@ -359,6 +369,7 @@ export const apiResponse = {
   paginated: ApiResponseHelper.paginated.bind(ApiResponseHelper),
   error: ApiResponseHelper.error.bind(ApiResponseHelper),
   badRequest: ApiResponseHelper.badRequest.bind(ApiResponseHelper),
+  conflict: ApiResponseHelper.conflict.bind(ApiResponseHelper),
   validationError: ApiResponseHelper.validationError.bind(ApiResponseHelper),
   notFound: ApiResponseHelper.notFound.bind(ApiResponseHelper),
   unauthorized: ApiResponseHelper.unauthorized.bind(ApiResponseHelper),

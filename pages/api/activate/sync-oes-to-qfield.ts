@@ -15,7 +15,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import https from 'https';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('OESSync');
 import { withAuth, withRole } from '@/lib/auth';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
@@ -46,7 +48,7 @@ async function getSyncTargetProjectIds(specificProjectId?: string): Promise<stri
       return result.rows.map((r: any) => r.qfield_project_id);
     }
   } catch {
-    log.warn('OESSync', 'Failed to query QField projects from DB, using fallback');
+    log.warn('Failed to query QField projects from DB, using fallback');
   }
   return [FALLBACK_PROJECT_ID];
 }
@@ -140,7 +142,7 @@ async function qfieldApiRequest(
           try {
             resolve(JSON.parse(body));
           } catch (e) {
-            log.error('activate-sync-oes-to-qfield', { error: e instanceof Error ? e.message : String(e) });
+            log.error('JSON parse error', { error: e instanceof Error ? e.message : String(e) });
             resolve(body);
           }
         } else {
@@ -299,10 +301,10 @@ async function deleteExistingOESFile(projectId: string, filename: string): Promi
   try {
     const result = await deleteFileFromQFieldCloud(projectId, filename);
     if (result.success && result.status !== 404) {
-      log.info('OESSync', `Deleted existing OES file from project ${projectId}`);
+      log.info(`Deleted existing OES file from project ${projectId}`);
     }
   } catch (error) {
-    log.warn('OESSync', 'Error deleting OES file (may not exist)', error);
+    log.warn('Error deleting OES file (may not exist)', { error });
   }
 }
 
@@ -316,7 +318,7 @@ async function uploadOESFile(
 ): Promise<{ success: boolean; message: string }> {
   const geojsonContent = JSON.stringify(geojson, null, 2);
 
-  log.info('OESSync', `Uploading ${filename} to project ${projectId} (${geojsonContent.length} bytes)`);
+  log.info(`Uploading ${filename} to project ${projectId} (${geojsonContent.length} bytes)`);
 
   const result = await uploadFileToQFieldCloud(
     projectId,
@@ -351,7 +353,7 @@ async function handler(
     // Get target projects: specific one if provided, otherwise all sync-enabled
     const targetProjectIds = await getSyncTargetProjectIds(specificProjectId);
 
-    log.info('OESSync', `Starting OES sync to ${targetProjectIds.length} QField project(s)`, {
+    log.info(`Starting OES sync to ${targetProjectIds.length} QField project(s)`, {
       targetProjectIds, reportDate, teamFilter,
     });
 
@@ -405,7 +407,7 @@ async function handler(
     const result = await pool.query(query, queryParams);
     const oesPoints: OESPoint[] = result.rows;
 
-    log.info('OESSync', `Found ${oesPoints.length} OES points with valid coordinates from drops table`);
+    log.info(`Found ${oesPoints.length} OES points with valid coordinates from drops table`);
 
     if (oesPoints.length === 0) {
       return res.status(200).json({
@@ -446,7 +448,7 @@ async function handler(
       }
     };
 
-    log.info('OESSync', `Created GeoJSON with ${features.length} features`);
+    log.info(`Created GeoJSON with ${features.length} features`);
 
     // Get the report date for the filename
     // Priority: 1) reportDate from request, 2) latest import batch report_date, 3) today
@@ -468,7 +470,7 @@ async function handler(
     // Generate filenames with the report date
     const oesFilename = getOESReportFilename(filenameDate);
     const remainingFilename = getRemainingDropsFilename(filenameDate);
-    log.info('OESSync', `Using filenames: ${oesFilename}, ${remainingFilename}`);
+    log.info(`Using filenames: ${oesFilename}, ${remainingFilename}`);
 
     // Step 3: Fetch REMAINING drops (drops NOT in oes_activations)
     const remainingQuery = `
@@ -496,7 +498,7 @@ async function handler(
     const remainingResult = await pool.query(remainingQuery);
     const remainingDrops: RemainingDrop[] = remainingResult.rows;
 
-    log.info('OESSync', `Found ${remainingDrops.length} remaining (unactivated) drops`);
+    log.info(`Found ${remainingDrops.length} remaining (unactivated) drops`);
 
     // Convert remaining drops to GeoJSON
     const remainingFeatures: GeoJSONFeature[] = remainingDrops.map(drop => ({
@@ -533,7 +535,7 @@ async function handler(
 
     for (const pid of targetProjectIds) {
       try {
-        log.info('OESSync', `Syncing to project ${pid}...`);
+        log.info(`Syncing to project ${pid}...`);
 
         // Delete existing files (if any)
         await deleteExistingOESFile(pid, oesFilename);
@@ -552,15 +554,15 @@ async function handler(
             [pid]
           );
         } catch {
-          log.warn('OESSync', `Failed to update last_synced_at for ${pid} (non-critical)`);
+          log.warn(`Failed to update last_synced_at for ${pid} (non-critical)`);
         }
 
         syncResults.push({ projectId: pid, success: true });
-        log.info('OESSync', `Successfully synced to project ${pid}`);
+        log.info(`Successfully synced to project ${pid}`);
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         syncResults.push({ projectId: pid, success: false, error: errorMsg });
-        log.error('OESSync', `Failed to sync to project ${pid}`, err);
+        log.error(`Failed to sync to project ${pid}`, { error: err });
       }
     }
 
@@ -581,7 +583,7 @@ async function handler(
     });
 
   } catch (error) {
-    log.error('OESSync', 'Sync failed', error);
+    log.error('Sync failed', { error });
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to sync OES data to QFieldCloud'
     });
