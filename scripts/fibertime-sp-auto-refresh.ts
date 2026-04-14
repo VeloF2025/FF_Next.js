@@ -99,7 +99,7 @@ async function fetchOtpFromImap(since: Date): Promise<string | null> {
       const parsed = await simpleParser(msg.source);
       const subject = (parsed.subject ?? '').toLowerCase();
       const fromText = (parsed.from?.text ?? '').toLowerCase();
-      const body = `${parsed.text ?? ''}\n${parsed.html ?? ''}`;
+      // Subject/from filtering uses lowercase versions; code extraction uses parsed.text directly
 
       const isFibertime =
         subject.includes('fibertime') ||
@@ -118,13 +118,18 @@ async function fetchOtpFromImap(since: Date): Promise<string | null> {
         continue;
       }
 
-      // Extract 6-digit code
-      const match = body.match(/\b(\d{6})\b/);
-      if (match) {
-        log('INFO','OTP found in email', { subject: parsed.subject, uid, sentAt: parsed.date?.toISOString() });
+      // Extract verification code — Microsoft uses 8-digit codes for Fibertime tenant
+      // Search plain text first to avoid matching numbers in HTML/CSS
+      const textBody = parsed.text ?? '';
+      const codeMatch =
+        textBody.match(/verification code:\s*(\d{6,8})/i) ??
+        textBody.match(/\b(\d{8})\b/) ??
+        textBody.match(/\b(\d{6})\b/);
+      if (codeMatch) {
+        log('INFO','OTP found in email', { code: codeMatch[1], subject: parsed.subject, uid, sentAt: parsed.date?.toISOString() });
         // Mark as read so future runs won't pick it up
         await client.messageFlagsAdd(String(uid), ['\\Seen']);
-        return match[1];
+        return codeMatch[1];
       }
     }
 
