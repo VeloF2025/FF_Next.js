@@ -12,6 +12,7 @@ import {
   isFormerEmployee,
 } from '@/types/staff.types';
 import { mapLegacyContractType } from '@/types/staff/compliance.types';
+import type { UIFStatus, COIDAStatus, TaxStatus, ProbationStatus, NoticePeriod } from '@/types/staff/enums.types';
 import { getPositionsByDepartment } from '@/types/staff-hierarchy.types';
 import { safeToDate } from '@/utils/dateHelpers';
 import { ExitEmployeeModal, ExitFormData } from './ExitEmployeeModal';
@@ -139,12 +140,12 @@ export function StaffEditForm() {
         // Map legacy contract types (full-time, fixed-term, etc.) to SAContractType enum values
         formUpdate.saContractType = mapLegacyContractType(staff.contractType as string);
       }
-      if (staff.uifStatus) formUpdate.uifStatus = staff.uifStatus;
+      if (staff.uifStatus) formUpdate.uifStatus = staff.uifStatus as UIFStatus;
       if (staff.uifNumber) formUpdate.uifNumber = staff.uifNumber;
-      if (staff.coidaStatus) formUpdate.coidaStatus = staff.coidaStatus;
-      if (staff.taxStatus) formUpdate.taxStatus = staff.taxStatus;
-      if (staff.probationStatus) formUpdate.probationStatus = staff.probationStatus;
-      if (staff.noticePeriod) formUpdate.noticePeriod = staff.noticePeriod;
+      if (staff.coidaStatus) formUpdate.coidaStatus = staff.coidaStatus as COIDAStatus;
+      if (staff.taxStatus) formUpdate.taxStatus = staff.taxStatus as TaxStatus;
+      if (staff.probationStatus) formUpdate.probationStatus = staff.probationStatus as ProbationStatus;
+      if (staff.noticePeriod) formUpdate.noticePeriod = staff.noticePeriod as NoticePeriod;
       if (staff.weeklyHours) formUpdate.weeklyHours = staff.weeklyHours;
       if (staff.idNumber) formUpdate.idNumber = staff.idNumber;
       if (staff.workPermitNumber) formUpdate.workPermitNumber = staff.workPermitNumber;

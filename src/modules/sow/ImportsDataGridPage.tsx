@@ -89,10 +89,10 @@ export function ImportsDataGridPage() {
             <DataGrid
               rows={polesData}
               columns={polesColumns}
-              pageSize={50}
-              rowsPerPageOptions={[25, 50, 100]}
+              pageSizeOptions={[25, 50, 100]}
+              initialState={{ pagination: { paginationModel: { pageSize: 50 } } }}
               checkboxSelection
-              disableSelectionOnClick
+              disableRowSelectionOnClick
               loading={loading}
               getRowId={(row) => row.id || row.pole_number}
               slots={{ toolbar: GridToolbar }}
@@ -112,10 +112,10 @@ export function ImportsDataGridPage() {
             <DataGrid
               rows={fibreData}
               columns={fibreColumns}
-              pageSize={50}
-              rowsPerPageOptions={[25, 50, 100]}
+              pageSizeOptions={[25, 50, 100]}
+              initialState={{ pagination: { paginationModel: { pageSize: 50 } } }}
               checkboxSelection
-              disableSelectionOnClick
+              disableRowSelectionOnClick
               loading={loading}
               getRowId={(row) => row.id || row.segment_id}
               slots={{ toolbar: GridToolbar }}
@@ -135,10 +135,10 @@ export function ImportsDataGridPage() {
             <DataGrid
               rows={dropsData}
               columns={dropsColumns}
-              pageSize={50}
-              rowsPerPageOptions={[25, 50, 100]}
+              pageSizeOptions={[25, 50, 100]}
+              initialState={{ pagination: { paginationModel: { pageSize: 50 } } }}
               checkboxSelection
-              disableSelectionOnClick
+              disableRowSelectionOnClick
               loading={loading}
               getRowId={(row) => row.id || row.drop_number}
               slots={{ toolbar: GridToolbar }}
@@ -158,10 +158,10 @@ export function ImportsDataGridPage() {
             <DataGrid
               rows={onemapData}
               columns={onemapColumns}
-              pageSize={50}
-              rowsPerPageOptions={[25, 50, 100]}
+              pageSizeOptions={[25, 50, 100]}
+              initialState={{ pagination: { paginationModel: { pageSize: 50 } } }}
               checkboxSelection
-              disableSelectionOnClick
+              disableRowSelectionOnClick
               loading={loading}
               getRowId={(row) => row.id || row.property_id}
               slots={{ toolbar: GridToolbar }}
@@ -181,10 +181,10 @@ export function ImportsDataGridPage() {
             <DataGrid
               rows={nokiaData}
               columns={nokiaColumns}
-              pageSize={50}
-              rowsPerPageOptions={[25, 50, 100]}
+              pageSizeOptions={[25, 50, 100]}
+              initialState={{ pagination: { paginationModel: { pageSize: 50 } } }}
               checkboxSelection
-              disableSelectionOnClick
+              disableRowSelectionOnClick
               loading={loading}
               getRowId={(row) => row.id || `${row.property_id}_${row.drop_number}`}
               slots={{ toolbar: GridToolbar }}
@@ -201,3 +201,5 @@ export function ImportsDataGridPage() {
     </div>
   );
 }
+
+export default ImportsDataGridPage;

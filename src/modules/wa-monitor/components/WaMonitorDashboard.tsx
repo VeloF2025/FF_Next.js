@@ -236,11 +236,14 @@ export function WaMonitorDashboard() {
     const complete = filteredDrops.filter(d => d.completed).length;  // Fixed: was d.complete, should be d.completed
     const totalFeedback = filteredDrops.filter(d => d.completed || d.incomplete).length;  // Fixed: count all reviewed drops (complete OR incomplete)
 
+    const averageFeedbackCount = total > 0 ? totalFeedback / total : 0;
+
     return {
       total,
       incomplete,
       complete,
-      totalFeedback
+      totalFeedback,
+      averageFeedbackCount
     };
   }, [filteredDrops]);
 
@@ -306,7 +309,7 @@ export function WaMonitorDashboard() {
 
       {/* Summary Cards - Now showing filtered totals */}
       <Grid container spacing={3}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card sx={{ bgcolor: 'var(--ff-bg-secondary)', color: 'var(--ff-text-primary)' }}>
             <CardContent>
               <Typography sx={{ color: 'var(--ff-text-secondary)' }} gutterBottom variant="body2">
@@ -327,7 +330,7 @@ export function WaMonitorDashboard() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card sx={{ bgcolor: 'var(--ff-bg-secondary)', color: 'var(--ff-text-primary)' }}>
             <CardContent>
               <Typography sx={{ color: 'var(--ff-text-secondary)' }} gutterBottom variant="body2">
@@ -339,7 +342,7 @@ export function WaMonitorDashboard() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card sx={{ bgcolor: 'var(--ff-bg-secondary)', color: 'var(--ff-text-primary)' }}>
             <CardContent>
               <Typography sx={{ color: 'var(--ff-text-secondary)' }} gutterBottom variant="body2">
@@ -351,7 +354,7 @@ export function WaMonitorDashboard() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card sx={{ bgcolor: 'var(--ff-bg-secondary)', color: 'var(--ff-text-primary)' }}>
             <CardContent>
               <Typography sx={{ color: 'var(--ff-text-secondary)' }} gutterBottom variant="body2">
