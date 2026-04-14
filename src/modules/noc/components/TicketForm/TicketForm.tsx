@@ -29,6 +29,7 @@ import {
   AssignmentSection,
   FaultSection,
   DevOpsSection,
+  SitePhotoUploader,
 } from './sections';
 
 interface TicketFormProps {
@@ -153,6 +154,15 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
       {/* Section 2b: Ticket Details — hidden until category is picked */}
       {category && (
         <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 sm:p-6 border border-[var(--ff-border-light)]">
+          {/* Site photo uploader — shown for all categories except DevOps */}
+          {!sections.devops && (
+            <SitePhotoUploader
+              setFields={form.setFields}
+              onDRFound={(dr) => form.lookupDR(dr)}
+              onFileReady={(file) => form.addMediaFile(file)}
+              disabled={form.isSubmitting}
+            />
+          )}
           <DetailsSection
             formData={form.formData}
             errors={form.errors}
