@@ -7,14 +7,35 @@ import { analyticsApi } from '@/services/api/analyticsApi';
 import type { ProjectOverview, ProjectTrend } from './types';
 import { log } from '@/lib/logger';
 
+interface ProjectSummaryOverview {
+  totalProjects: number;
+  totalBudget: number;
+  spentBudget: number;
+  avgCompletion: number;
+  activeProjects: number;
+  completedProjects: number;
+  delayedProjects: number;
+  totalValue: number;
+  averageCompletionRate: number;
+}
+
+interface ProjectSummaryResponse {
+  overview: ProjectSummaryOverview;
+}
+
+interface ProjectTrendsResponse {
+  trends?: ProjectTrend[];
+}
+
 export class ProjectAnalyticsService {
   /**
    * Get project performance overview
    */
   async getProjectOverview(projectId?: string): Promise<ProjectOverview[]> {
     try {
-      const summary = await analyticsApi.getProjectSummary(projectId);
-      
+      const summaryRaw = await analyticsApi.getProjectSummary(projectId);
+      const summary = summaryRaw as unknown as ProjectSummaryResponse;
+
       // Convert API response to ProjectOverview format
       return [{
         totalProjects: summary.overview.totalProjects,
@@ -49,14 +70,15 @@ export class ProjectAnalyticsService {
    */
   async getProjectTrends(dateFrom: Date, dateTo: Date): Promise<ProjectTrend[]> {
     try {
-      const trends = await analyticsApi.getProjectTrends('', {
+      const trendsRaw = await analyticsApi.getProjectTrends('', {
         type: 'monthly',
         startDate: dateFrom.toISOString(),
         endDate: dateTo.toISOString()
       });
-      
+      const trends = trendsRaw as unknown as ProjectTrendsResponse;
+
       // Convert API response to ProjectTrend format
-      return trends.trends || [];
+      return trends.trends ?? [];
     } catch (error) {
       log.error('Failed to get project trends:', { data: error }, 'projectAnalytics');
       // Return empty array instead of throwing

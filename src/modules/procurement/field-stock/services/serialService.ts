@@ -85,7 +85,7 @@ export async function getSerials(filters?: SerialFilters): Promise<StockSerial[]
     const results = await query<StockSerial>(queryText, params);
     return results;
   } catch (error) {
-    log.error('Failed to get serials', error, 'serialService');
+    log.error('Failed to get serials', { error }, 'serialService');
     throw error;
   }
 }
@@ -121,7 +121,7 @@ export async function getSerialByNumber(serialNumber: string): Promise<StockSeri
 
     return (results[0] as StockSerial) || null;
   } catch (error) {
-    log.error('Failed to get serial by number', error, 'serialService');
+    log.error('Failed to get serial by number', { error }, 'serialService');
     throw error;
   }
 }
@@ -157,7 +157,7 @@ export async function getSerialById(id: string): Promise<StockSerial | null> {
 
     return (results[0] as StockSerial) || null;
   } catch (error) {
-    log.error('Failed to get serial by ID', error, 'serialService');
+    log.error('Failed to get serial by ID', { error }, 'serialService');
     throw error;
   }
 }
@@ -205,7 +205,7 @@ export async function registerSerial(input: RegisterSerialInput): Promise<StockS
     log.info(`Registered serial: ${input.serialNumber}`, undefined, 'serialService');
     return results[0] as StockSerial;
   } catch (error) {
-    log.error('Failed to register serial', error, 'serialService');
+    log.error('Failed to register serial', { error }, 'serialService');
     throw error;
   }
 }
@@ -238,7 +238,7 @@ export async function updateSerialStatus(
     log.info(`Updated serial status: ${id} -> ${status}`, undefined, 'serialService');
     return results[0] as StockSerial;
   } catch (error) {
-    log.error('Failed to update serial status', error, 'serialService');
+    log.error('Failed to update serial status', { error }, 'serialService');
     throw error;
   }
 }
@@ -277,7 +277,7 @@ export async function markSerialInstalled(
     log.info(`Serial ${serialId} installed at drop ${dropNumber}`, undefined, 'serialService');
     return results[0] as StockSerial;
   } catch (error) {
-    log.error('Failed to mark serial installed', error, 'serialService');
+    log.error('Failed to mark serial installed', { error }, 'serialService');
     throw error;
   }
 }
@@ -308,7 +308,7 @@ export async function getAvailableSerials(stockItemId: string): Promise<StockSer
 
     return results as StockSerial[];
   } catch (error) {
-    log.error('Failed to get available serials', error, 'serialService');
+    log.error('Failed to get available serials', { error }, 'serialService');
     throw error;
   }
 }
@@ -338,7 +338,7 @@ export async function getSerialsByTechnician(technicianLocationId: string): Prom
 
     return results as StockSerial[];
   } catch (error) {
-    log.error('Failed to get technician serials', error, 'serialService');
+    log.error('Failed to get technician serials', { error }, 'serialService');
     throw error;
   }
 }
@@ -376,7 +376,7 @@ export async function validateSerialForConsumption(
 
     return { valid: true, serial };
   } catch (error) {
-    log.error('Failed to validate serial for consumption', error, 'serialService');
+    log.error('Failed to validate serial for consumption', { error }, 'serialService');
     throw error;
   }
 }
@@ -407,7 +407,7 @@ export async function getSerialHistory(serialId: string): Promise<unknown[]> {
 
     return results;
   } catch (error) {
-    log.error('Failed to get serial history', error, 'serialService');
+    log.error('Failed to get serial history', { error }, 'serialService');
     throw error;
   }
 }

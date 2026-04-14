@@ -84,7 +84,7 @@ export async function getLocations(
     const results = await query<StockLocation>(queryText, params);
     return results;
   } catch (error) {
-    log.error('Failed to get locations', error, 'locationService');
+    log.error('Failed to get locations', { error }, 'locationService');
     throw error;
   }
 }
@@ -118,7 +118,7 @@ export async function getLocationById(id: string): Promise<StockLocation | null>
 
     return (results[0] as StockLocation) || null;
   } catch (error) {
-    log.error('Failed to get location by ID', error, 'locationService');
+    log.error('Failed to get location by ID', { error }, 'locationService');
     throw error;
   }
 }
@@ -152,7 +152,7 @@ export async function getLocationByCode(code: string): Promise<StockLocation | n
 
     return (results[0] as StockLocation) || null;
   } catch (error) {
-    log.error('Failed to get location by code', error, 'locationService');
+    log.error('Failed to get location by code', { error }, 'locationService');
     throw error;
   }
 }
@@ -215,7 +215,7 @@ export async function createLocation(
     log.info(`Created location: ${input.code}`, undefined, 'locationService');
     return results[0] as StockLocation;
   } catch (error) {
-    log.error('Failed to create location', error, 'locationService');
+    log.error('Failed to create location', { error }, 'locationService');
     throw error;
   }
 }
@@ -305,7 +305,7 @@ export async function updateLocation(
     log.info(`Updated location: ${id}`, undefined, 'locationService');
     return results[0];
   } catch (error) {
-    log.error('Failed to update location', error, 'locationService');
+    log.error('Failed to update location', { error }, 'locationService');
     throw error;
   }
 }
@@ -322,7 +322,7 @@ export async function deleteLocation(id: string): Promise<void> {
     `;
     log.info(`Deleted location: ${id}`, undefined, 'locationService');
   } catch (error) {
-    log.error('Failed to delete location', error, 'locationService');
+    log.error('Failed to delete location', { error }, 'locationService');
     throw error;
   }
 }
@@ -358,7 +358,7 @@ export async function getTechnicianLocations(): Promise<StockLocation[]> {
 
     return results as StockLocation[];
   } catch (error) {
-    log.error('Failed to get technician locations', error, 'locationService');
+    log.error('Failed to get technician locations', { error }, 'locationService');
     throw error;
   }
 }
@@ -413,7 +413,7 @@ export async function getOrCreateTechnicianLocation(
       isVirtual: true,
     });
   } catch (error) {
-    log.error('Failed to get or create technician location', error, 'locationService');
+    log.error('Failed to get or create technician location', { error }, 'locationService');
     throw error;
   }
 }
@@ -481,7 +481,7 @@ export async function getLocationHierarchy(
 
     return rootLocations;
   } catch (error) {
-    log.error('Failed to get location hierarchy', error, 'locationService');
+    log.error('Failed to get location hierarchy', { error }, 'locationService');
     throw error;
   }
 }
@@ -499,7 +499,7 @@ export async function getLocationStockCount(locationId: string): Promise<number>
 
     return Number(results[0]?.count || 0);
   } catch (error) {
-    log.error('Failed to get location stock count', error, 'locationService');
+    log.error('Failed to get location stock count', { error }, 'locationService');
     throw error;
   }
 }

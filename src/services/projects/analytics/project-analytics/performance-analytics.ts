@@ -5,12 +5,34 @@
 
 import { analyticsApi } from '@/services/api/analyticsApi';
 import { log } from '@/lib/logger';
-import type { 
-  ProjectPerformanceMetrics, 
+import type {
+  ProjectPerformanceMetrics,
   OverdueProject,
   PerformanceKPI,
   AnalyticsQuery
 } from './analytics-types';
+
+interface PerformanceMetricsMap {
+  overdue?: OverdueProject[];
+  onTime?: { rate?: number };
+  efficiency?: { avgDuration?: number; productivityScore?: number; avgUtilization?: number };
+  budget?: { utilizationRate?: number };
+  quality?: { score?: number };
+  risk?: { highRisk?: number; mediumRisk?: number; lowRisk?: number };
+}
+
+interface PerformanceResponse {
+  metrics?: PerformanceMetricsMap;
+}
+
+interface KpiItem {
+  name: unknown;
+  value: unknown;
+  target?: number;
+  trend: string;
+  unit?: string;
+  description?: string;
+}
 
 export class ProjectPerformanceAnalytics {
   /**
@@ -19,9 +41,10 @@ export class ProjectPerformanceAnalytics {
   static async getOverdueProjects(_query?: AnalyticsQuery): Promise<OverdueProject[]> {
     try {
       // Get performance metrics including overdue projects
-      const performance = await analyticsApi.getProjectPerformance('', ['overdue']);
-      
-      return performance.metrics?.overdue || [];
+      const performanceRaw = await analyticsApi.getProjectPerformance('', ['overdue']);
+      const performance = performanceRaw as unknown as PerformanceResponse;
+
+      return performance.metrics?.overdue ?? [];
     } catch (error) {
       log.error('Error fetching overdue projects:', { data: error }, 'performance-analytics');
       return [];
@@ -34,14 +57,15 @@ export class ProjectPerformanceAnalytics {
   static async getProjectPerformanceMetrics(_query?: AnalyticsQuery): Promise<ProjectPerformanceMetrics> {
     try {
       // Get all performance metrics from API
-      const performance = await analyticsApi.getProjectPerformance('', ['onTime', 'budget', 'quality', 'efficiency']);
-      
-      const metrics = performance.metrics || {};
-      
+      const performanceRaw = await analyticsApi.getProjectPerformance('', ['onTime', 'budget', 'quality', 'efficiency']);
+      const performance = performanceRaw as unknown as PerformanceResponse;
+
+      const metrics = performance.metrics ?? {};
+
       return {
-        onTimeCompletionRate: metrics.onTime?.rate || 0,
-        averageProjectDuration: metrics.efficiency?.avgDuration || 0,
-        budgetUtilizationRate: metrics.budget?.utilizationRate || 0,
+        onTimeCompletionRate: metrics.onTime?.rate ?? 0,
+        averageProjectDuration: metrics.efficiency?.avgDuration ?? 0,
+        budgetUtilizationRate: metrics.budget?.utilizationRate ?? 0,
         clientSatisfactionScore: 4.2 // Placeholder - would need client feedback system
       };
     } catch (error) {
@@ -61,16 +85,17 @@ export class ProjectPerformanceAnalytics {
   static async getPerformanceKPIs(): Promise<PerformanceKPI[]> {
     try {
       // Get KPIs from API
-      const kpis = await analyticsApi.getKPIs('performance');
-      
+      const kpisRaw = await analyticsApi.getKPIs('performance');
+      const kpis = kpisRaw as unknown as KpiItem[];
+
       // Transform API response to PerformanceKPI format
       return kpis.map(kpi => ({
-        name: kpi.name,
-        value: kpi.value,
-        target: kpi.target || 0,
+        name: kpi.name as string,
+        value: kpi.value as number,
+        target: kpi.target ?? 0,
         trend: kpi.trend as 'up' | 'down' | 'stable',
-        unit: kpi.unit || '',
-        description: kpi.description || ''
+        unit: kpi.unit ?? '',
+        description: kpi.description ?? ''
       }));
     } catch (error) {
       log.error('Error calculating performance KPIs:', { data: error }, 'performance-analytics');
@@ -89,14 +114,15 @@ export class ProjectPerformanceAnalytics {
   }> {
     try {
       // Get efficiency metrics from API
-      const performance = await analyticsApi.getProjectPerformance('', ['efficiency', 'quality']);
-      const metrics = performance.metrics || {};
-      
+      const performanceRaw = await analyticsApi.getProjectPerformance('', ['efficiency', 'quality']);
+      const performance = performanceRaw as unknown as PerformanceResponse;
+      const metrics = performance.metrics ?? {};
+
       return {
-        productivity: metrics.efficiency?.productivityScore || 0,
-        resourceUtilization: metrics.efficiency?.avgUtilization || 0,
-        deliverySpeed: 100 - (metrics.efficiency?.avgDuration || 0), // Convert duration to speed
-        qualityScore: metrics.quality?.score || 0
+        productivity: metrics.efficiency?.productivityScore ?? 0,
+        resourceUtilization: metrics.efficiency?.avgUtilization ?? 0,
+        deliverySpeed: 100 - (metrics.efficiency?.avgDuration ?? 0), // Convert duration to speed
+        qualityScore: metrics.quality?.score ?? 0
       };
     } catch (error) {
       log.error('Error calculating efficiency analysis:', { data: error }, 'performance-analytics');
@@ -124,28 +150,29 @@ export class ProjectPerformanceAnalytics {
   }> {
     try {
       // Get risk metrics from API
-      const performance = await analyticsApi.getProjectPerformance('', ['risk']);
-      const riskMetrics = performance.metrics?.risk || {};
-      
+      const performanceRaw = await analyticsApi.getProjectPerformance('', ['risk']);
+      const performance = performanceRaw as unknown as PerformanceResponse;
+      const riskMetrics = performance.metrics?.risk ?? {};
+
       return {
-        highRisk: riskMetrics.highRisk || 0,
-        mediumRisk: riskMetrics.mediumRisk || 0,
-        lowRisk: riskMetrics.lowRisk || 0,
+        highRisk: riskMetrics.highRisk ?? 0,
+        mediumRisk: riskMetrics.mediumRisk ?? 0,
+        lowRisk: riskMetrics.lowRisk ?? 0,
         riskFactors: [
           {
             factor: 'Deadline Pressure',
-            impact: 'high',
-            projects: Math.round((riskMetrics.highRisk || 0) * 0.6)
+            impact: 'high' as const,
+            projects: Math.round((riskMetrics.highRisk ?? 0) * 0.6)
           },
           {
             factor: 'Budget Overrun',
-            impact: 'medium',
-            projects: Math.round((riskMetrics.mediumRisk || 0) * 0.4)
+            impact: 'medium' as const,
+            projects: Math.round((riskMetrics.mediumRisk ?? 0) * 0.4)
           },
           {
             factor: 'Low Progress Rate',
-            impact: 'medium',
-            projects: Math.round((riskMetrics.highRisk || 0) * 0.3)
+            impact: 'medium' as const,
+            projects: Math.round((riskMetrics.highRisk ?? 0) * 0.3)
           }
         ]
       };
