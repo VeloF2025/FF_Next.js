@@ -92,10 +92,7 @@ async function handler(
 
     // Validate group JID is a known maintenance group
     if (!MAINTENANCE_GROUP_JIDS.has(body.group_jid)) {
-      logger.warn(
-        { received: body.group_jid },
-        'Message from unknown maintenance group'
-      );
+      logger.warn('Message from unknown maintenance group', { received: body.group_jid });
       return res.status(400).json({
         success: false,
         error: `Unknown maintenance group: ${body.group_jid}`,
@@ -103,29 +100,23 @@ async function handler(
     }
 
     // Log incoming message
-    logger.info(
-      {
+    logger.info('Received maintenance WA message', {
         messageId: body.message_id,
         sender: body.sender_name || body.sender_jid,
         hasText: !!body.text,
         hasMedia: body.has_media,
         mediaCount: body.media?.length || 0,
-      },
-      'Received maintenance WA message'
-    );
+      });
 
     // Process the message
     const result = await processMaintenanceMessage(body);
 
-    logger.info(
-      {
+    logger.info('Message processed successfully', {
         messageId: result.id,
         dropNumber: result.drop_number,
         drMentioned: result.dr_mentioned_directly,
         photosCount: result.photos_count,
-      },
-      'Message processed successfully'
-    );
+      });
 
     return res.status(200).json({
       success: true,
@@ -135,7 +126,7 @@ async function handler(
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
 
-    logger.error({ error: errorMessage }, 'Failed to process WA message');
+    logger.error('Failed to process WA message', { error: errorMessage });
 
     return res.status(500).json({
       success: false,

@@ -189,7 +189,7 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
       >
         <Icon
           className={`w-4 h-4 ${config.color} ${
-            config.animate ? 'animate-spin' : ''
+            (config as { animate?: boolean }).animate ? 'animate-spin' : ''
           }`}
         />
         

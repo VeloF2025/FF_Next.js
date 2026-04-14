@@ -168,25 +168,25 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     logger.debug('Executing fault trends query', { sql, params });
 
     // Execute query
-    const result = await query(sql, params);
+    const rows = await query(sql, params);
 
     logger.info('Successfully fetched fault trends', {
       groupBy,
-      resultCount: result.rows.length,
+      resultCount: rows.length,
     });
 
     // Calculate total count
-    const totalCount = result.rows.reduce((sum: number, row: { count: string }) => sum + parseInt(row.count), 0);
+    const totalCount = rows.reduce((sum: number, row: { count: string }) => sum + parseInt(row.count), 0);
 
     return NextResponse.json(
       {
         success: true,
-        data: result.rows,
+        data: rows,
         meta: {
           timestamp: new Date().toISOString(),
           group_by: groupBy,
           total_count: totalCount,
-          result_count: result.rows.length,
+          result_count: rows.length,
           ...(projectId && { project_id: projectId }),
           ...(startDate && { start_date: startDate }),
           ...(endDate && { end_date: endDate }),

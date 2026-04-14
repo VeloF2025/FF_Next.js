@@ -409,9 +409,9 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
                     <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} fontSize={12} />
                     <YAxis />
                     <Tooltip 
-                      content={({ payload }) => {
+                      content={({ payload }: { payload?: Array<{ payload: Record<string, unknown> }> }) => {
                         if (payload && payload.length) {
-                          const data = payload[0].payload;
+                          const data = payload[0]!.payload;
                           return (
                             <div className="bg-card p-3 border rounded-lg shadow-lg">
                               <p className="font-medium">{data.fullName}</p>

@@ -71,7 +71,7 @@ async function handleGet(projectId: string, req: NextApiRequest, res: NextApiRes
         LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
       `;
 
-  const [{ count }] = status
+  const [{ count }] = (status
     ? await sql`
         SELECT COUNT(*)::int as count FROM hs_project_audits
         WHERE project_id = ${projectId} AND status = ${status}
@@ -79,7 +79,7 @@ async function handleGet(projectId: string, req: NextApiRequest, res: NextApiRes
     : await sql`
         SELECT COUNT(*)::int as count FROM hs_project_audits
         WHERE project_id = ${projectId}
-      `;
+      `) as unknown as [{ count: number }];
 
   return apiResponse.success(res, {
     audits,

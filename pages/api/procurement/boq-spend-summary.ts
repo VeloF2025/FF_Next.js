@@ -92,7 +92,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.success(res, { transactions });
     } catch (err) {
       log.error('Failed to load project PO transactions', { err, projectId }, 'boq-spend-summary');
-      return apiResponse.serverError(res, err instanceof Error ? err.message : 'Unknown error');
+      return apiResponse.internalError(res, err);
     }
   }
 
@@ -168,7 +168,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.success(res, { projects: summary, totals });
   } catch (err) {
     log.error('Failed to load BOQ spend summary', { err }, 'boq-spend-summary');
-    return apiResponse.serverError(res, err instanceof Error ? err.message : 'Unknown error');
+    return apiResponse.internalError(res, err);
   }
 }
 

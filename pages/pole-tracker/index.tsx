@@ -1,7 +1,7 @@
 import { GetServerSideProps } from 'next';
 import dynamic from 'next/dynamic';
 
-const PoleTrackerDashboard = dynamic(() => import('@/modules/projects/pole-tracker/PoleTrackerDashboard').then(mod => mod.PoleTrackerDashboard || mod.default), {
+const PoleTrackerDashboard = dynamic(() => import('@/modules/projects/pole-tracker/PoleTrackerDashboard').then(mod => mod.PoleTrackerDashboard), {
   ssr: false,
   loading: () => <div>Loading pole tracker...</div>
 });

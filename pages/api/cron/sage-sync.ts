@@ -126,22 +126,6 @@ export default async function handler(
       logger.error('Payment sync failed', { error });
     }
 
-    // Update tokens if refreshed
-    const tokens = client.getTokens();
-    if (tokens && tokens.accessToken !== config.access_token) {
-      await sql`
-        UPDATE sage_api_config
-        SET
-          access_token = ${tokens.accessToken},
-          refresh_token = ${tokens.refreshToken},
-          token_expires_at = ${tokens.expiresAt.toISOString()},
-          last_token_refresh_at = NOW(),
-          updated_at = NOW()
-        WHERE id = ${config.id}
-      `;
-      logger.info('Sage tokens refreshed');
-    }
-
     // Update last sync timestamp
     await sql`
       UPDATE sage_api_config

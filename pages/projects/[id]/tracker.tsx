@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { AppLayout } from '@/components/layout/AppLayout';
 
-const UnifiedTrackerGrid = dynamic(() => import('@/modules/projects/tracker/UnifiedTrackerGrid').then(mod => mod.UnifiedTrackerGrid || mod.default), {
+const UnifiedTrackerGrid = dynamic(() => import('@/modules/projects/tracker/UnifiedTrackerGrid').then(mod => mod.UnifiedTrackerGrid), {
   ssr: false,
   loading: () => <div>Loading tracker...</div>
 });

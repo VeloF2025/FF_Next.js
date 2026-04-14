@@ -64,7 +64,7 @@ async function handler(
       case 'GET':
         return handleGet(res, vehicleId);
       case 'POST':
-        return handlePost(req, res, vehicleId, vehicle);
+        return handlePost(req, res, vehicleId, vehicle as Record<string, unknown>);
       case 'DELETE':
         return handleDelete(res, vehicleId);
       default:
@@ -133,17 +133,17 @@ async function handleGet(
     staffPhone: row.phone as string | null,
     staffPhotoUrl: row.photo_url as string | null,
     assignmentStart: row.assignment_start
-      ? new Date(row.assignment_start as string).toISOString().split('T')[0]
+      ? new Date(row.assignment_start as string).toISOString().split('T')[0] ?? ''
       : '',
     assignmentEnd: row.assignment_end
-      ? new Date(row.assignment_end as string).toISOString().split('T')[0]
+      ? new Date(row.assignment_end as string).toISOString().split('T')[0] ?? null
       : null,
     fuelCardNumber: row.fuel_card_number as string | null,
     fuelCardLimit: row.fuel_card_limit as number | null,
     notes: row.notes as string | null,
     hasValidLicense,
     licenseExpiry: row.license_expiry
-      ? new Date(row.license_expiry as string).toISOString().split('T')[0]
+      ? new Date(row.license_expiry as string).toISOString().split('T')[0] ?? null
       : null,
     isActive: row.is_active as boolean,
   };

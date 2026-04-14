@@ -51,7 +51,8 @@ export default withAuth(withErrorHandler(async (
       `;
       
       // Transform data to match FieldTechnician format
-      const transformedTechnicians: FieldTechnician[] = technicianData.map((s) => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const transformedTechnicians = technicianData.map((s) => ({
         id: s.id,
         name: `${s.first_name} ${s.last_name}`,
         email: s.email,

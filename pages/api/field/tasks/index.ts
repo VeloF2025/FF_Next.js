@@ -123,7 +123,7 @@ export default withAuth(withErrorHandler(async (
       }
       
       // Transform data to match FieldTask format
-      const transformedTasks: FieldTask[] = taskData.map((task: Record<string, any>) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+      const transformedTasks: FieldTask[] = (taskData as unknown as Record<string, any>[]).map((task: Record<string, any>) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         const metadata = task.metadata as any || {};
         const location = metadata.location || {};
         

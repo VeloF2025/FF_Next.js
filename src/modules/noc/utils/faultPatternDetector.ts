@@ -115,7 +115,7 @@ export async function detectFaultPattern(
 
   // Map to contributing tickets
   const contributing_tickets: ContributingTicket[] = tickets.map((ticket) => ({
-    ticket_id: ticket.id,
+    ticket_id: ticket.ticket_id || (ticket as unknown as { id: string }).id,
     ticket_uid: ticket.ticket_uid,
     created_at: new Date(ticket.created_at),
     fault_cause: ticket.fault_cause,

@@ -99,9 +99,9 @@ export function StaffList() {
       a.href = url;
       // Build descriptive filename with active filters
       const filterParts: string[] = [];
-      if (filter.status) filterParts.push(filter.status);
-      if (filter.department) filterParts.push(filter.department.replace(/\s+/g, '-'));
-      if (filter.position) filterParts.push(filter.position.replace(/\s+/g, '-'));
+      if (filter.status?.length) filterParts.push(filter.status.join('-'));
+      if (filter.department?.length) filterParts.push(filter.department.join('-').replace(/\s+/g, '-'));
+      // position filter not in StaffFilter - omitted
       if (filter.searchTerm) filterParts.push('search');
       const filterSuffix = filterParts.length > 0 ? `-${filterParts.join('-')}` : '-all';
       a.download = `staff${filterSuffix}-${new Date().toISOString().split('T')[0]}.csv`;

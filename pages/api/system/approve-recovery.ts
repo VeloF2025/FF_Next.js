@@ -124,7 +124,7 @@ async function processDecision(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, 'Action must be "approve" or "reject"');
   }
 
-  const decidedBy = session?.user?.id || req.body.decidedBy || 'dashboard';
+  const decidedBy = (session as unknown as { user?: { id?: string } } | null)?.user?.id || req.body.decidedBy || 'dashboard';
   const newStatus = action === 'approve' ? 'approved' : 'rejected';
 
   try {

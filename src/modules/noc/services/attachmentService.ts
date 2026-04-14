@@ -23,7 +23,7 @@ import {
   FileType
 } from '../types/attachment';
 
-const logger = createLogger({ module: 'AttachmentService' });
+const logger = createLogger('AttachmentService');
 
 // UUID validation regex
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -472,7 +472,7 @@ export async function deleteAttachment(attachmentId: string): Promise<void> {
         const type = pathParts[0]; // 'maintenance'
         const category = pathParts.slice(1, -1).join('/'); // 'attachments/{ticketId}'
         const filename = pathParts[pathParts.length - 1];
-        await vfStorage.deleteFile(type, category, filename);
+        await vfStorage.deleteFile(type ?? '', category, filename ?? '');
         logger.debug('Deleted file from VF Storage', {
           storage_path: attachment.storage_path
         });
@@ -634,6 +634,7 @@ export async function getAttachmentStatistics(): Promise<AttachmentStatistics> {
         total_size_gb: 0,
         by_file_type: {
           [FileType.PHOTO]: 0,
+          [FileType.VIDEO]: 0,
           [FileType.PDF]: 0,
           [FileType.DOCUMENT]: 0,
           [FileType.EXCEL]: 0
@@ -654,6 +655,7 @@ export async function getAttachmentStatistics(): Promise<AttachmentStatistics> {
       total_size_gb: totalSizeGB,
       by_file_type: {
         [FileType.PHOTO]: result.photo_count,
+        [FileType.VIDEO]: 0,
         [FileType.PDF]: result.pdf_count,
         [FileType.DOCUMENT]: result.document_count,
         [FileType.EXCEL]: result.excel_count

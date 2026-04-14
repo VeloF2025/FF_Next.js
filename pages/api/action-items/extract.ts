@@ -44,7 +44,8 @@ async function handler(
     }
 
     // Fetch meeting with action items - check participant access
-    const [meeting] = isSuperAdmin
+    type MeetingRow = { id: string; summary: { action_items?: string } | null; participants: { name: string; email: string; displayName?: string }[] };
+    const [meeting] = (isSuperAdmin
       ? await sql`
           SELECT id, summary, participants
           FROM meetings
@@ -58,7 +59,7 @@ async function handler(
             SELECT 1 FROM jsonb_array_elements(participants) AS p
             WHERE LOWER(p->>'email') = ${userEmail}
           )
-        `;
+        `) as unknown as MeetingRow[];
 
     if (!meeting) {
       return res.status(403).json({ error: 'Meeting not found or not authorized to access' });
@@ -74,13 +75,13 @@ async function handler(
     const parsedItems = parseFirefliesActionItems(actionItemsText);
 
     // Check for existing action items from this meeting
-    const existing = await sql`
+    const existing = (await sql`
       SELECT COUNT(*)::int as count
       FROM action_items
       WHERE meeting_id = ${meeting_id}
-    `;
+    `) as unknown as [{ count: number }];
 
-    if (existing[0]?.count > 0) {
+    if ((existing[0]?.count ?? 0) > 0) {
       return apiResponse.validationError(res, {
         meeting_id: `Action items already extracted for meeting ${meeting_id}`,
       });

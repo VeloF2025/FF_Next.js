@@ -123,7 +123,7 @@ async function syncFuelTransaction(
       const data: Record<string, unknown> = jsonResult ?? Object.create(null);
       return {
         success: false,
-        error: data.error?.message || data.message || `API error: ${response.status}`,
+        error: (data.error as { message?: string } | undefined)?.message || (data.message as string | undefined) || `API error: ${response.status}`,
       };
     }
 
@@ -185,7 +185,7 @@ async function syncCheckIn(
       const data: Record<string, unknown> = jsonResult ?? Object.create(null);
       return {
         success: false,
-        error: data.error?.message || data.message || `API error: ${response.status}`,
+        error: (data.error as { message?: string } | undefined)?.message || (data.message as string | undefined) || `API error: ${response.status}`,
       };
     }
 

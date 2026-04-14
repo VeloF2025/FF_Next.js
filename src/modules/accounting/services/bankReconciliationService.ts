@@ -414,7 +414,7 @@ export async function deleteTransactions(bankTxIds: string[]): Promise<number> {
       WHERE id = ANY(${bankTxIds}::UUID[])
         AND status = 'imported'
     `) as Row[];
-    const deleted = result.count ?? bankTxIds.length;
+    const deleted = result.length > 0 ? result.length : bankTxIds.length;
     log.info('Deleted bank transactions', { count: deleted, ids: bankTxIds }, 'accounting');
     return deleted;
   } catch (err) {

@@ -378,10 +378,10 @@ export async function getSyncJobHistory(
     const result = await query<SyncJobHistoryEntry>(sql, values);
 
     logger.debug('Retrieved sync job history', {
-      count: result.rows.length,
+      count: result.length,
     });
 
-    return result.rows;
+    return result;
   } catch (error) {
     logger.error('Failed to fetch sync job history', {
       error: error instanceof Error ? error.message : String(error),

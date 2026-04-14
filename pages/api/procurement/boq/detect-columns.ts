@@ -14,7 +14,7 @@ export const config = {
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return apiResponse.error(res, 'Method not allowed', 405);
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
   // Force connection close to prevent Cloudflare tunnel response buffering
@@ -39,13 +39,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Extract the uploaded file
     const fileArray = files.file;
     if (!fileArray || fileArray.length === 0) {
-      return apiResponse.error(res, 'No file uploaded', 400);
+      return apiResponse.badRequest(res, 'No file uploaded');
     }
 
     const uploadedFile = Array.isArray(fileArray) ? fileArray[0] : fileArray;
 
     if (!uploadedFile || !uploadedFile.filepath) {
-      return apiResponse.error(res, 'Invalid file upload', 400);
+      return apiResponse.badRequest(res, 'Invalid file upload');
     }
 
     log.info('Processing BOQ file for column detection', {
@@ -79,11 +79,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.success(res, result);
   } catch (error) {
     log.error('Column detection failed', { data: error }, 'boq-detect-columns');
-    return apiResponse.error(
-      res,
-      error instanceof Error ? error.message : 'Column detection failed',
-      500
-    );
+    return apiResponse.internalError(res, error);
   }
 }
 

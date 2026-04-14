@@ -29,7 +29,7 @@ const FAULT_CAUSE_DESCRIPTIONS: Record<FaultCause, string> = {
 export function FaultSection({ formData, errors, setField, disabled }: FaultSectionProps) {
   // Only shown for Maintenance category tickets. TicketForm.tsx guards the
   // outer render; this is belt-and-braces for any direct caller.
-  if (formData.ticket_category !== 'maintenance') {
+  if (formData.category !== 'maintenance') {
     return null;
   }
 

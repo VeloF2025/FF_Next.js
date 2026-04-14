@@ -72,12 +72,14 @@ async function handler(
       ${whereClause}
     `, params);
 
-    const total = parseInt(countQuery[0]?.total || '0');
+    const queryArr = query as unknown as Record<string, unknown>[];
+    const countQueryArr = countQuery as unknown as { total?: string }[];
+    const total = parseInt(countQueryArr[0]?.total || '0');
 
     return res.status(200).json({
       success: true,
-      data: query,
-      count: query.length,
+      data: queryArr,
+      count: queryArr.length,
       total,
       page: Math.floor(offsetNum / limitNum) + 1,
       pageSize: limitNum,

@@ -78,10 +78,10 @@ export async function listSheets(
       ORDER BY created_at DESC
       LIMIT ${pageSize} OFFSET ${offset}
     `;
-    const [{ count }] = await sql`
+    const [{ count }] = (await sql`
       SELECT COUNT(*)::int as count FROM eod_install_sheets
       WHERE sheet_date = ${dateFilter}
-    `;
+    `) as unknown as [{ count: number }];
     return { sheets: sheets as EodInstallSheet[], total: count };
   }
 
@@ -90,9 +90,9 @@ export async function listSheets(
     ORDER BY sheet_date DESC, created_at DESC
     LIMIT ${pageSize} OFFSET ${offset}
   `;
-  const [{ count }] = await sql`
+  const [{ count }] = (await sql`
     SELECT COUNT(*)::int as count FROM eod_install_sheets
-  `;
+  `) as unknown as [{ count: number }];
   return { sheets: sheets as EodInstallSheet[], total: count };
 }
 

@@ -204,7 +204,7 @@ export async function PUT(
     if (token) {
       const jwt = await verifyToken(token);
       if (jwt) {
-        actingUser = { id: jwt.sub, name: jwt.name as string, email: jwt.email as string, role: jwt.role as string };
+        actingUser = { id: jwt.sub, name: (jwt as unknown as { name?: string }).name, email: jwt.email as string, role: jwt.role as string };
       }
     }
 
@@ -394,7 +394,7 @@ export async function DELETE(
     if (token) {
       const jwt = await verifyToken(token);
       if (jwt) {
-        actingUser = { id: jwt.sub, name: jwt.name as string, email: jwt.email as string };
+        actingUser = { id: jwt.sub, name: (jwt as unknown as { name?: string }).name, email: jwt.email as string };
       }
     }
 

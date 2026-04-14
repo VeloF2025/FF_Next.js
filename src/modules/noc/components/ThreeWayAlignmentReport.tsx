@@ -94,6 +94,7 @@ interface ApplyResult {
   applied: number;
   skipped: number;
   errors: Array<{ action: AlignmentAction; error: string }>;
+  dry_run?: boolean;
 }
 
 // Fetch 3-way alignment report
@@ -138,12 +139,12 @@ export function ThreeWayAlignmentReport() {
       const workbook = XLSX.read(data, { type: 'array' });
 
       // Auto-detect sheet with FT refs (look for "MNT Tickets Logged" or sheet with FT data)
-      let targetSheet = workbook.SheetNames[0];
+      let targetSheet = workbook.SheetNames[0] ?? '';
       for (const name of workbook.SheetNames) {
         // Prefer "MNT Tickets Logged" sheet
         if (name.toLowerCase().includes('tickets') || name.toLowerCase().includes('mnt')) {
           const sheet = workbook.Sheets[name];
-          const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 });
+          const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet ?? {}, { header: 1 });
           // Check if this sheet has FT refs
           for (let r = 1; r < Math.min(10, rows.length); r++) {
             const row = rows[r] || [];
@@ -160,7 +161,7 @@ export function ThreeWayAlignmentReport() {
       }
 
       const sheet = workbook.Sheets[targetSheet];
-      const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 });
+      const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet ?? {}, { header: 1 });
 
       // First row is headers
       const headers = rows[0] as string[];
@@ -230,7 +231,7 @@ export function ThreeWayAlignmentReport() {
   // Build selected actions
   const getSelectedActions = (): AlignmentAction[] => {
     if (!report) return [];
-    return [...selectedActions].map((idx) => report.suggested_actions[idx]);
+    return [...selectedActions].map((idx) => report.suggested_actions[idx]).filter((a): a is AlignmentAction => a !== undefined);
   };
 
   // Handle preview/apply

@@ -21,7 +21,7 @@ async function handler(
   }
 
   // User is already attached by withAuth middleware
-  const { user } = req;
+  const { user } = authReq;
 
   return apiResponse.success(res, {
     user: {

@@ -24,7 +24,7 @@ export default async function handler(
 
   if (!cronSecret) {
     log.error('cronTask', { action: 'sync-action-items', error: 'CRON_SECRET not configured' });
-    return apiResponse.serverError(res, new Error('CRON_SECRET not configured'));
+    return apiResponse.internalError(res, new Error('CRON_SECRET not configured'));
   }
   if (authHeader !== `Bearer ${cronSecret}`) {
     log.error('cronTask', { action: 'sync-action-items', error: 'Unauthorized request' });

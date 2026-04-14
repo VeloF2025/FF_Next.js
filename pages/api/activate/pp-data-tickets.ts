@@ -16,7 +16,7 @@ import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
 import { createTicket } from '@/modules/noc/services/ticketService';
-import { TicketSource, TicketType, TicketPriority } from '@/modules/noc/types/ticket';
+import { TicketSource, TicketType, TicketPriority, TicketStatus } from '@/modules/noc/types/ticket';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('activate:pp-data-tickets');
@@ -134,11 +134,12 @@ async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method === 'POST') {
-    return handleCreate(req, res);
+    return handleCreate(authReq, res);
   }
   if (req.method === 'PATCH') {
-    return handleBackfill(req, res);
+    return handleBackfill(authReq, res);
   }
   return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST', 'PATCH']);
 }
@@ -233,9 +234,9 @@ async function handleCreate(
         description,
         dr_number: dr || undefined,
         ont_serial: serial,
-        created_by: authReq.user.id,
+        created_by: req.user.id,
         assigned_team_id: assigned_team_id || undefined,
-        status: assigned_team_id ? 'assigned' : undefined,
+        status: assigned_team_id ? TicketStatus.ASSIGNED : undefined,
         project_id: enrichment.project_id || undefined,
         address: enrichment.address || undefined,
         zone_id: enrichment.zone || undefined,

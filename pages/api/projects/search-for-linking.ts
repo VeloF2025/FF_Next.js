@@ -38,7 +38,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         SELECT project_id FROM project_pipeline_links
         WHERE pipeline_project_id = ${pipelineProjectId}
       `;
-      linkedProjectIds = linkedResult.map((r: { project_id: string }) => r.project_id);
+      linkedProjectIds = (linkedResult as unknown as { project_id: string }[]).map((r) => r.project_id);
     }
 
     // Build query based on filters
@@ -118,9 +118,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
     }
 
+    const resultsArray = results as unknown as Record<string, unknown>[];
     return apiResponse.success(res, {
-      projects: results,
-      count: results.length,
+      projects: resultsArray,
+      count: resultsArray.length,
     });
   } catch (error) {
     log.error('Failed to search projects for linking', { error }, 'projects-search-api');

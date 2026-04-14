@@ -30,8 +30,8 @@ export function reportWebVitals(metric: any) {
   }
   
   // Vercel Analytics integration
-  if (typeof window !== 'undefined' && window.vercel) {
-    window.vercel.webVitals(metric)
+  if (typeof window !== 'undefined' && (window as unknown as { vercel?: { webVitals: (m: unknown) => void } }).vercel) {
+    (window as unknown as { vercel: { webVitals: (m: unknown) => void } }).vercel.webVitals(metric)
   }
 }
 

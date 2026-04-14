@@ -6,7 +6,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
@@ -32,7 +32,7 @@ const RegisterAssetsSchema = z.object({
   ).min(1, 'At least one item required'),
 });
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   const { id: grnId } = req.query;
 
   if (!grnId || typeof grnId !== 'string') {

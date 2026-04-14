@@ -11,11 +11,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const authReq = req as AuthenticatedNextApiRequest;
   switch (req.method) {
     case 'GET':
-      return handleGet(req, res);
+      return handleGet(authReq, res);
     case 'POST':
-      return handlePost(req, res);
+      return handlePost(authReq, res);
     case 'DELETE':
-      return handleDelete(req, res);
+      return handleDelete(authReq, res);
     default:
       return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST', 'DELETE']);
   }
@@ -93,7 +93,7 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
     return apiResponse.badRequest(res, 'stockItemId and supplierItemCode are required');
   }
 
-  const userName = authReq.user?.name || 'Unknown';
+  const userName = req.user?.name || req.user?.email || 'Unknown';
 
   try {
     // Upsert: if mapping already exists for this supplier+code, update it

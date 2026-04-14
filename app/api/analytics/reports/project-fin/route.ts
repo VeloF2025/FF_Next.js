@@ -47,7 +47,9 @@ function serialToMonthLabel(serial: number): string {
 
 /** Returns the numeric sort key for a "MMM-YY" label for chronological ordering. */
 function monthLabelSortKey(label: string): number {
-  const [mon, yrStr] = label.split('-');
+  const parts = label.split('-');
+  const mon = parts[0] ?? '';
+  const yrStr = parts[1] ?? '0';
   const year = parseInt(yrStr, 10) + (parseInt(yrStr, 10) < 50 ? 2000 : 1900);
   const monIdx = MONTH_NAMES.indexOf(mon);
   return year * 12 + monIdx;
@@ -131,7 +133,7 @@ function parseSection(
 
       for (let c = 0; c < monthSerials.length; c++) {
         if (monthSerials[c]! <= currentMonthSerial) {
-          const label = serialToMonthLabel(monthSerials[c]);
+          const label = serialToMonthLabel(monthSerials[c] ?? 0);
           // cols 3+ correspond to month index c
           monthly[label] = toNumber(row[3 + c]);
         }

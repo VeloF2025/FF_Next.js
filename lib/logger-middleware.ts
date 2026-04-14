@@ -29,7 +29,7 @@ export const httpLogger = pinoHttp({
   // Customize request properties to log
   customProps: function (req, res) {
     return {
-      responseTime: res.responseTime,
+      responseTime: (res as unknown as { responseTime?: number }).responseTime,
       userAgent: req.headers['user-agent'],
       ip: req.headers['x-forwarded-for'] || req.connection?.remoteAddress
     };

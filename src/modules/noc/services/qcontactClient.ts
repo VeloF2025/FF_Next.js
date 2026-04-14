@@ -493,17 +493,18 @@ export class QContactClient {
         }
 
         lastError = error as QContactError;
+        const qError = error as QContactError;
 
         // Don't retry if not recoverable or no more attempts
-        if (!error.isRecoverable || attempt >= retryAttempts) {
+        if (!qError.isRecoverable || attempt >= retryAttempts) {
           throw error;
         }
 
         // Calculate backoff delay with exponential backoff
         // In test environment, use minimal delays
         const isTest = process.env.NODE_ENV === 'test' || process.env.VITEST;
-        const baseDelay = error.retryAfter
-          ? error.retryAfter * 1000
+        const baseDelay = qError.retryAfter
+          ? qError.retryAfter * 1000
           : isTest
             ? 10 // 10ms in tests
             : Math.pow(2, attempt) * 1000;

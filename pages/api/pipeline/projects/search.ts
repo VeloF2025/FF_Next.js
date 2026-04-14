@@ -46,7 +46,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         SELECT pipeline_project_id FROM project_pipeline_links
         WHERE project_id = ${projectIdFilter}
       `;
-      linkedPipelineIds = linkedResult.map((r: { pipeline_project_id: string }) => r.pipeline_project_id);
+      linkedPipelineIds = (linkedResult as unknown as { pipeline_project_id: string }[]).map((r) => r.pipeline_project_id);
     }
 
     const allExcludeIds = [...excludeIds, ...linkedPipelineIds];
@@ -211,9 +211,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
     }
 
+    const resultsArray = results as unknown as Record<string, unknown>[];
     return apiResponse.success(res, {
-      projects: results,
-      count: results.length,
+      projects: resultsArray,
+      count: resultsArray.length,
     });
   } catch (error) {
     log.error('Failed to search pipeline projects', { error }, 'pipeline-search-api');

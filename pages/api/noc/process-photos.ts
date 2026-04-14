@@ -40,7 +40,7 @@ async function handler(
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      logger.error({ error: errorMessage }, 'Failed to get photo stats');
+      logger.error('Failed to get photo stats', { error: errorMessage });
 
       return res.status(500).json({
         success: false,
@@ -54,18 +54,15 @@ async function handler(
     try {
       const { limit = 10 } = req.body || {};
 
-      logger.info({ limit }, 'Starting photo processing batch');
+      logger.info('Starting photo processing batch', { limit });
 
       const results = await processPendingPhotos(limit);
 
-      logger.info(
-        {
+      logger.info('Photo processing batch complete', {
           processed: results.processed,
           succeeded: results.succeeded,
           failed: results.failed,
-        },
-        'Photo processing batch complete'
-      );
+        });
 
       return res.status(200).json({
         success: true,
@@ -74,7 +71,7 @@ async function handler(
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      logger.error({ error: errorMessage }, 'Photo processing failed');
+      logger.error('Photo processing failed', { error: errorMessage });
 
       return res.status(500).json({
         success: false,

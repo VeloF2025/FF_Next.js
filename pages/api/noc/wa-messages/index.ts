@@ -123,7 +123,7 @@ async function handler(
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
 
-    logger.error({ error: errorMessage }, 'Failed to fetch WA messages');
+    logger.error('Failed to fetch WA messages', { error: errorMessage });
 
     return res.status(500).json({
       success: false,

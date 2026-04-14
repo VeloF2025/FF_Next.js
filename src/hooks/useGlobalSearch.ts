@@ -16,6 +16,7 @@ interface SearchResponse {
   suggestions: string[];
   popular: string[];
   total: number;
+  error?: string;
 }
 
 export function useGlobalSearch(initialQuery = '') {

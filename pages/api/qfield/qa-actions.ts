@@ -7,7 +7,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { withAuth, AuthenticatedRequest } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
@@ -43,8 +43,8 @@ async function handler(
   }
 
   try {
-    const authReq = req as unknown as AuthenticatedRequest;
-    const userId = authReq.user?.email || authReq.user?.username || 'unknown';
+    const authReq = req as unknown as AuthenticatedNextApiRequest;
+    const userId = authReq.user?.email || 'unknown';
     const { action, validationIds, notes, assignee, dueDate, priority, escalationReason } = req.body as ActionRequest;
 
     if (!action || !validationIds?.length) {

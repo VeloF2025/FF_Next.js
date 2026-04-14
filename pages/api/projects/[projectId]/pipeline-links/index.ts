@@ -95,10 +95,11 @@ async function handleGet(res: NextApiResponse, projectId: string) {
       ORDER BY ppl.is_primary DESC, ppl.link_order ASC, ppl.linked_at ASC
     `;
 
+    const linksArray = links as unknown as PipelineLink[];
     return apiResponse.success(res, {
-      links,
-      primary_link_id: links.find((l: PipelineLink) => l.is_primary)?.id || null,
-      count: links.length,
+      links: linksArray,
+      primary_link_id: linksArray.find((l) => l.is_primary)?.id || null,
+      count: linksArray.length,
     });
   } catch (error) {
     log.error('Failed to fetch pipeline links', { projectId, error }, 'pipeline-links-api');

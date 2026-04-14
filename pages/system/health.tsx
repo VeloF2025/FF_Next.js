@@ -39,7 +39,7 @@ export default function SystemHealthHub() {
   const [autoRefresh, setAutoRefresh] = useState(true);
 
   // Check permissions
-  const hasAccess = hasPermission(Permission.SYSTEM_ADMIN) || user?.role === 'super_admin';
+  const hasAccess = hasPermission(Permission.SYSTEM_ADMIN) || (user as unknown as { role?: string })?.role === 'super_admin';
 
   // Handle URL tab parameter
   useEffect(() => {

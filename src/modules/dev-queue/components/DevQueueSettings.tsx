@@ -56,7 +56,7 @@ export function DevQueueSettings({ columns, onColumnsUpdated }: DevQueueSettings
   const handleColumnChange = (index: number, field: keyof ColumnSettings, value: string | number | boolean | null | undefined) => {
     setColumnSettings((prev) => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
+      updated[index] = { ...updated[index]!, [field]: value } as ColumnSettings;
       return updated;
     });
     setHasChanges(true);
@@ -69,7 +69,7 @@ export function DevQueueSettings({ columns, onColumnsUpdated }: DevQueueSettings
       {
         id: `new-${Date.now()}`,
         name: `New Column ${newPosition}`,
-        color: DEFAULT_COLORS[newPosition % DEFAULT_COLORS.length],
+        color: DEFAULT_COLORS[newPosition % DEFAULT_COLORS.length] ?? '#6b7280',
         wip_limit: null,
         position: newPosition,
         isNew: true,
@@ -101,7 +101,7 @@ export function DevQueueSettings({ columns, onColumnsUpdated }: DevQueueSettings
 
     setColumnSettings((prev) => {
       const updated = [...prev];
-      [updated[fromIndex], updated[toIndex]] = [updated[toIndex], updated[fromIndex]];
+      [updated[fromIndex], updated[toIndex]] = [updated[toIndex]!, updated[fromIndex]!];
       // Update positions
       return updated.map((col, i) => ({ ...col, position: i + 1 }));
     });

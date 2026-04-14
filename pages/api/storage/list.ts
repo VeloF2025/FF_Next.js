@@ -39,15 +39,15 @@ async function handler(
       });
     }
 
-    const typeStr = Array.isArray(type) ? type[0] : type;
-    const categoryStr = Array.isArray(category) ? category[0] : category;
+    const typeStr = (Array.isArray(type) ? type[0] : type) ?? '';
+    const categoryStr = (Array.isArray(category) ? category[0] : category) ?? '';
 
     // List files from VF Storage
     const fileNames = await vfStorage.listFiles(typeStr, categoryStr);
 
     const files = fileNames.map(name => ({
-      name,
-      url: vfStorage.getFileUrl(typeStr, categoryStr, name),
+      name: String(name),
+      url: vfStorage.getFileUrl(typeStr, categoryStr, String(name)),
     }));
 
     return res.status(200).json({

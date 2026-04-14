@@ -261,7 +261,7 @@ export function WorkflowCharts({ analytics, dateRange }: WorkflowChartsProps) {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name: _name, rate }) => `${rate}%`}
+                  label={({ name: _name, rate }: { name: string; rate: number }) => `${rate}%`}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="rate"
@@ -271,9 +271,9 @@ export function WorkflowCharts({ analytics, dateRange }: WorkflowChartsProps) {
                   ))}
                 </Pie>
                 <Tooltip 
-                  content={({ payload }) => {
+                  content={({ payload }: { payload?: Array<{ payload: Record<string, unknown> }> }) => {
                     if (payload && payload.length) {
-                      const data = payload[0].payload;
+                      const data = payload[0]!.payload;
                       return (
                         <div className="bg-card p-3 border rounded-lg shadow-lg">
                           <p className="font-medium text-foreground">

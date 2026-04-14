@@ -499,7 +499,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
     `;
   }
-  const { count } = countRow;
+  const { count } = countRow as { count: number };
 
   // Stats query — only uses project_id and contractor_id filters
   let stats;

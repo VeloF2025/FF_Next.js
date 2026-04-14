@@ -15,7 +15,7 @@ import {
   type AssetSyncOptions,
 } from '@/services/odoo/entities/assetSync';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLogger } from '@/lib/logger';
 
@@ -27,7 +27,7 @@ const ODOO_DB = process.env.ODOO_DB || 'velocityfibre';
 const ODOO_USERNAME = process.env.ODOO_USERNAME;
 const ODOO_PASSWORD = process.env.ODOO_PASSWORD;
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   if (!DATABASE_URL) {
     return apiResponse.internalError(res, new Error('Database URL not configured'));
   }
@@ -92,7 +92,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 /**
  * POST - Execute asset sync
  */
-async function handlePost(req: NextApiRequest, res: NextApiResponse) {
+async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   const {
     categories,
     includeFleet = false,

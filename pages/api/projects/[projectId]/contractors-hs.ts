@@ -51,7 +51,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       SELECT id, project_name FROM projects WHERE id = ${projectId}
     `;
 
-    if (projectResult.length === 0) {
+    if ((projectResult as unknown as unknown[]).length === 0) {
       return apiResponse.notFound(res, 'Project', projectId);
     }
 
