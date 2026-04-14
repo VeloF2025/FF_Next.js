@@ -87,7 +87,8 @@ async function fetchOtpFromImap(since: Date): Promise<string | null> {
   try {
     await client.mailboxOpen('INBOX');
 
-    // 30s buffer to catch emails that arrived just before the trigger
+    // IMAP SINCE is date-granularity only (matches whole day), so we also
+    // filter by parsed.date to skip stale OTPs from earlier runs
     const sinceDate = new Date(since.getTime() - 30_000);
     const uids = await client.search({ since: sinceDate, unseen: true });
 
@@ -111,10 +112,18 @@ async function fetchOtpFromImap(since: Date): Promise<string | null> {
 
       if (!isFibertime) continue;
 
+      // Skip emails sent before the trigger — prevents using stale OTPs
+      if (parsed.date && parsed.date.getTime() < since.getTime() - 30_000) {
+        log('INFO','Skipping stale OTP email', { subject: parsed.subject, uid, sentAt: parsed.date.toISOString() });
+        continue;
+      }
+
       // Extract 6-digit code
       const match = body.match(/\b(\d{6})\b/);
       if (match) {
-        log('INFO','OTP found in email', { subject: parsed.subject, uid });
+        log('INFO','OTP found in email', { subject: parsed.subject, uid, sentAt: parsed.date?.toISOString() });
+        // Mark as read so future runs won't pick it up
+        await client.messageFlagsAdd(String(uid), ['\\Seen']);
         return match[1];
       }
     }
@@ -241,7 +250,7 @@ async function main(): Promise<void> {
     const otpFailed = await otpErrorEl.isVisible({ timeout: 1_000 }).catch(() => false);
     if (otpFailed) {
       await page.screenshot({ path: '/tmp/fibertime-otp-rejected.png', fullPage: false });
-      throw new Error('OTP rejected by Microsoft (rate-limited or expired). Wait 30 min and retry.');
+      throw new Error('OTP rejected by Microsoft — code was likely stale or expired.');
     }
 
     // Step 7: Confirm SharePoint landing — handle KMSI + other MS prompts along the way
