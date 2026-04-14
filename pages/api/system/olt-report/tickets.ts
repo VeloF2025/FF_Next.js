@@ -11,6 +11,7 @@ import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
 import { createTicket } from '@/modules/noc/services/ticketService';
 import { TicketSource, TicketType, TicketPriority, TicketStatus } from '@/modules/noc/types/ticket';
+import { PP_OLT_SUBTYPES } from '@/modules/noc/constants/ticketCategories';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('olt-report:tickets');
@@ -20,6 +21,8 @@ const VALID_TICKET_TYPES: string[] = [
   TicketType.ACTIVATIONS,
 ];
 
+const VALID_CATEGORIES: string[] = [...PP_OLT_SUBTYPES];
+
 async function handler(
   req: AuthenticatedNextApiRequest,
   res: NextApiResponse
@@ -28,14 +31,44 @@ async function handler(
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET','POST','PUT','DELETE','PATCH']);
   }
 
-  const { record_ids, ticket_type, priority, notes, assigned_team_id } = req.body;
+  const {
+    record_ids,
+    ticket_type: rawTicketType,
+    ticket_category: rawCategory,
+    priority,
+    notes,
+    assigned_team_id,
+  } = req.body;
 
   if (!Array.isArray(record_ids) || record_ids.length === 0) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid record_ids');
   }
 
-  if (!ticket_type || !VALID_TICKET_TYPES.includes(ticket_type)) {
+  let ticket_type: string = rawTicketType;
+  let ticket_category: string | undefined = rawCategory;
+
+  // Legacy callers that still send the old sub-type as ticket_type — treat it
+  // as category and default the discipline to ACTIVATIONS.
+  if (rawTicketType && VALID_CATEGORIES.includes(rawTicketType) && !VALID_TICKET_TYPES.includes(rawTicketType)) {
+    ticket_category = ticket_category || rawTicketType;
+    ticket_type = TicketType.ACTIVATIONS;
+  }
+
+  if (!ticket_type) {
+    ticket_type = TicketType.ACTIVATIONS;
+  }
+
+  if (!VALID_TICKET_TYPES.includes(ticket_type)) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, `ticket_type must be one of: ${VALID_TICKET_TYPES.join(', ')}`);
+  }
+
+  if (ticket_category && !VALID_CATEGORIES.includes(ticket_category)) {
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, `ticket_category must be one of: ${VALID_CATEGORIES.join(', ')}`);
+  }
+
+  // Default OLT mismatch tickets to the serial_mismatch tag.
+  if (!ticket_category) {
+    ticket_category = 'serial_mismatch';
   }
 
   const ticketPriority = priority && Object.values(TicketPriority).includes(priority)
@@ -111,6 +144,7 @@ async function handler(
         source: TicketSource.OLT_MISMATCH,
         title,
         ticket_type: ticket_type as TicketType,
+        ticket_category,
         priority: ticketPriority,
         description,
         dr_number: dr,

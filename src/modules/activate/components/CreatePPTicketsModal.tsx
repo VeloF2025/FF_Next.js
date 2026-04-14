@@ -7,12 +7,20 @@ import { Button } from '@/components/ui/button';
 
 interface CreatePPTicketsModalProps {
   selectedCount: number;
-  onConfirm: (params: { ticket_type: string; priority: string; notes: string; assigned_team_id?: string }) => void;
+  onConfirm: (params: {
+    ticket_type: string;
+    ticket_category: string;
+    priority: string;
+    notes: string;
+    assigned_team_id?: string;
+  }) => void;
   onClose: () => void;
   loading: boolean;
 }
 
-const TICKET_TYPES = [
+// These are ticket_category sub-type tags; discipline is always 'activations'
+// for PP Data (Activate module). See migration 301.
+const TICKET_CATEGORIES = [
   { value: 'pre_provision', label: 'Pre-Provision' },
   { value: 'fault_repair', label: 'Fault Repair' },
   { value: 'modification', label: 'Modification' },
@@ -33,7 +41,7 @@ export function CreatePPTicketsModal({
   onClose,
   loading,
 }: CreatePPTicketsModalProps) {
-  const [ticketType, setTicketType] = useState('pre_provision');
+  const [ticketCategory, setTicketCategory] = useState('pre_provision');
   const [priority, setPriority] = useState('normal');
   const [notes, setNotes] = useState('');
   const [assignedTeamId, setAssignedTeamId] = useState<string | null>(null);
@@ -72,12 +80,12 @@ export function CreatePPTicketsModal({
               Ticket Type
             </label>
             <select
-              value={ticketType}
-              onChange={(e) => setTicketType(e.target.value)}
+              value={ticketCategory}
+              onChange={(e) => setTicketCategory(e.target.value)}
               className="w-full px-3 py-2 rounded bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]
                          text-[var(--ff-text-primary)] text-sm"
             >
-              {TICKET_TYPES.map((t) => (
+              {TICKET_CATEGORIES.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
             </select>
@@ -136,7 +144,13 @@ export function CreatePPTicketsModal({
           </Button>
           <Button
             variant="primary"
-            onClick={() => onConfirm({ ticket_type: ticketType, priority, notes, assigned_team_id: assignedTeamId || undefined })}
+            onClick={() => onConfirm({
+              ticket_type: 'activations',
+              ticket_category: ticketCategory,
+              priority,
+              notes,
+              assigned_team_id: assignedTeamId || undefined,
+            })}
             disabled={loading}
             loading={loading}
           >

@@ -289,12 +289,23 @@ export function TicketFilters({ filters, onFiltersChange, compact = false }: Tic
               className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             >
               <option value="">All Subcategories</option>
-              <option value="dev_ops">DevOps</option>
-              <option value="hse_incident">HSE</option>
-              <option value="maintenance">Maintenance</option>
-              <option value="sales_lead">Sales Lead</option>
-              <option value="snag">Snag</option>
-              <option value="unspecified">Unspecified</option>
+              <optgroup label="Operational">
+                <option value="maintenance">Maintenance</option>
+                <option value="snag">Snag</option>
+                <option value="hse_incident">HSE</option>
+                <option value="dev_ops">DevOps</option>
+                <option value="sales_lead">Sales Lead</option>
+                <option value="unspecified">Unspecified</option>
+              </optgroup>
+              <optgroup label="PP Data / OLT">
+                <option value="pre_provision">Pre-Provision</option>
+                <option value="fault_repair">Fault Repair</option>
+                <option value="modification">Modification</option>
+                <option value="ont_swap">ONT Swap</option>
+                <option value="new_installation">New Installation</option>
+                <option value="serial_mismatch">Serial Mismatch</option>
+                <option value="olt_investigation">OLT Investigation</option>
+              </optgroup>
             </select>
           </div>
 

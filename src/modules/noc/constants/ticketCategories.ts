@@ -73,15 +73,37 @@ export function getT1Label(type: string): string {
   return T1_LABELS[cat];
 }
 
-/** Display labels for ticket_category (T1 axis) */
+/** Display labels for ticket_category (T1 + T2 axis) */
 export const TICKET_CATEGORY_LABELS: Record<string, string> = {
+  // T1 operational categories
   maintenance: 'Maintenance',
   snag: 'Snag',
   hse_incident: 'HSE',
   dev_ops: 'DevOps',
   sales_lead: 'Sales',
   unspecified: 'Unspecified',
+  // T2 sub-type tags (PP Data + OLT mismatch)
+  pre_provision: 'Pre-Provision',
+  fault_repair: 'Fault Repair',
+  modification: 'Modification',
+  ont_swap: 'ONT Swap',
+  new_installation: 'New Installation',
+  serial_mismatch: 'Serial Mismatch',
+  olt_investigation: 'OLT Investigation',
 };
+
+/** The sub-type tags valid as ticket_category on PP/OLT ingest paths. */
+export const PP_OLT_SUBTYPES = [
+  'pre_provision',
+  'fault_repair',
+  'modification',
+  'ont_swap',
+  'new_installation',
+  'serial_mismatch',
+  'olt_investigation',
+] as const;
+
+export type PPOLTSubtype = (typeof PP_OLT_SUBTYPES)[number];
 
 /** Get display label for a ticket_category value */
 export function getTicketCategoryLabel(category: string | null | undefined): string {

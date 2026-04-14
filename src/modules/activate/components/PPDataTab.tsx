@@ -132,7 +132,7 @@ export function PPDataTab() {
     }
   };
 
-  const handleCreateTickets = async (params: { ticket_type: string; priority: string; notes: string; assigned_team_id?: string }) => {
+  const handleCreateTickets = async (params: { ticket_type: string; ticket_category: string; priority: string; notes: string; assigned_team_id?: string }) => {
     setCreatingTickets(true);
     try {
       const res = await fetch('/api/activate/pp-data-tickets', {

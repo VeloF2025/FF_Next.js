@@ -17,6 +17,7 @@ import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
 import { createTicket } from '@/modules/noc/services/ticketService';
 import { TicketSource, TicketType, TicketPriority, TicketStatus } from '@/modules/noc/types/ticket';
+import { PP_OLT_SUBTYPES } from '@/modules/noc/constants/ticketCategories';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('activate:pp-data-tickets');
@@ -27,6 +28,8 @@ const VALID_TICKET_TYPES: string[] = [
   TicketType.OPTICAL,
   TicketType.CIVILS,
 ];
+
+const VALID_CATEGORIES: string[] = [...PP_OLT_SUBTYPES];
 
 interface EnrichmentData {
   project_id?: string;
@@ -151,14 +154,45 @@ async function handleCreate(
   req: AuthenticatedNextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
-  const { pp_data_ids, ticket_type, priority, notes, assigned_team_id } = req.body;
+  const {
+    pp_data_ids,
+    ticket_type: rawTicketType,
+    ticket_category: rawCategory,
+    priority,
+    notes,
+    assigned_team_id,
+  } = req.body;
 
   if (!Array.isArray(pp_data_ids) || pp_data_ids.length === 0) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
   }
 
-  if (!ticket_type || !VALID_TICKET_TYPES.includes(ticket_type)) {
+  // Accept legacy callers that still send the old sub-type as ticket_type.
+  // If ticket_type looks like a PP/OLT sub-type, treat it as the category
+  // and default the discipline to ACTIVATIONS (PP Data lives under Activate).
+  let ticket_type: string = rawTicketType;
+  let ticket_category: string | undefined = rawCategory;
+
+  if (rawTicketType && VALID_CATEGORIES.includes(rawTicketType) && !VALID_TICKET_TYPES.includes(rawTicketType)) {
+    ticket_category = ticket_category || rawTicketType;
+    ticket_type = TicketType.ACTIVATIONS;
+  }
+
+  if (!ticket_type) {
+    ticket_type = TicketType.ACTIVATIONS;
+  }
+
+  if (!VALID_TICKET_TYPES.includes(ticket_type)) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, `ticket_type must be one of: ${VALID_TICKET_TYPES.join(', ')}`);
+  }
+
+  if (ticket_category && !VALID_CATEGORIES.includes(ticket_category)) {
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, `ticket_category must be one of: ${VALID_CATEGORIES.join(', ')}`);
+  }
+
+  // Default PP Data tickets to the pre_provision tag when none supplied.
+  if (!ticket_category) {
+    ticket_category = 'pre_provision';
   }
 
   const ticketPriority = priority && Object.values(TicketPriority).includes(priority)
@@ -230,6 +264,7 @@ async function handleCreate(
         source: TicketSource.PP_DATA,
         title,
         ticket_type: ticket_type as TicketType,
+        ticket_category,
         priority: ticketPriority,
         description,
         dr_number: dr || undefined,

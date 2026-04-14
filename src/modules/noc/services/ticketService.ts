@@ -810,22 +810,27 @@ export async function listTickets(
       paramCounter++;
     }
 
-    // 🟢 WORKING: Search filter - searches ticket_uid, dr_number, title, and description
-    // Each column needs its own parameter index because the neon HTTP driver
-    // splits by $N placeholders to build tagged template literals.
+    // 🟢 WORKING: Search filter - searches ticket_uid, dr_number, title,
+    // description, ticket_category, and source. Each column needs its own
+    // parameter index because the neon HTTP driver splits by $N placeholders
+    // to build tagged template literals.
     if (filters.search && filters.search.trim()) {
       const searchTerm = `%${filters.search.trim()}%`;
       const p1 = paramCounter++;
       const p2 = paramCounter++;
       const p3 = paramCounter++;
       const p4 = paramCounter++;
+      const p5 = paramCounter++;
+      const p6 = paramCounter++;
       whereClauses.push(`(
         ticket_uid ILIKE $${p1} OR
         dr_number ILIKE $${p2} OR
         title ILIKE $${p3} OR
-        description ILIKE $${p4}
+        description ILIKE $${p4} OR
+        ticket_category ILIKE $${p5} OR
+        source ILIKE $${p6}
       )`);
-      values.push(searchTerm, searchTerm, searchTerm, searchTerm);
+      values.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     // 🟢 WORKING: Build WHERE clause
