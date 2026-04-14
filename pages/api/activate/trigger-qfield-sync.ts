@@ -6,7 +6,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, withRole } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('TriggerQFieldSync');
 
 async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method !== 'POST') {
@@ -15,7 +17,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   try {
     const { force = false } = req.body;
-    log.info('TriggerQFieldSync', 'Manual sync triggered', { force });
+    log.info('Manual sync triggered', { force });
 
     const response = await fetch('http://100.96.203.105:8095/sync/oes', {
       method: 'POST',
@@ -28,15 +30,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       throw new Error(`Webhook returned ${response.status}: ${errorText}`);
     }
 
-    const result = await response.json();
-    log.info('TriggerQFieldSync', 'Sync webhook response', result);
+    const result = await response.json() as Record<string, unknown>;
+    log.info('Sync webhook response', result);
 
     // Non-blocking status check after 2s
-    setTimeout(async () => {
-      try {
-        const s = await fetch('http://100.96.203.105:8095/sync/status');
-        if (s.ok) log.info('TriggerQFieldSync', 'Sync status after trigger', await s.json());
-      } catch (e) { log.warn('TriggerQFieldSync', 'Could not check sync status', e); }
+    setTimeout(() => {
+      void (async () => {
+        try {
+          const s = await fetch('http://100.96.203.105:8095/sync/status');
+          if (s.ok) log.info('Sync status after trigger', await s.json() as Record<string, unknown>);
+        } catch (e) { log.warn('Could not check sync status', { error: e }); }
+      })();
     }, 2000);
 
     return apiResponse.success(res, {
@@ -48,7 +52,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       },
     }, 'QFieldCloud sync triggered successfully');
   } catch (error) {
-    log.error('TriggerQFieldSync', 'Failed to trigger sync', error);
+    log.error('Failed to trigger sync', { error });
     return apiResponse.internalError(res, error);
   }
 }

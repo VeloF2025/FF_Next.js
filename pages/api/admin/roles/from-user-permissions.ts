@@ -4,21 +4,24 @@
  * Creates a new role or updates an existing role using a user's effective permissions
  */
 
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import { createRoleFromUserPermissions, updateRoleFromUserPermissions } from '@/lib/permissions';
 import { apiResponse } from '@/lib/apiResponse';
-import log from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('FromUserPermissions');
 
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(
-  req: AuthenticatedNextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
+  const authReq = req as AuthenticatedNextApiRequest;
   if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
   try {
@@ -69,14 +72,14 @@ async function handler(
         name,
         displayName,
         description || null,
-        req.user.id
+        authReq.user.id
       );
 
       // Log audit event
       await sql`
         INSERT INTO user_audit_log (user_id, action, resource_type, resource_id, details, ip_address)
         VALUES (
-          ${req.user.id},
+          ${authReq.user.id},
           'role_create_from_user',
           'role',
           ${result.roleId}::uuid,
@@ -86,13 +89,13 @@ async function handler(
             sourceUser: userResult[0]!.email,
             sourceRole: userResult[0]!.role,
             permissionCount: result.permissionCount,
-            createdBy: req.user.email,
+            createdBy: authReq.user.email,
           })}::jsonb,
           ${(req.headers['x-forwarded-for'] as string)?.split(',')[0] || null}
         )
       `;
 
-      log.info({ roleId: result.roleId, name, sourceUser: userId }, 'Role created from user permissions');
+      log.info('Role created from user permissions', { roleId: result.roleId, name, sourceUser: userId });
 
       return apiResponse.created(res, {
         message: `Role "${displayName}" created with ${result.permissionCount} permissions`,
@@ -128,7 +131,7 @@ async function handler(
     await sql`
       INSERT INTO user_audit_log (user_id, action, resource_type, resource_id, details, ip_address)
       VALUES (
-        ${req.user.id},
+        ${authReq.user.id},
         'role_update_from_user',
         'role',
         ${roleData[0]!.id}::uuid,
@@ -137,16 +140,13 @@ async function handler(
           sourceUser: userResult[0]!.email,
           sourceRole: userResult[0]!.role,
           permissionCount: result.permissionCount,
-          updatedBy: req.user.email,
+          updatedBy: authReq.user.email,
         })}::jsonb,
         ${(req.headers['x-forwarded-for'] as string)?.split(',')[0] || null}
       )
     `;
 
-    log.info(
-      { role: existingRole, sourceUser: userId, perms: result.permissionCount },
-      'Role updated from user permissions'
-    );
+    log.info('Role updated from user permissions', { role: existingRole, sourceUser: userId, perms: result.permissionCount });
 
     return apiResponse.success(res, {
       message: `Role "${roleData[0]!.display_name}" updated with ${result.permissionCount} permissions`,
@@ -155,7 +155,7 @@ async function handler(
       permissionCount: result.permissionCount,
     });
   } catch (error) {
-    log.error({ error }, 'Error creating/updating role from user permissions');
+    log.error('Error creating/updating role from user permissions', { error });
     return apiResponse.internalError(res, error);
   }
 }

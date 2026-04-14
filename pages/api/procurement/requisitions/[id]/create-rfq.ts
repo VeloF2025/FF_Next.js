@@ -4,7 +4,9 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logCreate } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('CreateRfqApi');
 
 const smtpTransport = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -145,7 +147,7 @@ export default withAuth(withErrorHandler(async (
             addedSuppliers.push(result[0]);
           }
         } catch (e) {
-          log.error('CreateRfqApi', 'Failed to add supplier', { error: e });
+          log.error('Failed to add supplier', { error: e });
           // Skip invalid supplier IDs
         }
       }
@@ -172,7 +174,7 @@ export default withAuth(withErrorHandler(async (
         specifications: (item.specifications as string) || '',
       })),
     }).catch((err) => {
-      log.error('CreateRfqApi', 'Failed to send RFQ email', { error: err });
+      log.error('Failed to send RFQ email', { error: err });
     });
 
     // Log creation
@@ -198,7 +200,7 @@ export default withAuth(withErrorHandler(async (
     }, 'RFQ created from requisition successfully');
 
   } catch (error: any) {
-    log.error('CreateRfqApi', 'Failed to create RFQ from requisition', { error });
+    log.error('Failed to create RFQ from requisition', { error });
     return apiResponse.databaseError(res, error, 'Failed to create RFQ from requisition');
   }
 }));
@@ -301,7 +303,7 @@ async function sendRfqEmail(data: RfqEmailData): Promise<void> {
     html,
   });
 
-  log.info('CreateRfqApi', 'RFQ email sent via SMTP', {
+  log.info('RFQ email sent via SMTP', {
     rfqNumber: data.rfqNumber,
     messageId: info.messageId,
     recipients: RFQ_NOTIFY_EMAILS,

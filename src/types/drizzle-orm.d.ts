@@ -4,6 +4,24 @@
  * in src/lib/neon/ files that reference drizzle types.
  */
 
+declare module 'nodemailer' {
+  export interface Transport {
+    sendMail(options: {
+      from?: string;
+      to?: string;
+      subject?: string;
+      html?: string;
+      text?: string;
+    }): Promise<{ messageId: string }>;
+  }
+  export function createTransport(options: {
+    host?: string;
+    port?: number;
+    secure?: boolean;
+    auth?: { user?: string; pass?: string };
+  }): Transport;
+}
+
 declare module 'drizzle-orm/neon-http' {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   export function drizzle(client: any, options?: any): any;
