@@ -5,7 +5,6 @@
  * detects issues, classifies them, and triggers appropriate recovery actions.
  */
 
-import net from 'net';
 import { log } from '@/lib/logger';
 
 // Normalize query result to always have rows array
@@ -424,7 +423,7 @@ export async function getHealthHistory(
   limit: number = 100
 ): Promise<HealthCheckResult[]> {
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<HealthCheckResult>(
     `
     SELECT
       service_id as "serviceId",
@@ -511,7 +510,7 @@ export async function detectIssue(
  */
 export async function createIncident(input: IncidentInput): Promise<Incident> {
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<Incident>(
     `
     INSERT INTO infrastructure_incidents (
       service_id,
@@ -548,7 +547,7 @@ export async function createIncident(input: IncidentInput): Promise<Incident> {
   );
 
   log.warn(`[HealthDaemon] Created incident for service ${input.serviceId}: ${input.issueType}`);
-  return result.rows[0];
+  return result.rows[0] as Incident;
 }
 
 /**
@@ -556,7 +555,7 @@ export async function createIncident(input: IncidentInput): Promise<Incident> {
  */
 export async function getActiveIncident(serviceId: string): Promise<Incident | null> {
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<Incident>(
     `
     SELECT
       id,
@@ -573,7 +572,7 @@ export async function getActiveIncident(serviceId: string): Promise<Incident | n
     [serviceId]
   );
 
-  return result.rows[0] || null;
+  return (result.rows[0] as Incident) ?? null;
 }
 
 // ============================================
@@ -626,7 +625,7 @@ export async function runMonitoringCycle(
 
     lastCheck = new Date();
   } catch (error) {
-    log.error('[HealthDaemon] Error in monitoring cycle:', error);
+    log.error('[HealthDaemon] Error in monitoring cycle', { error });
   }
 }
 

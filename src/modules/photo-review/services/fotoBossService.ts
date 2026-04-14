@@ -5,7 +5,9 @@
  */
 
 import { EvaluationResult } from '../types';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('BossService');
 
 const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://100.96.203.105:8001';
 
@@ -43,7 +45,7 @@ export class BossEvaluationError extends Error {
  */
 export async function fetchBossEvaluation(drNumber: string): Promise<EvaluationResult | null> {
     try {
-        log.info('BossService', `Fetching evaluation from BOSS API for ${drNumber}`);
+        log.info(`Fetching evaluation from BOSS API for ${drNumber}`);
 
         // Try to get QA status first (includes detailed results)
         const qaResponse = await fetch(`${BOSS_API_URL}/api/qa/status/${drNumber}`, {
@@ -57,12 +59,12 @@ export async function fetchBossEvaluation(drNumber: string): Promise<EvaluationR
             const qaData = await qaResponse.json() as BossApiResponse;
 
             if (qaData.status === 'completed' || qaData.status === 'failed') {
-                log.info('BossService', `Found completed evaluation for ${drNumber}`);
+                log.info(`Found completed evaluation for ${drNumber}`);
                 return convertBossToEvaluationResult(qaData);
             }
 
             if (qaData.status === 'in_progress' || qaData.status === 'pending') {
-                log.info('BossService', `Evaluation in progress for ${drNumber}`);
+                log.info(`Evaluation in progress for ${drNumber}`);
                 return null; // Evaluation not ready yet
             }
         }
@@ -78,16 +80,16 @@ export async function fetchBossEvaluation(drNumber: string): Promise<EvaluationR
         if (evalResponse.ok) {
             const evalData = await evalResponse.json() as BossApiResponse;
             if (evalData && evalData.dr_number) {
-                log.info('BossService', `Found evaluation via evaluations endpoint for ${drNumber}`);
+                log.info(`Found evaluation via evaluations endpoint for ${drNumber}`);
                 return convertBossToEvaluationResult(evalData);
             }
         }
 
-        log.info('BossService', `No evaluation found for ${drNumber} in BOSS`);
+        log.info(`No evaluation found for ${drNumber} in BOSS`);
         return null;
 
     } catch (error) {
-        log.error('BossService', `Failed to fetch BOSS evaluation: ${error}`);
+        log.error('Failed to fetch BOSS evaluation', { error: String(error) });
         throw new BossEvaluationError(
             `Failed to fetch evaluation from BOSS for ${drNumber}`,
             'FETCH_ERROR',

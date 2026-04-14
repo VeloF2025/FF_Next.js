@@ -5,7 +5,9 @@
  * are approved and have effort XS, S, or M.
  */
 
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('GitHubMvpSync');
 
 const GITHUB_API = 'https://api.github.com';
 const MVP_REPO = 'VelocityFibre/mvp-builds';
@@ -103,7 +105,7 @@ export async function createMvpIssue(
   const token = process.env.GITHUB_TOKEN;
 
   if (!token) {
-    log.error('GITHUB_TOKEN not configured - cannot create MVP issue', null, 'GitHubMvpSync');
+    log.error('GITHUB_TOKEN not configured - cannot create MVP issue');
     return null;
   }
 
@@ -138,20 +140,20 @@ export async function createMvpIssue(
 
     if (!response.ok) {
       const errorText = await response.text();
-      log.error(`GitHub API error: ${response.status} - ${errorText}`, null, 'GitHubMvpSync');
+      log.error(`GitHub API error: ${response.status} - ${errorText}`);
       return null;
     }
 
     const issue: GitHubIssueResponse = await response.json();
 
-    log.info(`Created GitHub Issue #${issue.number} for devQueue item ${item.id}`, 'GitHubMvpSync');
+    log.info(`Created GitHub Issue #${issue.number} for devQueue item ${item.id}`);
 
     return {
       issueNumber: issue.number,
       issueUrl: issue.html_url,
     };
   } catch (error) {
-    log.error('Failed to create GitHub issue:', error, 'GitHubMvpSync');
+    log.error('Failed to create GitHub issue', { error });
     return null;
   }
 }
@@ -200,7 +202,7 @@ export async function linkPrToIssue(
 
     return true;
   } catch (error) {
-    log.error('Failed to link PR to issue:', error, 'GitHubMvpSync');
+    log.error('Failed to link PR to issue', { error });
     return false;
   }
 }
@@ -232,7 +234,7 @@ export async function closeIssue(issueNumber: number): Promise<boolean> {
 
     return true;
   } catch (error) {
-    log.error('Failed to close issue:', error, 'GitHubMvpSync');
+    log.error('Failed to close issue', { error });
     return false;
   }
 }
