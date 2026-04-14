@@ -104,11 +104,12 @@ function getGoogleMapsUrl(lat: number, lng: number): string {
 export function TicketHeader({ ticket, backLink = '/noc/tickets', onStatusChange, onPriorityChange }: TicketHeaderProps) {
   const { currentUser: authUser } = useAuth();
 
-  // Get GPS coordinates from enrichment or ticket
-  const gps = ticket.fibreflow_enrichment?.fibreflow_gps
+  // Get GPS coordinates from enrichment or ticket — validate lat/lng are numeric
+  const rawGps = ticket.fibreflow_enrichment?.fibreflow_gps
     || ticket.fibreflow_enrichment?.onemap_gps
     || ticket.gps_coordinates
     || null;
+  const gps = rawGps && typeof rawGps.latitude === 'number' && typeof rawGps.longitude === 'number' ? rawGps : null;
 
   return (
     <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4 sm:p-6">
