@@ -3,13 +3,22 @@
  *
  * GET /api/snags/resolution-report
  *
- * Returns snags resolved/fixed within a date range, with full context
- * including photos (before/after) and NOC ticket notes.
+ * Returns snags filtered by date range + optional facets, with photos
+ * (before/after) and NOC ticket notes attached.
  *
  * Query params:
- *   date_from    — ISO date string (required) — filters by audit_date >= date_from
- *   date_to      — ISO date string (required) — filters by audit_date <= date_to
- *   project_id   — UUID (optional)
+ *   date_from      — ISO date (required)
+ *   date_to        — ISO date (required)
+ *   date_field     — 'opened' | 'resolved'   (default 'opened')
+ *   project_id     — UUID (optional)
+ *   status         — CSV of snag status values (optional)
+ *   category       — CSV of categories (optional)
+ *   severity       — CSV of severities (optional)
+ *   assigned_to    — CSV of user UUIDs (optional)
+ *   zone_no        — CSV of ints (optional)
+ *   pon_no         — CSV of ints (optional)
+ *   has_photos     — 'yes' | 'no' (optional)
+ *   min_age_days   — int, resolution-lag floor in days (optional)
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -21,7 +30,6 @@ import type { ResolutionPhoto, ResolutionNote, ResolutionReportRow } from '@/mod
 
 const sql = neon(process.env.DATABASE_URL!);
 
-// Re-export for backwards compatibility
 export type { ResolutionPhoto, ResolutionNote, ResolutionReportRow };
 
 const SNAG_QUERY_FIELDS = `
@@ -59,6 +67,31 @@ const SNAG_JOINS = `
 
 type RawSnagRow = Record<string, unknown>;
 
+function parseCsvStrings(value: unknown): string[] | null {
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  const parts = value.split(',').map((v) => v.trim()).filter(Boolean);
+  return parts.length > 0 ? parts : null;
+}
+
+function parseCsvInts(value: unknown): number[] | null {
+  const strs = parseCsvStrings(value);
+  if (!strs) return null;
+  const ints = strs.map((s) => Number.parseInt(s, 10)).filter((n) => Number.isFinite(n));
+  return ints.length > 0 ? ints : null;
+}
+
+function parseHasPhotos(value: unknown): boolean | null {
+  if (value === 'yes') return true;
+  if (value === 'no') return false;
+  return null;
+}
+
+function parseInt0(value: unknown): number | null {
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  const n = Number.parseInt(value, 10);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
 async function attachPhotosAndNotes(snagRows: RawSnagRow[]): Promise<ResolutionReportRow[]> {
   if (snagRows.length === 0) return [];
 
@@ -67,13 +100,11 @@ async function attachPhotosAndNotes(snagRows: RawSnagRow[]): Promise<ResolutionR
     .map((s) => s.noc_ticket_id as string | null)
     .filter((id): id is string => !!id);
 
-  // Build ticket→snag map so we can merge attachment photos by snag
   const ticketToSnag = new Map<string, string>();
   for (const s of snagRows) {
     if (s.noc_ticket_id) ticketToSnag.set(s.noc_ticket_id as string, s.id as string);
   }
 
-  // Batch-fetch snag_photos, ticket attachments, and notes in parallel
   const [photoRows, attachmentRows, noteRows] = await Promise.all([
     sql`
       SELECT id, snag_id, phase, photo_url, thumbnail_url
@@ -104,7 +135,6 @@ async function attachPhotosAndNotes(snagRows: RawSnagRow[]): Promise<ResolutionR
       : Promise.resolve([]),
   ]);
 
-  // Group snag_photos by snag — track URLs to de-dup
   const photosBySnag = new Map<string, ResolutionPhoto[]>();
   const seenUrls = new Set<string>();
   for (const p of photoRows) {
@@ -118,11 +148,9 @@ async function attachPhotosAndNotes(snagRows: RawSnagRow[]): Promise<ResolutionR
     seenUrls.add(p.photo_url);
   }
 
-  // Merge maintenance_attachments photos (after photos often only here)
   for (const a of attachmentRows) {
     const snagId = ticketToSnag.get(a.ticket_id);
     if (!snagId || !a.url) continue;
-    // Skip duplicates already in snag_photos
     if (seenUrls.has(a.url)) continue;
     seenUrls.add(a.url);
     const phase = a.filename?.toLowerCase().includes('before') ? 'before' : 'after';
@@ -176,17 +204,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.methodNotAllowed(res, req.method ?? 'Unknown', ['GET']);
   }
 
-  const { date_from, date_to, project_id } = req.query;
+  const q = req.query;
 
-  if (!date_from || typeof date_from !== 'string') {
+  if (!q.date_from || typeof q.date_from !== 'string') {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'date_from is required');
   }
-  if (!date_to || typeof date_to !== 'string') {
+  if (!q.date_to || typeof q.date_to !== 'string') {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'date_to is required');
   }
 
-  const dateFrom = new Date(date_from);
-  const dateTo = new Date(date_to);
+  const dateFrom = new Date(q.date_from);
+  const dateTo = new Date(q.date_to);
   if (isNaN(dateFrom.getTime()) || isNaN(dateTo.getTime())) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Invalid date format');
   }
@@ -194,38 +222,55 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const fromStr = dateFrom.toISOString().slice(0, 10);
   const toStr   = dateTo.toISOString().slice(0, 10);
 
+  const dateField = q.date_field === 'resolved' ? 'resolved' : 'opened';
+  const dateCol = dateField === 'resolved'
+    ? 'COALESCE(s.fixed_at, s.updated_at)'
+    : 'sr.audit_date';
+
+  const projectId  = typeof q.project_id === 'string' && q.project_id ? q.project_id : null;
+  const statuses   = parseCsvStrings(q.status);
+  const categories = parseCsvStrings(q.category);
+  const severities = parseCsvStrings(q.severity);
+  const assignees  = parseCsvStrings(q.assigned_to);
+  const zones      = parseCsvInts(q.zone_no);
+  const pons       = parseCsvInts(q.pon_no);
+  const hasPhotos  = parseHasPhotos(q.has_photos);
+  const minAgeDays = parseInt0(q.min_age_days);
+
   try {
-    log.info('ResolutionReport: querying', { date_from, date_to, project_id });
+    log.info('ResolutionReport: querying', {
+      fromStr, toStr, dateField, projectId,
+      statuses, categories, severities, assignees, zones, pons, hasPhotos, minAgeDays,
+    });
 
-    let snagRows: RawSnagRow[];
-
-    if (project_id && typeof project_id === 'string') {
-      snagRows = await sql`
-        SELECT ${sql.unsafe(SNAG_QUERY_FIELDS)}
-        FROM snags s
-        ${sql.unsafe(SNAG_JOINS)}
-        WHERE s.project_id = ${project_id}
-          AND s.status IN ('pending_qa', 'resolved', 'verified', 'closed')
-          AND sr.audit_date >= ${fromStr}
-          AND sr.audit_date <= ${toStr}
-        ORDER BY sr.audit_date ASC, s.snag_number ASC
-      ` as RawSnagRow[];
-    } else {
-      snagRows = await sql`
-        SELECT ${sql.unsafe(SNAG_QUERY_FIELDS)}
-        FROM snags s
-        ${sql.unsafe(SNAG_JOINS)}
-        WHERE s.status IN ('pending_qa', 'resolved', 'verified', 'closed')
-          AND sr.audit_date >= ${fromStr}
-          AND sr.audit_date <= ${toStr}
-        ORDER BY p.project_name ASC, sr.audit_date ASC, s.snag_number ASC
-      ` as RawSnagRow[];
-    }
+    const snagRows = await sql`
+      SELECT ${sql.unsafe(SNAG_QUERY_FIELDS)}
+      FROM snags s
+      ${sql.unsafe(SNAG_JOINS)}
+      WHERE ${sql.unsafe(dateCol)} >= ${fromStr}
+        AND ${sql.unsafe(dateCol)} <= ${toStr}
+        AND (${projectId}::uuid IS NULL OR s.project_id = ${projectId}::uuid)
+        AND (${statuses}::text[] IS NULL OR s.status = ANY(${statuses}::text[]))
+        AND (${categories}::text[] IS NULL OR s.category = ANY(${categories}::text[]))
+        AND (${severities}::text[] IS NULL OR s.severity = ANY(${severities}::text[]))
+        AND (${assignees}::uuid[] IS NULL OR s.assigned_to = ANY(${assignees}::uuid[]))
+        AND (${zones}::int[] IS NULL
+             OR COALESCE(pole.zone_no, dr.zone_no, zb.zone_no) = ANY(${zones}::int[]))
+        AND (${pons}::int[]  IS NULL
+             OR COALESCE(pole.pon_no,  dr.pon_no,  pb.pon_no)  = ANY(${pons}::int[]))
+        AND (${hasPhotos}::bool IS NULL
+             OR (EXISTS (SELECT 1 FROM snag_photos sp WHERE sp.snag_id = s.id) = ${hasPhotos}::bool))
+        AND (${minAgeDays}::int IS NULL
+             OR EXTRACT(EPOCH FROM (
+                  COALESCE(s.fixed_at, s.updated_at, NOW()) - sr.audit_date
+                )) / 86400 >= ${minAgeDays}::int)
+      ORDER BY p.project_name ASC, sr.audit_date ASC, s.snag_number ASC
+    ` as RawSnagRow[];
 
     const rows = await attachPhotosAndNotes(snagRows);
 
     log.info('ResolutionReport: done', { count: rows.length });
-    return apiResponse.success(res, { rows, date_from, date_to });
+    return apiResponse.success(res, { rows, date_from: q.date_from, date_to: q.date_to });
 
   } catch (error) {
     log.error('ResolutionReport: failed', { error });
