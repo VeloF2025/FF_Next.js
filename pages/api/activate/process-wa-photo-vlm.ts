@@ -24,6 +24,14 @@ import { logWaPhotoVlmProcessed, logSerialChange } from '@/modules/activate/serv
 // VPS photo server (same as step photos - port 8866)
 const VPS_PHOTO_BASE = process.env.VPS_PHOTO_URL || 'http://72.61.197.178:8866';
 
+interface WaPhotoRow {
+  id: string;
+  wa_message_id: string | null;
+  original_filename: string | null;
+  local_path: string;
+  vlm_processed: boolean;
+}
+
 interface ProcessResult {
   photoId: string;
   filename: string;
@@ -46,7 +54,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, 'dropNumber is required');
   }
 
-  log.info('ProcessWaPhotoVlm', `Processing WA photos for ${dropNumber}`, { force });
+  log.info(`Processing WA photos for ${dropNumber}`, { force }, 'ProcessWaPhotoVlm');
 
   try {
     // Get unprocessed (or all if force=true) WA photos for this DR
@@ -64,7 +72,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           ORDER BY message_timestamp DESC
         `;
 
-    const photos = await photosQuery;
+    const photos = (await photosQuery) as unknown as WaPhotoRow[];
 
     if (photos.length === 0) {
       return apiResponse.success(res, {
@@ -99,7 +107,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       );
       const photoUrl = `${VPS_PHOTO_BASE}${urlPath}`;
 
-      log.debug('ProcessWaPhotoVlm', `Processing photo: ${photo.original_filename}`, { photoUrl });
+      log.debug(`Processing photo: ${photo.original_filename ?? 'unknown'}`, { photoUrl }, 'ProcessWaPhotoVlm');
 
       try {
         const extraction = await extractSerialsFromWaPhoto(photoUrl);
@@ -140,7 +148,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         if (extraction.success) {
           await logWaPhotoVlmProcessed(dropNumber, {
             photoId: photo.id,
-            filename: photo.original_filename,
+            filename: photo.original_filename ?? undefined,
             ontExtracted: extraction.ontSerial,
             upsExtracted: extraction.upsSerial,
             confidence: extraction.confidence,
@@ -150,7 +158,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
       } catch (photoError) {
         const errorMsg = photoError instanceof Error ? photoError.message : String(photoError);
-        log.error('ProcessWaPhotoVlm', `Failed to process photo ${photo.id}: ${errorMsg}`);
+        log.error(`Failed to process photo ${photo.id}: ${errorMsg}`, undefined, 'ProcessWaPhotoVlm');
 
         results.push({
           photoId: photo.id,
@@ -188,16 +196,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Log serial changes if WA photo shows different serial than OneMap
     if (bestOnt?.serial && onemapOnt && onemapOnt.toUpperCase() !== bestOnt.serial.toUpperCase()) {
-      log.warn('ProcessWaPhotoVlm', `ONT mismatch detected: OneMap=${onemapOnt}, WA Photo=${bestOnt.serial}`);
+      log.warn(`ONT mismatch detected: OneMap=${onemapOnt}, WA Photo=${bestOnt.serial}`, undefined, 'ProcessWaPhotoVlm');
     }
     if (bestUps?.serial && onemapUps && onemapUps.toUpperCase() !== bestUps.serial.toUpperCase()) {
-      log.warn('ProcessWaPhotoVlm', `UPS mismatch detected: OneMap=${onemapUps}, WA Photo=${bestUps.serial}`);
+      log.warn(`UPS mismatch detected: OneMap=${onemapUps}, WA Photo=${bestUps.serial}`, undefined, 'ProcessWaPhotoVlm');
     }
 
-    log.info('ProcessWaPhotoVlm', `Completed processing ${photos.length} photos for ${dropNumber}`, {
+    log.info(`Completed processing ${photos.length} photos for ${dropNumber}`, {
       successful: results.filter(r => r.success).length,
       comparison,
-    });
+    }, 'ProcessWaPhotoVlm');
 
     return apiResponse.success(res, {
       dropNumber,
@@ -212,8 +220,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.error('ProcessWaPhotoVlm', `Failed to process WA photos: ${message}`);
-    return apiResponse.error(res, message, 500);
+    log.error(`Failed to process WA photos: ${message}`, undefined, 'ProcessWaPhotoVlm');
+    return apiResponse.internalError(res, error);
   }
 }
 

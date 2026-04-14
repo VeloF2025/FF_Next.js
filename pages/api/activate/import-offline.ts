@@ -400,7 +400,7 @@ function parseOfflineExcel(filePath: string): ParseResult {
     warnings.push(...headerValidation.warnings);
   }
 
-  log.info('OfflineImport', `Detected format: ${format}`, { sheetName, headerCount: headers.length, warningCount: warnings.length });
+  log.info(`Detected format: ${format}`, { sheetName, headerCount: headers.length, warningCount: warnings.length }, 'OfflineImport');
 
   // Parse based on format
   const data = XLSX.utils.sheet_to_json(sheet);
@@ -466,12 +466,12 @@ async function handler(
     const filePath = uploadedFile.filepath;
     const action = Array.isArray(fields.action) ? fields.action[0] : fields.action;
 
-    log.info('OfflineImport', `Parsing file: ${uploadedFile.originalFilename}`);
+    log.info(`Parsing file: ${uploadedFile.originalFilename}`, undefined, 'OfflineImport');
     const { rows: offlineRows, format: reportFormat, warnings, headerMismatch } = parseOfflineExcel(filePath);
 
     // Log warnings if any
     if (warnings.length > 0) {
-      log.warn('OfflineImport', 'Format validation warnings detected', { warnings, headerMismatch });
+      log.warn('Format validation warnings detected', { warnings, headerMismatch }, 'OfflineImport');
     }
 
     fs.unlinkSync(filePath);
@@ -507,10 +507,10 @@ async function handler(
 
     if (action === 'import') {
       const reportDate =
-        Array.isArray(fields.reportDate) ? fields.reportDate[0] : fields.reportDate;
-      const reportDateStr = reportDate || new Date().toISOString().split('T')[0];
+        Array.isArray(fields.reportDate) ? (fields.reportDate[0] ?? null) : fields.reportDate;
+      const reportDateStr: string = reportDate ?? new Date().toISOString().split('T')[0]!;
 
-      log.info('OfflineImport', `Importing ${offlineRows.length} rows (${reportFormat} format)`, { reportDate: reportDateStr, reportFormat });
+      log.info(`Importing ${offlineRows.length} rows (${reportFormat} format)`, { reportDate: reportDateStr, reportFormat }, 'OfflineImport');
 
       // Step 1: Create import batch
       const batchResult = await pool.query(
@@ -540,7 +540,7 @@ async function handler(
         oesResult.rows.map((o) => [o.drop_number, o])
       );
 
-      log.info('OfflineImport', `Matching: ${dropsMap.size} drops, ${oesMap.size} OES records`);
+      log.info(`Matching: ${dropsMap.size} drops, ${oesMap.size} OES records`, undefined, 'OfflineImport');
 
       // Step 4: Process and batch insert offline devices (500 rows per batch like OES import)
       const BATCH_SIZE = 500;
@@ -577,9 +577,7 @@ async function handler(
       // Different pole/reason/time = different offline instance = import both
       const seenKeys = new Set<string>();
       const uniqueRows = offlineRows.filter((row) => {
-        const dateStr = row.last_inform_date instanceof Date
-          ? row.last_inform_date.toISOString()
-          : String(row.last_inform_date || '');
+        const dateStr = row.last_inform_date ?? '';
         const compositeKey = `${row.drop_number}|${row.pole_number || ''}|${row.last_down_reason}|${dateStr}`;
         if (seenKeys.has(compositeKey)) {
           return false; // Exact duplicate - skip
@@ -588,7 +586,7 @@ async function handler(
         return true;
       });
       const duplicatesSkipped = offlineRows.length - uniqueRows.length;
-      log.info('OfflineImport', `Smart dedup: ${offlineRows.length} rows, ${duplicatesSkipped} exact duplicates skipped, ${uniqueRows.length} unique instances`);
+      log.info(`Smart dedup: ${offlineRows.length} rows, ${duplicatesSkipped} exact duplicates skipped, ${uniqueRows.length} unique instances`, undefined, 'OfflineImport');
 
       const processedRows: ProcessedRow[] = uniqueRows.map((row) => {
         const drop = dropsMap.get(row.drop_number);
@@ -710,10 +708,10 @@ async function handler(
         } catch (chunkError) {
           const errMsg = chunkError instanceof Error ? chunkError.message : 'Unknown error';
           errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${errMsg}`);
-          log.error('OfflineImport', `Batch error at row ${i}`, chunkError);
+          log.error(`Batch error at row ${i}`, { error: chunkError instanceof Error ? chunkError.message : String(chunkError) }, 'OfflineImport');
         }
 
-        log.info('OfflineImport', `Processed ${Math.min(i + BATCH_SIZE, offlineRows.length)}/${offlineRows.length}`);
+        log.info(`Processed ${Math.min(i + BATCH_SIZE, offlineRows.length)}/${offlineRows.length}`, undefined, 'OfflineImport');
       }
 
       // Step 5: Bulk update drops table with offline status
@@ -757,7 +755,7 @@ async function handler(
       // Step 6: Skip alerts for now - can be added later as separate process
       // TODO: Re-enable alerts after core import is verified working
       const alertsCreated = 0;
-      log.info('OfflineImport', `Skipping ${alertsToCreate.length} alerts for performance`);
+      log.info(`Skipping ${alertsToCreate.length} alerts for performance`, undefined, 'OfflineImport');
 
       // Step 7: Update batch stats
       await pool.query(
@@ -770,14 +768,14 @@ async function handler(
         [matchedDrops, matchedOes, unmatched, serialMismatches, batchId]
       );
 
-      log.info('OfflineImport', 'Import complete', {
+      log.info('Import complete', {
         matchedDrops,
         matchedOes,
         unmatched,
         serialMismatches,
         alertsCreated,
         errors: errors.length,
-      });
+      }, 'OfflineImport');
 
       return res.status(200).json({
         success: true,
@@ -795,7 +793,7 @@ async function handler(
 
     return res.status(400).json({ error: 'Invalid action. Use "preview" or "import".' });
   } catch (error) {
-    log.error('OfflineImport', 'Import failed', error);
+    log.error('Import failed', { error: error instanceof Error ? error.message : String(error) }, 'OfflineImport');
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Import failed',
     });

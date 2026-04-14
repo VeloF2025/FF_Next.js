@@ -72,12 +72,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     const submittedDateValue = submittedDate ? new Date(submittedDate) : new Date();
     const submittedDateStr = submittedDateValue.toISOString().split('T')[0]!;
 
-    log.info('ProcessNewDr', `Processing DR: ${dropNumber}`, {
+    log.info(`Processing DR: ${dropNumber}`, {
       project,
       submittedDate: submittedDateStr,
       skipCategorization,
       senderPhone,
-    });
+    }, 'ProcessNewDr');
 
     // === DROPS TABLE VALIDATION ===
     const dropsRecord = await checkDropsTable(dropNumber);
@@ -91,11 +91,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
       if (project && expectedProject && project.toLowerCase() !== expectedProject.toLowerCase()) {
         projectMismatch = true;
-        log.warn('ProcessNewDr', `Project mismatch for ${dropNumber}`, {
+        log.warn(`Project mismatch for ${dropNumber}`, {
           expectedProject,
           submittedTo: project,
           senderPhone,
-        });
+        }, 'ProcessNewDr');
         return res.status(400).json({
           success: false,
           error: 'PROJECT_MISMATCH',
@@ -108,13 +108,13 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       }
 
       await markSiteSubmitted(dropNumber, senderPhone ?? null, project ?? expectedProject);
-      log.info('ProcessNewDr', `Marked ${dropNumber} as site submitted`, { expectedProject });
+      log.info(`Marked ${dropNumber} as site submitted`, { expectedProject }, 'ProcessNewDr');
       triggerSharePointFolderCreation(dropNumber, expectedProject);
     } else {
-      log.warn('ProcessNewDr', `DR ${dropNumber} not found in drops table - REJECTING`, {
+      log.warn(`DR ${dropNumber} not found in drops table - REJECTING`, {
         submittedTo: project,
         senderPhone,
-      });
+      }, 'ProcessNewDr');
       return res.status(400).json({
         success: false,
         error: 'DR_NOT_FOUND',
@@ -155,31 +155,31 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     });
 
     // === PHOTO FETCH ===
-    log.info('ProcessNewDr', `Fetching photos for ${dropNumber} with retry`);
+    log.info(`Fetching photos for ${dropNumber} with retry`, undefined, 'ProcessNewDr');
     const fetchResult = await fetchPhotosWithRetry(dropNumber, {
       maxRetries: 5,
       initialDelayMs: 2000,
       onStatusUpdate: (status) => {
-        log.debug('ProcessNewDr', `Photo fetch status: ${status.message}`, {
+        log.debug(`Photo fetch status: ${status.message}`, {
           dropNumber,
           attempt: status.attempt,
           status: status.status,
-        });
+        }, 'ProcessNewDr');
       },
     });
 
     const { photos, ont_barcode, ups_serial, fetchAttempts, downloadTriggered, totalWaitTimeMs } =
       fetchResult;
 
-    log.info('ProcessNewDr', `Photo fetch complete for ${dropNumber}`, {
+    log.info(`Photo fetch complete for ${dropNumber}`, {
       photoCount: photos.length,
       fetchAttempts,
       downloadTriggered,
       totalWaitTimeMs,
-    });
+    }, 'ProcessNewDr');
 
     if (photos.length === 0) {
-      log.warn('ProcessNewDr', `No photos found for ${dropNumber}`);
+      log.warn(`No photos found for ${dropNumber}`, undefined, 'ProcessNewDr');
       await persistNoPhotos(dropNumber, ont_barcode, ups_serial);
 
       return apiResponse.success(res, {
@@ -196,11 +196,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       } as ProcessNewDrResponse);
     }
 
-    log.info('ProcessNewDr', `Found ${photos.length} photos for ${dropNumber}`);
+    log.info(`Found ${photos.length} photos for ${dropNumber}`, undefined, 'ProcessNewDr');
     await persistPhotoMetadata(dropNumber, photos, ont_barcode, ups_serial);
 
     if (skipCategorization) {
-      log.info('ProcessNewDr', `Skipping categorization for ${dropNumber} (requested)`);
+      log.info(`Skipping categorization for ${dropNumber} (requested)`, undefined, 'ProcessNewDr');
       return apiResponse.success(res, {
         dropNumber,
         photosDownloaded: photos.length,
@@ -231,7 +231,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       expectedProject,
     } as ProcessNewDrResponse);
   } catch (error) {
-    log.error('ProcessNewDr', 'Error processing new DR', error);
+    log.error('Error processing new DR', { error: error instanceof Error ? error.message : String(error) }, 'ProcessNewDr');
     return apiResponse.internalError(res, error);
   }
 }
@@ -239,7 +239,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 /** Main handler — verifies bridge secret before dispatching */
 async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (!BRIDGE_SECRET) {
-    log.error('ProcessNewDr', 'WA_BRIDGE_SECRET env var not set');
+    log.error('WA_BRIDGE_SECRET env var not set', undefined, 'ProcessNewDr');
     return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Server configuration error');
   }
 
