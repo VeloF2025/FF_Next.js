@@ -5,7 +5,7 @@
  */
 
 import { useState } from 'react';
-import { X, FileText, MessageSquare, Film, CheckCircle, AlertCircle, Download, FileDown, Link2, Check } from 'lucide-react';
+import { X, FileText, MessageSquare, Film, CheckCircle, AlertCircle, Download, FileDown, Link2, Check, RefreshCw } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { toast } from 'react-hot-toast';
 import type { Meeting } from '../types/meeting.types';
@@ -22,13 +22,15 @@ interface MeetingDetailModalProps {
   meeting: Meeting | null;
   isOpen: boolean;
   onClose: () => void;
+  onRefresh?: () => void;
 }
 
 type DetailTab = 'summary' | 'action_items' | 'transcript' | 'recording';
 
-export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailModalProps) {
+export function MeetingDetailModal({ meeting, isOpen, onClose, onRefresh }: MeetingDetailModalProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('summary');
   const [isGeneratingMinutes, setIsGeneratingMinutes] = useState(false);
+  const [isResyncing, setIsResyncing] = useState(false);
   const [minutesBlob, setMinutesBlob] = useState<Blob | null>(null);
   const [showMinutesPreview, setShowMinutesPreview] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -69,6 +71,30 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
       log.error('Failed to generate meeting minutes PDF', { error: err instanceof Error ? err.message : String(err) });
     } finally {
       setIsGeneratingMinutes(false);
+    }
+  };
+
+  const handleResync = async () => {
+    if (!meeting) return;
+    setIsResyncing(true);
+    try {
+      const res = await fetch(`/api/meetings/${meeting.id}/resync`, { method: 'POST' });
+      if (res.ok || res.status === 202) {
+        toast.success('Re-sync started — transcript and recording will be fetched from Teams');
+        // Give the background job time to complete before refreshing
+        setTimeout(() => {
+          onRefresh?.();
+        }, 8000);
+      } else {
+        const data = await res.json();
+        toast.error(data.error?.message || 'Re-sync failed');
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Re-sync failed: ${msg}`);
+      log.error('Meeting re-sync failed', { meetingId: meeting.id, error: msg });
+    } finally {
+      setIsResyncing(false);
     }
   };
 
@@ -185,6 +211,22 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
                 )}
                 {isGeneratingMinutes ? 'Generating...' : 'Generate Minutes'}
               </button>
+              {meeting.source === 'teams' && (
+                <button
+                  type="button"
+                  onClick={handleResync}
+                  disabled={isResyncing}
+                  title="Re-fetch transcript and recording from Microsoft Teams"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isResyncing ? (
+                    <InlineSpinner size="sm" />
+                  ) : (
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  )}
+                  {isResyncing ? 'Re-syncing...' : 'Re-sync from Teams'}
+                </button>
+              )}
             </div>
             <button
               className="ff-button ff-button-secondary"

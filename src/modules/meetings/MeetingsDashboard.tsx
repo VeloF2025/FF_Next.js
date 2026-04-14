@@ -399,6 +399,7 @@ export function MeetingsDashboard() {
         meeting={selectedMeeting}
         isOpen={showMeetingModal}
         onClose={() => setShowMeetingModal(false)}
+        onRefresh={() => loadMeetings(sourceFilter, 1, true)}
       />
 
       <ScheduleMeetingModal

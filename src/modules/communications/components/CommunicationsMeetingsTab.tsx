@@ -282,6 +282,7 @@ export function CommunicationsMeetingsTab({
           setShowDetailModal(false);
           setSelectedMeeting(null);
         }}
+        onRefresh={() => _onRefresh?.()}
       />
     </div>
   );
