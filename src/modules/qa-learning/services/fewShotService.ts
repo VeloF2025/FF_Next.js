@@ -86,6 +86,29 @@ export async function getRelevantExamples(
       selectionCriteria.push(`canonical: ${canonical.length}`);
     }
 
+    // Strategy 1b: Virtual-canonical fallback — if no real canonical examples,
+    // pick the highest-frequency correction pairs as pseudo-canonical
+    if (canonical.length === 0 && selectedExamples.length < maxExamples) {
+      const virtualCanonical = await getVirtualCanonicalExamples(
+        workflowType,
+        Math.min(2, maxExamples - selectedExamples.length)
+      );
+      for (const c of virtualCanonical) {
+        if (selectedExamples.length < maxExamples && !usedIds.has(c.id)) {
+          selectedExamples.push(correctionToFewShot(c));
+          usedIds.add(c.id);
+        }
+      }
+      if (virtualCanonical.length > 0) {
+        selectionCriteria.push(`virtual_canonical: ${virtualCanonical.length}`);
+        log.info('FewShotService', {
+          action: 'virtual_canonical_fallback',
+          workflowType,
+          count: virtualCanonical.length,
+        });
+      }
+    }
+
     // Strategy 2: Get confusion pair examples
     if (includeConfusionPairs && selectedExamples.length < maxExamples) {
       const confusionPairs = getConfusionPairs(workflowType);
@@ -318,6 +341,47 @@ async function getRecentCorrections(
   params.push(limit);
 
   const result = await db.query<CorrectionRecordRow>(query, params);
+
+  return result.rows.map(rowToCorrectionRecord);
+}
+
+/**
+ * Get virtual-canonical examples: the best representative correction for each
+ * of the most frequent correction patterns (50+ occurrences).
+ * Falls back to this when no real canonical examples have been promoted.
+ */
+async function getVirtualCanonicalExamples(
+  workflowType: WorkflowType,
+  limit: number
+): Promise<CorrectionRecord[]> {
+  // Find the top correction pairs by frequency, then pick the best example for each
+  const result = await db.query<CorrectionRecordRow>(
+    `WITH top_pairs AS (
+      SELECT vlm_predicted_step, correct_step, COUNT(*) as freq
+      FROM qa_correction_examples
+      WHERE workflow_type = $1
+      GROUP BY vlm_predicted_step, correct_step
+      HAVING COUNT(*) >= 50
+      ORDER BY freq DESC
+      LIMIT $2
+    ),
+    ranked AS (
+      SELECT c.*,
+        ROW_NUMBER() OVER (
+          PARTITION BY c.vlm_predicted_step, c.correct_step
+          ORDER BY c.vlm_confidence DESC, c.created_at DESC
+        ) as rn
+      FROM qa_correction_examples c
+      JOIN top_pairs tp
+        ON c.vlm_predicted_step = tp.vlm_predicted_step
+       AND c.correct_step = tp.correct_step
+      WHERE c.workflow_type = $1
+        AND c.photo_description IS NOT NULL
+        AND c.photo_description != ''
+    )
+    SELECT * FROM ranked WHERE rn = 1`,
+    [workflowType, limit]
+  );
 
   return result.rows.map(rowToCorrectionRecord);
 }
