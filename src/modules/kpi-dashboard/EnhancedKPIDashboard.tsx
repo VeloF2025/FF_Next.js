@@ -29,7 +29,9 @@ import {
 } from 'lucide-react';
 import { useKPIDashboardData } from '@/hooks/useDashboardData';
 import { TrendChart, FunnelChart, GaugeChart } from '@/components/ui/charts';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('EnhancedKPIDashboard');
 
 // Types for API responses
 interface TrendDataPoint {
@@ -120,30 +122,18 @@ export function EnhancedKPIDashboard() {
   // Calculate date range based on selection
   const getDateRange = useCallback(() => {
     const today = new Date();
-    const to = today.toISOString().split('T')[0];
-    let from: string;
+    const to = today.toISOString().split('T')[0] ?? '';
+    let daysBack = 7;
 
     switch (timeRange) {
-      case '7d':
-        from = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
-          .toISOString()
-          .split('T')[0];
-        break;
-      case '30d':
-        from = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
-          .toISOString()
-          .split('T')[0];
-        break;
-      case '90d':
-        from = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000)
-          .toISOString()
-          .split('T')[0];
-        break;
-      default:
-        from = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
-          .toISOString()
-          .split('T')[0];
+      case '30d': daysBack = 30; break;
+      case '90d': daysBack = 90; break;
+      default: daysBack = 7;
     }
+
+    const from = new Date(today.getTime() - daysBack * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0] ?? '';
 
     return { from, to };
   }, [timeRange]);
@@ -168,7 +158,7 @@ export function EnhancedKPIDashboard() {
         setAvailableProjects(data.available_projects);
       }
     } catch (err) {
-      log.error('EnhancedKPIDashboard', 'Failed to fetch trend data', { error: err });
+      log.error('Failed to fetch trend data', { error: err });
       setError('Failed to load trend data');
     }
   }, [getDateRange, selectedProject, timeRange]);
@@ -188,7 +178,7 @@ export function EnhancedKPIDashboard() {
       const data = await response.json();
       setTeamData(data);
     } catch (err) {
-      log.error('EnhancedKPIDashboard', 'Failed to fetch team data', { error: err });
+      log.error('Failed to fetch team data', { error: err });
     }
   }, [getDateRange, selectedProject]);
 
@@ -207,7 +197,7 @@ export function EnhancedKPIDashboard() {
       const data: QAFunnelResponse = await response.json();
       setFunnelData(data);
     } catch (err) {
-      log.error('EnhancedKPIDashboard', 'Failed to fetch funnel data', { error: err });
+      log.error('Failed to fetch funnel data', { error: err });
     }
   }, [getDateRange, selectedProject]);
 
@@ -225,7 +215,7 @@ export function EnhancedKPIDashboard() {
       ]);
       setLastRefresh(new Date());
     } catch (err) {
-      log.error('EnhancedKPIDashboard', 'Refresh failed', { error: err });
+      log.error('Refresh failed', { error: err });
     } finally {
       setIsRefreshing(false);
     }

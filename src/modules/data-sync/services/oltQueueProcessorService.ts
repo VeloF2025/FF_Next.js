@@ -8,14 +8,24 @@
  * NLNH Confidence: HIGH
  */
 
-import type { Pool } from 'pg';
+import type { PoolClient } from 'pg';
 import pool from '@/lib/db';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('OltQueueProcessor');
 import { oneMapApi } from '@/modules/system/services/oneMapApiService';
 
 const BATCH_SIZE = 50;
 const CONCURRENCY = 3;
 const STAGGER_MS = 150;
+
+interface QueueItem {
+  id: number;
+  drop_number: string;
+  oes_serial: string;
+  oes_batch_id: string;
+  team: string;
+}
 
 function isUpsSerial(serial: string | null): boolean {
   return !!serial && serial.toUpperCase().startsWith('GU18');
@@ -42,7 +52,7 @@ export async function processLookupQueue(runId?: number): Promise<void> {
          WHERE status = 'error' AND attempts < 3`
       );
 
-      const queueResult = await client.query(
+      const queueResult = await client.query<QueueItem>(
         `SELECT id, drop_number, oes_serial, oes_batch_id, team
          FROM olt_onemap_lookup_queue
          WHERE status = 'pending' AND attempts < 3
@@ -50,7 +60,7 @@ export async function processLookupQueue(runId?: number): Promise<void> {
         [BATCH_SIZE]
       );
 
-      const items = queueResult.rows;
+      const items: QueueItem[] = queueResult.rows;
       if (items.length === 0) {
         if (runId) {
           await client.query(
@@ -60,12 +70,12 @@ export async function processLookupQueue(runId?: number): Promise<void> {
             [runId]
           );
         }
-        log.info('OltQueueProcessor', `Queue empty after ${totalProcessed} items`);
+        log.info(`Queue empty after ${totalProcessed} items`);
         return;
       }
 
-      // Get import_id for linking mismatch records
-      const firstBatchId = items[0].oes_batch_id;
+      // Get import_id for linking mismatch records (items.length > 0 guaranteed above)
+      const firstBatchId = items[0]!.oes_batch_id;
       const importRow = await client.query(
         `SELECT id FROM olt_report_imports
          WHERE filename LIKE $1
@@ -93,17 +103,16 @@ export async function processLookupQueue(runId?: number): Promise<void> {
       }
 
       totalProcessed += processed;
-      log.info('OltQueueProcessor', `Batch done: ${processed} items, total: ${totalProcessed}`);
+      log.info(`Batch done: ${processed} items, total: ${totalProcessed}`);
     } finally {
       client.release();
     }
   }
 
-  log.warn('OltQueueProcessor', `Hit max iterations (${MAX_ITERATIONS})`);
+  log.warn(`Hit max iterations (${MAX_ITERATIONS})`);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function processOneItem(client: any, item: any, importId: string | undefined): Promise<void> {
+async function processOneItem(client: PoolClient, item: QueueItem, importId: string | undefined): Promise<void> {
   await client.query(
     `UPDATE olt_onemap_lookup_queue
      SET status = 'processing', attempts = attempts + 1
@@ -233,7 +242,7 @@ async function processOneItem(client: any, item: any, importId: string | undefin
 }
 
 async function insertMismatchIfNew(
-  client: ReturnType<Pool['connect']> extends Promise<infer T> ? T : never,
+  client: PoolClient,
   data: {
     importId: string; dropNumber: string; oltSerial: string;
     wrongOneMapSerial: string | null; fixStatus: string;

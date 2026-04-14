@@ -9,7 +9,9 @@
 
 import { createHash } from 'crypto';
 import pool from '@/lib/db';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('PhotoHash');
 
 const VPS_PHOTO_API = process.env.VPS_PHOTO_URL || 'http://72.61.197.178:8866';
 const VELOCITY_PHOTO_API = process.env.VELOCITY_PHOTO_URL || 'http://100.96.203.105:8003';
@@ -52,7 +54,7 @@ export async function fetchAndHashPhoto(photoUrl: string): Promise<string | null
     const response = await fetch(internalUrl, { signal: AbortSignal.timeout(15000) });
 
     if (!response.ok) {
-      log.warn('PhotoHash', `Failed to fetch photo for hashing: ${response.status}`, { photoUrl });
+      log.warn(`Failed to fetch photo for hashing: ${response.status}`, { photoUrl });
       return null;
     }
 
@@ -60,7 +62,7 @@ export async function fetchAndHashPhoto(photoUrl: string): Promise<string | null
     const buffer = Buffer.from(arrayBuffer);
     return computeHash(buffer);
   } catch (error) {
-    log.warn('PhotoHash', 'Error fetching photo for hashing', { photoUrl, error });
+    log.warn('Error fetching photo for hashing', { photoUrl, error });
     return null;
   }
 }
@@ -87,9 +89,9 @@ export async function storePhotoHashes(
        DO UPDATE SET sha256_hash = EXCLUDED.sha256_hash`,
       [dropNumbers, filenames, hashes]
     );
-    log.info('PhotoHash', `Stored ${photos.length} hashes for ${dropNumber}`);
+    log.info(`Stored ${photos.length} hashes for ${dropNumber}`);
   } catch (error) {
-    log.error('PhotoHash', 'Error storing photo hashes', { dropNumber, error });
+    log.error('Error storing photo hashes', { dropNumber, error });
   }
 }
 
@@ -137,12 +139,12 @@ export async function findCrossDRDuplicates(
     }
 
     if (result.size > 0) {
-      log.info('PhotoHash', `Found ${result.size} cross-DR duplicate(s) for ${dropNumber}`, {
+      log.info(`Found ${result.size} cross-DR duplicate(s) for ${dropNumber}`, {
         duplicates: Object.fromEntries(result),
       });
     }
   } catch (error) {
-    log.error('PhotoHash', 'Error checking cross-DR duplicates', { dropNumber, error });
+    log.error('Error checking cross-DR duplicates', { dropNumber, error });
   }
 
   return result;
@@ -164,8 +166,8 @@ export async function recordHumanDuplicateDecision(
        WHERE drop_number = $2 AND filename = $3`,
       [userId, dropNumber, filename]
     );
-    log.info('PhotoHash', `Recorded human duplicate decision for ${dropNumber}/${filename} by ${userId}`);
+    log.info(`Recorded human duplicate decision for ${dropNumber}/${filename} by ${userId}`);
   } catch (error) {
-    log.error('PhotoHash', 'Error recording duplicate decision', { dropNumber, filename, error });
+    log.error('Error recording duplicate decision', { dropNumber, filename, error });
   }
 }
