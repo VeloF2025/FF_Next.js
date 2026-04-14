@@ -72,7 +72,15 @@ function buildCategorizationPrompt(
 Your task is to analyze ${photoCount} photos and categorize each one into one of these 13 installation steps:
 
 STEP CATEGORIES:
-0. Unclassifiable/Discard - ONLY for: completely blank photos, accidental selfies, unrelated objects (food, pets, vehicles). NOT for blurry/dark installation photos.
+0. Discard/Not Relevant - Photos that do NOT depict any specific installation step. This is a PRIMARY category, not a last resort. Use Step 0 for:
+   • Duplicate photos (same subject already covered by another photo)
+   • Blurry, dark, or unrecognizable photos where the subject cannot be identified
+   • Wide-angle/context shots that show a general scene without focusing on any installation step
+   • Photos of vehicles, people, paperwork (not signatures), food, or other non-installation subjects
+   • Generic exterior building shots that don't show the fiber route, cable, or installation context
+   • Screenshots or phone screen photos that aren't power meter readings or speed tests
+   • Accidental photos (selfies, ground, sky without cables)
+   If your confidence for any step 1-12 is below 0.65, prefer Step 0 over forcing a weak classification.
 1. House Photo - Property exterior showing the BUILDING for location verification. Must show the structure itself, not just sky/poles.
 2. Cable from Pole - Fiber cable visibly spanning open air between a utility pole and the building fascia. Must show cable crossing sky. Pole J-hook, service drop wire, messenger wire are indicators. A pole alone without visible cable span = low confidence.
 3. Cable Entry Outside - EXTERIOR close-up of where cable ENTERS the building through wall/roof. Cable penetrating exterior wall, conduit, grommet. Drip loop before entry point is a strong indicator. Cable transitioning from OUTSIDE to INSIDE.
@@ -96,14 +104,21 @@ KEY DIFFERENTIATORS for commonly confused categories:
 - Step 8 vs Step 9: FRAMING is key. Step 8 = WIDE shot (ONT + UPS + wall + surroundings). Step 9 = CLOSE-UP of front panel lights only. UPS and wall visible = Step 8 even if lights visible.
 - Step 11 vs Step 12: Step 11 (OPEN) = you can see INSIDE the dome joint — splice tray, cables, inner compartments visible. Step 12 (CLOSED) = lid is ON, sealed shut, only the outer casing visible. Cables visible inside = Step 11. Sealed box = Step 12.
 
-⚠️ CRITICAL — DO NOT DISCARD (Step 0) unless the photo is truly rubbish:
-Based on 2336 human corrections, the #1 VLM error is wrongly discarding valid installation photos.
-- A blurry or dark photo of installation equipment is NOT rubbish — classify it to the best matching step with low confidence.
-- An outdoor photo showing poles, cables, or buildings = Step 1 or 2, NOT discard.
-- A photo of an ONT, router, or networking equipment = Step 6, 8, or 9, NOT discard.
-- A photo of a meter, display, or screen = Step 7, NOT discard.
-- A photo of a signature or form = Step 10, NOT discard.
-- ONLY discard: completely blank photos, accidental selfies, unrelated objects (food, pets, vehicles).`;
+⚠️ STEP 0 BALANCE — Based on 3776 human corrections:
+The #1 error (50%+ of corrections) is OVER-CLASSIFYING: forcing photos into installation steps when they should be Step 0.
+Common over-classification mistakes to AVOID:
+- A generic building exterior without visible fiber route or cable = Step 0, NOT Step 1
+- A pole photo without visible cable span or installation context = Step 0, NOT Step 2
+- A dark/blurry photo where you cannot identify the subject = Step 0, NOT a guessed step
+- A random screenshot that isn't a power meter or speed test = Step 0, NOT Step 9
+- A photo of equipment packaging, labels, or boxes = Step 0, NOT Step 6 or 7
+- A wide contextual photo showing a room without ONT/UPS focus = Step 0, NOT Step 8
+
+DO still classify when the installation subject is clearly visible:
+- Clear ONT, router, or networking equipment = Step 6, 8, or 9
+- Clear power meter display with dBm reading = Step 7
+- Clear signature on a form = Step 10
+- Clear cable spanning sky between pole and building = Step 2`;
 
   // Inject few-shot examples from human corrections (HITL learning)
   if (fewShotExamples && fewShotExamples.length > 0) {
@@ -131,7 +146,7 @@ For EACH photo (numbered 1-${photoCount}), respond in this JSON format:
   ]
 }
 
-Step 0 = unclassifiable (completely blank, selfies, unrelated objects ONLY).
+Step 0 = not relevant/discard (duplicates, blurry, generic context shots, non-installation subjects, or confidence < 0.65 for any step).
 CRITICAL: Do NOT trust any pre-existing labels or filenames. Categorize based ONLY on visual content.
 If a photo doesn't clearly match any category, set confidence below 0.5 and explain why.`;
 
