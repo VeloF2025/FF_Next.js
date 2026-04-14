@@ -72,18 +72,18 @@ export function triggerSharePointFolderCreation(
     try {
       const config = getSharePointDrConfig();
       if (!config) {
-        log.debug('DrDropsService', 'SharePoint not configured, skipping folder creation');
+        log.debug('SharePoint not configured, skipping folder creation', undefined, 'DrDropsService');
         return;
       }
 
       const syncRecord = await getOrCreateSyncRecord(dropNumber, 'whatsapp');
       if (!syncRecord) {
-        log.warn('SharePointSync', `Could not create sync record for ${dropNumber}`);
+        log.warn(`Could not create sync record for ${dropNumber}`, undefined, 'SharePointSync');
         return;
       }
 
       if (syncRecord.folder_created && syncRecord.folder_id) {
-        log.debug('SharePointSync', `Folder already exists for ${dropNumber}`);
+        log.debug(`Folder already exists for ${dropNumber}`, undefined, 'SharePointSync');
         return;
       }
 
@@ -105,16 +105,12 @@ export function triggerSharePointFolderCreation(
           result.folderPath || '',
           result.parentFolderIds
         );
-        log.info('SharePointSync', `Created folder for ${dropNumber}`, {
-          folderPath: result.folderPath,
-        });
+        log.info(`Created folder for ${dropNumber}`, { folderPath: result.folderPath }, 'SharePointSync');
       } else {
-        log.warn('SharePointSync', `Failed to create folder for ${dropNumber}`, {
-          error: result.error,
-        });
+        log.warn(`Failed to create folder for ${dropNumber}`, { error: result.error }, 'SharePointSync');
       }
     } catch (spError) {
-      log.error('SharePointSync', `Error creating folder for ${dropNumber}`, spError);
+      log.error(`Error creating folder for ${dropNumber}`, { error: spError }, 'SharePointSync');
     }
   })();
 }

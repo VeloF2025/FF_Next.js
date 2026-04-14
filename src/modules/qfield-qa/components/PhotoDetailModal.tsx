@@ -163,7 +163,7 @@ export function PhotoDetailModal({
       <DialogContent dividers sx={{ bgcolor: 'rgb(17, 24, 39)', borderColor: 'rgb(55, 65, 81)' }}>
         <Grid container spacing={3}>
           {/* Photo */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Box
               sx={{
                 width: '100%',
@@ -188,7 +188,7 @@ export function PhotoDetailModal({
           </Grid>
 
           {/* Details */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             {/* AI Validation Card */}
             <Card sx={{ mb: 2, bgcolor: 'rgb(31, 41, 55)', border: '1px solid rgb(55, 65, 81)' }}>
               <CardContent>
@@ -308,7 +308,7 @@ export function PhotoDetailModal({
                       <InfoRow label="Material" value={photo.pole_material} />
                       <InfoRow label="Status" value={photo.pole_status} />
                       {photo.pole_latitude && photo.pole_longitude && (
-                        <Grid item xs={12}>
+                        <Grid size={{ xs: 12 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <MapPin className="w-4 h-4 text-gray-400" />
                             <Typography variant="body2">
@@ -382,7 +382,7 @@ export function PhotoDetailModal({
                       </>
                     )}
                     {photo.manual_notes && (
-                      <Grid item xs={12}>
+                      <Grid size={{ xs: 12 }}>
                         <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
                           <FileText className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
                           <Typography variant="body2" color="text.secondary">
@@ -503,7 +503,7 @@ function InfoRow({
 
   return (
     <>
-      <Grid item xs={4}>
+      <Grid size={{ xs: 4 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           {icon}
           <Typography variant="body2" sx={{ color: 'rgb(156, 163, 175)' }}>
@@ -511,7 +511,7 @@ function InfoRow({
           </Typography>
         </Box>
       </Grid>
-      <Grid item xs={8}>
+      <Grid size={{ xs: 8 }}>
         <Typography variant="body2" sx={{ color: 'white' }}>{value}</Typography>
       </Grid>
     </>
