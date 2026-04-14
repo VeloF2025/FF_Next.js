@@ -7,7 +7,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
-import { apiResponse } from '@/lib/apiResponse';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import {
   getVehiclesNeedingDailyCheck,
@@ -117,7 +117,7 @@ async function sendWhatsAppReminder(
     const data = await response.json();
     return { success: true, messageId: data.id };
   } catch (error) {
-    log.error('cron-fleet-check-reminders', { error: error instanceof Error ? error.message : String(error) });
+    log.error('WhatsApp send failed', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -259,7 +259,7 @@ async function sendReminder(
       await markReminderSent(vehicle.vehicleId, checkType);
       return { success: true, channel: 'whatsapp' };
     }
-    log.warn('FleetReminders', `WhatsApp failed for ${vehicle.driverName}: ${waResult.error}`);
+    log.warn(`WhatsApp failed for ${vehicle.driverName}: ${waResult.error}`);
   }
 
   // Fallback to email
@@ -281,7 +281,7 @@ async function sendReminder(
       await markReminderSent(vehicle.vehicleId, checkType);
       return { success: true, channel: 'email' };
     }
-    log.warn('FleetReminders', `Email failed for ${vehicle.driverName}: ${emailResult.error}`);
+    log.warn(`Email failed for ${vehicle.driverName}: ${emailResult.error}`);
   }
 
   // Both failed
@@ -305,7 +305,7 @@ export default async function handler(
   const expectedSecret = process.env.CRON_SECRET;
   if (!expectedSecret) {
     log.error('CRON_SECRET not configured — rejecting cron request');
-    return apiResponse.error(res, 'Cron endpoint misconfigured', 503);
+    return apiResponse.error(res, ErrorCode.SERVICE_UNAVAILABLE, 'Cron endpoint misconfigured');
   }
   if (cronSecret !== expectedSecret) {
     return apiResponse.unauthorized(res, 'Invalid cron secret');
@@ -319,11 +319,11 @@ export default async function handler(
     return apiResponse.success(res, { message: 'Sunday - no reminders sent', sent: 0 });
   }
 
-  log.info('FleetReminders', `Starting reminder job for ${today.toISOString().split('T')[0]}`);
+  log.info(`Starting reminder job for ${today.toISOString().split('T')[0]}`);
 
   try {
     const vehicles = await getVehiclesWithDrivers();
-    log.info('FleetReminders', `Found ${vehicles.length} vehicles with assigned drivers`);
+    log.info(`Found ${vehicles.length} vehicles with assigned drivers`);
 
     let sentCount = 0;
     let failedCount = 0;
@@ -338,7 +338,7 @@ export default async function handler(
     // Monday = Weekly check day
     if (dayOfWeek === 1) {
       const needsWeekly = await getVehiclesNeedingWeeklyCheck();
-      log.info('FleetReminders', `${needsWeekly.length} vehicles need weekly check`);
+      log.info(`${needsWeekly.length} vehicles need weekly check`);
 
       for (const vehicle of vehicles) {
         if (needsWeekly.includes(vehicle.vehicleId)) {
@@ -361,7 +361,7 @@ export default async function handler(
 
     // Daily check for remaining vehicles
     const needsDaily = await getVehiclesNeedingDailyCheck();
-    log.info('FleetReminders', `${needsDaily.length} vehicles need daily check`);
+    log.info(`${needsDaily.length} vehicles need daily check`);
 
     for (const vehicle of vehicles) {
       if (needsDaily.includes(vehicle.vehicleId)) {
@@ -381,7 +381,7 @@ export default async function handler(
       }
     }
 
-    log.info('FleetReminders', `Reminder job complete: ${sentCount} sent, ${failedCount} failed`);
+    log.info(`Reminder job complete: ${sentCount} sent, ${failedCount} failed`);
 
     return apiResponse.success(res, {
       date: today.toISOString().split('T')[0],
@@ -390,7 +390,7 @@ export default async function handler(
       results,
     });
   } catch (error) {
-    log.error('FleetReminders', `Reminder job failed: ${error}`);
+    log.error(`Reminder job failed`, { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, error);
   }
 }

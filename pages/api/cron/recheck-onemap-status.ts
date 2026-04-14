@@ -57,7 +57,7 @@ async function recheckDR(dropNumber: string): Promise<RecheckResult> {
     );
     return { dropNumber, previousStatus: 'not_found', newStatus: 'not_found', foundInOneMap: false };
   } catch (error) {
-    log.warn('RecheckOneMap', `Failed to re-check ${dropNumber}`, { error });
+    log.warn(`Failed to re-check ${dropNumber}`, { error });
     return { dropNumber, previousStatus: 'not_found', newStatus: 'not_found', foundInOneMap: false };
   }
 }
@@ -73,17 +73,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   const cronSecret = process.env.CRON_SECRET;
 
   if (!cronSecret) {
-    log.error('RecheckOneMap', 'CRON_SECRET not configured');
+    log.error('CRON_SECRET not configured');
     return res.status(500).json({ error: 'CRON_SECRET not configured' });
   }
   if (authHeader !== `Bearer ${cronSecret}`) {
-    log.error('RecheckOneMap', 'Unauthorized request');
+    log.error('Unauthorized request');
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
   const limit = Number(req.query.limit) || 50;
 
-  log.info('RecheckOneMap', `Starting re-check of not_found DRs (limit: ${limit})`);
+  log.info(`Starting re-check of not_found DRs (limit: ${limit})`);
 
   try {
     // Find DRs that are still not_found, oldest checked first
@@ -97,7 +97,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     );
 
     if (notFoundDRs.rows.length === 0) {
-      log.info('RecheckOneMap', 'No not_found DRs to re-check');
+      log.info('No not_found DRs to re-check');
       return apiResponse.success(res, {
         processed: 0,
         resolved: 0,
@@ -107,7 +107,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       });
     }
 
-    log.info('RecheckOneMap', `Found ${notFoundDRs.rows.length} DRs to re-check`);
+    log.info(`Found ${notFoundDRs.rows.length} DRs to re-check`);
 
     const results: RecheckResult[] = [];
     let resolved = 0;
@@ -119,13 +119,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
       if (result.foundInOneMap) {
         resolved++;
-        log.info('RecheckOneMap', `DR ${row.drop_number} now FOUND in 1Map - resolved!`);
+        log.info(`DR ${row.drop_number} now FOUND in 1Map - resolved!`);
       } else {
         stillNotFound++;
       }
     }
 
-    log.info('RecheckOneMap', `Re-check complete`, {
+    log.info('Re-check complete', {
       processed: results.length,
       resolved,
       stillNotFound,
@@ -139,7 +139,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    log.error('RecheckOneMap', 'Re-check job failed', { error });
+    log.error('Re-check job failed', { error });
     return apiResponse.internalError(res, error);
   }
 }

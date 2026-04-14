@@ -18,7 +18,7 @@ import { VLM_CHAT_ENDPOINT, VLM_MODEL, VLM_TIMEOUT_REALTIME } from '@/lib/vlm';
 // API key for QField plugin — required env var, no fallback
 const QFIELD_API_KEY = process.env.QFIELD_PLUGIN_API_KEY;
 if (!QFIELD_API_KEY) {
-  log.warn({ module: 'qfield-validate-photo' }, 'QFIELD_PLUGIN_API_KEY not set — endpoint will reject all requests');
+  log.warn('QFIELD_PLUGIN_API_KEY not set — endpoint will reject all requests', { module: 'qfield-validate-photo' });
 }
 
 // Work type prompts optimized for field feedback
@@ -139,8 +139,8 @@ export default async function handler(
   // omits the X-Api-Key header would also produce undefined, making
   // `undefined !== undefined` evaluate to false and bypassing auth entirely.
   if (!QFIELD_API_KEY) {
-    log.error({ module: 'qfield-validate-photo' }, 'QFIELD_PLUGIN_API_KEY not configured — rejecting all requests');
-    return apiResponse.serverError(res, new Error('QFIELD_PLUGIN_API_KEY not configured'));
+    log.error('QFIELD_PLUGIN_API_KEY not configured — rejecting all requests', { module: 'qfield-validate-photo' });
+    return apiResponse.internalError(res, new Error('QFIELD_PLUGIN_API_KEY not configured'));
   }
 
   // Authenticate via API key (for plugin use)
@@ -165,13 +165,13 @@ export default async function handler(
       return apiResponse.badRequest(res, 'Image too large. Maximum 10MB.');
     }
 
-    log.info({
+    log.info('Real-time validation request', {
       module: 'qfield-validate-photo',
       workType,
       projectId,
       featureId,
       imageSizeKB,
-    }, 'Real-time validation request');
+    });
 
     // Determine mime type (assume JPEG if not specified)
     let dataUrl: string;
@@ -214,11 +214,11 @@ export default async function handler(
 
     if (!vlmResponse.ok) {
       const errorText = await vlmResponse.text().catch(() => 'Unknown error');
-      log.error({
+      log.error('VLM service error', {
         module: 'qfield-validate-photo',
         status: vlmResponse.status,
         error: errorText.substring(0, 200),
-      }, 'VLM service error');
+      });
 
       // Return graceful degradation response
       return apiResponse.success(res, {
@@ -251,10 +251,10 @@ export default async function handler(
         throw new Error('No JSON in VLM response');
       }
     } catch (parseError) {
-      log.warn({
+      log.warn('Failed to parse VLM response', {
         module: 'qfield-validate-photo',
         error: parseError instanceof Error ? parseError.message : 'Parse error',
-      }, 'Failed to parse VLM response');
+      });
 
       // Default response on parse failure
       validationResult = {
@@ -268,13 +268,13 @@ export default async function handler(
 
     const duration = Date.now() - startTime;
 
-    log.info({
+    log.info('Validation complete', {
       module: 'qfield-validate-photo',
       valid: validationResult.valid,
       confidence: validationResult.confidence,
       issueCount: validationResult.issues.length,
       durationMs: duration,
-    }, 'Validation complete');
+    });
 
     return apiResponse.success(res, {
       ...validationResult,
@@ -286,10 +286,10 @@ export default async function handler(
 
     // Handle timeout specifically
     if (error instanceof Error && error.name === 'TimeoutError') {
-      log.warn({
+      log.warn('VLM request timed out', {
         module: 'qfield-validate-photo',
         durationMs: duration,
-      }, 'VLM request timed out');
+      });
 
       return apiResponse.success(res, {
         valid: true,
@@ -302,11 +302,11 @@ export default async function handler(
       }, 'Validation timed out');
     }
 
-    log.error({
+    log.error('Validation error', {
       module: 'qfield-validate-photo',
       error: error instanceof Error ? error.message : 'Unknown error',
       durationMs: duration,
-    }, 'Validation error');
+    });
 
     return apiResponse.internalError(res, error);
   }
