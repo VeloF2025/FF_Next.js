@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
     if (targetColumn === 'Approved' && isEligibleForMvp(updatedItem.effort_estimate)) {
       log.info(
         `Item ${itemId} approved with effort ${updatedItem.effort_estimate} - triggering Stage 1 (POC)`,
+        undefined,
         'DevQueueMove'
       );
 
@@ -91,6 +92,7 @@ export async function POST(req: NextRequest) {
         pipelineStage = 'poc';
         log.info(
           `Stage 1 (POC) triggered for item ${itemId} - GitHub Issue #${githubIssue.issueNumber}`,
+          undefined,
           'DevQueueMove'
         );
 
@@ -112,12 +114,13 @@ export async function POST(req: NextRequest) {
               priority: updatedItem.priority,
             },
           }).catch((err) => {
-            log.warn(`POC trigger failed (non-blocking): ${err}`, 'DevQueueMove');
+            log.warn(`POC trigger failed (non-blocking): ${err}`, undefined, 'DevQueueMove');
           });
         }
       } else {
         log.warn(
           `Failed to create GitHub issue for item ${itemId} - pipeline not triggered`,
+          undefined,
           'DevQueueMove'
         );
       }
@@ -127,6 +130,7 @@ export async function POST(req: NextRequest) {
     if (targetColumn === 'Building' && updatedItem.github_issue_url) {
       log.info(
         `Item ${itemId} moved to Building - triggering Stage 2 (Full Harness)`,
+        undefined,
         'DevQueueMove'
       );
 
@@ -164,7 +168,7 @@ export async function POST(req: NextRequest) {
             priority: updatedItem.priority,
           },
         }).catch((err) => {
-          log.warn(`Harness trigger failed (non-blocking): ${err}`, 'DevQueueMove');
+          log.warn(`Harness trigger failed (non-blocking): ${err}`, undefined, 'DevQueueMove');
         });
       }
     }
@@ -181,10 +185,10 @@ export async function POST(req: NextRequest) {
         } : null,
       }
     });
-  } catch (error: any) {
-    console.error('DevQueue move error:', error);
+  } catch (error: unknown) {
+    log.error('DevQueue move error', { error }, 'DevQueueMove');
     return NextResponse.json(
-      { error: 'Internal server error', details: error?.message },
+      { error: 'Internal server error', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

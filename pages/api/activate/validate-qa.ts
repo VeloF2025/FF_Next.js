@@ -47,7 +47,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber is required');
     }
 
-    log.info('ValidateQa', `Starting QA validation for ${dropNumber}`, { force });
+    log.info(`Starting QA validation for ${dropNumber}`, { force }, 'ValidateQa');
 
     // Get the review record
     const reviewResult = await pool.query(
@@ -65,7 +65,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
     // Check if already validated (skip unless forced)
     if (!force && review.vlm_qa_status === 'validated') {
-      log.info('ValidateQa', `Already validated for ${dropNumber}, skipping`);
+      log.info(`Already validated for ${dropNumber}, skipping`, undefined, 'ValidateQa');
 
       return apiResponse.success(res, {
         dropNumber,
@@ -165,12 +165,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
     const processingTimeMs = Date.now() - startTime;
 
-    log.info('ValidateQa', `QA validation complete for ${dropNumber}`, {
+    log.info(`QA validation complete for ${dropNumber}`, {
       totalPhotos: batchResult.totalPhotos,
       passedCount: batchResult.passedCount,
       passRate: batchResult.passRate,
       processingTimeMs,
-    });
+    }, 'ValidateQa');
 
     return apiResponse.success(res, {
       dropNumber,
@@ -185,7 +185,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       processingTimeMs,
     });
   } catch (error) {
-    log.error('ValidateQa', 'Error during QA validation', error);
+    log.error('Error during QA validation', { error }, 'ValidateQa');
 
     // Try to update status to failed
     try {
@@ -201,7 +201,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         );
       }
     } catch (dbError) {
-      log.error('ValidateQa', 'Failed to update status to failed', dbError);
+      log.error('Failed to update status to failed', { error: dbError }, 'ValidateQa');
     }
 
     return apiResponse.internalError(res, error);
@@ -252,7 +252,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       humanReviewerId: row.human_reviewer_id,
     });
   } catch (error) {
-    log.error('ValidateQa', 'Error getting QA results', error);
+    log.error('Error getting QA results', { error }, 'ValidateQa');
     return apiResponse.internalError(res, error);
   }
 }

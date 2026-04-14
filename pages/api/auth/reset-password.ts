@@ -15,7 +15,6 @@ import {
   isResetTokenExpired,
   deleteAllUserSessions,
 } from '@/lib/auth';
-import logger from '@/lib/logger';
 import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -124,7 +123,7 @@ export default async function handler(
 
     // Verify token matches
     if (user.reset_token !== hashedToken) {
-      logger.warn({ email: normalizedEmail }, 'Invalid reset token attempted');
+      log.warn('Invalid reset token attempted', { email: normalizedEmail });
       return res.status(400).json({
         success: false,
         error: { code: 'INVALID_TOKEN', message: 'Invalid or expired reset link' },
@@ -133,7 +132,7 @@ export default async function handler(
 
     // Check if token expired
     if (!user.reset_token_expires || isResetTokenExpired(user.reset_token_expires)) {
-      logger.warn({ email: normalizedEmail }, 'Expired reset token attempted');
+      log.warn('Expired reset token attempted', { email: normalizedEmail });
       return res.status(400).json({
         success: false,
         error: { code: 'TOKEN_EXPIRED', message: 'Reset link has expired. Please request a new one.' },
@@ -158,20 +157,20 @@ export default async function handler(
     // Invalidate all existing sessions for security
     try {
       await deleteAllUserSessions(user.id);
-      logger.info({ userId: user.id }, 'All sessions invalidated after password reset');
+      log.info('All sessions invalidated after password reset', { userId: user.id });
     } catch (sessionError) {
       // Don't fail the password reset if session cleanup fails
-      logger.warn({ userId: user.id, error: sessionError }, 'Failed to clear sessions after password reset');
+      log.warn('Failed to clear sessions after password reset', { userId: user.id, error: sessionError });
     }
 
-    logger.info({ userId: user.id, email: normalizedEmail }, 'Password reset successful');
+    log.info('Password reset successful', { userId: user.id, email: normalizedEmail });
 
     return res.status(200).json({
       success: true,
       message: 'Password has been reset successfully. Please log in with your new password.',
     });
   } catch (error) {
-    logger.error({ error }, 'Reset password error');
+    log.error('Reset password error', { error });
     return res.status(500).json({
       success: false,
       error: { code: 'SERVER_ERROR', message: 'An error occurred' },
