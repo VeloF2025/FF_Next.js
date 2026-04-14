@@ -241,7 +241,7 @@ function validateFormData(data: TicketFormData, mediaFiles: File[]): TicketFormE
   }
 
   // Fault cause required only for Maintenance category tickets.
-  if (data.ticket_category === TicketCategory.MAINTENANCE && !data.fault_cause) {
+  if (data.category === TicketCategory.MAINTENANCE && !data.fault_cause) {
     errors.fault_cause = 'Fault cause is required for maintenance tickets';
   }
 
@@ -389,7 +389,7 @@ export function useTicketForm(): UseTicketFormResult {
       source: formData.source,
       title: formData.title.trim(),
       ticket_type: formData.ticket_type as TicketType,
-      category: formData.category || undefined,
+      ticket_category: formData.category || undefined,
       priority: formData.priority,
     };
 
