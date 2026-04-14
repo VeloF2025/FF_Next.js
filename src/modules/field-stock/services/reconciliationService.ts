@@ -225,7 +225,7 @@ export async function getDailyReconciliation(
     if (!techId) continue;
 
     if (!technicianMap.has(techId)) {
-      const blocking = blockingStatus.find((b: { contractor_id: string }) => b.contractor_id === item.contractor_id);
+      const blocking = blockingStatus.find((b) => (b as { contractor_id: string }).contractor_id === item.contractor_id);
       technicianMap.set(techId, {
         id: techId,
         name: item.technician_name || 'Unknown',
@@ -252,7 +252,7 @@ export async function getDailyReconciliation(
     if (!techId) continue;
 
     if (!technicianMap.has(techId)) {
-      const blocking = blockingStatus.find((b: { contractor_id: string }) => b.contractor_id === item.contractor_id);
+      const blocking = blockingStatus.find((b) => (b as { contractor_id: string }).contractor_id === item.contractor_id);
       technicianMap.set(techId, {
         id: techId,
         name: item.technician_name || 'Unknown',
@@ -293,8 +293,8 @@ export async function getDailyReconciliation(
     let unaccounted_value = 0;
 
     for (let i = 0; i < tech.issued_serials.length; i++) {
-      const serial = tech.issued_serials[i];
-      const price = tech.issued_prices[i] || 1750;
+      const serial = tech.issued_serials[i] ?? '';
+      const price = tech.issued_prices[i] ?? 1750;
 
       if (!installedSet.has(serial) && !returnedSet.has(serial)) {
         unaccounted_serials.push(serial);

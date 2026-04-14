@@ -151,7 +151,7 @@ async function getSharePointAccessToken(): Promise<string | null> {
     const result = await response.json();
     return result.access_token || null;
   } catch (error) {
-    logger.error({ error }, 'Failed to get SharePoint access token');
+    logger.error('Failed to get SharePoint access token', { error });
     return null;
   }
 }
@@ -295,10 +295,7 @@ export async function processPhoto(photo: PendingPhoto): Promise<{
   await updatePhotoStatus(photo.id, 'uploading');
 
   // Step 1: Download from WhatsApp bridge
-  logger.info(
-    { photoId: photo.id, messageId: waMessageId },
-    'Downloading photo from bridge'
-  );
+  logger.info('Downloading photo from bridge', { photoId: photo.id, messageId: waMessageId });
 
   const downloadResult = await downloadFromBridge(waMessageId, waGroupJid);
 
@@ -311,10 +308,7 @@ export async function processPhoto(photo: PendingPhoto): Promise<{
   const remotePath = `${MAINTENANCE_FOLDER_PATH}/${photo.project}/${photo.drop_number}`;
   const filename = downloadResult.filename || `photo_${photo.photo_index}.jpg`;
 
-  logger.info(
-    { photoId: photo.id, remotePath, filename },
-    'Uploading photo to SharePoint'
-  );
+  logger.info('Uploading photo to SharePoint', { photoId: photo.id, remotePath, filename });
 
   const uploadResult = await uploadToSharePoint(
     downloadResult.path,
@@ -336,13 +330,10 @@ export async function processPhoto(photo: PendingPhoto): Promise<{
       fs.unlinkSync(downloadResult.path);
     }
   } catch (cleanupError) {
-    logger.warn({ error: cleanupError }, 'Failed to clean up local file');
+    logger.warn('Failed to clean up local file', { error: cleanupError });
   }
 
-  logger.info(
-    { photoId: photo.id, sharepointUrl: uploadResult.sharepoint_url },
-    'Photo uploaded successfully'
-  );
+  logger.info('Photo uploaded successfully', { photoId: photo.id, sharepointUrl: uploadResult.sharepoint_url });
 
   return { success: true, sharepoint_url: uploadResult.sharepoint_url };
 }

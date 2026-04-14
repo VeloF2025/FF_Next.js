@@ -47,7 +47,7 @@ export function MeetingActionItemsPanel({ meeting }: MeetingActionItemsPanelProp
       const data = await actionItemsService.getActionItems({ meeting_id: meetingId });
       setItems(data);
     } catch (err) {
-      log.error('Failed to fetch action items:', err);
+      log.error('Failed to fetch action items', { error: err });
     } finally {
       setIsLoading(false);
     }
@@ -63,7 +63,7 @@ export function MeetingActionItemsPanel({ meeting }: MeetingActionItemsPanelProp
       const extracted = await actionItemsService.extractFromMeeting(meetingId);
       setItems(extracted);
     } catch (err) {
-      log.error('Failed to extract action items:', err);
+      log.error('Failed to extract action items', { error: err });
     } finally {
       setIsExtracting(false);
     }
@@ -78,7 +78,7 @@ export function MeetingActionItemsPanel({ meeting }: MeetingActionItemsPanelProp
     try {
       await actionItemsService.updateStatus(item.id, newStatus);
     } catch (err) {
-      log.error('Failed to toggle action item status:', err);
+      log.error('Failed to toggle action item status', { error: err });
       setItems(prev => prev.map(i =>
         i.id === item.id ? { ...i, status: item.status } : i
       ));
@@ -101,7 +101,7 @@ export function MeetingActionItemsPanel({ meeting }: MeetingActionItemsPanelProp
       setNewDueDate('');
       setShowAddForm(false);
     } catch (err) {
-      log.error('Failed to create action item:', err);
+      log.error('Failed to create action item', { error: err });
     } finally {
       setIsAdding(false);
     }
@@ -112,7 +112,7 @@ export function MeetingActionItemsPanel({ meeting }: MeetingActionItemsPanelProp
     try {
       await actionItemsService.deleteActionItem(id);
     } catch (err) {
-      log.error('Failed to delete action item:', err);
+      log.error('Failed to delete action item', { error: err });
       fetchItems();
     }
   };
