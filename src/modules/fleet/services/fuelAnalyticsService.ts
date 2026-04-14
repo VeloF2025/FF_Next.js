@@ -77,7 +77,7 @@ export async function getFuelTransactions(options: {
         WHERE ft.vehicle_id = ${vehicleId}
           AND ft.transaction_date >= ${startDate}::date
           AND ft.transaction_date <= ${endDate}::date
-      `;
+      ` as unknown as { total: number }[];
     } else if (vehicleId) {
       rows = await sql`
         SELECT ft.*, fv.registration, fv.make, fv.model,
@@ -92,7 +92,7 @@ export async function getFuelTransactions(options: {
       countResult = await sql`
         SELECT COUNT(*)::int as total FROM fleet_fuel_transactions ft
         WHERE ft.vehicle_id = ${vehicleId}
-      `;
+      ` as unknown as { total: number }[];
     } else if (startDate && endDate) {
       rows = await sql`
         SELECT ft.*, fv.registration, fv.make, fv.model,
@@ -109,7 +109,7 @@ export async function getFuelTransactions(options: {
         SELECT COUNT(*)::int as total FROM fleet_fuel_transactions ft
         WHERE ft.transaction_date >= ${startDate}::date
           AND ft.transaction_date <= ${endDate}::date
-      `;
+      ` as unknown as { total: number }[];
     } else {
       rows = await sql`
         SELECT ft.*, fv.registration, fv.make, fv.model,
@@ -122,7 +122,7 @@ export async function getFuelTransactions(options: {
       ` as FuelTransactionRow[];
       countResult = await sql`
         SELECT COUNT(*)::int as total FROM fleet_fuel_transactions ft
-      `;
+      ` as unknown as { total: number }[];
     }
 
     return {
@@ -751,7 +751,7 @@ export async function getFuelAnomalies(options: {
       countResult = await sql`
         SELECT COUNT(*)::int as total FROM fleet_fuel_anomalies fa
         WHERE fa.vehicle_id = ${vehicleId} AND fa.status = ${status}
-      `;
+      ` as unknown as { total: number }[];
     } else if (status) {
       rows = await sql`
         SELECT fa.*, fv.registration, fv.make, fv.model,
@@ -765,7 +765,7 @@ export async function getFuelAnomalies(options: {
       countResult = await sql`
         SELECT COUNT(*)::int as total FROM fleet_fuel_anomalies fa
         WHERE fa.status = ${status}
-      `;
+      ` as unknown as { total: number }[];
     } else if (vehicleId) {
       rows = await sql`
         SELECT fa.*, fv.registration, fv.make, fv.model,
@@ -779,7 +779,7 @@ export async function getFuelAnomalies(options: {
       countResult = await sql`
         SELECT COUNT(*)::int as total FROM fleet_fuel_anomalies fa
         WHERE fa.vehicle_id = ${vehicleId}
-      `;
+      ` as unknown as { total: number }[];
     } else if (severity) {
       rows = await sql`
         SELECT fa.*, fv.registration, fv.make, fv.model,
@@ -793,7 +793,7 @@ export async function getFuelAnomalies(options: {
       countResult = await sql`
         SELECT COUNT(*)::int as total FROM fleet_fuel_anomalies fa
         WHERE fa.severity = ${severity}
-      `;
+      ` as unknown as { total: number }[];
     } else {
       rows = await sql`
         SELECT fa.*, fv.registration, fv.make, fv.model,
@@ -805,7 +805,7 @@ export async function getFuelAnomalies(options: {
       ` as FuelAnomalyRow[];
       countResult = await sql`
         SELECT COUNT(*)::int as total FROM fleet_fuel_anomalies fa
-      `;
+      ` as unknown as { total: number }[];
     }
 
     return {

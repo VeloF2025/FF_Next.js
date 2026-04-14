@@ -9,7 +9,7 @@
  * NLNH Confidence: HIGH
  */
 
-import type { Pool } from 'pg';
+import type { PoolClient } from 'pg';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { logActivity } from '@/modules/activate/services/activityLogService';
@@ -58,7 +58,7 @@ export async function runAutoDetect(oesBatchId: string): Promise<AutoDetectResul
     );
     const runId = runResult.rows[0].id;
 
-    log.info('OltAutoDetect', `Run #${runId} started for batch ${oesBatchId}`);
+    log.info(`Run #${runId} started for batch ${oesBatchId}`, undefined, 'OltAutoDetect');
 
     // Create synthetic import record for linking mismatch records
     const importResult = await client.query(
@@ -97,7 +97,7 @@ export async function runAutoDetect(oesBatchId: string): Promise<AutoDetectResul
     const rows = joinResult.rows;
     const totalOesRows = rows.length;
 
-    log.info('OltAutoDetect', `Run #${runId}: ${totalOesRows} OES rows to process`);
+    log.info(`Run #${runId}: ${totalOesRows} OES rows to process`, undefined, 'OltAutoDetect');
 
     // Update total count
     await client.query(
@@ -280,10 +280,10 @@ export async function runAutoDetect(oesBatchId: string): Promise<AutoDetectResul
       alreadyVerified,
     };
 
-    log.info('OltAutoDetect', `Run #${runId} cache phase complete`, result);
+    log.info(`Run #${runId} cache phase complete`, result as unknown as Record<string, unknown>, 'OltAutoDetect');
     return result;
   } catch (error) {
-    log.error('OltAutoDetect', 'Auto-detect failed', { oesBatchId, error });
+    log.error('Auto-detect failed', { oesBatchId, error }, 'OltAutoDetect');
     // Update run tracking with error status
     try {
       await client.query(
@@ -305,7 +305,7 @@ export async function runAutoDetect(oesBatchId: string): Promise<AutoDetectResul
  * Returns the number of actually inserted records.
  */
 async function insertMismatchBatch(
-  client: ReturnType<Pool['connect']> extends Promise<infer T> ? T : never,
+  client: PoolClient,
   batch: Array<{
     importId: string;
     dropNumber: string;

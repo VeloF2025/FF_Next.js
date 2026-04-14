@@ -27,7 +27,7 @@ class DevQueueService {
       const data = await response.json();
       return data.data || { columns: [], stats: {} };
     } catch (error) {
-      log.error('Error fetching devQueue board:', error, 'DevQueueService');
+      log.error('Error fetching devQueue board', { error });
       throw error;
     }
   }
@@ -44,7 +44,7 @@ class DevQueueService {
       const data = await response.json();
       return data.data;
     } catch (error) {
-      log.error('Error fetching devQueue item:', error, 'DevQueueService');
+      log.error('Error fetching devQueue item', { error });
       throw error;
     }
   }
@@ -70,7 +70,7 @@ class DevQueueService {
       const data = await response.json();
       return data.data;
     } catch (error) {
-      log.error('Error creating devQueue item:', error, 'DevQueueService');
+      log.error('Error creating devQueue item', { error });
       throw error;
     }
   }
@@ -96,7 +96,7 @@ class DevQueueService {
       const data = await response.json();
       return data.data;
     } catch (error) {
-      log.error('Error updating devQueue item:', error, 'DevQueueService');
+      log.error('Error updating devQueue item', { error });
       throw error;
     }
   }
@@ -115,7 +115,7 @@ class DevQueueService {
         throw new Error(errorData.error || 'Failed to delete devQueue item');
       }
     } catch (error) {
-      log.error('Error deleting devQueue item:', error, 'DevQueueService');
+      log.error('Error deleting devQueue item', { error });
       throw error;
     }
   }
@@ -141,7 +141,7 @@ class DevQueueService {
       const data = await response.json();
       return data.data.item;
     } catch (error) {
-      log.error('Error moving devQueue item:', error, 'DevQueueService');
+      log.error('Error moving devQueue item', { error });
       throw error;
     }
   }
@@ -170,7 +170,7 @@ class DevQueueService {
         votes: data.data.votes || 0,
       };
     } catch (error) {
-      log.error('Error voting on devQueue item:', error, 'DevQueueService');
+      log.error('Error voting on devQueue item', { error });
       throw error;
     }
   }
@@ -193,7 +193,7 @@ class DevQueueService {
         throw new Error(errorData.error || 'Failed to add comment');
       }
     } catch (error) {
-      log.error('Error adding comment:', error, 'DevQueueService');
+      log.error('Error adding comment', { error });
       throw error;
     }
   }
@@ -223,7 +223,7 @@ class DevQueueService {
         throw new Error(errorData.error || 'Failed to update columns');
       }
     } catch (error) {
-      log.error('Error updating columns:', error, 'DevQueueService');
+      log.error('Error updating columns', { error });
       throw error;
     }
   }
