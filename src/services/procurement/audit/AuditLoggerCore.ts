@@ -40,7 +40,7 @@ export class AuditLoggerCore {
     void metadata;
     try {
       // Generate changes summary
-      const changesSummary = generateChangesSummary(action, entityType, oldValue, newValue);
+      const changesSummary = generateChangesSummary(action, entityType, oldValue as Record<string, unknown> | undefined, newValue as Record<string, unknown> | undefined);
 
       // Create audit log entry
       const auditEntry: NewAuditLog = {

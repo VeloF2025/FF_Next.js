@@ -487,7 +487,7 @@ export const taskOperations = {
         ORDER BY t.task_order ASC
       `;
       
-      return result.map((task: PhaseTaskRow) => ({
+      return (result as PhaseTaskRow[]).map((task) => ({
         ...task,
         attachments: task.attachments || [],
         tags: task.tags || [],

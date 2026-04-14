@@ -52,7 +52,7 @@ export class SpecializedSubscriptions {
         })
         .slice(0, 50); // Limit to top 50 rated suppliers
 
-      callback(supplierRatings);
+      callback(supplierRatings as unknown as SupplierRatingData[]);
     } catch (error) {
       log.error('Error fetching supplier ratings:', { data: error }, 'specializedSubscriptions');
       const errorObj = error instanceof Error ? error : new Error('Unknown error');
@@ -96,7 +96,7 @@ export class SpecializedSubscriptions {
         }))
         .sort((a, b) => a.companyName.localeCompare(b.companyName));
 
-      callback(complianceData);
+      callback(complianceData as unknown as SupplierComplianceData[]);
     } catch (error) {
       log.error('Error fetching compliance status:', { data: error }, 'specializedSubscriptions');
       const errorObj = error instanceof Error ? error : new Error('Unknown error');

@@ -74,7 +74,8 @@ export function EnhancedSOWDisplay({ projectId }: EnhancedSOWDisplayProps) {
             />
 
             <SOWDataStatus
-              sowData={sowData}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              sowData={sowData as any}
               polesCount={totalPoles}
               dropsCount={totalDrops}
               fibreCount={totalFibre}

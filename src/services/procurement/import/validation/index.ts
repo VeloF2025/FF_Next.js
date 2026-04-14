@@ -83,7 +83,7 @@ export function validateBOQItem(
           row: rowNumber,
           column: err.path.join('.'),
           message: err.message,
-          details: err
+          details: err as unknown as Record<string, unknown>
         });
       });
     }

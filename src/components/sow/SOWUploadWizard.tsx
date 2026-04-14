@@ -1,8 +1,10 @@
 
 
 interface SOWUploadWizardProps {
+  projectId?: string;
   projectName?: string;
   onComplete?: () => void;
+  onCancel?: () => void;
 }
 
 export function SOWUploadWizard({ projectName = 'Project' }: SOWUploadWizardProps) {

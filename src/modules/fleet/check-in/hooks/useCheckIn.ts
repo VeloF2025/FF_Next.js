@@ -50,7 +50,7 @@ interface CheckInFormState {
 }
 
 interface VlmValidation {
-  suggestedAction: 'accept' | 'review' | 'reject';
+  suggestedAction: 'accept' | 'review' | 'verify' | 'reject';
   warning?: string;
 }
 
@@ -70,7 +70,7 @@ interface ReadingAnomaly {
   severity: 'low' | 'medium' | 'high';
 }
 
-interface VlmResult {
+export interface VlmResult {
   photoType: CheckPhotoType;
   analysisType: VlmAnalysisType;
   extractedValue: string | null;

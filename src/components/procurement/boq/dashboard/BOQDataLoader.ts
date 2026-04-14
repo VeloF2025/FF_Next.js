@@ -39,8 +39,9 @@ export class BOQDataLoader {
 
   async loadRecentBOQs(context: ProcurementContext): Promise<BOQ[]> {
     try {
-      const allBOQs = await procurementApiService.getBOQsByProject(context, context.projectId);
-      return allBOQs
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const allBOQs = await procurementApiService.getBOQsByProject(context as any, context.projectId);
+      return (allBOQs as unknown as BOQ[])
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
         .slice(0, 5);
     } catch (error) {

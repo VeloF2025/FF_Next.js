@@ -28,10 +28,10 @@ export class KPIAnalyticsService {
       
       // Transform API response to match KPIDashboardItem interface
       return filteredKPIs.map(kpi => ({
-        metricType: kpi.category,
-        metricName: kpi.name,
-        currentValue: kpi.value,
-        unit: kpi.unit || '',
+        metricType: kpi.category as string,
+        metricName: kpi.name as string,
+        currentValue: kpi.value as number,
+        unit: (kpi.unit as string) || '',
         recordCount: 1 // API doesn't provide record count
       }));
     } catch (error) {

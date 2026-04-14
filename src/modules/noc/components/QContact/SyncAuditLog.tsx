@@ -430,7 +430,7 @@ export function SyncAuditLog({
           by_direction: byDirection || { inbound: 0, outbound: 0 },
           by_status: byStatus || { success: 0, failed: 0, partial: 0, pending: 0 },
           success_rate: successRate,
-        }
+        } as SyncLogListResponse
       : null;
 
   const isLoading = externalData !== undefined ? externalIsLoading : internalIsLoading;

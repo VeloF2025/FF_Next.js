@@ -67,10 +67,10 @@ function mapSeverityToPriority(severity: SnagSeverity): TicketPriority {
 // Handler
 // ============================================================
 
-interface SnagWithReport extends Snag {
+type SnagWithReport = Snag & {
   report_number: string | null;
   audit_date: string | null;
-}
+};
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {

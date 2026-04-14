@@ -4,6 +4,7 @@
  */
 
 import { BOQException, ProcurementContext, CreateBOQExceptionData } from './types';
+import type { MappingSuggestion } from '@/types/procurement/boq.types';
 import { log } from '@/lib/logger';
 // MOCK DATA REMOVED - This service requires connection to real database
 // Consider using the Firebase-based boqService from '@/services/procurement/boqService'
@@ -53,7 +54,7 @@ export class ExceptionManager {
       severity: (exceptionData.severity as 'low' | 'medium' | 'high' | 'critical') || 'medium',
       issueDescription: exceptionData.issueDescription,
       suggestedAction: exceptionData.suggestedAction,
-      systemSuggestions: exceptionData.suggestions || [],
+      systemSuggestions: (exceptionData.suggestions || []) as unknown as MappingSuggestion[],
       status: (exceptionData.status as 'open' | 'in_review' | 'resolved' | 'ignored') || 'open',
       priority: (exceptionData.priority as 'low' | 'medium' | 'high' | 'urgent') || 'medium',
       createdAt: new Date(),

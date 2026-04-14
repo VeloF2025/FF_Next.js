@@ -23,7 +23,7 @@ export function useProcurementContext(): ProcurementContextResult {
   const error = !user ? 'User not authenticated' :
                 !currentProject ? 'No project selected' : null;
 
-  const context: ProcurementContext | null = user && currentProject ? {
+  const context = (user && currentProject ? {
     userId: user.uid,
     userName: user.displayName || user.email || 'Unknown User',
     projectId: currentProject.id,
@@ -48,7 +48,7 @@ export function useProcurementContext(): ProcurementContextResult {
       userEmail: user.email || '',
       timestamp: new Date()
     }
-  } : null;
+  } : null) as ProcurementContext | null;
 
   return {
     context,

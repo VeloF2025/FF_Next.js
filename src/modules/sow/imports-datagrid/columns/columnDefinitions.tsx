@@ -175,7 +175,7 @@ export const onemapColumns: GridColDef[] = [
         return (
           <Chip
             label={labels[matchType as keyof typeof labels] || '✓ Linked'}
-            color={colors[matchType as keyof typeof colors] || 'success'}
+            color={(colors[matchType as keyof typeof colors] || 'success') as 'success' | 'info' | 'warning'}
             size="small"
           />
         );

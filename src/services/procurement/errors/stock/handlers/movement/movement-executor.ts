@@ -84,7 +84,7 @@ export class MovementExecutor {
           batchSize: retryStrategy.data.batchSize,
           estimatedDuration: retryStrategy.estimatedTime
         },
-        batchIds: Array.from({ length: retryStrategy.data.numberOfBatches }, (_, i) => 
+        batchIds: Array.from({ length: retryStrategy.data.numberOfBatches } as ArrayLike<unknown>, (_, i) =>
           `BATCH-${Date.now()}-${i + 1}`
         ),
         rollbackEnabled: retryStrategy.data.rollbackOnFailure

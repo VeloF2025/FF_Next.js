@@ -255,14 +255,14 @@ export function TemplateList({
     setState(prev => ({ ...prev, isLoading: true, error: '' }));
 
     try {
-      const query: WorkflowTemplateQuery = {
+      const query = {
         ...state.filter,
         search: searchTerm || undefined,
         limit: state.pageSize,
         offset: (page - 1) * state.pageSize,
         orderBy: state.sorting.field,
         orderDirection: state.sorting.direction
-      };
+      } as WorkflowTemplateQuery;
 
       const result = await workflowManagementService.getTemplates(query);
 

@@ -61,7 +61,7 @@ export function PoleStats({ pole }: PoleStatsProps) {
           subtitle={stat.subtitle}
           value={stat.value}
           subValue={stat.subValue}
-          icon={stat.icon}
+          icon={stat.icon as import('lucide-react').LucideIcon}
           color={stat.color}
         />
       ))}

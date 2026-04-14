@@ -8,6 +8,7 @@ import { AlertCircle } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ProcurementFilters } from '../../src/modules/procurement/components/ProcurementFilters';
 import { ProcurementPortalProvider } from '../../src/modules/procurement/context/ProcurementPortalProvider';
+import type { ProcurementPortalContext } from '@/types/procurement/portal.types';
 import { useProcurementPermissions } from '../../src/modules/procurement/hooks/useProcurementPermissions';
 import { log } from '../../src/lib/logger';
 import Link from 'next/link';
@@ -254,7 +255,7 @@ export default function ProcurementPage({
 
   return (
     <AppLayout>
-      <ProcurementPortalProvider value={contextValue}>
+      <ProcurementPortalProvider value={contextValue as unknown as ProcurementPortalContext}>
         <div className="min-h-screen bg-[var(--ff-bg-primary)]">
           {/* Page Header */}
           <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">

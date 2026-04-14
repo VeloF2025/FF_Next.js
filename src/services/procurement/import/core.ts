@@ -82,7 +82,7 @@ export class ExcelImportEngine {
       let processedRows = 0;
 
       for (let i = 0; i < rawData.length; i++) {
-        const rowResult = this.rowProcessor.processRow(rawData[i], i, this.columnManager.getColumnMapping());
+        const rowResult = this.rowProcessor.processRow(rawData[i]!, i, this.columnManager.getColumnMapping());
 
         if (rowResult.item) {
           validItems.push(rowResult.item);

@@ -713,13 +713,6 @@ export default function RFQDetailPage() {
           projectId={rfq.projectId}
           rfqId={rfq.id}
           rfqNumber={rfq.rfqNumber}
-          rfqItems={rfq.items.map((item) => ({
-            id: item.id,
-            description: item.description,
-            itemCode: undefined,
-            quantity: item.quantity,
-            unit: item.unit,
-          }))}
           onExtractionComplete={(extraction, matching, extractionId) => {
             log.info('Quote extraction complete', { extractionId });
             notificationService.success('Quote scanned successfully! Review the extracted data.');

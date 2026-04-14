@@ -274,7 +274,7 @@ export function QFieldSyncDashboard() {
           {dashboardData?.conflicts && dashboardData.conflicts.length > 0 ? (
             <ConflictResolver
               conflicts={dashboardData.conflicts}
-              onResolve={resolveConflict}
+              onResolve={resolveConflict as (conflictId: string, resolution: string | undefined) => Promise<void>}
             />
           ) : (
             <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-8 text-center">

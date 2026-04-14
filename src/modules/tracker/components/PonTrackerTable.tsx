@@ -77,7 +77,7 @@ export function PonTrackerTable({ rows, editMode, onChange, filters, onFiltersCh
                     {c.label}
                     <ColumnFilter
                       column={c.label}
-                      values={[...new Set(rows.map((r) => String((r as Record<string, unknown>)[c.key] ?? '')))].sort()}
+                      values={[...new Set(rows.map((r) => String((r as unknown as Record<string, unknown>)[c.key] ?? '')))].sort()}
                       selected={filters[c.key] ?? new Set()}
                       onChange={(sel) => onFiltersChange({ ...filters, [c.key]: sel })}
                     />

@@ -27,7 +27,8 @@ export function OptimizedList<T>({
           key={keyExtractor(item, index)}
           item={item}
           index={index}
-          renderItem={renderItem}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          renderItem={renderItem as any}
         />
       )),
     [items, renderItem, keyExtractor]

@@ -199,7 +199,8 @@ export async function startRecording(roomName: string): Promise<RecordingRespons
         const filepath = `${EGRESS_OUTPUT_PATH}/${filename}`;
 
         // Use file output with filepath
-        const egress = await client.startRoomCompositeEgress(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const egress = await (client as any).startRoomCompositeEgress(
             roomName,
             { filepath }
         );

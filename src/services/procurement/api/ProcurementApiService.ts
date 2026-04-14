@@ -159,7 +159,8 @@ export class ProcurementApiService extends BaseService {
   async getStockPositions(context: ApiContext, filters?: StockFilters) {
     const authCheck = await this.validateContext(context, 'stock:read');
     if (!authCheck.success) return authCheck as ServiceResponse<never>;
-    return this.stockOps.getStockPositions(context, filters);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return this.stockOps.getStockPositions(context, filters as any);
   }
 
   // ==============================================

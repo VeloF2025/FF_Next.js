@@ -99,6 +99,8 @@ export const projectService = {
   subscribeToTasks: () => () => {},
   subscribeToHierarchy: () => () => {},
   unsubscribeAll: () => {},
-  subscribeToProject: (_id?: string, _cb?: (p: unknown) => void) => () => {},
-  subscribeToProjects: (_cb?: (p: unknown[]) => void, _filter?: unknown) => () => {} // Placeholder
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  subscribeToProject: (_id?: string, _cb?: (p: any) => void) => () => {},
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  subscribeToProjects: (_cb?: (p: any[]) => void, _filter?: unknown) => () => {} // Placeholder
 };

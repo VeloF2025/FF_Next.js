@@ -122,7 +122,7 @@ async function handler(
       // 5. Non-critical staff record validation
       let validation: Awaited<ReturnType<typeof validateDocument>> | undefined;
       try {
-        validation = await validateDocument(staffId, documentType ?? 'unknown', extractedData as Record<string, unknown>);
+        validation = await validateDocument(staffId, documentType ?? 'unknown', extractedData as unknown as Parameters<typeof validateDocument>[2]);
         log.info('Document validation completed', {
           staffId, documentType,
           isValid: validation.isValid, matchScore: validation.matchScore,

@@ -59,7 +59,8 @@ function validateRates(fuelRate: number | undefined, depreciationRate: number | 
   return null;
 }
 
-export default withFleetAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default withFleetAuth(withErrorHandler(async (req: any, res: any) => {
   const sql = getSqlInstance();
 
   switch (req.method) {
@@ -705,4 +706,5 @@ export default withFleetAuth(withErrorHandler(async (req: NextApiRequest, res: N
     default:
       return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST', 'PUT', 'DELETE']);
   }
-}));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+}) as any);

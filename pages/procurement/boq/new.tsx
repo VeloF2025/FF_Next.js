@@ -77,7 +77,7 @@ export default function NewBOQPage() {
 
   const updateItem = (index: number, field: keyof BOQItem, value: string | number) => {
     const newItems = [...items];
-    newItems[index] = { ...newItems[index], [field]: value };
+    newItems[index] = { ...newItems[index], [field]: value } as BOQItem;
     setItems(newItems);
   };
 

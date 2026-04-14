@@ -27,7 +27,7 @@ export function HierarchyTab() {
       const allStaff = await staffService.getAll();
       
       // Build hierarchy tree
-      const hierarchyTree = buildHierarchyTree(allStaff);
+      const hierarchyTree = buildHierarchyTree(allStaff as Parameters<typeof buildHierarchyTree>[0]);
       setHierarchy(hierarchyTree);
     } catch (error) {
       log.error('Error fetching hierarchy:', { data: error }, 'HierarchyTab');

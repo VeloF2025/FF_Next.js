@@ -6,7 +6,8 @@
 export class LodashReplacementMetrics {
   private static metrics = new Map<string, { calls: number; totalTime: number }>();
 
-  static trackPerformance<T extends (...args: unknown[]) => unknown>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  static trackPerformance<T extends (...args: any[]) => any>(
     name: string,
     func: T
   ): T {

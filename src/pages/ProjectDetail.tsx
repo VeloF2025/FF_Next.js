@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { log } from '@/lib/logger';
 import { useProject, useProjectHierarchy, useDeleteProject } from '@/hooks/useProjects';
+import type { ProjectHierarchy } from '@/types/project/hierarchy.types';
 import { EnhancedSOWDisplay } from '@/components/sow/EnhancedSOWDisplay';
 import { ProjectHSTab } from '@/modules/health-safety/components';
 import BOQList from '@/components/procurement/boq/BOQList';
@@ -252,7 +253,7 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
       )}
 
       {activeTab === 'hierarchy' && (
-        <ProjectHierarchyTab hierarchy={hierarchy} isLoading={isHierarchyLoading} />
+        <ProjectHierarchyTab hierarchy={hierarchy as ProjectHierarchy | null | undefined} isLoading={isHierarchyLoading} />
       )}
 
       {activeTab === 'sow' && (

@@ -82,7 +82,8 @@ export function logDebugInfo(_operation: string, data: unknown, reportsTo?: unkn
 /**
  * Log error information
  */
-export function logError(operation: string, error: unknown, data: StaffFormData): void {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function logError(operation: string, error: unknown, data: Record<string, any>): void {
   log.error(`❌ ${operation} ERROR - Detailed error info:`, { data: {
     message: error instanceof Error ? error.message : 'Unknown error',
     stack: error instanceof Error ? error.stack : 'No stack trace',

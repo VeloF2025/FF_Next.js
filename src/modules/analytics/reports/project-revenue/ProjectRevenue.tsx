@@ -199,7 +199,7 @@ export default function ProjectRevenue() {
 
   return (
     <ReportTabLayout
-      tableContent={<ProfitabilityTable rows={data.rows} totals={data.totals} />}
+      tableContent={<ProfitabilityTable rows={data.rows} totals={{ ...data.totals, forecastMargin: data.totals.forecastMargin ?? 0, actualMargin: data.totals.actualMargin ?? 0 }} />}
       chartsContent={<ProfitabilityCharts rows={data.rows} />}
     />
   );

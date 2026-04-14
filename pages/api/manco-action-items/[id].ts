@@ -121,7 +121,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       // 🟢 WORKING: dynamic SET — only present keys are updated.
-      const rows = await query<MancoActionItem>(queryText, values);
+      const rows = await query(queryText, values) as unknown as MancoActionItem[];
       const item = rows[0];
 
       if (!item) {

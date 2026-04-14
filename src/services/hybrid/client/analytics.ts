@@ -21,7 +21,8 @@ export async function getTopClients(limit: number = 10) {
 /**
  * Sync client data to analytics database
  */
-export async function syncClientToAnalytics(_clientId: string, _clientData: Record<string, unknown>): Promise<void> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function syncClientToAnalytics(_clientId: string, _clientData: Record<string, any>): Promise<void> {
   try {
     // const _analyticsData: NewClientAnalytics = {
     //   clientId,

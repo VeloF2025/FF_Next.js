@@ -98,7 +98,7 @@ export function AssignProjectForm({ contractorId, onSuccess, onCancel }: AssignP
         contractorId,
         projectId: formData.projectId,
         role: formData.role,
-        startDate: new Date(formData.startDate),
+        startDate: new Date(formData.startDate || new Date()),
         endDate: formData.endDate ? new Date(formData.endDate) : undefined,
         workloadPercentage: formData.workloadPercentage,
         estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : undefined,

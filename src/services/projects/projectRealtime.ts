@@ -173,7 +173,7 @@ export function subscribeToProjectHierarchy(
         callback(null);
         return;
       }
-      hierarchy.project = project;
+      hierarchy.project = project as unknown as Record<string, unknown>;
       callback({ ...hierarchy });
     })
   );

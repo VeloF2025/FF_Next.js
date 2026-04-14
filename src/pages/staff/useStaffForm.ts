@@ -133,6 +133,6 @@ export function useStaffForm(id?: string) {
     toggleSkill,
     createMutation,
     updateMutation,
-    navigate: router
+    navigate: (path: string) => router.push(path)
   };
 }

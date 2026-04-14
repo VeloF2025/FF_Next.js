@@ -95,3 +95,5 @@ export {
   ProjectPerformanceAnalytics,
   ProjectTrendAnalytics
 } from './project-analytics';
+
+export type { ProjectSummary } from './project-analytics';

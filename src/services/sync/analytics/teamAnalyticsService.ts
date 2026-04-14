@@ -59,7 +59,7 @@ export class TeamAnalyticsService {
     try {
       // Get team analytics from API
       const teamData = await analyticsApi.getTeamAnalytics();
-      const teams: TeamRecord[] = teamData.teams || [];
+      const teams: TeamRecord[] = (teamData.teams as TeamRecord[]) || [];
 
       // Aggregate data from all teams
       let _totalStaff = 0;
@@ -84,7 +84,7 @@ export class TeamAnalyticsService {
         });
       });
 
-      const latestPeriodRecords = this.filterLatestPeriodRecords(teams);
+      const latestPeriodRecords = this.filterLatestPeriodRecords(teams as unknown as StaffPerformanceRecord[]);
 
       if (latestPeriodRecords.length === 0) {
         return this.getEmptyTeamSummary();

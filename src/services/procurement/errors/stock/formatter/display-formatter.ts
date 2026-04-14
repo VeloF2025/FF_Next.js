@@ -251,17 +251,17 @@ export class DisplayFormatter {
       itemCode = error.itemCode;
     }
 
-    const result: Record<string, unknown> = {
+    const result: { title: string; message: string; priority: 'low' | 'medium' | 'high'; category: string; itemCode?: string } = {
       title: error.constructor.name.replace(/Error$/, '').replace(/([A-Z])/g, ' $1').trim(),
       message: error.message,
       priority,
       category
     };
-    
+
     if (itemCode !== undefined) {
       result.itemCode = itemCode;
     }
-    
+
     return result;
   }
 }

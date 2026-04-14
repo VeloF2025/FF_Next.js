@@ -21,6 +21,7 @@ import { log } from '@/lib/logger';
 interface FirestoreDocSnapshot {
   id: string;
   ref: unknown;
+  exists: () => boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: () => Record<string, any>;
 }
@@ -74,7 +75,7 @@ export class ProjectQueryService {
       
       snapshot.docs.slice(0, pageLimit).forEach((doc: FirestoreDocSnapshot, index: number) => {
         if (index === pageLimit - 1) {
-          lastVisible = doc;
+          lastVisible = doc as unknown as DocumentSnapshot;
         }
         projects.push({
           id: doc.id,

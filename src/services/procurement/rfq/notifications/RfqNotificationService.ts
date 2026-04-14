@@ -111,7 +111,8 @@ export class RfqNotificationService {
         recipientId: supplierId,
         recipientEmail: supplierRow.email,
         subject: `RFQ ${rfqRow.rfq_number}: ${type}`,
-        message: getNotificationMessage(type, rfqRow),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        message: getNotificationMessage(type, rfqRow as any),
         metadata: {
           supplierName: supplierRow.company_name,
           rfqNumber: rfqRow.rfq_number

@@ -111,7 +111,7 @@ const PivotTable = ({
                   ))}
                 </tr>
                 {/* Category T2 sub-rows */}
-                {isExp && cat.rows.map((sub: { categoryT2: string; fy26: number; fy27: number; fy28: number; monthly: Record<string, number>; grandTotal: number }) => (
+                {isExp && cat.rows.map((sub) => (
                   <tr key={`${cat.category}|${sub.categoryT2}`} className="bg-gray-900">
                     <td className="px-3 py-1.5 pl-9 text-gray-400 text-xs sticky left-0 bg-gray-900">{sub.categoryT2}</td>
                     <td className="px-3 py-1.5 text-right text-gray-400 text-xs border-l border-gray-600">{fZAR(sub.fy26)}</td>

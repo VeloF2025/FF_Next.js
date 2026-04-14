@@ -46,7 +46,8 @@ export async function recordKPI(
 /**
  * Sync project data to analytics database
  */
-export async function syncProjectToAnalytics(_projectId: string, _projectData: Record<string, unknown>): Promise<void> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function syncProjectToAnalytics(_projectId: string, _projectData: Record<string, any>): Promise<void> {
   try {
     // const _analyticsData: NewProjectAnalytics = {
     //   projectId,

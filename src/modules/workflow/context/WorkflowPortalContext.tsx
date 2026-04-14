@@ -17,10 +17,10 @@ import type {
 } from '../types/workflow.types';
 
 // Initial state
-const initialState: Omit<IWorkflowPortalContext, 
-  'setActiveTab' | 'setLoading' | 'setError' | 'updateTabBadge' | 'refreshData' | 
-  'loadTemplateStats' | 'loadProjectWorkflowStats' | 'loadProjectWorkflows' | 
-  'loadTemplates' | 'createProjectWorkflow'> = {
+const initialState: Omit<IWorkflowPortalContext,
+  'setActiveTab' | 'setLoading' | 'setError' | 'updateTabBadge' | 'refreshData' |
+  'loadTemplateStats' | 'loadProjectWorkflowStats' | 'loadProjectWorkflows' |
+  'loadTemplates' | 'createProjectWorkflow' | 'refreshTemplates'> = {
   activeTab: 'templates',
   isLoading: false,
   error: undefined,

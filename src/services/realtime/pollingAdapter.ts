@@ -103,7 +103,7 @@ class PollingAdapter extends EventEmitter {
             type: this.mapEventType(change.event_type),
             entityType: change.entity_type as EntityType,
             entityId: change.entity_id?.toString() || '',
-            data: change.data,
+            data: change.data as Record<string, unknown> | undefined,
             timestamp: new Date(change.timestamp)
           };
           

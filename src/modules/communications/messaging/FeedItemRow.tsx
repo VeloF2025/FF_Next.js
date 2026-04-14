@@ -67,7 +67,7 @@ function formatRelative(iso: string): string {
 export function FeedItemRow({ item, onClick }: FeedItemRowProps) {
   const config = CHANNEL_CONFIG[item.channel] || CHANNEL_CONFIG.notification;
   const Icon = config.icon;
-  const meta = item.metadata || {};
+  const meta: Record<string, string | number | boolean | null | undefined> = (item.metadata || {}) as Record<string, string | number | boolean | null | undefined>;
 
   const isUrgent = meta.priority === 'urgent' || meta.severity === 'error';
   const isHigh = meta.priority === 'high' || meta.severity === 'warning';

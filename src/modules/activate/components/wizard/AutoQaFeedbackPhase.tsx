@@ -17,7 +17,7 @@ import { log } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
 import { STEP_LABELS } from '../../utils/stepMapper';
 import type { AutoQaResults, AutoQaPhotoResult } from '../../services/autoQaCommentGenerator';
-import { generateFeedbackMessage, generatePhotoComment } from '../../services/autoQaCommentGenerator';
+import { generateFeedbackMessage, generatePhotoComment, type AutoQaValidations } from '../../services/autoQaCommentGenerator';
 import type { QaDecision } from '../../types/unified.types';
 import { PhotoCard, type EditablePhoto } from './PhotoCard';
 import { PhotoLightbox, type LightboxPhoto } from '@/components/PhotoLightbox';
@@ -229,13 +229,13 @@ export function AutoQaFeedbackPhase({
     const missing = Array.from({ length: 12 }, (_, i) => i + 1).filter((s) => !coveredSet.has(s));
     const updatedValidations = {
       ...autoQaResults.validations,
-      stepCoverage: { covered, missing, total: 12, coveragePercent: covered.length / 12 },
+      stepCoverage: { covered, missing, total: 12, coverageMap: {}, complete: missing.length === 0 },
     };
     const newMessage = generateFeedbackMessage(
       dropNumber,
       decision,
       allPhotos,
-      updatedValidations
+      updatedValidations as AutoQaValidations
     );
     setFeedbackMessage(newMessage);
     setFeedbackStale(false);
@@ -279,7 +279,7 @@ export function AutoQaFeedbackPhase({
                 filename: p.filename, step: p.step, stepLabel: p.stepLabel,
                 tier: p.tier, decision: p.decision, comment: p.comment, confidence: p.confidence,
               })), ...missingSteps],
-              { ...autoQaResults.validations, stepCoverage: { covered: cov, missing: mis, total: 12, coveragePercent: cov.length / 12 } }
+              { ...autoQaResults.validations, stepCoverage: { covered: cov, missing: mis, total: 12, coverageMap: {}, complete: mis.length === 0 } } as AutoQaValidations
             );
           })() : feedbackMessage,
           destination: sendDestination,

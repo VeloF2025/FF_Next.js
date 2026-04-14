@@ -274,7 +274,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
       // Use known category bucket or catch-all
       const bucket = COS_CATEGORIES.includes(cat) ? cat : (COS_CATEGORIES[0] ?? 'other');
-      accumulate(cosActual[bucket], month, amount);
+      accumulate(cosActual[bucket]!, month, amount);
       accumulate(cosTotal, month, amount);
     }
 

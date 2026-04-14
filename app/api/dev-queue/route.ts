@@ -37,9 +37,9 @@ export async function GET(req: NextRequest) {
       items: items.filter((item: any) => item.status === column.name)
     }));
 
-    const board: DevQueueBoard = {
-      columns: columnsWithItems as DevQueueBoard['columns']
-    };
+    const board = {
+      columns: columnsWithItems as DevQueueBoard['columns'],
+    } as DevQueueBoard;
 
     return NextResponse.json({ success: true, data: board });
   } catch (error) {

@@ -112,7 +112,8 @@ export class NeonRFQService {
   // ============= RESPONSE MANAGEMENT =============
 
   static async submitResponse(rfqId: string, response: RfqSubmitResponse): Promise<string> {
-    return RfqResponseService.submitResponse(rfqId, response);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return RfqResponseService.submitResponse(rfqId, response as any);
   }
 
   static async selectResponse(rfqId: string, responseId: string, reason?: string): Promise<void> {

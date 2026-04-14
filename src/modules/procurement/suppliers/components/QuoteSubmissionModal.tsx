@@ -101,7 +101,7 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
 
   const updateLineItem = (index: number, field: keyof QuoteLineItem, value: string | number | undefined) => {
     const newLineItems = [...(formData.lineItems || [])];
-    newLineItems[index] = { ...newLineItems[index], [field]: value };
+    newLineItems[index] = { ...newLineItems[index], [field]: value } as QuoteLineItem;
     
     // Calculate total price for the line item
     if (field === 'unitPrice' || field === 'quantity') {

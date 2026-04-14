@@ -46,7 +46,8 @@ export function lazyLoad<T extends ComponentType<AnyProps>>(
   }
 ) {
   return dynamic(importFunc, {
-    loading: options?.loading || (() => <LoadingFallback message={options?.loadingMessage} />),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    loading: (options?.loading || (() => <LoadingFallback message={options?.loadingMessage} />)) as any,
     ssr: options?.ssr ?? true,
   });
 }
@@ -59,7 +60,8 @@ export function lazyLoadWithLoader<T extends ComponentType<AnyProps>>(
   LoadingComponent: ComponentType
 ) {
   return dynamic(importFunc, {
-    loading: LoadingComponent,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    loading: LoadingComponent as any,
     ssr: true,
   });
 }

@@ -126,7 +126,7 @@ export default function BOQViewer({
             onSort={handleSort}
             onStartEdit={startEditing}
             onCancelEdit={cancelEditing}
-            onUpdateEdit={updateEditingItem}
+            onUpdateEdit={updateEditingItem as (itemId: string, field: keyof import('@/types/procurement/boq.types').BOQItem, value: unknown) => void}
             onSaveEdit={saveItem}
             isSaving={isSaving}
           />

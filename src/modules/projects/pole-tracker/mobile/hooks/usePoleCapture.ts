@@ -66,7 +66,7 @@ export function usePoleCapture(projectId: string) {
           captured: true,
           url: e.target?.result as string,
           file,
-        };
+        } as PhotoCapture;
         setPhotos(updatedPhotos);
         setActivePhotoIndex(null);
       };
@@ -95,7 +95,7 @@ export function usePoleCapture(projectId: string) {
 
   const updateDrop = (index: number, field: keyof DropData, value: string) => {
     const updatedDrops = [...formData.drops];
-    updatedDrops[index] = { ...updatedDrops[index], [field]: value };
+    updatedDrops[index] = { ...updatedDrops[index], [field]: value } as DropData;
     setFormData((prev) => ({ ...prev, drops: updatedDrops }));
   };
 

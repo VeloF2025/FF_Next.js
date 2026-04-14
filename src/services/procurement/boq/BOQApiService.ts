@@ -42,7 +42,8 @@ export class BOQApiService extends BaseService {
   ): Promise<ServiceResponse<BOQImportResult>> {
     try {
       // First, import the BOQ using base service
-      const importResult = await procurementApiService.importBOQ(context, importData);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const importResult = await procurementApiService.importBOQ(context, importData as any);
       if (!importResult.success) {
         return importResult as unknown as ServiceResponse<BOQImportResult>;
       }

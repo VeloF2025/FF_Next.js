@@ -7,28 +7,7 @@
 import React, { useState } from 'react';
 import { CheckCircle2, AlertCircle, Edit3, AlertTriangle, XCircle, Camera } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
-import type { VlmAnalysisType, CheckPhotoType } from '../../types/check-in.types';
-
-interface VlmValidation {
-  isValid: boolean;
-  validatedReading: number | null;
-  originalReading: number | null;
-  warning: string | null;
-  warningLevel: 'none' | 'low' | 'medium' | 'high';
-  suggestedAction: 'accept' | 'verify' | 'reject';
-}
-
-interface VlmResult {
-  photoType: CheckPhotoType;
-  analysisType: VlmAnalysisType;
-  extractedValue: string | null;
-  extractedNumeric: number | null;
-  confidence: number;
-  plateMatches?: boolean;
-  isProcessing: boolean;
-  error?: string;
-  validation?: VlmValidation;
-}
+import type { VlmResult } from '../hooks/useCheckIn';
 
 interface VlmResultCardProps {
   title: string;

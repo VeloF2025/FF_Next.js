@@ -308,7 +308,7 @@ export class StockMovementSyncService {
    * Sync a single stock move item
    */
   private async syncMoveItem(
-    client: OdooClient,
+    client: import('pg').PoolClient,
     movementId: string,
     move: OdooStockMove
   ): Promise<void> {

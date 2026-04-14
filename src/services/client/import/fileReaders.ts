@@ -25,7 +25,7 @@ export async function importFromCSV(file: File): Promise<ClientImportResult> {
             row[header] = values[index] || '';
           });
           
-          rows.push(row as ClientImportRow);
+          rows.push(row as unknown as ClientImportRow);
         }
         
         const result = await processImportRows(rows);

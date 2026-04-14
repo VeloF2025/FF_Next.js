@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import type { POFormData, POTotals } from './types';
-import type { CreatePOItemRequest, CreatePORequest } from '../../../../../types/procurement/po.types';
+import { POOrderType, type CreatePOItemRequest, type CreatePORequest } from '../../../../../types/procurement/po.types';
 
 interface UsePOFormProps {
   rfqId?: string;
@@ -17,7 +17,7 @@ export const usePOForm = ({ rfqId, quoteId, projectId }: UsePOFormProps) => {
       projectId: projectId || 'proj-001',
       supplierId: '',
       title: '',
-      orderType: 'GOODS',
+      orderType: POOrderType.GOODS,
       paymentTerms: '30 days net',
       deliveryTerms: 'DDP - Delivered Duty Paid',
       deliveryAddress: {
@@ -108,7 +108,7 @@ export const usePOForm = ({ rfqId, quoteId, projectId }: UsePOFormProps) => {
     return {
       ...restFormData,
       items: cleanItems
-    };
+    } as unknown as CreatePORequest;
   };
 
   return {

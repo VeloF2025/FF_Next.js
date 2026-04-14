@@ -112,7 +112,7 @@ function ChecklistsContent() {
             className="px-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary-500)]"
           >
             <option value="all">All Categories</option>
-            {categories.map((cat: string) => (
+            {(categories as string[]).map((cat) => (
               <option key={cat} value={cat}>
                 {cat.charAt(0).toUpperCase() + cat.slice(1).replace(/_/g, ' ')}
               </option>

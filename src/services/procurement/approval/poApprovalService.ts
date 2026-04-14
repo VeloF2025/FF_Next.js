@@ -18,7 +18,7 @@ import {
   createRejectionFollowUp,
 } from '@/lib/action-items/procurementActions';
 
-const sql: NeonQueryFunction<false> = neon(process.env.DATABASE_URL!);
+const sql: NeonQueryFunction<false, false> = neon(process.env.DATABASE_URL!);
 
 // Row types for SQL query results
 interface ApprovalLevelRow {

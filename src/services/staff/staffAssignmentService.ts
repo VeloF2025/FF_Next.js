@@ -1,6 +1,7 @@
 import { collection, doc, addDoc, updateDoc, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { ProjectAssignment, StaffMember } from '@/types/staff.types';
+import { Skill } from '@/types/staff/enums.types';
 import { log } from '@/lib/logger';
 
 /**
@@ -140,7 +141,7 @@ export const staffAssignmentService = {
       if (projectRequirements?.skills?.length) {
         availableStaff = availableStaff.filter((staff: StaffMember) =>
           projectRequirements.skills!.some(skill =>
-            (staff.skills || []).includes(skill)
+            (staff.skills || []).includes(skill as Skill)
           )
         );
       }

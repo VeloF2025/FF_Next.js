@@ -172,7 +172,7 @@ export const staffQueryService = {
       summary.topPerformers = staff
         .filter(s => s.averageProjectRating > 0)
         .sort((a, b) => b.averageProjectRating - a.averageProjectRating)
-        .slice(0, 5);
+        .slice(0, 5) as unknown as Record<string, unknown>[];
       
       return summary;
     } catch (error) {

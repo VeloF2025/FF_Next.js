@@ -62,7 +62,8 @@ export default async function handler(
 
     log.info('OneDrive scrape cron triggered', { lookbackDays, limit }, LOGGER);
 
-    const result = await scrapeOneDriveRecordings(sql, { lookbackDays, limit });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await scrapeOneDriveRecordings(sql as any, { lookbackDays, limit });
 
     log.info('OneDrive scrape cron complete', { data: result }, LOGGER);
 

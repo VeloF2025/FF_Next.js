@@ -4,13 +4,14 @@
  */
 
 import { ForecastCalculator } from './forecast-calculator';
+import type { StockError } from '../inventory';
 
 export class RegressionAnalyzer {
   /**
    * Generate advanced forecasting models
    */
   static generateAdvancedForecasts(
-    historicalErrors: Record<string, unknown>[],
+    historicalErrors: StockError[],
     forecastHorizon: number = 30
   ): {
     exponentialSmoothing: { forecast: number; trend: number; seasonal: number };
