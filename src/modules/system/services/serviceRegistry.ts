@@ -49,7 +49,7 @@ import type {
  */
 export async function getAllServices(): Promise<ServiceDefinition[]> {
   const db = await getDb();
-  const result = await db.query(`
+  const result = await db.query<ServiceDefinition>(`
     SELECT
       id,
       name,
@@ -77,7 +77,7 @@ export async function getAllServices(): Promise<ServiceDefinition[]> {
  */
 export async function getEnabledServices(): Promise<ServiceDefinition[]> {
   const db = await getDb();
-  const result = await db.query(`
+  const result = await db.query<ServiceDefinition>(`
     SELECT
       id,
       name,
@@ -106,7 +106,7 @@ export async function getEnabledServices(): Promise<ServiceDefinition[]> {
  */
 export async function getCriticalServices(): Promise<ServiceDefinition[]> {
   const db = await getDb();
-  const result = await db.query(`
+  const result = await db.query<ServiceDefinition>(`
     SELECT
       id,
       name,
@@ -135,7 +135,7 @@ export async function getCriticalServices(): Promise<ServiceDefinition[]> {
  */
 export async function getServiceById(id: string): Promise<ServiceDefinition | null> {
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<ServiceDefinition>(
     `
     SELECT
       id,
@@ -166,7 +166,7 @@ export async function getServiceById(id: string): Promise<ServiceDefinition | nu
  */
 export async function getServicesByCategory(category: ServiceCategory): Promise<ServiceDefinition[]> {
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<ServiceDefinition>(
     `
     SELECT
       id,
@@ -206,7 +206,7 @@ export async function createService(service: Omit<ServiceDefinition, 'id' | 'cre
   }
 
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<ServiceDefinition>(
     `
     INSERT INTO infrastructure_services (
       name,
@@ -253,6 +253,7 @@ export async function createService(service: Omit<ServiceDefinition, 'id' | 'cre
   );
 
   log.info(`[ServiceRegistry] Created service: ${service.name}`);
+  if (!result.rows[0]) throw new Error('INSERT did not return a row');
   return result.rows[0];
 }
 
@@ -269,7 +270,7 @@ export async function updateService(
   }
 
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<ServiceDefinition>(
     `
     UPDATE infrastructure_services SET
       name = COALESCE($2, name),
@@ -318,7 +319,7 @@ export async function updateService(
   );
 
   log.info(`[ServiceRegistry] Updated service: ${id}`);
-  return result.rows[0];
+  return result.rows[0] ?? null;
 }
 
 /**
@@ -347,7 +348,7 @@ export async function deleteService(id: string): Promise<boolean> {
  */
 export async function getRecoveryActions(serviceId: string): Promise<RecoveryAction[]> {
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<RecoveryAction>(
     `
     SELECT
       id,
@@ -389,7 +390,7 @@ export async function getRecoveryActions(serviceId: string): Promise<RecoveryAct
  */
 export async function getRecoveryActionById(id: string): Promise<RecoveryAction | null> {
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<RecoveryAction>(
     `
     SELECT
       id,
@@ -430,7 +431,7 @@ export async function getRecoveryActionById(id: string): Promise<RecoveryAction 
  */
 export async function getSafeRecoveryActions(serviceId: string): Promise<RecoveryAction[]> {
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<RecoveryAction>(
     `
     SELECT
       id,
@@ -491,7 +492,7 @@ export async function createRecoveryAction(input: RecoveryActionInput): Promise<
   const requiresApproval = input.requiresApproval ?? (input.riskLevel !== 'safe');
 
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<RecoveryAction>(
     `
     INSERT INTO recovery_actions (
       service_id,
@@ -546,6 +547,7 @@ export async function createRecoveryAction(input: RecoveryActionInput): Promise<
   );
 
   log.info(`[ServiceRegistry] Created recovery action: ${input.actionName} for service ${input.serviceId}`);
+  if (!result.rows[0]) throw new Error('INSERT did not return a row');
   return result.rows[0];
 }
 
@@ -562,7 +564,7 @@ export async function updateRecoveryAction(
   }
 
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<RecoveryAction>(
     `
     UPDATE recovery_actions SET
       action_name = COALESCE($2, action_name),
@@ -617,7 +619,7 @@ export async function updateRecoveryAction(
   );
 
   log.info(`[ServiceRegistry] Updated recovery action: ${id}`);
-  return result.rows[0];
+  return result.rows[0] ?? null;
 }
 
 /**
@@ -670,7 +672,7 @@ export async function updateActionRiskLevel(id: string, newLevel: RiskLevel): Pr
  */
 export async function getServiceCountByCategory(): Promise<Record<ServiceCategory, number>> {
   const db = await getDb();
-  const result = await db.query(`
+  const result = await db.query<{ category: string; count: string }>(`
     SELECT category, COUNT(*) as count
     FROM infrastructure_services
     WHERE is_enabled = true
@@ -697,7 +699,7 @@ export async function getServiceCountByCategory(): Promise<Record<ServiceCategor
  */
 export async function isRecoveryEnabled(serviceId: string): Promise<boolean> {
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<{ recovery_enabled: boolean }>(
     `SELECT recovery_enabled FROM infrastructure_services WHERE id = $1`,
     [serviceId]
   );
@@ -717,7 +719,7 @@ export async function getNextRecoveryAction(
     : '';
 
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<RecoveryAction>(
     `
     SELECT
       id,

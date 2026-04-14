@@ -127,7 +127,7 @@ export async function isAlertSuppressed(serviceId: string): Promise<{
   const now = new Date();
 
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<{ reason: string }>(
     `
     SELECT reason
     FROM alert_suppressions
@@ -160,7 +160,7 @@ export async function isDuplicateAlert(
   const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000);
 
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<{ count: string }>(
     `
     SELECT COUNT(*) as count
     FROM recovery_approval_queue q
@@ -214,7 +214,7 @@ function recordAlertForRateLimit(serviceId: string): void {
  */
 export async function createSuppression(input: SuppressionInput): Promise<AlertSuppression> {
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<AlertSuppression>(
     `
     INSERT INTO alert_suppressions (
       service_id,
@@ -242,6 +242,7 @@ export async function createSuppression(input: SuppressionInput): Promise<AlertS
   );
 
   log.info(`[EscalationService] Created suppression for service ${input.serviceId}: ${input.reason}`);
+  if (!result.rows[0]) throw new Error('INSERT did not return a row');
   return result.rows[0];
 }
 
@@ -252,7 +253,7 @@ export async function getActiveSuppressions(): Promise<AlertSuppression[]> {
   const now = new Date();
 
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<AlertSuppression>(
     `
     SELECT
       id,
@@ -340,7 +341,7 @@ export async function sendWhatsAppAlert(details: AlertDetails): Promise<AlertRes
   let serviceId: string | undefined;
 
   if (!serviceName && details.actionId) {
-    const actionResult = await db.query(
+    const actionResult = await db.query<{ id: string; name: string }>(
       `
       SELECT s.id, s.name
       FROM recovery_actions a
@@ -358,7 +359,7 @@ export async function sendWhatsAppAlert(details: AlertDetails): Promise<AlertRes
 
   // Get incident details
   if (details.incidentId) {
-    const incidentResult = await db.query(
+    const incidentResult = await db.query<{ issue_type: string; symptoms: string[]; service_id: string }>(
       `
       SELECT issue_type, symptoms, service_id
       FROM infrastructure_incidents
@@ -448,7 +449,7 @@ export async function sendWhatsAppAlert(details: AlertDetails): Promise<AlertRes
       messageId: result.messageId,
     };
   } catch (error) {
-    log.error('[EscalationService] Failed to send WhatsApp alert:', error);
+    log.error(`[EscalationService] Failed to send WhatsApp alert: ${error instanceof Error ? error.message : String(error)}`);
 
     return {
       success: false,
@@ -518,8 +519,13 @@ export async function getApprovalQueue(filters?: {
 
   query += ` ORDER BY q.escalation_level DESC, q.requested_at ASC`;
 
+  type QueueRow = Omit<ApprovalQueueItem, 'incident'> & {
+    incidentIssueType?: string;
+    incidentSymptoms?: string[];
+    incidentCreatedAt: Date;
+  };
   const db = await getDb();
-  const result = await db.query(query, params);
+  const result = await db.query<QueueRow>(query, params);
 
   return result.rows.map((row) => ({
     ...row,
@@ -536,7 +542,7 @@ export async function getApprovalQueue(filters?: {
  */
 export async function getPendingCount(): Promise<number> {
   const db = await getDb();
-  const result = await db.query(`
+  const result = await db.query<{ count: string }>(`
     SELECT COUNT(*) as count
     FROM recovery_approval_queue
     WHERE status = 'pending'
@@ -576,7 +582,7 @@ export async function processWhatsAppResponse(
 ): Promise<{ success: boolean; error?: string }> {
   // Find pending item by token prefix
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<{ id: string; token_expires_at: string }>(
     `
     SELECT id, token_expires_at
     FROM recovery_approval_queue
