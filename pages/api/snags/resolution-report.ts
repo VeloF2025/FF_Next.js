@@ -49,7 +49,7 @@ const SNAG_QUERY_FIELDS = `
   s.status,
   s.snag_number,
   sr.audit_date                                          AS opened_date,
-  COALESCE(s.fixed_at, s.updated_at)                     AS resolved_date,
+  s.fixed_at                                             AS resolved_date,
   (u.first_name || ' ' || u.last_name)                   AS assigned_to_name,
   mt.ticket_uid                                          AS noc_ticket_uid
 `;
@@ -223,9 +223,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const toStr   = dateTo.toISOString().slice(0, 10);
 
   const dateField = q.date_field === 'resolved' ? 'resolved' : 'opened';
-  const dateCol = dateField === 'resolved'
-    ? 'COALESCE(s.fixed_at, s.updated_at)'
-    : 'sr.audit_date';
+  // 'resolved' uses s.fixed_at ONLY — updated_at is bumped by unrelated
+  // edits (backfills, assignments) and would mis-report unresolved snags
+  // as resolved. fixed_at comparisons with non-null bounds also implicitly
+  // exclude unresolved snags (fixed_at IS NULL).
+  const dateCol = dateField === 'resolved' ? 's.fixed_at' : 'sr.audit_date';
 
   const projectId  = typeof q.project_id === 'string' && q.project_id ? q.project_id : null;
   const statuses   = parseCsvStrings(q.status);
@@ -262,7 +264,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
              OR (EXISTS (SELECT 1 FROM snag_photos sp WHERE sp.snag_id = s.id) = ${hasPhotos}::bool))
         AND (${minAgeDays}::int IS NULL
              OR EXTRACT(EPOCH FROM (
-                  COALESCE(s.fixed_at, s.updated_at, NOW()) - sr.audit_date
+                  COALESCE(s.fixed_at, NOW()) - sr.audit_date
                 )) / 86400 >= ${minAgeDays}::int)
       ORDER BY p.project_name ASC, sr.audit_date ASC, s.snag_number ASC
     ` as RawSnagRow[];
