@@ -97,21 +97,21 @@ export function PerformanceTab({ staffId }: PerformanceTabProps) {
 
   const getDateRange = useCallback(() => {
     const today = new Date();
-    const to = today.toISOString().split('T')[0];
+    const to = today.toISOString().split('T')[0] ?? '';
     let from: string;
 
     switch (timeRange) {
       case '7d':
-        from = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        from = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] ?? '';
         break;
       case '30d':
-        from = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        from = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] ?? '';
         break;
       case '90d':
-        from = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        from = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] ?? '';
         break;
       default:
-        from = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        from = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] ?? '';
     }
 
     return { from, to };
@@ -134,7 +134,7 @@ export function PerformanceTab({ staffId }: PerformanceTabProps) {
       const result = await response.json();
       setData(result);
     } catch (err) {
-      log.error('PerformanceTab', 'Failed to fetch performance data', { error: err });
+      log.error('Failed to fetch performance data', { error: err }, 'PerformanceTab');
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setIsLoading(false);

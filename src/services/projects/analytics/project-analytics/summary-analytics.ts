@@ -24,14 +24,14 @@ export class ProjectSummaryAnalytics {
   static async getProjectSummary(_query?: AnalyticsQuery): Promise<ProjectSummary> {
     try {
       const summary = await analyticsApi.getProjectSummary();
-      const overview = summary.overview;
-      
+      const overview = summary.overview as Record<string, unknown> | undefined;
+
       return {
-        totalProjects: parseInt(overview?.total_projects ?? '0'),
-        activeProjects: parseInt(overview?.active_projects ?? '0'),
-        completedProjects: parseInt(overview?.completed_projects ?? '0'),
-        onHoldProjects: parseInt(overview?.on_hold_projects ?? '0'),
-        averageProgress: parseFloat(overview?.avg_progress ?? '0') || 0
+        totalProjects: parseInt(String(overview?.total_projects ?? '0')),
+        activeProjects: parseInt(String(overview?.active_projects ?? '0')),
+        completedProjects: parseInt(String(overview?.completed_projects ?? '0')),
+        onHoldProjects: parseInt(String(overview?.on_hold_projects ?? '0')),
+        averageProgress: parseFloat(String(overview?.avg_progress ?? '0')) || 0
       };
     } catch (error) {
       log.error('Error fetching project summary:', { data: error }, 'summary-analytics');

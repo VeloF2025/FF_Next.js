@@ -75,7 +75,7 @@ export function useSerials(options: UseSerialsOptions = {}): UseSerialsReturn {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch serials';
       setError(message);
-      log.error('Failed to fetch serials', err, 'useSerials');
+      log.error('Failed to fetch serials', { error: err }, 'useSerials');
     } finally {
       setLoading(false);
     }
@@ -93,7 +93,7 @@ export function useSerials(options: UseSerialsOptions = {}): UseSerialsReturn {
 
       return result.data;
     } catch (err) {
-      log.error('Failed to fetch serial', err, 'useSerials');
+      log.error('Failed to fetch serial', { error: err }, 'useSerials');
       throw err;
     }
   }, []);
@@ -114,7 +114,7 @@ export function useSerials(options: UseSerialsOptions = {}): UseSerialsReturn {
 
       return result.data;
     } catch (err) {
-      log.error('Failed to fetch serial with history', err, 'useSerials');
+      log.error('Failed to fetch serial with history', { error: err }, 'useSerials');
       throw err;
     }
   }, []);
@@ -138,7 +138,7 @@ export function useSerials(options: UseSerialsOptions = {}): UseSerialsReturn {
 
       return result.data;
     } catch (err) {
-      log.error('Failed to register serial', err, 'useSerials');
+      log.error('Failed to register serial', { error: err }, 'useSerials');
       throw err;
     }
   }, [fetchSerials]);
@@ -166,7 +166,7 @@ export function useSerials(options: UseSerialsOptions = {}): UseSerialsReturn {
 
       return result.data;
     } catch (err) {
-      log.error('Failed to update serial status', err, 'useSerials');
+      log.error('Failed to update serial status', { error: err }, 'useSerials');
       throw err;
     }
   }, [fetchSerials]);

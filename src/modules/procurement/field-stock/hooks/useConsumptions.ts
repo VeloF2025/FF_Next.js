@@ -80,7 +80,7 @@ export function useConsumptions(options: UseConsumptionsOptions = {}): UseConsum
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch consumptions';
       setError(message);
-      log.error('Failed to fetch consumptions', err, 'useConsumptions');
+      log.error('Failed to fetch consumptions', { error: err }, 'useConsumptions');
     } finally {
       setLoading(false);
     }
@@ -105,7 +105,7 @@ export function useConsumptions(options: UseConsumptionsOptions = {}): UseConsum
 
       return result.data;
     } catch (err) {
-      log.error('Failed to record consumption', err, 'useConsumptions');
+      log.error('Failed to record consumption', { error: err }, 'useConsumptions');
       throw err;
     }
   }, [fetchConsumptions]);
@@ -132,7 +132,7 @@ export function useConsumptions(options: UseConsumptionsOptions = {}): UseConsum
 
       return result.data;
     } catch (err) {
-      log.error('Failed to verify consumption', err, 'useConsumptions');
+      log.error('Failed to verify consumption', { error: err }, 'useConsumptions');
       throw err;
     }
   }, [fetchConsumptions]);
@@ -150,7 +150,7 @@ export function useConsumptions(options: UseConsumptionsOptions = {}): UseConsum
 
       return result.data;
     } catch (err) {
-      log.error('Failed to fetch consumptions by drop', err, 'useConsumptions');
+      log.error('Failed to fetch consumptions by drop', { error: err }, 'useConsumptions');
       throw err;
     }
   }, []);
@@ -168,7 +168,7 @@ export function useConsumptions(options: UseConsumptionsOptions = {}): UseConsum
 
       return result.data;
     } catch (err) {
-      log.error('Failed to fetch consumptions by technician', err, 'useConsumptions');
+      log.error('Failed to fetch consumptions by technician', { error: err }, 'useConsumptions');
       throw err;
     }
   }, []);

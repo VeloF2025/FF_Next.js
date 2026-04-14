@@ -204,7 +204,7 @@ export const QaReviewCard = memo(function QaReviewCard({ drop, onUpdate, onSendF
       setIsLocked(true);
       setLockError(null);
     } catch (error) {
-      log.error('Error acquiring lock', error, 'QaReviewCard');
+      log.error('Error acquiring lock', { error }, 'QaReviewCard');
       setLockError('Failed to acquire lock');
     } finally {
       setSaving(false);
@@ -243,7 +243,7 @@ export const QaReviewCard = memo(function QaReviewCard({ drop, onUpdate, onSendF
       setIsLocked(false);
       setLockError(null);
     } catch (error) {
-      log.error('Error canceling', error, 'QaReviewCard');
+      log.error('Error canceling', { error }, 'QaReviewCard');
     } finally {
       setSaving(false);
     }
@@ -278,7 +278,7 @@ export const QaReviewCard = memo(function QaReviewCard({ drop, onUpdate, onSendF
       setIsLocked(false);
       setLockError(null);
     } catch (error) {
-      log.error('Error saving', error, 'QaReviewCard');
+      log.error('Error saving', { error }, 'QaReviewCard');
     } finally {
       setSaving(false);
     }
@@ -297,7 +297,7 @@ export const QaReviewCard = memo(function QaReviewCard({ drop, onUpdate, onSendF
       await onSendFeedback(drop.id, editedDropNumber, feedbackMessage, drop.project || undefined);
       setFeedbackMessage('');
     } catch (error) {
-      log.error('Error sending feedback', error, 'QaReviewCard');
+      log.error('Error sending feedback', { error }, 'QaReviewCard');
       notificationService.error(`Failed to send feedback: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSending(false);
@@ -366,7 +366,7 @@ export const QaReviewCard = memo(function QaReviewCard({ drop, onUpdate, onSendF
       setIsEditingDropNumber(false);
       notificationService.success('Drop number saved');
     } catch (error) {
-      log.error('Error saving drop number', error, 'QaReviewCard');
+      log.error('Error saving drop number', { error }, 'QaReviewCard');
       notificationService.error('Failed to save drop number');
       // Revert to original value
       setEditedDropNumber(drop.dropNumber);

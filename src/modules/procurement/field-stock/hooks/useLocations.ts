@@ -78,7 +78,7 @@ export function useLocations(options: UseLocationsOptions = {}): UseLocationsRet
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch locations';
       setError(message);
-      log.error('Failed to fetch locations', err, 'useLocations');
+      log.error('Failed to fetch locations', { error: err }, 'useLocations');
     } finally {
       setLoading(false);
     }
@@ -95,7 +95,7 @@ export function useLocations(options: UseLocationsOptions = {}): UseLocationsRet
 
       return result.data;
     } catch (err) {
-      log.error('Failed to fetch location', err, 'useLocations');
+      log.error('Failed to fetch location', { error: err }, 'useLocations');
       throw err;
     }
   }, []);
@@ -119,7 +119,7 @@ export function useLocations(options: UseLocationsOptions = {}): UseLocationsRet
 
       return result.data;
     } catch (err) {
-      log.error('Failed to create location', err, 'useLocations');
+      log.error('Failed to create location', { error: err }, 'useLocations');
       throw err;
     }
   }, [fetchLocations]);
@@ -146,7 +146,7 @@ export function useLocations(options: UseLocationsOptions = {}): UseLocationsRet
 
       return result.data;
     } catch (err) {
-      log.error('Failed to update location', err, 'useLocations');
+      log.error('Failed to update location', { error: err }, 'useLocations');
       throw err;
     }
   }, [fetchLocations]);
@@ -166,7 +166,7 @@ export function useLocations(options: UseLocationsOptions = {}): UseLocationsRet
       // Refresh the list
       await fetchLocations();
     } catch (err) {
-      log.error('Failed to delete location', err, 'useLocations');
+      log.error('Failed to delete location', { error: err }, 'useLocations');
       throw err;
     }
   }, [fetchLocations]);
