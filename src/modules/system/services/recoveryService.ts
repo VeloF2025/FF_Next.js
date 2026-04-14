@@ -238,7 +238,7 @@ export async function verifySuccess(
         }
       }
     } catch (error) {
-      log.warn(`[RecoveryService] Verification attempt ${attempt + 1} failed:`, error);
+      log.warn(`[RecoveryService] Verification attempt ${attempt + 1} failed: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     // Wait before retry
@@ -362,7 +362,7 @@ async function handleModerateAction(
       queueId,
     });
   } catch (error) {
-    log.error('[RecoveryService] Failed to send notification:', error);
+    log.error(`[RecoveryService] Failed to send notification: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   return { queued: true, queueId };
@@ -389,7 +389,7 @@ async function handleDangerousAction(
       urgent: true,
     });
   } catch (error) {
-    log.error('[RecoveryService] Failed to send urgent notification:', error);
+    log.error(`[RecoveryService] Failed to send urgent notification: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   return { queued: true, queueId };
@@ -412,7 +412,7 @@ async function queueForApproval(
   const tokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
   const db = await getDb();
-  const result = await db.query(
+  const result = await db.query<{ id: string }>(
     `
     INSERT INTO recovery_approval_queue (
       incident_id,
@@ -443,7 +443,7 @@ async function queueForApproval(
  */
 export async function getPendingApprovals(): Promise<ApprovalQueueItem[]> {
   const db = await getDb();
-  const result = await db.query(`
+  const result = await db.query<ApprovalQueueItem>(`
     SELECT
       q.id,
       q.incident_id as "incidentId",
@@ -483,7 +483,7 @@ export async function approveAction(
 ): Promise<ActionExecutionResult> {
   // Get the queue item
   const db = await getDb();
-  const queueResult = await db.query(
+  const queueResult = await db.query<{ action_id: string; incident_id: string }>(
     `SELECT * FROM recovery_approval_queue WHERE id = $1 AND status = 'pending'`,
     [queueId]
   );
@@ -547,7 +547,7 @@ export async function approveAction(
       reason,
     });
   } catch (error) {
-    log.error('[RecoveryService] Failed to record override:', error);
+    log.error(`[RecoveryService] Failed to record override: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   // Update action stats
@@ -566,7 +566,7 @@ export async function rejectAction(
   reason?: string
 ): Promise<boolean> {
   const db = await getDb();
-  const queueResult = await db.query(
+  const queueResult = await db.query<{ action_id: string; incident_id: string }>(
     `SELECT * FROM recovery_approval_queue WHERE id = $1 AND status = 'pending'`,
     [queueId]
   );
@@ -600,7 +600,7 @@ export async function rejectAction(
       reason,
     });
   } catch (error) {
-    log.error('[RecoveryService] Failed to record override:', error);
+    log.error(`[RecoveryService] Failed to record override: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   log.info(`[RecoveryService] Action rejected by ${decidedBy}: ${reason}`);
@@ -649,7 +649,7 @@ async function recordExecution(
 ): Promise<void> {
   // Get attempt number
   const db = await getDb();
-  const countResult = await db.query(
+  const countResult = await db.query<{ count: string }>(
     `SELECT COUNT(*) as count FROM incident_actions WHERE incident_id = $1`,
     [incidentId]
   );
@@ -721,7 +721,7 @@ async function updateActionStats(actionId: string, success: boolean): Promise<vo
     const { incidentLearningService } = await import('./incidentLearning');
     await incidentLearningService.checkAndAdjustClassification(actionId);
   } catch (error) {
-    log.error('[RecoveryService] Failed to check classification:', error);
+    log.error(`[RecoveryService] Failed to check classification: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -738,11 +738,11 @@ export async function triggerRecovery(
 ): Promise<{ success: boolean; result?: ActionExecutionResult; queued?: boolean; queueId?: string }> {
   const db = await getDb();
   // Get next action to try
-  const attemptedResult = await db.query(
+  const attemptedResult = await db.query<{ action_id: string }>(
     `SELECT action_id FROM incident_actions WHERE incident_id = $1`,
     [incidentId]
   );
-  const attemptedIds = attemptedResult.rows.map((r: { action_id: string }) => r.action_id);
+  const attemptedIds = attemptedResult.rows.map((r) => r.action_id);
 
   const action = await serviceRegistry.getNextRecoveryAction(serviceId, attemptedIds);
 

@@ -8,7 +8,9 @@
  * NLNH Confidence: HIGH
  */
 
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('FleetVlmService');
 import {
   FuelGaugeExtractionResult,
   FuelReceiptExtractionResult,
@@ -147,17 +149,15 @@ export async function extractFuelLevel(
     const fewShotSection = buildVlmFewShotPrompt(examples);
     if (fewShotSection) {
       fuelGaugePrompt = `${fewShotSection}\n\n${FUEL_GAUGE_PROMPT}`;
-      log.info('FleetVlmService', `Injecting ${examples.length} few-shot examples for fuel_gauge`);
+      log.info(`Injecting ${examples.length} few-shot examples for fuel_gauge`);
     }
   } catch (fewShotError) {
-    log.warn('FleetVlmService', `Few-shot retrieval failed (continuing without): ${fewShotError}`);
+    log.warn(`Few-shot retrieval failed (continuing without): ${fewShotError}`);
   }
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      log.info(
-        'FleetVlmService',
-        `Extracting fuel gauge level (attempt ${attempt}/${MAX_RETRIES})...`
+      log.info(`Extracting fuel gauge level (attempt ${attempt}/${MAX_RETRIES})...`
       );
 
       const content = await callVlmApi(
@@ -176,9 +176,7 @@ export async function extractFuelLevel(
       if (result.level_category) {
         const categoryLevel = categoryToPercent(result.level_category);
         if (categoryLevel !== null) {
-          log.info(
-            'FleetVlmService',
-            `Using categorical level: ${result.level_category} -> ${categoryLevel}%`
+          log.info(`Using categorical level: ${result.level_category} -> ${categoryLevel}%`
           );
           level = categoryLevel;
         }
@@ -189,9 +187,7 @@ export async function extractFuelLevel(
       }
 
       if (level !== null && (result.confidence || 0) < 0.4) {
-        log.warn(
-          'FleetVlmService',
-          `Low confidence fuel gauge read: ${level}% @ ${result.confidence} conf — attempt ${attempt}`
+        log.warn(`Low confidence fuel gauge read: ${level}% @ ${result.confidence} conf — attempt ${attempt}`
         );
       }
 
@@ -203,9 +199,7 @@ export async function extractFuelLevel(
     } catch (error) {
       const errMsg =
         error instanceof Error ? error.message : 'Unknown error';
-      log.error(
-        'FleetVlmService',
-        `Fuel gauge extraction attempt ${attempt} failed: ${errMsg}`
+      log.error(`Fuel gauge extraction attempt ${attempt} failed: ${errMsg}`
       );
 
       const isRetryable =
@@ -213,9 +207,7 @@ export async function extractFuelLevel(
         errMsg.includes('PARSE_ERROR') ||
         errMsg.includes('NO_CONTENT');
       if (attempt < MAX_RETRIES && isRetryable) {
-        log.info(
-          'FleetVlmService',
-          `Retrying fuel gauge extraction (${attempt}/${MAX_RETRIES})...`
+        log.info(`Retrying fuel gauge extraction (${attempt}/${MAX_RETRIES})...`
         );
         await new Promise((resolve) =>
           setTimeout(resolve, 1500 * attempt)
@@ -268,9 +260,7 @@ export async function extractFuelLevelWithCalibration(
       return { ...result, calibrationUsed: false };
     }
 
-    log.info(
-      'FleetVlmService',
-      `Fuel calibration context: baseline=${calibration.baselineFuelLevel}%`
+    log.info(`Fuel calibration context: baseline=${calibration.baselineFuelLevel}%`
     );
 
     const prevLevel =
@@ -279,9 +269,7 @@ export async function extractFuelLevelWithCalibration(
       const fuelChange = result.level - prevLevel;
 
       if (fuelChange > 60 && prevLevel > 30) {
-        log.warn(
-          'FleetVlmService',
-          `Suspicious fuel increase: ${prevLevel}% -> ${result.level}% (+${fuelChange}%)`
+        log.warn(`Suspicious fuel increase: ${prevLevel}% -> ${result.level}% (+${fuelChange}%)`
         );
         return {
           ...result,
@@ -299,9 +287,7 @@ export async function extractFuelLevelWithCalibration(
       baselineFuelLevel: calibration.baselineFuelLevel,
     };
   } catch (error) {
-    log.error(
-      'FleetVlmService',
-      `Calibration-aware fuel extraction failed: ${error}`
+    log.error(`Calibration-aware fuel extraction failed: ${error}`
     );
     const fallback = await extractFuelLevel(base64Image);
     return { ...fallback, calibrationUsed: false };
@@ -322,7 +308,7 @@ export async function extractFuelReceipt(
   base64Image: string
 ): Promise<FuelReceiptExtractionResult> {
   try {
-    log.info('FleetVlmService', 'Extracting fuel receipt data...');
+    log.info('Extracting fuel receipt data...');
 
     // Inject HITL few-shot examples from past corrections (non-blocking on failure)
     let prompt = FUEL_RECEIPT_PROMPT;
@@ -336,10 +322,10 @@ export async function extractFuelReceipt(
       const fewShotSection = buildVlmFewShotPrompt(examples);
       if (fewShotSection) {
         prompt = `${fewShotSection}\n\n${FUEL_RECEIPT_PROMPT}`;
-        log.info('FleetVlmService', `Injecting ${examples.length} few-shot examples for fuel_receipt`);
+        log.info(`Injecting ${examples.length} few-shot examples for fuel_receipt`);
       }
     } catch (fewShotError) {
-      log.warn('FleetVlmService', `Few-shot retrieval failed (continuing without): ${fewShotError}`);
+      log.warn(`Few-shot retrieval failed (continuing without): ${fewShotError}`);
     }
 
     const content = await callVlmApi(
@@ -369,7 +355,7 @@ export async function extractFuelReceipt(
       confidence: result.confidence || 0,
     };
   } catch (error) {
-    log.error('FleetVlmService', `Fuel receipt extraction failed: ${error}`);
+    log.error(`Fuel receipt extraction failed: ${error}`);
     return {
       amountRand: null,
       litres: null,
