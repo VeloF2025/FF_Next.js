@@ -9,7 +9,7 @@ import { getAuth } from '@/lib/auth-mock';
 export default function DevQueuePage() {
   const [loading, setLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<{ id: string; email: string; name: string; role: string } | null>(null);
 
   useEffect(() => {
     // Check authentication

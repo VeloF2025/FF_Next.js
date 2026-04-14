@@ -43,7 +43,7 @@ function excelSerialToMonthKey(serial: number): string {
 
 function monthKeySortValue(key: string): number {
   const [yearStr, monStr] = key.split('-');
-  return parseInt(yearStr, 10) * 12 + MONTH_NAMES.indexOf(monStr);
+  return parseInt(yearStr ?? '0', 10) * 12 + MONTH_NAMES.indexOf(monStr ?? '');
 }
 
 /** Returns FY label for a date: FY26 = Apr-2025→Mar-2026, FY27 = Apr-2026→Mar-2027, etc. */

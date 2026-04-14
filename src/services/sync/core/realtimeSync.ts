@@ -9,6 +9,9 @@ import { ProjectSync } from '../projectSync';
 import { ClientSync } from '../clientSync';
 import { StaffSync } from '../staffSync';
 import { SyncConfig, SyncError, RealtimeSyncEvent } from './types';
+import type { FirebaseProjectData } from '../types';
+import type { FirebaseClientData } from '../client/types';
+import type { FirebaseStaffData } from '../types';
 
 export class RealtimeSyncManager {
   private unsubscribeFunctions: Array<() => void> = [];
@@ -157,7 +160,7 @@ export class RealtimeSyncManager {
     switch (event.type) {
       case 'added':
       case 'modified':
-        await ProjectSync.syncSingleProject(event.entityId, event.data);
+        await ProjectSync.syncSingleProject(event.entityId, event.data as unknown as FirebaseProjectData);
         break;
       case 'removed':
         // Note: Delete functionality would need to be implemented
@@ -181,7 +184,7 @@ export class RealtimeSyncManager {
     switch (event.type) {
       case 'added':
       case 'modified':
-        await ClientSync.syncSingleClient(event.entityId, event.data);
+        await ClientSync.syncSingleClient(event.entityId, event.data as unknown as FirebaseClientData);
         break;
       case 'removed':
         // Note: Delete functionality would need to be implemented
@@ -205,7 +208,7 @@ export class RealtimeSyncManager {
     switch (event.type) {
       case 'added':
       case 'modified':
-        await StaffSync.syncSingleStaffMember(event.entityId, event.data);
+        await StaffSync.syncSingleStaffMember(event.entityId, event.data as unknown as FirebaseStaffData);
         break;
       case 'removed':
         // Note: Delete functionality would need to be implemented

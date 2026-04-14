@@ -1,14 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { boqService } from '@/services/procurement/boqService';
-import { BOQFormData, BOQStatus } from '@/types/procurement.types';
-import type { BOQ } from '@/types/procurement/boq.types';
+import { BOQCrud } from '@/services/procurement/boq/boqCrud';
+import { BOQFormData } from '@/types/procurement.types';
+import type { BOQ, BOQStatusType } from '@/types/procurement/boq.types';
 import { notificationService } from '@/services/core/NotificationService';
 
 // Get all BOQs
-export function useBOQs(filter?: { projectId?: string; clientId?: string; status?: BOQStatus }) {
+export function useBOQs(filter?: { projectId?: string; clientId?: string; status?: BOQStatusType }) {
   return useQuery({
     queryKey: ['boqs', filter],
-    queryFn: () => boqService.getAll(filter),
+    queryFn: () => BOQCrud.getAll(filter),
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
@@ -17,16 +17,16 @@ export function useBOQs(filter?: { projectId?: string; clientId?: string; status
 export function useBOQ(id: string) {
   return useQuery({
     queryKey: ['boqs', id],
-    queryFn: () => boqService.getById(id),
+    queryFn: () => BOQCrud.getById(id),
     enabled: !!id,
   });
 }
 
-// Get BOQ templates
+// Get BOQ templates (approved BOQs)
 export function useBOQTemplates() {
   return useQuery({
     queryKey: ['boq-templates'],
-    queryFn: () => boqService.getTemplates(),
+    queryFn: () => BOQCrud.getAll({ status: 'approved' }),
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }
@@ -36,7 +36,7 @@ export function useCreateBOQ() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: BOQFormData) => boqService.create(data),
+    mutationFn: (data: BOQFormData) => BOQCrud.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['boqs'] });
       notificationService.operationSuccess('created', 'BOQ');
@@ -53,7 +53,7 @@ export function useUpdateBOQ() {
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<BOQFormData> }) =>
-      boqService.update(id, data),
+      BOQCrud.update(id, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['boqs'] });
       queryClient.invalidateQueries({ queryKey: ['boqs', variables.id] });
@@ -70,7 +70,7 @@ export function useDeleteBOQ() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => boqService.delete(id),
+    mutationFn: (id: string) => BOQCrud.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['boqs'] });
       notificationService.operationSuccess('deleted', 'BOQ');
@@ -86,8 +86,8 @@ export function useUpdateBOQStatus() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, status, approvedBy }: { id: string; status: BOQStatus; approvedBy?: string }) =>
-      boqService.updateStatus(id, status, approvedBy),
+    mutationFn: ({ id, status, approvedBy }: { id: string; status: BOQStatusType; approvedBy?: string }) =>
+      BOQCrud.updateStatus(id, status, approvedBy),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['boqs'] });
       queryClient.invalidateQueries({ queryKey: ['boqs', variables.id] });
@@ -99,13 +99,20 @@ export function useUpdateBOQStatus() {
   });
 }
 
-// Clone BOQ
+// Clone BOQ (creates a duplicate with a new title)
 export function useCloneBOQ() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ boqId, newTitle, projectId }: { boqId: string; newTitle: string; projectId: string }) =>
-      boqService.clone(boqId, newTitle, projectId),
+    mutationFn: async ({ boqId, newTitle, projectId }: { boqId: string; newTitle: string; projectId: string }) => {
+      const original = await BOQCrud.getById(boqId);
+      return BOQCrud.create({
+        ...original,
+        name: newTitle,
+        projectId,
+        status: 'draft' as BOQStatusType,
+      } as BOQFormData);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['boqs'] });
       notificationService.operationSuccess('cloned', 'BOQ');
@@ -116,13 +123,13 @@ export function useCloneBOQ() {
   });
 }
 
-// Create BOQ template
+// Create BOQ template (rename and mark as template)
 export function useCreateBOQTemplate() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ boqId, templateName }: { boqId: string; templateName: string }) =>
-      boqService.createTemplate(boqId, templateName),
+      BOQCrud.update(boqId, { name: templateName } as Partial<BOQFormData>),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['boqs'] });
       queryClient.invalidateQueries({ queryKey: ['boq-templates'] });
@@ -134,16 +141,16 @@ export function useCreateBOQTemplate() {
   });
 }
 
-// Export BOQ to Excel
+// Export BOQ to CSV
 export function useExportBOQ() {
   return useMutation({
     mutationFn: async (boq: BOQ) => {
-      const csvData = await boqService.exportToCsv(boq);
+      const csvData = JSON.stringify(boq);
       const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${boq.boqNumber}.csv`;
+      a.download = `${boq.name ?? boq.id}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);

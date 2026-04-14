@@ -14,6 +14,7 @@ declare module 'firebase/firestore' {
   }
   export interface QueryDocumentSnapshot<T = DocumentData> {
     id: string;
+    ref: DocumentReference<T>;
     data(): T;
     exists(): boolean;
   }
@@ -38,6 +39,7 @@ declare module 'firebase/firestore' {
     fromDate(date: Date): Timestamp;
     now(): Timestamp;
   };
+  export function serverTimestamp(): any;
 }
 
 declare module 'firebase/app' {
@@ -61,6 +63,9 @@ declare module '@tabler/icons-react' {
   export const IconAlertCircle: React.FC<TablerIconProps>;
   export const IconX: React.FC<TablerIconProps>;
   export const IconPlus: React.FC<TablerIconProps>;
+  export const IconCircleCheckFilled: React.FC<TablerIconProps>;
+  export const IconCircleXFilled: React.FC<TablerIconProps>;
+  export const IconClock: React.FC<TablerIconProps>;
 }
 
 // --- @radix-ui/react-progress stub (used in src/components/ui/progress.tsx) ---

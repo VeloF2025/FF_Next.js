@@ -414,10 +414,10 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
                           const data = payload[0]!.payload;
                           return (
                             <div className="bg-card p-3 border rounded-lg shadow-lg">
-                              <p className="font-medium">{data.fullName}</p>
-                              <p className="text-sm">Success Rate: {data.successRate}%</p>
-                              <p className="text-sm">Projects: {data.projectCount}</p>
-                              <p className="text-sm">Avg Duration: {data.avgDuration} days</p>
+                              <p className="font-medium">{data.fullName as string}</p>
+                              <p className="text-sm">Success Rate: {data.successRate as string | number}%</p>
+                              <p className="text-sm">Projects: {data.projectCount as string | number}</p>
+                              <p className="text-sm">Avg Duration: {data.avgDuration as string | number} days</p>
                             </div>
                           );
                         }

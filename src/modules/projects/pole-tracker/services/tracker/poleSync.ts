@@ -15,12 +15,8 @@ import {
 import { db } from '@/config/firebase';
 import { Pole, POLE_COLLECTION } from './types';
 
-/** Firestore QueryDocumentSnapshot shape (firebase types are ts-ignored) */
-interface FirestoreDocSnapshot {
-  id: string;
-  ref: unknown;
-  data: () => Record<string, unknown>;
-}
+import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+type FirestoreDocSnapshot = QueryDocumentSnapshot<DocumentData>;
 
 export class PoleSyncService {
   /**

@@ -69,7 +69,7 @@ export const projectService = {
   
   // Placeholder functions for backward compatibility
   // These return empty data until migrated to Neon
-  generatePhases: async () => [],
+  generatePhases: async (_projectId?: string, _projectType?: string) => [],
   getPhases: async () => [],
   getPhase: async () => null,
   updatePhase: async () => ({}),
@@ -99,6 +99,6 @@ export const projectService = {
   subscribeToTasks: () => () => {},
   subscribeToHierarchy: () => () => {},
   unsubscribeAll: () => {},
-  subscribeToProject: () => () => {},
-  subscribeToProjects: () => () => {} // Placeholder
+  subscribeToProject: (_id?: string, _cb?: (p: unknown) => void) => () => {},
+  subscribeToProjects: (_cb?: (p: unknown[]) => void, _filter?: unknown) => () => {} // Placeholder
 };

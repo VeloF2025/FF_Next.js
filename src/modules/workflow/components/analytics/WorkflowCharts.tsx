@@ -277,10 +277,10 @@ export function WorkflowCharts({ analytics, dateRange }: WorkflowChartsProps) {
                       return (
                         <div className="bg-card p-3 border rounded-lg shadow-lg">
                           <p className="font-medium text-foreground">
-                            {data.fullName}
+                            {data.fullName as string}
                           </p>
-                          <p className="text-sm">Success Rate: {data.rate}%</p>
-                          <p className="text-sm">Projects: {data.projects}</p>
+                          <p className="text-sm">Success Rate: {data.rate as string | number}%</p>
+                          <p className="text-sm">Projects: {data.projects as string | number}</p>
                         </div>
                       );
                     }

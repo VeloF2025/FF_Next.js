@@ -66,7 +66,7 @@ function monthSortKey(label: string): number {
   const MONTHS: Record<string, string> = { Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12' };
   const m = label.match(/^(\w{3}) '(\d{2})$/);
   if (!m) return 0;
-  return parseInt(`20${m[2]}${MONTHS[m[1]] ?? '00'}`);
+  return parseInt(`20${m[2] ?? '00'}${MONTHS[m[1] ?? ''] ?? '00'}`);
 }
 
 function toNum(v: unknown): number {

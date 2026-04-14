@@ -310,7 +310,7 @@ export function AssetListClient() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {asset.categoryName || '-'}
+                    {(asset as typeof asset & { categoryName?: string }).categoryName ?? asset.category ?? '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 dark:text-white font-mono">

@@ -8,7 +8,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
-import { apiResponse } from '@/lib/api-response';
+const apiResponse = (success: boolean, message: string, data?: unknown) => ({ success, message, ...(data !== undefined && { data }) });
 
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -85,21 +85,21 @@ export default async function handler(
   }
 
   try {
-    const summaryRows = await sql<SpProjectSummary[]>`
+    const summaryRows = await sql`
       SELECT *
       FROM sp_project_summary
       WHERE project_id = ${projectId}
       LIMIT 1
-    `;
+    ` as SpProjectSummary[];
 
     const summary = summaryRows.length > 0 ? summaryRows[0] : null;
 
-    const pons = await sql<SpPonTracker[]>`
+    const pons = await sql`
       SELECT *
       FROM sp_pon_tracker
       WHERE project_id = ${projectId}
       ORDER BY zone_no ASC, hld_pon ASC
-    `;
+    ` as SpPonTracker[];
 
     const lastSyncedAt = summary?.synced_at || null;
     const totalPons = pons.length;

@@ -47,11 +47,11 @@ export async function POST(req: NextRequest) {
 
     logger.info('Cron job triggered: SP Tracker sync');
 
-    const configs = await sql<SpTrackerConfig[]>`
+    const configs = await sql`
       SELECT id, project_id, project_name, drive_id, item_id, sheet_name
       FROM sp_tracker_config
       WHERE enabled = true
-    `;
+    ` as SpTrackerConfig[];
 
     let totalSynced = 0;
     const syncedProjects: string[] = [];

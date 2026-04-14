@@ -132,8 +132,8 @@ export function ClientForm() {
     }
   };
 
-  const handleInputChange = (field: keyof ClientFormData, value: ClientFormData[keyof ClientFormData]) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (field: keyof ClientFormData, value: unknown) => {
+    setFormData(prev => ({ ...prev, [field]: value as ClientFormData[keyof ClientFormData] }));
   };
 
 

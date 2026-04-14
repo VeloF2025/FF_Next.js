@@ -6,7 +6,7 @@
  */
 
 import type { Meeting } from '../types/meeting.types';
-import { 
+import {
   MeetingFormHeader,
   BasicMeetingFields,
   MeetingLocationFields,
@@ -53,9 +53,11 @@ export function MeetingForm({ meeting, isOpen, onClose, onSave }: MeetingFormPro
         <MeetingFormHeader isEditing={!!meeting} onClose={onClose} />
 
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
-          <BasicMeetingFields register={register} errors={errors} />
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          <BasicMeetingFields register={register as any} errors={errors as any} />
 
-          <MeetingLocationFields register={register} isVirtual={isVirtual} />
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          <MeetingLocationFields register={register as any} isVirtual={isVirtual} />
 
           <AgendaItemsSection
             agendaItems={agendaItems}
@@ -71,7 +73,8 @@ export function MeetingForm({ meeting, isOpen, onClose, onSave }: MeetingFormPro
             onUpdateParticipant={updateParticipant}
           />
 
-          <MeetingNotesField register={register} />
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          <MeetingNotesField register={register as any} />
 
           <MeetingFormActions isEditing={!!meeting} onCancel={onClose} />
         </form>

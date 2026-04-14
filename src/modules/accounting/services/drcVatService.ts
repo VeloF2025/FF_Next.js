@@ -86,7 +86,7 @@ export async function applyDRCVat(
   ];
 
   const je = await createJournalEntry({
-    entryDate: new Date().toISOString().split('T')[0],
+    entryDate: new Date().toISOString().split('T')[0] ?? new Date().toISOString(),
     description,
     source: 'auto_vat_adjustment',
     sourceDocumentId: supplierInvoiceId,
@@ -131,7 +131,7 @@ export async function getDRCEligibleInvoices(): Promise<Array<{
     supplierName: String(r.supplier_name || 'Unknown'),
     totalAmount: Number(r.total_amount),
     vatAmount: Math.round(Number(r.total_amount) * vatRate * 100) / 100,
-    invoiceDate: String(r.invoice_date).split('T')[0],
+    invoiceDate: String(r.invoice_date).split('T')[0] ?? '',
   }));
 }
 
@@ -156,6 +156,6 @@ export async function getDRCHistory(): Promise<Array<{
     invoiceNumber: String(r.invoice_number),
     supplierName: String(r.supplier_name || 'Unknown'),
     totalAmount: Number(r.total_amount),
-    invoiceDate: String(r.invoice_date).split('T')[0],
+    invoiceDate: String(r.invoice_date).split('T')[0] ?? '',
   }));
 }

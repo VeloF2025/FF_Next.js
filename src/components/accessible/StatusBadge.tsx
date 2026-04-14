@@ -80,5 +80,3 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
     </div>
   );
 };
-
-export type { StatusBadgeProps };

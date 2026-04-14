@@ -197,7 +197,7 @@ export function DocumentUploadForm({ assetId }: DocumentUploadFormProps) {
             </label>
             <select
               value={formData.documentType}
-              onChange={(e) => setFormData(prev => ({ ...prev, documentType: e.target.value }))}
+              onChange={(e) => setFormData(prev => ({ ...prev, documentType: e.target.value as typeof prev.documentType }))}
               className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 dark:text-white"
             >
               {Object.entries(DOCUMENT_TYPE_CONFIG).map(([value, config]) => (

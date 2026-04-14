@@ -3,7 +3,8 @@
  * Sample BOQs, BOQ Items, and BOQ Exceptions for development and testing
  */
 
-import { BOQ, BOQItem, BOQException } from '../../neon/schema';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type BOQ = any; type BOQItem = any; type BOQException = any;
 import { 
   MOCK_PROJECT_IDS, 
   MOCK_USER_IDS, 

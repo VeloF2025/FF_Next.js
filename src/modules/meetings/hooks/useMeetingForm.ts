@@ -7,7 +7,8 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import type { Meeting } from '../types/meeting.types';
 
-type FormData = Omit<Meeting, 'id' | 'actionItems'> & {
+type FormData = Omit<Meeting, 'id' | 'actionItems' | 'date'> & {
+  date: string;
   actionItems: string[];
 };
 
@@ -24,7 +25,7 @@ export function useMeetingForm({ meeting, onSave, onClose }: UseMeetingFormProps
   const { register, handleSubmit, watch, formState: { errors } } = useForm<FormData>({
     defaultValues: meeting ? {
       ...meeting,
-      date: meeting.date,
+      date: meeting.date instanceof Date ? meeting.date.toISOString().split('T')[0] : (meeting.date as string),
       actionItems: meeting.actionItems.map(ai => ai.task)
     } : {
       type: 'team',
@@ -38,6 +39,7 @@ export function useMeetingForm({ meeting, onSave, onClose }: UseMeetingFormProps
   const onSubmit = (data: FormData) => {
     const meetingData: Partial<Meeting> = {
       ...data,
+      date: data.date ? new Date(data.date) : new Date(),
       agenda: agendaItems.filter(item => item.trim()),
       participants: participants.filter(p => p.trim()),
       actionItems: meeting?.actionItems || []

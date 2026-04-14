@@ -30,7 +30,7 @@ export {
 } from './procurement';
 
 // Legacy type aliases and utilities
-export type { BOQ, BOQItem, BOQException } from '../neon/schema';
+export type { BOQ, BOQItem, BOQException } from '@/types/procurement/boq.types';
 
 /**
  * Legacy function to get all seed data (simplified version)

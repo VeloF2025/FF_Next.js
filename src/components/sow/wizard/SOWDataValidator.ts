@@ -25,7 +25,7 @@
  * - status (optional)
  */
 
-import { ValidationResult } from './SOWWizardTypes';
+interface ValidationResult { isValid: boolean; error?: string; processedData?: unknown; }
 import { sowApi } from '@/services/api/sowApi';
 import { NeonPoleData, NeonDropData, NeonFibreData } from '@/services/sow/types';
 import { log } from '@/lib/logger';
@@ -236,8 +236,8 @@ const validateFibreData = (data: Record<string, unknown>[]): ValidationResult =>
       let toPoint = '';
       if (label && label.includes('-')) {
         const parts = label.split('-');
-        fromPoint = parts[0]!.split('.').slice(-1)[0]; // Get last part before dash
-        toPoint = parts[1]; // Everything after dash
+        fromPoint = parts[0]!.split('.').slice(-1)[0] ?? ''; // Get last part before dash
+        toPoint = parts[1] ?? ''; // Everything after dash
       }
       
       return {

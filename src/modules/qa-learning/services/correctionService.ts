@@ -89,7 +89,7 @@ export async function recordCorrection(input: RecordCorrectionInput): Promise<Co
       ]
     );
 
-    const correction = rowToCorrectionRecord(result.rows[0]);
+    const correction = rowToCorrectionRecord(result.rows[0]!);
     const duration = Date.now() - startTime;
 
     log.info('CorrectionService', {
@@ -313,7 +313,7 @@ export async function markAsCanonical(
       isCanonical,
     });
 
-    return rowToCorrectionRecord(result.rows[0]);
+    return rowToCorrectionRecord(result.rows[0]!);
   } catch (error) {
     log.error('CorrectionService', {
       action: 'markAsCanonical',
@@ -348,7 +348,7 @@ export async function incrementReviewCount(correctionId: string): Promise<Correc
       return null;
     }
 
-    return rowToCorrectionRecord(result.rows[0]);
+    return rowToCorrectionRecord(result.rows[0]!);
   } catch (error) {
     log.error('CorrectionService', {
       action: 'incrementReviewCount',

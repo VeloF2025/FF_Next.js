@@ -244,7 +244,7 @@ export function ActivityTab({ staffId }: ActivityTabProps) {
                     {isExpanded && hasDetails && (
                       <div className="px-3 pb-3 pt-0 border-t border-[var(--ff-border-light)]">
                         <div className="mt-2 space-y-1 text-sm">
-                          {entry.details.syncedFields && Array.isArray(entry.details.syncedFields) && (
+                          {Boolean(entry.details.syncedFields) && Array.isArray(entry.details.syncedFields) && (
                             <div className="space-y-1">
                               <p className="text-[var(--ff-text-secondary)] text-xs">Synced Fields:</p>
                               {(entry.details.syncedFields as string[]).map((field, idx) => (
@@ -255,7 +255,7 @@ export function ActivityTab({ staffId }: ActivityTabProps) {
                               ))}
                             </div>
                           )}
-                          {entry.details.changedFields && Array.isArray(entry.details.changedFields) && (
+                          {Boolean(entry.details.changedFields) && Array.isArray(entry.details.changedFields) && (
                             <div className="space-y-1">
                               <p className="text-[var(--ff-text-secondary)] text-xs">Changed Fields:</p>
                               {(entry.details.changedFields as string[]).map((field, idx) => (
@@ -266,12 +266,12 @@ export function ActivityTab({ staffId }: ActivityTabProps) {
                               ))}
                             </div>
                           )}
-                          {entry.details.reason && (
+                          {Boolean(entry.details.reason) && (
                             <p className="text-[var(--ff-text-primary)]">
                               <span className="text-[var(--ff-text-secondary)]">Reason:</span> {entry.details.reason as string}
                             </p>
                           )}
-                          {entry.details.documentType && !entry.details.syncedFields && (
+                          {Boolean(entry.details.documentType) && !entry.details.syncedFields && (
                             <p className="text-[var(--ff-text-primary)]">
                               <span className="text-[var(--ff-text-secondary)]">Document:</span> {formatLabel(entry.details.documentType as string)}
                             </p>

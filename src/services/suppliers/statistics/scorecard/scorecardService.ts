@@ -107,7 +107,7 @@ export class ScorecardService {
       };
 
       return {
-        scorecard,
+        scorecard: scorecard as unknown as import('../scorecard-service/service-types').ScorecardData,
         warnings,
         dataQuality: {
           completeness: dataValidation.completeness,
@@ -128,11 +128,12 @@ export class ScorecardService {
     supplierIds: string[],
     options: BatchScorecardOptions = {}
   ): Promise<SupplierScorecard[]> {
-    return ScorecardBatchProcessor.generateMultipleScorecards(
-      supplierIds, 
+    const results = await ScorecardBatchProcessor.generateMultipleScorecards(
+      supplierIds,
       options,
       (id) => this.generateSupplierScorecard(id)
     );
+    return results as unknown as SupplierScorecard[];
   }
 
   /**
@@ -160,7 +161,7 @@ export class ScorecardService {
   static async getScorecardSummary(supplierIds: string[]) {
     return ScorecardBatchProcessor.getScorecardSummary(
       supplierIds,
-      (ids) => this.generateMultipleScorecards(ids)
+      (ids) => this.generateMultipleScorecards(ids) as unknown as Promise<import('../scorecard-service/service-types').ScorecardData[]>
     );
   }
 

@@ -20,6 +20,8 @@ interface ReconStats {
   returned: number;
   oesMatched: number;
   waMatched: number;
+  ppFlagged?: number;
+  ppActivated?: number;
 }
 
 interface ReconRow {

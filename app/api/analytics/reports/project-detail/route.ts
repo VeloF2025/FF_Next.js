@@ -91,8 +91,8 @@ function serialToMonthLabel(serial: number): string {
 /** Sort comparator value for "MMM-YY" month labels */
 function monthLabelSortValue(label: string): number {
   const [monStr, yrStr] = label.split('-');
-  const year = 2000 + parseInt(yrStr, 10);
-  const monIdx = MONTH_NAMES.indexOf(monStr);
+  const year = 2000 + parseInt(yrStr ?? '0', 10);
+  const monIdx = MONTH_NAMES.indexOf(monStr ?? '');
   return year * 12 + monIdx;
 }
 
@@ -273,7 +273,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       const amount = toNumber(row[6]);
 
       // Use known category bucket or catch-all
-      const bucket = COS_CATEGORIES.includes(cat) ? cat : COS_CATEGORIES[0];
+      const bucket = COS_CATEGORIES.includes(cat) ? cat : (COS_CATEGORIES[0] ?? 'other');
       accumulate(cosActual[bucket], month, amount);
       accumulate(cosTotal, month, amount);
     }

@@ -3,7 +3,7 @@
  * Comprehensive reporting system for procurement operations
  */
 
-import { boqService } from '../boqService';
+import { BOQCrud as boqService } from '../boq/boqCrud';
 import { supplierService } from '@/services/suppliers/supplierService';
 import { log } from '@/lib/logger';
 

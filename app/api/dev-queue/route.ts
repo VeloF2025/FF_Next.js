@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     }));
 
     const board: DevQueueBoard = {
-      columns: columnsWithItems
+      columns: columnsWithItems as DevQueueBoard['columns']
     };
 
     return NextResponse.json({ success: true, data: board });

@@ -284,6 +284,9 @@ export class WhatsAppService {
         status: NotificationStatus.SENT,
         waha_message_id: wahaResponse.id,
         sent_at: new Date(),
+        delivered_at: null,
+        read_at: null,
+        error_message: null,
       });
 
       const duration = Date.now() - startTime;
@@ -317,6 +320,9 @@ export class WhatsAppService {
             message_content: request.message_content || '',
             status: NotificationStatus.FAILED,
             waha_message_id: null,
+            sent_at: null,
+            delivered_at: null,
+            read_at: null,
             error_message: error.message,
           });
         } catch (storeError) {
@@ -947,7 +953,7 @@ export class WhatsAppService {
       throw new Error('Failed to store notification in database');
     }
 
-    return result[0];
+    return result[0]!;
   }
 
   /**

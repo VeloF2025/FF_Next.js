@@ -146,12 +146,12 @@ export function FeedItemRow({ item, onClick }: FeedItemRowProps) {
             {/* Reply count for messages */}
             {item.channel === 'message' && Number(meta.reply_count) > 0 && (
               <span className="text-[10px] text-[var(--ff-text-tertiary)]">
-                {meta.reply_count} {Number(meta.reply_count) === 1 ? 'reply' : 'replies'}
+                {String(meta.reply_count)} {Number(meta.reply_count) === 1 ? 'reply' : 'replies'}
               </span>
             )}
 
             {/* Email status */}
-            {item.channel === 'email' && meta.status && (
+            {item.channel === 'email' && Boolean(meta.status) && (
               <span className="text-[10px] text-[var(--ff-text-tertiary)] capitalize">
                 {String(meta.status)}
               </span>

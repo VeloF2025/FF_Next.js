@@ -32,7 +32,7 @@ export function DrValidationClient() {
   const [projects, setProjects] = useState<string[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
+    new Date().toISOString().split('T')[0] ?? ''
   );
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -50,7 +50,7 @@ export function DrValidationClient() {
       const data = await response.json();
 
       if (data.success && data.data.drops) {
-        const projectList = data.data.drops.map((d: any) => d.project);
+        const projectList: string[] = data.data.drops.map((d: any) => d.project as string);
         setProjects([...new Set(projectList)].sort());
 
         // Auto-select "Lawley" if available
@@ -102,7 +102,7 @@ export function DrValidationClient() {
 
         if (uniqueDates.length === 1) {
           // Single date found - auto-set it
-          setSelectedDate(uniqueDates[0]);
+          setSelectedDate(uniqueDates[0] as string);
           console.log('📅 Auto-detected date from file:', uniqueDates[0]);
         } else if (uniqueDates.length > 1) {
           // Multiple dates found - use the most common one
