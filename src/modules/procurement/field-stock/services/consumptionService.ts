@@ -176,7 +176,7 @@ export async function recordConsumption(
 
     return consumption;
   } catch (error) {
-    log.error('Failed to record consumption', error, 'consumptionService');
+    log.error('Failed to record consumption', { error }, 'consumptionService');
     throw error;
   }
 }
@@ -215,7 +215,7 @@ async function updateDropWithSerial(
       `;
     }
   } catch (error) {
-    log.error('Failed to update drop with serial', error, 'consumptionService');
+    log.error('Failed to update drop with serial', { error }, 'consumptionService');
     // Don't throw - consumption was recorded, just update failed
   }
 }
@@ -294,7 +294,7 @@ export async function getConsumptions(
     const results = await query<StockConsumption>(queryText, params);
     return results;
   } catch (error) {
-    log.error('Failed to get consumptions', error, 'consumptionService');
+    log.error('Failed to get consumptions', { error }, 'consumptionService');
     throw error;
   }
 }
@@ -328,7 +328,7 @@ export async function getConsumptionsByDrop(dropNumber: string): Promise<StockCo
 
     return results as StockConsumption[];
   } catch (error) {
-    log.error('Failed to get consumptions by drop', error, 'consumptionService');
+    log.error('Failed to get consumptions by drop', { error }, 'consumptionService');
     throw error;
   }
 }
@@ -376,7 +376,7 @@ export async function getConsumptionsByTechnician(
     const results = await query<StockConsumption>(queryText, params);
     return results;
   } catch (error) {
-    log.error('Failed to get consumptions by technician', error, 'consumptionService');
+    log.error('Failed to get consumptions by technician', { error }, 'consumptionService');
     throw error;
   }
 }
@@ -408,7 +408,7 @@ export async function verifyConsumption(
     log.info(`Verified consumption: ${consumptionId}`, undefined, 'consumptionService');
     return results[0] as StockConsumption;
   } catch (error) {
-    log.error('Failed to verify consumption', error, 'consumptionService');
+    log.error('Failed to verify consumption', { error }, 'consumptionService');
     throw error;
   }
 }
@@ -426,7 +426,7 @@ export async function getUnverifiedCount(): Promise<number> {
 
     return Number(results[0]?.count || 0);
   } catch (error) {
-    log.error('Failed to get unverified count', error, 'consumptionService');
+    log.error('Failed to get unverified count', { error }, 'consumptionService');
     throw error;
   }
 }
@@ -461,7 +461,7 @@ export async function getTechnicianConsumptionSummary(
       unverified: Number(row.unverified || 0),
     };
   } catch (error) {
-    log.error('Failed to get technician consumption summary', error, 'consumptionService');
+    log.error('Failed to get technician consumption summary', { error }, 'consumptionService');
     throw error;
   }
 }

@@ -219,7 +219,7 @@ export class ProcurementReportsService {
       });
       
       // Calculate metrics
-      const totalBudget = boqs.reduce((sum: number, boq: BoqRecord) => sum + (boq.totalEstimatedValue || 0), 0);
+      const totalBudget = boqs.reduce((sum: number, boq: BoqRecord) => sum + Number(boq.totalEstimatedValue || 0), 0);
       const actualSpend = boqs.reduce((sum: number, boq: BoqRecord) => sum + (boq.totalEstimatedValue ? Number(boq.totalEstimatedValue) : 0), 0);
       const savings = totalBudget - actualSpend;
       const savingsPercentage = totalBudget > 0 ? (savings / totalBudget) * 100 : 0;
@@ -278,10 +278,10 @@ export class ProcurementReportsService {
         }));
       
       // Generate performance distribution
-      const performanceDistribution: PerformanceRange[] = this.generatePerformanceDistribution(activeSuppliers);
-      
+      const performanceDistribution: PerformanceRange[] = this.generatePerformanceDistribution(activeSuppliers as SupplierRecord[]);
+
       // Generate compliance stats
-      const complianceStats: ComplianceMetric[] = this.generateComplianceStats(activeSuppliers);
+      const complianceStats: ComplianceMetric[] = this.generateComplianceStats(activeSuppliers as SupplierRecord[]);
       
       return {
         totalSuppliers,
@@ -363,7 +363,7 @@ export class ProcurementReportsService {
         return sum + (0); // TODO: Implement actual spend tracking vs estimated
       }, 0);
       
-      const totalBudget = boqs.reduce((sum: number, boq: BoqRecord) => sum + (boq.totalEstimatedValue || 0), 0);
+      const totalBudget = boqs.reduce((sum: number, boq: BoqRecord) => sum + Number(boq.totalEstimatedValue || 0), 0);
       const variancePercentage = totalBudget > 0 ? (totalBudgetVariance / totalBudget) * 100 : 0;
       
       // Generate variance breakdowns
@@ -393,7 +393,7 @@ export class ProcurementReportsService {
       const existing = categoryMap.get(category) || { budgeted: 0, actual: 0 };
       
       categoryMap.set(category, {
-        budgeted: existing.budgeted + (boq.totalEstimatedValue || 0),
+        budgeted: existing.budgeted + Number(boq.totalEstimatedValue || 0),
         actual: existing.actual + (boq.totalEstimatedValue ? Number(boq.totalEstimatedValue) : 0)
       });
     });
@@ -446,7 +446,7 @@ export class ProcurementReportsService {
     
     return ranges.map(range => {
       const count = suppliers.filter(s => {
-        const rating = (s.rating || 0);
+        const rating = typeof s.rating === 'number' ? s.rating : (s.rating?.overall ?? 0);
         return rating >= range.min && rating <= range.max;
       }).length;
       
@@ -500,7 +500,7 @@ export class ProcurementReportsService {
       projectMap.set(projectId, {
         ...existing,
         totalSpend: existing.totalSpend + (boq.totalEstimatedValue ? Number(boq.totalEstimatedValue) : 0),
-        budgetedSpend: existing.budgetedSpend + (boq.totalEstimatedValue || 0)
+        budgetedSpend: existing.budgetedSpend + Number(boq.totalEstimatedValue || 0)
       });
     });
     

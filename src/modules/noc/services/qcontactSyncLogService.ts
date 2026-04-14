@@ -97,7 +97,11 @@ export async function getSyncStatus(): Promise<SyncStatusOverview> {
       []
     );
 
-    const lastSync = lastSyncResult.rows[0];
+    const lastSync = lastSyncResult[0] ?? {
+      last_sync_at: null as Date | null,
+      last_sync_status: null as string | null,
+      last_sync_duration_seconds: null as number | null,
+    };
 
     // Get pending outbound items (tickets with external_id that haven't been synced recently)
     const pendingOutboundResult = await query<{ count: string }>(
@@ -118,7 +122,7 @@ export async function getSyncStatus(): Promise<SyncStatusOverview> {
       []
     );
 
-    const pendingOutbound = parseInt(pendingOutboundResult.rows[0]?.count || '0', 10);
+    const pendingOutbound = parseInt(pendingOutboundResult[0]?.count || '0', 10);
 
     // Get pending inbound items (approximate - based on recent QContact tickets)
     // In production, this would query QContact API for pending updates
@@ -135,7 +139,7 @@ export async function getSyncStatus(): Promise<SyncStatusOverview> {
       []
     );
 
-    const failedLast24h = parseInt(failedLast24hResult.rows[0]?.count || '0', 10);
+    const failedLast24h = parseInt(failedLast24hResult[0]?.count || '0', 10);
 
     // Get success rate over last 7 days
     const successRateLast7dResult = await query<{
@@ -152,7 +156,7 @@ export async function getSyncStatus(): Promise<SyncStatusOverview> {
       []
     );
 
-    const successStats = successRateLast7dResult.rows[0];
+    const successStats = successRateLast7dResult[0];
     const successCount = parseInt(successStats?.success_count || '0', 10);
     const totalCount = parseInt(successStats?.total_count || '0', 10);
     const successRateLast7d = totalCount > 0 ? successCount / totalCount : 0;
@@ -297,7 +301,7 @@ export async function listSyncLogs(
       params
     );
 
-    const total = parseInt(countResult.rows[0]?.count || '0', 10);
+    const total = parseInt(countResult[0]?.count || '0', 10);
 
     // Get paginated logs
     const offset = (page - 1) * pageSize;
@@ -323,7 +327,7 @@ export async function listSyncLogs(
       [...params, pageSize, offset]
     );
 
-    const logs = logsResult.rows;
+    const logs = logsResult;
 
     // Get statistics by direction
     const directionStatsResult = await query<{
@@ -346,7 +350,7 @@ export async function listSyncLogs(
       [SyncDirection.OUTBOUND]: 0,
     };
 
-    directionStatsResult.rows.forEach((row: { sync_direction: string; count: string }) => {
+    directionStatsResult.forEach((row: { sync_direction: string; count: string }) => {
       byDirection[row.sync_direction as SyncDirection] = parseInt(row.count, 10);
     });
 
@@ -372,7 +376,7 @@ export async function listSyncLogs(
       [SyncStatus.PARTIAL]: 0,
     };
 
-    statusStatsResult.rows.forEach((row: { status: string; count: string }) => {
+    statusStatsResult.forEach((row: { status: string; count: string }) => {
       byStatus[row.status as SyncStatus] = parseInt(row.count, 10);
     });
 
