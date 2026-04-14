@@ -288,6 +288,8 @@ export function WeeklyImportWizard({ onComplete, onCancel: _onCancel }: WeeklyIm
           errors: result.data.errors || [],
           duration_seconds: 0,
           tickets_created: [],
+          updated_count: result.data.updated_count || 0,
+          tickets_updated: result.data.tickets_updated || [],
         };
 
         setImportResult(finalResult);

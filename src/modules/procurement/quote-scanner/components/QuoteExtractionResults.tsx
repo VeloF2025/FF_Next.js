@@ -68,7 +68,10 @@ export function QuoteExtractionResults({
   const handleSaveField = () => {
     if (!editingField || !onUpdate) return;
 
-    const [section, field] = editingField.split('.');
+    const parts = editingField.split('.');
+    const section = parts[0] ?? '';
+    const field = parts[1] ?? '';
+    if (!field) return;
     const updatedExtraction = { ...extraction };
 
     if (section === 'supplier') {
@@ -101,7 +104,9 @@ export function QuoteExtractionResults({
     if (editingItemIndex === null || !editingItemField || !onUpdate) return;
 
     const updatedItems = [...(extraction.lineItems || [])];
-    const item = { ...updatedItems[editingItemIndex] };
+    const existingItem = updatedItems[editingItemIndex];
+    if (!existingItem) return;
+    const item = { ...existingItem };
 
     // Parse numeric fields
     if (['quantity', 'unitPrice', 'totalPrice'].includes(editingItemField)) {

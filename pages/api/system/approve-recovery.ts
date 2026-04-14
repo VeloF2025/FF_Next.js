@@ -9,7 +9,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { withAuth, withRole, getSession } from '@/lib/auth';
+import { withAuth, withRole } from '@/lib/auth';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { log } from '@/lib/logger';
@@ -114,7 +114,6 @@ async function processDecision(req: NextApiRequest, res: NextApiResponse) {
   const pendingId = req.body.pendingId || req.body.queueId;
   const action = req.body.action || (req.body.approved ? 'approve' : 'reject');
   const { reason } = req.body;
-  const session = await getSession(req, res);
 
   if (!pendingId) {
     return apiResponse.badRequest(res, 'Pending ID is required');
@@ -124,7 +123,7 @@ async function processDecision(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, 'Action must be "approve" or "reject"');
   }
 
-  const decidedBy = (session as unknown as { user?: { id?: string } } | null)?.user?.id || req.body.decidedBy || 'dashboard';
+  const decidedBy = (req as NextApiRequest & { user?: { id?: string } }).user?.id ?? req.body.decidedBy ?? 'dashboard';
   const newStatus = action === 'approve' ? 'approved' : 'rejected';
 
   try {

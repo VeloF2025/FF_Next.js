@@ -87,9 +87,11 @@ export class ProductPricingService {
         return null;
       }
       
+      const firstDoc = snapshot.docs[0];
+      if (!firstDoc) return null;
       const priceList = {
-        id: snapshot.docs[0].id,
-        ...snapshot.docs[0].data()
+        id: firstDoc.id,
+        ...firstDoc.data()
       } as PriceList;
       
       // Check if within validity period

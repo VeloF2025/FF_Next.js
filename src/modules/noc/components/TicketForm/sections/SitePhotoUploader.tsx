@@ -137,7 +137,6 @@ export function SitePhotoUploader({ setFields, onDRFound, onFileReady, disabled 
         <div className="flex items-start gap-3 p-3 rounded-lg bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)]">
           {/* Thumbnail */}
           <div className="relative flex-shrink-0 w-16 h-16 rounded overflow-hidden bg-black">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={analysis.preview}
               alt="Site photo"

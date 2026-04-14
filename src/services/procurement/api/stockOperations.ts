@@ -252,7 +252,7 @@ export class StockOperations extends BaseService {
   ): Promise<ServiceResponse<{ movement: StockMovement, items: StockMovementItem[] }>> {
     try {
       const movementService = this.movementService;
-      return await movementService.processTransfer(transferData, context.projectId, context.userId);
+      return await movementService.processTransfer(transferData);
     } catch (error) {
       return this.handleError(error, 'processTransfer');
     }

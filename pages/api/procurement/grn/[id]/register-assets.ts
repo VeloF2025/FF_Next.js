@@ -6,7 +6,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth } from '@/lib/auth';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
@@ -32,7 +32,7 @@ const RegisterAssetsSchema = z.object({
   ).min(1, 'At least one item required'),
 });
 
-async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id: grnId } = req.query;
 
   if (!grnId || typeof grnId !== 'string') {
@@ -79,7 +79,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
         grnId,
         error: error instanceof Error ? error.message : 'Unknown',
       });
-      return apiResponse.error(res, 'Failed to get GRN registration data');
+      return apiResponse.internalError(res, error, 'Failed to get GRN registration data');
     }
   }
 
@@ -93,7 +93,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
       }
 
       const { items } = validation.data;
-      const userId = req.user?.email || 'system';
+      const userId = (req as NextApiRequest & { user?: { email?: string } }).user?.email ?? 'system';
 
       // Check GRN exists and is completed
       const grn = await getGrnForRegistration(grnId);
@@ -144,7 +144,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
         grnId,
         error: error instanceof Error ? error.message : 'Unknown',
       });
-      return apiResponse.error(res, 'Failed to register assets');
+      return apiResponse.internalError(res, error, 'Failed to register assets');
     }
   }
 

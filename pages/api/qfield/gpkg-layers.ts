@@ -68,8 +68,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             lastModified: entry.lastModified || '',
           });
         }
-      } catch {
-        log.error('Operation failed', { error: { error } }, 'GpkgLayersApi');
+      } catch (parseErr) {
+        log.error('Operation failed', { error: parseErr instanceof Error ? parseErr.message : String(parseErr) }, 'GpkgLayersApi');
         // Skip non-JSON lines (mc may emit warnings)
       }
     }

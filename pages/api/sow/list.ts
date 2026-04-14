@@ -224,7 +224,7 @@ async function getSOWData(
   
   // Get count - use safeTable (validated against allowlist)
   const countQuery = `SELECT COUNT(*) FROM ${safeTable} s ${whereClause}`;
-  const countResults = await sql.unsafe(countQuery, queryParams);
+  const countResults = await sql.query(countQuery, queryParams);
   const countResult = Array.isArray(countResults) ? countResults[0] : countResults;
   const count = parseInt(countResult?.count || '0');
 
@@ -243,7 +243,7 @@ async function getSOWData(
     queryParams.push(limit, offset);
   }
 
-  const dataResults = await sql.unsafe(dataQuery, queryParams);
+  const dataResults = await sql.query(dataQuery, queryParams);
   const data = Array.isArray(dataResults) ? dataResults : [];
   
   return { data, count };

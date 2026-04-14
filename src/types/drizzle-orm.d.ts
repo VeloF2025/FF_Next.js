@@ -40,6 +40,21 @@ declare module 'firebase/firestore' {
     now(): Timestamp;
   };
   export function serverTimestamp(): any;
+  export type Unsubscribe = () => void;
+  export function onSnapshot<T = DocumentData>(
+    reference: Query<T> | DocumentReference<T>,
+    observer: {
+      next?: (snapshot: any) => void;
+      error?: (error: any) => void;
+      complete?: () => void;
+    }
+  ): Unsubscribe;
+  export function onSnapshot<T = DocumentData>(
+    reference: Query<T> | DocumentReference<T>,
+    onNext: (snapshot: any) => void,
+    onError?: (error: any) => void,
+    onCompletion?: () => void
+  ): Unsubscribe;
 }
 
 declare module 'firebase/app' {

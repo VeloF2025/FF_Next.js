@@ -489,7 +489,7 @@ export function StaffDocumentUploadWizard({
       }
 
       // Add bank statement specific fields
-      const isBankStatement = state.selectedDocumentType === 'bank_statement' || state.selectedDocumentType === 'bank_details';
+      const isBankStatement = state.selectedDocumentType === 'bank_details';
       if (isBankStatement) {
         const bankName = extractValue(finalFields.bankName);
         const bankAccountNumber = extractValue(finalFields.accountNumber);

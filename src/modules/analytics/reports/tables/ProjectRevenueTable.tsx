@@ -7,7 +7,14 @@
 
 import { useState } from 'react';
 import { ChevronRight, ChevronDown } from 'lucide-react';
-import type { CostCentreRevenueItem } from '../project-revenue/useProjectRevenueData';
+interface CostCentreRevenueItem {
+  tier1: string;
+  revenue: number;
+  cos: number;
+  grossProfit: number;
+  margin: number;
+  children: { project: string; revenue: number; cos: number; grossProfit: number; margin: number }[];
+}
 
 function fZAR(v: number): string {
   const abs = Math.abs(Math.round(v));

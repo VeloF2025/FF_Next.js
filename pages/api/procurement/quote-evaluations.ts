@@ -409,7 +409,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       stack: errorStack,
       data: error
     }, 'procurement/quote-evaluations');
-    return apiResponse.error(res, `Failed to fetch quote evaluations: ${errorMessage}`);
+    return apiResponse.internalError(res, error, `Failed to fetch quote evaluations: ${errorMessage}`);
   }
 }
 

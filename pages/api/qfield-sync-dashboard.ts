@@ -88,7 +88,7 @@ async function checkDatabaseConnection(): Promise<'connected' | 'disconnected' |
 
 async function getQFieldProjects() {
   try {
-    const rows = await getQFieldCloudProjects();
+    const rows = await sql`SELECT id, name, description, owner_id, is_public, updated_at FROM qfield_projects ORDER BY name` as unknown as Record<string, unknown>[];
     // Normalise to the shape the dashboard component expects
     return rows.map((r: any) => ({
       id: r.id || r.name,

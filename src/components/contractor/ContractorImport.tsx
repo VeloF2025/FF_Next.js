@@ -66,7 +66,7 @@ export function ContractorImport({
   });
   const [importResult, setImportResult] = useState<ContractorImportResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [_error, setError] = useState<string | null>(null);
 
   const handleFileSelect = async (selectedFile: File) => {
     setFile(selectedFile);
@@ -144,7 +144,6 @@ export function ContractorImport({
               <ContractorFileDropZone
                 onFileSelect={handleFileSelect}
                 isProcessing={isProcessing}
-                error={error}
               />
             )}
 
@@ -152,10 +151,10 @@ export function ContractorImport({
               <ContractorFilePreview
                 data={importData}
                 options={importOptions}
-                onOptionsChange={setImportOptions}
+                onOptionsChange={(opts: ContractorImportOptions) => setImportOptions(opts)}
                 onImport={handleImport}
+                onCancel={handleClose}
                 isProcessing={isProcessing}
-                error={error}
               />
             )}
 
@@ -171,7 +170,8 @@ export function ContractorImport({
             {step === 'results' && importResult && (
               <ContractorImportResults
                 result={importResult}
-                onReset={handleReset}
+                onClose={handleClose}
+                onImportMore={handleReset}
               />
             )}
           </div>

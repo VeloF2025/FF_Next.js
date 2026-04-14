@@ -7,7 +7,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth/middleware';
+import { withAuth, withRole } from '@/lib/auth/middleware';
 import { log } from '@/lib/logger';
 import { getVlmMetrics, getModuleAccuracySummaries } from '@/services/vlmLearningService';
 import type { VlmModule, VlmAnalysisType } from '@/types/vlm-learning';
@@ -43,4 +43,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler, { requiredRoles: ['admin', 'system_admin'] });
+export default withAuth(withRole(['admin', 'system_admin'])(handler));

@@ -8,3 +8,5 @@
 export const db: any = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const app: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const auth: any = null;

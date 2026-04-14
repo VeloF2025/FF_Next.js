@@ -55,7 +55,7 @@ async function handler(
       : '';
 
     // Get search results with pagination
-    const query = await sql.unsafe(`
+    const query = await sql.query(`
       SELECT id, project_id, drop_number, pole_number, cable_type, cable_spec,
              cable_length, cable_capacity, start_point, end_point, latitude, longitude,
              address, pon_no, zone_no, municipality, status, qc_status, customer_name,
@@ -67,7 +67,7 @@ async function handler(
     `, [...params, limitNum, offsetNum]);
 
     // Get total count for search results
-    const countQuery = await sql.unsafe(`
+    const countQuery = await sql.query(`
       SELECT COUNT(*) as total FROM drops
       ${whereClause}
     `, params);

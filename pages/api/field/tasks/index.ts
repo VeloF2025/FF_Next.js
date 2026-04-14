@@ -95,7 +95,7 @@ export default withAuth(withErrorHandler(async (
           OFFSET $${offsetParam}
         `;
 
-        taskData = await sql.unsafe(baseQuery, params);
+        taskData = await sql.query(baseQuery, params);
       } else {
         // Simple query without filters
         taskData = await sql`

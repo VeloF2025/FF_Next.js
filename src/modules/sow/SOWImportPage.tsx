@@ -103,11 +103,7 @@ export function SOWImportPage() {
 
   if (!projectIdStr) {
     return (
-      <ErrorBoundary
-        onError={(error: Error, errorInfo: React.ErrorInfo) => {
-          log.error('Error in SOW Import Page (project selection)', { error, errorInfo }, 'SOWImportPage');
-        }}
-      >
+      <ErrorBoundary>
         <div className="min-h-screen bg-[var(--ff-bg-primary)]">
           <div className="p-6">
             <div className="mb-6">
@@ -172,11 +168,7 @@ export function SOWImportPage() {
   }
 
   return (
-    <ErrorBoundary
-      onError={(error: Error, errorInfo: React.ErrorInfo) => {
-        log.error('Error in SOW Import Page (upload wizard)', { error, errorInfo }, 'SOWImportPage');
-      }}
-    >
+    <ErrorBoundary>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         <div className="p-6">
           <div className="mb-6">
@@ -194,7 +186,6 @@ export function SOWImportPage() {
 
         {showWizard && projectIdStr && !urlValidationError && (
           <SOWUploadWizard
-            projectId={projectIdStr}
             projectName={projectNameStr}
             onComplete={handleComplete}
           />

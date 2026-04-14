@@ -38,7 +38,7 @@ export function DocumentChecklist({ documents }: DocumentChecklistProps) {
   const completed = items.filter((i) => i.status === 'complete').length;
   const required = items.filter((i) => i.status !== 'optional').length;
   const requiredComplete = items.filter(
-    (i) => i.status === 'complete' && i.status !== 'optional'
+    (i) => i.status === 'complete'
   ).length;
   const allGood = requiredComplete >= required;
 

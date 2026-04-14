@@ -12,7 +12,7 @@
 
 import { fetchDrPhotos, executeVlmEvaluation } from './fotoVlmService';
 import { saveEvaluation, getEvaluationByDR } from './fotoDbService';
-import { QA_STEPS } from './fotoVlmService';
+// QA_STEPS moved inside executeVlmEvaluation
 import { log } from '@/lib/logger';
 
 // ==================== TYPES ====================
@@ -143,7 +143,7 @@ export async function autoEvaluateDrop(
 
     // 3. Run VLM evaluation (smart batch processing)
     log.debug('autoEvaluator', { message: `[AUTO] Running VLM evaluation for ${drNumber}...` });
-    const evaluation = await executeVlmEvaluation(drNumber, photos, QA_STEPS);
+    const evaluation = await executeVlmEvaluation(drNumber);
 
     // 4. Save to database
     log.debug('autoEvaluator', { message: `[AUTO] Saving evaluation for ${drNumber}...` });

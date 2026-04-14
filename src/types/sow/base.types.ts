@@ -20,6 +20,9 @@ export interface SOWData {
   estimatedDays: number;
   totalCost: number;
   
+  // Summary (optional - derived from calculations)
+  summary?: Record<string, unknown>;
+
   // Import Metadata
   importSummary: import('./calculation.types').ImportSummary;
   validationResults: import('./calculation.types').ValidationResults;

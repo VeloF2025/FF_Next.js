@@ -117,8 +117,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     let parsedOutput: { layers?: Record<string, { count?: number; features?: any[] }> };
     try {
       parsedOutput = JSON.parse(stdout.trim());
-    } catch {
-      log.error('Operation failed', { error: { error } }, 'GpkgImportApi');
+    } catch (parseErr) {
+      log.error('Operation failed', { error: parseErr instanceof Error ? parseErr.message : String(parseErr) }, 'GpkgImportApi');
       await updateJobStatus(sql, jobId, 'failed', {}, ['Failed to parse GPKG reader output']);
       return apiResponse.internalError(res, new Error('Invalid JSON from GPKG reader'), 'Failed to parse GPKG data');
     }

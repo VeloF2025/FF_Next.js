@@ -191,7 +191,7 @@ const DISCARD_REASONS = [
 export default function PipelinesPage() {
   const router = useRouter();
   const { currentUser } = useAuth();
-  const canDiscard = currentUser?.role === 'super_admin' || currentUser?.role === 'admin' || currentUser?.role === 'manager';
+  const canDiscard = currentUser?.role === 'super_admin' || currentUser?.role === 'admin' || currentUser?.role === 'project_manager';
 
   const [threads, setThreads] = useState<PipelineThread[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);

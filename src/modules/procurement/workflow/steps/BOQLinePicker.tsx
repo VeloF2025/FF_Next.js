@@ -49,8 +49,10 @@ export function BOQLinePicker({ boqLines, selectedId, onSelect, onClear }: BOQLi
   const order: Record<BOQLineUtilization['status'], number> = {
     not_ordered: 0,
     partial: 1,
-    fully_ordered: 2,
-    over_ordered: 3,
+    partially_received: 2,
+    fully_ordered: 3,
+    over_ordered: 4,
+    received: 5,
   };
   const sorted = [...filtered].sort((a, b) => order[a.status] - order[b.status]);
 

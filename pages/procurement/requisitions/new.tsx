@@ -17,7 +17,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import type {
-  CreateRequisitionForm,
+  CreateRequisitionRequest,
   RequisitionUrgency,
 } from '@/types/procurement/requisition.types';
 import { log } from '@/lib/logger';
@@ -201,7 +201,7 @@ export default function NewRequisitionPage() {
     setIsSubmitting(true);
 
     try {
-      const payload: CreateRequisitionForm = {
+      const payload: CreateRequisitionRequest = {
         projectId: projectId || undefined,
         department: department || undefined,
         requiredDate: requiredDate || undefined,

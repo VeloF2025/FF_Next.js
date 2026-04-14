@@ -53,6 +53,7 @@ interface RequisitionListItem {
   status: RequisitionStatus;
   projectName?: string;
   requestedByName?: string;
+  department?: string;
   requiredDate?: string;
   estimatedTotal?: number;
   itemCount: number;

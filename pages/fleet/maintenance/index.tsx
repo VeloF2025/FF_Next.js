@@ -377,12 +377,8 @@ export default function FleetMaintenancePage() {
       setFormData(INITIAL_FORM_DATA);
       notificationService.success('Service interval created successfully');
 
-      // Refresh data without full page reload
-      const res2 = await fetch(`/api/fleet/maintenance/intervals?limit=50`);
-      if (res2.ok) {
-        const data = await res2.json();
-        setIntervals(data.data?.intervals || []);
-      }
+      // Refresh data by reloading the page (no intervals state to set directly)
+      window.location.reload();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'An error occurred';
       setFormError(message);

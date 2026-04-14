@@ -97,7 +97,7 @@ async function handleGetPoles(req: NextApiRequest, res: NextApiResponse<PoleData
 
     // Get total count
     const countQuery = `SELECT COUNT(*) FROM sow_poles p ${whereClause}`;
-    const countResults = await sql.unsafe(countQuery, queryParams as any);
+    const countResults = await sql.query(countQuery, queryParams as any);
     const countResult = Array.isArray(countResults) ? countResults[0] : countResults;
     const total = parseInt(countResult?.count || '0');
 
@@ -113,7 +113,7 @@ async function handleGetPoles(req: NextApiRequest, res: NextApiResponse<PoleData
     `;
     queryParams.push(validatedPageSize, offset);
 
-    const poles = await sql.unsafe(dataQuery, queryParams as any);
+    const poles = await sql.query(dataQuery, queryParams as any);
     
     return res.status(200).json({
       success: true,

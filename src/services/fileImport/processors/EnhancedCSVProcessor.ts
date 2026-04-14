@@ -157,7 +157,7 @@ export class EnhancedCSVProcessor {
 
           resolve(result);
         },
-        error: (error: Papa.ParseError) => {
+        error: (error: Error) => {
           const processingError = new Error(`CSV parsing failed: ${error.message}`);
           reject(processingError);
         }
@@ -289,10 +289,10 @@ export class EnhancedCSVProcessor {
           context.status = 'complete';
           resolve(result);
         },
-        error: (error: Papa.ParseError) => {
+        error: (error: Error) => {
           reject(new Error(`Streaming CSV parsing failed: ${error.message}`));
         }
-      });
+      } as Papa.ParseConfig);
 
       // Start streaming — stream is a Node.js Duplex returned by Papa with NODE_STREAM_INPUT
       const reader = file.stream().getReader();

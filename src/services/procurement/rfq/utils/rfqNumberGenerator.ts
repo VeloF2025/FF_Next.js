@@ -17,7 +17,7 @@ export async function generateRFQNumber(projectId: string): Promise<string> {
     WHERE project_id = ${projectId}
     AND EXTRACT(YEAR FROM created_at) = ${year}`;
 
-  const sequence = (parseInt(count[0].count) + 1).toString().padStart(4, '0');
+  const sequence = (parseInt(String(count[0]?.count ?? '0')) + 1).toString().padStart(4, '0');
   return `RFQ-${year}-${projectId.slice(0, 4).toUpperCase()}-${sequence}`;
 }
 
@@ -29,6 +29,6 @@ export async function generateResponseNumber(rfqId: string): Promise<string> {
     SELECT COUNT(*) as count FROM rfq_responses
     WHERE rfq_id = ${rfqId}`;
 
-  const sequence = (parseInt(count[0].count) + 1).toString().padStart(3, '0');
+  const sequence = (parseInt(String(count[0]?.count ?? '0')) + 1).toString().padStart(3, '0');
   return `RSP-${rfqId.slice(0, 8).toUpperCase()}-${sequence}`;
 }

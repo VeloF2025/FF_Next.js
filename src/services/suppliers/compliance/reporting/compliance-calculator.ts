@@ -86,7 +86,7 @@ export class ComplianceCalculator {
     categoryGroups.forEach((categoryDocs, categoryName) => {
       const requiredCount = categoryDocs.filter(doc => doc.isRequired).length;
       const providedCount = categoryDocs.length;
-      const validCount = categoryDocs.filter(doc => doc.status === 'valid').length;
+      const validCount = categoryDocs.filter(doc => doc.status === 'approved').length;
 
       const completionRate = requiredCount > 0 ? (validCount / requiredCount) * 100 : 100;
       let status: 'compliant' | 'partial' | 'non-compliant' = 'compliant';
