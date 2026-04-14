@@ -48,7 +48,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     // Force recomputation if requested
     if (recompute === 'true') {
-      log.info('SerialVerification', `Force recomputing verification for ${dropNumber}`);
+      log.info(`Force recomputing verification for ${dropNumber}`, undefined, 'SerialVerification');
       const verification = await computeAndPersistVerification(dropNumber);
       return apiResponse.success(res, { ...verification, source: 'recomputed' });
     }
@@ -69,10 +69,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const row = precomputed[0];
       const details = row.serial_verification_details || {};
 
-      log.info('SerialVerification', `Serving pre-computed verification for ${dropNumber}`, {
+      log.info(`Serving pre-computed verification for ${dropNumber}`, {
         status: row.serial_verification_status,
         computedAt: row.serial_verification_computed_at,
-      });
+      }, 'SerialVerification');
 
       const verification: SerialVerificationResult = {
         dropNumber,
@@ -92,14 +92,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // No pre-computed data — compute live and persist for future requests
-    log.info('SerialVerification', `No pre-computed data for ${dropNumber}, computing live`);
+    log.info(`No pre-computed data for ${dropNumber}, computing live`, undefined, 'SerialVerification');
     const verification = await computeAndPersistVerification(dropNumber);
 
     return apiResponse.success(res, { ...verification, source: 'computed' });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.error('SerialVerification', `Failed: ${message}`);
-    return apiResponse.error(res, message, 500);
+    log.error(`Failed: ${message}`, undefined, 'SerialVerification');
+    return apiResponse.internalError(res, error);
   }
 }
 

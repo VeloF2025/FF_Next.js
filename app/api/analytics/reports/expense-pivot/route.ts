@@ -47,8 +47,8 @@ function excelSerialToMonthKey(serial: number): string {
  */
 function monthKeySortValue(key: string): number {
   const [yearStr, monStr] = key.split('-');
-  const year = parseInt(yearStr, 10);
-  const monIdx = MONTH_NAMES.indexOf(monStr);
+  const year = parseInt(yearStr ?? '0', 10);
+  const monIdx = MONTH_NAMES.indexOf(monStr ?? '');
   return year * 12 + monIdx;
 }
 
@@ -178,7 +178,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     // Build yearGroups
     const yearGroupsMap = new Map<string, string[]>();
     for (const mk of months) {
-      const year = mk.split('-')[0];
+      const year = mk.split('-')[0] ?? '';
       if (!yearGroupsMap.has(year)) yearGroupsMap.set(year, []);
       yearGroupsMap.get(year)!.push(mk);
     }

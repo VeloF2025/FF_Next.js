@@ -9,6 +9,17 @@ import {
 } from '@/services/action-items/actionItemsParser';
 import { sql } from '@/lib/db-pool';
 
+interface MeetingRow extends Record<string, unknown> {
+  id: number;
+  title: string;
+  summary: { action_items?: string } | null;
+  participants: { name: string; email: string; displayName?: string }[];
+}
+
+interface CountRow extends Record<string, unknown> {
+  count: number;
+}
+
 /**
  * Extract action items from ALL meetings that have them
  * POST /api/action-items/extract-all
@@ -29,7 +40,7 @@ async function handler(
     log.debug('actionItemsExtractAll', { action: 'start' });
 
     // Find all meetings with action items
-    const meetings = await sql`
+    const meetings = await sql<MeetingRow>`
       SELECT id, title, summary, participants
       FROM meetings
       WHERE summary IS NOT NULL
@@ -46,13 +57,13 @@ async function handler(
     for (const meeting of meetings) {
       try {
         // Check if already extracted
-        const existing = await sql`
+        const existing = await sql<CountRow>`
           SELECT COUNT(*)::int as count
           FROM action_items
           WHERE meeting_id = ${meeting.id}
         `;
 
-        if (existing[0]?.count > 0) {
+        if ((existing[0]?.count ?? 0) > 0) {
           skipped++;
           continue;
         }
