@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth, getUser } from '@/lib/auth';
+import { withAuth, getAuthUser } from '@/lib/auth';
 import { generateBOQVersion } from '@/lib/utils/boq/versioning';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -23,7 +23,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, 'sourceBoqId is required');
   }
 
-  const user = getUser(req);
+  const user = getAuthUser(req);
   if (!user) {
     return apiResponse.unauthorized(res, 'Authentication required');
   }
@@ -42,14 +42,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const source = sourceRows[0];
 
     // Get all existing versions for this project to generate next version number
-    const existingVersions = await sql`
+    const existingVersions = (await sql`
       SELECT version FROM boqs WHERE project_id = ${source.project_id}
-    `;
-    const versionStrings = existingVersions.map((v: { version: string }) => v.version);
+    `) as unknown as { version: string }[];
+    const versionStrings = existingVersions.map((v) => v.version);
     const newVersion = generateBOQVersion(versionStrings);
 
     // Get source items
-    const sourceItems = await sql`
+    const sourceItems = (await sql`
       SELECT item_number, description, unit, quantity, rate, amount, category,
              material_code, mapped_material_id, mapping_confidence, is_mapped,
              mapping_notes, item_code, sequence_number, stock_item_id,
@@ -57,7 +57,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       FROM boq_items
       WHERE boq_id = ${sourceBoqId}
       ORDER BY sequence_number, item_number
-    `;
+    `) as unknown as { item_number: string; description: string; unit: string; quantity: string; rate: string; amount: string | null; category: string; material_code: string; mapped_material_id: string; mapping_confidence: number; is_mapped: boolean; mapping_notes: string; item_code: string; sequence_number: number; stock_item_id: string; stock_match_confidence: number; stock_match_method: string; custom_fields: unknown }[];
 
     if (sourceItems.length === 0) {
       return apiResponse.badRequest(res, 'Source BOQ has no items to restore');
@@ -65,11 +65,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Calculate totals from source items
     const totalValue = sourceItems.reduce(
-      (sum: number, item: { amount: string | null; quantity: string; rate: string }) =>
+      (sum: number, item) =>
         sum + (Number(item.amount) || Number(item.quantity) * Number(item.rate) || 0),
       0
     );
-    const mappedCount = sourceItems.filter((i: { is_mapped: boolean }) => i.is_mapped).length;
+    const mappedCount = sourceItems.filter((i) => i.is_mapped).length;
 
     // Mark current active/draft versions as superseded
     await sql`
@@ -155,7 +155,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       message: `Restored version ${source.version} as new version ${newBoq.version}`,
     });
   } catch (error) {
-    log.error('Failed to rollback BOQ version', error);
+    log.error('Failed to rollback BOQ version', { error });
     return apiResponse.internalError(res, error);
   }
 }

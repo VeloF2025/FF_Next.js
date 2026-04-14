@@ -201,7 +201,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
     try {
       quoteComparison = await poApprovalService.getQuoteComparisonForApproval(id);
     } catch {
-      log.error('IdApi', 'Operation failed', { error });
+      log.error('Quote comparison fetch failed (optional)');
       // Quote comparison is optional
     }
 
@@ -278,7 +278,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
 
     return apiResponse.success(res, purchaseOrder);
   } catch (error) {
-    log.error('Failed to fetch purchase order detail', error);
+    log.error('Failed to fetch purchase order detail', { error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -594,7 +594,7 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
         return apiResponse.badRequest(res, `Invalid action: ${action}`);
     }
   } catch (error) {
-    log.error('Failed to update purchase order status', error);
+    log.error('Failed to update purchase order status', { error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -644,7 +644,7 @@ async function handleDelete(req: NextApiRequest, res: NextApiResponse, id: strin
 
     return apiResponse.success(res, { deleted: true, id });
   } catch (error) {
-    log.error('Failed to delete purchase order', error);
+    log.error('Failed to delete purchase order', { error });
     return apiResponse.internalError(res, error);
   }
 }

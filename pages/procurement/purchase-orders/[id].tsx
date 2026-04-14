@@ -170,7 +170,7 @@ export default function PurchaseOrderDetailPage() {
         setError(data.error?.message || 'Failed to fetch purchase order');
       }
     } catch (err) {
-      log.error('Failed to fetch purchase order', err);
+      log.error('Failed to fetch purchase order', { error: err });
       setError('Failed to load purchase order');
     } finally {
       setIsLoading(false);
@@ -196,7 +196,7 @@ export default function PurchaseOrderDetailPage() {
         setError(data.error?.message || `Failed to ${action}`);
       }
     } catch (err) {
-      log.error(`Failed to ${action}`, err);
+      log.error(`Failed to ${action}`, { error: err });
       setError(`Failed to ${action}`);
     } finally {
       setActionLoading(false);
@@ -221,7 +221,7 @@ export default function PurchaseOrderDetailPage() {
         setError(data.error?.message || 'Failed to delete');
       }
     } catch (err) {
-      log.error('Failed to delete purchase order', err);
+      log.error('Failed to delete purchase order', { error: err });
       setError('Failed to delete');
     } finally {
       setActionLoading(false);
@@ -268,7 +268,7 @@ export default function PurchaseOrderDetailPage() {
         setError(data.error?.message || 'Failed to save');
       }
     } catch (err) {
-      log.error('Failed to save PO fields', err);
+      log.error('Failed to save PO fields', { error: err });
       setError('Failed to save');
     } finally {
       setActionLoading(false);

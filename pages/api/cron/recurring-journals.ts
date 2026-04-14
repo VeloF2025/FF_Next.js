@@ -10,6 +10,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { ErrorCode } from '@/lib/apiResponse';
 import { sql } from '@/lib/neon';
 import { generateJournalFromRecurring } from '@/modules/accounting/services/recurringJournalService';
 
@@ -25,7 +26,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const expectedSecret = process.env.CRON_SECRET;
   if (!expectedSecret) {
     log.error('CRON_SECRET not configured — rejecting cron request');
-    return apiResponse.error(res, 'Cron endpoint misconfigured', 503);
+    return apiResponse.error(res, ErrorCode.SERVICE_UNAVAILABLE, 'Cron endpoint misconfigured');
   }
   if (cronSecret !== expectedSecret && !req.headers.cookie) {
     return apiResponse.unauthorized(res, 'Invalid cron secret');
@@ -33,13 +34,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     // Find all active recurring journals due today or earlier
-    const dueItems = await sql`
+    const dueItems = (await sql`
       SELECT id, template_name
       FROM recurring_journals
       WHERE status = 'active'
         AND next_run_date <= CURRENT_DATE
       ORDER BY next_run_date ASC
-    `;
+    `) as unknown as { id: string; template_name: string }[];
 
     if (dueItems.length === 0) {
       return apiResponse.success(res, { processed: 0, message: 'No recurring journals due' });
