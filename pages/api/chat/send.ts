@@ -5,9 +5,13 @@
  * Body: { message, userName?, userRole?, userId?, topic?, history?, dataAccess? }
  *
  * Uses three tools:
- * 1. search_knowledge — vector search over embedded docs/manual/schema
+ * 1. search_knowledge — Qdrant semantic search over fibreflow_kb (nomic-embed-text, 768-dim)
  * 2. query_database — execute validated read-only SQL
  * 3. get_schema — fetch column info for specific tables
+ *
+ * LLM: nemotron-mini via local Ollama on Mac Mini (192.168.1.79)
+ * Embeddings: nomic-embed-text via local proxy (localhost:11435)
+ * Knowledge: Qdrant fibreflow_kb (2,714 chunks — user manual + module docs)
  *
  * Rate limited to 10 requests per minute per user.
  */
@@ -21,45 +25,50 @@ import pool from '@/lib/db';
 
 const logger = createLogger('api:chat:send');
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const MODEL = 'gpt-4o-mini';
-const EMBEDDING_MODEL = 'text-embedding-3-small';
+const OLLAMA_BASE = process.env.OLLAMA_URL ?? 'http://192.168.1.79:11434';
+const EMBED_BASE = process.env.EMBED_URL ?? 'http://localhost:11435';
+const QDRANT_BASE = process.env.QDRANT_URL ?? 'http://localhost:6333';
+const MODEL = 'nemotron-mini';
+const EMBED_MODEL = 'nomic-embed-text';
+const QDRANT_COLLECTION = 'fibreflow_kb';
 
-// ── Vector search ──────────────────────────────────────────────
+// ── Embeddings via nomic-embed-text (Mac Mini proxy) ──────────
 
 async function embedQuery(text: string): Promise<number[]> {
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
+  const response = await fetch(`${EMBED_BASE}/v1/embeddings`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${OPENAI_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ model: EMBEDDING_MODEL, input: text }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: EMBED_MODEL, input: text }),
   });
-  if (!response.ok) throw new Error(`Embedding API error: ${response.status}`);
+  if (!response.ok) throw new Error(`Embed error: ${response.status}`);
   const data = await response.json();
   return data.data[0].embedding;
 }
 
+// ── Semantic search via Qdrant fibreflow_kb ────────────────────
+
 async function searchKnowledge(query: string, limit: number = 5): Promise<string> {
   try {
-    const embedding = await embedQuery(query);
-    const result = await pool.query(
-      `SELECT source, section, content, 1 - (embedding <=> $1::vector) as similarity
-       FROM chat_knowledge
-       WHERE 1 - (embedding <=> $1::vector) > 0.3
-       ORDER BY embedding <=> $1::vector
-       LIMIT $2`,
-      [JSON.stringify(embedding), limit]
+    const vector = await embedQuery(query);
+    const response = await fetch(
+      `${QDRANT_BASE}/collections/${QDRANT_COLLECTION}/points/search`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vector, limit, with_payload: true }),
+      }
     );
+    if (!response.ok) throw new Error(`Qdrant error: ${response.status}`);
+    const data = await response.json();
+    const results: any[] = data.result ?? [];
 
-    if (result.rows.length === 0) {
-      return 'No relevant knowledge found.';
-    }
+    if (results.length === 0) return 'No relevant knowledge found.';
 
-    return result.rows.map((row: any, i: number) =>
-      `[${i + 1}] (${row.source} — ${row.section}, relevance: ${(row.similarity * 100).toFixed(0)}%)\n${row.content}`
-    ).join('\n\n---\n\n');
+    return results
+      .map((r, i) =>
+        `[${i + 1}] (${r.payload.source} — ${r.payload.section}, score: ${(r.score * 100).toFixed(0)}%)\n${r.payload.content}`
+      )
+      .join('\n\n---\n\n');
   } catch (err: any) {
     logger.error('Knowledge search failed', { error: err.message });
     return `Search error: ${err.message}`;
@@ -71,7 +80,6 @@ async function searchKnowledge(query: string, limit: number = 5): Promise<string
 const SQL_BLOCKLIST = /\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|EXECUTE|COPY|VACUUM|REINDEX)\b/i;
 
 async function queryDatabase(sql: string): Promise<string> {
-  // Validate: SELECT only
   const trimmed = sql.trim().replace(/;+$/, '');
   if (!trimmed.toUpperCase().startsWith('SELECT')) {
     return 'Error: Only SELECT queries are allowed.';
@@ -81,20 +89,15 @@ async function queryDatabase(sql: string): Promise<string> {
   }
 
   try {
-    // Set statement timeout and row limit
     const client = await pool.connect();
     try {
-      await client.query('SET statement_timeout = 5000'); // 5 seconds
-      // Add LIMIT if not already present
+      await client.query('SET statement_timeout = 5000');
       const hasLimit = /\bLIMIT\s+\d+/i.test(trimmed);
       const safeSql = hasLimit ? trimmed : `${trimmed} LIMIT 100`;
       const result = await client.query(safeSql);
 
-      if (result.rows.length === 0) {
-        return 'Query returned no results.';
-      }
+      if (result.rows.length === 0) return 'Query returned no results.';
 
-      // Format as readable text
       const cols = Object.keys(result.rows[0]);
       const header = cols.join(' | ');
       const rows = result.rows.map((row: any) =>
@@ -135,7 +138,9 @@ async function getSchema(tables: string[]): Promise<string> {
     const grouped: Record<string, string[]> = {};
     for (const row of result.rows) {
       if (!grouped[row.table_name]) grouped[row.table_name] = [];
-      grouped[row.table_name]!.push(`  ${row.column_name} ${row.data_type}${row.is_nullable === 'YES' ? ' (nullable)' : ''}`);
+      grouped[row.table_name]!.push(
+        `  ${row.column_name} ${row.data_type}${row.is_nullable === 'YES' ? ' (nullable)' : ''}`
+      );
     }
 
     return Object.entries(grouped)
@@ -164,21 +169,18 @@ async function getTableList(): Promise<string> {
   } catch { return ''; }
 }
 
-// ── OpenAI tools definition ────────────────────────────────────
+// ── Tool definitions (OpenAI-compatible format) ────────────────
 
 const TOOLS = [
   {
     type: 'function' as const,
     function: {
       name: 'search_knowledge',
-      description: 'Search the FibreFlow knowledge base (user manual, docs, DB schema) using semantic search. Use for questions about how to use features, what things mean, how the system works, or to find relevant table/column names before writing SQL.',
+      description: 'Search the FibreFlow knowledge base (user manual, docs, module guides) using semantic search. Use for questions about how to use features, what things mean, how the system works, or to understand workflows.',
       parameters: {
         type: 'object',
         properties: {
-          query: {
-            type: 'string',
-            description: 'Natural language search query',
-          },
+          query: { type: 'string', description: 'Natural language search query' },
         },
         required: ['query'],
       },
@@ -221,10 +223,7 @@ PostgreSQL date tips:
       parameters: {
         type: 'object',
         properties: {
-          sql: {
-            type: 'string',
-            description: 'SQL SELECT query to execute',
-          },
+          sql: { type: 'string', description: 'SQL SELECT query to execute' },
         },
         required: ['sql'],
       },
@@ -232,24 +231,20 @@ PostgreSQL date tips:
   },
 ];
 
-// Tools without data access (knowledge only)
 const TOOLS_NO_DATA = [TOOLS[0]]; // search_knowledge only
 
-// ── OpenAI API helper ──────────────────────────────────────────
+// ── Ollama API helper ──────────────────────────────────────────
 
-async function callOpenAI(body: Record<string, any>) {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+async function callOllama(body: Record<string, any>) {
+  const response = await fetch(`${OLLAMA_BASE}/v1/chat/completions`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${OPENAI_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`OpenAI API ${response.status}: ${errorText}`);
+    throw new Error(`Ollama API ${response.status}: ${errorText}`);
   }
 
   return response.json();
@@ -270,12 +265,12 @@ async function executeTool(name: string, args: any): Promise<string> {
   }
 }
 
-// ── Main handler ───────────────────────────────────────────────
+// ── System prompts ─────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are the Velo, the FibreFlow assistant — a friendly, knowledgeable guide embedded in the FibreFlow application (app.fibreflow.app).
+const SYSTEM_PROMPT = `You are Velo, the FibreFlow assistant — a knowledgeable guide embedded in the FibreFlow application (app.fibreflow.app) for Velocity Fibre internal staff.
 
 You have access to tools that let you:
-1. **Search knowledge** — search the user manual, documentation, and database schema
+1. **Search knowledge** — semantic search over the user manual, module docs, and guides
 2. **Look up table schemas** — see column names/types before writing queries
 3. **Query the database** — run read-only SQL to get live data
 
@@ -285,32 +280,29 @@ Guidelines:
 - Always verify table/column names with get_schema before writing SQL if unsure
 - Present data clearly with context ("As of right now, there are X...")
 - Use markdown formatting for readability
-- Be concise (2-4 paragraphs unless detailed steps needed)
+- Be concise (2-4 paragraphs unless detailed steps are needed)
 - Use specific menu paths like **Sidebar → Module → Tab** when guiding users
 - If you can't find the answer, say so honestly
 - You can ONLY read data — never suggest you can modify, create, or delete anything`;
 
-const SYSTEM_PROMPT_NO_DATA = `You are the Velo, the FibreFlow assistant — a friendly, knowledgeable guide embedded in the FibreFlow application (app.fibreflow.app).
+const SYSTEM_PROMPT_NO_DATA = `You are Velo, the FibreFlow assistant — a knowledgeable guide embedded in the FibreFlow application (app.fibreflow.app) for Velocity Fibre internal staff.
 
-You have access to search_knowledge to find information from the user manual and documentation.
+You have access to search_knowledge to find information from the user manual and module documentation.
 
 Guidelines:
 - Search the knowledge base to answer questions about features and how-to
 - Use markdown formatting for readability
-- Be concise (2-4 paragraphs unless detailed steps needed)
+- Be concise (2-4 paragraphs unless detailed steps are needed)
 - Use specific menu paths like **Sidebar → Module → Tab** when guiding users
 - You are INFORMATIONAL ONLY — you cannot query live data or modify anything
 - If users ask for live data or metrics, explain they need data access enabled for their role
 - If you can't find the answer, say so honestly`;
 
+// ── Main handler ───────────────────────────────────────────────
+
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return apiResponse.error(res, ErrorCode.METHOD_NOT_ALLOWED, 'Only POST requests allowed');
-  }
-
-  if (!OPENAI_API_KEY) {
-    logger.error('OpenAI API key not configured');
-    return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'AI service not configured');
   }
 
   const { message, userName, userRole, topic, history, dataAccess } = req.body;
@@ -342,18 +334,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   const hasDataAccess = !!dataAccess;
 
-  // Build system prompt with table list for data access users
   let systemPrompt = hasDataAccess ? SYSTEM_PROMPT : SYSTEM_PROMPT_NO_DATA;
   if (hasDataAccess) {
     const tables = await getTableList();
-    if (tables) {
-      systemPrompt += `\n\nAvailable database tables: ${tables}`;
-    }
+    if (tables) systemPrompt += `\n\nAvailable database tables: ${tables}`;
   }
 
-  const messages: Array<any> = [
-    { role: 'system', content: systemPrompt },
-  ];
+  const messages: Array<any> = [{ role: 'system', content: systemPrompt }];
 
   // Add conversation history (last 6 messages)
   if (Array.isArray(history)) {
@@ -371,12 +358,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     logger.info('Chat request', {
       userId, userName: trackingName, userRole: trackingRole,
       topic: topic || 'general', dataAccess: hasDataAccess,
-      messageLength: message.length,
+      messageLength: message.length, model: MODEL,
     });
 
     const tools = hasDataAccess ? TOOLS : TOOLS_NO_DATA;
 
-    let data = await callOpenAI({
+    let data = await callOllama({
       model: MODEL, messages, temperature: 0.3, max_tokens: 2048,
       tools, tool_choice: 'auto',
     });
@@ -401,7 +388,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         });
       }
 
-      data = await callOpenAI({
+      data = await callOllama({
         model: MODEL, messages, temperature: 0.3, max_tokens: 2048,
         tools, tool_choice: 'auto',
       });
@@ -410,7 +397,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     let assistantResponse = choice?.message?.content;
 
-    // If model ended with tool calls but no content, do one more call without tools to force a text response
+    // If model ended on tool calls with no content, force a text response
     if (!assistantResponse && choice?.message?.tool_calls) {
       messages.push(choice.message);
       for (const toolCall of choice.message.tool_calls) {
@@ -418,18 +405,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         const result = await executeTool(toolCall.function.name, args);
         messages.push({ role: 'tool', tool_call_id: toolCall.id, content: result });
       }
-      data = await callOpenAI({ model: MODEL, messages, temperature: 0.3, max_tokens: 2048 });
+      data = await callOllama({ model: MODEL, messages, temperature: 0.3, max_tokens: 2048 });
       assistantResponse = data.choices?.[0]?.message?.content;
     }
 
     if (!assistantResponse) {
-      logger.error('Empty response', { data, userId });
+      logger.error('Empty response from Ollama', { data, userId });
       return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Failed to generate response.');
     }
 
     logger.info('Chat response', {
       userId, responseLength: assistantResponse.length,
-      tokensUsed: data.usage, toolRounds: rounds,
+      tokensUsed: data.usage, toolRounds: rounds, model: MODEL,
     });
 
     return apiResponse.success(res, { response: assistantResponse, model: MODEL });
