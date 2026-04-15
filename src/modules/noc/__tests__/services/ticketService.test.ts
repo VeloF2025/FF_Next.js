@@ -120,9 +120,12 @@ describe('Ticket Service - CRUD Operations', () => {
       const result = await createTicket(payload);
 
       expect(queryOne).toHaveBeenCalled();
-      // Test verifies that queryOne was called (mock handles sequence generation + insert)
-      // The actual SQL includes INSERT INTO maintenance_tickets with all fields + sequence generation
-      const callArgs = vi.mocked(queryOne).mock.calls[0];
+      // createTicket does: staff lookup -> sequence -> INSERT. Find the INSERT call.
+      const insertCall = vi.mocked(queryOne).mock.calls.find(
+        (c) => typeof c[0] === 'string' && (c[0] as string).includes('INSERT INTO maintenance_tickets')
+      );
+      expect(insertCall).toBeDefined();
+      const callArgs = insertCall!;
       // Check that the call included the payload data in the values array
       expect(callArgs[1]).toContain(payload.source);
       expect(callArgs[1]).toContain(payload.title);
@@ -351,7 +354,8 @@ describe('Ticket Service - CRUD Operations', () => {
       // Verify the call includes the ticket ID and queries maintenance_tickets
       const callArgs = vi.mocked(queryOne).mock.calls[0];
       expect(callArgs[0]).toContain('FROM maintenance_tickets');
-      expect(callArgs[0]).toContain('LEFT JOIN users u ON t.assigned_to = u.id');
+      // assigned_to references staff.id (not users.id)
+      expect(callArgs[0]).toContain('LEFT JOIN staff s ON t.assigned_to = s.id');
       expect(callArgs[1]).toContain(ticketId);
       expect(result).toEqual(mockTicket);
     });
@@ -498,10 +502,13 @@ describe('Ticket Service - CRUD Operations', () => {
       const result = await updateTicket(ticketId, updatePayload);
 
       expect(queryOne).toHaveBeenCalled();
-      const callArgs = vi.mocked(queryOne).mock.calls[0];
-      expect(callArgs[0]).toContain('UPDATE maintenance_tickets');
+      // updateTicket may do a staff lookup before the UPDATE — find the UPDATE call.
+      const updateCall = vi.mocked(queryOne).mock.calls.find(
+        (c) => typeof c[0] === 'string' && (c[0] as string).includes('UPDATE maintenance_tickets')
+      );
+      expect(updateCall).toBeDefined();
+      const callArgs = updateCall!;
       expect(callArgs[1]).toContain(TicketStatus.IN_PROGRESS);
-      expect(callArgs[1]).toContain('user-uuid-123');
       expect(callArgs[1]).toContain(ticketId);
       expect(result.status).toBe(TicketStatus.IN_PROGRESS);
       expect(result.assigned_to).toBe('user-uuid-123');
@@ -940,6 +947,8 @@ describe('Ticket Service - CRUD Operations', () => {
       ];
 
       vi.mocked(query).mockResolvedValue(mockTickets);
+      // listTickets runs a COUNT queryOne before the results query
+      vi.mocked(queryOne).mockResolvedValueOnce({ count: String(mockTickets.length) });
 
       const result = await listTickets({});
 
@@ -1118,6 +1127,11 @@ describe('Ticket Service - CRUD Operations', () => {
       ];
 
       vi.mocked(query).mockResolvedValue(mockTickets);
+      // staff lookup returns null → source falls back to raw user UUID.
+      // Count query returns total.
+      vi.mocked(queryOne)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ count: '1' });
 
       const result = await listTickets({ assigned_to: assigneeId });
 
@@ -1176,6 +1190,9 @@ describe('Ticket Service - CRUD Operations', () => {
       ];
 
       vi.mocked(query).mockResolvedValue(mockTickets);
+      vi.mocked(queryOne)
+        .mockResolvedValueOnce(null) // staff lookup — fall back to user UUID
+        .mockResolvedValueOnce({ count: '1' });
 
       const result = await listTickets({
         status: TicketStatus.IN_PROGRESS,

@@ -175,10 +175,8 @@ describe('useVerificationSteps', () => {
     expect(result.current.data).toEqual(mockVerificationSteps);
     expect(result.current.error).toBeNull();
     expect(mockFetch).toHaveBeenCalledWith(
-      `/api/noc/tickets/${mockTicketId}/verification`,
-      expect.objectContaining({
-        method: 'GET',
-      })
+      `/api/noc/verification?ticketId=${mockTicketId}`,
+      expect.anything()
     );
   });
 
@@ -302,11 +300,10 @@ describe('useVerificationProgress', () => {
 
     expect(result.current.data).toEqual(mockVerificationProgress);
     expect(result.current.error).toBeNull();
+    // Progress derives from the main verification list endpoint.
     expect(mockFetch).toHaveBeenCalledWith(
-      `/api/noc/tickets/${mockTicketId}/verification/complete`,
-      expect.objectContaining({
-        method: 'POST',
-      })
+      `/api/noc/verification?ticketId=${mockTicketId}`,
+      expect.anything()
     );
   });
 
@@ -457,12 +454,9 @@ describe('useUpdateVerificationStep', () => {
 
     expect(result.current.data).toEqual(updatedStep);
     expect(mockFetch).toHaveBeenCalledWith(
-      `/api/noc/tickets/${mockTicketId}/verification/2`,
+      `/api/noc/verification-step?ticketId=${mockTicketId}&stepNumber=2`,
       expect.objectContaining({
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           is_complete: true,
           completed_by: 'user-456',

@@ -84,16 +84,14 @@ describe('QContact Sync Background Job', () => {
 
       vi.mocked(runFullSync).mockResolvedValue(mockSyncResult);
 
-      // Mock job history insert
-      vi.mocked(query).mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'job-1',
-            started_at: mockSyncResult.started_at,
-            completed_at: mockSyncResult.completed_at,
-          },
-        ],
-      });
+      // Mock job history insert (query<T>() returns T[] directly)
+      vi.mocked(query).mockResolvedValueOnce([
+        {
+          id: 'job-1',
+          started_at: mockSyncResult.started_at,
+          completed_at: mockSyncResult.completed_at,
+        },
+      ] as never);
 
       const result = await runSyncJob();
 
@@ -119,15 +117,13 @@ describe('QContact Sync Background Job', () => {
       vi.mocked(runFullSync).mockRejectedValue(syncError);
 
       // Mock job history insert for failed job
-      vi.mocked(query).mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'job-2',
-            started_at: new Date(),
-            completed_at: new Date(),
-          },
-        ],
-      });
+      vi.mocked(query).mockResolvedValueOnce([
+        {
+          id: 'job-2',
+          started_at: new Date(),
+          completed_at: new Date(),
+        },
+      ] as never);
 
       const result = await runSyncJob();
 
@@ -174,15 +170,13 @@ describe('QContact Sync Background Job', () => {
 
       // Mock database insert
       const mockJobId = 'job-123';
-      vi.mocked(query).mockResolvedValueOnce({
-        rows: [
-          {
-            id: mockJobId,
-            started_at: mockSyncResult.started_at,
-            completed_at: mockSyncResult.completed_at,
-          },
-        ],
-      });
+      vi.mocked(query).mockResolvedValueOnce([
+        {
+          id: mockJobId,
+          started_at: mockSyncResult.started_at,
+          completed_at: mockSyncResult.completed_at,
+        },
+      ] as never);
 
       const result = await runSyncJob();
 
@@ -230,15 +224,13 @@ describe('QContact Sync Background Job', () => {
       };
 
       vi.mocked(runFullSync).mockResolvedValue(mockSyncResult);
-      vi.mocked(query).mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'job-4',
-            started_at: mockSyncResult.started_at,
-            completed_at: mockSyncResult.completed_at,
-          },
-        ],
-      });
+      vi.mocked(query).mockResolvedValueOnce([
+        {
+          id: 'job-4',
+          started_at: mockSyncResult.started_at,
+          completed_at: mockSyncResult.completed_at,
+        },
+      ] as never);
 
       const beforeRun = Date.now();
       const result = await runSyncJob();
@@ -286,9 +278,9 @@ describe('QContact Sync Background Job', () => {
       };
 
       vi.mocked(runFullSync).mockResolvedValue(mockSyncResult);
-      vi.mocked(query).mockResolvedValueOnce({
-        rows: [{ id: 'job-5', started_at: new Date(), completed_at: new Date() }],
-      });
+      vi.mocked(query).mockResolvedValueOnce([
+        { id: 'job-5', started_at: new Date(), completed_at: new Date() },
+      ] as never);
 
       const customOptions = {
         start_date: new Date('2024-01-01T00:00:00Z'),
@@ -342,9 +334,9 @@ describe('QContact Sync Background Job', () => {
       };
 
       vi.mocked(runFullSync).mockResolvedValue(mockSyncResult);
-      vi.mocked(query).mockResolvedValueOnce({
-        rows: [{ id: 'job-6', started_at: new Date(), completed_at: new Date() }],
-      });
+      vi.mocked(query).mockResolvedValueOnce([
+        { id: 'job-6', started_at: new Date(), completed_at: new Date() },
+      ] as never);
 
       const result = await runSyncJob();
 
@@ -385,9 +377,7 @@ describe('QContact Sync Background Job', () => {
         },
       ];
 
-      vi.mocked(query).mockResolvedValueOnce({
-        rows: mockHistory,
-      });
+      vi.mocked(query).mockResolvedValueOnce(mockHistory as never);
 
       const history = await getSyncJobHistory({ limit: 10 });
 
@@ -400,9 +390,7 @@ describe('QContact Sync Background Job', () => {
 
     it('should support limit parameter', async () => {
       // 🟢 TDD: Test pagination limit
-      vi.mocked(query).mockResolvedValueOnce({
-        rows: [],
-      });
+      vi.mocked(query).mockResolvedValueOnce([] as never);
 
       await getSyncJobHistory({ limit: 5 });
 
@@ -429,9 +417,7 @@ describe('QContact Sync Background Job', () => {
         },
       ];
 
-      vi.mocked(query).mockResolvedValueOnce({
-        rows: mockHistory,
-      });
+      vi.mocked(query).mockResolvedValueOnce(mockHistory as never);
 
       const history = await getSyncJobHistory({ status: 'failed' });
 

@@ -54,7 +54,7 @@ vi.mock('@/lib/logger', () => ({
   })),
 }));
 
-import { syncInboundTickets } from '../../services/qcontactSyncInbound';
+import { syncFiberTimeInboundTickets } from '../../services/qcontactSyncInbound';
 import { query, queryOne } from '../../utils/db';
 
 describe('QContact Sync Orchestrator', () => {
@@ -78,21 +78,19 @@ describe('QContact Sync Orchestrator', () => {
         errors: [],
       };
 
-      vi.mocked(syncInboundTickets).mockResolvedValue(mockInboundSyncResult);
+      vi.mocked(syncFiberTimeInboundTickets).mockResolvedValue(mockInboundSyncResult);
 
-      // Mock outbound tickets query
-      vi.mocked(query).mockResolvedValueOnce({
-        rows: [
-          { id: 'ticket-1', external_id: 'QC-001', status: 'in_progress' },
-          { id: 'ticket-2', external_id: 'QC-002', status: 'closed' },
-        ],
-      });
+      // Mock outbound tickets query (query<T>() returns T[] directly)
+      vi.mocked(query).mockResolvedValueOnce([
+        { id: 'ticket-1', external_id: 'QC-001', status: 'in_progress' },
+        { id: 'ticket-2', external_id: 'QC-002', status: 'closed' },
+      ] as never);
 
       const request: FullSyncRequest = {};
       const result = await runFullSync(request);
 
       // Verify inbound sync was called
-      expect(syncInboundTickets).toHaveBeenCalledTimes(1);
+      expect(syncFiberTimeInboundTickets).toHaveBeenCalledTimes(1);
 
       // Verify result structure
       expect(result).toHaveProperty('started_at');
@@ -136,8 +134,8 @@ describe('QContact Sync Orchestrator', () => {
         ],
       };
 
-      vi.mocked(syncInboundTickets).mockResolvedValue(mockInboundSyncResult);
-      vi.mocked(query).mockResolvedValueOnce({ rows: [] });
+      vi.mocked(syncFiberTimeInboundTickets).mockResolvedValue(mockInboundSyncResult);
+      vi.mocked(query).mockResolvedValueOnce([] as never);
 
       const request: FullSyncRequest = {};
       const result = await runFullSync(request);
@@ -163,8 +161,8 @@ describe('QContact Sync Orchestrator', () => {
         errors: [],
       };
 
-      vi.mocked(syncInboundTickets).mockResolvedValue(mockInboundSyncResult);
-      vi.mocked(query).mockResolvedValueOnce({ rows: [] });
+      vi.mocked(syncFiberTimeInboundTickets).mockResolvedValue(mockInboundSyncResult);
+      vi.mocked(query).mockResolvedValueOnce([] as never);
 
       const request: FullSyncRequest = {};
       const result = await runFullSync(request);
@@ -190,8 +188,8 @@ describe('QContact Sync Orchestrator', () => {
         errors: [],
       };
 
-      vi.mocked(syncInboundTickets).mockResolvedValue(mockInboundSyncResult);
-      vi.mocked(query).mockResolvedValueOnce({ rows: [] });
+      vi.mocked(syncFiberTimeInboundTickets).mockResolvedValue(mockInboundSyncResult);
+      vi.mocked(query).mockResolvedValueOnce([] as never);
 
       const beforeSync = Date.now();
       const result = await runFullSync({});
@@ -228,8 +226,8 @@ describe('QContact Sync Orchestrator', () => {
         ],
       };
 
-      vi.mocked(syncInboundTickets).mockResolvedValue(mockInboundSyncResult);
-      vi.mocked(query).mockResolvedValueOnce({ rows: [] });
+      vi.mocked(syncFiberTimeInboundTickets).mockResolvedValue(mockInboundSyncResult);
+      vi.mocked(query).mockResolvedValueOnce([] as never);
 
       const result = await runFullSync({});
 
@@ -274,7 +272,7 @@ describe('QContact Sync Orchestrator', () => {
         errors: [],
       };
 
-      vi.mocked(syncInboundTickets).mockResolvedValue(mockInboundSyncResult);
+      vi.mocked(syncFiberTimeInboundTickets).mockResolvedValue(mockInboundSyncResult);
 
       const request: FullSyncRequest = {
         sync_direction: SyncDirection.INBOUND,
@@ -282,7 +280,7 @@ describe('QContact Sync Orchestrator', () => {
 
       const result = await runInboundOnlySync(request);
 
-      expect(syncInboundTickets).toHaveBeenCalledTimes(1);
+      expect(syncFiberTimeInboundTickets).toHaveBeenCalledTimes(1);
       expect(result.inbound_stats.total_processed).toBe(30);
       expect(result.inbound_stats.successful).toBe(28);
 
@@ -306,7 +304,7 @@ describe('QContact Sync Orchestrator', () => {
         errors: [],
       };
 
-      vi.mocked(syncInboundTickets).mockResolvedValue(mockInboundSyncResult);
+      vi.mocked(syncFiberTimeInboundTickets).mockResolvedValue(mockInboundSyncResult);
 
       const request: FullSyncRequest = {
         sync_direction: SyncDirection.INBOUND,
@@ -316,7 +314,7 @@ describe('QContact Sync Orchestrator', () => {
 
       await runInboundOnlySync(request);
 
-      expect(syncInboundTickets).toHaveBeenCalledWith({
+      expect(syncFiberTimeInboundTickets).toHaveBeenCalledWith({
         created_after: request.start_date,
         created_before: request.end_date,
       });
@@ -326,12 +324,10 @@ describe('QContact Sync Orchestrator', () => {
   describe('runOutboundOnlySync', () => {
     it('should run outbound sync only', async () => {
       // 🟢 WORKING: Test outbound-only sync
-      vi.mocked(query).mockResolvedValueOnce({
-        rows: [
-          { id: 'ticket-1', external_id: 'QC-001', status: 'in_progress', assigned_to: 'user-1' },
-          { id: 'ticket-2', external_id: 'QC-002', status: 'closed', assigned_to: null },
-        ],
-      });
+      vi.mocked(query).mockResolvedValueOnce([
+        { id: 'ticket-1', external_id: 'QC-001', status: 'in_progress', assigned_to: 'user-1' },
+        { id: 'ticket-2', external_id: 'QC-002', status: 'closed', assigned_to: null },
+      ] as never);
 
       const request: FullSyncRequest = {
         sync_direction: SyncDirection.OUTBOUND,
@@ -351,9 +347,7 @@ describe('QContact Sync Orchestrator', () => {
       // 🟢 WORKING: Test date filtering for outbound sync
       const startDate = new Date('2024-01-15T00:00:00Z');
 
-      vi.mocked(query).mockResolvedValueOnce({
-        rows: [],
-      });
+      vi.mocked(query).mockResolvedValueOnce([] as never);
 
       const request: FullSyncRequest = {
         sync_direction: SyncDirection.OUTBOUND,
@@ -436,7 +430,7 @@ describe('QContact Sync Orchestrator', () => {
   describe('Error Handling', () => {
     it('should handle inbound sync service errors', async () => {
       // 🟢 WORKING: Test error handling for inbound failures
-      vi.mocked(syncInboundTickets).mockRejectedValue(
+      vi.mocked(syncFiberTimeInboundTickets).mockRejectedValue(
         new Error('QContact API unavailable')
       );
 
@@ -468,8 +462,8 @@ describe('QContact Sync Orchestrator', () => {
         ],
       };
 
-      vi.mocked(syncInboundTickets).mockResolvedValue(mockInboundSyncResult);
-      vi.mocked(query).mockResolvedValueOnce({ rows: [] });
+      vi.mocked(syncFiberTimeInboundTickets).mockResolvedValue(mockInboundSyncResult);
+      vi.mocked(query).mockResolvedValueOnce([] as never);
 
       const result = await runFullSync({});
 

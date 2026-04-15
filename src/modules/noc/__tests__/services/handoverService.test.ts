@@ -71,12 +71,12 @@ describe('Handover Service', () => {
         ticket_uid: 'FT001234',
         status: TicketStatus.PENDING_QA,
         dr_number: 'DR12345',
-        pole_number: 'P001',
-        pon_number: 'PON001',
-        zone_id: 'zone-uuid-001',
+        pole_id: 'P001',
+        pon: 'PON001',
+        zone: 'zone-uuid-001',
         ont_serial: 'ONT123456',
         ont_rx_level: -18.5,
-        assigned_contractor_id: 'contractor-uuid-001'
+        contractor_id: 'contractor-uuid-001'
       };
 
       // Mock attachments - has photos
@@ -112,12 +112,12 @@ describe('Handover Service', () => {
         ticket_uid: 'FT001234',
         status: TicketStatus.PENDING_QA,
         dr_number: null, // Missing DR
-        pole_number: 'P001',
-        pon_number: 'PON001',
-        zone_id: 'zone-uuid-001',
+        pole_id: 'P001',
+        pon: 'PON001',
+        zone: 'zone-uuid-001',
         ont_serial: 'ONT123456',
         ont_rx_level: -18.5,
-        assigned_contractor_id: 'contractor-uuid-001'
+        contractor_id: 'contractor-uuid-001'
       };
 
       const mockAttachments = [{ id: 'att-1', file_type: 'photo' }];
@@ -143,12 +143,12 @@ describe('Handover Service', () => {
         ticket_uid: 'FT001234',
         status: TicketStatus.PENDING_QA,
         dr_number: 'DR12345',
-        pole_number: 'P001',
-        pon_number: 'PON001',
-        zone_id: 'zone-uuid-001',
+        pole_id: 'P001',
+        pon: 'PON001',
+        zone: 'zone-uuid-001',
         ont_serial: 'ONT123456',
         ont_rx_level: -18.5,
-        assigned_contractor_id: 'contractor-uuid-001'
+        contractor_id: 'contractor-uuid-001'
       };
 
       const mockAttachments = []; // No photos
@@ -173,12 +173,12 @@ describe('Handover Service', () => {
         ticket_uid: 'FT001234',
         status: TicketStatus.PENDING_QA,
         dr_number: 'DR12345',
-        pole_number: 'P001',
-        pon_number: 'PON001',
-        zone_id: 'zone-uuid-001',
+        pole_id: 'P001',
+        pon: 'PON001',
+        zone: 'zone-uuid-001',
         ont_serial: null, // Missing ONT serial
         ont_rx_level: null, // Missing RX level
-        assigned_contractor_id: 'contractor-uuid-001'
+        contractor_id: 'contractor-uuid-001'
       };
 
       const mockAttachments = [{ id: 'att-1', file_type: 'photo' }];
@@ -203,12 +203,12 @@ describe('Handover Service', () => {
         ticket_uid: 'FT001234',
         status: TicketStatus.PENDING_QA,
         dr_number: 'DR12345',
-        pole_number: 'P001',
-        pon_number: 'PON001',
-        zone_id: 'zone-uuid-001',
+        pole_id: 'P001',
+        pon: 'PON001',
+        zone: 'zone-uuid-001',
         ont_serial: 'ONT123456',
         ont_rx_level: -18.5,
-        assigned_contractor_id: null // No contractor assigned
+        contractor_id: null // No contractor assigned
       };
 
       const mockAttachments = [{ id: 'att-1', file_type: 'photo' }];
@@ -234,11 +234,11 @@ describe('Handover Service', () => {
         status: TicketStatus.PENDING_QA,
         dr_number: 'DR12345',
         pole_number: null, // Pole can be missing for build_to_qa
-        pon_number: 'PON001',
-        zone_id: 'zone-uuid-001',
+        pon: 'PON001',
+        zone: 'zone-uuid-001',
         ont_serial: 'ONT123456',
         ont_rx_level: -18.5,
-        assigned_contractor_id: 'contractor-uuid-001'
+        contractor_id: 'contractor-uuid-001'
       };
 
       const mockAttachments = [{ id: 'att-1', file_type: 'photo' }];
@@ -276,7 +276,7 @@ describe('Handover Service', () => {
         dr_number: 'DR12345',
         ont_serial: 'ONT123456',
         qa_ready: true,
-        assigned_contractor_id: 'contractor-uuid-001'
+        contractor_id: 'contractor-uuid-001'
       };
 
       const mockAttachments = [
@@ -311,7 +311,7 @@ describe('Handover Service', () => {
           ont_rx_level: null,
           ont_model: null,
           assigned_to: null,
-          assigned_contractor_id: mockTicket.assigned_contractor_id,
+          assigned_contractor_id: mockTicket.contractor_id,
           assigned_team: null,
           qa_ready: mockTicket.qa_ready,
           qa_readiness_check_at: null,
@@ -385,7 +385,7 @@ describe('Handover Service', () => {
         ont_serial: 'ONT123456',
         ont_rx_level: -18.5,
         qa_ready: true,
-        assigned_contractor_id: 'contractor-uuid-001'
+        contractor_id: 'contractor-uuid-001'
       };
 
       const mockAttachments = [
@@ -419,7 +419,7 @@ describe('Handover Service', () => {
           ont_rx_level: mockTicket.ont_rx_level,
           ont_model: null,
           assigned_to: null,
-          assigned_contractor_id: mockTicket.assigned_contractor_id,
+          assigned_contractor_id: mockTicket.contractor_id,
           assigned_team: null,
           qa_ready: mockTicket.qa_ready,
           qa_readiness_check_at: null,
@@ -639,12 +639,12 @@ describe('Handover Service', () => {
       const mockTicket = {
         id: ticketId,
         dr_number: 'DR12345',
-        pole_number: 'P001',
-        pon_number: 'PON001',
-        zone_id: 'zone-uuid',
+        pole_id: 'P001',
+        pon: 'PON001',
+        zone: 'zone-uuid',
         ont_serial: 'ONT123456',
         ont_rx_level: -18.5,
-        assigned_contractor_id: 'contractor-uuid'
+        contractor_id: 'contractor-uuid'
       };
 
       const mockAttachments = [{ id: 'att-1', file_type: 'photo' }];
@@ -667,7 +667,7 @@ describe('Handover Service', () => {
         id: ticketId,
         dr_number: null, // Missing DR - gate fails
         ont_serial: 'ONT123456',
-        assigned_contractor_id: 'contractor-uuid'
+        contractor_id: 'contractor-uuid'
       };
 
       const mockAttachments = [];

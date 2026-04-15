@@ -63,7 +63,8 @@ function formatOwnerType(type: string | null): string {
   const typeMap: Record<string, string> = {
     build: 'Build Team',
     qa: 'QA Team',
-    maintenance: 'Maintenance Team',
+    ops: 'Maintenance Team', // OwnerType.OPS was renamed from MAINTENANCE; display label unchanged
+    maintenance: 'Maintenance Team', // Keep for any legacy data still carrying the old value
   };
   return typeMap[type] || type;
 }

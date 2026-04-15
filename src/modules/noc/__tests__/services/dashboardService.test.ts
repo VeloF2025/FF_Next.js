@@ -270,9 +270,9 @@ describe('Dashboard Service - Statistics', () => {
       // Assert
       expect(result.overdue_count).toBe(8);
 
-      // Verify query checks SLA and status
+      // Verify query checks SLA and status (source uses `due_at` column)
       expect(queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('sla_due_at'),
+        expect.stringContaining('due_at'),
         expect.any(Array)
       );
     });

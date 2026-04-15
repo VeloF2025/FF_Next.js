@@ -46,6 +46,9 @@ interface HandoverHistoryProps {
 function formatHandoverType(type: string): string {
   const typeMap: Record<string, string> = {
     build_to_qa: 'Build to QA',
+    qa_to_ops: 'QA to Maintenance', // Enum renamed QA_TO_MAINTENANCE → QA_TO_OPS; label unchanged
+    ops_complete: 'Maintenance Complete', // Enum renamed MAINTENANCE_COMPLETE → OPS_COMPLETE; label unchanged
+    // Accept the legacy values too in case any persisted rows still carry them.
     qa_to_maintenance: 'QA to Maintenance',
     maintenance_complete: 'Maintenance Complete',
   };
@@ -60,7 +63,8 @@ function formatOwnerType(type: string | null): string {
   const typeMap: Record<string, string> = {
     build: 'Build',
     qa: 'QA',
-    maintenance: 'Maintenance',
+    ops: 'Maintenance', // OwnerType.OPS was renamed from MAINTENANCE; keep legacy label
+    maintenance: 'Maintenance', // Fallback for any legacy rows
   };
   return typeMap[type] || type;
 }

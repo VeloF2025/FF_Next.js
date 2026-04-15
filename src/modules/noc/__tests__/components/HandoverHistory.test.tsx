@@ -191,7 +191,8 @@ describe('HandoverHistory Component', () => {
       renderWithQueryClient(<HandoverHistory ticketId={mockTicketId} />);
 
       // Assert
-      expect(screen.getByText(/loading/i) || screen.getByRole('status')).toBeInTheDocument();
+      // LoadingSpinner renders sr-only + visible spans.
+      expect(screen.getAllByText(/loading/i).length).toBeGreaterThan(0);
     });
 
     it('should show error state on fetch failure', async () => {

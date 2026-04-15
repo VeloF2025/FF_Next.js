@@ -26,7 +26,11 @@ import handler from '../../../pages/api/analytics/projects/summary';
 
 describe('GET /api/analytics/projects/summary — error handling', () => {
   let req: Partial<NextApiRequest>;
-  let res: { status: ReturnType<typeof vi.fn>; json: ReturnType<typeof vi.fn> };
+  let res: {
+    status: ReturnType<typeof vi.fn>;
+    json: ReturnType<typeof vi.fn>;
+    setHeader: ReturnType<typeof vi.fn>;
+  };
   let statusReturn: { json: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
@@ -35,6 +39,8 @@ describe('GET /api/analytics/projects/summary — error handling', () => {
     res = {
       status: vi.fn().mockReturnValue(statusReturn),
       json: vi.fn(),
+      // apiResponse.methodNotAllowed() calls res.setHeader('Allow', ...).
+      setHeader: vi.fn(),
     };
     req = { method: 'GET', query: {} };
   });

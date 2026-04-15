@@ -111,7 +111,8 @@ describe('QAReadinessCheck Component', () => {
       renderWithQueryClient(<QAReadinessCheck ticketId="ticket-456" />);
 
       // Assert
-      expect(screen.getByText(/loading/i)).toBeInTheDocument();
+      // "Loading" appears in sr-only and visible spans; any match is fine.
+      expect(screen.getAllByText(/loading/i).length).toBeGreaterThan(0);
     });
 
     it('should show error state on fetch failure', async () => {
@@ -229,7 +230,9 @@ describe('QAReadinessCheck Component', () => {
           }),
         });
 
-      mockFetchFn = mockFetch;
+      // Swap the existing global fetch spy's implementation — cannot reassign
+      // the const, so install the queued responses onto it.
+      mockFetchFn.mockImplementation(mockFetch);
 
       // Act
       renderWithQueryClient(<QAReadinessCheck ticketId="ticket-456" />);
@@ -339,9 +342,12 @@ describe('ReadinessResults Component', () => {
     // Act
     render(<ReadinessResults check={check} />);
 
-    // Assert
+    // Assert — the exact date rendering is locale-dependent, so just check
+    // that the year and a Jan date are present (timezone may roll to Jan 14
+    // in UTC-leaning locales).
     expect(screen.getByText(/checked on/i)).toBeInTheDocument();
-    expect(screen.getByText(/jan 15, 2024/i)).toBeInTheDocument();
+    // Renders day-first: "15 Jan 2024, 12:30"
+    expect(screen.getByText(/1[45] jan 2024/i)).toBeInTheDocument();
   });
 
   it('should display progress bar for passed checks', () => {

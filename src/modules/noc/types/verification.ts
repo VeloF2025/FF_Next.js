@@ -113,7 +113,9 @@ export interface QAReadinessFailedCheck {
   check_name: string;
   reason: string;
   expected?: string | number;
-  actual?: string | number;
+  // `null` is carried through when the source value was explicitly null
+  // (missing field) so UI/tests can tell "not provided" from "0".
+  actual?: string | number | null;
 }
 
 /**

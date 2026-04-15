@@ -485,7 +485,8 @@ describe('FaultTrendAnalysis Component', () => {
       render(<FaultTrendAnalysis data={mockTrendData} isLoading={true} />);
 
       // Assert
-      expect(screen.getByText(/loading/i)).toBeInTheDocument();
+      // Component renders loading text in both sr-only + visible spans.
+      expect(screen.getAllByText(/loading/i).length).toBeGreaterThan(0);
     });
   });
 

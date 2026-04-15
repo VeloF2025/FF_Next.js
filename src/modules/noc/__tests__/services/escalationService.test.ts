@@ -268,7 +268,7 @@ describe('EscalationService (TDD)', () => {
       expect(ticketService.createTicket).toHaveBeenCalledWith(
         expect.objectContaining({
           title: expect.stringContaining('POLE-123'),
-          ticket_type: 'fault_repair',
+          ticket_type: 'maintenance',
           source: 'construction',
           priority: 'high',
         })

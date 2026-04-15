@@ -199,7 +199,8 @@ describe('SyncDashboard Component', () => {
       render(<SyncDashboard />, { wrapper: createWrapper() });
 
       // Assert
-      expect(screen.getByText(/Loading sync status/i)).toBeInTheDocument();
+      // Loading label duplicated in sr-only + visible spans.
+      expect(screen.getAllByText(/Loading sync status/i).length).toBeGreaterThan(0);
     });
 
     it('should show error state', () => {

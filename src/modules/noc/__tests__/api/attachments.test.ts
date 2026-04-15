@@ -78,6 +78,24 @@ const mockAttachmentList: AttachmentListResponse = {
   evidence_count: 0
 };
 
+// In node vitest env, NextRequest + FormData-with-File bodies hang on the
+// Route's `await request.formData()` call (upstream undici/next quirk). Build
+// a minimal request-shaped stub whose .formData() returns synchronously.
+function makeUploadRequest(
+  url: string,
+  fields: Record<string, string | Blob>
+): NextRequest {
+  const fd = new FormData();
+  for (const [k, v] of Object.entries(fields)) fd.append(k, v as Blob | string);
+  return {
+    url,
+    method: 'POST',
+    headers: new Headers(),
+    formData: async () => fd,
+    nextUrl: new URL(url),
+  } as unknown as NextRequest;
+}
+
 describe('POST /api/noc/tickets/[id]/attachments', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -89,17 +107,11 @@ describe('POST /api/noc/tickets/[id]/attachments', () => {
 
     const { POST } = await import('@/app/api/noc/tickets/[id]/attachments/route');
 
-    // Create form data
-    const formData = new FormData();
     const file = new File(['test content'], 'photo.jpg', { type: 'image/jpeg' });
-    formData.append('file', file);
-    formData.append('uploaded_by', mockUserId);
-    formData.append('is_evidence', 'false');
-
-    const request = new NextRequest('http://localhost/api/noc/tickets/' + mockTicketId + '/attachments', {
-      method: 'POST',
-      body: formData,
-    });
+    const request = makeUploadRequest(
+      `http://localhost/api/noc/tickets/${mockTicketId}/attachments`,
+      { file, uploaded_by: mockUserId, is_evidence: 'false' }
+    );
 
     const response = await POST(request, { params: Promise.resolve({ id: mockTicketId }) });
     const json = await response.json();
@@ -131,17 +143,16 @@ describe('POST /api/noc/tickets/[id]/attachments', () => {
 
     const { POST } = await import('@/app/api/noc/tickets/[id]/attachments/route');
 
-    const formData = new FormData();
     const file = new File(['test content'], 'evidence.jpg', { type: 'image/jpeg' });
-    formData.append('file', file);
-    formData.append('uploaded_by', mockUserId);
-    formData.append('is_evidence', 'true');
-    formData.append('verification_step_id', '111e2222-e89b-12d3-a456-426614174001');
-
-    const request = new NextRequest('http://localhost/api/noc/tickets/' + mockTicketId + '/attachments', {
-      method: 'POST',
-      body: formData,
-    });
+    const request = makeUploadRequest(
+      `http://localhost/api/noc/tickets/${mockTicketId}/attachments`,
+      {
+        file,
+        uploaded_by: mockUserId,
+        is_evidence: 'true',
+        verification_step_id: '111e2222-e89b-12d3-a456-426614174001',
+      }
+    );
 
     const response = await POST(request, { params: Promise.resolve({ id: mockTicketId }) });
     const json = await response.json();
@@ -179,14 +190,11 @@ describe('POST /api/noc/tickets/[id]/attachments', () => {
   it('should return 422 if uploaded_by is missing', async () => {
     const { POST } = await import('@/app/api/noc/tickets/[id]/attachments/route');
 
-    const formData = new FormData();
     const file = new File(['test content'], 'photo.jpg', { type: 'image/jpeg' });
-    formData.append('file', file);
-
-    const request = new NextRequest('http://localhost/api/noc/tickets/' + mockTicketId + '/attachments', {
-      method: 'POST',
-      body: formData,
-    });
+    const request = makeUploadRequest(
+      `http://localhost/api/noc/tickets/${mockTicketId}/attachments`,
+      { file }
+    );
 
     const response = await POST(request, { params: Promise.resolve({ id: mockTicketId }) });
     const json = await response.json();
@@ -226,15 +234,11 @@ describe('POST /api/noc/tickets/[id]/attachments', () => {
 
     const { POST } = await import('@/app/api/noc/tickets/[id]/attachments/route');
 
-    const formData = new FormData();
     const file = new File(['test content'], 'photo.jpg', { type: 'image/jpeg' });
-    formData.append('file', file);
-    formData.append('uploaded_by', mockUserId);
-
-    const request = new NextRequest('http://localhost/api/noc/tickets/' + mockTicketId + '/attachments', {
-      method: 'POST',
-      body: formData,
-    });
+    const request = makeUploadRequest(
+      `http://localhost/api/noc/tickets/${mockTicketId}/attachments`,
+      { file, uploaded_by: mockUserId }
+    );
 
     const response = await POST(request, { params: Promise.resolve({ id: mockTicketId }) });
     const json = await response.json();

@@ -133,7 +133,8 @@ describe('TicketDetail', () => {
 
     render(<TicketDetail ticketId="test-id-123" />, { wrapper: createWrapper() });
 
-    expect(screen.getByText('Loading ticket...')).toBeInTheDocument();
+    // LoadingSpinner renders sr-only + visible label.
+    expect(screen.getAllByText('Loading ticket...').length).toBeGreaterThan(0);
   });
 
   // 🟢 WORKING: Test error state
@@ -175,7 +176,8 @@ describe('TicketDetail', () => {
     render(<TicketDetail ticketId="test-id-123" />, { wrapper: createWrapper() });
 
     await waitFor(() => {
-      expect(screen.getByText('In Progress')).toBeInTheDocument();
+      // Status label text may appear in multiple places (badge + details).
+      expect(screen.getAllByText(/in progress/i).length).toBeGreaterThan(0);
     });
   });
 
@@ -200,7 +202,8 @@ describe('TicketDetail', () => {
     render(<TicketDetail ticketId="test-id-123" />, { wrapper: createWrapper() });
 
     await waitFor(() => {
-      expect(screen.getByText('high')).toBeInTheDocument();
+      // Priority label may appear in both badge and details section.
+      expect(screen.getAllByText(/high/i).length).toBeGreaterThan(0);
     });
   });
 
@@ -251,11 +254,12 @@ describe('TicketDetail', () => {
     render(<TicketDetail ticketId="test-id-123" />, { wrapper: createWrapper() });
 
     await waitFor(() => {
-      expect(screen.getByText('DR12345')).toBeInTheDocument();
-      expect(screen.getByText('POLE-001')).toBeInTheDocument();
-      expect(screen.getByText('PON-001')).toBeInTheDocument();
-      expect(screen.getByText('ONT-12345')).toBeInTheDocument();
-      expect(screen.getByText('-20.5 dBm')).toBeInTheDocument();
+      // Some fields render in multiple places (summary + details section).
+      expect(screen.getAllByText('DR12345').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('POLE-001').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('PON-001').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('ONT-12345').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('-20.5 dBm').length).toBeGreaterThan(0);
     });
   });
 
