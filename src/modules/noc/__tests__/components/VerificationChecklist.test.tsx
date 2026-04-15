@@ -174,7 +174,8 @@ describe('VerificationChecklist Component', () => {
       renderWithQueryClient(<VerificationChecklist ticketId="test-ticket-id" />);
 
       // Assert
-      expect(screen.getByText(/loading/i)).toBeInTheDocument();
+      // LoadingSpinner renders sr-only + visible spans.
+      expect(screen.getAllByText(/loading/i).length).toBeGreaterThan(0);
     });
 
     it('should show error state', () => {

@@ -458,7 +458,9 @@ describe('EscalationList Component', () => {
       render(<EscalationList escalations={[]} isLoading={true} />);
 
       // Assert
-      expect(screen.getByText(/Loading escalations/i)).toBeInTheDocument();
+      // Component renders "Loading escalations" in both sr-only and visible text;
+      // assert at least one instance is present.
+      expect(screen.getAllByText(/Loading escalations/i).length).toBeGreaterThan(0);
     });
 
     it('should show error state', () => {

@@ -31,7 +31,11 @@ import handler from '../../../pages/api/chat/access';
 
 describe('GET /api/chat/access — error handling', () => {
   let req: Partial<NextApiRequest> & { user?: { id: string } };
-  let res: { status: ReturnType<typeof vi.fn>; json: ReturnType<typeof vi.fn> };
+  let res: {
+    status: ReturnType<typeof vi.fn>;
+    json: ReturnType<typeof vi.fn>;
+    setHeader: ReturnType<typeof vi.fn>;
+  };
   let statusReturn: { json: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
@@ -40,6 +44,8 @@ describe('GET /api/chat/access — error handling', () => {
     res = {
       status: vi.fn().mockReturnValue(statusReturn),
       json: vi.fn(),
+      // apiResponse.methodNotAllowed() calls res.setHeader('Allow', ...).
+      setHeader: vi.fn(),
     };
     req = { method: 'GET', query: {}, user: { id: 'user-123' } };
   });
@@ -54,14 +60,18 @@ describe('GET /api/chat/access — error handling', () => {
     mockUserHasPermission.mockResolvedValue(true);
     await handler(req as NextApiRequest, res as unknown as NextApiResponse);
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(statusReturn.json).toHaveBeenCalledWith({ dataAccess: true });
+    expect(statusReturn.json).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ dataAccess: true }) })
+    );
   });
 
   it('returns 200 with dataAccess:false when user lacks permission', async () => {
     mockUserHasPermission.mockResolvedValue(false);
     await handler(req as NextApiRequest, res as unknown as NextApiResponse);
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(statusReturn.json).toHaveBeenCalledWith({ dataAccess: false });
+    expect(statusReturn.json).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ dataAccess: false }) })
+    );
   });
 
   it('REGRESSION: returns 500 (not 200) when permission check throws', async () => {

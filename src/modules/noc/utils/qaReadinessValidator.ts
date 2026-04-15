@@ -114,7 +114,7 @@ export function validateQAReadiness(
       check_name: 'dr_populated',
       reason: 'DR number is required',
       expected: 'Non-empty string',
-      actual: input.dr_number ?? undefined,
+      actual: input.dr_number ?? null,
     });
   }
 
@@ -125,7 +125,7 @@ export function validateQAReadiness(
       check_name: 'pole_populated',
       reason: 'Pole number is required',
       expected: 'Non-empty string',
-      actual: input.pole_number ?? undefined,
+      actual: input.pole_number ?? null,
     });
   }
 
@@ -136,7 +136,7 @@ export function validateQAReadiness(
       check_name: 'pon_populated',
       reason: 'PON number is required',
       expected: 'Non-empty string',
-      actual: input.pon_number ?? undefined,
+      actual: input.pon_number ?? null,
     });
   }
 
@@ -147,7 +147,7 @@ export function validateQAReadiness(
       check_name: 'zone_populated',
       reason: 'Zone is required',
       expected: 'Non-empty string',
-      actual: input.zone_id ?? undefined,
+      actual: input.zone_id ?? null,
     });
   }
 
@@ -158,7 +158,7 @@ export function validateQAReadiness(
       check_name: 'ont_serial_recorded',
       reason: 'ONT serial number is required',
       expected: 'Non-empty string',
-      actual: input.ont_serial ?? undefined,
+      actual: input.ont_serial ?? null,
     });
   }
 
@@ -170,7 +170,7 @@ export function validateQAReadiness(
       check_name: 'ont_rx_recorded',
       reason: 'ONT RX power level is required',
       expected: 'Numeric value',
-      actual: input.ont_rx_level ?? undefined,
+      actual: input.ont_rx_level ?? null,
     });
   }
 

@@ -410,7 +410,8 @@ describe('QContact Webhook API', () => {
       expect(response.status).toBe(200);
       // Verify webhook receipt was logged
       expect(queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO maintenance_qcontact_sync_log'),
+        // Table was later renamed — actual source uses `qcontact_sync_log`
+        expect.stringContaining('INSERT INTO qcontact_sync_log'),
         expect.arrayContaining([
           expect.stringContaining('qc-12345'), // qcontact_ticket_id
           expect.stringContaining('inbound'),

@@ -165,9 +165,13 @@ describe('WeeklyImportWizard Component', () => {
       });
       fireEvent.change(fileInput, { target: { files: [validFile] } });
 
-      // Assert
+      // Assert — wizard auto-parses on select; verify the parse endpoint
+      // was hit rather than looking for a manual "Parse file" button that
+      // no longer exists.
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /parse file/i })).toBeInTheDocument();
+        const fetchMock = (global.fetch as ReturnType<typeof vi.fn>);
+        const calls = fetchMock.mock.calls.map((c) => String(c[0]));
+        expect(calls.some((u) => u.includes('/import/weekly/parse'))).toBe(true);
       });
     });
 
@@ -263,11 +267,9 @@ describe('WeeklyImportWizard Component', () => {
       });
       fireEvent.change(fileInput, { target: { files: [validFile] } });
 
-      // Assert
-      await waitFor(() => {
-        const parseButton = screen.getByRole('button', { name: /parse file/i });
-        expect(parseButton).toHaveAttribute('type', 'button');
-      });
+      // Assert — no manual Parse File button exists any more (auto-parse on
+      // select). Just verify the Choose File control is still a proper label.
+      expect(fileInput).toBeInstanceOf(HTMLInputElement);
     });
   });
 

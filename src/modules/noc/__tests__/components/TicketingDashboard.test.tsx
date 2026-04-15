@@ -116,18 +116,41 @@ const mockRecentTickets = [
   },
 ];
 
+// Build a fetch Response-like object with both text() and json() so the
+// component's `safeJsonParse` (which calls .text() then JSON.parse) works.
+function makeResp(body: unknown, ok: boolean = true) {
+  const payload = JSON.stringify(body);
+  return {
+    ok,
+    status: ok ? 200 : 500,
+    text: async () => payload,
+    json: async () => body,
+  };
+}
+
 describe('TicketingDashboard Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The dashboard fires three parallel fetches. Install a URL-aware
+    // default so per-test `mockResolvedValueOnce` for the summary fetch
+    // leaves the other two with sensible responses.
+    (global.fetch as Mock).mockImplementation(async (url: string) => {
+      if (typeof url === 'string' && url.includes('/dashboard/workload')) {
+        return makeResp({ success: true, data: mockWorkloadData });
+      }
+      if (typeof url === 'string' && url.includes('/api/noc/tickets')) {
+        return makeResp({ success: true, data: mockRecentTickets });
+      }
+      return makeResp({ success: true, data: mockSummaryData });
+    });
   });
 
   describe('TDD: Display summary stats', () => {
     it('should display total tickets count', async () => {
       // Arrange
-      (global.fetch as Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true, data: mockSummaryData }),
-      });
+      (global.fetch as Mock).mockResolvedValueOnce(
+        makeResp({ success: true, data: mockSummaryData })
+      );
 
       // Act
       renderWithQueryClient(<TicketingDashboard />);
@@ -142,10 +165,9 @@ describe('TicketingDashboard Component', () => {
 
     it('should display tickets by status breakdown', async () => {
       // Arrange
-      (global.fetch as Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true, data: mockSummaryData }),
-      });
+      (global.fetch as Mock).mockResolvedValueOnce(
+        makeResp({ success: true, data: mockSummaryData })
+      );
 
       // Act
       renderWithQueryClient(<TicketingDashboard />);
@@ -160,27 +182,25 @@ describe('TicketingDashboard Component', () => {
 
     it('should display overdue tickets count', async () => {
       // Arrange
-      (global.fetch as Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true, data: mockSummaryData }),
-      });
+      (global.fetch as Mock).mockResolvedValueOnce(
+        makeResp({ success: true, data: mockSummaryData })
+      );
 
       // Act
       renderWithQueryClient(<TicketingDashboard />);
 
       // Assert
       await waitFor(() => {
-        expect(screen.getByText(/overdue/i)).toBeInTheDocument();
+        expect(screen.getAllByText(/overdue/i).length).toBeGreaterThan(0);
         expect(screen.getByText('8')).toBeInTheDocument();
       });
     });
 
     it('should display average resolution time', async () => {
       // Arrange
-      (global.fetch as Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true, data: mockSummaryData }),
-      });
+      (global.fetch as Mock).mockResolvedValueOnce(
+        makeResp({ success: true, data: mockSummaryData })
+      );
 
       // Act
       renderWithQueryClient(<TicketingDashboard />);
@@ -412,10 +432,9 @@ describe('TicketingDashboard Component', () => {
         active_escalations: 3,
       };
 
-      (global.fetch as Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true, data: summaryWithEscalations }),
-      });
+      (global.fetch as Mock).mockResolvedValueOnce(
+        makeResp({ success: true, data: summaryWithEscalations })
+      );
 
       // Act
       renderWithQueryClient(<TicketingDashboard />);
@@ -429,10 +448,9 @@ describe('TicketingDashboard Component', () => {
 
     it('should not display escalation section when no escalations', async () => {
       // Arrange
-      (global.fetch as Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true, data: mockSummaryData }),
-      });
+      (global.fetch as Mock).mockResolvedValueOnce(
+        makeResp({ success: true, data: mockSummaryData })
+      );
 
       // Act
       renderWithQueryClient(<TicketingDashboard />);
@@ -452,7 +470,7 @@ describe('TicketingDashboard Component', () => {
       renderWithQueryClient(<TicketingDashboard refreshInterval={60000} />);
 
       // Assert - component renders without error
-      expect(screen.getByText(/dashboard/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/dashboard/i).length).toBeGreaterThan(0);
     });
 
     it('should have default refresh interval of 30 seconds', () => {
@@ -460,7 +478,7 @@ describe('TicketingDashboard Component', () => {
       renderWithQueryClient(<TicketingDashboard />);
 
       // Assert - component renders without error with default interval
-      expect(screen.getByText(/dashboard/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/dashboard/i).length).toBeGreaterThan(0);
     });
   });
 
@@ -485,7 +503,7 @@ describe('TicketingDashboard Component', () => {
       renderWithQueryClient(<TicketingDashboard />);
 
       // Assert - should show loading indicator
-      expect(screen.getByText(/loading/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/loading/i).length).toBeGreaterThan(0);
     });
 
     it('should display error state when API fails', async () => {
@@ -504,13 +522,12 @@ describe('TicketingDashboard Component', () => {
 
     it('should display error message when API returns error', async () => {
       // Arrange
-      (global.fetch as Mock).mockResolvedValueOnce({
-        ok: false,
-        json: async () => ({
-          success: false,
-          error: { message: 'Failed to fetch dashboard data' },
-        }),
-      });
+      (global.fetch as Mock).mockResolvedValueOnce(
+        makeResp(
+          { success: false, error: { message: 'Failed to fetch dashboard data' } },
+          false
+        )
+      );
 
       // Act
       renderWithQueryClient(<TicketingDashboard />);
@@ -538,10 +555,9 @@ describe('TicketingDashboard Component', () => {
   describe('Accessibility', () => {
     it('should have proper heading hierarchy', async () => {
       // Arrange
-      (global.fetch as Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true, data: mockSummaryData }),
-      });
+      (global.fetch as Mock).mockResolvedValueOnce(
+        makeResp({ success: true, data: mockSummaryData })
+      );
 
       // Act
       renderWithQueryClient(<TicketingDashboard />);

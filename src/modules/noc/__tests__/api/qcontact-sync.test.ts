@@ -333,16 +333,16 @@ describe('QContact Sync API', () => {
       const response = await GET(request as unknown as NextRequest);
       const data = await response.json();
 
+      // Route returns a flat SyncStatusOverview (not the old nested shape).
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
-      expect(data.data.last_sync).toBeDefined();
-      expect(data.data.last_24h).toBeDefined();
-      expect(data.data.last_24h.total).toBe(100);
-      expect(data.data.last_24h.successful).toBe(85);
-      expect(data.data.last_24h.success_rate).toBe(0.85);
-      expect(data.data.last_7d.by_direction).toBeDefined();
-      expect(data.data.health).toBeDefined();
-      expect(data.data.health.is_healthy).toBe(true);
+      expect(data.data.last_sync_at).toBeDefined();
+      expect(data.data.last_sync_status).toBe('success');
+      expect(data.data.failed_last_24h).toBe(10);
+      // success_rate is returned as percentage (0.85 → 85)
+      expect(data.data.success_rate_last_7d).toBe(85);
+      expect(data.data.is_healthy).toBe(true);
+      expect(Array.isArray(data.data.health_issues)).toBe(true);
     });
 
     it('should mark as unhealthy when success rate is low', async () => {
@@ -375,10 +375,9 @@ describe('QContact Sync API', () => {
 
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
-      expect(data.data.health.is_healthy).toBe(false);
-      expect(data.data.health.health_issues.length).toBeGreaterThan(0);
-      // Check that at least one health issue mentions low success rate
-      const hasSuccessRateIssue = data.data.health.health_issues.some((issue: string) =>
+      expect(data.data.is_healthy).toBe(false);
+      expect(data.data.health_issues.length).toBeGreaterThan(0);
+      const hasSuccessRateIssue = data.data.health_issues.some((issue: string) =>
         issue.toLowerCase().includes('success rate')
       );
       expect(hasSuccessRateIssue).toBe(true);

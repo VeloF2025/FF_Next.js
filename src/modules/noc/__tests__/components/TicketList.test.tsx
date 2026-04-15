@@ -163,7 +163,8 @@ describe('TicketList', () => {
 
     render(<TicketList />, { wrapper: createWrapper() });
 
-    expect(screen.getByText('Loading tickets...')).toBeInTheDocument();
+    // Loading label appears in sr-only + visible spans.
+    expect(screen.getAllByText('Loading tickets...').length).toBeGreaterThan(0);
   });
 
   // 🟢 WORKING: Test error state

@@ -274,8 +274,7 @@ describe('Fault Attribution API Endpoints', () => {
   describe('GET /api/noc/analytics/fault-trends - Get fault trends', () => {
     it('should get trends by fault cause', async () => {
       const { query } = await import('../../utils/db');
-      const mockTrends = {
-        rows: [
+      const mockTrends = [
           {
             fault_cause: FaultCause.WORKMANSHIP,
             count: '15',
@@ -291,8 +290,7 @@ describe('Fault Attribution API Endpoints', () => {
             count: '8',
             percentage: '16.00',
           },
-        ],
-      };
+        ];
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
@@ -313,8 +311,7 @@ describe('Fault Attribution API Endpoints', () => {
 
     it('should get trends by location (pole_number)', async () => {
       const { query } = await import('../../utils/db');
-      const mockTrends = {
-        rows: [
+      const mockTrends = [
           {
             pole_number: 'P123',
             count: '5',
@@ -325,8 +322,7 @@ describe('Fault Attribution API Endpoints', () => {
             count: '3',
             percentage: '15.00',
           },
-        ],
-      };
+        ];
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
@@ -345,8 +341,7 @@ describe('Fault Attribution API Endpoints', () => {
 
     it('should get trends by location (pon_number)', async () => {
       const { query } = await import('../../utils/db');
-      const mockTrends = {
-        rows: [
+      const mockTrends = [
           {
             pon_number: 'PON123',
             count: '8',
@@ -357,8 +352,7 @@ describe('Fault Attribution API Endpoints', () => {
             count: '6',
             percentage: '30.00',
           },
-        ],
-      };
+        ];
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
@@ -376,8 +370,7 @@ describe('Fault Attribution API Endpoints', () => {
 
     it('should get trends by zone', async () => {
       const { query } = await import('../../utils/db');
-      const mockTrends = {
-        rows: [
+      const mockTrends = [
           {
             zone_id: 'zone-123',
             count: '12',
@@ -388,8 +381,7 @@ describe('Fault Attribution API Endpoints', () => {
             count: '9',
             percentage: '25.00',
           },
-        ],
-      };
+        ];
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
@@ -407,15 +399,13 @@ describe('Fault Attribution API Endpoints', () => {
 
     it('should filter trends by project_id', async () => {
       const { query } = await import('../../utils/db');
-      const mockTrends = {
-        rows: [
+      const mockTrends = [
           {
             fault_cause: FaultCause.WORKMANSHIP,
             count: '8',
             percentage: '40.00',
           },
-        ],
-      };
+        ];
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
@@ -435,15 +425,13 @@ describe('Fault Attribution API Endpoints', () => {
 
     it('should filter trends by date range', async () => {
       const { query } = await import('../../utils/db');
-      const mockTrends = {
-        rows: [
+      const mockTrends = [
           {
             fault_cause: FaultCause.WORKMANSHIP,
             count: '5',
             percentage: '50.00',
           },
-        ],
-      };
+        ];
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
@@ -476,7 +464,7 @@ describe('Fault Attribution API Endpoints', () => {
 
     it('should return empty array when no trends found', async () => {
       const { query } = await import('../../utils/db');
-      vi.mocked(query).mockResolvedValue({ rows: [] });
+      vi.mocked(query).mockResolvedValue([]);
 
       const { GET } = await import('@/app/api/noc/analytics/fault-trends/route');
 
@@ -506,15 +494,13 @@ describe('Fault Attribution API Endpoints', () => {
 
     it('should include metadata in response', async () => {
       const { query } = await import('../../utils/db');
-      const mockTrends = {
-        rows: [
+      const mockTrends = [
           {
             fault_cause: FaultCause.WORKMANSHIP,
             count: '10',
             percentage: '50.00',
           },
-        ],
-      };
+        ];
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 

@@ -615,8 +615,12 @@ export function WorkflowEditorProvider({ children }: WorkflowEditorProviderProps
 
   // Node management functions
   const addNode = useCallback((type: 'phase' | 'step' | 'task', position: EditorPosition, parentId?: string) => {
+    // Use a random suffix so back-to-back calls in the same millisecond
+    // produce distinct IDs. Previously `temp-${Date.now()}` collided when
+    // two nodes were added in one render tick, which broke subsequent
+    // connection lookups by source/target node id.
     const newNode: EditorNode = {
-      id: `temp-${Date.now()}`,
+      id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       type,
       position,
       data: {} as WorkflowPhase, // Will be filled when created

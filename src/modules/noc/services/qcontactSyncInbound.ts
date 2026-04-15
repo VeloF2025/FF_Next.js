@@ -128,7 +128,7 @@ export interface SyncInboundResult {
  */
 function mapPriority(qcontactPriority: string | null): string {
   if (!qcontactPriority) {
-    return 'medium';
+    return 'normal';
   }
 
   const priorityLower = qcontactPriority.toLowerCase();
@@ -138,14 +138,15 @@ function mapPriority(qcontactPriority: string | null): string {
       return 'low';
     case 'normal':
     case 'medium':
-      return 'medium';
+      return 'normal';
     case 'high':
       return 'high';
     case 'urgent':
+      return 'urgent';
     case 'critical':
       return 'critical';
     default:
-      return 'medium';
+      return 'normal';
   }
 }
 

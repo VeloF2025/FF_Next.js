@@ -163,7 +163,10 @@ describe('Bank CSV Parsers', () => {
     });
 
     it('should detect Standard Bank format from headers', () => {
-      const csv = `Date,Description,Debit,Credit,Balance\n25/02/2026,TEST,,1000,5000`;
+      // Standard Bank statements include an extra column (e.g. "Batch No") —
+      // exactly 5 columns of Date,Description,Debit,Credit,Balance is used
+      // as the Capitec tiebreak (both banks share the short header).
+      const csv = `Date,Description,Debit,Credit,Balance,Batch No\n25/02/2026,TEST,,1000,5000,001`;
       expect(detectBankFormat(csv)).toBe('standard_bank');
     });
 
