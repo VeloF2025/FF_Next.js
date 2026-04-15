@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/auth';
 import { createLoggedSql, logCreate, logUpdate, logDelete } from '@/lib/db-logger';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
+import { cacheInvalidation } from '@/lib/queryCache';
 
 // Create a new connection for each request to avoid connection pooling issues
 const getSql = () => createLoggedSql(process.env.DATABASE_URL!);
@@ -258,7 +259,9 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse) {
     if (updatedProject.length === 0) {
       return apiResponse.notFound(res, 'Project not found');
     }
-    
+
+    cacheInvalidation.project(id as string);
+
     return res.status(200).json({ success: true, data: updatedProject[0] });
   } catch (error) {
     log.error('Failed to update project', { error, method: 'PUT', path: '/api/projects', projectId: id }, 'ProjectsAPI');
