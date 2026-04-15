@@ -415,9 +415,12 @@ export async function runInboundOnlySync(
 
 
   try {
-    // Run inbound sync from FiberTime QContact
+    // Run inbound sync from FiberTime QContact, forwarding the
+    // caller-supplied date range so a windowed sync actually filters.
     const inboundResult = await syncFiberTimeInboundTickets({
       fetchDetails: true,
+      ...(request.start_date ? { created_after: request.start_date } : {}),
+      ...(request.end_date ? { created_before: request.end_date } : {}),
     });
 
     const completed_at = new Date();

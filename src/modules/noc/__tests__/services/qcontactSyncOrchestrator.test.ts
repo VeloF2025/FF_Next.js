@@ -314,10 +314,14 @@ describe('QContact Sync Orchestrator', () => {
 
       await runInboundOnlySync(request);
 
-      expect(syncFiberTimeInboundTickets).toHaveBeenCalledWith({
-        created_after: request.start_date,
-        created_before: request.end_date,
-      });
+      // Source also forwards `fetchDetails: true`; assert the date
+      // window is included rather than equality on the whole arg.
+      expect(syncFiberTimeInboundTickets).toHaveBeenCalledWith(
+        expect.objectContaining({
+          created_after: request.start_date,
+          created_before: request.end_date,
+        })
+      );
     });
   });
 
