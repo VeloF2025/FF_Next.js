@@ -13,7 +13,7 @@ import { formatDisplayDateShort } from '@/utils/dateFormat';
 import type { Ticket } from '../../types/ticket';
 import { TicketPriority } from '../../types/ticket';
 
-import { getT1Label, getTicketCategoryLabel } from '../../constants/ticketCategories';
+import { getT1Label, getTicketCategoryLabel, getSourceLabel } from '../../constants/ticketCategories';
 
 /** Extended ticket shape returned by Kanban queries (extra DB columns not in base Ticket) */
 interface KanbanTicket extends Ticket {
@@ -137,10 +137,16 @@ export function KanbanCard({ ticket, isDragging, onQuickMove, canMoveForward, ca
           <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${categoryStyle.bg} ${categoryStyle.text}`}>
             {getT1Label(ticket.ticket_type)}
           </span>
-          {/* T1 ticket_category badge (new April-11 axis) */}
+          {/* ticket_category badge (T1/T2 axis) */}
           {ticket.ticket_category && (
             <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-indigo-500/15 text-indigo-300">
               {getTicketCategoryLabel(ticket.ticket_category)}
+            </span>
+          )}
+          {/* Source badge — where the ticket originated */}
+          {ticket.source && (
+            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-500/15 text-purple-300">
+              {getSourceLabel(ticket.source)}
             </span>
           )}
         </div>
