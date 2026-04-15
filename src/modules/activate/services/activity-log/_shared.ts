@@ -43,6 +43,8 @@ export type ActivityEventType =
   | 'AUTO_QA_COMPLETED'
   | 'AUTO_QA_RESET'
   | 'HITL_STEP_CORRECTION'
+  | 'HITL_PASSFAIL_CORRECTION'
+  | 'HITL_COMMENT_CORRECTION'
   | 'INVESTIGATION_RESOLVED'
   | 'ESCALATED_TO_ADMIN';
 
@@ -270,6 +272,16 @@ export const EVENT_METADATA: Record<ActivityEventType, { title: string; icon: st
   HITL_STEP_CORRECTION: {
     title: 'Step Correction (HITL)',
     icon: '✏️',
+    iconColor: 'text-purple-500',
+  },
+  HITL_PASSFAIL_CORRECTION: {
+    title: 'Pass/Fail Correction (HITL)',
+    icon: '🔁',
+    iconColor: 'text-purple-500',
+  },
+  HITL_COMMENT_CORRECTION: {
+    title: 'Comment Correction (HITL)',
+    icon: '💬',
     iconColor: 'text-purple-500',
   },
   INVESTIGATION_RESOLVED: {

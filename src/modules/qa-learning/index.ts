@@ -121,3 +121,23 @@ export {
   getOcrCorrectionStats,
   OcrLearningError,
 } from './services/ocrLearningService';
+
+// ============================================================================
+// PASS/FAIL + COMMENT CORRECTION SERVICE (Auto-QA HITL expansion)
+// ============================================================================
+
+export type {
+  QaDecisionValue,
+  PassFailCorrectionInput,
+  PassFailCorrectionRecord,
+  CommentCorrectionInput,
+  CommentCorrectionRecord,
+} from './services/passFailCommentService';
+
+export {
+  recordPassFailCorrection,
+  recordCommentCorrection,
+  getPassFailCorrectionsForStep,
+  getCommentCorrectionsForStep,
+  PassFailCommentServiceError,
+} from './services/passFailCommentService';

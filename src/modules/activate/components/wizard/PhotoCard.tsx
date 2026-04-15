@@ -6,7 +6,7 @@
  * Step changes are recorded as HITL corrections for VLM learning.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { STEP_LABELS } from '../../utils/stepMapper';
 import type { AutoQaPhotoResult } from '../../services/autoQaCommentGenerator';
 
@@ -14,6 +14,10 @@ export interface EditablePhoto extends AutoQaPhotoResult {
   edited: boolean;
   /** Original VLM-predicted step before any human override */
   originalStep?: number;
+  /** Original VLM-predicted decision before any human override */
+  originalDecision?: 'PASS' | 'FAIL';
+  /** Original VLM-generated comment before any human override */
+  originalComment?: string;
 }
 
 interface PhotoCardProps {
@@ -34,8 +38,15 @@ export function PhotoCard({
   onClickPhoto,
 }: PhotoCardProps) {
   const [showComment, setShowComment] = useState(false);
+  const [draftComment, setDraftComment] = useState(photo.comment);
   const photoUrl = `/api/activate/photo/${dropNumber}/${photo.filename}`;
   const isPassed = photo.decision === 'PASS';
+
+  // Resync draft when the parent resets the comment (e.g. after step change)
+  useEffect(() => {
+    if (!showComment) setDraftComment(photo.comment);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photo.comment]);
 
   return (
     <div className={`rounded-lg border p-3 ${
@@ -141,8 +152,17 @@ export function PhotoCard({
           {showComment && (
             <input
               type="text"
-              value={photo.comment}
-              onChange={(e) => onUpdateComment(e.target.value)}
+              value={draftComment}
+              onChange={(e) => setDraftComment(e.target.value)}
+              onBlur={() => {
+                if (draftComment !== photo.comment) onUpdateComment(draftComment);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  if (draftComment !== photo.comment) onUpdateComment(draftComment);
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
               className="mt-2 w-full px-2 py-1 text-sm border border-gray-200 dark:border-gray-600 rounded dark:bg-gray-900"
             />
           )}

@@ -40,7 +40,13 @@ export function AutoQaFeedbackPhase({
   const [photos, setPhotos] = useState<EditablePhoto[]>(() =>
     autoQaResults.photos
       .filter((p) => !p.filename.startsWith('missing_step_'))
-      .map((p) => ({ ...p, edited: false, originalStep: p.step }))
+      .map((p) => ({
+        ...p,
+        edited: false,
+        originalStep: p.step,
+        originalDecision: p.decision,
+        originalComment: p.comment,
+      }))
   );
   const [missingSteps, setMissingSteps] = useState<AutoQaPhotoResult[]>(() =>
     autoQaResults.photos.filter((p) => p.filename.startsWith('missing_step_'))
@@ -82,24 +88,85 @@ export function AutoQaFeedbackPhase({
   );
 
   const togglePhotoDecision = useCallback((index: number) => {
+    const currentPhoto = photos[index];
+    const newDecision: 'PASS' | 'FAIL' = currentPhoto?.decision === 'PASS' ? 'FAIL' : 'PASS';
+
+    // HITL pass/fail learning — fire when new decision differs from the
+    // VLM's original call. Skipped if the reviewer toggled back to original.
+    if (currentPhoto) {
+      const originalDecision = currentPhoto.originalDecision ?? currentPhoto.decision;
+      if (originalDecision !== newDecision) {
+        fetch('/api/activate/record-passfail-correction', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            photoFilename: currentPhoto.filename,
+            dropNumber,
+            step: currentPhoto.step,
+            stepLabel: STEP_LABELS[currentPhoto.step] || `Step ${currentPhoto.step}`,
+            vlmDecision: originalDecision,
+            vlmConfidence: currentPhoto.confidence,
+            vlmReasoning: currentPhoto.reasoning,
+            vlmComment: currentPhoto.originalComment ?? currentPhoto.comment,
+            photoDescription: currentPhoto.identifiedAs || currentPhoto.reasoning,
+            correctDecision: newDecision,
+          }),
+        }).catch((err) => {
+          log.error('Failed to record HITL pass/fail correction', { error: err }, 'AutoQaFeedback');
+        });
+      }
+    }
+
     setPhotos((prev) => prev.map((p, i) => {
       if (i !== index) return p;
       return {
         ...p,
-        decision: p.decision === 'PASS' ? 'FAIL' : 'PASS',
+        decision: newDecision,
         edited: true,
       };
     }));
     setFeedbackStale(true);
-  }, []);
+  }, [dropNumber, photos]);
 
   const updatePhotoComment = useCallback((index: number, comment: string) => {
+    const currentPhoto = photos[index];
+
+    // HITL comment learning — fire when the edited comment differs from the
+    // VLM's original auto-generated comment. Trimmed equality check so pure
+    // whitespace edits are ignored.
+    if (currentPhoto) {
+      const originalComment = (currentPhoto.originalComment ?? '').trim();
+      const newComment = (comment ?? '').trim();
+      if (originalComment && newComment && originalComment !== newComment) {
+        fetch('/api/activate/record-comment-correction', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            photoFilename: currentPhoto.filename,
+            dropNumber,
+            step: currentPhoto.step,
+            stepLabel: STEP_LABELS[currentPhoto.step] || `Step ${currentPhoto.step}`,
+            decision: currentPhoto.decision,
+            vlmConfidence: currentPhoto.confidence,
+            vlmReasoning: currentPhoto.reasoning,
+            photoDescription: currentPhoto.identifiedAs || currentPhoto.reasoning,
+            vlmComment: currentPhoto.originalComment,
+            correctedComment: comment,
+          }),
+        }).catch((err) => {
+          log.error('Failed to record HITL comment correction', { error: err }, 'AutoQaFeedback');
+        });
+      }
+    }
+
     setPhotos((prev) => prev.map((p, i) => {
       if (i !== index) return p;
       return { ...p, comment, edited: true };
     }));
     setFeedbackStale(true);
-  }, []);
+  }, [dropNumber, photos]);
 
   /**
    * Handle step reassignment from the dropdown.
