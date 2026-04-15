@@ -52,7 +52,7 @@ const TICKET_TYPE_LABELS: Record<string, string> = {
   ont_swap: 'ONT Swap',
   new_installation: 'New Installation',
   serial_mismatch: 'Serial Mismatch',
-  olt_investigation: 'OLT Investigation',
+  olt_investigation: 'ONT not found',
 };
 
 // ---------------------------------------------------------------------------
@@ -75,7 +75,10 @@ async function postJson(url: string, body: Record<string, unknown>): Promise<voi
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
+    const data = await res.json().catch((err: unknown) => {
+      log.debug('create-ticket-modal', { message: 'non-JSON error response', err: String(err) });
+      return {};
+    });
     throw new Error((data as { message?: string }).message ?? `HTTP ${res.status}`);
   }
 }

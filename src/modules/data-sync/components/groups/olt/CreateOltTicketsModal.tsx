@@ -13,7 +13,7 @@ interface CreateOltTicketsModalProps {
 }
 
 const TICKET_TYPES = [
-  { value: 'olt_investigation', label: 'OLT Investigation' },
+  { value: 'olt_investigation', label: 'ONT not found' },
   { value: 'serial_mismatch', label: 'Serial Mismatch' },
   { value: 'fault_repair', label: 'Fault Repair' },
   { value: 'ont_swap', label: 'ONT Swap' },

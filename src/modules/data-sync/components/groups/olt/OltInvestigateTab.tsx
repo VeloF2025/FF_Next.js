@@ -36,7 +36,7 @@ interface OltInvestigateTabProps {
   setError: (e: string | null) => void;
   isStatusMismatch: (record: OltRecord) => boolean;
   getInvestigationContext: (record: OltRecord) => InvestigationContext | null;
-  fetchRecords: (status: string, subStatus?: string, search?: string) => Promise<void>;
+  fetchRecords: (status: string, subStatus?: string, search?: string, project?: string) => Promise<void>;
   fetchStats: () => Promise<void>;
 }
 
@@ -56,6 +56,8 @@ export function OltInvestigateTab({
 }: OltInvestigateTabProps) {
   // Local state
   const [investigateSubFilter, setInvestigateSubFilter] = useState<string>('all');
+  const [projectFilter, setProjectFilter] = useState<string>('all');
+  const [projects, setProjects] = useState<string[]>([]);
   const [expandedContexts, setExpandedContexts] = useState<Set<string>>(new Set());
   const [showResolveModal, setShowResolveModal] = useState<string | null>(null);
   const [showEscalateModal, setShowEscalateModal] = useState<string | null>(null);
@@ -82,13 +84,31 @@ export function OltInvestigateTab({
     return () => clearTimeout(timer);
   }, [searchText, setPage]);
 
-  // Re-fetch when sub-filter or search changes
+  // Re-fetch when sub-filter, search, or project changes
   useEffect(() => {
     const sub = investigateSubFilter !== 'all' ? investigateSubFilter : undefined;
-    fetchRecords('needs_investigation', sub, debouncedSearch || undefined);
+    const proj = projectFilter !== 'all' ? projectFilter : undefined;
+    fetchRecords('needs_investigation', sub, debouncedSearch || undefined, proj);
     setSelectedIds(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [investigateSubFilter, debouncedSearch]);
+  }, [investigateSubFilter, debouncedSearch, projectFilter]);
+
+  // Load distinct project list once for the filter dropdown
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/system/olt-report/projects?status=needs_investigation');
+        if (!res.ok) return;
+        const data = await res.json();
+        const list: string[] = data.data?.projects || data.projects || [];
+        if (!cancelled) setProjects(list);
+      } catch {
+        // Non-fatal — filter dropdown just stays empty
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const toggleContext = (id: string) => {
     setExpandedContexts(prev => {
@@ -126,7 +146,12 @@ export function OltInvestigateTab({
   const handleSelectAllNotFound = async () => {
     setSelectingAll(true);
     try {
-      const res = await fetch('/api/system/olt-report/records?status=needs_investigation&limit=10000&fields=id,fix_status,maintenance_ticket_id');
+      const params = new URLSearchParams({
+        status: 'needs_investigation',
+        pageSize: '10000',
+      });
+      if (projectFilter !== 'all') params.set('project', projectFilter);
+      const res = await fetch(`/api/system/olt-report/records?${params.toString()}`);
       const data = await res.json();
       const allRecords = (data.data?.records || data.records || []) as OltRecord[];
       const ticketable = allRecords.filter((r: OltRecord) =>
@@ -156,7 +181,12 @@ export function OltInvestigateTab({
       toast.success(`Created ${created} ticket${created !== 1 ? 's' : ''}${skipped > 0 ? ` (${skipped} skipped)` : ''}`);
       setShowTicketModal(false);
       setSelectedIds(new Set());
-      fetchRecords('needs_investigation', investigateSubFilter !== 'all' ? investigateSubFilter : undefined);
+      fetchRecords(
+        'needs_investigation',
+        investigateSubFilter !== 'all' ? investigateSubFilter : undefined,
+        debouncedSearch || undefined,
+        projectFilter !== 'all' ? projectFilter : undefined,
+      );
       fetchStats();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create tickets');
@@ -244,7 +274,12 @@ export function OltInvestigateTab({
         }).catch(() => { /* non-fatal */ });
 
         setSwapLookups(prev => { const n = { ...prev }; delete n[record.id]; return n; });
-        fetchRecords('needs_investigation');
+        fetchRecords(
+          'needs_investigation',
+          investigateSubFilter !== 'all' ? investigateSubFilter : undefined,
+          debouncedSearch || undefined,
+          projectFilter !== 'all' ? projectFilter : undefined,
+        );
         fetchStats();
       } else {
         const errMsg = typeof result.error === 'string' ? result.error : result.error?.message || 'Swap fix failed';
@@ -258,7 +293,12 @@ export function OltInvestigateTab({
   };
 
   const onResolved = () => {
-    fetchRecords('needs_investigation', investigateSubFilter !== 'all' ? investigateSubFilter : undefined);
+    fetchRecords(
+      'needs_investigation',
+      investigateSubFilter !== 'all' ? investigateSubFilter : undefined,
+      debouncedSearch || undefined,
+      projectFilter !== 'all' ? projectFilter : undefined,
+    );
     fetchStats();
   };
 
@@ -442,6 +482,20 @@ export function OltInvestigateTab({
                   </button>
                 )}
               </div>
+              {/* Project filter */}
+              <select
+                value={projectFilter}
+                onChange={(e) => { setProjectFilter(e.target.value); setPage(1); }}
+                className="shrink-0 px-2.5 py-1.5 rounded bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)]
+                           text-[var(--ff-text-primary)] text-xs
+                           focus:outline-none focus:ring-1 focus:ring-[var(--ff-accent)]/50"
+                title="Filter by project"
+              >
+                <option value="all">All Projects</option>
+                {projects.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
               <span className="text-xs text-[var(--ff-text-secondary)] mr-1">Filter:</span>
               {([
                 { key: 'all', label: 'All', count: stats.needs_investigation },

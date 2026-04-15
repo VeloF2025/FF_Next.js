@@ -96,10 +96,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       whereClause = whereClause ? `${whereClause} AND ${cond}` : `WHERE ${cond}`;
     }
 
-    // Get total count
+    // Optional project filter — matches on import project or drops→projects.project_name
+    const project = req.query.project ? String(req.query.project).trim() : null;
+    if (project) {
+      params.push(project);
+      const cond = `COALESCE(i.project, p.project_name) = $${params.length}`;
+      whereClause = whereClause ? `${whereClause} AND ${cond}` : `WHERE ${cond}`;
+    }
+
+    // Get total count — JOIN needed when project filter applied so count matches list
     const countResult = await pool.query(`
       SELECT COUNT(*)::int as total
       FROM olt_mismatch_records r
+      LEFT JOIN olt_report_imports i ON r.import_id = i.id
+      LEFT JOIN drops d ON r.drop_number = d.drop_number
+      LEFT JOIN projects p ON d.project_id = p.id
       ${whereClause}
     `, params);
     const total = countResult.rows[0]?.total || 0;
