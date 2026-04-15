@@ -34,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx ts-node .claude/hooks/expert-load.ts 2>&1 || true",
+            "command": "node .claude/hooks/expert-load.js 2>&1 || true",
             "timeout": 10,
             "statusMessage": "Loading FF expertise..."
           }
