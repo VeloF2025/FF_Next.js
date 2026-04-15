@@ -22,6 +22,17 @@ vi.mock('@/lib/arcjet', () => ({
   aj: {},
 }));
 
+// Handler is wrapped in `withAuth` in production, which injects
+// `req.user`. The tests import the raw handler so we must provide a
+// passthrough mock and a user + staff-access service mock.
+vi.mock('@/lib/auth', () => ({
+  withAuth: (handler: Function) => handler,
+}));
+
+vi.mock('@/services/staff/staffAccessService', () => ({
+  canAccessStaffDocuments: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('@/lib/logger', () => ({
   log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), getLogs: vi.fn(() => []), clearLogs: vi.fn() },
   createLogger: () => ({
@@ -46,7 +57,9 @@ describe('Staff Documents API - GET /api/staff/[staffId]/documents', () => {
       method: 'GET',
       query: { staffId: 'staff-123' },
       body: {},
-    };
+      // withAuth would populate this in prod; inject directly here.
+      user: { id: 'user-admin' },
+    } as Partial<NextApiRequest>;
 
     res = {
       status: vi.fn().mockReturnThis(),
@@ -216,7 +229,7 @@ describe('Staff Documents API - GET /api/staff/[staffId]/documents', () => {
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
-        error: 'Staff ID is required',
+        error: expect.objectContaining({ message: 'Staff ID is required' }),
       })
     );
   });
@@ -229,7 +242,7 @@ describe('Staff Documents API - GET /api/staff/[staffId]/documents', () => {
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
-        error: 'Staff ID is required',
+        error: expect.objectContaining({ message: 'Staff ID is required' }),
       })
     );
   });
@@ -244,6 +257,7 @@ describe('Staff Documents API - GET /api/staff/[staffId]/documents', () => {
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
+        // 500 path uses the flat envelope `{ error, message }` (not apiResponse).
         error: 'Failed to fetch documents',
       })
     );
@@ -257,7 +271,7 @@ describe('Staff Documents API - GET /api/staff/[staffId]/documents', () => {
     expect(res.status).toHaveBeenCalledWith(405);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
-        error: 'Method not allowed',
+        error: expect.objectContaining({ message: expect.stringMatching(/not allowed/i) }),
       })
     );
   });
