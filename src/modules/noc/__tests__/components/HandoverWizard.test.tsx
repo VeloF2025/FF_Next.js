@@ -23,12 +23,22 @@ import { HandoverWizard } from '../../components/Handover/HandoverWizard';
 import { HandoverType, OwnerType } from '../../types/handover';
 import type { HandoverGateValidation } from '../../types/handover';
 
-// Mock Clerk auth
+// Mock Clerk auth (legacy import — kept for any old call sites)
 vi.mock('@clerk/nextjs', () => ({
   useUser: vi.fn(() => ({
     user: { id: 'test-user-id', fullName: 'Test User' },
     isLoaded: true,
   })),
+}));
+
+// Component actually uses @/contexts/AuthContext useAuth and reads
+// `user.uid` for the handover_by field; without this, `handleSubmit`
+// short-circuits with "User not authenticated" and never calls fetch.
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({
+    user: { uid: 'test-user-id' },
+    currentUser: { id: 'test-user-id', role: 'super_admin' },
+  }),
 }));
 
 // Mock fetch for API calls

@@ -48,7 +48,7 @@ describe('StaffDocumentList', () => {
       {
         id: 'doc-1',
         staffId: 'staff-123',
-        documentType: 'id_document',
+        documentType: 'sa_id',
         documentName: 'SA ID Card',
         fileUrl: 'https://example.com/doc1.pdf',
         fileSize: 1024,
@@ -169,7 +169,7 @@ describe('StaffDocumentList', () => {
       render(<StaffDocumentList staffId={staffId} />);
 
       await waitFor(() => {
-        expect(screen.getByText('ID Document / Passport')).toBeInTheDocument();
+        expect(screen.getByText('SA ID Document')).toBeInTheDocument();
         expect(screen.getByText("Driver's License")).toBeInTheDocument();
         expect(screen.getByText('Industry Certification')).toBeInTheDocument();
       });

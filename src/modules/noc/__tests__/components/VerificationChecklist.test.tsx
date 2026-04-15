@@ -26,12 +26,23 @@ vi.mock('../../hooks/useVerification', () => ({
   useUpdateVerificationStep: vi.fn(),
 }));
 
-// Mock Clerk auth
+// Mock Clerk auth (legacy import — kept for any old call sites)
 vi.mock('@clerk/nextjs', () => ({
   useUser: vi.fn(() => ({
     user: { id: 'test-user-id' },
     isLoaded: true,
   })),
+}));
+
+// Component actually uses @/contexts/AuthContext useAuth, which exposes
+// `user.uid` (Firebase-style) plus a `currentUser` summary. Provide both
+// so handleStepToggle's `user?.uid` guard passes and the QA-approver
+// check can resolve its role lookups.
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({
+    user: { uid: 'test-user-id' },
+    currentUser: { id: 'test-user-id', role: 'super_admin' },
+  }),
 }));
 
 // Helper to create mock verification steps

@@ -24,7 +24,7 @@ describe('DocumentVerificationPanel', () => {
   const mockDocument: StaffDocument = {
     id: 'doc-123',
     staffId: 'staff-456',
-    documentType: 'id_document',
+    documentType: 'sa_id',
     documentName: 'South African ID Card',
     fileUrl: 'https://storage.example.com/documents/id-card.pdf',
     fileSize: 2048000,
@@ -91,7 +91,7 @@ describe('DocumentVerificationPanel', () => {
 
     it('should display document type label', () => {
       render(<DocumentVerificationPanel {...defaultProps} />);
-      expect(screen.getByText('ID Document / Passport')).toBeInTheDocument();
+      expect(screen.getByText('SA ID Document')).toBeInTheDocument();
     });
 
     it('should display staff name', () => {

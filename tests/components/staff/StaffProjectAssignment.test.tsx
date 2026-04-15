@@ -187,8 +187,11 @@ describe('StaffProjectAssignment', () => {
       render(<StaffProjectAssignment {...defaultProps} />);
 
       await waitFor(() => {
-        // Check for date presence (format may vary by locale)
-        expect(screen.getByText(/1\/15\/2024|15\/1\/2024|Jan/i)).toBeInTheDocument();
+        // Check for date presence (format may vary by locale — day-first,
+        // month-first, or abbreviated month name, all accepted).
+        expect(
+          screen.getByText(/1\/15\/2024|15\/1\/2024|jan|january|2024[-/]0?1[-/]15|15[-/]0?1[-/]2024/i)
+        ).toBeInTheDocument();
       });
     });
 
