@@ -498,7 +498,10 @@ export function OltInvestigateTab({
               </select>
               <span className="text-xs text-[var(--ff-text-secondary)] mr-1">Filter:</span>
               {([
-                { key: 'all', label: 'All', count: stats.needs_investigation },
+                // When a project filter is active, the "All" pill reflects the filtered total
+                // from the current fetch. Sub-filter counts remain unfiltered (stats endpoint
+                // doesn't know about project — would require a separate call).
+                { key: 'all', label: 'All', count: projectFilter !== 'all' ? total : stats.needs_investigation },
                 { key: 'needs_investigation', label: 'Cross-DR Conflict', count: investigateSubCounts.cross_dr },
                 { key: 'not_found', label: 'Not on 1Map', count: investigateSubCounts.not_found },
                 { key: 'other', label: 'Other', count: investigateSubCounts.other },
@@ -526,7 +529,7 @@ export function OltInvestigateTab({
                 {selectingAll ? (
                   <><InlineSpinner size="sm" /> Loading...</>
                 ) : (
-                  <><Ticket className="w-3 h-3" /> Ticket All ({stats.needs_investigation})</>
+                  <><Ticket className="w-3 h-3" /> Ticket All ({projectFilter !== 'all' ? total : stats.needs_investigation})</>
                 )}
               </button>
               {selectedIds.size > 0 && (
