@@ -9,7 +9,7 @@
  * 2. query_database — execute validated read-only SQL
  * 3. get_schema — fetch column info for specific tables
  *
- * LLM: nemotron-mini via local Ollama on Mac Mini (192.168.1.79)
+ * LLM: gemma4:e4b via local Ollama on Mac Mini (192.168.1.79)
  * Embeddings: nomic-embed-text via local proxy (localhost:11435)
  * Knowledge: Qdrant fibreflow_kb (2,714 chunks — user manual + module docs)
  *
@@ -28,7 +28,7 @@ const logger = createLogger('api:chat:send');
 const OLLAMA_BASE = process.env.OLLAMA_URL ?? 'http://192.168.1.79:11434';
 const EMBED_BASE = process.env.EMBED_URL ?? 'http://localhost:11435';
 const QDRANT_BASE = process.env.QDRANT_URL ?? 'http://localhost:6333';
-const MODEL = 'nemotron-mini';
+const MODEL = 'gemma4:e4b';
 const EMBED_MODEL = 'nomic-embed-text';
 const QDRANT_COLLECTION = 'fibreflow_kb';
 
@@ -267,6 +267,26 @@ async function executeTool(name: string, args: any): Promise<string> {
 
 // ── System prompts ─────────────────────────────────────────────
 
+const DOMAIN_GLOSSARY = `
+Key FibreFlow terms and acronyms (use these definitions — never guess):
+- BOQ: Bill of Quantities — a list of materials/items needed for a project, used in Procurement
+- RFQ: Request for Quotation — sent to suppliers to get pricing for a BOQ
+- PO: Purchase Order — issued to a supplier after approving a quote
+- GRN: Goods Received Note — records physical receipt of stock from a supplier
+- OES: Outside Equipment Survey — field survey data collected via QField
+- DR: Drop Request — a request to install a fibre drop to a customer premises
+- QA: Quality Assurance — photo review workflow for civil/activation work
+- VLM: Vision Language Model — AI model used for automated photo analysis
+- NOC: Network Operations Centre — monitors network faults and maintenance tickets
+- OTIF: On Time In Full — supplier delivery performance metric
+- KYC: Know Your Customer — customer onboarding document verification
+- SOW: Schedule of Works — project work breakdown imported from spreadsheets
+- PP: Planned Premises — premises planned for fibre coverage in a project
+- OLT: Optical Line Terminal — network device that connects the fibre backbone
+- PON: Passive Optical Network — the fibre distribution network
+- RBAC: Role-Based Access Control — permission system controlling feature access
+`;
+
 const SYSTEM_PROMPT = `You are Velo, the FibreFlow assistant — a knowledgeable guide embedded in the FibreFlow application (app.fibreflow.app) for Velocity Fibre internal staff.
 
 You have access to tools that let you:
@@ -275,7 +295,7 @@ You have access to tools that let you:
 3. **Query the database** — run read-only SQL to get live data
 
 Guidelines:
-- For "how to" questions → search_knowledge first
+- For "how to" questions → search_knowledge first, ALWAYS, before answering
 - For data questions (counts, lists, metrics) → get_schema if needed, then query_database
 - Always verify table/column names with get_schema before writing SQL if unsure
 - Present data clearly with context ("As of right now, there are X...")
@@ -283,20 +303,22 @@ Guidelines:
 - Be concise (2-4 paragraphs unless detailed steps are needed)
 - Use specific menu paths like **Sidebar → Module → Tab** when guiding users
 - If you can't find the answer, say so honestly
-- You can ONLY read data — never suggest you can modify, create, or delete anything`;
+- You can ONLY read data — never suggest you can modify, create, or delete anything
+${DOMAIN_GLOSSARY}`;
 
 const SYSTEM_PROMPT_NO_DATA = `You are Velo, the FibreFlow assistant — a knowledgeable guide embedded in the FibreFlow application (app.fibreflow.app) for Velocity Fibre internal staff.
 
 You have access to search_knowledge to find information from the user manual and module documentation.
 
 Guidelines:
-- Search the knowledge base to answer questions about features and how-to
+- Search the knowledge base ALWAYS before answering any question about features or how-to
 - Use markdown formatting for readability
 - Be concise (2-4 paragraphs unless detailed steps are needed)
 - Use specific menu paths like **Sidebar → Module → Tab** when guiding users
 - You are INFORMATIONAL ONLY — you cannot query live data or modify anything
 - If users ask for live data or metrics, explain they need data access enabled for their role
-- If you can't find the answer, say so honestly`;
+- If you can't find the answer, say so honestly
+${DOMAIN_GLOSSARY}`;
 
 // ── Main handler ───────────────────────────────────────────────
 
