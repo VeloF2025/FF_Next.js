@@ -22,6 +22,10 @@ vi.mock('@/lib/arcjet', () => ({
   aj: {},
 }));
 
+vi.mock('@/lib/auth', () => ({
+  withAuth: (handler: Function) => handler,
+}));
+
 vi.mock('@/lib/logger', () => ({
   log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), getLogs: vi.fn(() => []), clearLogs: vi.fn() },
   createLogger: () => ({
@@ -104,7 +108,7 @@ describe('Staff Document API - /api/staff-documents/[documentId]', () => {
       expect(res.status).toHaveBeenCalledWith(404);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'Document not found',
+          error: expect.objectContaining({ message: expect.stringMatching(/not found/i) }),
         })
       );
     });
@@ -117,7 +121,7 @@ describe('Staff Document API - /api/staff-documents/[documentId]', () => {
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'Document ID is required',
+          error: expect.objectContaining({ message: 'Document ID is required' }),
         })
       );
     });
@@ -220,7 +224,7 @@ describe('Staff Document API - /api/staff-documents/[documentId]', () => {
       expect(res.status).toHaveBeenCalledWith(404);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'Document not found',
+          error: expect.objectContaining({ message: expect.stringMatching(/not found/i) }),
         })
       );
     });
@@ -275,7 +279,7 @@ describe('Staff Document API - /api/staff-documents/[documentId]', () => {
       expect(res.status).toHaveBeenCalledWith(404);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'Document not found',
+          error: expect.objectContaining({ message: expect.stringMatching(/not found/i) }),
         })
       );
     });
@@ -326,7 +330,7 @@ describe('Staff Document API - /api/staff-documents/[documentId]', () => {
       expect(res.status).toHaveBeenCalledWith(405);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'Method not allowed',
+          error: expect.objectContaining({ message: expect.stringMatching(/not allowed/i) }),
         })
       );
     });

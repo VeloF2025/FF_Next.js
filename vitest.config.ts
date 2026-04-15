@@ -49,6 +49,10 @@ export default defineConfig({
       { find: '@/lib/arcjet', replacement: path.resolve(__dirname, './src/lib/arcjet') },
       { find: '@/lib/email', replacement: path.resolve(__dirname, './src/lib/email') },
       { find: '@/lib/dbCircuitBreaker', replacement: path.resolve(__dirname, './src/lib/dbCircuitBreaker') },
+      // @/lib/auth-mock lives at root ./lib/ — the generic @/lib fallback
+      // below doesn't get the chance because `@/lib/auth` (more specific)
+      // matches first. Needs an explicit entry above the auth alias.
+      { find: '@/lib/auth-mock', replacement: path.resolve(__dirname, './lib/auth-mock') },
       { find: '@/lib/auth', replacement: path.resolve(__dirname, './src/lib/auth') },
       { find: '@/lib/permissions', replacement: path.resolve(__dirname, './src/lib/permissions') },
       { find: '@/lib/logger', replacement: path.resolve(__dirname, './src/lib/logger') },
