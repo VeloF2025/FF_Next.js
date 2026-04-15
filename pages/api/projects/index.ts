@@ -392,6 +392,8 @@ async function handler(
           return apiResponse.validationError(res, { name: 'Project name is required' });
         }
 
+        const resolvedProjectCode = project_code || `PRJ-${Date.now()}`;
+
         const result = await safeMutation(
           async () => sql`
             INSERT INTO projects (
@@ -400,7 +402,7 @@ async function handler(
               budget, project_manager, location
             )
             VALUES (
-              ${project_code || null},
+              ${resolvedProjectCode},
               ${projectName},
               ${client_id || null},
               ${description || null},
