@@ -8,9 +8,11 @@ Usage:
   python3 scripts/ingest-qdrant.py --source docs/INFRASTRUCTURE.md  # Single file
   python3 scripts/ingest-qdrant.py --dry-run    # Count chunks without embedding
 
-Uses local Ollama nomic-embed-text (768-dim) for embeddings.
+Uses Ollama nomic-embed-text (768-dim) for embeddings.
 Reads .env.local for DATABASE_URL (schema ingestion).
-Connects to Qdrant at localhost:6333 and GPU embed-server at localhost:11437 (must run on Velocity).
+Connects to Qdrant at localhost:6333. Embeddings served by the Mac Mini
+Ollama at http://100.117.249.72:11434 (Tailscale) by default — override
+with the OLLAMA_URL env var (expects the base URL, /v1/embeddings is appended).
 
 Safety guards (ported from Ironman reindex-qdrant.py):
 - Lockfile prevents concurrent instances
@@ -66,7 +68,7 @@ except Exception as e:
 COLLECTION = "fibreflow_kb"
 QDRANT_HOST = "localhost"
 QDRANT_PORT = 6333
-OLLAMA_URL = "http://localhost:11437/v1/embeddings"
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://100.117.249.72:11434").rstrip("/") + "/v1/embeddings"
 EMBEDDING_MODEL = "nomic-embed-text"
 EMBEDDING_DIM = 768
 CHUNK_SIZE = 800          # max words per chunk
