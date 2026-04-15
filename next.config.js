@@ -15,6 +15,9 @@ const BUILD_TIMESTAMP = new Date().toISOString();
 const nextConfig = {
   reactStrictMode: true,
 
+  // Expose source maps in production only when Sentry is active (for error tracking)
+  productionBrowserSourceMaps: process.env.SENTRY_ENABLED === 'true',
+
   // Build-time version info — available in server-side code via process.env
   env: {
     GIT_SHA: BUILD_GIT_SHA,
@@ -267,4 +270,17 @@ const nextConfig = {
   trailingSlash: false,
 };
 
-module.exports = withBundleAnalyzer(nextConfig);
+const { withSentryConfig } = require('@sentry/nextjs');
+
+module.exports = withSentryConfig(withBundleAnalyzer(nextConfig), {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  url: process.env.SENTRY_URL,
+  silent: !process.env.CI,
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+  },
+  hideSourceMaps: true,
+  disableLogger: true,
+});

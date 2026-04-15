@@ -47,6 +47,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# GIT_SHA is captured after the pull (Step 2) so it reflects the deployed code.
+
 # --- Time gate ---
 is_business_hours() {
   local hour day_of_week
@@ -146,6 +148,13 @@ sudo -u velo bash -c "cd $DIR && git fetch origin && git checkout $BRANCH && git
 NEW_COMMIT=$(sudo -u velo bash -c "cd $DIR && git rev-parse --short HEAD")
 log "Commit: $CURRENT_COMMIT -> $NEW_COMMIT"
 
+# --- Release tagging for Sentry/Bugsink (BL-54) ---
+GIT_SHA="$NEW_COMMIT"
+export GIT_SHA
+export SENTRY_RELEASE="$GIT_SHA"
+export NEXT_PUBLIC_GIT_SHA="$GIT_SHA"
+log "Release SHA: $GIT_SHA"
+
 # --- Step 3: Install deps if needed ---
 if sudo -u velo bash -c "cd $DIR && git diff --name-only $CURRENT_COMMIT HEAD 2>/dev/null" | grep -q 'package.json'; then
   log "package.json changed, running npm install..."
@@ -198,7 +207,7 @@ fi
 BUILD_SUCCESS=false
 for attempt in $(seq 1 $MAX_RETRIES); do
   log "Build attempt $attempt/$MAX_RETRIES..."
-  if sudo -u velo bash -c "cd $DIR && npm run build" 2>&1; then
+  if sudo -u velo GIT_SHA="$GIT_SHA" SENTRY_RELEASE="$SENTRY_RELEASE" NEXT_PUBLIC_GIT_SHA="$NEXT_PUBLIC_GIT_SHA" bash -c "cd $DIR && npm run build" 2>&1; then
     BUILD_SUCCESS=true
     break
   fi
@@ -299,3 +308,13 @@ echo -e "  URL:         $URL"
 echo -e "  Health:      HTTP $HTTP_CODE"
 echo -e "  Time:        $(TZ=$TIMEZONE date '+%Y-%m-%d %H:%M %Z')"
 echo "==============================="
+
+# --- Step 11: Finalize Sentry release (BL-54, fail-open) ---
+if [ -n "${SENTRY_AUTH_TOKEN:-}" ] && command -v sentry-cli >/dev/null 2>&1; then
+  log "Finalizing Sentry release $GIT_SHA..."
+  sentry-cli releases finalize "$GIT_SHA" || warn "sentry-cli finalize failed (non-fatal)"
+  sentry-cli releases deploys "$GIT_SHA" new -e "$TARGET" \
+    || warn "sentry-cli deploys failed (non-fatal)"
+else
+  log "Skipping Sentry release finalize (no SENTRY_AUTH_TOKEN or sentry-cli)"
+fi
