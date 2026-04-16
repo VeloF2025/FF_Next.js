@@ -16,7 +16,7 @@
  *
  * LLM: qwen2.5-coder:14b-instruct-q4_K_M via local Ollama (Mac Mini 192.168.1.79)
  * Embeddings: nomic-embed-text via local proxy (localhost:11435)
- * Knowledge: Qdrant fibreflow_kb (~2,700 chunks)
+ * Knowledge: Qdrant fibreflow_kb (~284 curated chunks — user-manuals + feature docs)
  *
  * Rate limited to 10 requests per minute per user.
  */
@@ -70,11 +70,39 @@ const TOPIC_SOURCE_PREFIXES: Record<string, string[]> = {
 
 const SCORE_THRESHOLD = 0.62; // drop chunks below this relevance score
 
+// ── Domain acronym expansion ───────────────────────────────────
+// nomic-embed-text doesn't embed acronyms well — expand them so
+// "What is a BOQ?" scores against "Bill of Quantities" content.
+
+const ACRONYM_EXPANSIONS: Record<string, string> = {
+  BOQ:  'Bill of Quantities BOQ',
+  RFQ:  'Request for Quotation RFQ',
+  GRN:  'Goods Received Note GRN',
+  GRV:  'Goods Received Voucher GRV',
+  OES:  'Outside Equipment Survey OES QField',
+  DR:   'Drop Request DR fibre installation',
+  QA:   'Quality Assurance photo review QA',
+  NOC:  'Network Operations Centre NOC',
+  OLT:  'Optical Line Terminal OLT',
+  PON:  'Passive Optical Network PON fibre',
+  SOW:  'Schedule of Works SOW',
+  VLM:  'Vision Language Model AI photo',
+  KYC:  'Know Your Customer KYC document',
+  PP:   'Planned Premises PP coverage',
+  OTIF: 'On Time In Full OTIF delivery',
+};
+
+function expandAcronyms(query: string): string {
+  return query.replace(/\b([A-Z]{2,5})\b/g, (match) =>
+    ACRONYM_EXPANSIONS[match] ?? match
+  );
+}
+
 // ── Qdrant semantic search ─────────────────────────────────────
 
 async function searchKnowledge(query: string, topic?: string, limit: number = 8): Promise<string> {
   try {
-    const vector = await embedQuery(query);
+    const vector = await embedQuery(expandAcronyms(query));
 
     // Build optional source filter for topic-scoped search
     const prefixes = topic ? TOPIC_SOURCE_PREFIXES[topic] : null;
