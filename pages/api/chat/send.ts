@@ -14,7 +14,8 @@
  *   data: [DONE]            — stream complete
  *   data: {"error":"..."}   — error
  *
- * LLM: qwen2.5-coder:14b-instruct-q4_K_M via local Ollama (Mac Mini 192.168.1.79)
+ * LLM: qwen3:8b via local Ollama (Mac Mini 192.168.1.79)
+ *   keep_alive: -1 keeps it in VRAM permanently — no cold-start delay
  * Embeddings: nomic-embed-text via local proxy (localhost:11435)
  * Knowledge: Qdrant fibreflow_kb (~284 curated chunks — user-manuals + feature docs)
  *
@@ -33,7 +34,7 @@ const logger = createLogger('api:chat:send');
 const OLLAMA_BASE = process.env.OLLAMA_URL ?? 'http://192.168.1.79:11434';
 const EMBED_BASE = process.env.EMBED_URL ?? 'http://localhost:11435';
 const QDRANT_BASE = process.env.QDRANT_URL ?? 'http://localhost:6333';
-const MODEL = 'qwen2.5-coder:14b-instruct-q4_K_M';
+const MODEL = 'qwen3:8b';
 const EMBED_MODEL = 'nomic-embed-text';
 const QDRANT_COLLECTION = 'fibreflow_kb';
 
@@ -330,6 +331,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
     // Phase 5: streaming Ollama call
+    // keep_alive: -1  — model stays in VRAM permanently, eliminates 10-15s cold-start
+    // think: false    — disable qwen3's extended thinking (we don't want <think> in chat)
     const ollamaRes = await fetch(`${OLLAMA_BASE}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -339,6 +342,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         temperature: 0.3,
         max_tokens: 1024,
         stream: true,
+        keep_alive: -1,
+        think: false,
       }),
     });
 
@@ -348,10 +353,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Phase 6: pipe SSE tokens to client
+    // Filter out <think>...</think> blocks — qwen3 may emit these even with think:false
     const reader = ollamaRes.body.getReader();
     const decoder = new TextDecoder();
     let fullResponse = '';
     let buffer = '';
+    let inThinkBlock = false;
+    let thinkBuffer = '';
 
     while (true) {
       const { done, value } = await reader.read();
@@ -369,8 +377,23 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           const chunk = JSON.parse(jsonStr);
           const token = chunk.choices?.[0]?.delta?.content;
           if (token) {
-            fullResponse += token;
-            sseWrite(res, JSON.stringify({ token }));
+            // Strip <think>...</think> blocks emitted by thinking models
+            thinkBuffer += token;
+            if (!inThinkBlock && thinkBuffer.includes('<think>')) {
+              inThinkBlock = true;
+              // Emit anything before the <think> tag
+              const before = thinkBuffer.split('<think>')[0];
+              if (before) { fullResponse += before; sseWrite(res, JSON.stringify({ token: before })); }
+              thinkBuffer = '';
+            } else if (inThinkBlock && thinkBuffer.includes('</think>')) {
+              inThinkBlock = false;
+              thinkBuffer = thinkBuffer.split('</think>').slice(1).join('</think>');
+              if (thinkBuffer) { fullResponse += thinkBuffer; sseWrite(res, JSON.stringify({ token: thinkBuffer })); thinkBuffer = ''; }
+            } else if (!inThinkBlock) {
+              fullResponse += thinkBuffer;
+              sseWrite(res, JSON.stringify({ token: thinkBuffer }));
+              thinkBuffer = '';
+            }
           }
         } catch {
           // malformed chunk — skip
