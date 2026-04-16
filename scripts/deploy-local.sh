@@ -164,6 +164,14 @@ if sudo -u velo bash -c "cd $DIR && git diff --name-only $CURRENT_COMMIT HEAD 2>
   sudo -u velo bash -c "cd $DIR && npm ci --legacy-peer-deps"
 fi
 
+# --- Step 3a: Apply pending DB migrations (fail fast before build) ---
+log "Checking DB migrations..."
+MIGRATION_EXIT=0
+sudo -u velo bash -c "cd $DIR && bash scripts/run-pending-migrations.sh 2>&1 | sed 's/^/  /'" || MIGRATION_EXIT=$?
+if [[ "$MIGRATION_EXIT" -ne 0 ]]; then
+  error "DB migration failed (exit $MIGRATION_EXIT). Fix the SQL and redeploy."
+fi
+
 # --- Step 3b: Run lint gates (Zero Tolerance) ---
 if [[ "$FORCE" != true ]]; then
   log "Running lint gates..."
