@@ -144,6 +144,8 @@ fi
 # --- Step 2: Pull latest code ---
 log "Pulling $BRANCH..."
 CURRENT_COMMIT=$(sudo -u velo bash -c "cd $DIR && git rev-parse --short HEAD")
+# Reset package-lock.json before pull — npm install regenerates it which blocks the next git pull
+sudo -u velo bash -c "cd $DIR && git checkout -- package-lock.json 2>/dev/null || true"
 sudo -u velo bash -c "cd $DIR && git fetch origin && git checkout $BRANCH && git pull origin $BRANCH"
 NEW_COMMIT=$(sudo -u velo bash -c "cd $DIR && git rev-parse --short HEAD")
 log "Commit: $CURRENT_COMMIT -> $NEW_COMMIT"
@@ -157,8 +159,9 @@ log "Release SHA: $GIT_SHA"
 
 # --- Step 3: Install deps if needed ---
 if sudo -u velo bash -c "cd $DIR && git diff --name-only $CURRENT_COMMIT HEAD 2>/dev/null" | grep -q 'package.json'; then
-  log "package.json changed, running npm install..."
-  sudo -u velo bash -c "cd $DIR && npm install --legacy-peer-deps"
+  log "package.json changed, running npm ci..."
+  # npm ci installs exactly what's in the lock file — never rewrites package-lock.json
+  sudo -u velo bash -c "cd $DIR && npm ci --legacy-peer-deps"
 fi
 
 # --- Step 3b: Run lint gates (Zero Tolerance) ---
