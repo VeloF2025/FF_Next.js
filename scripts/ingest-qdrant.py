@@ -107,15 +107,14 @@ def load_env():
 # Only user-facing content — no .claude/ developer docs or module-context
 # .claude/ docs are for AI coding assistants; they pollute user-facing search
 SOURCE_GLOBS = [
+    # Primary: user manuals (how-to, feature guides)
     ("docs/user-manuals/source/*.md",   "user-manual"),
-    ("docs/user-manuals/**/*.md",       "user-manual"),
-    ("docs/docs/**/*.md",               "docs"),
+    # Feature docs (PRDs with user-facing feature descriptions)
+    ("docs/features/*.md",              "feature-docs"),
 ]
 
 # Additional single files worth including (curated user-facing content)
-EXTRA_FILES = [
-    "docs/INFRASTRUCTURE.md",
-]
+EXTRA_FILES = []
 
 
 def discover_sources(single_source=None):
