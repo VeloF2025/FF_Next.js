@@ -263,6 +263,17 @@ const nextConfig = {
       });
     }
 
+    // Supabase compatibility: replace Neon HTTP driver with pg-based shim.
+    // Allows all existing neon`sql` tagged-template calls to work with any
+    // standard PostgreSQL server without touching the 425+ API files.
+    if (isServer) {
+      const path = require('path');
+      config.resolve.alias['@neondatabase/serverless'] = path.resolve(
+        __dirname,
+        './src/lib/neon-shim'
+      );
+    }
+
     return config;
   },
 
