@@ -28,9 +28,11 @@ import { Pool } from 'pg';
 import { log } from '@/lib/logger';
 import { dbCircuitBreaker } from '@/lib/dbCircuitBreaker';
 
+const useSSL = process.env.DATABASE_URL?.includes('sslmode=require') ?? false;
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: true,
+  ssl: useSSL ? { rejectUnauthorized: false } : false,
   max: 20,
   min: 2,                           // keep 2 idle connections ready
   idleTimeoutMillis: 300_000,       // 5 min — keeps min-pool alive between the 60s db-health pings
