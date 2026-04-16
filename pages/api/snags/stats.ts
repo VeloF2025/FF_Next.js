@@ -1,7 +1,16 @@
 /**
  * Snags Stats API
  * GET /api/snags/stats
- * Returns snag counts per project for the dashboard.
+ *
+ * Optional query filters (all multi-select via repeated params or CSV):
+ *   projectIds      — comma-separated project UUIDs
+ *   severity        — comma-separated: major,minor,critical
+ *   reportType      — comma-separated: tqr,field_report
+ *   importFrom      — ISO date (inclusive) for snag_reports.created_at
+ *   importTo        — ISO date (inclusive) for snag_reports.created_at
+ *
+ * Filters at the snag level by joining on snag_reports and applying
+ * WHERE conditions. Returns one row per project that has matching snags.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -13,26 +22,35 @@ import type { SnagProjectStats } from '@/modules/construction-qa/types/snag.type
 
 const sql = neon(process.env.DATABASE_URL!);
 
+function parseList(raw: unknown): string[] | null {
+  if (typeof raw !== 'string' || raw.trim() === '') return null;
+  const items = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  return items.length > 0 ? items : null;
+}
+
+function parseDate(raw: unknown): string | null {
+  if (typeof raw !== 'string' || raw.trim() === '') return null;
+  const d = raw.trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
+}
+
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method ?? 'Unknown', ['GET']);
   }
 
   try {
-    // Use NOC ticket status when a ticket is linked, otherwise fall back to snag status.
-    // Aligned to NOC Kanban columns:
-    //   open:        NOC open         | snag open, reopened
-    //   assigned:    NOC assigned     | snag assigned
-    //   in_progress: NOC in_progress, qa_rejected | snag in_progress
-    //   pending_qa:  NOC pending_qa, qa_in_progress | snag pending_qa, fixed (legacy)
-    //   resolved:    NOC qa_approved, pending_handover, handed_to_ops, resolved | snag resolved
-    //   verified:    NOC verified     | snag verified
-    //   closed:      NOC closed, cancelled | snag closed
+    const projectIds = parseList(req.query.projectIds);
+    const severity   = parseList(req.query.severity);
+    const reportType = parseList(req.query.reportType);
+    const importFrom = parseDate(req.query.importFrom);
+    const importTo   = parseDate(req.query.importTo);
+
     const rows = await sql`
       SELECT
-        p.id                    AS project_id,
-        p.project_name                  AS project_name,
-        COUNT(s.id)             AS total,
+        p.id             AS project_id,
+        p.project_name   AS project_name,
+        COUNT(s.id)      AS total,
         COUNT(s.id) FILTER (WHERE
           CASE WHEN t.id IS NOT NULL THEN t.status = 'open'
                ELSE s.status IN ('open','reopened') END
@@ -61,19 +79,29 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           CASE WHEN t.id IS NOT NULL THEN t.status IN ('closed','cancelled')
                ELSE s.status = 'closed' END
         ) AS closed,
-        lr.report_number        AS latest_report_number,
-        lr.audit_date           AS latest_report_date,
-        lr.id                   AS latest_report_id
+        lr.report_number AS latest_report_number,
+        lr.audit_date    AS latest_report_date,
+        lr.id            AS latest_report_id
       FROM projects p
       INNER JOIN snags s ON s.project_id = p.id
+      INNER JOIN snag_reports sr ON sr.id = s.report_id
       LEFT JOIN maintenance_tickets t ON t.id = s.noc_ticket_id
       LEFT JOIN LATERAL (
         SELECT id, report_number, audit_date
-        FROM snag_reports sr
-        WHERE sr.project_id = p.id
-        ORDER BY sr.audit_date DESC
+        FROM snag_reports r
+        WHERE r.project_id = p.id
+        ORDER BY r.audit_date DESC
         LIMIT 1
       ) lr ON TRUE
+      WHERE
+        (${projectIds}::uuid[] IS NULL OR p.id = ANY(${projectIds}::uuid[]))
+        AND (${severity}::text[] IS NULL OR s.severity = ANY(${severity}::text[]))
+        AND (${importFrom}::date IS NULL OR sr.created_at >= ${importFrom}::date)
+        AND (${importTo}::date IS NULL OR sr.created_at < (${importTo}::date + INTERVAL '1 day'))
+        AND (${reportType}::text[] IS NULL OR (
+          ('tqr' = ANY(${reportType}::text[]) AND sr.report_number NOT LIKE 'FIELD-%')
+          OR ('field_report' = ANY(${reportType}::text[]) AND sr.report_number LIKE 'FIELD-%')
+        ))
       GROUP BY p.id, p.project_name, lr.report_number, lr.audit_date, lr.id
       ORDER BY p.project_name ASC
     ` as Array<{

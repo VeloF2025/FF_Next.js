@@ -8,18 +8,23 @@
  */
 
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { FileSpreadsheet, Search, X } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import type { ProjectNode, ZoneNode, PonNode } from '../../types/snag.types';
-import { fetchSnagStats, fetchSnagHierarchyStats } from '../../services/snagService';
+import {
+  fetchSnagStats,
+  fetchSnagHierarchyStats,
+  type SnagSummaryFilters,
+} from '../../services/snagService';
 import { buildHierarchy } from './snagHierarchyUtils';
 import { COL_COUNT, SkeletonRow } from './SnagSummaryHelpers';
 import { SnagProjectRow } from './SnagProjectRow';
 import { SnagZoneRow } from './SnagZoneRow';
 import { SnagPonRow } from './SnagPonRow';
 import { SnagDrillDown } from './SnagDrillDown';
+import { SnagSummaryFiltersBar, type ProjectOption } from './SnagSummaryFiltersBar';
 
 export function SnagSummaryPage() {
   const router = useRouter();
@@ -33,6 +38,8 @@ export function SnagSummaryPage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const [drillDown, setDrillDown] = useState<{ projectId: string; status: string } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [filters, setFilters] = useState<SnagSummaryFilters>({});
+  const [projectOptions, setProjectOptions] = useState<ProjectOption[]>([]);
 
   const handleSearchChange = useCallback((value: string) => {
     setSearchInput(value);
@@ -46,18 +53,24 @@ export function SnagSummaryPage() {
     if (debounceRef.current) clearTimeout(debounceRef.current);
   }, []);
 
+  // Merge search term into filters for API calls
+  const activeFilters = useMemo<SnagSummaryFilters>(
+    () => ({ ...filters, search: searchTerm || undefined }),
+    [filters, searchTerm]
+  );
+
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
 
-    Promise.all([fetchSnagStats(), fetchSnagHierarchyStats(undefined, searchTerm || undefined)])
+    Promise.all([fetchSnagStats(activeFilters), fetchSnagHierarchyStats(activeFilters)])
       .then(([statsData, hierarchyRows]) => {
         if (!cancelled) {
           const statsById = new Map(statsData.map((s) => [s.project_id, s]));
           setProjects(buildHierarchy(hierarchyRows, statsById));
           setIsLoading(false);
-          // Auto-expand all projects when searching
-          if (searchTerm) {
+          // Auto-expand all projects when searching or filtering
+          if (searchTerm || filters.projectIds?.length) {
             const allIds = new Set(hierarchyRows.map((r) => r.project_id));
             setExpandedProjects(allIds);
           }
@@ -71,7 +84,16 @@ export function SnagSummaryPage() {
       });
 
     return () => { cancelled = true; };
-  }, [searchTerm]);
+  }, [activeFilters, searchTerm, filters.projectIds]);
+
+  // Load project options once — for the project multi-select
+  useEffect(() => {
+    fetchSnagStats()
+      .then((all) => {
+        setProjectOptions(all.map((s) => ({ id: s.project_id, name: s.project_name })));
+      })
+      .catch(() => { /* non-fatal, filter will be empty */ });
+  }, []);
 
   function toggleProject(id: string) {
     setExpandedProjects(prev => {
@@ -100,7 +122,7 @@ export function SnagSummaryPage() {
 
   function handleDrillDownSnagUpdated() {
     setRefreshKey((k) => k + 1);
-    Promise.all([fetchSnagStats(), fetchSnagHierarchyStats(undefined, searchTerm || undefined)])
+    Promise.all([fetchSnagStats(activeFilters), fetchSnagHierarchyStats(activeFilters)])
       .then(([statsData, hierarchyRows]) => {
         const statsById = new Map(statsData.map((s) => [s.project_id, s]));
         setProjects(buildHierarchy(hierarchyRows, statsById));
@@ -255,6 +277,14 @@ export function SnagSummaryPage() {
         </div>
       </div>
 
+      <div className="mb-3">
+        <SnagSummaryFiltersBar
+          filters={filters}
+          onChange={setFilters}
+          projectOptions={projectOptions}
+        />
+      </div>
+
       {error && (
         <div className="mb-3 rounded-md bg-red-900/20 border border-red-700/40 px-4 py-3 text-xs text-red-300">
           {error}
@@ -267,7 +297,7 @@ export function SnagSummaryPage() {
           <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
             <thead className="sticky top-0 z-10 bg-[var(--ff-bg-tertiary)]">
               <tr>
-                {['Project', 'Total', 'Open', 'Assigned', 'In Progress', 'Pending QA', 'Resolved', 'Verified', 'Closed', 'Latest TQR'].map((h) => (
+                {['Project', 'Total', 'Open', 'Assigned', 'In Progress', 'Pending QA', 'Resolved', 'Verified', 'Closed', 'Latest Snag Report'].map((h) => (
                   <th
                     key={h}
                     className="px-3 py-2 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide whitespace-nowrap"

@@ -112,7 +112,7 @@ export function SnagsPage() {
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-2 rounded-md font-medium transition-colors"
           >
             <Upload className="h-3.5 w-3.5" />
-            Import TQR Report
+            Import Snag Report
           </button>
         </div>
       </div>
@@ -127,7 +127,7 @@ export function SnagsPage() {
           ) : stats.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-zinc-500">
               <p className="text-sm">No snags imported yet</p>
-              <p className="text-xs mt-1">Click &quot;Import TQR Report&quot; to get started</p>
+              <p className="text-xs mt-1">Click &quot;Import Snag Report&quot; to get started</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">

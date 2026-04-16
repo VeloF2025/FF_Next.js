@@ -53,19 +53,41 @@ export async function fetchSnagSummary(params: {
   return json.data;
 }
 
+/** Optional filters shared by stats + hierarchy-stats endpoints. */
+export interface SnagSummaryFilters {
+  projectIds?: string[];
+  severity?:   string[];
+  reportType?: string[];   // 'tqr' | 'field_report'
+  importFrom?: string;     // YYYY-MM-DD
+  importTo?:   string;     // YYYY-MM-DD
+  search?:     string;
+}
+
+function buildFilterParams(f: SnagSummaryFilters | undefined): URLSearchParams {
+  const params = new URLSearchParams();
+  if (!f) return params;
+  if (f.projectIds?.length) params.set('projectIds', f.projectIds.join(','));
+  if (f.severity?.length)   params.set('severity',   f.severity.join(','));
+  if (f.reportType?.length) params.set('reportType', f.reportType.join(','));
+  if (f.importFrom)         params.set('importFrom', f.importFrom);
+  if (f.importTo)           params.set('importTo',   f.importTo);
+  if (f.search)             params.set('search',     f.search);
+  return params;
+}
+
 /** Fetch per-project snag counts for the dashboard. */
-export async function fetchSnagStats(): Promise<SnagProjectStats[]> {
-  const res = await fetch('/api/snags/stats');
+export async function fetchSnagStats(filters?: SnagSummaryFilters): Promise<SnagProjectStats[]> {
+  const params = buildFilterParams(filters);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  const res = await fetch(`/api/snags/stats${qs}`);
   if (!res.ok) throw new Error(`Failed to fetch snag stats: ${res.status}`);
   const json = await res.json() as { data: SnagProjectStats[] };
   return json.data;
 }
 
 /** Fetch project→zone→PON hierarchy snag counts. */
-export async function fetchSnagHierarchyStats(projectId?: string, search?: string): Promise<HierarchyRow[]> {
-  const params = new URLSearchParams();
-  if (projectId) params.set('projectId', projectId);
-  if (search) params.set('search', search);
+export async function fetchSnagHierarchyStats(filters?: SnagSummaryFilters): Promise<HierarchyRow[]> {
+  const params = buildFilterParams(filters);
   const qs = params.toString() ? `?${params.toString()}` : '';
   const res = await fetch(`/api/snags/hierarchy-stats${qs}`);
   if (!res.ok) throw new Error(`hierarchy-stats: ${res.status}`);
