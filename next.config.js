@@ -64,6 +64,12 @@ const nextConfig = {
     ],
   },
 
+  // Force @neondatabase/serverless to be bundled by webpack (not externalized)
+  // so the resolve.alias pointing to neon-shim.ts is actually applied.
+  // Without this, Next.js Pages Router externalizes node_modules and the
+  // alias is bypassed at runtime.
+  transpilePackages: ['@neondatabase/serverless'],
+
   // Disable static generation to prevent SSR issues
   experimental: {
     // Enable optimized package imports for tree-shaking
