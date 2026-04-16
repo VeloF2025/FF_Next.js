@@ -77,10 +77,10 @@ STEP CATEGORIES:
    • Blurry, dark, or unrecognizable photos where the subject cannot be identified
    • Wide-angle/context shots that show a general scene without focusing on any installation step
    • Photos of vehicles, people, paperwork (not signatures), food, or other non-installation subjects
-   • Generic exterior building shots that don't show the fiber route, cable, or installation context
+   • Generic exterior shots that show ONLY sky, roads, or landscapes with NO building/structure visible
    • Screenshots or phone screen photos that aren't power meter readings or speed tests
    • Accidental photos (selfies, ground, sky without cables)
-   If your confidence for any step 1-12 is below 0.65, prefer Step 0 over forcing a weak classification.
+   If your confidence for any step 1-12 is below 0.50, prefer Step 0 over forcing a weak classification.
 1. House Photo - Property exterior showing the BUILDING for location verification. Must show the structure itself, not just sky/poles.
 2. Cable from Pole - Fiber cable visibly spanning open air between a utility pole and the building fascia. Must show cable crossing sky. Pole J-hook, service drop wire, messenger wire are indicators. A pole alone without visible cable span = low confidence.
 3. Cable Entry Outside - EXTERIOR close-up of where cable ENTERS the building through wall/roof. Cable penetrating exterior wall, conduit, grommet. Drip loop before entry point is a strong indicator. Cable transitioning from OUTSIDE to INSIDE.
@@ -89,7 +89,7 @@ STEP CATEGORIES:
 6. ONT Back After Install - BACK panel of ONT showing fiber port and power cable connections. Yellow fiber connector, power cable. Camera angle BEHIND the ONT.
 7. Power Meter Reading - Optical power meter display showing dBm reading (valid range: -18 to -24 dBm). Handheld meter screen with numbers.
 8. Final Installation - WIDE shot of COMPLETE setup from a distance: ONT + UPS/GIZZU + wall + surroundings. Key = WIDE FRAMING showing full context, even if green lights visible.
-9. Green Lights on ONT - CLOSE-UP of ONT FRONT panel focused on indicator lights (POWER, LINK, LAN, 2.4GHz, 5GHz, INTERNET). Nokia/Fibertime branding, LED labels, green dots.
+9. Green Lights on ONT - CLOSE-UP of ONT FRONT panel focused on indicator lights (POWER, LINK, LAN, 2.4GHz, 5GHz, INTERNET). Nokia/Fibertime branding, LED labels, green dots. Also includes photos showing the ONT label/sticker with Nokia/Fibertime branding, DR number, or serial number — these confirm the installed device.
 10. Signature - Customer signature on paper/tablet completion form. Handwriting, form fields, sign here marks.
 11. Dome Joint Open - The dome joint (handhole/splice closure) with its LID REMOVED, showing the INSIDE: fibre splice tray, cables routed into the enclosure, inner compartments visible. Key = you can see INSIDE the box with cables/fibres.
 12. Dome Joint Closed - The dome joint (handhole/splice closure) with its LID SEALED shut. Just the outer black/grey enclosure casing visible, no internal components showing. Key = the box is CLOSED, lid on, you CANNOT see inside.
@@ -107,15 +107,17 @@ KEY DIFFERENTIATORS for commonly confused categories:
 ⚠️ STEP 0 BALANCE — Based on 3776 human corrections:
 The #1 error (50%+ of corrections) is OVER-CLASSIFYING: forcing photos into installation steps when they should be Step 0.
 Common over-classification mistakes to AVOID:
-- A generic building exterior without visible fiber route or cable = Step 0, NOT Step 1
+- A photo of ONLY sky, road, or landscape with NO building/structure visible = Step 0, NOT Step 1. But ANY photo showing a building/house/shack/structure IS Step 1 — fiber route or cable is NOT required for Step 1
 - A pole photo without visible cable span or installation context = Step 0, NOT Step 2
 - A dark/blurry photo where you cannot identify the subject = Step 0, NOT a guessed step
 - A random screenshot that isn't a power meter or speed test = Step 0, NOT Step 9
-- A photo of equipment packaging, labels, or boxes = Step 0, NOT Step 6 or 7
+- A photo of empty cardboard boxes or packaging material WITHOUT any device visible = Step 0, NOT Step 6 or 7. But a Nokia/Fibertime ONT showing its label, branding, serial number, or DR sticker = Step 9 (it confirms the installed device)
 - A wide contextual photo showing a room without ONT/UPS focus = Step 0, NOT Step 8
 
 DO still classify when the installation subject is clearly visible:
+- ANY building, house, shack, or structure = Step 1 (house photo for location verification)
 - Clear ONT, router, or networking equipment = Step 6, 8, or 9
+- Nokia/Fibertime ONT with label, branding, DR sticker, or serial number = Step 9
 - Clear power meter display with dBm reading = Step 7
 - Clear signature on a form = Step 10
 - Clear cable spanning sky between pole and building = Step 2`;
@@ -146,7 +148,7 @@ For EACH photo (numbered 1-${photoCount}), respond in this JSON format:
   ]
 }
 
-Step 0 = not relevant/discard (duplicates, blurry, generic context shots, non-installation subjects, or confidence < 0.65 for any step).
+Step 0 = not relevant/discard (duplicates, blurry, generic context shots, non-installation subjects, or confidence < 0.50 for any step).
 CRITICAL: Do NOT trust any pre-existing labels or filenames. Categorize based ONLY on visual content.
 If a photo doesn't clearly match any category, set confidence below 0.5 and explain why.`;
 
