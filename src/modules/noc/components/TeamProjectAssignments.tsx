@@ -29,7 +29,16 @@ export function TeamProjectAssignments({ teamId, assignments, onChanged }: TeamP
   useEffect(() => {
     fetch('/api/pipeline/projects?limit=200')
       .then(r => r.json())
-      .then(d => setProjects(d.data ?? []))
+      .then(d => {
+        // /api/pipeline/projects returns { data: { projects: [...] } },
+        // not a flat array — unwrap either shape defensively.
+        const list = Array.isArray(d?.data)
+          ? d.data
+          : Array.isArray(d?.data?.projects)
+            ? d.data.projects
+            : [];
+        setProjects(list);
+      })
       .catch(() => {});
   }, []);
 
