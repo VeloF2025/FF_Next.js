@@ -1,4 +1,4 @@
--- Migration 260: Pass/Fail + Comment Correction Learning Tables
+-- Migration 303: Pass/Fail + Comment Correction Learning Tables
 -- Purpose: Extend HITL learning beyond step categorization.
 -- Captures human overrides of VLM Pass/Fail decisions and auto-generated
 -- comments so future auto-QA runs can be guided by prior human judgments.
