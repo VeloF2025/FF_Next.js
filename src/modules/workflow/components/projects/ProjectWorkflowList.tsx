@@ -162,7 +162,7 @@ export function ProjectWorkflowList({
                             {workflow.name}
                           </h3>
                         </div>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(workflow.status)}`}>
+                        <span aria-label={`Status: ${workflow.status}`} className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(workflow.status)}`}>
                           {workflow.status.charAt(0).toUpperCase() + workflow.status.slice(1)}
                         </span>
                         {isOverdue(workflow) && (

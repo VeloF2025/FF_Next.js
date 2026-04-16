@@ -85,7 +85,12 @@ export function WorkflowProgress({ workflow, compact = false, showPhases = true 
               </span>
             </div>
             <div className="w-full bg-secondary rounded-full h-2">
-              <div 
+              <div
+                role="progressbar"
+                aria-valuenow={workflow.progressPercentage}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`${workflow.name} progress: ${workflow.progressPercentage}%`}
                 className="bg-green-600 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${workflow.progressPercentage || 0}%` }}
               />
@@ -134,7 +139,12 @@ export function WorkflowProgress({ workflow, compact = false, showPhases = true 
         </div>
         
         <div className="w-full bg-secondary rounded-full h-3">
-          <div 
+          <div
+            role="progressbar"
+            aria-valuenow={workflow.progressPercentage}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`${workflow.name} progress: ${workflow.progressPercentage}%`}
             className="bg-gradient-to-r from-green-500 to-green-600 h-3 rounded-full transition-all duration-500"
             style={{ width: `${workflow.progressPercentage || 0}%` }}
           />

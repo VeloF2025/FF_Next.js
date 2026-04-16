@@ -80,6 +80,7 @@ function TemplateCard({
 
   return (
     <div
+      role="listitem"
       className={`relative bg-[var(--ff-bg-secondary)] rounded-lg border-2 transition-all duration-200 hover:shadow-md cursor-pointer ${
         isSelected
           ? 'border-blue-500 shadow-md'
@@ -141,8 +142,9 @@ function TemplateCard({
                   className="fixed inset-0 z-10"
                   onClick={() => setShowMenu(false)}
                 />
-                <div className="absolute right-0 top-8 z-20 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-md shadow-lg py-1 w-32">
+                <div role="menu" className="absolute right-0 top-8 z-20 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-md shadow-lg py-1 w-32">
                   <Button
+                    role="menuitem"
                     variant="ghost"
                     size="sm"
                     onClick={(e) => {
@@ -156,6 +158,7 @@ function TemplateCard({
                     Edit
                   </Button>
                   <Button
+                    role="menuitem"
                     variant="ghost"
                     size="sm"
                     onClick={(e) => {
@@ -169,6 +172,7 @@ function TemplateCard({
                     Duplicate
                   </Button>
                   <Button
+                    role="menuitem"
                     variant="ghost"
                     size="sm"
                     onClick={(e) => {
@@ -183,6 +187,7 @@ function TemplateCard({
                   </Button>
                   {!template.isSystem && (
                     <Button
+                      role="menuitem"
                       variant="ghost"
                       size="sm"
                       onClick={(e) => {
@@ -389,7 +394,8 @@ export function TemplateList({
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
           <input
-            type="text"
+            type="search"
+            aria-label="Search templates"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search templates..."
@@ -408,6 +414,11 @@ export function TemplateList({
           <Filter className="w-4 h-4 mr-2" />
           Filters
         </button>
+      </div>
+
+      {/* Status for screen readers */}
+      <div role="status" aria-live="polite" className="sr-only">
+        {state.isLoading ? 'Loading templates...' : `${state.templates.length} template${state.templates.length !== 1 ? 's' : ''} found`}
       </div>
 
       {/* Error Alert */}
@@ -441,7 +452,7 @@ export function TemplateList({
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div role="list" aria-label="Workflow templates" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {state.templates.map((template) => (
             <TemplateCard
               key={template.id}

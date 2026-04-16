@@ -186,7 +186,7 @@ export function WorkflowEditor({ templateId, className = '' }: WorkflowEditorPro
             )}
 
             {/* Zoom Controls */}
-            <div className="flex items-center space-x-1 bg-[var(--ff-bg-tertiary)] rounded-lg p-1">
+            <div role="toolbar" aria-label="Editor controls" className="flex items-center space-x-1 bg-[var(--ff-bg-tertiary)] rounded-lg p-1">
               <button
                 onClick={handleZoomOut}
                 className="p-1.5 hover:bg-[var(--ff-bg-secondary)] rounded transition-colors"
@@ -287,7 +287,7 @@ export function WorkflowEditor({ templateId, className = '' }: WorkflowEditorPro
           {/* Error State */}
           {state.error && (
             <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-40">
-              <div className="bg-red-500/20 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg shadow-lg">
+              <div role="alert" aria-live="polite" className="bg-red-500/20 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg shadow-lg">
                 <div className="flex items-center space-x-2">
                   <AlertTriangle className="w-5 h-5" />
                   <span className="font-medium">Error:</span>
@@ -297,8 +297,13 @@ export function WorkflowEditor({ templateId, className = '' }: WorkflowEditorPro
             </div>
           )}
 
+          {/* Status announcements for screen readers */}
+          <div role="status" aria-live="polite" className="sr-only">
+            {state.isLoading ? 'Loading template...' : state.hasUnsavedChanges ? 'Template has unsaved changes' : 'Template saved'}
+          </div>
+
           {/* Canvas */}
-          <div 
+          <div
             className="h-full w-full overflow-hidden"
             onClick={handleCanvasClick}
           >
