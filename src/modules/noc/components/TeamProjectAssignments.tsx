@@ -1,37 +1,49 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Plus, Search, Trash2, Loader2 } from 'lucide-react';
 import type { ProjectTeamAssignment } from '@/modules/noc/types/team';
 
-interface Project { id: string; project_name: string; }
+interface Project { id: string; name: string; status?: string | null; }
 
-interface TeamProjectAssignmentsProps {
+interface Props {
   teamId: string;
   assignments: ProjectTeamAssignment[];
   onChanged: () => void;
 }
 
-const ROLES = [
-  { value: 'activations', label: 'Activations' },
-  { value: 'maintenance', label: 'Maintenance' },
+type Role = 'activations' | 'maintenance' | 'fault_repair' | 'other';
+
+const ROLES: Array<{ value: Role; label: string }> = [
+  { value: 'activations',  label: 'Activations' },
+  { value: 'maintenance',  label: 'Maintenance' },
   { value: 'fault_repair', label: 'Fault Repair' },
-  { value: 'other', label: 'Other' },
+  { value: 'other',        label: 'Other' },
 ];
 
-export function TeamProjectAssignments({ teamId, assignments, onChanged }: TeamProjectAssignmentsProps) {
+const ROLE_COLORS: Record<Role, string> = {
+  activations:  'bg-blue-500/10 text-blue-300 border-blue-500/30',
+  maintenance:  'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+  fault_repair: 'bg-red-500/10 text-red-300 border-red-500/30',
+  other:        'bg-zinc-500/10 text-zinc-300 border-zinc-500/30',
+};
+
+export function TeamProjectAssignments({ teamId, assignments, onChanged }: Props) {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [newProjectId, setNewProjectId] = useState('');
-  const [newRole, setNewRole] = useState<'activations' | 'maintenance' | 'fault_repair' | 'other'>('activations');
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [search, setSearch] = useState('');
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [role, setRole] = useState<Role>('activations');
   const [saving, setSaving] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
+  // Only active projects — not pipeline projects.
   useEffect(() => {
-    fetch('/api/pipeline/projects?limit=200')
+    setProjectsLoading(true);
+    fetch('/api/projects?status=active&limit=500')
       .then(r => r.json())
       .then(d => {
-        // /api/pipeline/projects returns { data: { projects: [...] } },
-        // not a flat array — unwrap either shape defensively.
         const list = Array.isArray(d?.data)
           ? d.data
           : Array.isArray(d?.data?.projects)
@@ -39,20 +51,48 @@ export function TeamProjectAssignments({ teamId, assignments, onChanged }: TeamP
             : [];
         setProjects(list);
       })
-      .catch(() => {});
+      .catch(() => setProjects([]))
+      .finally(() => setProjectsLoading(false));
   }, []);
 
+  const assignedProjectIds = useMemo(
+    () => new Set(assignments.map(a => a.project_id)),
+    [assignments]
+  );
+
+  const filteredProjects = useMemo(() => {
+    const available = projects.filter(p => !assignedProjectIds.has(p.id));
+    const term = search.trim().toLowerCase();
+    if (!term) return available;
+    return available.filter(p => p.name?.toLowerCase().includes(term));
+  }, [projects, assignedProjectIds, search]);
+
+  const selectedProject = useMemo(
+    () => projects.find(p => p.id === selectedProjectId) ?? null,
+    [projects, selectedProjectId]
+  );
+
+  const resetAddForm = () => {
+    setSelectedProjectId(null);
+    setSearch('');
+    setRole('activations');
+    setShowAdd(false);
+  };
+
   const handleAdd = async () => {
-    if (!newProjectId) return;
+    if (!selectedProjectId) return;
     setSaving(true);
     try {
-      await fetch('/api/noc/project-team-assignments', {
+      const res = await fetch('/api/noc/project-team-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: newProjectId, team_id: teamId, role: newRole }),
+        body: JSON.stringify({ project_id: selectedProjectId, team_id: teamId, role }),
       });
-      setNewProjectId('');
+      if (!res.ok) throw new Error('Assignment failed');
+      resetAddForm();
       onChanged();
+    } catch {
+      // non-fatal — leave form state so the user can retry
     } finally {
       setSaving(false);
     }
@@ -69,47 +109,146 @@ export function TeamProjectAssignments({ teamId, assignments, onChanged }: TeamP
   };
 
   return (
-    <div className="space-y-2 min-w-[260px]">
-      {assignments.length === 0 && (
-        <span className="text-xs text-[var(--ff-text-tertiary)]">No project assignments</span>
-      )}
-      {assignments.map((a) => (
-        <div key={a.id} className="flex items-center gap-2 text-xs">
-          <span className="text-[var(--ff-text-primary)] font-medium">{a.project_name}</span>
-          <span className="text-[var(--ff-text-tertiary)] capitalize">({a.role})</span>
-          <button
-            onClick={() => handleRemove(a.id)}
-            disabled={removingId === a.id}
-            className="ml-auto text-[var(--ff-text-tertiary)] hover:text-red-400 transition-colors"
-          >
-            {removingId === a.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-          </button>
+    <div className="space-y-3">
+      {assignments.length === 0 ? (
+        <p className="text-sm text-[var(--ff-text-tertiary)] py-2">
+          No projects assigned to this team yet.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {assignments.map((a) => {
+            const roleColor = ROLE_COLORS[a.role as Role] ?? ROLE_COLORS.other;
+            return (
+              <div
+                key={a.id}
+                className="flex items-center gap-3 p-2.5 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-[var(--ff-text-primary)] truncate">
+                      {a.project_name}
+                    </span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded border capitalize ${roleColor}`}>
+                      {a.role.replace('_', ' ')}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemove(a.id)}
+                  disabled={removingId === a.id}
+                  className="p-1.5 text-[var(--ff-text-tertiary)] hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors disabled:opacity-50"
+                  title="Remove assignment"
+                >
+                  {removingId === a.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                </button>
+              </div>
+            );
+          })}
         </div>
-      ))}
-      <div className="flex items-center gap-1 pt-1 border-t border-[var(--ff-border-light)]">
-        <select
-          value={newProjectId}
-          onChange={e => setNewProjectId(e.target.value)}
-          className="text-xs px-1.5 py-1 rounded bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] flex-1 min-w-0"
-        >
-          <option value="">Project...</option>
-          {projects.map(p => <option key={p.id} value={p.id}>{p.project_name}</option>)}
-        </select>
-        <select
-          value={newRole}
-          onChange={e => setNewRole(e.target.value as typeof newRole)}
-          className="text-xs px-1.5 py-1 rounded bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)]"
-        >
-          {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-        </select>
+      )}
+
+      {!showAdd ? (
         <button
-          onClick={handleAdd}
-          disabled={!newProjectId || saving}
-          className="p-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 transition-colors"
+          type="button"
+          onClick={() => setShowAdd(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
-          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+          <Plus className="w-4 h-4" />
+          Assign Project
         </button>
-      </div>
+      ) : (
+        <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg space-y-3">
+          {!selectedProject ? (
+            <>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={projectsLoading ? 'Loading active projects…' : 'Search active projects…'}
+                  disabled={projectsLoading}
+                  className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  autoFocus
+                />
+              </div>
+
+              <div className="max-h-48 overflow-auto border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg)]">
+                {filteredProjects.length === 0 ? (
+                  <p className="p-3 text-sm text-[var(--ff-text-tertiary)]">
+                    {projectsLoading ? 'Loading…' : search ? 'No matching active projects' : 'All active projects assigned'}
+                  </p>
+                ) : (
+                  filteredProjects.slice(0, 30).map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setSelectedProjectId(p.id)}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--ff-bg-hover)] transition-colors border-b border-[var(--ff-border-light)] last:border-0 text-[var(--ff-text-primary)]"
+                    >
+                      {p.name}
+                    </button>
+                  ))
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-[var(--ff-text-tertiary)]">Project:</span>
+                <span className="font-medium text-[var(--ff-text-primary)]">{selectedProject.name}</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedProjectId(null)}
+                  className="ml-auto text-xs text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] underline"
+                >
+                  Change
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-xs text-[var(--ff-text-tertiary)] mb-1.5">Role</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {ROLES.map((r) => (
+                    <button
+                      key={r.value}
+                      type="button"
+                      onClick={() => setRole(r.value)}
+                      className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
+                        role === r.value
+                          ? ROLE_COLORS[r.value]
+                          : 'bg-[var(--ff-bg)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={resetAddForm}
+              className="px-3 py-1.5 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleAdd}
+              disabled={!selectedProjectId || saving}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 transition-colors"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              Assign
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

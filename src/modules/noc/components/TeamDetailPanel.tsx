@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { X, UserPlus, Trash2, Crown, Search } from 'lucide-react';
 import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import {
@@ -10,7 +10,8 @@ import {
   useAddTeamMember,
   useRemoveTeamMember,
 } from '@/modules/noc/hooks/useTeams';
-import type { UserDropdownOption } from '@/modules/noc/types/team';
+import type { ProjectTeamAssignment, UserDropdownOption } from '@/modules/noc/types/team';
+import { TeamProjectAssignments } from './TeamProjectAssignments';
 
 interface TeamDetailPanelProps {
   teamId: string;
@@ -29,6 +30,15 @@ export function TeamDetailPanel({ teamId, onClose }: TeamDetailPanelProps) {
   const [selectedStaff, setSelectedStaff] = useState<UserDropdownOption | null>(null);
   const [memberRole, setMemberRole] = useState('');
   const [isTeamLead, setIsTeamLead] = useState(false);
+
+  const [projectAssignments, setProjectAssignments] = useState<ProjectTeamAssignment[]>([]);
+  const fetchProjectAssignments = useCallback(() => {
+    fetch(`/api/noc/project-team-assignments?team_id=${teamId}`)
+      .then((r) => r.json())
+      .then((d) => setProjectAssignments(Array.isArray(d?.data) ? d.data : []))
+      .catch(() => setProjectAssignments([]));
+  }, [teamId]);
+  useEffect(() => { fetchProjectAssignments(); }, [fetchProjectAssignments]);
 
   const existingEmails = new Set(members.map((m) => m.email?.toLowerCase()).filter(Boolean));
   const availableStaff = staff.filter((s) => !existingEmails.has(s.email?.toLowerCase()));
@@ -98,7 +108,7 @@ export function TeamDetailPanel({ teamId, onClose }: TeamDetailPanelProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-[var(--ff-bg-card)] border border-[var(--ff-border)] rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
+      <div className="relative bg-[var(--ff-bg-card)] border border-[var(--ff-border)] rounded-xl shadow-2xl max-w-xl w-full mx-4 max-h-[85vh] flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-[var(--ff-border-light)] flex items-start justify-between flex-shrink-0">
           <div>
@@ -264,6 +274,23 @@ export function TeamDetailPanel({ teamId, onClose }: TeamDetailPanelProps) {
               ))}
             </div>
           )}
+
+          {/* Project Assignments */}
+          <div className="mt-8 pt-6 border-t border-[var(--ff-border-light)]">
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-[var(--ff-text-secondary)]">
+                Project Assignments ({projectAssignments.length})
+              </h3>
+              <p className="text-xs text-[var(--ff-text-tertiary)] mt-0.5">
+                Assign this team to active projects so new tickets auto-route here.
+              </p>
+            </div>
+            <TeamProjectAssignments
+              teamId={teamId}
+              assignments={projectAssignments}
+              onChanged={fetchProjectAssignments}
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -40,7 +40,6 @@ import { useTeams, useCreateTeam, useUpdateTeam, useDeleteTeam } from '@/modules
 import { TeamType } from '@/modules/noc/types/team';
 import type { Team, CreateTeamPayload, UpdateTeamPayload, ProjectTeamAssignment } from '@/modules/noc/types/team';
 import { TeamDetailPanel } from '@/modules/noc/components/TeamDetailPanel';
-import { TeamProjectAssignments } from '@/modules/noc/components/TeamProjectAssignments';
 
 type ViewMode = 'cards' | 'list';
 
@@ -444,7 +443,7 @@ export default function TeamsPageClient() {
                       <td className="px-4 py-3 hidden lg:table-cell" onClick={e => e.stopPropagation()}>
                         <TeamProjectAssignmentsCell
                           team={team}
-                          onChanged={refreshAssignments}
+                          onOpenTeam={() => setSelectedTeamId(team.id)}
                         />
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -687,32 +686,44 @@ function TeamCard({
   );
 }
 
-function TeamProjectAssignmentsCell({ team, onChanged }: { team: Team & { project_assignments?: ProjectTeamAssignment[] }; onChanged: () => void }) {
-  const [open, setOpen] = useState(false);
+function TeamProjectAssignmentsCell({
+  team,
+  onOpenTeam,
+}: {
+  team: Team & { project_assignments?: ProjectTeamAssignment[] };
+  onOpenTeam: () => void;
+}) {
   const assignments = team.project_assignments ?? [];
-  const label = assignments.length === 0
-    ? '—'
+  const titleText = assignments.length === 0
+    ? 'No projects assigned — click to manage'
     : assignments.map(a => `${a.project_name} (${a.role})`).join(', ');
 
-  if (!open) {
-    return (
-      <button
-        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
-        className="text-xs text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] text-left truncate max-w-[200px]"
-        title={label}
-      >
-        {label}
-      </button>
-    );
-  }
-
   return (
-    <div onClick={e => e.stopPropagation()}>
-      <TeamProjectAssignments
-        teamId={team.id}
-        assignments={assignments}
-        onChanged={() => { setOpen(false); onChanged(); }}
-      />
-    </div>
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onOpenTeam(); }}
+      className="flex flex-wrap gap-1 max-w-[260px] text-left hover:opacity-80 transition-opacity"
+      title={titleText}
+    >
+      {assignments.length === 0 ? (
+        <span className="text-xs text-[var(--ff-text-tertiary)] italic">Assign…</span>
+      ) : (
+        <>
+          {assignments.slice(0, 3).map((a) => (
+            <span
+              key={a.id}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded border bg-blue-500/10 text-blue-300 border-blue-500/30"
+            >
+              {a.project_name}
+            </span>
+          ))}
+          {assignments.length > 3 && (
+            <span className="text-[10px] text-[var(--ff-text-tertiary)] px-1 py-0.5">
+              +{assignments.length - 3} more
+            </span>
+          )}
+        </>
+      )}
+    </button>
   );
 }
