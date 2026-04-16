@@ -155,6 +155,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`, role: 'user', content: trimmed, timestamp: new Date(),
     };
+    const assistantId = `assistant-${Date.now()}`;
     setMessages(prev => [...prev, userMessage]);
     if (!text) setInput('');
     setIsLoading(true);
@@ -170,21 +171,67 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
           history, dataAccess,
         }),
       });
-      const data = await res.json();
-      const responseText = data.data?.response || data.response || data.error?.message || data.error || 'Sorry, something went wrong.';
+
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+      // Add placeholder message, then stream tokens into it
       setMessages(prev => [...prev, {
-        id: `assistant-${Date.now()}`, role: 'assistant',
-        content: responseText,
-        timestamp: new Date(),
+        id: assistantId, role: 'assistant', content: '', timestamp: new Date(),
       }]);
-    } catch {
-      setMessages(prev => [...prev, {
-        id: `error-${Date.now()}`, role: 'assistant',
-        content: 'Sorry, I couldn\'t connect to the help service. Please try again.',
-        timestamp: new Date(),
-      }]);
-    } finally {
       setIsLoading(false);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      outer: while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+          const payload = trimmedLine.slice(6);
+          if (payload === '[DONE]') break outer;
+          try {
+            const parsed = JSON.parse(payload);
+            if (parsed.error) {
+              setMessages(prev => prev.map(m =>
+                m.id === assistantId ? { ...m, content: parsed.error } : m
+              ));
+              break outer;
+            }
+            if (parsed.token) {
+              setMessages(prev => prev.map(m =>
+                m.id === assistantId ? { ...m, content: m.content + parsed.token } : m
+              ));
+            }
+          } catch {
+            // malformed SSE chunk — skip
+          }
+        }
+      }
+    } catch {
+      setIsLoading(false);
+      setMessages(prev => {
+        const hasPlaceholder = prev.some(m => m.id === assistantId);
+        if (hasPlaceholder) {
+          return prev.map(m =>
+            m.id === assistantId
+              ? { ...m, content: 'Sorry, I couldn\'t connect to the help service. Please try again.' }
+              : m
+          );
+        }
+        return [...prev, {
+          id: `error-${Date.now()}`, role: 'assistant' as const,
+          content: 'Sorry, I couldn\'t connect to the help service. Please try again.',
+          timestamp: new Date(),
+        }];
+      });
     }
   };
 

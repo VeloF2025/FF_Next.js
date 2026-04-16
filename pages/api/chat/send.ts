@@ -4,14 +4,19 @@
  * POST /api/chat/send
  * Body: { message, userName?, userRole?, userId?, topic?, history?, dataAccess? }
  *
- * Architecture: always-on RAG (no tool_choice — local models don't reliably emit tool calls)
- * 1. Embed query → search Qdrant fibreflow_kb → inject top-5 chunks as context
- * 2. If dataAccess + data-query detected → also run SQL and inject results
- * 3. Single LLM call with full context → plain text response
+ * Architecture: always-on RAG + SSE streaming
+ * 1. Embed query → Qdrant search → inject top-6 chunks as context
+ * 2. Optional data query for common metrics
+ * 3. Stream Ollama tokens via SSE — first token arrives in ~2s
  *
- * LLM: qwen2.5-coder:14b-instruct-q4_K_M via local Ollama on Mac Mini (192.168.1.79)
+ * SSE events:
+ *   data: {"token":"..."}   — incremental token
+ *   data: [DONE]            — stream complete
+ *   data: {"error":"..."}   — error
+ *
+ * LLM: qwen2.5-coder:14b-instruct-q4_K_M via local Ollama (Mac Mini 192.168.1.79)
  * Embeddings: nomic-embed-text via local proxy (localhost:11435)
- * Knowledge: Qdrant fibreflow_kb (2,714 chunks — user manual + module docs)
+ * Knowledge: Qdrant fibreflow_kb (~2,700 chunks)
  *
  * Rate limited to 10 requests per minute per user.
  */
@@ -19,7 +24,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth/middleware';
 import { createLogger } from '@/lib/logger';
-import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { ErrorCode } from '@/lib/apiResponse';
 import rateLimiter, { RateLimits } from '@/lib/rateLimiter';
 import pool from '@/lib/db';
 
@@ -47,7 +52,7 @@ async function embedQuery(text: string): Promise<number[]> {
 
 // ── Qdrant semantic search ─────────────────────────────────────
 
-async function searchKnowledge(query: string, limit: number = 5): Promise<string> {
+async function searchKnowledge(query: string, limit: number = 6): Promise<string> {
   try {
     const vector = await embedQuery(query);
     const response = await fetch(
@@ -79,9 +84,7 @@ const SQL_BLOCKLIST = /\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|
 
 async function queryDatabase(sql: string): Promise<string> {
   const trimmed = sql.trim().replace(/;+$/, '');
-  if (!trimmed.toUpperCase().startsWith('SELECT') || SQL_BLOCKLIST.test(trimmed)) {
-    return '';
-  }
+  if (!trimmed.toUpperCase().startsWith('SELECT') || SQL_BLOCKLIST.test(trimmed)) return '';
   try {
     const client = await pool.connect();
     try {
@@ -110,54 +113,31 @@ async function queryDatabase(sql: string): Promise<string> {
 }
 
 // ── Data query heuristic ───────────────────────────────────────
-// Returns a best-effort SQL for simple data questions, or empty string.
 
 function inferDataQuery(message: string): string {
   const m = message.toLowerCase();
-  if (/how many (activations|homes? activated)/.test(m)) {
+  if (/how many (activations|homes? activated)/.test(m))
     return `SELECT COUNT(*) AS total_activations FROM oes_activations WHERE activation_date >= CURRENT_DATE - 30`;
-  }
-  if (/how many (purchase orders?|pos?)\b/.test(m)) {
+  if (/how many (purchase orders?|pos?)\b/.test(m))
     return `SELECT status, COUNT(*) FROM purchase_orders GROUP BY status ORDER BY count DESC`;
-  }
-  if (/how many (projects?)\b/.test(m)) {
+  if (/how many (projects?)\b/.test(m))
     return `SELECT status, COUNT(*) FROM projects GROUP BY status ORDER BY count DESC`;
-  }
-  if (/how many (suppliers?)\b/.test(m)) {
+  if (/how many (suppliers?)\b/.test(m))
     return `SELECT COUNT(*) AS total_suppliers FROM suppliers`;
-  }
-  if (/how many (staff|users?|team members?)\b/.test(m)) {
+  if (/how many (staff|users?|team members?)\b/.test(m))
     return `SELECT COUNT(*) AS total_staff FROM staff WHERE is_active = true`;
-  }
-  if (/how many (tickets?|faults?)\b/.test(m)) {
+  if (/how many (tickets?|faults?)\b/.test(m))
     return `SELECT status, COUNT(*) FROM maintenance_tickets GROUP BY status ORDER BY count DESC`;
-  }
   return '';
-}
-
-// ── Ollama chat completion ─────────────────────────────────────
-
-async function callOllama(messages: any[]): Promise<string> {
-  const response = await fetch(`${OLLAMA_BASE}/v1/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: MODEL, messages, temperature: 0.3, max_tokens: 1024 }),
-  });
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Ollama API ${response.status}: ${errorText}`);
-  }
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content ?? '';
 }
 
 // ── System prompt ──────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `You are Velo, the FibreFlow assistant for Velocity Fibre internal staff.
 
-FibreFlow (app.fibreflow.app) is a fibre network project management platform. You help staff understand features, workflows, and live data.
+FibreFlow (app.fibreflow.app) is a fibre network project management platform.
 
-Key FibreFlow terms (use these exact definitions):
+Key FibreFlow terms (exact definitions — never guess):
 - BOQ: Bill of Quantities — materials list for a project, created in Procurement
 - RFQ: Request for Quotation — sent to suppliers for BOQ pricing
 - PO: Purchase Order — issued to supplier after quote approval
@@ -175,23 +155,31 @@ Key FibreFlow terms (use these exact definitions):
 - PON: Passive Optical Network — fibre distribution network
 
 Guidelines:
-- Answer based ONLY on the knowledge context provided below
+- Answer based ONLY on the knowledge context provided
 - If the context doesn't cover the question, say so honestly
-- Use markdown for clarity (headers, bullet points, bold paths)
-- Navigation paths: **Sidebar → Module → Tab**
-- Be concise — 2-4 paragraphs unless step-by-step is needed
+- Use markdown (headers, bullets, bold paths like **Sidebar → Module → Tab**)
+- Be concise — 2-4 paragraphs unless steps are needed
 - You can ONLY read data, never modify anything`;
+
+// ── SSE helper ─────────────────────────────────────────────────
+
+function sseWrite(res: NextApiResponse, data: string): void {
+  res.write(`data: ${data}\n\n`);
+  if (typeof (res as any).flush === 'function') (res as any).flush();
+}
 
 // ── Main handler ───────────────────────────────────────────────
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return apiResponse.error(res, ErrorCode.METHOD_NOT_ALLOWED, 'Only POST requests allowed');
+    res.status(405).json({ error: { code: ErrorCode.METHOD_NOT_ALLOWED, message: 'Only POST requests allowed' } });
+    return;
   }
 
   const { message, userName, userRole, topic, history, dataAccess } = req.body;
   if (!message) {
-    return apiResponse.error(res, ErrorCode.VALIDATION_ERROR, 'message is required');
+    res.status(400).json({ error: { code: ErrorCode.VALIDATION_ERROR, message: 'message is required' } });
+    return;
   }
 
   const authenticatedUser = (req as any).user;
@@ -210,9 +198,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const retryAfter = Math.ceil((resetAt - Date.now()) / 1000);
     logger.warn('Rate limit exceeded', { userId, userName: trackingName });
     res.setHeader('Retry-After', retryAfter);
-    return apiResponse.error(res, ErrorCode.RATE_LIMIT, `Too many requests. Please wait ${retryAfter} seconds.`);
+    res.status(429).json({ error: { code: ErrorCode.RATE_LIMIT, message: `Too many requests. Please wait ${retryAfter} seconds.` } });
+    return;
   }
+
+  // Switch to SSE streaming mode
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-RateLimit-Remaining', remaining);
+  res.flushHeaders();
 
   try {
     logger.info('Chat request', {
@@ -221,10 +216,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       messageLength: message.length, model: MODEL,
     });
 
-    // ── Phase 1: Always search knowledge base ──
-    const knowledgeContext = await searchKnowledge(message, 6);
+    // Phase 1: RAG — embed + Qdrant search
+    const knowledgeContext = await searchKnowledge(message);
 
-    // ── Phase 2: Data query if applicable ──
+    // Phase 2: optional data query
     let dataContext = '';
     if (dataAccess) {
       const sql = inferDataQuery(message);
@@ -234,18 +229,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     }
 
-    // ── Phase 3: Build context block ──
+    // Phase 3: build context block
     const contextParts: string[] = [];
     if (knowledgeContext) contextParts.push(`Knowledge base results:\n${knowledgeContext}`);
     if (dataContext) contextParts.push(dataContext);
     const contextBlock = contextParts.length > 0
       ? `\n\n---\n${contextParts.join('\n\n')}\n---\n`
-      : '\n\n(No relevant knowledge base entries found for this query.)\n';
+      : '\n\n(No relevant knowledge base entries found.)\n';
 
-    // ── Phase 4: Build messages ──
+    // Phase 4: build messages
     const messages: any[] = [{ role: 'system', content: SYSTEM_PROMPT }];
-
-    // Conversation history (last 6 turns)
     if (Array.isArray(history)) {
       for (const msg of history.slice(-6)) {
         if (msg.role === 'user' || msg.role === 'assistant') {
@@ -253,27 +246,71 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
       }
     }
-
-    const userContent = `[${trackingName}${trackingRole ? ` — ${trackingRole}` : ''}] ${message}${contextBlock}`;
-    messages.push({ role: 'user', content: userContent });
-
-    // ── Phase 5: Single LLM call ──
-    const assistantResponse = await callOllama(messages);
-
-    if (!assistantResponse) {
-      logger.error('Empty response from Ollama', { userId });
-      return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Failed to generate response.');
-    }
-
-    logger.info('Chat response', {
-      userId, responseLength: assistantResponse.length,
-      hadKnowledge: !!knowledgeContext, hadData: !!dataContext, model: MODEL,
+    messages.push({
+      role: 'user',
+      content: `[${trackingName}${trackingRole ? ` — ${trackingRole}` : ''}] ${message}${contextBlock}`,
     });
 
-    return apiResponse.success(res, { response: assistantResponse, model: MODEL });
+    // Phase 5: streaming Ollama call
+    const ollamaRes = await fetch(`${OLLAMA_BASE}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL,
+        messages,
+        temperature: 0.3,
+        max_tokens: 1024,
+        stream: true,
+      }),
+    });
+
+    if (!ollamaRes.ok || !ollamaRes.body) {
+      const errText = await ollamaRes.text().catch(() => 'unknown');
+      throw new Error(`Ollama API ${ollamaRes.status}: ${errText}`);
+    }
+
+    // Phase 6: pipe SSE tokens to client
+    const reader = ollamaRes.body.getReader();
+    const decoder = new TextDecoder();
+    let fullResponse = '';
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed === 'data: [DONE]') continue;
+        const jsonStr = trimmed.startsWith('data: ') ? trimmed.slice(6) : trimmed;
+        try {
+          const chunk = JSON.parse(jsonStr);
+          const token = chunk.choices?.[0]?.delta?.content;
+          if (token) {
+            fullResponse += token;
+            sseWrite(res, JSON.stringify({ token }));
+          }
+        } catch {
+          // malformed chunk — skip
+        }
+      }
+    }
+
+    sseWrite(res, '[DONE]');
+
+    logger.info('Chat response', {
+      userId, responseLength: fullResponse.length,
+      hadKnowledge: !!knowledgeContext, hadData: !!dataContext, model: MODEL,
+    });
   } catch (err: any) {
     logger.error('Chat API error', { error: err.message, stack: err.stack, userId });
-    return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'An unexpected error occurred. Please try again.');
+    sseWrite(res, JSON.stringify({ error: 'An unexpected error occurred. Please try again.' }));
+  } finally {
+    res.end();
   }
 }
 
