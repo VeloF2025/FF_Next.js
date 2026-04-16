@@ -48,21 +48,23 @@ function getPool(connectionString: string): Pool {
 
 // ---------------------------------------------------------------------------
 // NeonQueryFunction type — matches the original export shape
+// Extends with .query() for callers that use parameterized form directly
 // ---------------------------------------------------------------------------
-export type NeonQueryFunction = (
-  strings: TemplateStringsArray,
-  ...values: unknown[]
-) => Promise<Record<string, unknown>[]>;
+export interface NeonQueryFunction {
+  (strings: TemplateStringsArray, ...values: unknown[]): Promise<Record<string, unknown>[]>;
+  query(text: string, params?: unknown[]): Promise<Record<string, unknown>[]>;
+}
 
 // ---------------------------------------------------------------------------
 // neon() — tagged-template factory, drop-in for @neondatabase/serverless
+// Also exposes .query(text, params) for callers like db-pool.ts
 // ---------------------------------------------------------------------------
 export function neon(
   connectionString: string
 ): NeonQueryFunction {
   const pool = getPool(connectionString);
 
-  return async function sql(
+  const sqlFn = async function sql(
     strings: TemplateStringsArray,
     ...values: unknown[]
   ): Promise<Record<string, unknown>[]> {
@@ -76,6 +78,17 @@ export function neon(
     const result = await pool.query(query, values as unknown[]);
     return result.rows as Record<string, unknown>[];
   };
+
+  // Attach .query() for callers that use parameterized form directly
+  (sqlFn as NeonQueryFunction).query = async function(
+    text: string,
+    params: unknown[] = []
+  ): Promise<Record<string, unknown>[]> {
+    const result = await pool.query(text, params);
+    return result.rows as Record<string, unknown>[];
+  };
+
+  return sqlFn as NeonQueryFunction;
 }
 
 // Re-export pg Pool and Client so files that import them from
