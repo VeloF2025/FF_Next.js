@@ -6,7 +6,7 @@
  * filtered by category when a card is clicked.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ArrowLeft, LayoutDashboard, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { OverviewDashboard } from './OverviewDashboard';
@@ -33,9 +33,20 @@ export function NonInvoiceablesPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('action_centre');
   const [activeCategory, setActiveCategory] = useState<NonInvoiceableCategory | null>(null);
   const [project, setProject] = useState<string | undefined>(undefined);
+  const [projects, setProjects] = useState<string[]>([]);
   const [ticketItems, setTicketItems] = useState<TicketSelection[]>([]);
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    fetch('/api/activate/non-invoiceables/projects')
+      .then(r => r.json())
+      .then(d => {
+        const list = d.data?.projects ?? d.projects ?? [];
+        setProjects(list);
+      })
+      .catch(() => {/* silent — dropdown stays empty */});
+  }, []);
 
   const handleCategoryClick = useCallback((category: NonInvoiceableCategory) => {
     setActiveCategory(category);
@@ -131,9 +142,9 @@ export function NonInvoiceablesPage() {
           className="bg-[#0d1117] border border-gray-600 rounded px-3 py-1.5 text-sm text-white"
         >
           <option value="">All Projects</option>
-          <option value="Lawley">Lawley</option>
-          <option value="Mohadin">Mohadin</option>
-          <option value="Mamelodi">Mamelodi</option>
+          {projects.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
         </select>
       </div>
 

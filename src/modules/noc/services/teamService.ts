@@ -16,6 +16,7 @@ import type {
   UpdateTeamPayload,
   TeamFilters,
   AddTeamMemberPayload,
+  ProjectTeamAssignment,
 } from '../types/team';
 
 const logger = createLogger('maintenance:teamService');
@@ -418,24 +419,67 @@ export async function getTeamsForDropdown(): Promise<TeamDropdownOption[]> {
   logger.debug('Fetching teams for dropdown');
 
   try {
-    const sql = `
-      SELECT
-        t.id,
-        t.name,
-        CASE WHEN t.contractor_id IS NOT NULL THEN 'contractor' ELSE 'internal' END as type,
-        t.team_type,
-        (SELECT COUNT(*) FROM team_members tm WHERE tm.team_id = t.id AND tm.is_active = true) as member_count,
-        COALESCE(u.first_name || ' ' || u.last_name, u.email) as lead_name
-      FROM teams t
-      LEFT JOIN users u ON t.lead_user_id = u.id
-      WHERE t.is_active = true
-      ORDER BY
-        CASE WHEN t.contractor_id IS NULL THEN 0 ELSE 1 END,
-        t.name ASC
-    `;
+    const result = await query<{
+      id: string;
+      name: string;
+      team_type: string;
+      member_count: number;
+      lead_name: string | null;
+      contractor_name: string | null;
+      assignment_id: string | null;
+      project_id: string | null;
+      project_name: string | null;
+      role: string | null;
+      assignment_created_at: string | null;
+    }>(
+      `SELECT
+         t.id, t.name, t.team_type,
+         (SELECT COUNT(*) FROM team_members tm WHERE tm.team_id = t.id AND tm.is_active = true)::int as member_count,
+         COALESCE(u.first_name || ' ' || u.last_name, u.email) as lead_name,
+         c.name as contractor_name,
+         pta.id as assignment_id,
+         pta.project_id,
+         p.project_name,
+         pta.role,
+         pta.created_at::text as assignment_created_at
+       FROM teams t
+       LEFT JOIN users u ON u.id = t.lead_user_id
+       LEFT JOIN contractors c ON c.id = t.contractor_id
+       LEFT JOIN project_team_assignments pta ON pta.team_id = t.id
+       LEFT JOIN projects p ON p.id = pta.project_id
+       WHERE t.is_active = true
+       ORDER BY
+         CASE WHEN t.contractor_id IS NULL THEN 0 ELSE 1 END,
+         t.name ASC`
+    );
 
-    const teams = await query<TeamDropdownOption>(sql, []);
-    return teams;
+    // Collapse multiple assignment rows into one TeamDropdownOption per team
+    const teamMap = new Map<string, TeamDropdownOption>();
+    for (const row of result) {
+      if (!teamMap.has(row.id)) {
+        teamMap.set(row.id, {
+          id: row.id,
+          name: row.name,
+          type: row.team_type === 'contractor' ? 'contractor' : 'internal',
+          team_type: row.team_type,
+          member_count: row.member_count,
+          lead_name: row.lead_name || undefined,
+          contractor_name: row.contractor_name || undefined,
+          project_assignments: [],
+        });
+      }
+      if (row.assignment_id) {
+        teamMap.get(row.id)!.project_assignments!.push({
+          id: row.assignment_id,
+          project_id: row.project_id!,
+          team_id: row.id,
+          role: row.role as ProjectTeamAssignment['role'],
+          created_at: row.assignment_created_at!,
+          project_name: row.project_name || undefined,
+        });
+      }
+    }
+    return Array.from(teamMap.values());
   } catch (error) {
     logger.error('Failed to fetch teams for dropdown', { error });
     throw error;

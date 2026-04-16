@@ -93,6 +93,22 @@ export interface TeamDropdownOption {
   member_count: number;
   lead_name?: string;
   contractor_name?: string;
+  project_assignments?: ProjectTeamAssignment[];
+}
+
+/**
+ * Project-team junction — one row per (project, team, role) triple.
+ * See migration 304.
+ */
+export interface ProjectTeamAssignment {
+  id: string;
+  project_id: string;
+  team_id: string;
+  role: 'activations' | 'maintenance' | 'fault_repair' | 'other';
+  created_at: string;
+  // Enriched from joins
+  project_name?: string;
+  team_name?: string;
 }
 
 /**

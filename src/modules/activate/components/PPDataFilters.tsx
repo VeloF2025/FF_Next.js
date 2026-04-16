@@ -4,6 +4,7 @@ import { Search, XCircle, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface PPDataFiltersProps {
+  projects: string[];
   searchText: string;
   onSearchChange: (val: string) => void;
   filterProject: string;
@@ -22,6 +23,7 @@ interface PPDataFiltersProps {
 }
 
 export function PPDataFilters({
+  projects,
   searchText, onSearchChange,
   filterProject, onProjectChange,
   filterStatus, onStatusChange,
@@ -62,9 +64,9 @@ export function PPDataFilters({
                    text-[var(--ff-text-primary)] text-sm"
       >
         <option value="">All Projects</option>
-        <option value="Lawley">Lawley</option>
-        <option value="Mohadin">Mohadin</option>
-        <option value="Mamelodi">Mamelodi</option>
+        {projects.map((p) => (
+          <option key={p} value={p}>{p}</option>
+        ))}
       </select>
       <select
         value={filterStatus}

@@ -13,7 +13,7 @@
  * 🟢 WORKING: Teams page integrates ModulePage for consistent tab navigation
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { ModulePage } from '@/components/module-page';
 import { nocConfig } from '@/modules/navigation';
 import {
@@ -38,8 +38,9 @@ import {
 import { cn } from '@/lib/utils';
 import { useTeams, useCreateTeam, useUpdateTeam, useDeleteTeam } from '@/modules/noc/hooks/useTeams';
 import { TeamType } from '@/modules/noc/types/team';
-import type { Team, CreateTeamPayload, UpdateTeamPayload } from '@/modules/noc/types/team';
+import type { Team, CreateTeamPayload, UpdateTeamPayload, ProjectTeamAssignment } from '@/modules/noc/types/team';
 import { TeamDetailPanel } from '@/modules/noc/components/TeamDetailPanel';
+import { TeamProjectAssignments } from '@/modules/noc/components/TeamProjectAssignments';
 
 type ViewMode = 'cards' | 'list';
 
@@ -67,6 +68,18 @@ export default function TeamsPageClient() {
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [allAssignments, setAllAssignments] = useState<ProjectTeamAssignment[]>([]);
+
+  const refreshAssignments = useCallback(() => {
+    fetch('/api/noc/project-team-assignments')
+      .then(r => r.json())
+      .then(d => setAllAssignments(d.data ?? []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refreshAssignments();
+  }, [refreshAssignments]);
 
   // Form state for create/edit
   const [formData, setFormData] = useState<{
@@ -112,6 +125,14 @@ export default function TeamsPageClient() {
     const contractor = filteredTeams.filter((t) => t.team_type === 'contractor');
     return { internal, contractor };
   }, [filteredTeams]);
+
+  const teamsWithAssignments = useMemo(() =>
+    filteredTeams.map(t => ({
+      ...t,
+      project_assignments: allAssignments.filter(a => a.team_id === t.id),
+    })),
+    [filteredTeams, allAssignments]
+  );
 
   // Handle create team
   const handleCreate = () => {
@@ -378,11 +399,12 @@ export default function TeamsPageClient() {
                   <th className="text-left px-4 py-3 text-[var(--ff-text-secondary)] font-medium hidden md:table-cell">Description</th>
                   <th className="text-center px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Members</th>
                   <th className="text-left px-4 py-3 text-[var(--ff-text-secondary)] font-medium hidden sm:table-cell">Lead</th>
+                  <th className="text-left px-4 py-3 text-[var(--ff-text-secondary)] font-medium hidden lg:table-cell">Projects</th>
                   <th className="text-right px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredTeams.map((team) => {
+                {teamsWithAssignments.map((team) => {
                   const Icon = team.team_type === 'contractor' ? Wrench : Building2;
                   const colorClass = team.team_type === 'contractor' ? 'text-orange-400' : 'text-blue-400';
                   return (
@@ -418,6 +440,12 @@ export default function TeamsPageClient() {
                         ) : (
                           <span className="text-[var(--ff-text-tertiary)]">—</span>
                         )}
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell" onClick={e => e.stopPropagation()}>
+                        <TeamProjectAssignmentsCell
+                          team={team}
+                          onChanged={refreshAssignments}
+                        />
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -655,6 +683,36 @@ function TeamCard({
           <span className="text-xs text-[var(--ff-text-secondary)]">Lead: {team.lead_user.name}</span>
         </div>
       )}
+    </div>
+  );
+}
+
+function TeamProjectAssignmentsCell({ team, onChanged }: { team: Team & { project_assignments?: ProjectTeamAssignment[] }; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const assignments = team.project_assignments ?? [];
+  const label = assignments.length === 0
+    ? '—'
+    : assignments.map(a => `${a.project_name} (${a.role})`).join(', ');
+
+  if (!open) {
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+        className="text-xs text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] text-left truncate max-w-[200px]"
+        title={label}
+      >
+        {label}
+      </button>
+    );
+  }
+
+  return (
+    <div onClick={e => e.stopPropagation()}>
+      <TeamProjectAssignments
+        teamId={team.id}
+        assignments={assignments}
+        onChanged={() => { setOpen(false); onChanged(); }}
+      />
     </div>
   );
 }

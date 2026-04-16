@@ -24,6 +24,7 @@ import { OltRecordTable } from './OltRecordTable';
 import { OltResolveModal } from './OltResolveModal';
 import { OltEscalateModal } from './OltEscalateModal';
 import { CreateOltTicketsModal } from './CreateOltTicketsModal';
+import type { OltTicketBatch } from './CreateOltTicketsModal';
 
 interface OltInvestigateTabProps {
   records: OltRecord[];
@@ -167,13 +168,21 @@ export function OltInvestigateTab({
     }
   };
 
-  const handleCreateTickets = async (params: { ticket_type: string; priority: string; notes: string; assigned_team_id?: string }) => {
+  const handleCreateTickets = async (params: { ticket_type: string; priority: string; notes: string; batches: OltTicketBatch[] }) => {
     setCreatingTickets(true);
     try {
       const res = await fetch('/api/system/olt-report/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ record_ids: Array.from(selectedIds), ...params }),
+        body: JSON.stringify({
+          batches: params.batches.map(b => ({
+            record_ids: b.record_ids,
+            assigned_team_id: b.assigned_team_id,
+          })),
+          ticket_type: params.ticket_type,
+          priority: params.priority,
+          notes: params.notes,
+        }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error?.message || result.error || 'Failed to create tickets');
@@ -187,8 +196,7 @@ export function OltInvestigateTab({
         debouncedSearch || undefined,
         projectFilter !== 'all' ? projectFilter : undefined,
       );
-      fetchStats();
-    } catch (err) {
+    } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to create tickets');
     } finally {
       setCreatingTickets(false);
@@ -587,7 +595,7 @@ export function OltInvestigateTab({
       )}
       {showTicketModal && (
         <CreateOltTicketsModal
-          selectedCount={selectedIds.size}
+          selectedRecords={records.filter(r => selectedIds.has(r.id))}
           onConfirm={handleCreateTickets}
           onClose={() => setShowTicketModal(false)}
           loading={creatingTickets}

@@ -15,6 +15,7 @@ import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
+import { normalizePPTicketBatches } from '@/modules/activate/services/ticketBatchService';
 import { createTicket } from '@/modules/noc/services/ticketService';
 import { TicketSource, TicketType, TicketPriority, TicketStatus } from '@/modules/noc/types/ticket';
 import { PP_OLT_SUBTYPES } from '@/modules/noc/constants/ticketCategories';
@@ -155,15 +156,15 @@ async function handleCreate(
   res: NextApiResponse
 ): Promise<void> {
   const {
-    pp_data_ids,
     ticket_type: rawTicketType,
     ticket_category: rawCategory,
     priority,
     notes,
-    assigned_team_id,
   } = req.body;
 
-  if (!Array.isArray(pp_data_ids) || pp_data_ids.length === 0) {
+  const batches = normalizePPTicketBatches(req.body);
+  const totalIds = batches.reduce((sum: number, b: { ids: number[] }) => sum + b.ids.length, 0);
+  if (totalIds === 0) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
   }
 
@@ -200,114 +201,132 @@ async function handleCreate(
     : TicketPriority.NORMAL;
 
   try {
-    const eligible = await pool.query(
-      `SELECT id, serial_number, resolved_drop_number, project, resolution_status
-       FROM oes_pp_data
-       WHERE id = ANY($1)
-         AND maintenance_ticket_id IS NULL
-         AND resolution_status != 'activated'`,
-      [pp_data_ids]
-    );
-
-    const records = eligible.rows;
-    const skipped = pp_data_ids.length - records.length;
-
-    if (records.length === 0) {
-      return apiResponse.success(res, { created: 0, skipped: pp_data_ids.length, tickets: [] });
-    }
-
-    logger.info('Creating enriched PP Data tickets', {
-      eligible: records.length, skipped, ticket_type, assigned_team_id: assigned_team_id || null,
-    });
-
-    const tickets: { id: string; ticket_uid: string; pp_data_id: number }[] = [];
+    const allTickets: { id: string; ticket_uid: string; pp_data_id: number }[] = [];
+    let totalSkipped = 0;
     const projectCounts: Record<string, number> = {};
 
-    for (const record of records) {
-      const dr = record.resolved_drop_number;
-      const serial = record.serial_number;
-      const project = record.project || 'Unknown';
+    for (const batch of batches) {
+      const pp_data_ids = batch.ids;
+      const assigned_team_id = batch.assigned_team_id;
 
-      projectCounts[project] = (projectCounts[project] || 0) + 1;
+      if (pp_data_ids.length === 0) continue;
 
-      // Fetch enrichment data from drops + onemap_properties
-      const enrichment = dr
-        ? await getEnrichmentForDR(dr, project)
-        : await getProjectId(project);
-
-      // Build enriched title
-      const locationParts: string[] = [];
-      if (enrichment.pole_number) locationParts.push(`Pole: ${enrichment.pole_number}`);
-      if (enrichment.zone) locationParts.push(`Zone ${enrichment.zone}`);
-      if (enrichment.pon) locationParts.push(`PON ${enrichment.pon}`);
-
-      const title = dr
-        ? `PP ONT ${serial} at ${dr}`
-        : `PP ONT ${serial} — No DR (Project: ${project})`;
-
-      // Build enriched description
-      const descParts: string[] = [];
-      descParts.push(dr
-        ? `PP Data investigation: ONT ${serial} located at DR ${dr} (Project: ${project})`
-        : `PP Data investigation: ONT ${serial} — not found in any source (Project: ${project}). Requires physical verification.`);
-
-      if (locationParts.length > 0) descParts.push(`Location: ${locationParts.join(', ')}`);
-      if (enrichment.address) descParts.push(`Address: ${enrichment.address}`);
-      if (enrichment.client_name) descParts.push(`End User: ${enrichment.client_name}`);
-      if (enrichment.client_contact) descParts.push(`Contact: ${enrichment.client_contact}`);
-      if (enrichment.installer_name) descParts.push(`Installer: ${enrichment.installer_name}`);
-      if (enrichment.installed_at) descParts.push(`Installed: ${enrichment.installed_at}`);
-
-      const description = notes || descParts.join('\n');
-
-      const ticket = await createTicket({
-        source: TicketSource.PP_DATA,
-        title,
-        ticket_type: ticket_type as TicketType,
-        ticket_category,
-        priority: ticketPriority,
-        description,
-        dr_number: dr || undefined,
-        ont_serial: serial,
-        created_by: req.user.id,
-        assigned_team_id: assigned_team_id || undefined,
-        status: assigned_team_id ? TicketStatus.ASSIGNED : undefined,
-        project_id: enrichment.project_id || undefined,
-        address: enrichment.address || undefined,
-        zone_id: enrichment.zone || undefined,
-        pon_number: enrichment.pon || undefined,
-        // Note: pole_number maps to pole_id (UUID) column — store pole label in description instead
-        client_name: enrichment.client_name || undefined,
-        client_contact: enrichment.client_contact || undefined,
-        client_email: enrichment.client_email || undefined,
-      });
-
-      // Set GPS coordinates directly (createTicket doesn't handle text GPS format)
-      if (enrichment.lat && enrichment.lng) {
-        await pool.query(
-          `UPDATE maintenance_tickets SET gps_coordinates = $1 WHERE id = $2`,
-          [`${enrichment.lat},${enrichment.lng}`, ticket.id]
-        );
-      }
-
-      // Link ticket back to PP data record
-      await pool.query(
-        `UPDATE oes_pp_data SET maintenance_ticket_id = $1 WHERE id = $2`,
-        [ticket.id, record.id]
+      const eligible = await pool.query(
+        `SELECT id, serial_number, resolved_drop_number, project, resolution_status
+         FROM oes_pp_data
+         WHERE id = ANY($1)
+           AND maintenance_ticket_id IS NULL
+           AND resolution_status != 'activated'`,
+        [pp_data_ids]
       );
 
-      tickets.push({ id: ticket.id, ticket_uid: ticket.ticket_uid, pp_data_id: record.id });
-    }
+      const records = eligible.rows;
+      totalSkipped += pp_data_ids.length - records.length;
 
-    logger.info('PP Data tickets created', { created: tickets.length, skipped });
+      if (records.length === 0) continue;
 
-    if (assigned_team_id && tickets.length > 0) {
-      sendTeamNotification(assigned_team_id, tickets, projectCounts).catch((err) => {
-        logger.error('Failed to send team notification email', { error: err });
+      logger.info('Creating enriched PP Data tickets (batch)', {
+        eligible: records.length,
+        skipped: pp_data_ids.length - records.length,
+        ticket_type,
+        assigned_team_id: assigned_team_id || null,
       });
+
+      const batchTickets: { id: string; ticket_uid: string; pp_data_id: number }[] = [];
+
+      for (const record of records) {
+        const dr = record.resolved_drop_number;
+        const serial = record.serial_number;
+        const project = record.project || 'Unknown';
+
+        projectCounts[project] = (projectCounts[project] || 0) + 1;
+
+        // Fetch enrichment data from drops + onemap_properties
+        const enrichment = dr
+          ? await getEnrichmentForDR(dr, project)
+          : await getProjectId(project);
+
+        // Build enriched title
+        const locationParts: string[] = [];
+        if (enrichment.pole_number) locationParts.push(`Pole: ${enrichment.pole_number}`);
+        if (enrichment.zone) locationParts.push(`Zone ${enrichment.zone}`);
+        if (enrichment.pon) locationParts.push(`PON ${enrichment.pon}`);
+
+        const title = dr
+          ? `PP ONT ${serial} at ${dr}`
+          : `PP ONT ${serial} — No DR (Project: ${project})`;
+
+        // Build enriched description
+        const descParts: string[] = [];
+        descParts.push(dr
+          ? `PP Data investigation: ONT ${serial} located at DR ${dr} (Project: ${project})`
+          : `PP Data investigation: ONT ${serial} — not found in any source (Project: ${project}). Requires physical verification.`);
+
+        if (locationParts.length > 0) descParts.push(`Location: ${locationParts.join(', ')}`);
+        if (enrichment.address) descParts.push(`Address: ${enrichment.address}`);
+        if (enrichment.client_name) descParts.push(`End User: ${enrichment.client_name}`);
+        if (enrichment.client_contact) descParts.push(`Contact: ${enrichment.client_contact}`);
+        if (enrichment.installer_name) descParts.push(`Installer: ${enrichment.installer_name}`);
+        if (enrichment.installed_at) descParts.push(`Installed: ${enrichment.installed_at}`);
+
+        const description = notes || descParts.join('\n');
+
+        const ticket = await createTicket({
+          source: TicketSource.PP_DATA,
+          title,
+          ticket_type: ticket_type as TicketType,
+          ticket_category,
+          priority: ticketPriority,
+          description,
+          dr_number: dr || undefined,
+          ont_serial: serial,
+          created_by: req.user.id,
+          assigned_team_id: assigned_team_id || undefined,
+          status: assigned_team_id ? TicketStatus.ASSIGNED : undefined,
+          project_id: enrichment.project_id || undefined,
+          address: enrichment.address || undefined,
+          zone_id: enrichment.zone || undefined,
+          pon_number: enrichment.pon || undefined,
+          // Note: pole_number maps to pole_id (UUID) column — store pole label in description instead
+          client_name: enrichment.client_name || undefined,
+          client_contact: enrichment.client_contact || undefined,
+          client_email: enrichment.client_email || undefined,
+        });
+
+        // Set GPS coordinates directly (createTicket doesn't handle text GPS format)
+        if (enrichment.lat && enrichment.lng) {
+          await pool.query(
+            `UPDATE maintenance_tickets SET gps_coordinates = $1 WHERE id = $2`,
+            [`${enrichment.lat},${enrichment.lng}`, ticket.id]
+          );
+        }
+
+        // Link ticket back to PP data record
+        await pool.query(
+          `UPDATE oes_pp_data SET maintenance_ticket_id = $1 WHERE id = $2`,
+          [ticket.id, record.id]
+        );
+
+        batchTickets.push({ id: ticket.id, ticket_uid: ticket.ticket_uid, pp_data_id: record.id });
+      }
+
+      allTickets.push(...batchTickets);
+
+      // Per-batch team notification
+      if (assigned_team_id && batchTickets.length > 0) {
+        sendTeamNotification(assigned_team_id, batchTickets, projectCounts).catch((err) => {
+          logger.error('Failed to send team notification email', { error: err });
+        });
+      }
     }
 
-    return apiResponse.success(res, { created: tickets.length, skipped, tickets });
+    logger.info('PP Data tickets created', { created: allTickets.length, skipped: totalSkipped });
+
+    if (allTickets.length === 0) {
+      return apiResponse.success(res, { created: 0, skipped: totalSkipped, tickets: [] });
+    }
+
+    return apiResponse.success(res, { created: allTickets.length, skipped: totalSkipped, tickets: allTickets });
   } catch (err) {
     logger.error('Failed to create PP Data tickets', { error: err });
     return apiResponse.internalError(res, err);

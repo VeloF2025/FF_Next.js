@@ -13,6 +13,7 @@ import { createTicket } from '@/modules/noc/services/ticketService';
 import { TicketSource, TicketType, TicketPriority, TicketStatus } from '@/modules/noc/types/ticket';
 import { PP_OLT_SUBTYPES } from '@/modules/noc/constants/ticketCategories';
 import { createLogger } from '@/lib/logger';
+import { normalizeOltTicketBatches } from '@/modules/activate/services/ticketBatchService';
 
 const logger = createLogger('olt-report:tickets');
 
@@ -32,15 +33,15 @@ async function handler(
   }
 
   const {
-    record_ids,
     ticket_type: rawTicketType,
     ticket_category: rawCategory,
     priority,
     notes,
-    assigned_team_id,
   } = req.body;
 
-  if (!Array.isArray(record_ids) || record_ids.length === 0) {
+  const batches = normalizeOltTicketBatches(req.body);
+  const totalIds = batches.reduce((sum: number, b: { ids: number[] }) => sum + b.ids.length, 0);
+  if (totalIds === 0) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid record_ids');
   }
 
@@ -76,108 +77,116 @@ async function handler(
     : TicketPriority.NORMAL;
 
   try {
-    // Fetch eligible records: needs_investigation or not_found, not yet ticketed
-    const eligible = await pool.query(
-      `SELECT id, drop_number, olt_serial, wrong_onemap_serial, fix_status,
-              investigation_context
-       FROM olt_mismatch_records
-       WHERE id = ANY($1)
-         AND fix_status IN ('needs_investigation', 'not_found', 'empty_serial')
-         AND maintenance_ticket_id IS NULL`,
-      [record_ids]
-    );
-
-    const records = eligible.rows;
-    const skipped = record_ids.length - records.length;
-
-    if (records.length === 0) {
-      return apiResponse.success(res, {
-        created: 0, skipped: record_ids.length, tickets: [],
-      });
-    }
-
-    logger.info('Creating OLT mismatch maintenance tickets', {
-      eligible: records.length,
-      skipped,
-      ticket_type,
-      assigned_team_id: assigned_team_id || null,
-    });
-
-    const tickets: { id: string; ticket_uid: string; record_id: string }[] = [];
+    const allTickets: { id: string; ticket_uid: string; record_id: string }[] = [];
+    let totalSkipped = 0;
     const projectCounts: Record<string, number> = {};
 
-    for (const record of records) {
-      const dr = record.drop_number as string;
-      const oltSerial = record.olt_serial as string;
-      const wrongSerial = record.wrong_onemap_serial as string | null;
-      const status = record.fix_status as string;
+    for (const batch of batches) {
+      const record_ids = batch.ids;
+      const assigned_team_id = batch.assigned_team_id;
 
-      // Try to get project from investigation_context
-      let project = 'Unknown';
-      try {
-        if (record.investigation_context) {
-          const ctx = typeof record.investigation_context === 'string'
-            ? JSON.parse(record.investigation_context)
-            : record.investigation_context;
-          project = ctx.belongsToTeam || project;
-        }
-      } catch { /* ignore parse errors */ }
+      if (record_ids.length === 0) continue;
 
-      projectCounts[project] = (projectCounts[project] || 0) + 1;
-
-      // Build title based on mismatch type
-      let title: string;
-      let description: string;
-
-      if (status === 'not_found') {
-        title = `OLT Mismatch: ${dr} — ONT ${oltSerial} not on 1Map`;
-        description = notes || `OLT report shows ONT serial ${oltSerial} for ${dr}, but this DR is not found on 1Map. Requires investigation to confirm installation status and update records.`;
-      } else if (wrongSerial) {
-        title = `OLT Mismatch: ${dr} — Wrong serial on 1Map`;
-        description = notes || `OLT report shows ONT serial ${oltSerial} for ${dr}, but 1Map has ${wrongSerial}. Serial mismatch requires investigation — possible swap or data entry error.`;
-      } else {
-        title = `OLT Mismatch: ${dr} — Serial investigation needed`;
-        description = notes || `OLT report flagged ${dr} with ONT serial ${oltSerial} for investigation. Current status: ${status}.`;
-      }
-
-      const ticket = await createTicket({
-        source: TicketSource.OLT_MISMATCH,
-        title,
-        ticket_type: ticket_type as TicketType,
-        ticket_category,
-        priority: ticketPriority,
-        description,
-        dr_number: dr,
-        ont_serial: oltSerial,
-        created_by: req.user.id,
-        assigned_team_id: assigned_team_id || undefined,
-        status: assigned_team_id ? TicketStatus.ASSIGNED : undefined,
-      });
-
-      // Link ticket back to mismatch record
-      await pool.query(
-        `UPDATE olt_mismatch_records SET maintenance_ticket_id = $1 WHERE id = $2`,
-        [ticket.id, record.id]
+      // Fetch eligible records: needs_investigation or not_found, not yet ticketed
+      const eligible = await pool.query(
+        `SELECT id, drop_number, olt_serial, wrong_onemap_serial, fix_status,
+                investigation_context
+         FROM olt_mismatch_records
+         WHERE id = ANY($1)
+           AND fix_status IN ('needs_investigation', 'not_found', 'empty_serial')
+           AND maintenance_ticket_id IS NULL`,
+        [record_ids]
       );
 
-      tickets.push({
-        id: ticket.id,
-        ticket_uid: ticket.ticket_uid,
-        record_id: record.id,
+      const records = eligible.rows;
+      totalSkipped += record_ids.length - records.length;
+
+      if (records.length === 0) continue;
+
+      logger.info('Creating OLT mismatch maintenance tickets (batch)', {
+        eligible: records.length,
+        skipped: record_ids.length - records.length,
+        ticket_type,
+        assigned_team_id: assigned_team_id || null,
       });
+
+      const batchTickets: { id: string; ticket_uid: string; record_id: string }[] = [];
+
+      for (const record of records) {
+        const dr = record.drop_number as string;
+        const oltSerial = record.olt_serial as string;
+        const wrongSerial = record.wrong_onemap_serial as string | null;
+        const status = record.fix_status as string;
+
+        // Try to get project from investigation_context
+        let project = 'Unknown';
+        try {
+          if (record.investigation_context) {
+            const ctx = typeof record.investigation_context === 'string'
+              ? JSON.parse(record.investigation_context)
+              : record.investigation_context;
+            project = ctx.belongsToTeam || project;
+          }
+        } catch { /* ignore parse errors */ }
+
+        projectCounts[project] = (projectCounts[project] || 0) + 1;
+
+        // Build title based on mismatch type
+        let title: string;
+        let description: string;
+
+        if (status === 'not_found') {
+          title = `OLT Mismatch: ${dr} — ONT ${oltSerial} not on 1Map`;
+          description = notes || `OLT report shows ONT serial ${oltSerial} for ${dr}, but this DR is not found on 1Map. Requires investigation to confirm installation status and update records.`;
+        } else if (wrongSerial) {
+          title = `OLT Mismatch: ${dr} — Wrong serial on 1Map`;
+          description = notes || `OLT report shows ONT serial ${oltSerial} for ${dr}, but 1Map has ${wrongSerial}. Serial mismatch requires investigation — possible swap or data entry error.`;
+        } else {
+          title = `OLT Mismatch: ${dr} — Serial investigation needed`;
+          description = notes || `OLT report flagged ${dr} with ONT serial ${oltSerial} for investigation. Current status: ${status}.`;
+        }
+
+        const ticket = await createTicket({
+          source: TicketSource.OLT_MISMATCH,
+          title,
+          ticket_type: ticket_type as TicketType,
+          ticket_category,
+          priority: ticketPriority,
+          description,
+          dr_number: dr,
+          ont_serial: oltSerial,
+          created_by: req.user.id,
+          assigned_team_id: assigned_team_id || undefined,
+          status: assigned_team_id ? TicketStatus.ASSIGNED : undefined,
+        });
+
+        // Link ticket back to mismatch record
+        await pool.query(
+          `UPDATE olt_mismatch_records SET maintenance_ticket_id = $1 WHERE id = $2`,
+          [ticket.id, record.id]
+        );
+
+        batchTickets.push({
+          id: ticket.id,
+          ticket_uid: ticket.ticket_uid,
+          record_id: record.id,
+        });
+      }
+
+      allTickets.push(...batchTickets);
+
+      // Per-batch team notification
+      if (assigned_team_id && batchTickets.length > 0) {
+        sendTeamNotification(assigned_team_id, batchTickets, projectCounts).catch((err) => {
+          logger.error('Failed to send team notification email', { error: err });
+        });
+      }
     }
 
-    logger.info('OLT mismatch tickets created', { created: tickets.length, skipped });
-
-    // Send email notification to team members if team was assigned
-    if (assigned_team_id && tickets.length > 0) {
-      sendTeamNotification(assigned_team_id, tickets, projectCounts).catch((err) => {
-        logger.error('Failed to send team notification email', { error: err });
-      });
-    }
+    logger.info('OLT mismatch tickets created', { created: allTickets.length, skipped: totalSkipped });
 
     return apiResponse.success(res, {
-      created: tickets.length, skipped, tickets,
+      created: allTickets.length, skipped: totalSkipped, tickets: allTickets,
     });
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);

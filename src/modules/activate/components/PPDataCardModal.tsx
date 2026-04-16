@@ -5,6 +5,7 @@ import { X, Search, XCircle, Wrench } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import { CreatePPTicketsModal } from './CreatePPTicketsModal';
+import type { PPTicketBatch } from './CreatePPTicketsModal';
 import { type PPRecord, type PPCardCategory, isSelectable } from './ppDataShared';
 import { PPDataRow, PPDataTableHead } from './PPDataRow';
 import toast from 'react-hot-toast';
@@ -94,23 +95,40 @@ export function PPDataCardModal({ category, count, onClose }: PPDataCardModalPro
     }
   };
 
-  const handleCreateTickets = async (params: { ticket_type: string; ticket_category: string; priority: string; notes: string; assigned_team_id?: string }) => {
+  const handleCreateTickets = async (params: {
+    ticket_type: string;
+    ticket_category: string;
+    priority: string;
+    notes: string;
+    batches: PPTicketBatch[];
+  }) => {
     setCreatingTickets(true);
     try {
       const res = await fetch('/api/activate/pp-data-tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pp_data_ids: selectedIds, ...params }),
+        body: JSON.stringify({
+          batches: params.batches.map(b => ({
+            pp_data_ids: b.pp_data_ids,
+            assigned_team_id: b.assigned_team_id,
+          })),
+          ticket_type: params.ticket_type,
+          ticket_category: params.ticket_category,
+          priority: params.priority,
+          notes: params.notes,
+        }),
       });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error?.message || result.error || 'Failed to create tickets');
-      const { created, skipped } = result.data;
-      toast.success(`Created ${created} ticket${created !== 1 ? 's' : ''}${skipped > 0 ? ` (${skipped} skipped)` : ''}`);
-      setShowTicketModal(false);
-      setSelectedIds([]);
-      fetchRecords();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create tickets');
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Created ${data.data.created} ticket${data.data.created !== 1 ? 's' : ''}`);
+        setShowTicketModal(false);
+        setSelectedIds([]);
+        fetchRecords();
+      } else {
+        toast.error(data.error?.message || 'Failed to create tickets');
+      }
+    } catch {
+      toast.error('Failed to create tickets');
     } finally {
       setCreatingTickets(false);
     }
@@ -187,7 +205,7 @@ export function PPDataCardModal({ category, count, onClose }: PPDataCardModalPro
       )}
 
       {showTicketModal && (
-        <CreatePPTicketsModal selectedCount={selectedIds.length} onConfirm={handleCreateTickets} onClose={() => setShowTicketModal(false)} loading={creatingTickets} />
+        <CreatePPTicketsModal selectedRecords={records.filter(r => selectedIds.includes(r.id))} onConfirm={handleCreateTickets} onClose={() => setShowTicketModal(false)} loading={creatingTickets} />
       )}
     </div>
   );
