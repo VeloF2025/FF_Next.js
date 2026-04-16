@@ -28,7 +28,10 @@ import {
 import {
   listPdfImages,
   filterSnagPhotos,
+  filterFieldReportPhotos,
 } from '@/modules/construction-qa/services/tqr-image-extractor';
+import { detectPdfFormat } from '@/modules/construction-qa/services/detect-pdf-format';
+import { parseFieldReport } from '@/modules/construction-qa/services/field-report-pdf-parser';
 
 // ============================================================
 // Config
@@ -53,6 +56,7 @@ interface ProjectCandidate {
 }
 
 export interface PdfPreviewResult {
+  format?: 'tqr' | 'field_report';
   metadata: {
     reportNumber: string;
     auditDate: string;
@@ -153,86 +157,148 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
     const pdfText = fs.readFileSync(textPath, 'utf-8');
 
-    // ── 3. Parse text ────────────────────────────────────────
-    const { metadata, findings, auditScores } = parseTqrText(pdfText);
+    // ── 3. Detect format ─────────────────────────────────────
+    const format = detectPdfFormat(pdfText);
 
-    if (!metadata.reportNumber) {
+    if (format === 'unknown') {
       return apiResponse.error(
         res,
         ErrorCode.BAD_REQUEST,
-        'Could not extract report number. Ensure this is a TQR PDF.'
+        'Unrecognised PDF format. Supported formats: TQR Audit Report, Field Snag Report.'
       );
     }
-    if (!metadata.auditDate) {
+
+    // ── 4a. TQR path ─────────────────────────────────────────
+    if (format === 'tqr') {
+      const { metadata, findings, auditScores } = parseTqrText(pdfText);
+
+      if (!metadata.reportNumber) {
+        return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Could not extract report number from TQR PDF.');
+      }
+      if (!metadata.auditDate) {
+        return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Could not extract audit date from TQR PDF.');
+      }
+
+      const imageList   = listPdfImages(pdfPath);
+      const snagEntries = filterSnagPhotos(imageList);
+      const photoCount  = snagEntries.length;
+
+      const existing = await sql`
+        SELECT id FROM snag_reports WHERE report_number = ${metadata.reportNumber}
+      ` as Array<{ id: string }>;
+
+      const isDuplicate       = existing.length > 0;
+      const duplicateReportId = existing[0]?.id ?? null;
+
+      const { project, candidates } = await detectProject(metadata.address, metadata.siteName);
+
+      const categoryCounts: Record<string, number> = {};
+      for (const f of findings) {
+        categoryCounts[f.category] = (categoryCounts[f.category] ?? 0) + 1;
+      }
+      const dominantCategory =
+        Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'quality';
+
+      const result: PdfPreviewResult = {
+        format: 'tqr',
+        metadata: {
+          reportNumber: metadata.reportNumber,
+          auditDate: metadata.auditDate,
+          siteName: metadata.siteName,
+          address: metadata.address,
+          category: dominantCategory,
+          auditor: metadata.auditor,
+          client: metadata.client,
+          contractor: metadata.contractor,
+        },
+        project,
+        projectCandidates: candidates,
+        findings: findings.map((f: TqrFinding) => ({
+          number: f.snagNumber,
+          description: f.description,
+          category: f.category,
+        })),
+        photoCount,
+        auditScores,
+        isDuplicate,
+        duplicateReportId,
+      };
+
+      log.info('TqrPdfPreview: TQR complete', {
+        reportNumber: metadata.reportNumber,
+        findingCount: findings.length,
+        photoCount,
+        projectDetected: Boolean(project),
+        isDuplicate,
+      });
+      return apiResponse.success(res, result);
+    }
+
+    // ── 4b. Field report path ────────────────────────────────
+    const originalFilename = uploadedFile.originalFilename ?? 'field-report.pdf';
+    const { rows, suggestedName } = parseFieldReport(pdfText, originalFilename);
+
+    if (rows.length === 0) {
       return apiResponse.error(
         res,
         ErrorCode.BAD_REQUEST,
-        'Could not extract audit date from PDF.'
+        'No snag rows found in PDF. Ensure this is a valid field snag report.'
       );
     }
 
-    // ── 4. Count snag photos (no extraction) ─────────────────
-    const imageList   = listPdfImages(pdfPath);
-    const snagEntries = filterSnagPhotos(imageList);
-    const photoCount  = snagEntries.length;
+    const today        = new Date().toISOString().split('T')[0]!;
+    const slug         = suggestedName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const reportNumber = `FIELD-${slug}-${today}`;
 
-    // ── 5. Check for duplicate ───────────────────────────────
-    const existing = await sql`
-      SELECT id FROM snag_reports WHERE report_number = ${metadata.reportNumber}
+    const imageList  = listPdfImages(pdfPath);
+    const photoCount = filterFieldReportPhotos(imageList).length;
+
+    const existingField = await sql`
+      SELECT id FROM snag_reports WHERE report_number = ${reportNumber}
     ` as Array<{ id: string }>;
 
-    const isDuplicate       = existing.length > 0;
-    const duplicateReportId = existing[0]?.id ?? null;
+    const isDuplicate       = existingField.length > 0;
+    const duplicateReportId = existingField[0]?.id ?? null;
 
-    // ── 6. Auto-detect project ───────────────────────────────
-    const { project, candidates } = await detectProject(
-      metadata.address,
-      metadata.siteName
-    );
+    const { project, candidates } = await detectProject(suggestedName, null);
 
-    // ── 7. Determine dominant category ──────────────────────
-    const categoryCounts: Record<string, number> = {};
-    for (const f of findings) {
-      categoryCounts[f.category] = (categoryCounts[f.category] ?? 0) + 1;
-    }
-    const dominantCategory =
-      Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'quality';
-
-    const previewFindings = findings.map((f: TqrFinding) => ({
-      number: f.snagNumber,
-      description: f.description,
-      category: f.category,
-    }));
-
-    const result: PdfPreviewResult = {
+    const fieldResult: PdfPreviewResult = {
+      format: 'field_report',
       metadata: {
-        reportNumber: metadata.reportNumber,
-        auditDate: metadata.auditDate,
-        siteName: metadata.siteName,
-        address: metadata.address,
-        category: dominantCategory,
-        auditor: metadata.auditor,
-        client: metadata.client,
-        contractor: metadata.contractor,
+        reportNumber,
+        auditDate: today,
+        siteName: suggestedName,
+        address: suggestedName,
+        category: 'quality',
+        auditor: null,
+        client: null,
+        contractor: null,
       },
       project,
       projectCandidates: candidates,
-      findings: previewFindings,
+      findings: rows.map(r => ({
+        number: r.rowIndex + 1,
+        description: r.description,
+        category: r.category,
+      })),
       photoCount,
-      auditScores,
+      auditScores: {
+        qualityAssurance: 0, qualityNc: 0,
+        healthAssurance: 0,  healthNc: 0,
+        safetyAssurance: 0,  safetyNc: 0,
+        environmentAssurance: 0, environmentNc: 0,
+        trafficAssurance: 0, trafficNc: 0,
+      },
       isDuplicate,
       duplicateReportId,
     };
 
-    log.info('TqrPdfPreview: complete', {
-      reportNumber: metadata.reportNumber,
-      findingCount: findings.length,
+    log.info('TqrPdfPreview: field_report complete', {
+      suggestedName,
+      rowCount: rows.length,
       photoCount,
-      projectDetected: Boolean(project),
-      isDuplicate,
     });
-
-    return apiResponse.success(res, result);
+    return apiResponse.success(res, fieldResult);
 
   } catch (error) {
     log.error('TqrPdfPreview: failed', { error });

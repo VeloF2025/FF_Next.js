@@ -28,7 +28,14 @@ import {
   extractJpegs,
   uploadSnagPhotos,
   uploadSourcePdf,
+  filterFieldReportPhotos,
 } from '@/modules/construction-qa/services/tqr-image-extractor';
+import { detectPdfFormat } from '@/modules/construction-qa/services/detect-pdf-format';
+import {
+  parseFieldReport,
+  type FieldSnagRow,
+} from '@/modules/construction-qa/services/field-report-pdf-parser';
+import { detectRepeats } from '@/modules/construction-qa/services/snag-repeat-detector';
 import type { SnagReport } from '@/modules/construction-qa/types/snag.types';
 import { createSnagsPerPhoto } from './snag-photo-mapper';
 
@@ -44,6 +51,137 @@ export const config = {
 };
 
 const sql = neon(process.env.DATABASE_URL!);
+
+// ============================================================
+// Field Report Import Helper
+// ============================================================
+
+async function importFieldReport(params: {
+  pdfText: string;
+  pdfPath: string;
+  originalFilename: string;
+  projectId: string;
+  userId: string | null;
+  sql: typeof sql;
+  tempDir: string;
+}): Promise<{
+  reportId: string;
+  reportNumber: string;
+  snagCount: number;
+  photoCount: number;
+}> {
+  const { pdfText, pdfPath, originalFilename, projectId, userId, sql: sqlFn, tempDir } = params;
+
+  const { rows, suggestedName } = parseFieldReport(pdfText, originalFilename);
+
+  if (rows.length === 0) {
+    throw new Error('No snag rows found in field report PDF.');
+  }
+
+  const today        = new Date().toISOString().split('T')[0]!;
+  const slug         = suggestedName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const reportNumber = `FIELD-${slug}-${today}`;
+
+  log.info('FieldReportImport: starting', { reportNumber, rowCount: rows.length, projectId });
+
+  // ── A. Extract + upload photos ──────────────────────────
+  const imageList      = listPdfImages(pdfPath);
+  const filteredImages = filterFieldReportPhotos(imageList);
+  const extractedFiles = extractJpegs(pdfPath, tempDir, filteredImages);
+  const uploadedPhotos = await uploadSnagPhotos(extractedFiles, projectId, reportNumber);
+
+  if (uploadedPhotos.length !== rows.length) {
+    log.warn('FieldReportImport: photo/row count mismatch', {
+      photos: uploadedPhotos.length,
+      rows: rows.length,
+    });
+  }
+
+  // ── B. Upload source PDF ────────────────────────────────
+  const pdfBuffer    = fs.readFileSync(pdfPath);
+  const sourcePdfUrl = await uploadSourcePdf(pdfBuffer, originalFilename, projectId, reportNumber);
+
+  // ── C. Insert snag_report ───────────────────────────────
+  const reportRows = await sqlFn`
+    INSERT INTO snag_reports (
+      project_id, report_number, site_name, audit_date,
+      source_pdf_url, source_pdf_filename,
+      quality_assurance, quality_nc,
+      health_assurance, health_nc,
+      safety_assurance, safety_nc,
+      environment_assurance, environment_nc,
+      traffic_assurance, traffic_nc,
+      total_findings, import_status, import_notes, imported_by
+    ) VALUES (
+      ${projectId}, ${reportNumber}, ${suggestedName}, ${today},
+      ${sourcePdfUrl ?? null}, ${originalFilename},
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      ${rows.length}, 'complete', ${'field_report import - table format'}, ${userId}
+    )
+    RETURNING id
+  ` as Array<{ id: string }>;
+
+  const reportId = reportRows[0]?.id;
+  if (!reportId) throw new Error('Failed to create snag_report record');
+
+  // ── D. Insert snags + photos ────────────────────────────
+  let snagCount  = 0;
+  let photoCount = 0;
+
+  for (let i = 0; i < rows.length; i++) {
+    const row   = rows[i] as FieldSnagRow;
+    const photo = uploadedPhotos[i] ?? null;
+
+    const snagRows = await sqlFn`
+      INSERT INTO snags (
+        report_id, project_id, snag_number,
+        category, severity, description,
+        status, is_repeat, repeat_count, reopen_count
+      ) VALUES (
+        ${reportId}, ${projectId}, ${row.rowIndex + 1},
+        ${row.category}, ${row.severity}, ${row.description},
+        'open', false, 0, 0
+      )
+      RETURNING id
+    ` as Array<{ id: string }>;
+
+    const snagId = snagRows[0]?.id;
+    if (!snagId) {
+      log.warn('FieldReportImport: failed to insert snag', { rowIndex: i });
+      continue;
+    }
+    snagCount++;
+
+    await detectRepeats(
+      {
+        id: snagId,
+        project_id: projectId,
+        category: row.category,
+        pole_references: null,
+        report_id: reportId,
+      },
+      sqlFn
+    );
+
+    if (photo) {
+      await sqlFn`
+        INSERT INTO snag_photos (
+          snag_id, phase, photo_url, source,
+          latitude, longitude
+        ) VALUES (
+          ${snagId}, 'before', ${photo.url}, 'field_report',
+          ${row.latitude}, ${row.longitude}
+        )
+      `;
+      photoCount++;
+    } else {
+      log.warn('FieldReportImport: no photo for snag', { snagId, rowIndex: i });
+    }
+  }
+
+  log.info('FieldReportImport: complete', { reportId, snagCount, photoCount });
+  return { reportId, reportNumber, snagCount, photoCount };
+}
 
 // ============================================================
 // Handler
@@ -126,6 +264,39 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       timeout: 60_000,
     });
     const pdfText = fs.readFileSync(textPath, 'utf-8');
+
+    // ── Format detection + routing ────────────────────────
+    const format = detectPdfFormat(pdfText);
+
+    if (format === 'unknown') {
+      return apiResponse.error(
+        res,
+        ErrorCode.BAD_REQUEST,
+        'Unrecognised PDF format. Supported: TQR Audit Report, Field Snag Report.'
+      );
+    }
+
+    if (format === 'field_report') {
+      const originalFilename = uploadedFile.originalFilename ?? 'field-report.pdf';
+      try {
+        const result = await importFieldReport({
+          pdfText,
+          pdfPath,
+          originalFilename,
+          projectId: projectId!,
+          userId: user?.id ?? null,
+          sql,
+          tempDir,
+        });
+        return apiResponse.success(res, { ...result, format: 'field_report' });
+      } catch (fieldErr) {
+        const msg = fieldErr instanceof Error ? fieldErr.message : 'Field report import failed';
+        log.error('FieldReportImport: failed', { error: fieldErr });
+        return apiResponse.badRequest(res, msg);
+      }
+    }
+
+    // ── TQR path continues below (unchanged) ─────────────
 
     // ── 4. Parse text ────────────────────────────────────────
     const { metadata, findings, gridMapping, auditScores } = parseTqrText(pdfText);

@@ -98,7 +98,7 @@ export function SnagImportDialog({ onClose, onImported }: SnagImportDialogProps)
       <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-lg flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 shrink-0">
-          <h2 className="text-sm font-semibold text-zinc-100">Import TQR Report</h2>
+          <h2 className="text-sm font-semibold text-zinc-100">Import Snag Report</h2>
           <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close">
             <X className="h-4 w-4" />
           </Button>
@@ -213,9 +213,20 @@ interface PreviewCardProps {
 function PreviewCard({ preview, projectId, onProjectChange, disabled }: PreviewCardProps) {
   return (
     <div className="bg-zinc-800/60 border border-zinc-700 rounded-lg p-4 space-y-0.5">
-      <p className="text-xs font-semibold text-zinc-100 mb-2">
-        {preview.metadata.reportNumber} — Ready to Import
-      </p>
+      <div className="flex items-center gap-2 mb-2">
+        {preview.format === 'field_report' ? (
+          <span className="inline-flex items-center rounded-full bg-orange-900/40 border border-orange-700 px-2 py-0.5 text-[10px] font-medium text-orange-300">
+            Field Report
+          </span>
+        ) : (
+          <span className="inline-flex items-center rounded-full bg-blue-900/40 border border-blue-700 px-2 py-0.5 text-[10px] font-medium text-blue-300">
+            TQR Audit
+          </span>
+        )}
+        <p className="text-xs font-semibold text-zinc-100">
+          {preview.metadata.reportNumber} — Ready to Import
+        </p>
+      </div>
 
       {/* Project row */}
       <div className="flex items-start gap-2 py-1.5 border-b border-zinc-800">
@@ -249,7 +260,9 @@ function PreviewCard({ preview, projectId, onProjectChange, disabled }: PreviewC
       <SummaryRow label="Category"   value={preview.metadata.category} />
       <SummaryRow label="Findings"   value={String(preview.findings.length)} />
       <SummaryRow label="Photos"     value={String(preview.photoCount)} />
-      <SummaryRow label="Auditor"    value={preview.metadata.auditor ?? '—'} />
+      {preview.format !== 'field_report' && (
+        <SummaryRow label="Auditor"    value={preview.metadata.auditor ?? '—'} />
+      )}
     </div>
   );
 }

@@ -282,6 +282,7 @@ export async function uploadSnagPhotoFile(
 
 /** Preview result from /api/snags/preview-pdf — no DB writes */
 export interface PdfPreviewResult {
+  format?: 'tqr' | 'field_report';
   metadata: {
     reportNumber: string;
     auditDate: string;
@@ -339,12 +340,32 @@ export async function importPdf(
     throw new Error(err.error?.message ?? 'PDF import failed');
   }
   const json = await res.json() as {
-    data: { report: { id: string }; snags: unknown[]; photoCount: number };
+    data: {
+      // TQR shape
+      report?: { id: string };
+      snags?: unknown[];
+      // Field report shape
+      reportId?: string;
+      snagCount?: number;
+      photoCount?: number;
+      format?: string;
+    };
   };
+
+  // Field report returns flat { reportId, snagCount, photoCount }
+  if (json.data.reportId) {
+    return {
+      reportId: json.data.reportId,
+      snagCount: json.data.snagCount ?? 0,
+      photoCount: json.data.photoCount ?? 0,
+    };
+  }
+
+  // TQR returns { report, snags, photoCount }
   return {
-    reportId: json.data.report.id,
-    snagCount: json.data.snags.length,
-    photoCount: json.data.photoCount,
+    reportId: json.data.report?.id ?? '',
+    snagCount: json.data.snags?.length ?? 0,
+    photoCount: json.data.photoCount ?? 0,
   };
 }
 

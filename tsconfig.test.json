@@ -1,0 +1,28 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/__tests__/**/*.ts",
+    "**/__tests__/**/*.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "vitest.setup.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "archived/**/*",
+    "archive/**/*",
+    "tools/pdfcraft/**",
+    "scripts/**",
+    "neon/**",
+    "src/app/router/**",
+    "src/performance/**",
+    "convex/**"
+  ]
+}

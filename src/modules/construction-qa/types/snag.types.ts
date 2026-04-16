@@ -37,7 +37,8 @@ export type SnagPhotoSource =
   | 'tqr_import'
   | 'noc_upload'
   | 'manual'
-  | 'whatsapp';
+  | 'whatsapp'
+  | 'field_report';
 
 export type SnagImportStatus = 'pending' | 'processing' | 'complete' | 'failed';
 

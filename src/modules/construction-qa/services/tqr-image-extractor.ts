@@ -46,7 +46,7 @@ export interface UploadedSnagPhoto {
 // Image List Parser
 // ============================================================
 
-interface ImageListEntry {
+export interface ImageListEntry {
   page: number;
   index: number;
   type: string;
@@ -109,6 +109,18 @@ export function filterSnagPhotos(entries: ImageListEntry[]): ImageListEntry[] {
       e.enc === 'jpeg' &&
       e.width > 300
   );
+}
+
+/**
+ * Filter images for field report format:
+ * - No page restriction (whole doc is the table)
+ * - Width > 150px to exclude decorative elements
+ * - Sorted by page → index (document reading order)
+ */
+export function filterFieldReportPhotos(images: ImageListEntry[]): ImageListEntry[] {
+  return images
+    .filter(img => img.type === 'image' && img.enc === 'jpeg' && img.width > 150)
+    .sort((a, b) => a.page !== b.page ? a.page - b.page : a.index - b.index);
 }
 
 // ============================================================
