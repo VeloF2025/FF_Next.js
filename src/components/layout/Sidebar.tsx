@@ -6,6 +6,7 @@ import { navItems } from './sidebar/navigationConfig';
 import { filterNavigationItemsRBAC, getSidebarStyles } from './sidebar/sidebarUtils';
 import { SidebarHeader } from './sidebar/SidebarHeader';
 import { NavigationMenu } from './sidebar/NavigationMenu';
+import { NavigationMenuSkeleton } from './sidebar/NavigationMenuSkeleton';
 import { CollapseToggle } from './sidebar/CollapseToggle';
 import { useSidebarPreferences } from './sidebar/hooks/useSidebarPreferences';
 import { buildMainSectionItems } from './sidebar/config/customizableItems';
@@ -14,7 +15,7 @@ import type { SidebarProps, NavSection } from './sidebar/types';
 export function Sidebar({ isOpen, isCollapsed, onCollapse }: SidebarProps) {
   const { currentUser } = useAuth();
   const { themeConfig } = useTheme();
-  const { can } = usePermission();
+  const { can, isLoading: permissionsLoading } = usePermission();
   const { mainSectionItems } = useSidebarPreferences();
 
   // Build nav items with customized MAIN section
@@ -63,12 +64,19 @@ export function Sidebar({ isOpen, isCollapsed, onCollapse }: SidebarProps) {
               themeConfig={themeConfig}
             />
             
-            <NavigationMenu 
-              visibleNavItems={visibleNavItems}
-              isCollapsed={isCollapsed}
-              sidebarStyles={sidebarStyles}
-              themeConfig={themeConfig}
-            />
+            {permissionsLoading ? (
+              <NavigationMenuSkeleton
+                isCollapsed={isCollapsed}
+                sidebarStyles={sidebarStyles}
+              />
+            ) : (
+              <NavigationMenu
+                visibleNavItems={visibleNavItems}
+                isCollapsed={isCollapsed}
+                sidebarStyles={sidebarStyles}
+                themeConfig={themeConfig}
+              />
+            )}
           </nav>
 
           <CollapseToggle 
