@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:api": "node server.mjs",
-    "build": "NODE_OPTIONS=--max-old-space-size=4096 next build",
+    "build": "NODE_OPTIONS=--max-old-space-size=6144 next build",
     "build:turbo": "next build --turbo",
     "start": "next start",
     "postinstall": "node scripts/setup-eslint-plugin.js",
