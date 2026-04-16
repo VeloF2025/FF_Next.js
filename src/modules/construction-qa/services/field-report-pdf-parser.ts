@@ -10,13 +10,22 @@
  *   - "- Google Maps" continuation: description after the marker
  *   - Indented continuation lines: trimmed text (indent >= MIN_CONTINUATION_INDENT)
  *
- * Deduplication: same GPS+description pairs are collapsed to one row.
+ * No deduplication: each PDF row becomes one snag so photos map 1:1.
+ * Same GPS + same description across rows is valid (same pole, different
+ * angles or different issues).
  *
  * Status: WORKING
  */
 
 import type { SnagSeverity, SnagCategory } from '../types/snag.types';
-import { DMS_PATTERN, GMAPS_ANCHOR, reconstructUrlGps, dmsToDecimal } from './field-report-gps';
+import {
+  DMS_PATTERN,
+  DMS_LAT_ONLY,
+  DMS_LNG_ONLY,
+  GMAPS_ANCHOR,
+  reconstructUrlGps,
+  dmsToDecimal,
+} from './field-report-gps';
 
 export { parseGpsFromLine } from './field-report-gps';
 
@@ -122,21 +131,17 @@ function extractDescFromGmapsLine(line: string): string {
 }
 
 // ============================================================
-// Duplicate detection
-// ============================================================
-
-function makeDedupeKey(gpsRaw: string | null, description: string): string {
-  return `${gpsRaw ?? 'no-gps'}||${description}`;
-}
-
-// ============================================================
 // Main Parser
 // ============================================================
 
 /**
  * Parse pdftotext -layout output of a field report PDF.
  * Returns ordered snag rows suitable for direct DB import.
- * Duplicate GPS+description pairs are collapsed to one row.
+ *
+ * Each PDF row becomes one snag — no deduplication. The PDF table has
+ * one photo per row, so a 1:1 row-to-photo mapping is preserved. Rows
+ * may share GPS and description text when the same pole was captured
+ * multiple times (different angles / different issues at the same pole).
  */
 export function parseFieldReport(
   pdfText: string,
@@ -144,7 +149,6 @@ export function parseFieldReport(
 ): FieldReportParseResult {
   const lines = pdfText.split('\n');
   const rows: FieldSnagRow[] = [];
-  const seenKeys = new Set<string>();
   let rowIndex = 0;
 
   let currentGps: { lat: number; lng: number } | null = null;
@@ -155,19 +159,15 @@ export function parseFieldReport(
   const flushRow = () => {
     const description = currentDesc.join(' ').replace(/\s+/g, ' ').trim();
     if (description) {
-      const key = makeDedupeKey(currentGpsRaw, description);
-      if (!seenKeys.has(key)) {
-        seenKeys.add(key);
-        rows.push({
-          rowIndex: rowIndex++,
-          description,
-          latitude:  currentGps?.lat ?? null,
-          longitude: currentGps?.lng ?? null,
-          gpsRaw:    currentGpsRaw,
-          severity:  inferSeverity(description),
-          category:  'quality',
-        });
-      }
+      rows.push({
+        rowIndex: rowIndex++,
+        description,
+        latitude:  currentGps?.lat ?? null,
+        longitude: currentGps?.lng ?? null,
+        gpsRaw:    currentGpsRaw,
+        severity:  inferSeverity(description),
+        category:  'quality',
+      });
     }
     currentGps    = null;
     currentGpsRaw = null;
@@ -183,7 +183,7 @@ export function parseFieldReport(
     // Skip blank lines (only flush if we were mid-block and hit multiple blanks)
     if (!trimmed) continue;
 
-    // ── DMS anchor line ────────────────────────────────────
+    // ── DMS anchor line (single-line, lat + lng together) ──
     const dmsMatch = line.match(DMS_PATTERN);
     if (dmsMatch && dmsMatch[1] && dmsMatch[2] && dmsMatch[3] && dmsMatch[4] &&
         dmsMatch[5] && dmsMatch[6] && dmsMatch[7] && dmsMatch[8] &&
@@ -197,6 +197,39 @@ export function parseFieldReport(
       const matchEnd = (dmsMatch.index) + dmsMatch[0].length;
       const descPart = extractDescFromDmsLine(line, matchEnd);
       if (descPart) currentDesc.push(descPart);
+      continue;
+    }
+
+    // ── Split DMS anchor (lat on this line, lng on next line) ──
+    // Example: "26°07'53.6"S               Pole Scew"
+    //          "28°28'33.0"E - Google"
+    const latOnly = line.match(DMS_LAT_ONLY);
+    const nextLine = (lines[i + 1] ?? '').replace(/\f/g, '');
+    const lngOnly = nextLine.match(DMS_LNG_ONLY);
+    if (latOnly && latOnly[1] && latOnly[2] && latOnly[3] && latOnly[4] &&
+        latOnly.index !== undefined &&
+        !DMS_PATTERN.test(line) &&
+        lngOnly && lngOnly[1] && lngOnly[2] && lngOnly[3] && lngOnly[4] &&
+        !DMS_PATTERN.test(nextLine)) {
+      flushRow();
+      currentGps = {
+        lat: dmsToDecimal(latOnly[1], latOnly[2], latOnly[3], latOnly[4]),
+        lng: dmsToDecimal(lngOnly[1], lngOnly[2], lngOnly[3], lngOnly[4]),
+      };
+      currentGpsRaw = `${latOnly[0]} ${lngOnly[0]}`;
+      const matchEnd = latOnly.index + latOnly[0].length;
+      const descPart = extractDescFromDmsLine(line, matchEnd);
+      if (descPart) currentDesc.push(descPart);
+      // Skip the lng line (it has the "- Google Maps" marker and possibly more description)
+      // Check if there's description text on the lng line after the lng match
+      const lngMatchEnd = (lngOnly.index ?? 0) + lngOnly[0].length;
+      const lngRemainder = nextLine.substring(lngMatchEnd).trim();
+      if (lngRemainder && !/^-?\s*Google\s+Maps/i.test(lngRemainder)) {
+        // Strip off a leading "- Google" or "- Google Maps" marker if present
+        const cleaned = lngRemainder.replace(/^-\s*Google(\s+Maps)?\s*/i, '').trim();
+        if (cleaned) currentDesc.push(cleaned);
+      }
+      i++; // consume the lng line
       continue;
     }
 

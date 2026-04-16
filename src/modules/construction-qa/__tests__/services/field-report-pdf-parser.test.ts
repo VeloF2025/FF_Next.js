@@ -186,4 +186,20 @@ describe('parseFieldReport', () => {
     const result = parseFieldReport('Some random text\nNo GPS here\n', 'test.pdf');
     expect(result.rows).toHaveLength(0);
   });
+
+  it('does NOT deduplicate rows with matching GPS + description', () => {
+    // Same pole, same description, two separate entries — preserves 1:1 photo mapping.
+    const text = `Photo   Location                    Snag
+26°07'41.2"S 28°28'29.6"E Pole Scew
+- Google Maps
+
+26°07'41.2"S 28°28'29.6"E Pole Scew
+- Google Maps
+`;
+    const result = parseFieldReport(text, 'test.pdf');
+    expect(result.rows).toHaveLength(2);
+    expect(result.rows[0]!.description).toBe('Pole Scew');
+    expect(result.rows[1]!.description).toBe('Pole Scew');
+    expect(result.rows[0]!.latitude).toBeCloseTo(result.rows[1]!.latitude!, 4);
+  });
 });

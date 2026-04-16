@@ -8,6 +8,10 @@
 // ============================================================
 
 export const DMS_PATTERN = /(\d+)°(\d+)'([\d.]+)"([NS])\s+(\d+)°(\d+)'([\d.]+)"([EW])/;
+/** Matches just the lat (N/S) part when lng appears on the next line */
+export const DMS_LAT_ONLY = /(\d+)°(\d+)'([\d.]+)"([NS])/;
+/** Matches just the lng (E/W) part */
+export const DMS_LNG_ONLY = /(\d+)°(\d+)'([\d.]+)"([EW])/;
 export const GMAPS_ANCHOR = /https?:\/\/maps\.google\.com\//i;
 const URL_DECIMAL_PATTERN = /[?&]q=(-?\d+\.?\d+)%2[Cc](\d+\.?\d+)/i;
 
