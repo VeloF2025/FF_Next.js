@@ -8,13 +8,19 @@
 
 import { log } from '@/lib/logger';
 import db from '@/lib/db';
-import type { WorkflowType } from '../types/learning.types';
+import type {
+  WorkflowType,
+  QaDecisionValue,
+  PassFailCorrectionRecord,
+  CommentCorrectionRecord,
+} from '../types/learning.types';
+
+export type { QaDecisionValue } from '../types/learning.types';
+export type { PassFailCorrectionRecord, CommentCorrectionRecord } from '../types/learning.types';
 
 // ============================================================================
 // TYPES
 // ============================================================================
-
-export type QaDecisionValue = 'PASS' | 'FAIL';
 
 export interface PassFailCorrectionInput {
   workflowType: WorkflowType;
@@ -50,29 +56,6 @@ export interface CommentCorrectionInput {
   correctedComment: string;
 
   correctedBy: string;
-}
-
-export interface PassFailCorrectionRecord {
-  id: string;
-  workflowType: WorkflowType;
-  dropNumber: string | null;
-  photoFilename: string;
-  step: number;
-  vlmDecision: QaDecisionValue;
-  correctDecision: QaDecisionValue;
-  createdAt: Date;
-}
-
-export interface CommentCorrectionRecord {
-  id: string;
-  workflowType: WorkflowType;
-  dropNumber: string | null;
-  photoFilename: string;
-  step: number;
-  decision: QaDecisionValue;
-  vlmComment: string;
-  correctedComment: string;
-  createdAt: Date;
 }
 
 export class PassFailCommentServiceError extends Error {

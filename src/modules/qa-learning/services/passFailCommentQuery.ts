@@ -8,12 +8,12 @@
  */
 
 import db from '@/lib/db';
-import type { WorkflowType } from '../types/learning.types';
 import type {
+  WorkflowType,
   QaDecisionValue,
   PassFailCorrectionRecord,
   CommentCorrectionRecord,
-} from './passFailCommentService';
+} from '../types/learning.types';
 
 // ============================================================================
 // RETRIEVE (minimal — for future few-shot injection)

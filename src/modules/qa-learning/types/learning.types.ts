@@ -11,6 +11,36 @@
  */
 
 // ============================================================================
+// PASS/FAIL + COMMENT CORRECTION TYPES
+// Shared between passFailCommentService and passFailCommentQuery.
+// ============================================================================
+
+export type QaDecisionValue = 'PASS' | 'FAIL';
+
+export interface PassFailCorrectionRecord {
+  id: string;
+  workflowType: WorkflowType;
+  dropNumber: string | null;
+  photoFilename: string;
+  step: number;
+  vlmDecision: QaDecisionValue;
+  correctDecision: QaDecisionValue;
+  createdAt: Date;
+}
+
+export interface CommentCorrectionRecord {
+  id: string;
+  workflowType: WorkflowType;
+  dropNumber: string | null;
+  photoFilename: string;
+  step: number;
+  decision: QaDecisionValue;
+  vlmComment: string;
+  correctedComment: string;
+  createdAt: Date;
+}
+
+// ============================================================================
 // WORKFLOW TYPES
 // ============================================================================
 
