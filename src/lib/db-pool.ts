@@ -58,7 +58,6 @@
  */
 
 import { pool } from './db';
-import { neon } from './db-neon';
 import type { PoolClient } from 'pg';
 
 // ============================================================================
@@ -75,27 +74,13 @@ export interface TxnClient {
 }
 
 // ============================================================================
-// Neon HTTP Singleton
-// ============================================================================
-
-/** Lazy-initialised neon HTTP driver — works from any network (no TCP needed). */
-let _neonSql: ReturnType<typeof neon> | null = null;
-function getNeonSql() {
-  if (!_neonSql) {
-    _neonSql = neon(process.env.DATABASE_URL!);
-  }
-  return _neonSql;
-}
-
-// ============================================================================
 // Tagged Template Literal Adapter
 // ============================================================================
 
 /**
  * Drop-in replacement for `const sql = neon(DATABASE_URL)`.
  *
- * Uses the Neon HTTP driver (HTTPS) which works reliably from all
- * environments, unlike pg Pool which requires TCP port 5432 access.
+ * Uses the pg Pool directly — no Neon HTTP driver dependency.
  *
  * @example
  * const rows = await sql`SELECT * FROM users WHERE id = ${userId}`;
@@ -104,9 +89,13 @@ export async function sql<T extends SqlRow = SqlRow>(
   strings: TemplateStringsArray,
   ...values: unknown[]
 ): Promise<T[]> {
-  const neonSql = getNeonSql();
-  const result = await neonSql(strings, ...values);
-  return result as unknown as T[];
+  let text = strings[0] ?? '';
+  for (let i = 0; i < values.length; i++) {
+    text += `$${i + 1}${strings[i + 1] ?? ''}`;
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = await pool.query<T & Record<string, unknown>>(text as any, values as unknown[]);
+  return result.rows as T[];
 }
 
 // ============================================================================
@@ -117,18 +106,16 @@ export async function query<T extends SqlRow = SqlRow>(
   text: string,
   params: unknown[] = []
 ): Promise<T[]> {
-  const neonSql = getNeonSql();
-  const result = await neonSql.query(text, params);
-  return result as unknown as T[];
+  const result = await pool.query<T & Record<string, unknown>>(text, params);
+  return result.rows as T[];
 }
 
 export async function queryOne<T extends SqlRow = SqlRow>(
   text: string,
   params: unknown[] = []
 ): Promise<T | null> {
-  const neonSql = getNeonSql();
-  const result = await neonSql.query(text, params);
-  return (result as unknown as T[])[0] ?? null;
+  const result = await pool.query<T & Record<string, unknown>>(text, params);
+  return result.rows[0] ?? null;
 }
 
 // ============================================================================
