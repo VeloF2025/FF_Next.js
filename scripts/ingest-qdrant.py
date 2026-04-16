@@ -71,9 +71,10 @@ QDRANT_PORT = 6333
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://100.117.249.72:11434").rstrip("/") + "/v1/embeddings"
 EMBEDDING_MODEL = "nomic-embed-text"
 EMBEDDING_DIM = 768
-CHUNK_SIZE = 800          # max words per chunk
-MAX_EMBED_CHARS = 3200    # truncate text sent to Ollama (nomic context ~8k tokens)
-MAX_PAYLOAD_CHARS = 3000  # truncate content stored in payload
+CHUNK_SIZE = 400          # target words per chunk (tighter = better relevance signal)
+MIN_CHUNK_CHARS = 150     # skip chunks smaller than this (fragments)
+MAX_EMBED_CHARS = 2000    # truncate text sent to Ollama
+MAX_PAYLOAD_CHARS = 2000  # truncate content stored in payload
 RSS_LIMIT_MB = 16000      # kill if RSS exceeds this
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -103,18 +104,25 @@ def load_env():
 # Source discovery
 # ---------------------------------------------------------------------------
 
+# Only user-facing content — no .claude/ developer docs or module-context
+# .claude/ docs are for AI coding assistants; they pollute user-facing search
 SOURCE_GLOBS = [
-    ("docs/*.md",                          "docs"),
-    ("docs/user-manuals/source/*.md",      "user-manual"),
-    (".claude/modules/*.md",               "claude-modules"),
-    (".claude/knowledge-base/**/*.md",     "knowledge-base"),
-    ("src/modules/*/.claude.md",           "module-context"),
+    ("docs/user-manuals/source/*.md",   "user-manual"),
+    ("docs/user-manuals/**/*.md",       "user-manual"),
+    ("docs/docs/**/*.md",               "docs"),
+]
+
+# Additional single files worth including (curated user-facing content)
+EXTRA_FILES = [
+    "docs/INFRASTRUCTURE.md",
 ]
 
 
 def discover_sources(single_source=None):
     """Return list of (source_id, file_path) tuples."""
     sources = []
+    seen = set()
+
     if single_source:
         p = PROJECT_ROOT / single_source
         if not p.exists():
@@ -125,10 +133,18 @@ def discover_sources(single_source=None):
 
     for pattern, _tag in SOURCE_GLOBS:
         for p in sorted(PROJECT_ROOT.glob(pattern)):
-            if p.name == "README.md":
+            if p.name == "README.md" or not p.is_file():
                 continue
             rel = str(p.relative_to(PROJECT_ROOT))
-            sources.append((rel, p))
+            if rel not in seen:
+                seen.add(rel)
+                sources.append((rel, p))
+
+    for extra in EXTRA_FILES:
+        p = PROJECT_ROOT / extra
+        if p.exists() and extra not in seen:
+            seen.add(extra)
+            sources.append((extra, p))
 
     return sources
 
@@ -149,7 +165,7 @@ def chunk_markdown(text, source_id):
         cleaned = re.sub(r"!\[.*?\]\(.*?\)\n?\*.*?\*\n?", "", section)
         cleaned = re.sub(r"!\[.*?\]\(.*?\)", "", cleaned).strip()
 
-        if not cleaned or len(cleaned) < 20:
+        if not cleaned or len(cleaned) < MIN_CHUNK_CHARS:
             continue
 
         words = cleaned.split()

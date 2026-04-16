@@ -5,7 +5,7 @@
  * Body: { message, userName?, userRole?, userId?, topic?, history?, dataAccess? }
  *
  * Architecture: always-on RAG + SSE streaming
- * 1. Embed query → Qdrant search → inject top-6 chunks as context
+ * 1. Embed query → Qdrant search (score ≥ 0.65, topic-scoped) → inject chunks
  * 2. Optional data query for common metrics
  * 3. Stream Ollama tokens via SSE — first token arrives in ~2s
  *
@@ -50,22 +50,72 @@ async function embedQuery(text: string): Promise<number[]> {
   return data.data[0].embedding;
 }
 
+// ── Topic → source path prefix map ────────────────────────────
+// Used to filter Qdrant results to topic-relevant sources
+
+const TOPIC_SOURCE_PREFIXES: Record<string, string[]> = {
+  'procurement':     ['docs/user-manuals', 'docs/docs/procurement', 'procurement'],
+  'projects':        ['docs/user-manuals', 'docs/docs/project'],
+  'activate':        ['docs/user-manuals', 'docs/docs/activate', 'activate'],
+  'construction-qa': ['docs/user-manuals', 'docs/docs/construction', 'construction-qa'],
+  'field-ops':       ['docs/user-manuals', 'docs/docs/field', 'qfield'],
+  'maintenance':     ['docs/user-manuals', 'docs/docs/maintenance', 'noc'],
+  'assets':          ['docs/user-manuals', 'docs/docs/asset'],
+  'fleet':           ['docs/user-manuals', 'docs/docs/fleet'],
+  'hr':              ['docs/user-manuals', 'docs/docs/staff', 'staff'],
+  'analytics':       ['docs/user-manuals', 'docs/docs/kpi'],
+  'communications':  ['docs/user-manuals', 'docs/docs/communications', 'wa-monitor'],
+  'system':          ['docs/user-manuals', 'docs/docs/system'],
+};
+
+const SCORE_THRESHOLD = 0.62; // drop chunks below this relevance score
+
 // ── Qdrant semantic search ─────────────────────────────────────
 
-async function searchKnowledge(query: string, limit: number = 6): Promise<string> {
+async function searchKnowledge(query: string, topic?: string, limit: number = 8): Promise<string> {
   try {
     const vector = await embedQuery(query);
+
+    // Build optional source filter for topic-scoped search
+    const prefixes = topic ? TOPIC_SOURCE_PREFIXES[topic] : null;
+    const body: any = { vector, limit, with_payload: true, score_threshold: SCORE_THRESHOLD };
+    if (prefixes) {
+      body.filter = {
+        should: prefixes.map(p => ({
+          key: 'source',
+          match: { text: p },
+        })),
+      };
+    }
+
     const response = await fetch(
       `${QDRANT_BASE}/collections/${QDRANT_COLLECTION}/points/search`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vector, limit, with_payload: true }),
+        body: JSON.stringify(body),
       }
     );
     if (!response.ok) throw new Error(`Qdrant error: ${response.status}`);
     const data = await response.json();
-    const results: any[] = data.result ?? [];
+    let results: any[] = data.result ?? [];
+
+    // Fallback: if topic filter returns <3 results, retry without filter
+    if (prefixes && results.length < 3) {
+      const fallback = await fetch(
+        `${QDRANT_BASE}/collections/${QDRANT_COLLECTION}/points/search`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vector, limit, with_payload: true, score_threshold: SCORE_THRESHOLD }),
+        }
+      );
+      if (fallback.ok) {
+        const fd = await fallback.json();
+        results = fd.result ?? [];
+      }
+    }
+
     if (results.length === 0) return '';
     return results
       .map((r, i) =>
@@ -216,8 +266,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       messageLength: message.length, model: MODEL,
     });
 
-    // Phase 1: RAG — embed + Qdrant search
-    const knowledgeContext = await searchKnowledge(message);
+    // Phase 1: RAG — embed + Qdrant search (topic-scoped, score-filtered)
+    const knowledgeContext = await searchKnowledge(message, topic);
 
     // Phase 2: optional data query
     let dataContext = '';
