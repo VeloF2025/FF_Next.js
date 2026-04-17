@@ -172,9 +172,12 @@ export function WeeklySummaryTab() {
   const latestWeekEnding = weekGroups[0]?.[0] ?? null;
   const note1Total = sumField(latestWeekRows, 'ft_note1_count');
   const note2Total = sumField(latestWeekRows, 'ft_note2_count');
+  const note3Total = sumField(latestWeekRows, 'ft_note3_count');
   const note4Total = sumField(latestWeekRows, 'ft_note4_count');
   const note5Total = sumField(latestWeekRows, 'ft_note5_count');
   const preProvTotal = sumField(latestWeekRows, 'ft_pre_provisions_count');
+  // Note 3 is FT's "degraded signal, monitor only" — not a billing exclusion,
+  // so it's shown on its own card with a badge but excluded from the headline total.
   const currentlyExcludedFromRows = note1Total + note2Total + note4Total + note5Total;
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -248,7 +251,7 @@ export function WeeklySummaryTab() {
               Week ending {formatDate(latestWeekEnding)}
             </span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
             <NoteCard
               label="Note 1"
               sublabel="Lower than -26 dB"
@@ -262,6 +265,14 @@ export function WeeklySummaryTab() {
               count={note2Total}
               colour="blue"
               loading={loading}
+            />
+            <NoteCard
+              label="Note 3"
+              sublabel="Degraded signal"
+              count={note3Total}
+              colour="yellow"
+              loading={loading}
+              badge="Monitor only"
             />
             <NoteCard
               label="Note 4"
@@ -346,6 +357,12 @@ export function WeeklySummaryTab() {
                     N2 NoApp
                   </th>
                   <th
+                    className="px-3 py-3 text-right text-xs font-medium text-yellow-300 uppercase tracking-wide"
+                    title="Note 3: Degraded signal — monitor only, not a billing exclusion"
+                  >
+                    N3 Degraded
+                  </th>
+                  <th
                     className="px-3 py-3 text-right text-xs font-medium text-red-300 uppercase tracking-wide"
                     title="Note 4: Inaccurate — Drop# & ONT SN does not match to OLT"
                   >
@@ -404,6 +421,9 @@ export function WeeklySummaryTab() {
                         <td className="px-3 py-2.5 text-right text-blue-300 tabular-nums">
                           {sumField(weekRows, 'ft_note2_count').toLocaleString()}
                         </td>
+                        <td className="px-3 py-2.5 text-right text-yellow-300 tabular-nums">
+                          {sumField(weekRows, 'ft_note3_count').toLocaleString()}
+                        </td>
                         <td className="px-3 py-2.5 text-right text-red-300 tabular-nums">
                           {sumField(weekRows, 'ft_note4_count').toLocaleString()}
                         </td>
@@ -446,6 +466,9 @@ export function WeeklySummaryTab() {
                           <td className="px-3 py-3 text-right text-blue-300 tabular-nums">
                             {row.ft_note2_count.toLocaleString()}
                           </td>
+                          <td className="px-3 py-3 text-right text-yellow-300 tabular-nums">
+                            {row.ft_note3_count.toLocaleString()}
+                          </td>
                           <td className="px-3 py-3 text-right text-red-300 tabular-nums">
                             {row.ft_note4_count.toLocaleString()}
                           </td>
@@ -484,11 +507,12 @@ export function WeeklySummaryTab() {
 
 // ─── Per-note-type card ────────────────────────────────────────────────────
 
-type NoteCardColour = 'orange' | 'blue' | 'red' | 'purple' | 'cyan';
+type NoteCardColour = 'orange' | 'blue' | 'yellow' | 'red' | 'purple' | 'cyan';
 
 const NOTE_CARD_THEMES: Record<NoteCardColour, { bg: string; border: string; text: string }> = {
   orange: { bg: 'bg-orange-500/10', border: 'border-orange-500/20', text: 'text-orange-400' },
   blue:   { bg: 'bg-blue-500/10',   border: 'border-blue-500/20',   text: 'text-blue-400' },
+  yellow: { bg: 'bg-yellow-500/10', border: 'border-yellow-500/20', text: 'text-yellow-400' },
   red:    { bg: 'bg-red-500/10',    border: 'border-red-500/20',    text: 'text-red-400' },
   purple: { bg: 'bg-purple-500/10', border: 'border-purple-500/20', text: 'text-purple-400' },
   cyan:   { bg: 'bg-cyan-500/10',   border: 'border-cyan-500/20',   text: 'text-cyan-400' },
@@ -500,20 +524,27 @@ function NoteCard({
   count,
   colour,
   loading,
+  badge,
 }: {
   label: string;
   sublabel: string;
   count: number;
   colour: NoteCardColour;
   loading: boolean;
+  badge?: string;
 }) {
   const theme = NOTE_CARD_THEMES[colour];
   return (
     <div className={`${theme.bg} border ${theme.border} rounded-lg p-3`}>
-      <div className="flex items-center justify-between mb-0.5">
+      <div className="flex items-center justify-between mb-0.5 gap-2">
         <span className={`text-xs font-medium ${theme.text} uppercase tracking-wide`}>
           {label}
         </span>
+        {badge && (
+          <span className={`text-[9px] font-medium ${theme.text} border ${theme.border} rounded-full px-1.5 py-0.5 uppercase tracking-wide whitespace-nowrap`}>
+            {badge}
+          </span>
+        )}
       </div>
       <p className="text-2xl font-bold text-[var(--ff-text-primary)] tabular-nums">
         {loading ? <InlineSpinner size="sm" /> : count.toLocaleString()}
