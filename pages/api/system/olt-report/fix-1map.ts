@@ -33,6 +33,10 @@ import { withAuth, withRole, getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { oneMapApi } from '@/modules/system/services/oneMapApiService';
 import { logActivity } from '@/modules/activate/services/activityLogService';
+import {
+  logSerialReconciled,
+  log1MapWriteRejected,
+} from '@/modules/activate/services/activity-log/eventLoggers';
 
 // Extend timeout for 1Map API calls (4-step auth is slow)
 export const config = {
@@ -299,6 +303,40 @@ async function fixSingleDR(
         ]
       );
 
+      // Action Centre timeline: emit serial_reconciled for each prop_id whose
+      // ph_ont was accepted by 1Map. These are stronger signals than
+      // SERIAL_UPDATE because they imply the write wasn't silently dropped.
+      // Best-effort — timeline logging must never fail the fix handler.
+      const updatedPropIdsForTimeline = allPropUpdates
+        .filter((u: { propId: string; updated?: boolean; ont?: { updated: boolean }; oldValue?: string | null }) => {
+          return 'ont' in u ? u.ont?.updated : u.updated;
+        })
+        .map((u: { propId: string; oldValue?: string | null; ont?: { oldValue: string | null } }) => ({
+          propId: u.propId,
+          oldValue: 'ont' in u ? u.ont?.oldValue ?? null : u.oldValue ?? null,
+        }));
+
+      for (const p of updatedPropIdsForTimeline) {
+        try {
+          await logSerialReconciled(
+            drNumber,
+            {
+              propId: p.propId,
+              oldValue: p.oldValue,
+              newValue: correctSerial,
+              matchesOes: true,
+            },
+            userId || 'system',
+          );
+        } catch (e) {
+          log.warn('Timeline log for serial_reconciled skipped', {
+            drNumber,
+            propId: p.propId,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      }
+
       // If UPS serial was also updated, record that too
       if (hasUpsSerial && 'ups' in result && result.ups.updated) {
         await client.query(
@@ -402,6 +440,27 @@ async function fixSingleDR(
         },
         userId || 'system'
       );
+
+      // Action Centre timeline: emit 1map_write_rejected for silent-drop
+      // cases so the DR timeline clearly shows our attempt and its outcome.
+      if (silentlyRejected) {
+        try {
+          await log1MapWriteRejected(
+            drNumber,
+            {
+              propId: 'propId' in result ? result.propId : 'unknown',
+              attemptedValue: correctSerial,
+              reason: result.error || 'tenant ACL or record lock',
+            },
+            userId || 'system',
+          );
+        } catch (e) {
+          log.warn('Timeline log for 1map_write_rejected skipped', {
+            drNumber,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      }
 
       return {
         drNumber,
