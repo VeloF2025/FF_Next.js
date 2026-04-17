@@ -193,6 +193,7 @@ function deepLinkForEntry(
 export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('timeline');
   const [timelineCategory, setTimelineCategory] = useState<TimelineCategory>('all');
+  const [exporting, setExporting] = useState(false);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [summary, setSummary] = useState<ActivitySummary | null>(null);
   const [reviews, setReviews] = useState<QAReviewHistory[]>([]);
@@ -270,6 +271,60 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
       }
       return newSet;
     });
+  };
+
+  const exportPdf = async (): Promise<void> => {
+    if (exporting || timeline.length === 0) return;
+    setExporting(true);
+    try {
+      const [{ generateDrTimelinePdf, triggerDrTimelineDownload }, contextRes] = await Promise.all([
+        import('@/modules/activate/utils/exportDrTimelinePdf'),
+        fetch(`/api/activate/dr/${dropNumber}/pdf-context`).catch(() => null),
+      ]);
+
+      // Best-effort context — if the endpoint isn't available, the PDF
+      // still renders with just the timeline rows.
+      let ctx: {
+        project?: string | null;
+        team?: string | null;
+        oesSerial?: string | null;
+        oesActivatedAt?: string | null;
+        lastFixSerial?: string | null;
+        lastFixAt?: string | null;
+        latestBillingNote?: string | null;
+        latestBillingWeek?: string | null;
+      } = {};
+      if (contextRes && contextRes.ok) {
+        const j = await contextRes.json().catch(() => null);
+        if (j?.success && j.data) ctx = j.data;
+      }
+
+      const blob = await generateDrTimelinePdf({
+        drNumber,
+        project: ctx.project ?? null,
+        team: ctx.team ?? null,
+        oesSerial: ctx.oesSerial ?? null,
+        oesActivatedAt: ctx.oesActivatedAt ?? null,
+        lastFixSerial: ctx.lastFixSerial ?? null,
+        lastFixAt: ctx.lastFixAt ?? null,
+        latestBillingNote: ctx.latestBillingNote ?? null,
+        latestBillingWeek: ctx.latestBillingWeek ?? null,
+        generatedAt: new Date().toISOString(),
+        generatedBy: 'FibreFlow Timeline Export',
+        timeline: timeline.map((e) => ({
+          timestamp: e.timestamp,
+          title: e.title,
+          description: e.description,
+          actor: e.actor,
+          eventType: e.eventType,
+        })),
+      });
+      triggerDrTimelineDownload(blob, dropNumber);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'PDF export failed');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -410,9 +465,10 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
       {/* Timeline View */}
       {viewMode === 'timeline' && (
         <div className="space-y-4">
-          {/* Category filter chips — slice the timeline by subsystem */}
-          <div className="flex flex-wrap gap-2">
-            {(Object.keys(TIMELINE_CATEGORY_LABELS) as TimelineCategory[]).map((key) => {
+          {/* Category filter chips + export action */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap gap-2 flex-1">
+              {(Object.keys(TIMELINE_CATEGORY_LABELS) as TimelineCategory[]).map((key) => {
               const { label, icon } = TIMELINE_CATEGORY_LABELS[key];
               const count =
                 key === 'all'
@@ -441,6 +497,15 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                 </button>
               );
             })}
+            </div>
+            <button
+              onClick={() => exportPdf()}
+              disabled={exporting || timeline.length === 0}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-border bg-secondary text-foreground hover:bg-card transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              title="Download a PDF of this DR's timeline for disputes"
+            >
+              📄 {exporting ? 'Exporting…' : 'Export PDF'}
+            </button>
           </div>
 
           {(() => {
