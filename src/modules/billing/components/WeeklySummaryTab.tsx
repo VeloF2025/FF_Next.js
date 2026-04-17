@@ -7,7 +7,8 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useRouter } from 'next/router';
 import { BarChart3, Clock, CheckCircle, AlertCircle, ChevronRight, ChevronDown } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { FtWeeklyBilling } from '@/modules/data-sync/types';
@@ -31,6 +32,7 @@ const STATUS_BADGE: Record<FtWeeklyBilling['reconciliation_status'], string> = {
 
 // 🟢 WORKING: Weekly summary with metric cards + filterable table
 export function WeeklySummaryTab() {
+  const router = useRouter();
   const [projectFilter, setProjectFilter] = useState<string>('All');
   const [rows, setRows] = useState<FtWeeklyBilling[]>([]);
   const [metrics, setMetrics] = useState<BillingStatusMetrics | null>(null);
@@ -39,6 +41,8 @@ export function WeeklySummaryTab() {
   const [error, setError] = useState<string | null>(null);
   /** Expanded weeks by week_ending ISO date. Empty set = all collapsed. */
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set());
+  /** Tracks which week rows we have already scrolled/highlighted for. */
+  const highlightedWeekRef = useRef<string | null>(null);
 
   const toggleWeek = (weekEnding: string) => {
     setExpandedWeeks((prev) => {
@@ -148,6 +152,28 @@ export function WeeklySummaryTab() {
       a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0,
     );
   }, [rows]);
+
+  // Deep-link support: when navigated here with ?week=YYYY-MM-DD (from
+  // Timeline entries per PR #1346), auto-expand that week and scroll it
+  // into view. Runs once per distinct week value after data loads.
+  useEffect(() => {
+    const weekParam = typeof router.query.week === 'string' ? router.query.week : null;
+    if (!weekParam || loading || weekGroups.length === 0) return;
+    if (highlightedWeekRef.current === weekParam) return;
+    const exists = weekGroups.some(([w]) => w === weekParam);
+    if (!exists) return;
+    highlightedWeekRef.current = weekParam;
+    setExpandedWeeks((prev) => {
+      const next = new Set(prev);
+      next.add(weekParam);
+      return next;
+    });
+    // Let React render the expanded state, then scroll the row into view.
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`week-row-${weekParam}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }, [router.query.week, loading, weekGroups]);
 
   const sumField = (items: FtWeeklyBilling[], key: keyof FtWeeklyBilling): number =>
     items.reduce((acc, r) => acc + (Number(r[key] ?? 0) || 0), 0);
@@ -388,11 +414,16 @@ export function WeeklySummaryTab() {
               <tbody className="divide-y divide-[var(--ff-border-light)]">
                 {weekGroups.map(([weekEnding, weekRows]) => {
                   const isExpanded = expandedWeeks.has(weekEnding);
+                  const focusedWeek = typeof router.query.week === 'string' ? router.query.week : null;
+                  const isFocused = focusedWeek === weekEnding;
                   return (
                     <React.Fragment key={weekEnding}>
                       {/* Week total row — always rendered, clickable to expand */}
                       <tr
-                        className="bg-[var(--ff-bg-tertiary)] font-semibold cursor-pointer hover:bg-[var(--ff-bg-secondary)] transition-colors"
+                        id={`week-row-${weekEnding}`}
+                        className={`bg-[var(--ff-bg-tertiary)] font-semibold cursor-pointer hover:bg-[var(--ff-bg-secondary)] transition-colors ${
+                          isFocused ? 'ring-2 ring-blue-500 ring-inset' : ''
+                        }`}
                         onClick={() => toggleWeek(weekEnding)}
                         aria-expanded={isExpanded}
                       >
