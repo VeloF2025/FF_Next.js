@@ -15,13 +15,15 @@ import { activateConfig } from '@/modules/navigation';
 import { OverviewTab } from '@/modules/action-centre/OverviewTab';
 import { ItemsTab } from '@/modules/action-centre/ItemsTab';
 import { ReconTab } from '@/modules/action-centre/ReconTab';
+import { TicketsTab } from '@/modules/action-centre/TicketsTab';
 
-type TabId = 'overview' | 'items' | 'recon';
+type TabId = 'overview' | 'items' | 'recon' | 'tickets';
 
 const TABS: Array<{ id: TabId; label: string; icon: string }> = [
   { id: 'overview', label: 'Overview', icon: '📊' },
   { id: 'items', label: 'Action items', icon: '📋' },
   { id: 'recon', label: 'Recon', icon: '⚖️' },
+  { id: 'tickets', label: 'Tickets', icon: '🎫' },
 ];
 
 const ActionCentrePage: NextPage = () => {
@@ -71,6 +73,7 @@ const ActionCentrePage: NextPage = () => {
           {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'items' && <ItemsTab />}
           {activeTab === 'recon' && <ReconTab />}
+          {activeTab === 'tickets' && <TicketsTab />}
         </div>
       </ModulePage>
     </AppLayout>
