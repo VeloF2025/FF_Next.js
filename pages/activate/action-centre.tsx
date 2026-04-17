@@ -16,14 +16,16 @@ import { OverviewTab } from '@/modules/action-centre/OverviewTab';
 import { ItemsTab } from '@/modules/action-centre/ItemsTab';
 import { ReconTab } from '@/modules/action-centre/ReconTab';
 import { TicketsTab } from '@/modules/action-centre/TicketsTab';
+import { AutomationTab } from '@/modules/action-centre/AutomationTab';
 
-type TabId = 'overview' | 'items' | 'recon' | 'tickets';
+type TabId = 'overview' | 'items' | 'recon' | 'tickets' | 'automation';
 
 const TABS: Array<{ id: TabId; label: string; icon: string }> = [
   { id: 'overview', label: 'Overview', icon: '📊' },
   { id: 'items', label: 'Action items', icon: '📋' },
   { id: 'recon', label: 'Recon', icon: '⚖️' },
   { id: 'tickets', label: 'Tickets', icon: '🎫' },
+  { id: 'automation', label: 'Automation', icon: '⚡' },
 ];
 
 const ActionCentrePage: NextPage = () => {
@@ -74,6 +76,7 @@ const ActionCentrePage: NextPage = () => {
           {activeTab === 'items' && <ItemsTab />}
           {activeTab === 'recon' && <ReconTab />}
           {activeTab === 'tickets' && <TicketsTab />}
+          {activeTab === 'automation' && <AutomationTab />}
         </div>
       </ModulePage>
     </AppLayout>
