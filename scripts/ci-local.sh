@@ -71,7 +71,11 @@ fi
 echo -e "\n${CYAN}── Gate 2: Error Handling (no-silent-catch) ──${NC}\n"
 
 CATCH_OUTPUT=$(npx eslint pages/api --ext .ts --rulesdir scripts/eslint-rules --rule '{"no-silent-catch": "warn"}' 2>&1 || true)
-CATCH_COUNT=$(echo "$CATCH_OUTPUT" | grep -c "no-silent-catch" || echo "0")
+# `grep -c` exits 1 when it finds 0 matches, which combined with `pipefail`
+# and a `|| echo "0"` fallback produced a "0\n0" multi-line count that broke
+# the `[ -le ]` numeric comparison. Count with grep + wc + tr, with `|| true`
+# so no-matches doesn't trip pipefail.
+CATCH_COUNT=$( { echo "$CATCH_OUTPUT" | grep "no-silent-catch" || true; } | wc -l | tr -d ' ')
 
 if [ "$CATCH_COUNT" -le "$MAX_SILENT_CATCHES" ]; then
   pass "Silent catches: ${CATCH_COUNT} (≤${MAX_SILENT_CATCHES})"

@@ -208,7 +208,7 @@ export function triggerVlmLearning(affectedDRs: string[]): void {
 export function triggerPpActivationCheck(): void {
   (async () => {
     try {
-      const activatedResult = await pool.query(`
+      const activatedResult = await pool.query<{ drop_number: string; activation_date: string }>(`
         UPDATE oes_pp_data pp
         SET resolution_status = 'activated',
             resolved_drop_number = COALESCE(pp.resolved_drop_number, oa.drop_number),
@@ -222,9 +222,32 @@ export function triggerPpActivationCheck(): void {
         FROM oes_activations oa
         WHERE pp.serial_number = oa.serial_number
           AND pp.resolution_status != 'activated'
+        RETURNING oa.drop_number, oa.activation_date::text
       `);
       if ((activatedResult.rowCount ?? 0) > 0) {
         logger.info(`PP activation check: ${activatedResult.rowCount} serials now activated`);
+
+        // Action Centre timeline: emit pre_prov_resolved for each newly-activated
+        // PP row so the DR timeline shows "pre-provisioned → active" transition.
+        // Best-effort — never fail the check on a log error.
+        try {
+          const { logPreProvResolved } = await import(
+            '@/modules/activate/services/activity-log/eventLoggers'
+          );
+          await Promise.all(
+            activatedResult.rows.map((r: { drop_number: string; activation_date: string }) =>
+              logPreProvResolved(
+                r.drop_number,
+                { resolutionReason: 'activated_on_oes', activationDate: r.activation_date ?? null },
+                'oes-post-import',
+              ).catch(() => undefined),
+            ),
+          );
+        } catch (e) {
+          logger.warn('Timeline log for pre_prov_resolved skipped', {
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
       }
     } catch (err) {
       logger.error('PP activation check failed', { error: err instanceof Error ? err.message : String(err) });

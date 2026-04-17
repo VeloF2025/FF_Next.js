@@ -218,16 +218,20 @@ export async function importPPData(ppRows: PPRow[], filename: string): Promise<v
       );
     }
 
-    // Run local resolution — 3 sequential UPDATE queries
-    const oesMatch = await pool.query(`
+    // Run local resolution — 3 sequential UPDATE queries. RETURNING captures
+    // every newly-resolved drop so we can emit pre_prov_added to the Action
+    // Centre timeline for each.
+    type ResolvedRow = { drop_number: string; serial_number: string; project: string };
+    const oesMatch = await pool.query<ResolvedRow>(`
       UPDATE oes_pp_data pp SET resolution_status = 'located_oes',
         resolved_drop_number = oa.drop_number, resolved_source = 'oes_activations',
         resolved_details = jsonb_build_object('activation_date', oa.activation_date::text, 'status', oa.status, 'team', oa.team),
         resolved_at = NOW(), updated_at = NOW()
       FROM oes_activations oa WHERE pp.serial_number = oa.serial_number AND pp.resolution_status = 'not_found'
+      RETURNING oa.drop_number, pp.serial_number, pp.project
     `);
 
-    const unifiedMatch = await pool.query(`
+    const unifiedMatch = await pool.query<ResolvedRow>(`
       UPDATE oes_pp_data pp SET resolution_status = 'located_unified',
         resolved_drop_number = ur.drop_number, resolved_source = 'dr_photo_unified_reviews',
         resolved_details = jsonb_build_object('matched_field',
@@ -235,22 +239,41 @@ export async function importPPData(ppRows: PPRow[], filename: string): Promise<v
         resolved_at = NOW(), updated_at = NOW()
       FROM dr_photo_unified_reviews ur
       WHERE (ur.oes_serial = pp.serial_number OR ur.ont_serial_scanned = pp.serial_number) AND pp.resolution_status = 'not_found'
+      RETURNING ur.drop_number, pp.serial_number, pp.project
     `);
 
     let onemapMatches = 0;
+    let onemapRows: ResolvedRow[] = [];
     try {
-      const onemapMatch = await pool.query(`
+      const onemapMatch = await pool.query<ResolvedRow>(`
         UPDATE oes_pp_data pp SET resolution_status = 'located_onemap',
           resolved_drop_number = op.drop_number, resolved_source = 'onemap_properties',
           resolved_details = jsonb_build_object('site', op.site, 'pole', op.pole),
           resolved_at = NOW(), updated_at = NOW()
         FROM onemap_properties op WHERE op.ont_barcode = pp.serial_number AND pp.resolution_status = 'not_found'
+        RETURNING op.drop_number, pp.serial_number, pp.project
       `);
       onemapMatches = onemapMatch.rowCount ?? 0;
+      onemapRows = onemapMatch.rows;
     } catch (err) {
       logger.warn('PP DATA resolution: onemap_properties query failed (may not have ont_barcode column)', {
         error: err instanceof Error ? err.message : String(err),
       });
+    }
+
+    // Action Centre timeline: emit pre_prov_added for every drop a PP row
+    // was resolved to in this batch. Best-effort — never fail the import.
+    const resolvedRows: ResolvedRow[] = [...oesMatch.rows, ...unifiedMatch.rows, ...onemapRows];
+    if (resolvedRows.length > 0) {
+      const { logPreProvAdded } = await import(
+        '@/modules/activate/services/activity-log/eventLoggers'
+      );
+      await Promise.all(
+        resolvedRows.map((r) =>
+          logPreProvAdded(r.drop_number, { serial: r.serial_number, project: r.project })
+            .catch(() => undefined),
+        ),
+      );
     }
 
     const totalResolved = (oesMatch.rowCount ?? 0) + (unifiedMatch.rowCount ?? 0) + onemapMatches;
