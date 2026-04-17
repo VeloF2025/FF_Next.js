@@ -26,15 +26,9 @@ import { createLogger } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import pool from '@/lib/db';
+import { classifyReconRow, type Classification } from '@/modules/action-centre/classifyReconRow';
 
 const logger = createLogger('api/activate/action-centre/recon');
-
-type Classification =
-  | 'already_fixed_still_billed'
-  | 'actionable'
-  | 'blocked_no_installed'
-  | 'no_oes'
-  | 'unknown';
 
 interface ReconRow {
   drNumber: string;
@@ -165,7 +159,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     );
 
     const output: ReconRow[] = rows.map((r) => {
-      const classification = classify({
+      const classification = classifyReconRow({
         oesSerial: r.oes_serial,
         ftSerial: r.ft_serial,
         lastFixSerial: r.last_fix_serial,
@@ -214,25 +208,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     logger.error('recon failed', { error: err instanceof Error ? err.message : String(err) });
     return apiResponse.internalError(res, err);
   }
-}
-
-/** Classify a recon row using only local data (no live 1Map calls). */
-function classify(input: {
-  oesSerial: string | null;
-  ftSerial: string | null;
-  lastFixSerial: string | null;
-  lastFixAt: string | null;
-  oltRejected: boolean;
-}): Classification {
-  if (!input.oesSerial) return 'no_oes';
-  if (input.lastFixSerial && input.lastFixAt) {
-    // We wrote to 1Map at some point. If FT's billed serial still
-    // disagrees, flag as dispute candidate.
-    const fixedMatches = input.lastFixSerial.toUpperCase() === (input.oesSerial || '').toUpperCase();
-    if (fixedMatches) return 'already_fixed_still_billed';
-  }
-  if (input.oltRejected) return 'blocked_no_installed';
-  return 'actionable';
 }
 
 export default withAuth(handler);
