@@ -53,6 +53,26 @@ function fmtDate(iso: string | null | undefined): string {
   }
 }
 
+/**
+ * Load the VF brand logo as a base64 data URL. Returns null on failure
+ * so the PDF still renders with a text-only header (graceful degradation).
+ */
+async function loadLogoAsBase64(): Promise<string | null> {
+  try {
+    const res = await fetch('/assets/vf/velocity-fibre-logo.jpg');
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function generateDrTimelinePdf(ctx: DrPdfContext): Promise<Blob> {
   const [{ jsPDF }, { default: autoTable }] = await Promise.all([
     import('jspdf'),
@@ -66,15 +86,33 @@ export async function generateDrTimelinePdf(ctx: DrPdfContext): Promise<Blob> {
   const MR = 16;
   let y = 16;
 
+  // Load brand logo in parallel with the first page layout so we don't
+  // block rendering when the network is slow.
+  const logoData = await loadLogoAsBase64();
+
   // ─── Header ────────────────────────────────────────────────────────────────
+  const LOGO_WIDTH_MM = 22;
+  const LOGO_HEIGHT_MM = 9;
+  let titleX = ML;
+
+  if (logoData) {
+    try {
+      doc.addImage(logoData, 'JPEG', ML, y - 4, LOGO_WIDTH_MM, LOGO_HEIGHT_MM);
+      titleX = ML + LOGO_WIDTH_MM + 4;
+    } catch {
+      // addImage can throw on malformed data URLs — fall back to text-only.
+      titleX = ML;
+    }
+  }
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
   doc.setTextColor(...COLOR_INK);
-  doc.text('DR Timeline', ML, y);
+  doc.text('DR Timeline', titleX, y);
 
   doc.setFontSize(14);
   doc.setTextColor(...COLOR_BRAND);
-  doc.text(ctx.drNumber, ML + 48, y);
+  doc.text(ctx.drNumber, titleX + 48, y);
 
   doc.setFontSize(8);
   doc.setTextColor(...COLOR_MUTED);
@@ -85,7 +123,7 @@ export async function generateDrTimelinePdf(ctx: DrPdfContext): Promise<Blob> {
     { align: 'right' },
   );
 
-  y += 4;
+  y += 6;
   doc.setDrawColor(...COLOR_LINE);
   doc.setLineWidth(0.3);
   doc.line(ML, y, PW - MR, y);
