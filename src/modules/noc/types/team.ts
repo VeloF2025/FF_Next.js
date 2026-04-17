@@ -104,7 +104,7 @@ export interface ProjectTeamAssignment {
   id: string;
   project_id: string;
   team_id: string;
-  role: 'activations' | 'maintenance' | 'fault_repair' | 'other';
+  role: 'activations' | 'maintenance' | 'civils' | 'optical' | 'fault_repair' | 'other';
   created_at: string;
   // Enriched from joins
   project_name?: string;

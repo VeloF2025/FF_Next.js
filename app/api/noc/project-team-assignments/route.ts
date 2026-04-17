@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
         { status: 422 }
       );
     }
-    const validRoles = ['activations', 'maintenance', 'fault_repair', 'other'] as const;
+    const validRoles = ['activations', 'maintenance', 'civils', 'optical', 'fault_repair', 'other'] as const;
     const role = validRoles.includes(body.role as typeof validRoles[number]) ? body.role : 'activations';
     const assignment = await createProjectTeamAssignment({ project_id: body.project_id, team_id: body.team_id, role });
     return NextResponse.json({ success: true, data: assignment }, { status: 201 });

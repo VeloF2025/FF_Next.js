@@ -12,11 +12,13 @@ interface Props {
   onChanged: () => void;
 }
 
-type Role = 'activations' | 'maintenance' | 'fault_repair' | 'other';
+type Role = 'activations' | 'maintenance' | 'civils' | 'optical' | 'fault_repair' | 'other';
 
 const ROLES: Array<{ value: Role; label: string }> = [
   { value: 'activations',  label: 'Activations' },
   { value: 'maintenance',  label: 'Maintenance' },
+  { value: 'civils',       label: 'Civils' },
+  { value: 'optical',      label: 'Optical' },
   { value: 'fault_repair', label: 'Fault Repair' },
   { value: 'other',        label: 'Other' },
 ];
@@ -24,6 +26,8 @@ const ROLES: Array<{ value: Role; label: string }> = [
 const ROLE_COLORS: Record<Role, string> = {
   activations:  'bg-blue-500/10 text-blue-300 border-blue-500/30',
   maintenance:  'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+  civils:       'bg-amber-500/10 text-amber-300 border-amber-500/30',
+  optical:      'bg-purple-500/10 text-purple-300 border-purple-500/30',
   fault_repair: 'bg-red-500/10 text-red-300 border-red-500/30',
   other:        'bg-zinc-500/10 text-zinc-300 border-zinc-500/30',
 };
@@ -209,7 +213,7 @@ export function TeamProjectAssignments({ teamId, assignments, onChanged }: Props
 
               <div>
                 <label className="block text-xs text-[var(--ff-text-tertiary)] mb-1.5">Role</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {ROLES.map((r) => (
                     <button
                       key={r.value}
