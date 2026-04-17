@@ -97,6 +97,13 @@ export async function GET(req: NextRequest) {
     if (searchParams.has('status')) {
       filters.status = searchParams.get('status') as TicketStatus;
     }
+    if (searchParams.has('exclude_status')) {
+      // Blacklist — repeated ?exclude_status=closed&exclude_status=cancelled
+      filters.exclude_status = searchParams.getAll('exclude_status') as TicketStatus[];
+    }
+    if (searchParams.has('sort')) {
+      filters.sort = searchParams.get('sort')!;
+    }
     if (searchParams.has('ticket_type')) {
       const types = searchParams.getAll('ticket_type');
       // Array when T1 category filter expanded multiple types; single otherwise

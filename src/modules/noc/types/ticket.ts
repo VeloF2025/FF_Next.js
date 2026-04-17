@@ -337,6 +337,8 @@ export type TicketStatusGroup = 'active' | 'completed';
  */
 export interface TicketFilters {
   status?: TicketStatus | TicketStatus[] | TicketStatusGroup;
+  /** Explicit status blacklist (e.g. `['closed','cancelled']` to hide completed work) */
+  exclude_status?: TicketStatus[] | string[];
   ticket_type?: TicketType | TicketType[];
   /**
    * T1 category filter — client-side virtual filter that expands to the

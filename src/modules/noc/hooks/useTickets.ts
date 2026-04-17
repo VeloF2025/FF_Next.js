@@ -49,6 +49,9 @@ async function fetchTickets(filters?: TicketFilters): Promise<TicketListResult> 
 
   if (filters) {
     if (filters.status && !META_STATUSES.has(filters.status as string)) params.append('status', filters.status as string);
+    if (filters.exclude_status && filters.exclude_status.length > 0) {
+      filters.exclude_status.forEach((s) => params.append('exclude_status', s as string));
+    }
     // ticket_type can be a single value or an array (from T1 category expansion)
     if (filters.ticket_type) {
       if (Array.isArray(filters.ticket_type)) {

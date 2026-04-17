@@ -75,8 +75,18 @@ const COLUMN_STATUSES: Record<DatabaseStatus, string[]> = {
 const ACTIVE_STATUSES: DatabaseStatus[] = ['open', 'assigned', 'in_progress', 'pending_qa'];
 const COMPLETED_STATUSES: DatabaseStatus[] = ['resolved', 'verified', 'closed'];
 
-// Max tickets fetched for Kanban (server caps at 200)
-const KANBAN_PAGE_SIZE = 200;
+// Max tickets fetched for Kanban (server caps at 2500).
+// Needs to cover the active working set so every column can populate —
+// otherwise tickets outside the window disappear from the board even
+// though the summary endpoint still counts them. Previously 200, which
+// silently hid thousands of assigned/resolved tickets once the dataset
+// grew past a couple of days of activity.
+const KANBAN_PAGE_SIZE = 2500;
+
+// Default Kanban view drops closed+cancelled at the API level and hides
+// the 'closed' column. Those two statuses account for ~1/3 of all tickets
+// and users view them through the Table view when needed.
+const DEFAULT_EXCLUDED_STATUSES = ['closed', 'cancelled'];
 
 export function KanbanBoard({ filters }: KanbanBoardProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -92,23 +102,32 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  // Strip meta status filter (active/completed) — Kanban needs all statuses for columns
+  // Strip meta status filter (active/completed) — handled below on the fetch side
   const { status: metaStatus, ...apiFilters } = filters || {};
 
-  // Fetch tickets with sane limit
-  const { tickets, isLoading, isError, error, refetch } = useTickets({
+  // Default view drops closed+cancelled server-side and sorts by updated_at
+  // so the 200/2500-row window floats recently-touched work to the top.
+  // The 'completed' sub-tab keeps closed/cancelled (that's the whole point).
+  const isCompletedView = (metaStatus as string) === 'completed';
+  const ticketFetchFilters: TicketFilters = {
     ...apiFilters,
     pageSize: KANBAN_PAGE_SIZE,
-  });
+    sort: 'updated_desc',
+    ...(isCompletedView ? {} : { exclude_status: DEFAULT_EXCLUDED_STATUSES }),
+  };
 
-  // Lightweight summary for accurate column counts
+  const { tickets, isLoading, isError, error, refetch } = useTickets(ticketFetchFilters);
+
+  // Summary endpoint drives column header counts. Intentionally skips the
+  // exclude_status filter so closed/cancelled totals still render accurately.
   const { counts: summaryCounts } = useTicketSummary(apiFilters as TicketFilters);
 
-  // Determine which columns to show based on sub-tab filter
+  // Determine which columns to show based on sub-tab filter.
+  // Default view hides 'closed' to match the exclude_status fetch above.
   const visibleColumns = useMemo(() => {
     if ((metaStatus as string) === 'completed') return COLUMN_CONFIG.filter(c => COMPLETED_STATUSES.includes(c.status));
     if ((metaStatus as string) === 'active') return COLUMN_CONFIG.filter(c => ACTIVE_STATUSES.includes(c.status));
-    return COLUMN_CONFIG;
+    return COLUMN_CONFIG.filter(c => c.status !== 'closed');
   }, [metaStatus]);
 
   const updateTicket = useUpdateTicket();

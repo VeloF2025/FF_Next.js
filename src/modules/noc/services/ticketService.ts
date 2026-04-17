@@ -731,6 +731,17 @@ export async function listTickets(
       paramCounter++;
     }
 
+    // Status blacklist — lets the Kanban default view drop closed/cancelled
+    // tickets without touching the positive `status`/meta filter above.
+    if (filters.exclude_status && filters.exclude_status.length > 0) {
+      const placeholders = filters.exclude_status
+        .map((_, i) => `$${paramCounter + i}`)
+        .join(', ');
+      whereClauses.push(`status NOT IN (${placeholders})`);
+      values.push(...filters.exclude_status);
+      paramCounter += filters.exclude_status.length;
+    }
+
     if (filters.assigned_to) {
       // assigned_to column stores staff.id, but auth provides users.id
       // Look up staff_id first, fall back to the value as-is
@@ -838,10 +849,17 @@ export async function listTickets(
       ? `WHERE ${whereClauses.join(' AND ')}`
       : '';
 
-    // 🟢 WORKING: Pagination (default: page 1, pageSize 50, max 200)
+    // Pagination — default page 1, pageSize 50, max 2500.
+    // Cap raised from 200 because the Kanban needs to pull the full active
+    // working set in one shot to populate every column; column counts come
+    // from the summary endpoint but cards come from this list.
     const page = filters.page || 1;
-    const pageSize = Math.min(filters.pageSize || 50, 200);
+    const pageSize = Math.min(filters.pageSize || 50, 2500);
     const offset = (page - 1) * pageSize;
+
+    // Sort: 'updated_desc' lets the Kanban float recently-touched tickets to
+    // the top of each column; default stays 'created_desc' for back-compat.
+    const orderByColumn = filters.sort === 'updated_desc' ? 'updated_at' : 'created_at';
 
     // Add LIMIT and OFFSET as last parameters
     values.push(pageSize);
@@ -888,7 +906,7 @@ export async function listTickets(
       LEFT JOIN users cu ON t.created_by = cu.id
       LEFT JOIN teams tm ON t.assigned_team_id = tm.id
       ${whereClause ? whereClause.replace(/\b(status|type|priority|source|assigned_to|contractor_id|project_id|dr_number|qa_verified|sla_breached|assigned_team_id|ticket_uid|title|description|created_at)\b/g, 't.$1') : ''}
-      ORDER BY t.created_at DESC
+      ORDER BY t.${orderByColumn} DESC
       LIMIT $${limitParam} OFFSET $${offsetParam}
     `;
 

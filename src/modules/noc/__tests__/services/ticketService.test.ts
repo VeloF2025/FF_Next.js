@@ -1310,5 +1310,46 @@ describe('Ticket Service - CRUD Operations', () => {
       expect(result.tickets).toEqual([]);
       expect(result.total).toBe(0);
     });
+
+    it('should exclude statuses when exclude_status is provided', async () => {
+      // Kanban default view hides closed/cancelled to keep the window small
+      vi.mocked(query).mockResolvedValue([]);
+      vi.mocked(queryOne).mockResolvedValueOnce({ count: '0' });
+
+      await listTickets({ exclude_status: ['closed', 'cancelled'] });
+
+      const callArgs = vi.mocked(query).mock.calls[0];
+      expect(callArgs[0]).toContain('status NOT IN');
+      expect(callArgs[1]).toEqual(expect.arrayContaining(['closed', 'cancelled']));
+    });
+
+    it('should order by updated_at DESC when sort=updated_desc', async () => {
+      vi.mocked(query).mockResolvedValue([]);
+      vi.mocked(queryOne).mockResolvedValueOnce({ count: '0' });
+
+      await listTickets({ sort: 'updated_desc' });
+
+      const callArgs = vi.mocked(query).mock.calls[0];
+      expect(callArgs[0]).toContain('ORDER BY t.updated_at DESC');
+      expect(callArgs[0]).not.toContain('ORDER BY t.created_at DESC');
+    });
+
+    it('should allow pageSize up to 2500 for Kanban-sized fetches', async () => {
+      vi.mocked(query).mockResolvedValue([]);
+      vi.mocked(queryOne).mockResolvedValueOnce({ count: '0' });
+
+      const result = await listTickets({ pageSize: 2500 });
+
+      expect(result.limit).toBe(2500);
+    });
+
+    it('should clamp pageSize above 2500 down to 2500', async () => {
+      vi.mocked(query).mockResolvedValue([]);
+      vi.mocked(queryOne).mockResolvedValueOnce({ count: '0' });
+
+      const result = await listTickets({ pageSize: 10000 });
+
+      expect(result.limit).toBe(2500);
+    });
   });
 });
