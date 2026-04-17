@@ -14,12 +14,14 @@ import { ModulePage } from '@/components/module-page';
 import { activateConfig } from '@/modules/navigation';
 import { OverviewTab } from '@/modules/action-centre/OverviewTab';
 import { ItemsTab } from '@/modules/action-centre/ItemsTab';
+import { ReconTab } from '@/modules/action-centre/ReconTab';
 
-type TabId = 'overview' | 'items';
+type TabId = 'overview' | 'items' | 'recon';
 
 const TABS: Array<{ id: TabId; label: string; icon: string }> = [
   { id: 'overview', label: 'Overview', icon: '📊' },
   { id: 'items', label: 'Action items', icon: '📋' },
+  { id: 'recon', label: 'Recon', icon: '⚖️' },
 ];
 
 const ActionCentrePage: NextPage = () => {
@@ -68,6 +70,7 @@ const ActionCentrePage: NextPage = () => {
 
           {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'items' && <ItemsTab />}
+          {activeTab === 'recon' && <ReconTab />}
         </div>
       </ModulePage>
     </AppLayout>
