@@ -451,6 +451,33 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
       ticket_uid: ticket.ticket_uid
     });
 
+    // Timeline: emit ticket_created if this ticket is bound to a DR. Best-effort.
+    if (ticket.dr_number) {
+      try {
+        const { logTicketCreated } = await import(
+          '@/modules/activate/services/activity-log/eventLoggers'
+        );
+        await logTicketCreated(
+          ticket.dr_number,
+          {
+            ticketId: ticket.id,
+            ticketUid: ticket.ticket_uid,
+            category: ticket.ticket_category ?? null,
+            type: ticket.ticket_type ?? null,
+            priority: ticket.priority ?? null,
+            source: ticket.source ?? null,
+            sourceType: payload.source_type ?? null,
+          },
+          payload.created_by || ticket.source || 'system',
+        );
+      } catch (e) {
+        logger.warn('Timeline log for ticket_created skipped', {
+          ticket_uid: ticket.ticket_uid,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+
     return ticket;
   } catch (error) {
     logger.error('Failed to create ticket', { error, payload });
@@ -536,6 +563,17 @@ export async function updateTicket(
   logger.info('Updating ticket', { id, fields: Object.keys(payload) });
 
   try {
+    // Capture the previous status before updating so we can emit a precise
+    // ticket_status_changed timeline event when status actually changes.
+    let previousStatus: string | null = null;
+    if (payload.status !== undefined) {
+      const current = await queryOne<{ status: string }>(
+        `SELECT status FROM maintenance_tickets WHERE id = $1`,
+        [id]
+      );
+      previousStatus = current?.status ?? null;
+    }
+
     // Resolve user_id → staff_id for assigned_to (FK references staff table)
     if (payload.assigned_to) {
       const staffRow = await queryOne<{ id: string }>(
@@ -616,6 +654,35 @@ export async function updateTicket(
       id,
       ticket_uid: updatedTicket.ticket_uid
     });
+
+    // Timeline: emit ticket_status_changed when status transitions and the
+    // ticket is bound to a DR. Best-effort — never fail the update on log error.
+    if (
+      updatedTicket.dr_number &&
+      previousStatus !== null &&
+      previousStatus !== updatedTicket.status
+    ) {
+      try {
+        const { logTicketStatusChanged } = await import(
+          '@/modules/activate/services/activity-log/eventLoggers'
+        );
+        await logTicketStatusChanged(
+          updatedTicket.dr_number,
+          {
+            ticketId: updatedTicket.id,
+            ticketUid: updatedTicket.ticket_uid,
+            fromStatus: previousStatus,
+            toStatus: updatedTicket.status,
+          },
+          'system',
+        );
+      } catch (e) {
+        logger.warn('Timeline log for ticket_status_changed skipped', {
+          ticket_uid: updatedTicket.ticket_uid,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
 
     return updatedTicket;
   } catch (error) {

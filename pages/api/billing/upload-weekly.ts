@@ -21,6 +21,10 @@ import {
   resolveProjectName,
   type BillableProject,
 } from '@/modules/billing/services/resolveProjectName';
+import {
+  logNonInvoiceableFlagged,
+  type NoteCode,
+} from '@/modules/activate/services/activity-log/eventLoggers';
 
 const logger = createLogger('api/billing/upload-weekly');
 
@@ -345,6 +349,31 @@ async function handler(
         billingWeekId,
         deductionCount: deductions.length,
       });
+
+      // Timeline: emit non_invoiceable_flagged for each deduction so the Action
+      // Centre + QA Centre DR timeline show this week's billing exclusion.
+      // Best-effort — a logging failure must not fail the import.
+      await Promise.all(
+        deductions.map((d) =>
+          logNonInvoiceableFlagged(
+            d.drNumber,
+            {
+              weekEnding: summary.weekEnding,
+              noteCode: d.note as NoteCode,
+              team: d.team ?? null,
+              project: summary.project,
+              reason: d.reason ?? null,
+              serial: d.serialNumber ?? null,
+            }
+          ).catch((e: unknown) => {
+            logger.warn('non_invoiceable_flagged log skipped', {
+              drNumber: d.drNumber,
+              error: e instanceof Error ? e.message : String(e),
+            });
+            return undefined;
+          })
+        )
+      );
     }
 
     cleanupTempFiles(pdfPath, notesPath);

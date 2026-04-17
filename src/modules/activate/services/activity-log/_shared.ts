@@ -46,7 +46,19 @@ export type ActivityEventType =
   | 'HITL_PASSFAIL_CORRECTION'
   | 'HITL_COMMENT_CORRECTION'
   | 'INVESTIGATION_RESOLVED'
-  | 'ESCALATED_TO_ADMIN';
+  | 'ESCALATED_TO_ADMIN'
+  // Action Centre events (RFC Phase 2 — docs/rfcs/2026-04-17-action-centre-and-dr-timeline.md)
+  | 'non_invoiceable_flagged'
+  | 'non_invoiceable_resolved'
+  | 'pre_prov_added'
+  | 'pre_prov_resolved'
+  | 'ticket_created'
+  | 'ticket_status_changed'
+  | 'ticket_auto_closed'
+  | 'serial_reconciled'
+  | '1map_write_rejected'
+  | 'anomaly_fixed_still_billed'
+  | 'anomaly_persistent_note';
 
 /**
  * Serial change source types
@@ -293,6 +305,62 @@ export const EVENT_METADATA: Record<ActivityEventType, { title: string; icon: st
     title: 'Escalated to Admin',
     icon: '⬆️',
     iconColor: 'text-orange-500',
+  },
+  // ── Action Centre events (RFC Phase 2) ──
+  non_invoiceable_flagged: {
+    title: 'Non-invoiceable flagged',
+    icon: '🚫',
+    iconColor: 'text-orange-500',
+  },
+  non_invoiceable_resolved: {
+    title: 'Non-invoiceable resolved',
+    icon: '✓',
+    iconColor: 'text-green-500',
+  },
+  pre_prov_added: {
+    title: 'Pre-provisioned',
+    icon: '⏳',
+    iconColor: 'text-amber-500',
+  },
+  pre_prov_resolved: {
+    title: 'Pre-provisioned resolved',
+    icon: '✓',
+    iconColor: 'text-green-500',
+  },
+  ticket_created: {
+    title: 'NOC ticket raised',
+    icon: '🎫',
+    iconColor: 'text-blue-500',
+  },
+  ticket_status_changed: {
+    title: 'Ticket status changed',
+    icon: '🔁',
+    iconColor: 'text-blue-500',
+  },
+  ticket_auto_closed: {
+    title: 'Ticket auto-closed',
+    icon: '✅',
+    iconColor: 'text-green-500',
+  },
+  serial_reconciled: {
+    title: '1Map serial reconciled',
+    icon: '🔒',
+    iconColor: 'text-green-500',
+  },
+  '1map_write_rejected': {
+    title: '1Map silently rejected write',
+    icon: '🚧',
+    iconColor: 'text-red-500',
+  },
+  anomaly_fixed_still_billed: {
+    title: 'Anomaly: fixed but still billed',
+    icon: '⚠️',
+    iconColor: 'text-yellow-500',
+  },
+  anomaly_persistent_note: {
+    title: 'Anomaly: persistent note',
+    icon: '⚠️',
+    iconColor: 'text-yellow-500',
   },
 };
 

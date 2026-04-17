@@ -36,6 +36,10 @@ import {
 } from '@/modules/billing/services/bundleProcessor';
 import { fetchBillableProjects } from '@/modules/billing/services/resolveProjectName';
 import { reconcileBillingWeek } from '@/modules/billing/services/reconcileBillingWeek';
+import {
+  logNonInvoiceableFlagged,
+  type NoteCode,
+} from '@/modules/activate/services/activity-log/eventLoggers';
 
 const logger = createLogger('api/billing/upload-weekly-bundle');
 
@@ -384,6 +388,24 @@ async function importProjectResult(
            team             = EXCLUDED.team,
            deduction_reason = EXCLUDED.deduction_reason`,
         [weekIdArr, weekEndingArr, projectArr, drNumbers, notes, serials, teams, reasons],
+      );
+
+      // Timeline: emit non_invoiceable_flagged per deduction (Action Centre Phase 2).
+      // Best-effort — never fail the import on a log error.
+      await Promise.all(
+        r.deductions.map((d) =>
+          logNonInvoiceableFlagged(
+            d.drNumber,
+            {
+              weekEnding: summary.weekEnding,
+              noteCode: d.note as NoteCode,
+              team: d.team ?? null,
+              project: canonicalName,
+              reason: d.reason ?? null,
+              serial: d.serialNumber ?? null,
+            },
+          ).catch(() => undefined),
+        ),
       );
     }
 

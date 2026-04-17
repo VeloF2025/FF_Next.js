@@ -222,3 +222,186 @@ export async function logOntSwapReported(
     'whatsapp-bridge'
   );
 }
+
+// ─── Action Centre event loggers (RFC Phase 2) ────────────────────────────────
+// These feed the unified DR timeline that the Action Centre + QA Centre render.
+// See docs/rfcs/2026-04-17-action-centre-and-dr-timeline.md §5.3
+
+export type NoteCode = 'note1' | 'note2' | 'note3' | 'note4' | 'note5';
+
+/**
+ * A Fibertime weekly-billing deduction has flagged this DR for the week.
+ * Emitted once per (DR, week, note) combination from billing upload-weekly.
+ */
+export async function logNonInvoiceableFlagged(
+  drNumber: string,
+  payload: {
+    weekEnding: string;
+    noteCode: NoteCode;
+    team?: string | null;
+    project?: string | null;
+    reason?: string | null;
+    serial?: string | null;
+  },
+  actor: string = 'billing-import'
+): Promise<string> {
+  return logActivity(drNumber, 'non_invoiceable_flagged', payload, actor);
+}
+
+/**
+ * A deduction has been resolved (billing reconcile, NOC ticket closed, dispute accepted).
+ */
+export async function logNonInvoiceableResolved(
+  drNumber: string,
+  payload: {
+    weekEnding: string;
+    noteCode: NoteCode;
+    resolutionReason: string;
+    disputeOutcome?: string | null;
+  },
+  actor: string
+): Promise<string> {
+  return logActivity(drNumber, 'non_invoiceable_resolved', payload, actor);
+}
+
+/**
+ * Pre-provisioned ONT added to the oes_pp_data backlog.
+ */
+export async function logPreProvAdded(
+  drNumber: string,
+  payload: { serial: string; activationCode?: string | null; project?: string | null },
+  actor: string = 'oes-pp-import'
+): Promise<string> {
+  return logActivity(drNumber, 'pre_prov_added', payload, actor);
+}
+
+/**
+ * Pre-provisioned ONT resolved (activated or written off).
+ */
+export async function logPreProvResolved(
+  drNumber: string,
+  payload: { resolutionReason: string; activationDate?: string | null },
+  actor: string
+): Promise<string> {
+  return logActivity(drNumber, 'pre_prov_resolved', payload, actor);
+}
+
+/**
+ * NOC ticket created and bound to this DR.
+ */
+export async function logTicketCreated(
+  drNumber: string,
+  payload: {
+    ticketId: string;
+    ticketUid: string;
+    category?: string | null;
+    type?: string | null;
+    priority?: string | null;
+    source?: string | null;
+    sourceType?: string | null;
+  },
+  actor: string
+): Promise<string> {
+  return logActivity(drNumber, 'ticket_created', payload, actor);
+}
+
+/**
+ * NOC ticket status transitioned. Emitted on every status change so the
+ * Timeline can render the full ticket lifecycle.
+ */
+export async function logTicketStatusChanged(
+  drNumber: string,
+  payload: {
+    ticketId: string;
+    ticketUid: string;
+    fromStatus: string;
+    toStatus: string;
+  },
+  actor: string
+): Promise<string> {
+  return logActivity(drNumber, 'ticket_status_changed', payload, actor);
+}
+
+/**
+ * NOC ticket auto-closed by the rule engine (Phase 3) — e.g. pre-prov → active.
+ */
+export async function logTicketAutoClosed(
+  drNumber: string,
+  payload: {
+    ticketId: string;
+    ticketUid: string;
+    triggeringEvent: string;
+    ruleName: string;
+  },
+  actor: string = 'action-centre-rule-engine'
+): Promise<string> {
+  return logActivity(drNumber, 'ticket_auto_closed', payload, actor);
+}
+
+/**
+ * 1Map ph_ont write landed AND a post-write read-back confirmed the value.
+ * Stronger signal than a raw SERIAL_UPDATE log entry.
+ */
+export async function logSerialReconciled(
+  drNumber: string,
+  payload: {
+    propId: string;
+    oldValue: string | null;
+    newValue: string;
+    matchesOes?: boolean;
+  },
+  actor: string
+): Promise<string> {
+  return logActivity(drNumber, 'serial_reconciled', payload, actor);
+}
+
+/**
+ * 1Map silently rejected a write (tenant ACL / record lock) — PR #1334 detects
+ * this when the response body returns items:[] while claiming success:true.
+ */
+export async function log1MapWriteRejected(
+  drNumber: string,
+  payload: {
+    propId: string;
+    attemptedValue: string;
+    reason: string;
+    itemsReturned?: number;
+  },
+  actor: string
+): Promise<string> {
+  return logActivity(drNumber, '1map_write_rejected', payload, actor);
+}
+
+/**
+ * Anomaly: a DR was previously reconciled on 1Map but still shows up in
+ * Fibertime's weekly billing deductions. Dispute candidate.
+ */
+export async function logAnomalyFixedStillBilled(
+  drNumber: string,
+  payload: {
+    noteCode: NoteCode;
+    weekEnding: string;
+    ourFixDate: string;
+    weeksSinceFix: number;
+  },
+  actor: string = 'action-centre-recon'
+): Promise<string> {
+  return logActivity(drNumber, 'anomaly_fixed_still_billed', payload, actor);
+}
+
+/**
+ * Anomaly: a DR has been flagged with the same note code for 3+ consecutive
+ * weeks without a fix attempt — needs escalation.
+ */
+export async function logAnomalyPersistentNote(
+  drNumber: string,
+  payload: {
+    noteCode: NoteCode;
+    consecutiveWeeks: number;
+    firstWeek: string;
+    latestWeek: string;
+  },
+  actor: string = 'action-centre-recon'
+): Promise<string> {
+  return logActivity(drNumber, 'anomaly_persistent_note', payload, actor);
+}
