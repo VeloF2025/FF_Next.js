@@ -342,12 +342,24 @@ async function insertMismatchBatch(
           continue;
         }
 
-        // Different serial after fix -> needs reinvestigation
+        // Different serial after fix -> needs reinvestigation.
+        // ON CONFLICT backstops the partial unique index so overlapping runs
+        // can't create duplicate active rows for the same drop.
         await client.query(
           `INSERT INTO olt_mismatch_records
             (import_id, drop_number, olt_serial, wrong_onemap_serial, fix_status,
              has_ups_swap, detection_source, oes_batch_id, onemap_source)
-           VALUES ($1, $2, $3, $4, 'needs_reinvestigation', $5, 'auto', $6, $7)`,
+           VALUES ($1, $2, $3, $4, 'needs_reinvestigation', $5, 'auto', $6, $7)
+           ON CONFLICT (drop_number)
+             WHERE fix_status IN ('pending','needs_investigation','not_found','empty_serial','needs_reinvestigation')
+           DO UPDATE SET
+             olt_serial = EXCLUDED.olt_serial,
+             wrong_onemap_serial = EXCLUDED.wrong_onemap_serial,
+             has_ups_swap = EXCLUDED.has_ups_swap,
+             detection_source = 'auto',
+             oes_batch_id = EXCLUDED.oes_batch_id,
+             onemap_source = EXCLUDED.onemap_source,
+             fix_status = 'needs_reinvestigation'`,
           [item.importId, item.dropNumber, item.oltSerial, item.wrongOneMapSerial,
            item.hasUpsSwap, item.oesBatchId, item.oesSource]
         );
@@ -383,12 +395,22 @@ async function insertMismatchBatch(
       // For other statuses (needs_reinvestigation etc), allow new insert
     }
 
-    // New record
+    // New record. ON CONFLICT guards against overlapping auto-detect runs or
+    // a race with the queue processor trying to insert the same drop.
     await client.query(
       `INSERT INTO olt_mismatch_records
         (import_id, drop_number, olt_serial, wrong_onemap_serial, fix_status,
          has_ups_swap, detection_source, oes_batch_id, onemap_source)
-       VALUES ($1, $2, $3, $4, $5, $6, 'auto', $7, $8)`,
+       VALUES ($1, $2, $3, $4, $5, $6, 'auto', $7, $8)
+       ON CONFLICT (drop_number)
+         WHERE fix_status IN ('pending','needs_investigation','not_found','empty_serial','needs_reinvestigation')
+       DO UPDATE SET
+         olt_serial = EXCLUDED.olt_serial,
+         wrong_onemap_serial = EXCLUDED.wrong_onemap_serial,
+         has_ups_swap = EXCLUDED.has_ups_swap,
+         detection_source = 'auto',
+         oes_batch_id = EXCLUDED.oes_batch_id,
+         onemap_source = EXCLUDED.onemap_source`,
       [item.importId, item.dropNumber, item.oltSerial, item.wrongOneMapSerial,
        item.fixStatus, item.hasUpsSwap, item.oesBatchId, item.oesSource]
     );
