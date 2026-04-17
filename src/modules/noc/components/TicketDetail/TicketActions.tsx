@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils';
 import { useUpdateTicket, useDeleteTicket } from '../../hooks/useTicket';
 import { TicketStatus } from '../../types/ticket';
 import type { EnrichedTicket } from '../../types/ticket';
+import { GenerateReportButton } from './GenerateReportButton';
 
 interface TicketActionsProps {
   /** Ticket data */
@@ -164,6 +165,9 @@ export function TicketActions({ ticket, compact = false, onActionComplete }: Tic
           })}
         </div>
       )}
+
+      {/* Report Action — generate a professional PDF for this ticket */}
+      <GenerateReportButton ticketId={ticket.id} ticketUid={ticket.ticket_uid} />
 
       {/* Delete Action */}
       {!showDeleteConfirm ? (
