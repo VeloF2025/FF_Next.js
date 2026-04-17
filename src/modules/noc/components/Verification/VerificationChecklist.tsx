@@ -97,34 +97,8 @@ export function VerificationChecklist({
     [ticketId, user?.uid, updateStep, progress, onAllComplete]
   );
 
-  // 🟢 WORKING: Handle photo upload
-  const handlePhotoUpload = useCallback(
-    (stepNumber: VerificationStepNumber, photoUrl: string) => {
-      updateStep.mutate({
-        ticketId,
-        stepNumber,
-        payload: {
-          photo_url: photoUrl,
-        },
-      });
-    },
-    [ticketId, updateStep]
-  );
-
-  // 🟢 WORKING: Handle photo delete
-  const handlePhotoDelete = useCallback(
-    (stepNumber: VerificationStepNumber) => {
-      updateStep.mutate({
-        ticketId,
-        stepNumber,
-        payload: {
-          photo_url: undefined,
-          photo_verified: false,
-        },
-      });
-    },
-    [ticketId, updateStep]
-  );
+  // Photo uploads happen inside `VerificationStepPhotos` — it POSTs to the
+  // attachments API and invalidates the verification query on success.
 
   // 🟢 WORKING: Loading state
   if (isLoading) {
@@ -220,10 +194,9 @@ export function VerificationChecklist({
                   {categorySteps.map((step) => (
                     <VerificationStep
                       key={step.id}
+                      ticketId={ticketId}
                       step={step}
                       onToggle={handleStepToggle}
-                      onPhotoUpload={handlePhotoUpload}
-                      onPhotoDelete={handlePhotoDelete}
                       editable={editable}
                       compact={compact}
                     />
@@ -239,10 +212,9 @@ export function VerificationChecklist({
           {steps.map((step) => (
             <VerificationStep
               key={step.id}
+              ticketId={ticketId}
               step={step}
               onToggle={handleStepToggle}
-              onPhotoUpload={handlePhotoUpload}
-              onPhotoDelete={handlePhotoDelete}
               editable={editable}
               compact={compact}
             />

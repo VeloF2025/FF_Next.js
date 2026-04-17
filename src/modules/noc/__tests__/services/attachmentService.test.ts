@@ -468,6 +468,58 @@ describe('Attachment Service - VF Storage API Integration', () => {
 
       await expect(createAttachment(payload)).rejects.toThrow('Failed to create attachment');
     });
+
+    it('should backfill step photo_url when inserting evidence attachment', async () => {
+      // Multi-photo gallery: the first evidence upload should populate
+      // maintenance_verification_steps.photo_url so legacy readers keep working.
+      const payload: CreateAttachmentPayload = {
+        ticket_id: 'ticket-uuid-123',
+        filename: 'photo.jpg',
+        storage_path: 'tickets/ticket-uuid-123/photo.jpg',
+        storage_url: 'http://vf/photo.jpg',
+        verification_step_id: 'step-uuid-789',
+        is_evidence: true,
+      };
+
+      vi.mocked(queryOne).mockResolvedValueOnce({
+        id: 'attachment-uuid-111',
+        ...payload,
+      });
+
+      await createAttachment(payload);
+
+      // Second call (after the INSERT) is the UPDATE that backfills photo_url
+      const updateCall = vi.mocked(query).mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('UPDATE maintenance_verification_steps')
+      );
+      expect(updateCall).toBeDefined();
+      expect(updateCall?.[0]).toContain('photo_url IS NULL');
+      expect(updateCall?.[1]).toEqual(['http://vf/photo.jpg', 'step-uuid-789']);
+    });
+
+    it('should skip backfill when attachment is not evidence', async () => {
+      const payload: CreateAttachmentPayload = {
+        ticket_id: 'ticket-uuid-123',
+        filename: 'internal.pdf',
+        storage_path: 'tickets/ticket-uuid-123/internal.pdf',
+        storage_url: 'http://vf/internal.pdf',
+        verification_step_id: 'step-uuid-789',
+        is_evidence: false,
+      };
+
+      vi.mocked(queryOne).mockResolvedValueOnce({
+        id: 'attachment-uuid-112',
+        ...payload,
+      });
+
+      vi.mocked(query).mockClear();
+      await createAttachment(payload);
+
+      const updateCall = vi.mocked(query).mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('UPDATE maintenance_verification_steps')
+      );
+      expect(updateCall).toBeUndefined();
+    });
   });
 
   describe('getAttachmentById', () => {

@@ -35,12 +35,33 @@ async function initializeVerificationSteps(
 ): Promise<VerificationStep[]> {
   // Check if steps already exist
   const existing = await sql`
-    SELECT id, ticket_id, step_number, step_name, step_description,
-           is_complete, completed_at, completed_by, photo_required,
-           photo_url, photo_verified, notes, created_at
-    FROM maintenance_verification_steps
-    WHERE ticket_id = ${ticketId}
-    ORDER BY step_number
+    SELECT s.id, s.ticket_id, s.step_number, s.step_name, s.step_description,
+           s.is_complete, s.completed_at, s.completed_by, s.photo_required,
+           s.photo_url, s.photo_verified, s.notes, s.created_at,
+           COALESCE(
+             json_agg(
+               json_build_object(
+                 'id', a.id,
+                 'file_url', a.file_url,
+                 'storage_url', a.storage_url,
+                 'storage_path', a.storage_path,
+                 'filename', a.filename,
+                 'file_type', a.file_type,
+                 'mime_type', a.mime_type,
+                 'file_size', a.file_size,
+                 'uploaded_by', a.uploaded_by,
+                 'uploaded_at', a.uploaded_at
+               )
+               ORDER BY a.uploaded_at ASC
+             ) FILTER (WHERE a.id IS NOT NULL),
+             '[]'::json
+           ) AS photos
+    FROM maintenance_verification_steps s
+    LEFT JOIN maintenance_attachments a
+      ON a.verification_step_id = s.id AND a.is_evidence = true
+    WHERE s.ticket_id = ${ticketId}
+    GROUP BY s.id
+    ORDER BY s.step_number
   `;
 
   if (existing.length > 0) {
@@ -60,12 +81,33 @@ async function initializeVerificationSteps(
 
   // Fetch and return created steps
   const created = await sql`
-    SELECT id, ticket_id, step_number, step_name, step_description,
-           is_complete, completed_at, completed_by, photo_required,
-           photo_url, photo_verified, notes, created_at
-    FROM maintenance_verification_steps
-    WHERE ticket_id = ${ticketId}
-    ORDER BY step_number
+    SELECT s.id, s.ticket_id, s.step_number, s.step_name, s.step_description,
+           s.is_complete, s.completed_at, s.completed_by, s.photo_required,
+           s.photo_url, s.photo_verified, s.notes, s.created_at,
+           COALESCE(
+             json_agg(
+               json_build_object(
+                 'id', a.id,
+                 'file_url', a.file_url,
+                 'storage_url', a.storage_url,
+                 'storage_path', a.storage_path,
+                 'filename', a.filename,
+                 'file_type', a.file_type,
+                 'mime_type', a.mime_type,
+                 'file_size', a.file_size,
+                 'uploaded_by', a.uploaded_by,
+                 'uploaded_at', a.uploaded_at
+               )
+               ORDER BY a.uploaded_at ASC
+             ) FILTER (WHERE a.id IS NOT NULL),
+             '[]'::json
+           ) AS photos
+    FROM maintenance_verification_steps s
+    LEFT JOIN maintenance_attachments a
+      ON a.verification_step_id = s.id AND a.is_evidence = true
+    WHERE s.ticket_id = ${ticketId}
+    GROUP BY s.id
+    ORDER BY s.step_number
   `;
 
   log.info('Initialized verification steps for ticket', {

@@ -17,21 +17,19 @@
 
 import { useCallback } from 'react';
 import { Check, Camera, Clock, User } from 'lucide-react';
-import { PhotoUpload } from './PhotoUpload';
+import { VerificationStepPhotos } from './VerificationStepPhotos';
 import { formatDisplayDateTime } from '@/utils/dateFormat';
 import { cn } from '@/lib/utils';
 import type { VerificationStep as VerificationStepType, VerificationStepNumber } from '../../types/verification';
 import { VERIFICATION_STEP_TEMPLATES, getStepCategoryColor } from '../../constants/verificationSteps';
 
 interface VerificationStepProps {
+  /** Ticket UUID — needed by the photo gallery to POST attachments */
+  ticketId: string;
   /** Verification step data */
   step: VerificationStepType;
   /** Callback when step completion is toggled */
   onToggle: (stepNumber: VerificationStepNumber, isComplete: boolean) => void;
-  /** Callback when photo is uploaded */
-  onPhotoUpload: (stepNumber: VerificationStepNumber, photoUrl: string) => void;
-  /** Callback when photo is deleted */
-  onPhotoDelete?: (stepNumber: VerificationStepNumber) => void;
   /** Whether step is editable */
   editable: boolean;
   /** Compact mode for smaller display */
@@ -42,10 +40,9 @@ interface VerificationStepProps {
  * 🟢 WORKING: Individual verification step component
  */
 export function VerificationStep({
+  ticketId,
   step,
   onToggle,
-  onPhotoUpload,
-  onPhotoDelete,
   editable,
   compact = false,
 }: VerificationStepProps) {
@@ -58,21 +55,6 @@ export function VerificationStep({
       onToggle(stepNumber, !step.is_complete);
     }
   }, [editable, onToggle, stepNumber, step.is_complete]);
-
-  // 🟢 WORKING: Handle photo upload
-  const handlePhotoUploaded = useCallback(
-    (photoUrl: string) => {
-      onPhotoUpload(stepNumber, photoUrl);
-    },
-    [onPhotoUpload, stepNumber]
-  );
-
-  // 🟢 WORKING: Handle photo delete
-  const handlePhotoDeleted = useCallback(() => {
-    if (onPhotoDelete) {
-      onPhotoDelete(stepNumber);
-    }
-  }, [onPhotoDelete, stepNumber]);
 
   // Get category color
   const categoryColor = getStepCategoryColor(template.category);
@@ -168,12 +150,12 @@ export function VerificationStep({
                 )}
               </div>
 
-              <PhotoUpload
-                photoUrl={step.photo_url}
+              <VerificationStepPhotos
+                ticketId={ticketId}
+                stepId={step.id}
+                photos={step.photos ?? []}
                 photoVerified={step.photo_verified}
                 disabled={!editable}
-                onPhotoUploaded={handlePhotoUploaded}
-                onPhotoDeleted={handlePhotoDeleted}
                 compact={compact}
               />
             </div>

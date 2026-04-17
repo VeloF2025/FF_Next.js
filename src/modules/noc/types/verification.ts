@@ -25,12 +25,32 @@ export interface VerificationStep {
 
   // Evidence tracking
   photo_required: boolean;
+  /** First/cover photo URL — kept in sync with the oldest entry in `photos` for back-compat */
   photo_url: string | null;
   photo_verified: boolean; // Photo passed quality check
   notes: string | null;
+  /** Full photo gallery — every attachment with verification_step_id = this.id and is_evidence = true */
+  photos?: VerificationStepPhoto[];
 
   // Timestamp
   created_at: Date;
+}
+
+/**
+ * A single evidence photo attached to a verification step.
+ * Subset of `TicketAttachment` fields relevant to the gallery UI.
+ */
+export interface VerificationStepPhoto {
+  id: string;
+  file_url: string | null;
+  storage_url: string | null;
+  storage_path: string | null;
+  filename: string;
+  file_type: string | null;
+  mime_type: string | null;
+  file_size: number | null;
+  uploaded_by: string;
+  uploaded_at: string;
 }
 
 /**

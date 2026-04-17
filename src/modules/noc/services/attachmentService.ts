@@ -296,6 +296,18 @@ export async function createAttachment(
       throw new Error('Failed to create attachment record');
     }
 
+    // Back-compat: keep maintenance_verification_steps.photo_url pointing at
+    // the oldest evidence photo for the step. Older readers of photo_url (QA
+    // workflow, closeout reports) still see a photo when the gallery has any.
+    if (payload.verification_step_id && payload.is_evidence && attachment.storage_url) {
+      await query(
+        `UPDATE maintenance_verification_steps
+           SET photo_url = $1
+         WHERE id = $2 AND photo_url IS NULL`,
+        [attachment.storage_url, payload.verification_step_id]
+      );
+    }
+
     logger.info('Attachment record created', {
       attachment_id: attachment.id,
       ticket_id: attachment.ticket_id
@@ -496,6 +508,26 @@ export async function deleteAttachment(attachmentId: string): Promise<void> {
     `;
 
     await query(sql, [attachmentId]);
+
+    // Back-compat: if the deleted attachment was the step's cover photo_url,
+    // promote the next oldest remaining evidence photo (or clear if none left).
+    if (attachment.verification_step_id) {
+      await query(
+        `UPDATE maintenance_verification_steps
+           SET photo_url = (
+             SELECT storage_url
+               FROM maintenance_attachments
+              WHERE verification_step_id = $1
+                AND is_evidence = true
+                AND storage_url IS NOT NULL
+              ORDER BY uploaded_at ASC
+              LIMIT 1
+           )
+         WHERE id = $1
+           AND photo_url = $2`,
+        [attachment.verification_step_id, attachment.storage_url]
+      );
+    }
 
     logger.info('Attachment deleted successfully', {
       attachment_id: attachmentId

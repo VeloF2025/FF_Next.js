@@ -196,9 +196,25 @@ describe('VerificationService - TDD', () => {
       // Assert
       expect(steps).toHaveLength(12);
       expect(db.query).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY step_number ASC'),
+        expect.stringContaining('ORDER BY s.step_number ASC'),
         [mockTicketId]
       );
+    });
+
+    it('should LEFT JOIN attachments and aggregate into photos[]', async () => {
+      // Arrange
+      vi.mocked(db.query).mockResolvedValueOnce([]);
+
+      // Act
+      await verificationService.getVerificationSteps(mockTicketId);
+
+      // Assert — SQL includes the aggregated photo gallery + back-compat cover
+      const callSql = vi.mocked(db.query).mock.calls[0]?.[0] as string;
+      expect(callSql).toContain('LEFT JOIN maintenance_attachments');
+      expect(callSql).toContain("a.verification_step_id = s.id");
+      expect(callSql).toContain('a.is_evidence = true');
+      expect(callSql).toContain('AS photos');
+      expect(callSql).toContain('s.photo_url');
     });
 
     it('should return empty array if ticket has no verification steps', async () => {

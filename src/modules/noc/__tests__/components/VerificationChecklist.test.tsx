@@ -47,21 +47,42 @@ vi.mock('@/contexts/AuthContext', () => ({
 
 // Helper to create mock verification steps
 const createMockSteps = (completedCount: number): VerificationStep[] => {
-  return Array.from({ length: 12 }, (_, index) => ({
-    id: `step-${index + 1}`,
-    ticket_id: 'test-ticket-id',
-    step_number: (index + 1) as VerificationStepNumber,
-    step_name: `Step ${index + 1}`,
-    step_description: `Description for step ${index + 1}`,
-    is_complete: index < completedCount,
-    completed_at: index < completedCount ? new Date() : null,
-    completed_by: index < completedCount ? 'test-user-id' : null,
-    photo_required: index !== 8, // Step 9 doesn't require photo
-    photo_url: index < completedCount && index !== 8 ? `https://example.com/photo-${index + 1}.jpg` : null,
-    photo_verified: index < completedCount,
-    notes: null,
-    created_at: new Date(),
-  }));
+  return Array.from({ length: 12 }, (_, index) => {
+    const hasPhoto = index < completedCount && index !== 8;
+    const photoUrl = hasPhoto ? `https://example.com/photo-${index + 1}.jpg` : null;
+    return {
+      id: `step-${index + 1}`,
+      ticket_id: 'test-ticket-id',
+      step_number: (index + 1) as VerificationStepNumber,
+      step_name: `Step ${index + 1}`,
+      step_description: `Description for step ${index + 1}`,
+      is_complete: index < completedCount,
+      completed_at: index < completedCount ? new Date() : null,
+      completed_by: index < completedCount ? 'test-user-id' : null,
+      photo_required: index !== 8, // Step 9 doesn't require photo
+      photo_url: photoUrl,
+      photo_verified: index < completedCount,
+      notes: null,
+      created_at: new Date(),
+      // Gallery photos: legacy `photo_url` becomes first entry in `photos`
+      photos: hasPhoto
+        ? [
+            {
+              id: `attachment-${index + 1}`,
+              file_url: null,
+              storage_url: photoUrl,
+              storage_path: null,
+              filename: `photo-${index + 1}.jpg`,
+              file_type: 'photo',
+              mime_type: 'image/jpeg',
+              file_size: 12345,
+              uploaded_by: 'test-user-id',
+              uploaded_at: new Date().toISOString(),
+            },
+          ]
+        : [],
+    };
+  });
 };
 
 // Helper to create mock progress
@@ -312,8 +333,9 @@ describe('VerificationChecklist Component', () => {
       // Act
       renderWithQueryClient(<VerificationChecklist ticketId="test-ticket-id" editable={true} />);
 
-      // Assert - Should have 11 photo upload buttons (step 9 doesn't require photo)
-      const uploadButtons = screen.getAllByText(/upload photo/i);
+      // Assert - Should have 11 "Add photo" buttons (step 9 doesn't require photo).
+      // Each gallery renders an "Add photo" tile whose aria-label is stable.
+      const uploadButtons = screen.getAllByLabelText(/^add photo$/i);
       expect(uploadButtons).toHaveLength(11);
     });
 
@@ -358,7 +380,7 @@ describe('VerificationChecklist Component', () => {
       renderWithQueryClient(<VerificationChecklist ticketId="test-ticket-id" />);
 
       // Assert - Should have photo thumbnails for completed steps
-      const photoThumbnails = screen.getAllByAltText(/photo for step/i);
+      const photoThumbnails = screen.getAllByRole('img');
       expect(photoThumbnails.length).toBeGreaterThan(0);
     });
 
