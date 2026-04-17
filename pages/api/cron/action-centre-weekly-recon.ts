@@ -18,6 +18,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { scanPersistentNotes } from '@/modules/activate/services/action-centre-scanners/persistentNoteScanner';
 import { scanMaintenanceReopens } from '@/modules/activate/services/action-centre-scanners/maintenanceReopenScanner';
 import { scanStalePp } from '@/modules/activate/services/action-centre-scanners/stalePpScanner';
+import { scanMaintenanceTechOnsite } from '@/modules/activate/services/action-centre-scanners/maintenanceTechOnsiteScanner';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const authHeader = req.headers.authorization;
@@ -35,6 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const dryRun = String(req.query.dryRun || '').toLowerCase() === 'true';
   const minWeeks = Math.max(2, Number(req.query.minWeeks) || 3);
   const stalePpDays = Math.max(7, Number(req.query.stalePpDays) || 30);
+  const techOnsiteLookbackDays = Math.max(1, Number(req.query.techOnsiteDays) || 14);
   // Lookback for maintenance reopens — weekly cron uses a full week.
   const maintLookbackHours = 168;
 
@@ -44,6 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     dryRun,
     minWeeks,
     stalePpDays,
+    techOnsiteLookbackDays,
   });
 
   try {
@@ -52,16 +55,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // would have executed.
       return apiResponse.success(res, {
         dryRun: true,
-        persistent: { note: 'skipped in dry-run' },
+        persistent:  { note: 'skipped in dry-run' },
         maintenance: { note: 'skipped in dry-run' },
-        stalePp:    { note: 'skipped in dry-run' },
+        stalePp:     { note: 'skipped in dry-run' },
+        techOnsite:  { note: 'skipped in dry-run' },
       });
     }
 
-    const [persistent, maintenance, stalePp] = await Promise.all([
+    const [persistent, maintenance, stalePp, techOnsite] = await Promise.all([
       scanPersistentNotes(minWeeks),
       scanMaintenanceReopens(maintLookbackHours),
       scanStalePp(stalePpDays),
+      scanMaintenanceTechOnsite(techOnsiteLookbackDays),
     ]);
 
     log.info('cronTask', {
@@ -70,9 +75,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       persistent,
       maintenance,
       stalePp,
+      techOnsite,
     });
 
-    return apiResponse.success(res, { persistent, maintenance, stalePp });
+    return apiResponse.success(res, { persistent, maintenance, stalePp, techOnsite });
   } catch (err) {
     log.error('cronTask', {
       action: 'action-centre-weekly-recon',

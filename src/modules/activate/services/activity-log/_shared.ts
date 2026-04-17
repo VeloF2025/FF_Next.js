@@ -62,7 +62,8 @@ export type ActivityEventType =
   | 'anomaly_stale_pp'
   // Maintenance lifecycle pointer events (RFC §5.6) — Timeline entries that
   // link into the Maintenance tab rather than duplicating content.
-  | 'maintenance_reopened';
+  | 'maintenance_reopened'
+  | 'maintenance_tech_onsite';
 
 /**
  * Serial change source types
@@ -375,6 +376,11 @@ export const EVENT_METADATA: Record<ActivityEventType, { title: string; icon: st
     title: 'Maintenance reopened',
     icon: '🔁',
     iconColor: 'text-red-500',
+  },
+  maintenance_tech_onsite: {
+    title: 'Tech on site',
+    icon: '👷',
+    iconColor: 'text-blue-500',
   },
 };
 

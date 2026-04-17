@@ -247,6 +247,13 @@ export async function getActivityTimeline(
         description = `Pre-provisioned ${serial} unresolved for ${age} days — likely never installed`;
         break;
       }
+      case 'maintenance_tech_onsite': {
+        const uid = data.ticketUid ? String(data.ticketUid) : 'ticket';
+        const n = data.photoCount ?? 0;
+        const team = data.team ? ` · ${data.team}` : '';
+        description = `${uid} · ${n} photo(s) submitted${team}`;
+        break;
+      }
 
       default:
         description = JSON.stringify(data).slice(0, 100);

@@ -443,3 +443,22 @@ export async function logMaintenanceReopened(
 ): Promise<string> {
   return logActivity(drNumber, 'maintenance_reopened', payload, actor);
 }
+
+/**
+ * First maintenance photo arrived for a ticket's DR — tech is on site.
+ * Pointer event: Timeline renders "Tech on site · N photos" and links
+ * into the Maintenance tab where the actual photos live (RFC §5.6 hybrid).
+ */
+export async function logMaintenanceTechOnsite(
+  drNumber: string,
+  payload: {
+    ticketId: string | null;
+    ticketUid: string | null;
+    photoCount: number;
+    firstPhotoAt: string;
+    team?: string | null;
+  },
+  actor: string = 'action-centre-scanner',
+): Promise<string> {
+  return logActivity(drNumber, 'maintenance_tech_onsite', payload, actor);
+}
