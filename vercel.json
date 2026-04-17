@@ -44,6 +44,10 @@
     {
       "path": "/api/cron/action-centre-rules",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/action-centre-weekly-recon",
+      "schedule": "0 4 * * 1"
     }
   ]
 }
