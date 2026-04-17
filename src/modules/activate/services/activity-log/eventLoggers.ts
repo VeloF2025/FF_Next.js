@@ -405,3 +405,23 @@ export async function logAnomalyPersistentNote(
 ): Promise<string> {
   return logActivity(drNumber, 'anomaly_persistent_note', payload, actor);
 }
+
+/**
+ * A previously-resolved maintenance ticket transitioned back to an open-ish
+ * status within 30 days. Pointer event into the Maintenance tab so the
+ * Timeline renders "Maintenance reopened" with a link while the actual
+ * content (photos, wizard) stays in the Maintenance tab (RFC §5.6 hybrid).
+ */
+export async function logMaintenanceReopened(
+  drNumber: string,
+  payload: {
+    ticketId: string;
+    ticketUid: string;
+    daysSinceResolved: number;
+    previousStatus: string;
+    newStatus: string;
+  },
+  actor: string = 'action-centre-rule-engine',
+): Promise<string> {
+  return logActivity(drNumber, 'maintenance_reopened', payload, actor);
+}

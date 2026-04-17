@@ -235,6 +235,12 @@ export async function getActivityTimeline(
         description = `${note} flagged for ${weeks} consecutive weeks — needs escalation`;
         break;
       }
+      case 'maintenance_reopened': {
+        const uid = data.ticketUid ? String(data.ticketUid) : 'ticket';
+        const days = data.daysSinceResolved ?? '?';
+        description = `${uid} reopened after ${days} day(s)`;
+        break;
+      }
 
       default:
         description = JSON.stringify(data).slice(0, 100);

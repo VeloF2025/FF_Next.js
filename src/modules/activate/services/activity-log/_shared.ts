@@ -58,7 +58,10 @@ export type ActivityEventType =
   | 'serial_reconciled'
   | '1map_write_rejected'
   | 'anomaly_fixed_still_billed'
-  | 'anomaly_persistent_note';
+  | 'anomaly_persistent_note'
+  // Maintenance lifecycle pointer events (RFC §5.6) — Timeline entries that
+  // link into the Maintenance tab rather than duplicating content.
+  | 'maintenance_reopened';
 
 /**
  * Serial change source types
@@ -361,6 +364,11 @@ export const EVENT_METADATA: Record<ActivityEventType, { title: string; icon: st
     title: 'Anomaly: persistent note',
     icon: '⚠️',
     iconColor: 'text-yellow-500',
+  },
+  maintenance_reopened: {
+    title: 'Maintenance reopened',
+    icon: '🔁',
+    iconColor: 'text-red-500',
   },
 };
 
