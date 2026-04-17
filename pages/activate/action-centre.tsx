@@ -17,13 +17,15 @@ import { ItemsTab } from '@/modules/action-centre/ItemsTab';
 import { ReconTab } from '@/modules/action-centre/ReconTab';
 import { TicketsTab } from '@/modules/action-centre/TicketsTab';
 import { AutomationTab } from '@/modules/action-centre/AutomationTab';
+import { DisputesTab } from '@/modules/action-centre/DisputesTab';
 
-type TabId = 'overview' | 'items' | 'recon' | 'tickets' | 'automation';
+type TabId = 'overview' | 'items' | 'recon' | 'disputes' | 'tickets' | 'automation';
 
 const TABS: Array<{ id: TabId; label: string; icon: string }> = [
   { id: 'overview', label: 'Overview', icon: '📊' },
   { id: 'items', label: 'Action items', icon: '📋' },
   { id: 'recon', label: 'Recon', icon: '⚖️' },
+  { id: 'disputes', label: 'Disputes', icon: '💼' },
   { id: 'tickets', label: 'Tickets', icon: '🎫' },
   { id: 'automation', label: 'Automation', icon: '⚡' },
 ];
@@ -75,6 +77,7 @@ const ActionCentrePage: NextPage = () => {
           {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'items' && <ItemsTab />}
           {activeTab === 'recon' && <ReconTab />}
+          {activeTab === 'disputes' && <DisputesTab />}
           {activeTab === 'tickets' && <TicketsTab />}
           {activeTab === 'automation' && <AutomationTab />}
         </div>
