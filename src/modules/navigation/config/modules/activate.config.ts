@@ -7,7 +7,7 @@
  * - Reports: Analytics and reporting dashboards
  */
 
-import { LayoutDashboard, ClipboardCheck, BarChart3, Users, Database } from 'lucide-react';
+import { LayoutDashboard, ClipboardCheck, BarChart3, Users, Database, Target } from 'lucide-react';
 import type { ModuleNavigationConfig } from '../../types';
 
 export const activateConfig: ModuleNavigationConfig = {
@@ -56,6 +56,14 @@ export const activateConfig: ModuleNavigationConfig = {
       icon: Database,
       path: '/activate/data-sync',
       rbacKey: 'activate.data-sync',
+    },
+    {
+      id: 'action-centre',
+      label: 'Action Centre',
+      shortLabel: 'Actions',
+      icon: Target,
+      path: '/activate/action-centre',
+      rbacKey: 'activate.action-centre',
     },
   ],
 };
