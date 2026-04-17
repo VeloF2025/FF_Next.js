@@ -93,7 +93,7 @@ async function handler(
                 investigation_context
          FROM olt_mismatch_records
          WHERE id = ANY($1)
-           AND fix_status IN ('needs_investigation', 'not_found', 'empty_serial')
+           AND fix_status IN ('needs_investigation', 'not_found', 'empty_serial', 'rejected')
            AND maintenance_ticket_id IS NULL`,
         [record_ids]
       );

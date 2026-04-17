@@ -42,7 +42,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (status === 'pending') {
       whereClause = "WHERE r.fix_status = 'pending' AND r.olt_serial IS NOT NULL";
     } else if (status === 'needs_investigation') {
-      whereClause = "WHERE (r.fix_status IN ('not_found', 'needs_investigation', 'needs_reinvestigation', 'empty_serial') OR r.olt_serial IS NULL)";
+      whereClause = "WHERE (r.fix_status IN ('not_found', 'needs_investigation', 'needs_reinvestigation', 'empty_serial', 'rejected') OR r.olt_serial IS NULL)";
     } else if (status === 'fixed') {
       whereClause = "WHERE r.fix_status = 'fixed'";
     } else if (status === 'escalated') {
@@ -63,7 +63,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Optional sub-status filter (within needs_investigation group)
-    const validSubStatuses = ['needs_investigation', 'not_found', 'empty_serial'];
+    const validSubStatuses = ['needs_investigation', 'not_found', 'empty_serial', 'rejected'];
     if (subStatus && validSubStatuses.includes(subStatus)) {
       if (subStatus === 'needs_investigation') {
         const cond = `r.fix_status IN ('needs_investigation', 'needs_reinvestigation')`;

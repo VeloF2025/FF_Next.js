@@ -364,24 +364,32 @@ async function fixSingleDR(
         };
       }
 
+      // Detect 1Map silent-drop (tenant ACL / record lock). 1Map returns
+      // success=true with zero rows written; oneMapApiService flags it explicitly.
+      const silentlyRejected = result.error?.toLowerCase().includes('silently rejected') ?? false;
+      const newStatus = silentlyRejected ? 'rejected' : 'pending';
+
       // Record failure in offline_devices (if exists)
       await client.query(
         `UPDATE offline_devices
          SET onemap_fix_attempted = true,
-             onemap_fix_result = 'failed',
+             onemap_fix_result = $1,
              onemap_fix_at = NOW()
-         WHERE drop_number = $1`,
-        [drNumber]
+         WHERE drop_number = $2`,
+        [silentlyRejected ? 'rejected' : 'failed', drNumber]
       );
 
-      // Record failure in olt_mismatch_records
+      // Record failure in olt_mismatch_records. For silent drops, flip status to
+      // 'rejected' so bulk-fix buttons skip them — retrying is pointless until the
+      // underlying 1Map tenant permission is resolved.
       await client.query(
         `UPDATE olt_mismatch_records
-         SET fix_attempted_at = NOW(),
-             fix_result = $1
-         WHERE drop_number = $2
+         SET fix_status = $1,
+             fix_attempted_at = NOW(),
+             fix_result = $2
+         WHERE drop_number = $3
            AND fix_status = 'pending'`,
-        [result.error || 'Unknown error', drNumber]
+        [newStatus, result.error || 'Unknown error', drNumber]
       );
 
       await logActivity(
@@ -390,7 +398,7 @@ async function fixSingleDR(
         {
           message: `1Map fix failed: ${result.error}`,
           source: 'olt_report',
-          fix_type: 'onemap_fix_failed',
+          fix_type: silentlyRejected ? 'onemap_fix_rejected' : 'onemap_fix_failed',
         },
         userId || 'system'
       );

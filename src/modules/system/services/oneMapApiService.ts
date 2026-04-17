@@ -216,6 +216,45 @@ class OneMapApiService {
   }
 
   /**
+   * Parse an /api/apps/app/attributes write response and distinguish real writes
+   * from silent ACL/permission drops.
+   *
+   * 1Map returns HTTP 200 with {"success":true, items:[], total_results:N, message:"OK"}
+   * when the server matches the target row but refuses to write it (tenant ACL, record
+   * lock, status-gated write, etc). The only honest signal is `items.length` — a real
+   * write echoes the updated row; a silent drop echoes an empty array.
+   */
+  private parseWriteResponse(
+    rawText: string,
+    httpOk: boolean
+  ): { accepted: boolean; itemsReturned: number; reason: string } {
+    if (!httpOk) {
+      return { accepted: false, itemsReturned: 0, reason: 'HTTP error' };
+    }
+    let parsed: { success?: boolean; items?: unknown[]; total_results?: number; message?: string };
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      return { accepted: false, itemsReturned: 0, reason: 'Invalid JSON response' };
+    }
+    if (parsed.success !== true) {
+      return { accepted: false, itemsReturned: 0, reason: parsed.message || 'API returned success=false' };
+    }
+    const itemsReturned = Array.isArray(parsed.items) ? parsed.items.length : 0;
+    if (itemsReturned === 0) {
+      const matched = parsed.total_results ?? 0;
+      return {
+        accepted: false,
+        itemsReturned: 0,
+        reason: matched > 0
+          ? `1Map silently rejected write (matched ${matched} row(s) but wrote 0 — tenant ACL or record lock)`
+          : '1Map did not match the target prop_id',
+      };
+    }
+    return { accepted: true, itemsReturned, reason: 'OK' };
+  }
+
+  /**
    * Search for a DR in 1Map
    */
   async searchDR(drNumber: string): Promise<SearchResult> {
@@ -319,20 +358,20 @@ class OneMapApiService {
       });
 
       const text = await response.text();
-      const success = response.ok && text.includes('"success":true');
+      const parsed = this.parseWriteResponse(text, response.ok);
 
-      if (!success) {
-        logger.error('Update failed', { propId, response: text });
+      if (!parsed.accepted) {
+        logger.error('Update failed', { propId, reason: parsed.reason, response: text });
         return {
           success: false,
           oldValue: null,
           newValue: newOntSerial,
           propId,
-          error: 'API returned failure',
+          error: parsed.reason,
         };
       }
 
-      logger.info('ONT serial updated', { propId, newOntSerial });
+      logger.info('ONT serial updated', { propId, newOntSerial, itemsReturned: parsed.itemsReturned });
       return {
         success: true,
         oldValue: null, // Caller should provide this from pre-search
@@ -412,16 +451,16 @@ class OneMapApiService {
       });
 
       const text = await response.text();
-      const success = response.ok && text.includes('"success":true');
+      const parsed = this.parseWriteResponse(text, response.ok);
 
-      if (!success) {
-        logger.error('Dual update failed', { propId, response: text });
+      if (!parsed.accepted) {
+        logger.error('Dual update failed', { propId, reason: parsed.reason, response: text });
         return {
           success: false,
           propId,
           ont: { oldValue: null, newValue: newOntSerial, updated: false },
           ups: { oldValue: null, newValue: newUpsSerial || null, updated: false },
-          error: 'API returned failure',
+          error: parsed.reason,
         };
       }
 
@@ -429,6 +468,7 @@ class OneMapApiService {
         propId,
         newOntSerial,
         newUpsSerial: newUpsSerial || 'not updated',
+        itemsReturned: parsed.itemsReturned,
       });
 
       return {
@@ -712,14 +752,14 @@ class OneMapApiService {
       });
 
       const text = await response.text();
-      const success = response.ok && text.includes('"success":true');
+      const parsed = this.parseWriteResponse(text, response.ok);
 
-      if (!success) {
-        logger.error('Status update failed', { propId, newStatus, response: text });
-        return { success: false, propId, newStatus, error: 'API returned failure' };
+      if (!parsed.accepted) {
+        logger.error('Status update failed', { propId, newStatus, reason: parsed.reason, response: text });
+        return { success: false, propId, newStatus, error: parsed.reason };
       }
 
-      logger.info('Record status updated', { propId, newStatus });
+      logger.info('Record status updated', { propId, newStatus, itemsReturned: parsed.itemsReturned });
       return { success: true, propId, newStatus };
     } catch (error) {
       const isTimeout = error instanceof Error && error.name === 'AbortError';
