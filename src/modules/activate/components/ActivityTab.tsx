@@ -134,7 +134,7 @@ const TIMELINE_CATEGORY_MEMBERS: Record<Exclude<TimelineCategory, 'all'>, Readon
   tickets: ['ticket_created', 'ticket_status_changed', 'ticket_auto_closed',
             'INVESTIGATION_RESOLVED', 'ESCALATED_TO_ADMIN'],
   pre_prov: ['pre_prov_added', 'pre_prov_resolved'],
-  anomaly: ['anomaly_fixed_still_billed', 'anomaly_persistent_note', 'error'],
+  anomaly: ['anomaly_fixed_still_billed', 'anomaly_persistent_note', 'anomaly_stale_pp', 'error'],
 };
 
 const TIMELINE_CATEGORY_LABELS: Record<TimelineCategory, { label: string; icon: string }> = {

@@ -59,6 +59,7 @@ export type ActivityEventType =
   | '1map_write_rejected'
   | 'anomaly_fixed_still_billed'
   | 'anomaly_persistent_note'
+  | 'anomaly_stale_pp'
   // Maintenance lifecycle pointer events (RFC §5.6) — Timeline entries that
   // link into the Maintenance tab rather than duplicating content.
   | 'maintenance_reopened';
@@ -363,6 +364,11 @@ export const EVENT_METADATA: Record<ActivityEventType, { title: string; icon: st
   anomaly_persistent_note: {
     title: 'Anomaly: persistent note',
     icon: '⚠️',
+    iconColor: 'text-yellow-500',
+  },
+  anomaly_stale_pp: {
+    title: 'Anomaly: stale pre-prov',
+    icon: '⏳',
     iconColor: 'text-yellow-500',
   },
   maintenance_reopened: {

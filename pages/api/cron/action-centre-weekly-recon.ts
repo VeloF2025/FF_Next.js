@@ -17,6 +17,7 @@ import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { scanPersistentNotes } from '@/modules/activate/services/action-centre-scanners/persistentNoteScanner';
 import { scanMaintenanceReopens } from '@/modules/activate/services/action-centre-scanners/maintenanceReopenScanner';
+import { scanStalePp } from '@/modules/activate/services/action-centre-scanners/stalePpScanner';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const authHeader = req.headers.authorization;
@@ -33,6 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const dryRun = String(req.query.dryRun || '').toLowerCase() === 'true';
   const minWeeks = Math.max(2, Number(req.query.minWeeks) || 3);
+  const stalePpDays = Math.max(7, Number(req.query.stalePpDays) || 30);
   // Lookback for maintenance reopens — weekly cron uses a full week.
   const maintLookbackHours = 168;
 
@@ -41,25 +43,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     step: 'start',
     dryRun,
     minWeeks,
+    stalePpDays,
   });
 
   try {
     if (dryRun) {
-      // Dry run: return what would happen without emitting events.
-      // We run the scanner's SELECT path only by passing an impossibly
-      // high threshold for maintenance, and by skipping actual emission
-      // for persistent notes. Simplest approach: just skip both
-      // scanners and report "dry_run: would have executed".
+      // Dry run: no scanner mutates state. Report that everything
+      // would have executed.
       return apiResponse.success(res, {
         dryRun: true,
         persistent: { note: 'skipped in dry-run' },
         maintenance: { note: 'skipped in dry-run' },
+        stalePp:    { note: 'skipped in dry-run' },
       });
     }
 
-    const [persistent, maintenance] = await Promise.all([
+    const [persistent, maintenance, stalePp] = await Promise.all([
       scanPersistentNotes(minWeeks),
       scanMaintenanceReopens(maintLookbackHours),
+      scanStalePp(stalePpDays),
     ]);
 
     log.info('cronTask', {
@@ -67,9 +69,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       step: 'done',
       persistent,
       maintenance,
+      stalePp,
     });
 
-    return apiResponse.success(res, { persistent, maintenance });
+    return apiResponse.success(res, { persistent, maintenance, stalePp });
   } catch (err) {
     log.error('cronTask', {
       action: 'action-centre-weekly-recon',

@@ -407,6 +407,24 @@ export async function logAnomalyPersistentNote(
 }
 
 /**
+ * Anomaly: a pre-provisioned ONT has been in the PP backlog for more than the
+ * configured stale-threshold (default 30 days) without moving to 'activated'.
+ * Usually means the install never completed — operator action required.
+ */
+export async function logAnomalyStalePp(
+  drNumber: string,
+  payload: {
+    serial: string;
+    ageDays: number;
+    resolutionStatus: string | null;
+    project: string | null;
+  },
+  actor: string = 'action-centre-recon',
+): Promise<string> {
+  return logActivity(drNumber, 'anomaly_stale_pp', payload, actor);
+}
+
+/**
  * A previously-resolved maintenance ticket transitioned back to an open-ish
  * status within 30 days. Pointer event into the Maintenance tab so the
  * Timeline renders "Maintenance reopened" with a link while the actual

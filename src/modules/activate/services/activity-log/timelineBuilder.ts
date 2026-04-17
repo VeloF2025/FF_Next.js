@@ -241,6 +241,12 @@ export async function getActivityTimeline(
         description = `${uid} reopened after ${days} day(s)`;
         break;
       }
+      case 'anomaly_stale_pp': {
+        const serial = data.serial ? String(data.serial) : 'unknown';
+        const age = data.ageDays ?? '?';
+        description = `Pre-provisioned ${serial} unresolved for ${age} days — likely never installed`;
+        break;
+      }
 
       default:
         description = JSON.stringify(data).slice(0, 100);
