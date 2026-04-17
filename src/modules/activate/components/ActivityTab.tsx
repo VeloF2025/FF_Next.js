@@ -148,6 +148,48 @@ const TIMELINE_CATEGORY_LABELS: Record<TimelineCategory, { label: string; icon: 
   anomaly: { label: 'Anomalies', icon: '⚠️' },
 };
 
+/**
+ * Compute the source-record link for a timeline entry. Returns {href, label}
+ * when the event_data carries enough context to deep-link to the thing that
+ * produced it (ticket detail, billing week, etc). Returns null otherwise.
+ *
+ * The link targets the same app (not a new tab) so the back button returns to
+ * the DR detail page. Callers render this as a small button next to the
+ * timestamp.
+ */
+function deepLinkForEntry(
+  entry: TimelineEntry,
+): { href: string; label: string } | null {
+  const data = (entry.metadata as Record<string, unknown> | undefined) ?? {};
+
+  // Ticket events → NOC ticket detail
+  if (
+    entry.eventType === 'ticket_created' ||
+    entry.eventType === 'ticket_status_changed' ||
+    entry.eventType === 'ticket_auto_closed'
+  ) {
+    const id = typeof data.ticketId === 'string' ? data.ticketId : null;
+    const uid = typeof data.ticketUid === 'string' ? data.ticketUid : null;
+    if (id) return { href: `/noc/tickets/${id}`, label: uid ? `Open ${uid}` : 'Open ticket' };
+  }
+
+  // Billing / anomaly events → weekly billing summary, scrolled to the week
+  if (
+    entry.eventType === 'non_invoiceable_flagged' ||
+    entry.eventType === 'non_invoiceable_resolved' ||
+    entry.eventType === 'anomaly_fixed_still_billed'
+  ) {
+    const week = typeof data.weekEnding === 'string' ? data.weekEnding.slice(0, 10) : null;
+    const base = '/activate/data-sync?group=billing&tab=summary';
+    return {
+      href: week ? `${base}&week=${week}` : base,
+      label: week ? `Open week ${week}` : 'Open billing',
+    };
+  }
+
+  return null;
+}
+
 export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('timeline');
   const [timelineCategory, setTimelineCategory] = useState<TimelineCategory>('all');
@@ -535,6 +577,19 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                             by {entry.actor === 'batch_sync' ? 'Auto Sync' : entry.actor}
                           </p>
                         )}
+                        {(() => {
+                          const link = deepLinkForEntry(entry);
+                          if (!link) return null;
+                          return (
+                            <a
+                              href={link.href}
+                              className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap"
+                            >
+                              {link.label}
+                              <span aria-hidden="true">↗</span>
+                            </a>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
