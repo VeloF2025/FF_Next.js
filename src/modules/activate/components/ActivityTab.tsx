@@ -110,8 +110,47 @@ interface ActivityTabProps {
 
 type ViewMode = 'timeline' | 'history' | 'serials';
 
+// Timeline filter chips. Maps a user-facing category to the set of event types
+// that belong to it. "All" is the default and skips filtering entirely.
+type TimelineCategory = 'all' | 'oes' | '1map' | 'wa_qa' | 'billing' | 'tickets' | 'pre_prov' | 'anomaly';
+
+const TIMELINE_CATEGORY_MEMBERS: Record<Exclude<TimelineCategory, 'all'>, ReadonlyArray<string>> = {
+  oes: ['oes_activated', 'SWAP_DETECTED'],
+  '1map': [
+    'SERIAL_UPDATE', 'SERIAL_VERIFIED', 'SERIAL_CONFIRMED', 'SERIAL_VERIFICATION_COMPUTED',
+    'MANUAL_SERIAL_EDIT', 'INVESTIGATE', 'INSTALLATION_MISMATCH', 'STATUS_UPDATE',
+    'SERIAL_HISTORY_ENTRY', 'ONT_SWAP_REPORTED',
+    'serial_reconciled', '1map_write_rejected',
+  ],
+  wa_qa: [
+    'whatsapp_submitted', 'dr_acknowledged', 'photos_fetched', 'PHOTOS_SYNCED',
+    'attribute_categorized', 'vlm_qa_started', 'vlm_qa_completed', 'vlm_qa_failed',
+    'WA_PHOTO_VLM_PROCESSED', 'human_review_started', 'human_review_completed',
+    'step_approved', 'step_rejected', 'AUTO_QA_COMPLETED', 'AUTO_QA_RESET',
+    'HITL_STEP_CORRECTION', 'HITL_PASSFAIL_CORRECTION', 'HITL_COMMENT_CORRECTION',
+    'feedback_generated', 'feedback_sent',
+  ],
+  billing: ['non_invoiceable_flagged', 'non_invoiceable_resolved'],
+  tickets: ['ticket_created', 'ticket_status_changed', 'ticket_auto_closed',
+            'INVESTIGATION_RESOLVED', 'ESCALATED_TO_ADMIN'],
+  pre_prov: ['pre_prov_added', 'pre_prov_resolved'],
+  anomaly: ['anomaly_fixed_still_billed', 'anomaly_persistent_note', 'error'],
+};
+
+const TIMELINE_CATEGORY_LABELS: Record<TimelineCategory, { label: string; icon: string }> = {
+  all: { label: 'All', icon: '📅' },
+  oes: { label: 'OES', icon: '⚡' },
+  '1map': { label: '1Map', icon: '🗺️' },
+  wa_qa: { label: 'WhatsApp / QA', icon: '📱' },
+  billing: { label: 'Billing', icon: '💰' },
+  tickets: { label: 'Tickets', icon: '🎫' },
+  pre_prov: { label: 'Pre-Prov', icon: '⏳' },
+  anomaly: { label: 'Anomalies', icon: '⚠️' },
+};
+
 export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('timeline');
+  const [timelineCategory, setTimelineCategory] = useState<TimelineCategory>('all');
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [summary, setSummary] = useState<ActivitySummary | null>(null);
   const [reviews, setReviews] = useState<QAReviewHistory[]>([]);
@@ -329,18 +368,67 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
       {/* Timeline View */}
       {viewMode === 'timeline' && (
         <div className="space-y-4">
-          {timeline.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <span className="text-4xl mb-4 block">📅</span>
-              <p>No activity recorded yet</p>
-            </div>
-          ) : (
-            <div className="relative">
-              {/* Timeline Line */}
-              <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-secondary" />
+          {/* Category filter chips — slice the timeline by subsystem */}
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(TIMELINE_CATEGORY_LABELS) as TimelineCategory[]).map((key) => {
+              const { label, icon } = TIMELINE_CATEGORY_LABELS[key];
+              const count =
+                key === 'all'
+                  ? timeline.length
+                  : timeline.filter((e) => TIMELINE_CATEGORY_MEMBERS[key].includes(e.eventType)).length;
+              const isActive = timelineCategory === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setTimelineCategory(key)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                    isActive
+                      ? 'bg-blue-600 border-blue-600 text-white'
+                      : 'bg-transparent border-border text-muted-foreground hover:bg-secondary hover:text-foreground'
+                  }`}
+                >
+                  <span>{icon}</span>
+                  <span>{label}</span>
+                  <span
+                    className={`ml-0.5 rounded-full px-1.5 tabular-nums ${
+                      isActive ? 'bg-blue-700 text-white' : 'bg-secondary text-muted-foreground'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
 
-              {/* Timeline Events */}
-              {timeline.map((entry, _index) => {
+          {(() => {
+            const filteredTimeline =
+              timelineCategory === 'all'
+                ? timeline
+                : timeline.filter((e) =>
+                    TIMELINE_CATEGORY_MEMBERS[timelineCategory].includes(e.eventType),
+                  );
+
+            if (filteredTimeline.length === 0) {
+              return (
+                <div className="text-center py-8 text-muted-foreground">
+                  <span className="text-4xl mb-4 block">📅</span>
+                  <p>
+                    {timelineCategory === 'all'
+                      ? 'No activity recorded yet'
+                      : `No "${TIMELINE_CATEGORY_LABELS[timelineCategory].label}" events for this DR yet`}
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <div className="relative">
+                {/* Timeline Line */}
+                <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-secondary" />
+
+                {/* Timeline Events */}
+                {filteredTimeline.map((entry, _index) => {
                 const meta = entry.metadata as Record<string, unknown> | undefined;
                 return (
                 <div key={entry.id} className="relative pl-10 pb-6">
@@ -453,8 +541,9 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                 </div>
               );
               })}
-            </div>
-          )}
+              </div>
+            );
+          })()}
         </div>
       )}
 

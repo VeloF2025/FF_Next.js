@@ -170,6 +170,72 @@ export async function getActivityTimeline(
       case 'MANUAL_SERIAL_EDIT':
         description = data.details ? String(data.details) : 'Serial manually edited';
         break;
+
+      // ── Action Centre events (RFC Phase 2) ──
+      case 'non_invoiceable_flagged': {
+        const note = data.noteCode ? String(data.noteCode).toUpperCase() : 'note';
+        const week = data.weekEnding ? String(data.weekEnding).slice(0, 10) : 'unknown week';
+        const team = data.team ? ` · team ${data.team}` : '';
+        description = `${note} on week ${week}${team}`;
+        break;
+      }
+      case 'non_invoiceable_resolved': {
+        const note = data.noteCode ? String(data.noteCode).toUpperCase() : 'note';
+        const reason = data.resolutionReason ? String(data.resolutionReason) : 'resolved';
+        description = `${note} ${reason}`;
+        break;
+      }
+      case 'pre_prov_added':
+        description = `Pre-provisioned serial ${data.serial || 'unknown'}${data.project ? ` (${data.project})` : ''}`;
+        break;
+      case 'pre_prov_resolved': {
+        const reason = data.resolutionReason ? String(data.resolutionReason) : 'resolved';
+        const date = data.activationDate ? ` on ${String(data.activationDate).slice(0, 10)}` : '';
+        description = `Pre-prov ${reason}${date}`;
+        break;
+      }
+      case 'ticket_created': {
+        const uid = data.ticketUid ? String(data.ticketUid) : 'ticket';
+        const cat = data.category ? ` · ${data.category}` : '';
+        const prio = data.priority && data.priority !== 'normal' ? ` · ${data.priority}` : '';
+        description = `${uid}${cat}${prio}`;
+        break;
+      }
+      case 'ticket_status_changed': {
+        const uid = data.ticketUid ? String(data.ticketUid) : 'ticket';
+        description = `${uid}: ${data.fromStatus || '?'} → ${data.toStatus || '?'}`;
+        break;
+      }
+      case 'ticket_auto_closed': {
+        const uid = data.ticketUid ? String(data.ticketUid) : 'ticket';
+        description = `${uid} auto-closed (${data.ruleName || 'rule'})`;
+        break;
+      }
+      case 'serial_reconciled': {
+        const oldV = data.oldValue ? String(data.oldValue) : '(empty)';
+        const newV = data.newValue ? String(data.newValue) : '?';
+        const match = data.matchesOes ? ' · matches OES' : '';
+        description = `prop ${data.propId}: ${oldV} → ${newV}${match}`;
+        break;
+      }
+      case '1map_write_rejected':
+        description = data.reason
+          ? `${data.reason} (prop ${data.propId ?? 'unknown'})`
+          : `1Map rejected write on prop ${data.propId ?? 'unknown'}`;
+        break;
+      case 'anomaly_fixed_still_billed': {
+        const note = data.noteCode ? String(data.noteCode).toUpperCase() : 'note';
+        const weeks = data.weeksSinceFix ?? '?';
+        description = `${note} still billing ${weeks} week(s) after we fixed it — dispute candidate`;
+        break;
+      }
+      case 'anomaly_persistent_note': {
+        const note = data.noteCode ? String(data.noteCode).toUpperCase() : 'note';
+        const weeks = data.consecutiveWeeks ?? '?';
+        description = `${note} flagged for ${weeks} consecutive weeks — needs escalation`;
+        break;
+      }
+
       default:
         description = JSON.stringify(data).slice(0, 100);
     }
