@@ -436,7 +436,7 @@ export async function getTeamsForDropdown(): Promise<TeamDropdownOption[]> {
          t.id, t.name, t.team_type,
          (SELECT COUNT(*) FROM team_members tm WHERE tm.team_id = t.id AND tm.is_active = true)::int as member_count,
          COALESCE(u.first_name || ' ' || u.last_name, u.email) as lead_name,
-         c.name as contractor_name,
+         c.company_name as contractor_name,
          pta.id as assignment_id,
          pta.project_id,
          p.project_name,
