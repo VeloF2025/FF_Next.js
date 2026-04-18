@@ -41,6 +41,16 @@ export interface TrackingErrorEvent {
   fingerprint?: string[];
 }
 
+// Browser wallet extensions (MetaMask, Phantom, etc.) auto-inject into every
+// page and surface promise rejections our global handler picks up. FibreFlow
+// uses no Web3, so these are pure noise — drop them before shipping to Bugsink.
+const WALLET_NOISE_PATTERN = /metamask|window\.ethereum|web3|wallet.?connect|phantom|coinbase.?wallet/i;
+
+function isWalletExtensionNoise(event: TrackingErrorEvent): boolean {
+  return WALLET_NOISE_PATTERN.test(event.message) ||
+    (event.stack ? WALLET_NOISE_PATTERN.test(event.stack) : false);
+}
+
 /**
  * Configuration
  */
@@ -48,7 +58,8 @@ const config = {
   enabled: process.env.NODE_ENV === 'production',
   endpoint: '/api/analytics/errors',
   sampleRate: 1.0, // 100% of errors
-  beforeSend: (event: TrackingErrorEvent) => event, // Transform before sending
+  beforeSend: (event: TrackingErrorEvent): TrackingErrorEvent | null =>
+    isWalletExtensionNoise(event) ? null : event,
 };
 
 /**
