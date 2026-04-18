@@ -41,6 +41,7 @@ export function TeamProjectAssignments({ teamId, assignments, onChanged }: Props
   const [role, setRole] = useState<Role>('activations');
   const [saving, setSaving] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Only active projects — not pipeline projects.
   useEffect(() => {
@@ -81,22 +82,27 @@ export function TeamProjectAssignments({ teamId, assignments, onChanged }: Props
     setSearch('');
     setRole('activations');
     setShowAdd(false);
+    setErrorMessage(null);
   };
 
   const handleAdd = async () => {
     if (!selectedProjectId) return;
     setSaving(true);
+    setErrorMessage(null);
     try {
       const res = await fetch('/api/noc/project-team-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ project_id: selectedProjectId, team_id: teamId, role }),
       });
-      if (!res.ok) throw new Error('Assignment failed');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.success === false) {
+        throw new Error(data?.error?.message || `Assignment failed (HTTP ${res.status})`);
+      }
       resetAddForm();
       onChanged();
-    } catch {
-      // non-fatal — leave form state so the user can retry
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Assignment failed — please retry');
     } finally {
       setSaving(false);
     }
@@ -104,9 +110,16 @@ export function TeamProjectAssignments({ teamId, assignments, onChanged }: Props
 
   const handleRemove = async (id: string) => {
     setRemovingId(id);
+    setErrorMessage(null);
     try {
-      await fetch(`/api/noc/project-team-assignments/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/noc/project-team-assignments/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error?.message || `Remove failed (HTTP ${res.status})`);
+      }
       onChanged();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Remove failed — please retry');
     } finally {
       setRemovingId(null);
     }
@@ -114,6 +127,21 @@ export function TeamProjectAssignments({ teamId, assignments, onChanged }: Props
 
   return (
     <div className="space-y-3">
+      {errorMessage && (
+        <div
+          role="alert"
+          className="px-3 py-2 text-sm bg-red-500/10 text-red-300 border border-red-500/30 rounded-lg flex items-center justify-between gap-2"
+        >
+          <span>{errorMessage}</span>
+          <button
+            type="button"
+            onClick={() => setErrorMessage(null)}
+            className="text-red-300 hover:text-red-100 text-xs underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       {assignments.length === 0 ? (
         <p className="text-sm text-[var(--ff-text-tertiary)] py-2">
           No projects assigned to this team yet.

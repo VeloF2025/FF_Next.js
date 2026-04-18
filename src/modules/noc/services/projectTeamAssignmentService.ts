@@ -4,14 +4,28 @@ import type { ProjectTeamAssignment } from '../types/team';
 
 const logger = createLogger('noc:projectTeamAssignmentService');
 
-export async function listProjectTeamAssignments(): Promise<ProjectTeamAssignment[]> {
+export async function listProjectTeamAssignments(filters?: { team_id?: string; project_id?: string }): Promise<ProjectTeamAssignment[]> {
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (filters?.team_id) {
+    params.push(filters.team_id);
+    where.push(`pta.team_id = $${params.length}`);
+  }
+  if (filters?.project_id) {
+    params.push(filters.project_id);
+    where.push(`pta.project_id = $${params.length}`);
+  }
+  const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
   return query<ProjectTeamAssignment>(
     `SELECT pta.id, pta.project_id, pta.team_id, pta.role, pta.created_at::text as created_at,
        p.project_name as project_name, t.name as team_name
      FROM project_team_assignments pta
      JOIN projects p ON p.id = pta.project_id
      JOIN teams t ON t.id = pta.team_id
-     ORDER BY p.project_name, pta.role`
+     ${whereClause}
+     ORDER BY p.project_name, pta.role`,
+    params
   );
 }
 

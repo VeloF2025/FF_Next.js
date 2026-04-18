@@ -5,9 +5,12 @@ import type { ProjectTeamAssignment } from '@/modules/noc/types/team';
 
 const logger = createLogger('noc:api:project-team-assignments');
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const assignments = await listProjectTeamAssignments();
+    const { searchParams } = new URL(req.url);
+    const teamId = searchParams.get('team_id') ?? undefined;
+    const projectId = searchParams.get('project_id') ?? undefined;
+    const assignments = await listProjectTeamAssignments({ team_id: teamId, project_id: projectId });
     return NextResponse.json({ success: true, data: assignments });
   } catch (error) {
     logger.error('Failed to list project-team assignments', { error });

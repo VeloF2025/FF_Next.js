@@ -21,6 +21,15 @@ describe('project-team-assignments API logic', () => {
     expect(result[0].role).toBe('activations');
   });
 
+  it('GET filters by team_id when provided', async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    const { listProjectTeamAssignments } = await import('@/modules/noc/services/projectTeamAssignmentService');
+    await listProjectTeamAssignments({ team_id: 'team-42' });
+    const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(sql).toMatch(/pta\.team_id = \$1/);
+    expect(params).toEqual(['team-42']);
+  });
+
   it('createProjectTeamAssignment inserts and returns row', async () => {
     mockQueryOne.mockResolvedValueOnce({ id: 'new-id', project_id: 'p1', team_id: 't1', role: 'activations', created_at: '2026-04-16T00:00:00Z' });
     const { createProjectTeamAssignment } = await import('@/modules/noc/services/projectTeamAssignmentService');
