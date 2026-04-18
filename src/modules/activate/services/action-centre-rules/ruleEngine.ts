@@ -3,7 +3,10 @@
  *
  * RFC Phase 3 — docs/rfcs/2026-04-17-action-centre-and-dr-timeline.md §5.4
  *
- * A cron-driven worker that reads dr_activity_log events since each rule's
+ * Cron-driven worker scheduled DAILY (not 5-min) because the PP activation
+ * rule depends on pre_prov_resolved events emitted by the OES import, which
+ * runs once a day. Running faster than that just wastes invocations —
+ * there's nothing to process. Reads dr_activity_log events since each rule's
  * last watermark and applies rules. Each rule is idempotent (checkpoint per
  * rule) and defensive (dry-run mode, 48h human-edit skip).
  *

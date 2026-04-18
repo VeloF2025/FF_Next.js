@@ -3,6 +3,11 @@
  *
  * RFC Phase 3 — docs/rfcs/2026-04-17-action-centre-and-dr-timeline.md §5.4
  *
+ * Scheduled DAILY at 05:00 UTC (07:00 SAST) — after the morning OES import
+ * typically lands. The PP activation rule depends on pre_prov_resolved events
+ * that only get emitted by triggerPpActivationCheck inside oesPostImportService,
+ * so running faster than the OES import cadence is pointless. See vercel.json.
+ *
  * Reads dr_activity_log events since the last per-rule watermark and applies
  * rules: auto-close pre-prov tickets on activation, auto-close N4 tickets on
  * 1Map reconciliation, emit dispute candidates when N4 flags a DR we already

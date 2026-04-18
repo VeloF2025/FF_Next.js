@@ -63,8 +63,10 @@ Registered in `src/modules/activate/services/activity-log/_shared.ts` `ActivityE
 
 ## Automation
 
-### Rule engine (every 5 min)
+### Rule engine (daily 05:00 UTC / 07:00 SAST)
 `pages/api/cron/action-centre-rules.ts` → `runActionCentreRules(dryRun?)` in `src/modules/activate/services/action-centre-rules/ruleEngine.ts`.
+
+Daily (not 5-min) because the PP activation rule depends on `pre_prov_resolved` events emitted by the OES import, which runs once a day. Scheduled just after the morning OES import typically lands.
 
 3 rules:
 

@@ -93,7 +93,8 @@ export function AutomationTab() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm text-[var(--ff-text-tertiary)] flex-1">
-          Rule engine runs every 5 minutes (auto-close + dispute flagging). Weekly recon runs Mondays 04:00 UTC
+          Rule engine runs daily at 05:00 UTC / 07:00 SAST, after the morning OES import
+          (auto-close + dispute flagging). Weekly recon runs Mondays 04:00 UTC
           (persistent-note, maintenance reopens, stale PP, tech on site).
         </p>
         <button
