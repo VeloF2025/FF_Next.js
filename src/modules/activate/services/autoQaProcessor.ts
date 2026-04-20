@@ -13,6 +13,82 @@ import pool from '@/lib/db';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('AutoQA');
+
+// ============================================================================
+// DATE VALIDATION HELPERS
+// ============================================================================
+
+/**
+ * Minimum VLM categorization run date for which date-stamp validation is active.
+ *
+ * Choice: Option B — we skip the duplicate-photo date-mismatch rule for DRs
+ * whose VLM categorization ran before this cutoff, because those older runs
+ * pre-date the `vlm_date_stamps` extraction feature and will always produce
+ * empty arrays, leading to false negatives rather than false positives.
+ * Any DR categorized on or after this date is guaranteed to have the new
+ * date-stamp extraction prompt active.
+ */
+export const VLM_DATE_VALIDATION_ACTIVE_FROM = '2026-04-21';
+
+/**
+ * Regex for the strict ISO-8601-ish formats the VLM is instructed to emit.
+ * Accepts:
+ *   YYYY-MM-DD
+ *   YYYY-MM-DDTHH:MM
+ *   YYYY-MM-DDTHH:MM:SS
+ *   YYYY-MM-DD HH:MM
+ *   YYYY-MM-DD HH:MM:SS
+ */
+const STRICT_DATE_RE = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?)?$/;
+
+/**
+ * Format a Date object as a YYYY-MM-DD string using the SAST timezone
+ * (Africa/Johannesburg, UTC+2).  Using `en-CA` locale because it produces
+ * the canonical YYYY-MM-DD format without any locale-specific separators.
+ *
+ * This avoids the UTC-drift bug where `toISOString().split('T')[0]` can
+ * return the previous calendar day for a SAST date at or near midnight.
+ */
+export function toSastYmd(date: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Johannesburg',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+/**
+ * Validate a raw VLM date string and return a Date if it passes strict
+ * format checks, or null if it should be rejected.
+ *
+ * Only strings matching `YYYY-MM-DD[...optional time...]` are accepted.
+ * Ambiguous formats like `10/3/2026` or `03/10/2026` are always rejected
+ * to prevent silent MM/DD vs DD/MM misinterpretation.
+ *
+ * @param raw - The raw string from VLM output
+ * @param dropNumber - DR number for log context
+ * @returns Parsed Date in SAST context, or null if rejected
+ */
+export function parseStrictVlmDate(raw: string, dropNumber: string): Date | null {
+  if (!STRICT_DATE_RE.test(raw)) {
+    log.warn(`VLM_DATE_EXTRACTION_REJECTED: ambiguous/non-ISO format "${raw}" for DR ${dropNumber} — skipped`);
+    return null;
+  }
+  // Parse as a UTC-anchored date (YYYY-MM-DD is unambiguous once we have validated format)
+  const d = new Date(raw.includes('T') || raw.includes(' ') ? raw.replace(' ', 'T') : `${raw}T00:00:00Z`);
+  if (isNaN(d.getTime())) {
+    log.warn(`VLM_DATE_EXTRACTION_REJECTED: valid format but unparseable "${raw}" for DR ${dropNumber} — skipped`);
+    return null;
+  }
+  // Reject invalid calendar days (e.g. 2026-02-30 rolls over to 2026-03-02 silently).
+  const [yyyy, mm, dd] = raw.slice(0, 10).split('-').map(Number);
+  if (d.getUTCFullYear() !== yyyy || d.getUTCMonth() + 1 !== mm || d.getUTCDate() !== dd) {
+    log.warn(`VLM_DATE_EXTRACTION_REJECTED: invalid calendar date "${raw}" for DR ${dropNumber} — skipped`);
+    return null;
+  }
+  return d;
+}
 import {
   checkPrerequisites,
   checkStepCoverage,
@@ -124,7 +200,8 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
          vlm_ont_serial_step9,
          vlm_dr_number_step9,
          project,
-         submitted_date
+         submitted_date,
+         vlm_categorized_at
        FROM dr_photo_unified_reviews
        WHERE drop_number = $1`,
       [dropNumber]
@@ -224,33 +301,116 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
       log.info(`Auto-discarded ${autoDiscardedCount} within-DR duplicate(s) for ${dropNumber}`);
     }
 
-    // --- DATE MISMATCH CHECK: discard photos taken >2 days from DR submission ---
+    // --- DUPLICATE PHOTO CHECK (date mismatch on any available source) ---
+    // Any photo with a detectable date (EXIF metadata OR VLM-extracted visible
+    // date stamp(s)) that doesn't match the DR submission day within a 2-day
+    // tolerance is marked as Duplicate Photo. Applies to both:
+    //  • Single-date mismatch (e.g. one burned-in 10-month-old stamp)
+    //  • Multi-date mismatch (re-photographed content with 2+ visible stamps)
+    // Rationale: any date discrepancy is a strong signal of recycled content.
     const submittedDate = dr.submitted_date ? new Date(dr.submitted_date) : null;
     if (submittedDate) {
       const photosMetadata: Array<{ filename: string; url: string }> = dr.photos_json ? JSON.parse(dr.photos_json) : [];
       const exifDates = await extractExifDatesForPhotos(dropNumber, photosMetadata);
 
-      for (const photo of photoResults) {
-        if (photo.step === -1) continue; // already discarded
-        const exifDate = exifDates.get(photo.filename);
-        if (!exifDate) continue; // no EXIF date available — skip check
+      // --- HISTORIC-DATA SCOPE GUARD (Blocker 4 — Option B) ---
+      // Only apply VLM date-stamp validation when the DR's VLM categorization
+      // run occurred on or after VLM_DATE_VALIDATION_ACTIVE_FROM (2026-04-21).
+      // Older runs pre-date the date_stamps extraction prompt and will always
+      // produce empty arrays, so applying the rule would be a no-op — but
+      // being explicit here makes the intent clear and guards against future
+      // backfill attempts reprocessing historic data with incorrect verdicts.
+      const vlmCategorizedAt: Date | null = dr.vlm_categorized_at ? new Date(dr.vlm_categorized_at) : null;
+      const vlmDateValidationCutoff = new Date(`${VLM_DATE_VALIDATION_ACTIVE_FROM}T00:00:00+02:00`);
+      const vlmDateValidationActive = vlmCategorizedAt !== null && vlmCategorizedAt >= vlmDateValidationCutoff;
 
-        const diffMs = Math.abs(exifDate.getTime() - submittedDate.getTime());
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
-        if (diffDays > 2) {
-          const reason = `Date mismatch — photo taken on ${exifDate.toISOString().split('T')[0]} but DR submitted on ${submittedDate.toISOString().split('T')[0]} (${Math.round(diffDays)} days difference, max 2 allowed)`;
-          discardedPhotos.push({ filename: photo.filename, originalStep: photo.step, reason });
-          photo.step = -1;
-          photo.stepLabel = 'Date Mismatch';
-          photo.decision = 'FAIL';
-          photo.comment = reason;
-          autoDiscardedCount++;
+      if (!vlmDateValidationActive) {
+        log.debug(`Skipping VLM date-stamp validation for ${dropNumber} — vlm_categorized_at (${vlmCategorizedAt?.toISOString() ?? 'null'}) is before cutoff ${VLM_DATE_VALIDATION_ACTIVE_FROM}`);
+      }
+
+      // Build VLM date stamp map from categorizations (all visible dates per photo).
+      // Only populated when validation is active to avoid wasted work on historic DRs.
+      const vlmAllDatesMap = new Map<string, Date[]>();
+      if (vlmDateValidationActive) {
+        for (const cat of categorizations) {
+          const rawDates: string[] = Array.isArray(cat.vlm_date_stamps) && cat.vlm_date_stamps.length > 0
+            ? cat.vlm_date_stamps
+            : cat.vlm_date_stamp
+              ? [cat.vlm_date_stamp]
+              : [];
+
+          // Blocker 1: Strict regex validation — reject ambiguous formats (MM/DD/YYYY, etc.)
+          const parsedDates: Date[] = [];
+          for (const raw of rawDates) {
+            const parsed = parseStrictVlmDate(raw, dropNumber);
+            if (parsed !== null) {
+              parsedDates.push(parsed);
+            }
+            // rejected strings are logged inside parseStrictVlmDate with VLM_DATE_EXTRACTION_REJECTED
+          }
+
+          if (parsedDates.length > 0) {
+            vlmAllDatesMap.set(cat.photo_filename, parsedDates);
+          } else if (rawDates.length > 0) {
+            // All entries were rejected — telemetry (per blocker 1)
+            log.info(`VLM_DATE_EXTRACTION_REJECTED: all ${rawDates.length} raw date(s) for photo ${cat.photo_filename} on DR ${dropNumber} failed strict validation — treated as no date`);
+          }
+        }
+
+        if (vlmAllDatesMap.size > 0) {
+          log.info(`VLM extracted visible date stamps for ${vlmAllDatesMap.size}/${categorizations.length} photos on ${dropNumber}`);
         }
       }
 
-      if (discardedPhotos.some((d) => d.reason.startsWith('Date mismatch'))) {
-        const dateMismatchCount = discardedPhotos.filter((d) => d.reason.startsWith('Date mismatch')).length;
-        log.info(`Auto-discarded ${dateMismatchCount} photo(s) for date mismatch on ${dropNumber}`);
+      // Blocker 2: SAST-aware YMD comparison instead of toISOString().split('T')[0]
+      const submittedYmd = toSastYmd(submittedDate);
+      const MAX_DIFF_DAYS = 2;
+
+      for (const photo of photoResults) {
+        if (photo.step === -1) continue; // already discarded
+
+        // Collect all candidate dates for this photo from every available source
+        const candidateDates: Array<{ date: Date; source: string }> = [];
+        const exifDate = exifDates.get(photo.filename);
+        if (exifDate) candidateDates.push({ date: exifDate, source: 'EXIF' });
+
+        // Only include VLM dates when validation is active (scope guard)
+        if (vlmDateValidationActive) {
+          const vlmDates = vlmAllDatesMap.get(photo.filename) ?? [];
+          for (const d of vlmDates) candidateDates.push({ date: d, source: 'visible date stamp' });
+        }
+
+        if (candidateDates.length === 0) continue; // nothing to compare against
+
+        // Flag if ANY candidate date is >2 days from DR submission.
+        // Blocker 2: compare using SAST-aware YMD strings via toSastYmd()
+        const mismatched = candidateDates.filter(({ date }) => {
+          const diffDays = Math.abs(date.getTime() - submittedDate.getTime()) / (1000 * 60 * 60 * 24);
+          return diffDays > MAX_DIFF_DAYS;
+        });
+
+        if (mismatched.length === 0) continue;
+
+        // Build a reason message that reflects the number and source of dates found
+        // Blocker 2: use toSastYmd() instead of toISOString().split('T')[0] for display
+        const datesList = candidateDates
+          .map((c) => `${toSastYmd(c.date)} (${c.source})`)
+          .join(', ');
+        const reason = candidateDates.length >= 2
+          ? `Duplicate photo — ${candidateDates.length} date stamps found (${datesList}) but DR submitted on ${submittedYmd}. Photo appears to be a re-photograph of older content.`
+          : `Duplicate photo — ${candidateDates[0]!.source} shows ${toSastYmd(candidateDates[0]!.date)} but DR submitted on ${submittedYmd}. Photo date does not match DR submission day.`;
+
+        discardedPhotos.push({ filename: photo.filename, originalStep: photo.step, reason });
+        photo.step = -1;
+        photo.stepLabel = 'Duplicate Photo';
+        photo.decision = 'FAIL';
+        photo.comment = reason;
+        autoDiscardedCount++;
+      }
+
+      const dateDupCount = discardedPhotos.filter((d) => d.reason.startsWith('Duplicate photo — ')).length;
+      if (dateDupCount > 0) {
+        log.info(`Auto-discarded ${dateDupCount} photo(s) as Duplicate Photo (date mismatch) on ${dropNumber}`);
       }
     }
 

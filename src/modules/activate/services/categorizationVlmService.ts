@@ -143,10 +143,18 @@ For EACH photo (numbered 1-${photoCount}), respond in this JSON format:
       "predicted_category": "Category name from list above",
       "predicted_step": <number 0-12>,
       "confidence": <0.0-1.0>,
-      "reasoning": "Visual elements that led to this classification"
+      "reasoning": "Visual elements that led to this classification",
+      "date_stamps": ["YYYY-MM-DD", ...] or null
     }
   ]
 }
+
+DATE STAMP EXTRACTION:
+Many photos have visible date/time watermarks burned into the image pixels (e.g. "2026/2/5 13:12" or "2026-03-15 09:30"). These are NOT EXIF metadata — they are TEXT overlaid on the photo, typically in a corner. Scan the ENTIRE photo carefully for ALL visible date stamps — there may be more than one:
+- A FRESH stamp added by the camera app at capture time (usually top-left or bottom-right)
+- An OLD stamp burned into the original photo that was then re-photographed (anywhere in the frame)
+
+Return ALL distinct dates you can read in "date_stamps" as an array of YYYY-MM-DD strings. Order from most prominent/legible first. If no visible date stamps exist, return null. Finding 2+ dates is a strong signal of a recycled/duplicated photo, so be thorough — check corners, edges, and any text overlays on both the outer frame and the inner (re-photographed) content.
 
 Step 0 = not relevant/discard (duplicates, blurry, generic context shots, non-installation subjects, or confidence < 0.50 for any step).
 CRITICAL: Do NOT trust any pre-existing labels or filenames. Categorize based ONLY on visual content.
@@ -513,6 +521,28 @@ export async function categorizePhotos(
           continue;
         }
 
+        // Normalise date stamps: accept either new `date_stamps` array or legacy singular `date_stamp`
+        const dateStamps: string[] = Array.isArray(cat.date_stamps)
+          ? cat.date_stamps.filter((d): d is string => typeof d === 'string' && d.length > 0)
+          : cat.date_stamp
+            ? [cat.date_stamp]
+            : [];
+        const uniqueDates = Array.from(new Set(dateStamps));
+
+        // Blocker 5: Distinct telemetry for each VLM date-extraction outcome so
+        // we can distinguish silent failures from real "no stamps" results.
+        const photoMeta = { drNumber, photoFilename: photo.filename };
+        if (!('date_stamps' in cat) && !('date_stamp' in cat)) {
+          // Field entirely absent from VLM response — indicates a prompt/parsing issue
+          log.info('VLM_DATE_EXTRACTION_MISSING_FIELD', photoMeta, 'CategorizationVlm');
+        } else if (uniqueDates.length === 0) {
+          // Field present but empty — VLM found no visible date stamps in the photo
+          log.info('VLM_DATE_EXTRACTION_EMPTY', photoMeta, 'CategorizationVlm');
+        } else {
+          // Field present with one or more entries — extraction succeeded
+          log.info('VLM_DATE_EXTRACTION_OK', { ...photoMeta, count: uniqueDates.length, dates: uniqueDates }, 'CategorizationVlm');
+        }
+
         results.push({
           photo_filename: photo.filename,
           original_type: photo.original_type,
@@ -522,6 +552,8 @@ export async function categorizePhotos(
           vlm_confidence: cat.confidence,
           vlm_identified_as: cat.identified_as,
           vlm_reasoning: cat.reasoning,
+          vlm_date_stamp: uniqueDates[0] ?? null,
+          vlm_date_stamps: uniqueDates.length > 0 ? uniqueDates : null,
           human_approved: null,
           human_override_step: null,
           human_override_reason: null,

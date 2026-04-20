@@ -303,6 +303,14 @@ export interface VlmCategorizationResult {
   /** VLM reasoning for the classification */
   vlm_reasoning: string;
 
+  /** VLM-extracted visible date stamp from the photo (YYYY-MM-DD or null) — first/primary date */
+  vlm_date_stamp?: string | null;
+
+  /** All VLM-extracted visible date stamps from the photo (YYYY-MM-DD array or null).
+   *  Multiple entries (2+) indicate a recycled/duplicated photo — the device overlays
+   *  a fresh timestamp but the original burned-in date from the reused photo is still visible. */
+  vlm_date_stamps?: string[] | null;
+
   /** Has human approved this categorization? */
   human_approved: boolean | null;
 
@@ -324,6 +332,8 @@ export interface VlmBatchCategorizationResponse {
     predicted_step: number;
     confidence: number;
     reasoning: string;
+    date_stamp?: string | null;
+    date_stamps?: string[] | null;
   }>;
 }
 
