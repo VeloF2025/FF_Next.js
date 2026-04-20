@@ -82,12 +82,14 @@ interface PropUpdate {
   oldValue: string | null;
   newValue: string;
   updated: boolean;
+  error?: string;
 }
 
 interface DualPropUpdate {
   propId: string;
   ont: { oldValue: string | null; newValue: string; updated: boolean };
   ups: { oldValue: string | null; newValue: string | null; updated: boolean };
+  error?: string;
 }
 
 interface UpdateResult {
@@ -544,6 +546,7 @@ class OneMapApiService {
         oldValue: rec.ph_ont,
         newValue: correctSerial,
         updated: updateResult.success,
+        error: updateResult.success ? undefined : updateResult.error,
       });
       // Small delay between API calls to avoid rate limiting
       if (i < wrongRecords.length - 1) {
@@ -586,11 +589,18 @@ class OneMapApiService {
       propIds: allPropUpdates.map((u) => `${u.propId}:${u.updated ? 'fixed' : 'ok'}`),
     });
 
+    // When no records actually updated, surface the first per-prop reason so
+    // callers (swap-fix, fix-1map) can show an honest error instead of `undefined`.
+    const firstError = updatedCount === 0
+      ? allPropUpdates.find((u) => !u.updated && u.error)?.error
+      : undefined;
+
     return {
       success: updatedCount > 0,
       oldValue: primaryTarget.ph_ont || null,
       newValue: correctSerial,
       propId: primaryTarget.prop_id,
+      error: firstError,
       allPropUpdates,
       totalRecords: records.length,
       updatedCount,
@@ -659,10 +669,12 @@ class OneMapApiService {
         correctOntSerial,
         correctUpsSerial
       );
+      const propUpdated = updateResult.ont.updated || updateResult.ups.updated;
       allPropUpdates.push({
         propId: rec.prop_id,
         ont: { oldValue: rec.ph_ont, newValue: correctOntSerial, updated: updateResult.ont.updated },
         ups: { oldValue: rec.br_ser, newValue: correctUpsSerial || null, updated: updateResult.ups.updated },
+        error: propUpdated ? undefined : updateResult.error,
       });
       if (i < wrongRecords.length - 1) {
         await new Promise((resolve) => setTimeout(resolve, 200));
@@ -703,11 +715,17 @@ class OneMapApiService {
       totalRecords: records.length,
     });
 
+    // Surface first per-prop error when nothing wrote (silent-drop, ACL, etc.)
+    const firstError = updatedCount === 0
+      ? allPropUpdates.find((u) => !u.ont.updated && !u.ups.updated && u.error)?.error
+      : undefined;
+
     return {
       success: updatedCount > 0,
       propId: primaryTarget.prop_id,
       ont: { oldValue: primaryTarget.ph_ont || null, newValue: correctOntSerial, updated: updatedCount > 0 },
       ups: { oldValue: primaryTarget.br_ser || null, newValue: correctUpsSerial || null, updated: updatedCount > 0 && !!correctUpsSerial },
+      error: firstError,
       allPropUpdates,
       totalRecords: records.length,
       updatedCount,

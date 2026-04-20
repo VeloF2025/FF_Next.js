@@ -102,9 +102,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const drAResult = await oneMapApi.fixDrOntSerial(drANumber, drACorrectSerial, drAWrongSerial);
 
     if (!drAResult.success) {
+      const reason = drAResult.error || 'no error reason returned by 1Map';
       return apiResponse.success(res, {
         success: false,
-        error: `Failed to fix DR A (${drANumber}): ${drAResult.error}`,
+        error: `Failed to fix DR A (${drANumber}): ${reason}`,
         drAResult,
       });
     }
