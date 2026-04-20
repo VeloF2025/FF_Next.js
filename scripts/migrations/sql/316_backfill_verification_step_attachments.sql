@@ -1,4 +1,6 @@
--- 306_backfill_verification_step_attachments.sql
+-- 316_backfill_verification_step_attachments.sql
+-- (renamed from 306_ — resolves a duplicate-prefix collision with
+--  306_action_centre_rule_engine.sql; see fix/duplicate-migration-numbers)
 --
 -- Multi-photo verification steps (PR #1338) keep the full gallery in
 -- maintenance_attachments, joined back to the step via verification_step_id.
@@ -9,8 +11,10 @@
 --
 -- Idempotent: only inserts attachments for (step_id, photo_url) pairs that
 -- don't already have a matching attachment row.
-
-BEGIN;
+-- The migration runner wraps every file in BEGIN/COMMIT on a single pooled
+-- client, so no explicit transaction wrapper is needed here — the former
+-- BEGIN/COMMIT would open a nested transaction, which pg treats as a warning
+-- but which the new pg.Pool-based runner doesn't need.
 
 INSERT INTO maintenance_attachments (
   ticket_id,
@@ -58,5 +62,3 @@ WHERE s.photo_url IS NOT NULL
     WHERE a.verification_step_id = s.id
       AND a.is_evidence = TRUE
   );
-
-COMMIT;

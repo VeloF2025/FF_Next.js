@@ -1,4 +1,5 @@
--- Migration 274: Add promoted_at column and index for canonical auto-promotion
+-- Migration 317: Add promoted_at column and index for canonical auto-promotion
+-- (renamed from 274_ — collision with 274_ticket_subtypes.sql)
 -- Purpose: Support auto-promoting high-frequency corrections to canonical status
 
 -- Add promoted_at timestamp to track when corrections were auto-promoted

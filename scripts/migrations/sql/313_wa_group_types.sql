@@ -1,4 +1,5 @@
--- Migration: 272_wa_group_types.sql
+-- Migration: 313_wa_group_types.sql
+-- (renamed from 272_ — collision with 272_rbac_cleanup_site_diary.sql)
 -- Description: Add group_type to wa_group_config so projects can have
 --              separate WhatsApp groups for different purposes (dr_photos, snags, etc.)
 

@@ -1,4 +1,5 @@
--- Migration 242: Recording bot infrastructure
+-- Migration 311: Recording bot infrastructure
+-- (renamed from 242_ — collision with 242_auto_qa_pipeline.sql)
 -- Tracks bot-initiated recordings for "Meet Now" calls
 
 -- Bot recording jobs — one row per recording bot dispatch

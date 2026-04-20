@@ -73,7 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     
 #### Database Migrations
 
-- **Migration 242** (scripts/migrations/sql/242_recording_bot.sql) — Recording bot infrastructure
+- **Migration 311** (scripts/migrations/sql/311_recording_bot.sql) — Recording bot infrastructure (renamed from 242_ to resolve a duplicate-prefix collision)
   - `bot_recordings` table — Tracks all bot dispatch and execution
     - Columns: id, meeting_id, join_url, container_id, status (7 states), triggered_by, audio_path, audio_size, duration_sec, error, timestamps
     - Status lifecycle: dispatched → joining → recording → uploading → completed | failed | timeout

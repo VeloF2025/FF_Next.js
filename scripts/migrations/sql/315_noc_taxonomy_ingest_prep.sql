@@ -1,4 +1,5 @@
--- Migration 278: NOC taxonomy — expand type constraint + seed team disciplines
+-- Migration 315: NOC taxonomy — expand type constraint + seed team disciplines
+-- (renamed from 278_ — collision with 278_expand_ticket_type_for_disciplines.sql)
 --
 -- Part of PR 3/4 in the April-11 two-axis taxonomy refactor. Prepares the DB
 -- for the auto-ingest classification code changes that land in the same PR:

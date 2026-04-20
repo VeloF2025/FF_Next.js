@@ -1,4 +1,5 @@
--- Migration 270: Add PP (pre-provision) tracking to stock_serials
+-- Migration 312: Add PP (pre-provision) tracking to stock_serials
+-- (renamed from 270_ — collision with 270_create_teams_table.sql)
 -- Tracks if a serial has ever appeared in the OES PP DATA report
 
 ALTER TABLE stock_serials ADD COLUMN IF NOT EXISTS pp_flagged BOOLEAN DEFAULT FALSE;

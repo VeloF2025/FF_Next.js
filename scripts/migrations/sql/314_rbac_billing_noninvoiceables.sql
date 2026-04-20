@@ -1,4 +1,5 @@
--- Migration 277: Add RBAC permissions for billing and non-invoiceables modules
+-- Migration 314: Add RBAC permissions for billing and non-invoiceables modules
+-- (renamed from 277_ — collision with 277_add_ticket_category_and_team_discipline.sql)
 --
 -- Gap found in RBAC audit (2026-04-13): billing and non-invoiceables exist in code
 -- but had no entries in access_permissions or role_permissions.

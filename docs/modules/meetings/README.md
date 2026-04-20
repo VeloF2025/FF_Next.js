@@ -291,7 +291,7 @@ Tracks active Microsoft Graph API subscriptions.
 
 5. **Database Migration**
    ```bash
-   npx tsx scripts/run-migration.ts 242
+   npx tsx scripts/run-migration.ts 311
    ```
 
 6. **Cron Job** — Add to crontab (presence subscriptions expire every 60 min)
@@ -503,7 +503,7 @@ ORDER BY in_call_since DESC;
 ## 📚 Related Documentation
 
 - **[scripts/recording-bot/README.md](../../../scripts/recording-bot/README.md)** — Full bot setup and testing guide
-- **[Migration 242](../../../scripts/migrations/sql/242_recording_bot.sql)** — Database schema
+- **[Migration 311](../../../scripts/migrations/sql/311_recording_bot.sql)** — Database schema
 - **[Commit c5f36dd](https://github.com/fibreflow/fibreflow/commit/c5f36dd)** — Implementation details
 
 ---
