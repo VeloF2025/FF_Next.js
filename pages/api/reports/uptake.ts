@@ -1,5 +1,5 @@
 /**
- * API Route: /api/reports/uptake?projectId=<uuid>
+ * API Route: /api/reports/uptake?projectId=<uuid> OR ?project=<name>
  *
  * Returns PON-level uptake data for the Uptake Report.
  * Shared fetcher also used by /api/reports/uptake-pdf.
@@ -36,16 +36,42 @@ interface ProjectDbRow {
   project_name: string;
 }
 
-export async function fetchUptakePayload(projectId: string): Promise<UptakeReportPayload | null> {
+export interface UptakeLookup {
+  projectId?: string;
+  projectName?: string;
+}
+
+async function resolveProject(lookup: UptakeLookup): Promise<ProjectDbRow | null> {
   const client = await pool.connect();
   try {
-    const projRes = await client.query<ProjectDbRow>(
-      `SELECT id::text AS id, project_name FROM projects WHERE id = $1 LIMIT 1`,
-      [projectId]
-    );
-    const project = projRes.rows[0];
-    if (!project) return null;
+    if (lookup.projectId) {
+      const res = await client.query<ProjectDbRow>(
+        `SELECT id::text AS id, project_name FROM projects WHERE id = $1 LIMIT 1`,
+        [lookup.projectId]
+      );
+      return res.rows[0] ?? null;
+    }
+    if (lookup.projectName) {
+      const res = await client.query<ProjectDbRow>(
+        `SELECT id::text AS id, project_name FROM projects WHERE project_name = $1 LIMIT 1`,
+        [lookup.projectName]
+      );
+      return res.rows[0] ?? null;
+    }
+    return null;
+  } finally {
+    client.release();
+  }
+}
 
+export async function fetchUptakePayload(
+  lookup: UptakeLookup
+): Promise<UptakeReportPayload | null> {
+  const project = await resolveProject(lookup);
+  if (!project) return null;
+
+  const client = await pool.connect();
+  try {
     const ponRes = await client.query<PonDbRow>(
       `
       SELECT
@@ -59,7 +85,7 @@ export async function fetchUptakePayload(projectId: string): Promise<UptakeRepor
       GROUP BY d.pon_no
       ORDER BY d.pon_no
       `,
-      [projectId]
+      [project.id]
     );
 
     const pons: UptakePon[] = ponRes.rows.map((r: PonDbRow) => ({
@@ -84,24 +110,29 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 
-  const { projectId } = req.query;
-  if (!projectId || typeof projectId !== 'string') {
-    return apiResponse.badRequest(res, 'projectId query parameter is required');
+  const { projectId, project } = req.query;
+  const lookup: UptakeLookup = {};
+  if (typeof projectId === 'string' && projectId) lookup.projectId = projectId;
+  if (typeof project === 'string' && project) lookup.projectName = project;
+
+  if (!lookup.projectId && !lookup.projectName) {
+    return apiResponse.badRequest(res, 'projectId or project query parameter is required');
   }
 
   try {
-    const payload = await fetchUptakePayload(projectId);
+    const payload = await fetchUptakePayload(lookup);
     if (!payload) {
-      return apiResponse.notFound(res, 'Project', projectId);
+      return apiResponse.notFound(res, 'Project', lookup.projectId ?? lookup.projectName ?? '');
     }
 
-    log.info('Fetched uptake payload', {
-      projectId,
-      pons: payload.pons.length,
-    }, 'UptakeReportAPI');
+    log.info(
+      'Fetched uptake payload',
+      { lookup, pons: payload.pons.length },
+      'UptakeReportAPI'
+    );
     return apiResponse.success(res, payload);
   } catch (error) {
-    log.error('Failed to fetch uptake payload', { error, projectId }, 'UptakeReportAPI');
+    log.error('Failed to fetch uptake payload', { error, lookup }, 'UptakeReportAPI');
     return apiResponse.internalError(res, error);
   }
 }

@@ -468,7 +468,8 @@ export type ReportCategory =
   | 'gaps' // Installed but Not Activated - money spent, never went live
   | 'progress' // Activation Progress - Project > Zone > PON tracking
   | 'maturity' // Maturity Tracking - time to reach milestones, velocity, projections
-  | 'penetration'; // Penetration Curve - activation % over time, drill down Project > Zone > PON
+  | 'penetration' // Penetration Curve - activation % over time, drill down Project > Zone > PON
+  | 'uptake'; // Uptake % per PON against target — downloadable as PDF
 
 // ============================================================================
 // SERIAL MISMATCH TRACKING TYPES (Installation vs Activation)

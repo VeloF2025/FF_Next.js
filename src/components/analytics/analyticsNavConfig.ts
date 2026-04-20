@@ -35,10 +35,9 @@ export const TABS: Tab[] = [
     label: 'Reports',
     items: [
       { label: 'Reports Hub', href: '/reports' },
-      { label: 'Daily Progress', href: '/daily-progress' },
       { label: 'Progress Today', href: '/reports/progress-today' },
-      { label: 'Uptake', href: '/reports/uptake' },
       { label: 'Weekly Activations', href: '/reports/weekly-activations' },
+      { label: 'Daily Progress', href: '/daily-progress' },
     ],
   },
 ];

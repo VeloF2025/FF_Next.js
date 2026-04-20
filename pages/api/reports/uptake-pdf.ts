@@ -1,5 +1,5 @@
 /**
- * API Route: /api/reports/uptake-pdf?projectId=<uuid>
+ * API Route: /api/reports/uptake-pdf?projectId=<uuid> OR ?project=<name>
  *
  * Renders the Uptake Report as a PDF via puppeteer. Reuses the shared fetcher
  * from /api/reports/uptake.
@@ -9,7 +9,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, withPermission } from '@/lib/auth';
 import { generateReportHtml, buildUptakeReport } from '@/templates/reports';
-import { fetchUptakePayload } from './uptake';
+import { fetchUptakePayload, type UptakeLookup } from './uptake';
 
 function buildReportId(projectName: string): string {
   const date = new Date();
@@ -36,15 +36,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 
-  const { projectId } = req.query;
-  if (!projectId || typeof projectId !== 'string') {
-    return apiResponse.badRequest(res, 'projectId query parameter is required');
+  const { projectId, project } = req.query;
+  const lookup: UptakeLookup = {};
+  if (typeof projectId === 'string' && projectId) lookup.projectId = projectId;
+  if (typeof project === 'string' && project) lookup.projectName = project;
+
+  if (!lookup.projectId && !lookup.projectName) {
+    return apiResponse.badRequest(res, 'projectId or project query parameter is required');
   }
 
   try {
-    const payload = await fetchUptakePayload(projectId);
+    const payload = await fetchUptakePayload(lookup);
     if (!payload) {
-      return apiResponse.notFound(res, 'Project', projectId);
+      return apiResponse.notFound(res, 'Project', lookup.projectId ?? lookup.projectName ?? '');
     }
 
     const reportData = buildUptakeReport({
@@ -82,13 +86,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', buffer.length);
 
-      log.info('Uptake PDF generated', { projectId, reportId: reportData.reportId }, 'UptakeReportPDF');
+      log.info('Uptake PDF generated', { lookup, reportId: reportData.reportId }, 'UptakeReportPDF');
       return res.send(buffer);
     } finally {
       await browser.close();
     }
   } catch (error) {
-    log.error('Uptake PDF generation failed', { error, projectId }, 'UptakeReportPDF');
+    log.error('Uptake PDF generation failed', { error, lookup }, 'UptakeReportPDF');
     return apiResponse.internalError(res, error);
   }
 }

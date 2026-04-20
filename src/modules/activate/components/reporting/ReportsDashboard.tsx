@@ -28,6 +28,7 @@ import {
   CircleDollarSign,
   Target,
   Clock,
+  Gauge,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ReportCategory, ReportFilters } from '../../types/reporting.types';
@@ -45,6 +46,7 @@ import { InstallationGapsReports } from './InstallationGapsReports';
 import { ActivationProgressReport } from './ActivationProgressReport';
 import { MaturityTrackingReport } from './MaturityTrackingReport';
 import { PenetrationCurveReport } from './PenetrationCurveReport';
+import { UptakeReport } from './UptakeReport';
 import { Button } from '@/components/ui/button';
 
 interface CategoryTab {
@@ -120,6 +122,12 @@ const categories: CategoryTab[] = [
     label: 'Penetration Curve',
     icon: TrendingUp,
     description: 'Penetration % over time — drill down Project → Zone → PON',
+  },
+  {
+    id: 'uptake',
+    label: 'Uptake',
+    icon: Gauge,
+    description: 'Per-PON activation % against target — downloadable as dark-themed PDF',
   },
 ];
 
@@ -505,6 +513,9 @@ export function ReportsDashboard() {
         )}
         {activeCategory === 'penetration' && (
           <PenetrationCurveReport filters={filters} refreshKey={refreshKey} />
+        )}
+        {activeCategory === 'uptake' && (
+          <UptakeReport filters={filters} refreshKey={refreshKey} />
         )}
       </div>
     </div>
