@@ -27,6 +27,14 @@ const LAYER_ID = '5121';
 const BASE_URL = 'https://www.1map.co.za';
 const FETCH_TIMEOUT_MS = 30000; // 30 second timeout - 1Map search can take 10-15s under load
 
+// Business rule: ONT/UPS serial fixes require at least one prop record on the DR
+// to have status "Home Installation: Installed". Writing to pre-install records
+// (e.g. "Home Sign Ups: Approved & Installation Scheduled") corrupts data.
+const HII_STATUS_REGEX = /home installation.*installed/i;
+export function hasHomeInstallationInstalled(records: { status: string | null }[]): boolean {
+  return records.some((r) => HII_STATUS_REGEX.test(r.status || ''));
+}
+
 /**
  * Fetch with timeout
  */
@@ -98,6 +106,7 @@ interface UpdateResult {
   newValue: string;
   propId: string;
   error?: string;
+  errorCode?: 'NO_HII' | 'AUTH' | 'NOT_FOUND' | 'SILENT_DROP' | 'OTHER';
   // Multi-prop_id tracking: ALL records for the DR
   allPropUpdates?: PropUpdate[];
   totalRecords?: number;
@@ -119,6 +128,7 @@ interface DualUpdateResult {
     updated: boolean;
   };
   error?: string;
+  errorCode?: 'NO_HII' | 'AUTH' | 'NOT_FOUND' | 'SILENT_DROP' | 'OTHER';
   // Multi-prop_id tracking: ALL records for the DR
   allPropUpdates?: DualPropUpdate[];
   totalRecords?: number;
@@ -320,9 +330,33 @@ class OneMapApiService {
    *
    * @param propId - The property ID to update
    * @param newOntSerial - The new ONT serial value
+   * @param records - Pre-fetched 1Map records for this DR. If provided the HII guard
+   *   is enforced here as a low-level safety net: writes are blocked when no record
+   *   carries "Home Installation: Installed" status. Callers that already performed
+   *   the HII check via the higher-level wrappers (`fixDrOntSerial`) may omit this
+   *   parameter, but direct callers (e.g. swap-fix) MUST supply it.
    * @returns UpdateResult with success status and old/new values
    */
-  async updateOntSerial(propId: string, newOntSerial: string): Promise<UpdateResult> {
+  async updateOntSerial(
+    propId: string,
+    newOntSerial: string,
+    records?: OneMapRecord[]
+  ): Promise<UpdateResult> {
+    // Low-level HII guard — fail closed if pre-fetched records are supplied and
+    // none of them carry the installed status.
+    if (records !== undefined && !hasHomeInstallationInstalled(records)) {
+      const seenStatuses = Array.from(new Set(records.map((r) => r.status || 'NULL')));
+      logger.warn('updateOntSerial: HII guard blocked write', { propId, statuses: seenStatuses });
+      return {
+        success: false,
+        oldValue: null,
+        newValue: newOntSerial,
+        propId,
+        error: `No prop has Home Installation: Installed status — write blocked (statuses: ${seenStatuses.join(' | ')})`,
+        errorCode: 'NO_HII',
+      };
+    }
+
     try {
       if (!(await this.ensureSession())) {
         return {
@@ -399,13 +433,32 @@ class OneMapApiService {
    * @param propId - The property ID to update
    * @param newOntSerial - The new ONT serial value
    * @param newUpsSerial - The new UPS serial value (optional)
+   * @param records - Pre-fetched 1Map records for this DR. If provided the HII guard
+   *   is enforced here as a low-level safety net. Direct callers (e.g. swap-fix)
+   *   MUST supply this so the invariant — "if reached, HII was verified" — holds.
    * @returns DualUpdateResult with success status and old/new values for both fields
    */
   async updateOntAndUpsSerial(
     propId: string,
     newOntSerial: string,
-    newUpsSerial?: string | null
+    newUpsSerial?: string | null,
+    records?: OneMapRecord[]
   ): Promise<DualUpdateResult> {
+    // Low-level HII guard — fail closed if pre-fetched records are supplied and
+    // none of them carry the installed status.
+    if (records !== undefined && !hasHomeInstallationInstalled(records)) {
+      const seenStatuses = Array.from(new Set(records.map((r) => r.status || 'NULL')));
+      logger.warn('updateOntAndUpsSerial: HII guard blocked write', { propId, statuses: seenStatuses });
+      return {
+        success: false,
+        propId,
+        ont: { oldValue: null, newValue: newOntSerial, updated: false },
+        ups: { oldValue: null, newValue: newUpsSerial || null, updated: false },
+        error: `No prop has Home Installation: Installed status — write blocked (statuses: ${seenStatuses.join(' | ')})`,
+        errorCode: 'NO_HII',
+      };
+    }
+
     try {
       if (!(await this.ensureSession())) {
         return {
@@ -517,6 +570,24 @@ class OneMapApiService {
     }
 
     const records = searchResult.records;
+
+    // HII guard: refuse to write if no prop has Home Installation: Installed status.
+    // Writing to pre-install records (e.g. "Home Sign Ups: Approved & Installation
+    // Scheduled") corrupts data. Confirmed root-cause of 79 bad writes on 2026-04-18.
+    if (!hasHomeInstallationInstalled(records)) {
+      const seenStatuses = Array.from(new Set(records.map((r) => r.status || 'NULL')));
+      logger.warn('HII guard blocked write', { drNumber, statuses: seenStatuses });
+      return {
+        success: false,
+        oldValue: null,
+        newValue: correctSerial,
+        propId: records[0]?.prop_id || '',
+        error: `No prop has Home Installation: Installed status — write blocked (statuses: ${seenStatuses.join(' | ')})`,
+        errorCode: 'NO_HII',
+        totalRecords: records.length,
+      };
+    }
+
     const allPropUpdates: PropUpdate[] = [];
 
     // Categorize: correct vs wrong/empty
@@ -638,6 +709,22 @@ class OneMapApiService {
     }
 
     const records = searchResult.records;
+
+    // HII guard — see fixDrOntSerial for rationale
+    if (!hasHomeInstallationInstalled(records)) {
+      const seenStatuses = Array.from(new Set(records.map((r) => r.status || 'NULL')));
+      logger.warn('HII guard blocked write (ONT+UPS)', { drNumber, statuses: seenStatuses });
+      return {
+        success: false,
+        propId: records[0]?.prop_id || '',
+        ont: { oldValue: null, newValue: correctOntSerial, updated: false },
+        ups: { oldValue: null, newValue: correctUpsSerial || null, updated: false },
+        error: `No prop has Home Installation: Installed status — write blocked (statuses: ${seenStatuses.join(' | ')})`,
+        errorCode: 'NO_HII',
+        totalRecords: records.length,
+      };
+    }
+
     const allPropUpdates: DualPropUpdate[] = [];
 
     // Categorize: fully correct vs needing update

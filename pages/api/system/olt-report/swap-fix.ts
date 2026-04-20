@@ -30,7 +30,7 @@ import { withAuth, withRole, getAuthUser } from '@/lib/auth';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('SwapFix');
-import { oneMapApi } from '@/modules/system/services/oneMapApiService';
+import { oneMapApi, hasHomeInstallationInstalled } from '@/modules/system/services/oneMapApiService';
 import { logActivity } from '@/modules/activate/services/activityLogService';
 
 export const config = {
@@ -328,44 +328,104 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         let drBSetSuccess = false;
         let drAClearSuccess = false;
 
-        // Part A: Set UPS on DR B (skip if DR B already has it)
+        // Part A: Set UPS on DR B.
+        // Blocker #2 fix: perform the HII check for DR B BEFORE branching on whether
+        // DR B already has the matching serial. The "already there" path previously
+        // set drBSetSuccess=true without any HII verification, which caused Part B to
+        // clear DR A's UPS unconditionally — a dangerous write on an unverified DR.
         const drBSearchResult = await oneMapApi.searchDR(drBNumber);
         if (drBSearchResult.success && drBSearchResult.records.length > 0) {
-          const drBHasThisUps = drBSearchResult.records.some(
-            r => r.br_ser?.toUpperCase() === upsSerial.toUpperCase()
-          );
-          if (drBHasThisUps) {
-            drBSetSuccess = true; // Already there
-          } else if (!drBSearchResult.records.some(r => r.br_ser)) {
-            // DR B has no UPS — set it
-            const drBRecord = (drBSearchResult.records.find(r => r.ph_ont && !r.br_ser)
-              || drBSearchResult.records[0])!;
-            const currentOnt = drBRecord.ph_ont || drBCorrectSerial || '';
-            const upsResult = await oneMapApi.updateOntAndUpsSerial(
-              drBRecord.prop_id,
-              currentOnt,
-              upsSerial
+          // HII guard evaluated once, early — applies to ALL branches below.
+          if (!hasHomeInstallationInstalled(drBSearchResult.records)) {
+            log.warn('SwapFix UPS transfer blocked: DR B has no Home Installation: Installed status', {
+              drB: drBNumber,
+              statuses: Array.from(new Set(drBSearchResult.records.map(r => r.status || 'NULL'))),
+            });
+            upsTransferResult = {
+              success: false,
+              error: 'UPS transfer blocked: DR B not installed (no HII status)',
+              errorCode: 'NO_HII',
+            };
+          } else {
+            // DR B passes HII — now decide which write path to take.
+            const drBHasThisUps = drBSearchResult.records.some(
+              r => r.br_ser?.toUpperCase() === upsSerial.toUpperCase()
             );
-            drBSetSuccess = upsResult.success;
+            const drBHasOtherUps = !drBHasThisUps && drBSearchResult.records.some(r => r.br_ser);
+
+            if (drBHasThisUps) {
+              // Already correct — no write needed for DR B.
+              drBSetSuccess = true;
+            } else if (drBHasOtherUps) {
+              // Blocker #4 fix: explicit conflict branch — DR B already has a
+              // different UPS serial. Overwriting without investigation risks
+              // data corruption; surface a clear error instead of silently
+              // falling through with upsTransferResult=null.
+              log.warn('SwapFix UPS transfer blocked: DR B already has a different UPS serial', {
+                drB: drBNumber,
+                existingUpss: drBSearchResult.records
+                  .filter(r => r.br_ser)
+                  .map(r => r.br_ser),
+                wantedUps: upsSerial,
+              });
+              upsTransferResult = {
+                success: false,
+                error: 'DR B already has a different UPS serial (cannot overwrite)',
+                errorCode: 'UPS_CONFLICT',
+              };
+            } else {
+              // DR B has no UPS — set it, passing records for the low-level guard.
+              const drBRecord = (drBSearchResult.records.find(r => r.ph_ont && !r.br_ser)
+                || drBSearchResult.records[0])!;
+              const currentOnt = drBRecord.ph_ont || drBCorrectSerial || '';
+              const upsResult = await oneMapApi.updateOntAndUpsSerial(
+                drBRecord.prop_id,
+                currentOnt,
+                upsSerial,
+                drBSearchResult.records  // low-level guard receives records
+              );
+              drBSetSuccess = upsResult.success;
+            }
           }
         }
 
-        // Part B: Clear UPS from DR A (always attempt if DR B has it)
+        // Part B: Clear UPS from DR A — only if DR B was successfully set/confirmed.
+        // Blocker #1 fix: fetch DR A's current records and enforce the HII guard
+        // before clearing. Clearing a UPS on a pre-install DR corrupts data just
+        // as much as writing one. If DR A lacks HII, skip the clear and surface the
+        // reason so the caller can decide.
         if (drBSetSuccess) {
           const drASearchForUps = await oneMapApi.searchDR(drANumber);
-          if (drASearchForUps.success) {
-            const drAUpsRecord = drASearchForUps.records.find(
-              r => r.br_ser?.toUpperCase() === upsSerial.toUpperCase()
-            );
-            if (drAUpsRecord) {
-              const clearResult = await oneMapApi.updateOntAndUpsSerial(
-                drAUpsRecord.prop_id,
-                drAUpsRecord.ph_ont || drACorrectSerial,
-                '' // Clear UPS
-              );
-              drAClearSuccess = clearResult.success;
+          if (drASearchForUps.success && drASearchForUps.records.length > 0) {
+            if (!hasHomeInstallationInstalled(drASearchForUps.records)) {
+              log.warn('SwapFix UPS clear blocked: DR A has no Home Installation: Installed status', {
+                drA: drANumber,
+                statuses: Array.from(new Set(drASearchForUps.records.map(r => r.status || 'NULL'))),
+              });
+              // DR B is already correct but we cannot clear DR A — surface both facts.
+              upsTransferResult = {
+                success: false,
+                error: 'UPS set on DR B succeeded but DR A UPS clear blocked: DR A not installed (no HII status)',
+                errorCode: 'NO_HII',
+                drBSet: true,
+              };
+              // Override drBSetSuccess so the success branch below is not entered.
+              drBSetSuccess = false;
             } else {
-              drAClearSuccess = true; // Already cleared
+              const drAUpsRecord = drASearchForUps.records.find(
+                r => r.br_ser?.toUpperCase() === upsSerial.toUpperCase()
+              );
+              if (drAUpsRecord) {
+                const clearResult = await oneMapApi.updateOntAndUpsSerial(
+                  drAUpsRecord.prop_id,
+                  drAUpsRecord.ph_ont || drACorrectSerial,
+                  '', // Clear UPS
+                  drASearchForUps.records  // low-level guard receives records
+                );
+                drAClearSuccess = clearResult.success;
+              } else {
+                drAClearSuccess = true; // Already cleared
+              }
             }
           }
         }
@@ -414,7 +474,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               JSON.stringify({ toDr: drBNumber, source: 'olt_report' }),
             ]
           );
-        } else {
+        } else if (upsTransferResult === null) {
+          // Generic fallback: search succeeded but nothing set and no specific error was
+          // recorded above (e.g. search returned empty records).
           upsTransferResult = { success: false, error: 'Failed to set UPS on DR B' };
         }
       } catch (upsErr) {
