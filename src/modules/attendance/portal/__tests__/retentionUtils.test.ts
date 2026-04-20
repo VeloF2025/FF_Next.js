@@ -35,6 +35,7 @@ vi.mock('@/services/vfStorageAdapter', () => ({
 }));
 
 import {
+  AuditWriteError,
   DEFAULT_RETENTION_DAYS,
   logSelfieAccess,
   sweepExpiredSelfies,
@@ -77,11 +78,14 @@ describe('logSelfieAccess', () => {
     expect(values[4]).toBeNull();
   });
 
-  it('never throws on a DB failure (best-effort audit write)', async () => {
+  it('THROWS AuditWriteError on a DB failure — callers MUST refuse to serve', async () => {
+    // Regression guard: an earlier version swallowed the insert failure,
+    // producing silent POPIA gaps. The selfie endpoint now checks for
+    // AuditWriteError and returns 503 — this test pins the contract.
     sqlFn.mockRejectedValueOnce(new Error('boom'));
     await expect(
       logSelfieAccess({ entryId: 'e', selfieType: 'in', viewedBy: 'u' })
-    ).resolves.toBeUndefined();
+    ).rejects.toBeInstanceOf(AuditWriteError);
   });
 });
 

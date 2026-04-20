@@ -42,10 +42,22 @@ export interface LogSelfieAccessArgs {
   context?: string | null;
 }
 
+export class AuditWriteError extends Error {
+  readonly cause: unknown;
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'AuditWriteError';
+    this.cause = cause;
+  }
+}
+
 /**
- * Insert one row in `attendance_selfie_access_log`. Best-effort: a failure
- * to write the audit row must NOT block the admin view it describes — but
- * we log loudly so ops sees the miss.
+ * Insert one row in `attendance_selfie_access_log` for every admin selfie
+ * view. THROWS `AuditWriteError` on insert failure — callers that serve
+ * POPIA-sensitive content MUST refuse to proceed when the audit can't be
+ * written. A 503 with a specific error id beats a 200 with a silent
+ * compliance gap. The retention cron does NOT depend on this function, so
+ * tightening to throw here doesn't affect the sweep path.
  */
 export async function logSelfieAccess(args: LogSelfieAccessArgs): Promise<void> {
   const ctx = typeof args.context === 'string' ? args.context.slice(0, 32) : null;
@@ -65,6 +77,7 @@ export async function logSelfieAccess(args: LogSelfieAccessArgs): Promise<void> 
       viewedBy: args.viewedBy,
       error: err instanceof Error ? err.message : String(err),
     });
+    throw new AuditWriteError('Failed to write POPIA selfie access audit row', err);
   }
 }
 

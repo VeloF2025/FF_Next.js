@@ -16,6 +16,7 @@ import {
   Activity,
   Lock,
   BarChart3,
+  Clock,
 } from 'lucide-react';
 import { useStaffMember, useDeleteStaff } from '@/hooks/useStaff';
 import { useStaffAccess } from '@/hooks/staff/useStaffAccess';
@@ -33,13 +34,14 @@ import { DisciplinaryTab } from './tabs/DisciplinaryTab';
 import { NotesTab } from './tabs/NotesTab';
 import { ActivityTab } from './tabs/ActivityTab';
 import { PerformanceTab } from './tabs/PerformanceTab';
+import { TimeAttendanceTab } from './tabs/TimeAttendanceTab';
 import { DisciplinaryIncidentForm } from './DisciplinaryIncidentForm';
 import { VehicleAssignmentForm } from './VehicleAssignmentForm';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import type { DisciplinaryIncident, VehicleAssignment } from '@/types/staff';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
-type TabType = 'overview' | 'performance' | 'employment' | 'compliance' | 'vehicles' | 'disciplinary' | 'documents' | 'projects' | 'notes' | 'activity';
+type TabType = 'overview' | 'performance' | 'employment' | 'compliance' | 'vehicles' | 'attendance' | 'disciplinary' | 'documents' | 'projects' | 'notes' | 'activity';
 
 interface TabConfig {
   id: TabType;
@@ -55,6 +57,7 @@ const ALL_TABS: TabConfig[] = [
   { id: 'employment', label: 'Employment', icon: Briefcase, requiresSensitiveAccess: true, permissionKey: 'people.staff.tabs.employment' },
   { id: 'compliance', label: 'Compliance', icon: Shield, requiresSensitiveAccess: true, permissionKey: 'people.staff.tabs.compliance' },
   { id: 'vehicles', label: 'Vehicles', icon: Car, permissionKey: 'people.staff.tabs.vehicles' },
+  { id: 'attendance', label: 'Attendance', icon: Clock, permissionKey: 'people.staff.tabs.attendance' },
   { id: 'disciplinary', label: 'Disciplinary', icon: AlertTriangle, requiresSensitiveAccess: true, permissionKey: 'people.staff.tabs.disciplinary' },
   { id: 'documents', label: 'Documents', icon: FileText, requiresSensitiveAccess: true, permissionKey: 'people.staff.tabs.documents' },
   { id: 'projects', label: 'Projects', icon: FolderKanban, permissionKey: 'people.staff.tabs.projects' },
@@ -492,6 +495,10 @@ export function StaffDetail() {
               onEditVehicle={handleEditVehicle}
               onRemoveVehicle={handleRemoveVehicle}
             />
+          )}
+
+          {activeTab === 'attendance' && (
+            <TimeAttendanceTab staffId={id} />
           )}
 
           {activeTab === 'disciplinary' && canViewSensitive && (
