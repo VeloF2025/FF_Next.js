@@ -1,12 +1,6 @@
 /**
- * /my/attendance/clock — selfie + GPS capture + submit.
- *
+ * /my/attendance/clock — selfie + GPS + submit, with offline queue fallback.
  * Query: ?action=in | ?action=out (default: in).
- * Flow: take selfie → capture GPS (auto) → review → submit. Error mapping
- * lives in clockErrors.ts so the page stays focused on UI orchestration.
- *
- * Offline queue is NOT in this PR — submit is disabled when navigator.onLine
- * is false. PR5 adds the IndexedDB flush.
  */
 
 import React from 'react';
@@ -16,31 +10,27 @@ import Link from 'next/link';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 
 import { captureGPS } from '@/modules/fleet/offline/gpsCapture';
-import {
-  ApiError,
-  clockIn,
-  clockOut,
-  grantSelfieConsent,
-  getSession,
-} from '@/modules/attendance/portal/client/api';
+import { ApiError, grantSelfieConsent, getSession } from '@/modules/attendance/portal/client/api';
+import { submitClockEventWithOfflineFallback } from '@/modules/attendance/portal/client/offline/submitClockEvent';
+import { useAttendanceSync } from '@/modules/attendance/portal/client/offline/useAttendanceSync';
 import { fileToResizedBase64 } from '@/modules/attendance/portal/client/imageUtils';
 import { useDeviceFingerprint } from '@/modules/attendance/portal/client/useDeviceFingerprint';
 import { MyPortalShell } from '@/modules/attendance/portal/client/MyPortalShell';
-import {
-  ConsentModal,
-  GpsSnapshot,
-  GpsStep,
-  SelfieStep,
-  SuccessView,
-} from '@/modules/attendance/portal/client/clockSteps';
-import {
-  mapConsentError,
-  mapImageError,
-  mapSubmitError,
-} from '@/modules/attendance/portal/client/clockErrors';
+import { ConsentModal, GpsSnapshot, GpsStep, SelfieStep } from '@/modules/attendance/portal/client/clockSteps';
+import { NotSavedView, QueuedView, SuccessView } from '@/modules/attendance/portal/client/clockResults';
+import { OfflineBanner, PendingQueueBanner, QueueUnavailableBanner } from '@/modules/attendance/portal/client/clockBanners';
+import { mapConsentError, mapImageError } from '@/modules/attendance/portal/client/clockErrors';
 
 type Action = 'in' | 'out';
-type FlowState = 'idle' | 'gps' | 'submitting' | 'consent_required' | 'success' | 'error';
+type FlowState =
+  | 'idle'
+  | 'gps'
+  | 'submitting'
+  | 'consent_required'
+  | 'success'
+  | 'queued'
+  | 'not_saved'
+  | 'error';
 
 const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.ReactElement } = () => {
   const router = useRouter();
@@ -55,8 +45,9 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
   const [state, setState] = React.useState<FlowState>('idle');
   const [error, setError] = React.useState<string | null>(null);
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
-  const [online, setOnline] = React.useState(true);
 
+  const { online, pendingCount, syncing, queueUnavailable, syncNow, refreshPendingCount } =
+    useAttendanceSync();
   const cameraRef = React.useRef<HTMLInputElement>(null);
   const gpsInFlight = React.useRef(false);
 
@@ -74,8 +65,6 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
         setStaffName(sess.profile?.name ?? null);
       } catch (err) {
         if (cancelled) return;
-        // 401 → login. Anything else is worth seeing rather than silently
-        // punting the user to the login page with no signal.
         if (err instanceof ApiError && err.status === 401) {
           await router.replace('/my');
           return;
@@ -84,26 +73,14 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
         setState('error');
       }
     })();
-    setOnline(typeof navigator === 'undefined' ? true : navigator.onLine);
-    const on = () => setOnline(true);
-    const off = () => setOnline(false);
-    window.addEventListener('online', on);
-    window.addEventListener('offline', off);
-    return () => {
-      cancelled = true;
-      window.removeEventListener('online', on);
-      window.removeEventListener('offline', off);
-    };
+    return () => { cancelled = true; };
   }, [router]);
 
-  React.useEffect(() => {
-    return () => {
-      if (selfiePreview) URL.revokeObjectURL(selfiePreview);
-    };
+  React.useEffect(() => () => {
+    if (selfiePreview) URL.revokeObjectURL(selfiePreview);
   }, [selfiePreview]);
 
   const captureGpsOnce = React.useCallback(async () => {
-    // Guard against concurrent calls racing their setState.
     if (gpsInFlight.current) return;
     gpsInFlight.current = true;
     setState('gps');
@@ -163,33 +140,55 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
       return;
     }
 
-    const shared = {
-      lat: gps.lat,
-      lon: gps.lon,
-      accuracyM: gps.accuracyM,
-      clientOccurredAt: new Date().toISOString(),
-      selfieBase64,
-      deviceFingerprint: deviceFingerprint ?? undefined,
-    };
+    const result = await submitClockEventWithOfflineFallback(
+      action,
+      {
+        lat: gps.lat,
+        lon: gps.lon,
+        accuracyM: gps.accuracyM,
+        clientOccurredAt: new Date().toISOString(),
+        selfieBase64,
+        deviceFingerprint: deviceFingerprint ?? undefined,
+      },
+      { online }
+    );
 
-    try {
-      if (action === 'in') {
-        const result = await clockIn(shared);
+    switch (result.kind) {
+      case 'submitted_in': {
+        const r = result.response;
         setSuccessMessage(
-          result.insideSite && result.siteName
-            ? `Clocked in at ${result.siteName}.`
+          r.insideSite && r.siteName
+            ? `Clocked in at ${r.siteName}.`
             : 'Clocked in. (No site geofence matched — your supervisor has been notified.)'
         );
-      } else {
-        const hours = (await clockOut(shared)).durationMs / 3_600_000;
-        setSuccessMessage(`Clocked out. Shift length: ${hours.toFixed(1)}h.`);
+        setState('success');
+        return;
       }
-      setState('success');
-    } catch (err) {
-      const mapped = mapSubmitError(err, action);
-      if (mapped.kind === 'consent_required') { setState('consent_required'); return; }
-      setError(mapped.message);
-      setState('error');
+      case 'submitted_out': {
+        const hours = result.response.durationMs / 3_600_000;
+        setSuccessMessage(`Clocked out. Shift length: ${hours.toFixed(1)}h.`);
+        setState('success');
+        return;
+      }
+      case 'queued':
+        await refreshPendingCount();
+        setSuccessMessage(
+          action === 'in'
+            ? 'Clock-in saved on this phone.'
+            : 'Clock-out saved on this phone.'
+        );
+        setState('queued');
+        return;
+      case 'consent_required':
+        setState('consent_required');
+        return;
+      case 'not_saved':
+        setError(result.message);
+        setState('not_saved');
+        return;
+      case 'error':
+        setError(result.message);
+        setState('error');
     }
   };
 
@@ -209,48 +208,52 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
   };
 
   const headingLabel = action === 'in' ? 'Clock in' : 'Clock out';
-  const submitDisabled = !selfieFile || !gps || state === 'submitting' || state === 'gps' || !online;
+  const submitDisabled = !selfieFile || !gps || state === 'submitting' || state === 'gps';
 
   return (
-    <MyPortalShell
-      title={headingLabel}
-      staffName={staffName}
-      showFooterNav={false}
-    >
+    <MyPortalShell title={headingLabel} staffName={staffName} showFooterNav={false}>
       <div className="pt-2 pb-3">
-        <Link
-          href="/my/attendance"
-          className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
-        >
+        <Link href="/my/attendance" className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700">
           <ArrowLeft className="w-4 h-4" />
           Back
         </Link>
       </div>
 
-      {!online && (
-        <div className="rounded-lg bg-yellow-50 border border-yellow-200 px-3 py-2 text-sm text-yellow-900 mb-3">
-          You are offline. Submissions while offline aren&apos;t supported yet —
-          please try again once you have signal.
-        </div>
+      {queueUnavailable && <QueueUnavailableBanner />}
+      {!online && <OfflineBanner />}
+
+      {pendingCount > 0 && (
+        <PendingQueueBanner
+          pendingCount={pendingCount}
+          online={online}
+          syncing={syncing}
+          onSyncNow={() => void syncNow()}
+        />
       )}
 
-      {state === 'success' ? (
-        <SuccessView
-          message={successMessage ?? 'Done.'}
+      {state === 'success' && (
+        <SuccessView message={successMessage ?? 'Done.'} onDone={() => router.push('/my/attendance')} />
+      )}
+      {state === 'queued' && (
+        <QueuedView
+          message={successMessage ?? 'Saved.'}
+          queuePosition={pendingCount}
           onDone={() => router.push('/my/attendance')}
         />
-      ) : state === 'consent_required' ? (
+      )}
+      {state === 'not_saved' && (
+        <NotSavedView message={error ?? 'Not saved.'} onBack={() => { setError(null); setState('idle'); }} />
+      )}
+      {state === 'consent_required' && (
         <ConsentModal
           onGrant={handleGrantConsent}
           onCancel={() => { setState('idle'); setError('Consent is required to clock in or out.'); }}
           submitting={false}
         />
-      ) : (
+      )}
+      {(state === 'idle' || state === 'gps' || state === 'submitting' || state === 'error') && (
         <>
-          <SelfieStep
-            selfiePreview={selfiePreview}
-            onCapture={() => cameraRef.current?.click()}
-          />
+          <SelfieStep selfiePreview={selfiePreview} onCapture={() => cameraRef.current?.click()} />
           <input
             ref={cameraRef}
             type="file"
@@ -259,19 +262,12 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
             className="hidden"
             onChange={handleSelfieChange}
           />
-
-          <GpsStep
-            gps={gps}
-            capturing={state === 'gps'}
-            onRetry={captureGpsOnce}
-          />
-
+          <GpsStep gps={gps} capturing={state === 'gps'} onRetry={captureGpsOnce} />
           {error && (
             <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800 mb-3">
               {error}
             </div>
           )}
-
           <button
             type="button"
             onClick={doSubmit}
@@ -285,9 +281,7 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
                 <Loader2 className="w-5 h-5 animate-spin" />
                 Submitting…
               </span>
-            ) : (
-              `Submit ${headingLabel.toLowerCase()}`
-            )}
+            ) : `Submit ${headingLabel.toLowerCase()}`}
           </button>
         </>
       )}

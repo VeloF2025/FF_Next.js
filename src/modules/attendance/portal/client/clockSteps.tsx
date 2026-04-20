@@ -1,7 +1,6 @@
 /**
- * Sub-components for /my/attendance/clock. Kept in a single sibling module
- * rather than one-file-per-component to stay under the project's file-count
- * budget while still keeping the page below 300 lines.
+ * Form-step components for /my/attendance/clock (selfie, GPS, consent).
+ * Terminal views live in clockResults.tsx; banners in clockBanners.tsx.
  */
 
 import {
@@ -161,37 +160,6 @@ export function ConsentModal({
           Cancel
         </button>
       </div>
-    </div>
-  );
-}
-
-export function SuccessView({
-  message,
-  onDone,
-}: {
-  message: string;
-  onDone: () => void;
-}) {
-  return (
-    <div className="text-center py-10">
-      <div className="mx-auto w-16 h-16 rounded-full bg-green-100 text-green-700 flex items-center justify-center mb-4">
-        <CheckCircle className="w-8 h-8" />
-      </div>
-      <h2 className="text-xl font-semibold mb-1">{message}</h2>
-      <p className="text-sm text-gray-500 mb-6">
-        {new Date().toLocaleTimeString('en-ZA', {
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZone: 'Africa/Johannesburg',
-        })}
-      </p>
-      <button
-        type="button"
-        onClick={onDone}
-        className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold"
-      >
-        Done
-      </button>
     </div>
   );
 }
