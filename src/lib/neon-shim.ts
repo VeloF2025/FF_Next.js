@@ -48,11 +48,24 @@ function getPool(connectionString: string): Pool {
 
 // ---------------------------------------------------------------------------
 // NeonQueryFunction type — matches the original export shape
-// Extends with .query() for callers that use parameterized form directly
+// Extends with .query() and .unsafe() to match the Neon HTTP driver's API
 // ---------------------------------------------------------------------------
+/** Sentinel produced by `sql.unsafe(raw)`, inlined verbatim when the tagged
+ *  template rebuilds the query. Not exported — callers never touch it. */
+const UNSAFE_SYMBOL = Symbol('neon-shim:unsafe');
+interface UnsafeFragment { readonly [UNSAFE_SYMBOL]: true; readonly value: string; }
+
+function isUnsafe(v: unknown): v is UnsafeFragment {
+  return typeof v === 'object' && v !== null && (v as UnsafeFragment)[UNSAFE_SYMBOL] === true;
+}
+
 export interface NeonQueryFunction {
   (strings: TemplateStringsArray, ...values: unknown[]): Promise<Record<string, unknown>[]>;
   query(text: string, params?: unknown[]): Promise<Record<string, unknown>[]>;
+  /** Inlines a raw string verbatim into a tagged-template query, bypassing
+   *  parameterisation. Mirrors the Neon HTTP driver's `sql.unsafe`. Use only
+   *  for trusted input such as dynamic column lists or WHERE fragments. */
+  unsafe(raw: string): UnsafeFragment;
 }
 
 // ---------------------------------------------------------------------------
@@ -68,24 +81,40 @@ export function neon(
     strings: TemplateStringsArray,
     ...values: unknown[]
   ): Promise<Record<string, unknown>[]> {
-    // Rebuild parameterised query from template parts
+    // Rebuild the query: interpolate parameterised values as $N placeholders,
+    // but inline sql.unsafe(...) sentinels verbatim.
     let query = '';
+    const params: unknown[] = [];
     strings.forEach((str, i) => {
       query += str;
-      if (i < values.length) query += `$${i + 1}`;
+      if (i < values.length) {
+        const v = values[i];
+        if (isUnsafe(v)) {
+          query += v.value;
+        } else {
+          params.push(v);
+          query += `$${params.length}`;
+        }
+      }
     });
 
-    const result = await pool.query(query, values as unknown[]);
+    const result = await pool.query(query, params);
     return result.rows as Record<string, unknown>[];
   };
 
-  // Attach .query() for callers that use parameterized form directly
+  // .query(text, params) — parameterised pass-through.
   (sqlFn as NeonQueryFunction).query = async function(
     text: string,
     params: unknown[] = []
   ): Promise<Record<string, unknown>[]> {
     const result = await pool.query(text, params);
     return result.rows as Record<string, unknown>[];
+  };
+
+  // .unsafe(raw) — returns a sentinel that the tagged-template branch inlines
+  // verbatim. Callers use it as: sql`WHERE ${sql.unsafe(whereClause)}`.
+  (sqlFn as NeonQueryFunction).unsafe = function(raw: string): UnsafeFragment {
+    return { [UNSAFE_SYMBOL]: true as const, value: raw };
   };
 
   return sqlFn as NeonQueryFunction;

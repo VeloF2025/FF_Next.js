@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { sql } from '@/lib/db/pool';
+import { sql } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';

@@ -77,26 +77,73 @@ export interface TxnClient {
 // Tagged Template Literal Adapter
 // ============================================================================
 
+// Sentinel produced by `sql.unsafe(raw)`; recognised by the tagged-template
+// builder below to inline a trusted string verbatim instead of parameterising.
+const UNSAFE_SYMBOL = Symbol('db-pool:unsafe');
+interface UnsafeFragment { readonly [UNSAFE_SYMBOL]: true; readonly value: string; }
+function isUnsafe(v: unknown): v is UnsafeFragment {
+  return typeof v === 'object' && v !== null && (v as UnsafeFragment)[UNSAFE_SYMBOL] === true;
+}
+
 /**
  * Drop-in replacement for `const sql = neon(DATABASE_URL)`.
  *
  * Uses the pg Pool directly — no Neon HTTP driver dependency.
  *
+ * Also exposes the methods callers rely on from the Neon client:
+ *   - `sql.query(text, params)` — parameterised query, returns rows
+ *   - `sql.unsafe(raw)` — returns a sentinel for verbatim interpolation
+ *     inside a tagged-template query (e.g. dynamic WHERE fragments)
+ *
  * @example
  * const rows = await sql`SELECT * FROM users WHERE id = ${userId}`;
+ * const rows2 = await sql.query('SELECT * FROM t WHERE x = $1', [x]);
+ * const rows3 = await sql`SELECT ${sql.unsafe(columnList)} FROM t`;
  */
-export async function sql<T extends SqlRow = SqlRow>(
+interface SqlFunction {
+  <T extends SqlRow = SqlRow>(
+    strings: TemplateStringsArray,
+    ...values: unknown[]
+  ): Promise<T[]>;
+  query<T extends SqlRow = SqlRow>(text: string, params?: unknown[]): Promise<T[]>;
+  unsafe(raw: string): UnsafeFragment;
+}
+
+async function sqlFn<T extends SqlRow = SqlRow>(
   strings: TemplateStringsArray,
   ...values: unknown[]
 ): Promise<T[]> {
-  let text = strings[0] ?? '';
-  for (let i = 0; i < values.length; i++) {
-    text += `$${i + 1}${strings[i + 1] ?? ''}`;
-  }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const result = await pool.query<T & Record<string, unknown>>(text as any, values as unknown[]);
+  let text = '';
+  const params: unknown[] = [];
+  strings.forEach((str, i) => {
+    text += str;
+    if (i < values.length) {
+      const v = values[i];
+      if (isUnsafe(v)) {
+        text += v.value;
+      } else {
+        params.push(v);
+        text += `$${params.length}`;
+      }
+    }
+  });
+  const result = await pool.query<T & Record<string, unknown>>(text, params);
   return result.rows as T[];
 }
+
+(sqlFn as SqlFunction).query = async function<T extends SqlRow = SqlRow>(
+  text: string,
+  params: unknown[] = []
+): Promise<T[]> {
+  const result = await pool.query<T & Record<string, unknown>>(text, params);
+  return result.rows as T[];
+};
+
+(sqlFn as SqlFunction).unsafe = function(raw: string): UnsafeFragment {
+  return { [UNSAFE_SYMBOL]: true as const, value: raw };
+};
+
+export const sql = sqlFn as SqlFunction;
 
 // ============================================================================
 // Parameterized Query Helpers
