@@ -86,7 +86,7 @@ STEP CATEGORIES:
 3. Cable Entry Outside - EXTERIOR close-up of where cable ENTERS the building through wall/roof. Cable penetrating exterior wall, conduit, grommet. Drip loop before entry point is a strong indicator. Cable transitioning from OUTSIDE to INSIDE.
 4. Cable Entry Inside - INTERIOR view showing cable ROUTING from entry point along walls/ceiling. Cable running along interior wall, cable clips, indoor path. Cable is TRAVELING, not yet at destination.
 5. Wall for Installation - The DESTINATION wall surface where ONT will be mounted. Mounting bracket, power outlet nearby, clean wall section. NO cable routing as main subject. Also includes a bare pole (with nothing on it) inside a house or shack — in informal housing the pole IS the wall/mounting point.
-6. ONT Back After Install - BACK panel of ONT showing fiber port and power cable connections. Yellow fiber connector, power cable. Camera angle BEHIND the ONT.
+6. ONT Back After Install - BACK panel of ONT with a GREEN FIBER CABLE physically plugged into the fiber port (yellow/orange socket). Camera angle BEHIND the ONT. Power cable may also be connected. The green fiber cable inserted into the fiber port is REQUIRED — without it, the ONT is not actually installed. If you see a back-of-ONT photo with an empty fiber port, no green cable visible at the port, or the port obscured, classify as Step 0 (not Step 6). Step 6 is specifically "After Install" and proves the fiber is connected.
 7. Power Meter Reading - Optical power meter display showing dBm reading (valid range: -18 to -24 dBm). Handheld meter screen with numbers.
 8. Final Installation - WIDE shot of COMPLETE setup from a distance: ONT + UPS/GIZZU + wall + surroundings. Key = WIDE FRAMING showing full context, even if green lights visible.
 9. Green Lights on ONT - CLOSE-UP of ONT FRONT panel focused on indicator lights (POWER, LINK, LAN, 2.4GHz, 5GHz, INTERNET). Nokia/Fibertime branding, LED labels, green dots. Also includes photos showing the ONT label/sticker with Nokia/Fibertime branding, DR number, or serial number — these confirm the installed device.
@@ -100,7 +100,7 @@ KEY DIFFERENTIATORS for commonly confused categories:
 - Step 3 vs Step 4: Step 3 = OUTSIDE (exterior wall, daylight). Step 4 = INSIDE (interior wall, indoor lighting). Sky or exterior materials = Step 3. Enclosed indoor = Step 4.
 - Step 4 vs Step 5: Step 4 = cable ROUTING/traveling along walls. Step 5 = TARGET wall (bracket, outlet). Cable as main subject = Step 4. Wall surface as main subject = Step 5.
 - Step 2 vs Step 5: Step 2 = pole OUTSIDE with cable in the air/sky. Step 5 = bare pole INSIDE a house/shack (no cable span, indoor setting, walls/roof visible around it). Indoor pole = Step 5 (wall/mounting point).
-- Step 6 vs Step 8: ONT BACK only (cables) vs FULL SETUP wide shot (ONT + UPS + cables)
+- Step 6 vs Step 8: ONT BACK only (with green fiber cable plugged into fiber port) vs FULL SETUP wide shot (ONT + UPS + cables). Step 6 REQUIRES a green fiber cable visibly plugged into the fiber port — if no green cable is at the port, the photo is Step 0, not Step 6.
 - Step 8 vs Step 9: FRAMING is key. Step 8 = WIDE shot (ONT + UPS + wall + surroundings). Step 9 = CLOSE-UP of front panel lights only. UPS and wall visible = Step 8 even if lights visible.
 - Step 11 vs Step 12: Step 11 (OPEN) = you can see INSIDE the dome joint — splice tray, cables, inner compartments visible. Step 12 (CLOSED) = lid is ON, sealed shut, only the outer casing visible. Cables visible inside = Step 11. Sealed box = Step 12.
 

@@ -37,6 +37,7 @@ import { logActivity } from './activityLogService';
 import { persistAutoQaResults, makeResult } from './autoQaHelpers';
 import { STEP_LABELS } from '../utils/stepMapper';
 import { extractExifDatesForPhotos } from './photoDateValidator';
+import { validateOntBackCables } from './ontBackCableValidator';
 import type { VlmCategorizationResult, QaDecision } from '../types/unified.types';
 
 // ============================================================================
@@ -250,6 +251,39 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
       if (discardedPhotos.some((d) => d.reason.startsWith('Date mismatch'))) {
         const dateMismatchCount = discardedPhotos.filter((d) => d.reason.startsWith('Date mismatch')).length;
         log.info(`Auto-discarded ${dateMismatchCount} photo(s) for date mismatch on ${dropNumber}`);
+      }
+    }
+
+    // --- ONT BACK GREEN-CABLE CHECK ---
+    // A true "ONT Back After Install" photo must show a green fiber cable
+    // plugged into the fiber port. Without that cable the ONT is not actually
+    // installed, so reclassify to Step 0 (Discard) with a specific comment.
+    const photosMetadataForCable: Array<{ filename: string; url: string }> = dr.photos_json ? JSON.parse(dr.photos_json) : [];
+    const urlByFilename = new Map(photosMetadataForCable.map((p) => [p.filename, p.url]));
+    const step6PhotosForCheck = photoResults
+      .filter((p) => p.step === 6 && urlByFilename.has(p.filename))
+      .map((p) => ({ filename: p.filename, url: urlByFilename.get(p.filename)! }));
+
+    if (step6PhotosForCheck.length > 0) {
+      const cableResults = await validateOntBackCables(dropNumber, step6PhotosForCheck);
+      let noCableCount = 0;
+      for (const photo of photoResults) {
+        if (photo.step !== 6) continue;
+        const result = cableResults.get(photo.filename);
+        if (!result || result.checkFailed) continue; // leave classification alone on check failure
+        if (!result.hasGreenCable) {
+          const reason = 'No green cable in the back';
+          discardedPhotos.push({ filename: photo.filename, originalStep: photo.step, reason });
+          photo.step = 0;
+          photo.stepLabel = 'Discard - Rubbish';
+          photo.decision = 'FAIL';
+          photo.comment = reason;
+          autoDiscardedCount++;
+          noCableCount++;
+        }
+      }
+      if (noCableCount > 0) {
+        log.info(`Reclassified ${noCableCount} Step 6 photo(s) to Step 0 for missing green fiber cable on ${dropNumber}`);
       }
     }
 
