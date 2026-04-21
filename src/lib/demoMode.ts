@@ -14,12 +14,16 @@
 import { log } from '@/lib/logger';
 
 const COOKIE_NAME = 'ff_demo_mode';
-const MAP_STORAGE_KEY = 'ff_demo_mode_map_v1';
+// v2: adds client name/contact maps alongside the original project maps
+const MAP_STORAGE_KEY = 'ff_demo_mode_map_v2';
 
 export interface DemoProjectMap {
   nameMap: Record<string, string>;
   codeMap: Record<string, string>;
   idMap: Record<string, { name: string; code: string }>;
+  clientNameMap?: Record<string, string>;
+  clientContactMap?: Record<string, string>;
+  clientIdMap?: Record<string, { name: string }>;
 }
 
 // -----------------------------------------------------------------------------
@@ -51,6 +55,8 @@ function compileMap(map: DemoProjectMap | null): CompiledMap {
   const entries: Array<[string, string]> = [
     ...Object.entries(map.nameMap),
     ...Object.entries(map.codeMap),
+    ...Object.entries(map.clientNameMap || {}),
+    ...Object.entries(map.clientContactMap || {}),
   ]
     .filter(([real]) => real && real.length >= 2)
     .sort((a, b) => b[0].length - a[0].length); // longest first
