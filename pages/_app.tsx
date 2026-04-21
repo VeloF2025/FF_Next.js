@@ -11,6 +11,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { reportWebVitals } from '@/lib/performance';
 import { initErrorTracking } from '@/lib/errorTracking';
 import { VersionChecker } from '@/components/VersionChecker';
+import { DemoModeBanner } from '@/components/DemoModeBanner';
 // Install global 401 interceptor early - this import sets up the fetch interceptor
 import '@/lib/authErrorHandler';
 
@@ -45,6 +46,7 @@ function MyApp({ Component, pageProps }: AppProps) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <VersionChecker />
+      <DemoModeBanner />
       <AuthProvider>
         <ThemeProvider enableSystemTheme={false}>
           <QueryClientProvider client={queryClient}>
