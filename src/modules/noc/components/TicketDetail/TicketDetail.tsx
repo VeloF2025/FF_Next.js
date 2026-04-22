@@ -25,6 +25,7 @@ import {
   Pencil,
   X,
   Check,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
@@ -42,6 +43,7 @@ import { AssignmentPanel } from '../Assignment/AssignmentPanel';
 import { RelatedTickets } from './RelatedTickets';
 import { NearbyTickets } from './NearbyTickets';
 import { NotesTab } from './NotesTab';
+import { HistoricalPhotosPanel } from './HistoricalPhotosPanel';
 import { useTicketNotes } from '../../hooks/useTicketNotesWithMutations';
 import { useAuth } from '@/contexts/AuthContext';
 import { canEditDescription } from '@/modules/construction-qa/utils/snagPermissions';
@@ -58,13 +60,15 @@ interface TicketDetailProps {
   backLink?: string;
 }
 
-type TabKey = 'overview' | 'activity' | 'notes' | 'attachments' | 'verification';
+type TabKey = 'overview' | 'activity' | 'notes' | 'attachments' | 'verification' | 'historical';
 
 interface Tab {
   key: TabKey;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: number;
+  disabled?: boolean;
+  disabledTooltip?: string;
 }
 
 /**
@@ -76,6 +80,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
   const { summary: activitySummary } = useTicketActivities(ticketId);
   const { summary: notesSummary } = useTicketNotes(ticketId);
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
+  const [historicalCount, setHistoricalCount] = useState<number | undefined>(undefined);
   const [editingDescription, setEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState('');
   const { currentUser } = useAuth();
@@ -157,12 +162,23 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
     return events;
   }, [ticket]);
 
+  // Historical photos tab is only meaningful when a DR or pole is linked
+  const hasHistoricalEntity = Boolean(ticket?.dr_number || ticket?.pole_number);
+
   // Define tabs
   const tabs: Tab[] = [
     { key: 'overview', label: 'Overview', icon: FileText },
     { key: 'activity', label: 'Activity', icon: Activity, badge: activitySummary.total },
     { key: 'notes', label: 'Notes', icon: MessageSquare, badge: notesSummary.total },
     { key: 'verification', label: 'Verification', icon: CheckSquare },
+    {
+      key: 'historical',
+      label: 'Historical Photos',
+      icon: ImageIcon,
+      badge: historicalCount,
+      disabled: !hasHistoricalEntity,
+      disabledTooltip: 'No DR or pole linked to this ticket',
+    },
   ];
 
   // Loading state
@@ -217,17 +233,22 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;
+            const isDisabled = tab.disabled ?? false;
 
             return (
               <button
                 key={tab.key}
                 type="button"
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => { if (!isDisabled) setActiveTab(tab.key); }}
+                disabled={isDisabled}
+                title={isDisabled ? tab.disabledTooltip : undefined}
                 className={cn(
                   'flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0',
-                  isActive
-                    ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
+                  isDisabled
+                    ? 'border-transparent text-[var(--ff-text-secondary)]/40 cursor-not-allowed'
+                    : isActive
+                      ? 'border-blue-500 text-blue-400'
+                      : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
                 )}
               >
                 <Icon className="w-4 h-4" />
@@ -478,6 +499,11 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
               onStatusChange={(s) => { void handleStatusChange(s); }}
             />
           )}
+
+          {/* Historical Photos Tab */}
+          {activeTab === 'historical' && hasHistoricalEntity && (
+            <HistoricalPhotosPanel ticketId={ticketId} onCountChange={setHistoricalCount} />
+          )}
         </div>
 
         {/* Right Column - Sidebar (always visible) */}
@@ -572,7 +598,9 @@ function BeforePhoto({ ticketId }: { ticketId: string }) {
       }
 
       if (imageAttachments.length > 0) setPhotos(imageAttachments);
-    }).catch(() => {});
+    }).catch((err) => {
+      log.warn('Failed to load ticket photo evidence', { ticketId, err });
+    });
   }, [ticketId]);
 
   if (photos.length === 0) return null;

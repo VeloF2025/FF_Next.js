@@ -280,6 +280,16 @@ const nextConfig = {
       );
     }
 
+    // Sentry is not in use — alias imports to a local no-op stub so files
+    // that still import from @sentry/nextjs compile without the package.
+    {
+      const path = require('path');
+      config.resolve.alias['@sentry/nextjs'] = path.resolve(
+        __dirname,
+        './src/lib/sentry/__stubs__/sentry-nextjs'
+      );
+    }
+
     return config;
   },
 
@@ -287,17 +297,4 @@ const nextConfig = {
   trailingSlash: false,
 };
 
-const { withSentryConfig } = require('@sentry/nextjs');
-
-module.exports = withSentryConfig(withBundleAnalyzer(nextConfig), {
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  authToken: process.env.SENTRY_AUTH_TOKEN,
-  url: process.env.SENTRY_URL,
-  silent: !process.env.CI,
-  sourcemaps: {
-    disable: !process.env.SENTRY_AUTH_TOKEN,
-  },
-  hideSourceMaps: true,
-  disableLogger: true,
-});
+module.exports = withBundleAnalyzer(nextConfig);
