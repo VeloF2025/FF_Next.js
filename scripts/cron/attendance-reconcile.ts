@@ -18,25 +18,36 @@
  * selfie-retention sweep at 02:30):
  *   45 2 * * * cd /home/velo/fibreflow-production && \
  *     /usr/bin/npx tsx scripts/cron/attendance-reconcile.ts \
- *     >> /var/log/attendance-reconcile.log 2>&1
+ *     >> /home/velo/logs/attendance-reconcile.log 2>&1
+ *
+ * Output:
+ *   - A small set of stderr trail lines (start / done / fatal) so the cron
+ *     log file surfaces what happened on each run. The in-memory `log`
+ *     buffer never flushes to stdout in production mode, so if we relied
+ *     on it alone the cron would run silently on success.
+ *   - Fine-grained events inside reconcile.ts still go to the in-memory
+ *     logger — visible via the usual /api/system/logs path in the app.
  *
  * Exits non-zero ONLY on unrecoverable errors (missing DATABASE_URL, no
- * default rule seeded, top-level throw). Per-entry failures are counted in
- * the report and logged, but do not fail the run — a single bad row must
- * not block payroll for the rest of the company.
+ * default rule seeded, top-level throw). Per-entry failures are counted
+ * in the report and logged, but do not fail the run — a single bad row
+ * must not block payroll for the rest of the company.
+ *
+ * Imports ordering matters: dotenv MUST run before we import modules that
+ * instantiate the pg.Pool (db-pool.ts constructs the pool at module load).
+ * We use dynamic imports below so the pool sees the resolved DATABASE_URL.
  */
 
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
-import { reconcile, type ReconcileOptions } from '../../src/services/attendance/reconcile';
-import { log } from '../../src/lib/logger';
 
-// In production, .env.production MUST exist — silently falling back to a
-// dev .env.local on a prod box could write auto-closes + summaries to the
-// wrong database. Fail loud instead.
+function stderr(msg: string): void {
+  process.stderr.write(`${new Date().toISOString()} ${msg}\n`);
+}
+
 const isProd = process.env.NODE_ENV === 'production';
 if (isProd && !fs.existsSync('.env.production')) {
-  log.error(
+  stderr(
     '[attendance-reconcile] NODE_ENV=production but .env.production missing — refusing to run'
   );
   process.exit(2);
@@ -46,19 +57,15 @@ dotenv.config({ path: '.env.production' });
 dotenv.config({ path: '.env.local', override: false });
 
 if (!process.env.DATABASE_URL) {
-  log.error('[attendance-reconcile] DATABASE_URL not set — aborting');
+  stderr('[attendance-reconcile] DATABASE_URL not set — aborting');
   process.exit(2);
 }
 
-// One-line fence against wrong-DB writes: surface the host we're about to
-// write to so a deploy going to the wrong target is visible in the first
-// log line of the run, not 30 minutes later when payroll gets a weird csv.
 try {
   const dbHost = new URL(process.env.DATABASE_URL).host;
-  log.info('[attendance-reconcile] starting', { dbHost, isProd });
+  stderr(`[attendance-reconcile] starting dbHost=${dbHost} isProd=${isProd}`);
 } catch {
-  // Malformed URL — let the actual DB call fail with a clearer pg error
-  // than we could synthesize here.
+  // Malformed URL — let the actual DB call fail with a clearer pg error.
 }
 
 function parseArg(name: string): string | undefined {
@@ -67,37 +74,42 @@ function parseArg(name: string): string | undefined {
   return hit?.slice(prefix.length);
 }
 
-const opts: ReconcileOptions = {};
-const fromDate = parseArg('from');
-const toDate = parseArg('to');
-if (fromDate) opts.fromDate = fromDate;
-if (toDate) opts.toDate = toDate;
-
 (async () => {
-  const startedAt = new Date();
+  const startedAt = Date.now();
   try {
+    const { reconcile } = await import('../../src/services/attendance/reconcile');
+    type Opts = Parameters<typeof reconcile>[0];
+    const opts: Opts = {};
+    const fromDate = parseArg('from');
+    const toDate = parseArg('to');
+    if (fromDate) opts.fromDate = fromDate;
+    if (toDate) opts.toDate = toDate;
+
     const report = await reconcile(opts);
-    log.info('[attendance-reconcile] done', {
-      scannedFrom: report.scannedFrom,
-      scannedTo: report.scannedTo,
-      autoClosed: report.autoClosed,
-      summariesUpserted: report.summariesUpserted,
-      summariesSkippedIncomplete: report.summariesSkippedIncomplete,
-      weeklyCapViolations: report.weeklyCapViolations,
-      perEntryErrors: report.errorsPerEntry.length,
-      durationMs: Date.now() - startedAt.getTime(),
-    });
+    stderr(
+      `[attendance-reconcile] done ` +
+        `scanned=${report.scannedFrom}..${report.scannedTo} ` +
+        `autoClosed=${report.autoClosed} ` +
+        `summaries=${report.summariesUpserted} ` +
+        `skippedIncomplete=${report.summariesSkippedIncomplete} ` +
+        `capViolations=${report.weeklyCapViolations} ` +
+        `perEntryErrors=${report.errorsPerEntry.length} ` +
+        `durationMs=${Date.now() - startedAt}`
+    );
     if (report.errorsPerEntry.length > 0) {
-      log.warn('[attendance-reconcile] some entries failed — see error logs above', {
-        failedEntryIds: report.errorsPerEntry.map((e) => e.entryId),
-      });
+      stderr(
+        `[attendance-reconcile] failed entryIds=${report.errorsPerEntry
+          .map((e) => e.entryId)
+          .join(',')}`
+      );
     }
     process.exit(0);
   } catch (err) {
-    log.error('[attendance-reconcile] fatal error', {
-      error: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : undefined,
-    });
+    stderr(
+      `[attendance-reconcile] fatal: ${
+        err instanceof Error ? err.stack ?? err.message : String(err)
+      }`
+    );
     process.exit(1);
   }
 })();
