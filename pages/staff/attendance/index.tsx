@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, Clock, Users } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { AttendanceNav } from '@/components/attendance/AttendanceNav';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 
@@ -97,6 +98,7 @@ export default function StaffAttendanceRosterPage() {
 
   return (
     <AppLayout>
+      <AttendanceNav />
       <div className="px-6 py-6 max-w-6xl mx-auto">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div>
