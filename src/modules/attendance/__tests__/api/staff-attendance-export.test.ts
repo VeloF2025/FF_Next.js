@@ -81,6 +81,7 @@ const SAMPLE_ROW = {
   holiday_hrs: '0.00',
   night_hrs: '0.00',
   wage_amount_cents: null as string | null,
+  hourly_rate_snapshot_cents: null as string | null,
   exceptions_count: 0,
 };
 
@@ -133,7 +134,7 @@ describe('GET /api/staff/attendance-export', () => {
     const firstLine = body.split('\r\n')[0];
     expect(firstLine).toBe(
       'staff_id,employee_id,full_name,work_date,clock_in_at,clock_out_at,' +
-        'regular_hrs,overtime_hrs,sunday_hrs,holiday_hrs,night_hrs,wage_amount,exceptions_count'
+        'regular_hrs,overtime_hrs,sunday_hrs,holiday_hrs,night_hrs,wage_amount,hourly_rate,exceptions_count'
     );
     expect(body).toContain('Alice Example');
     expect(body).toContain('EMP001');
@@ -242,6 +243,7 @@ describe('GET /api/staff/attendance-export', () => {
       'holiday_hrs',
       'night_hrs',
       'wage_amount',
+      'hourly_rate',
       'exceptions_count',
     ]);
   });

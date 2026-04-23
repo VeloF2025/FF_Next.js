@@ -8,8 +8,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mocks = vi.hoisted(() => ({ sql: vi.fn() }));
 vi.mock('@/lib/logger', () => ({
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+  createLogger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
 }));
 vi.mock('@/lib/db-pool', () => ({ sql: mocks.sql }));
+vi.mock('@/services/attendance/supervisorScope', () => ({
+  authorizedToSuperviseStaff: vi.fn().mockResolvedValue(true),
+  staffIdsSupervisedBy: vi.fn().mockResolvedValue(null),
+  canSuperviseStaff: vi.fn().mockResolvedValue(true),
+}));
 vi.mock('@/lib/auth/middleware', () => ({
   withAuth: (h: unknown) => h,
   withPermission: () => (h: unknown) => h,

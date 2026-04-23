@@ -202,30 +202,51 @@ describe('POST /api/my/attendance-corrections', () => {
 });
 
 describe('GET /api/my/attendance-corrections', () => {
-  it('returns own adjustments scoped to session.staffId', async () => {
-    mocks.sql.mockResolvedValueOnce([
-      {
-        id: 'adj-1',
-        entry_id: 'e-1',
-        requested_by: 'staff-1',
-        adjustment_kind: 'forgot_clock_out',
-        adjusted_clock_in_at: null,
-        adjusted_clock_out_at: '2026-04-20T14:00:00+00:00',
-        adjusted_site_geofence_id: null,
-        reason: 'forgot to clock out',
-        status: 'pending',
-        reviewed_by: null,
-        reviewed_at: null,
-        review_note: null,
-        created_at: '2026-04-22T10:00:00Z',
-        updated_at: '2026-04-22T10:00:00Z',
-      },
-    ]);
+  it('returns own adjustments scoped to session.staffId plus the counts badge', async () => {
+    // Handler now fires list + counts in parallel (#1409), so mock both.
+    // Order isn't guaranteed across Promise.all, so match on query shape
+    // when asserting — both mocks return mock fixtures.
+    mocks.sql
+      .mockResolvedValueOnce([
+        {
+          id: 'adj-1',
+          entry_id: 'e-1',
+          requested_by: 'staff-1',
+          adjustment_kind: 'forgot_clock_out',
+          adjusted_clock_in_at: null,
+          adjusted_clock_out_at: '2026-04-20T14:00:00+00:00',
+          adjusted_site_geofence_id: null,
+          reason: 'forgot to clock out',
+          status: 'pending',
+          reviewed_by: null,
+          reviewed_at: null,
+          review_note: null,
+          created_at: '2026-04-22T10:00:00Z',
+          updated_at: '2026-04-22T10:00:00Z',
+        },
+      ])
+      .mockResolvedValueOnce([
+        { status: 'pending', count: '1' },
+        { status: 'approved', count: '4' },
+      ]);
     const { res, captured } = makeRes();
     await handler(makeReq({}, 'GET'), res);
     expect(captured.statusCode).toBe(200);
-    const call = mocks.sql.mock.calls[0] as [readonly string[], ...unknown[]];
-    // The staff_id filter in the SQL must be parameterised with session.staffId.
-    expect(call.slice(1)).toContain('staff-1');
+
+    // Locate the list call (it has LIMIT in its template).
+    const calls = mocks.sql.mock.calls as Array<[readonly string[], ...unknown[]]>;
+    const listCall = calls.find((c) => /LIMIT/i.test(c[0].join(' ')));
+    expect(listCall).toBeDefined();
+    expect(listCall!.slice(1)).toContain('staff-1');
+
+    // Response carries the counts badge + statusFilter echo.
+    const body = captured.body as {
+      data: {
+        counts: { pending: number; approved: number; rejected: number; cancelled: number };
+        statusFilter: string;
+      };
+    };
+    expect(body.data.counts).toEqual({ pending: 1, approved: 4, rejected: 0, cancelled: 0 });
+    expect(body.data.statusFilter).toBe('all');
   });
 });

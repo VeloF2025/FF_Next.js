@@ -31,6 +31,10 @@ import {
   isoWeekMonday,
   lookupActiveLock,
 } from '@/modules/attendance/corrections/lockQueries';
+import {
+  ADJUSTMENT_HINTS,
+  ABSOLUTE_MIN_REASON_CHARS,
+} from '@/modules/attendance/corrections/hintCatalogue';
 
 const VALID_KINDS: readonly AdjustmentKind[] = [
   'forgot_clock_out',
@@ -68,8 +72,19 @@ async function handlePost(
     apiResponse.badRequest(res, `adjustment_kind must be one of: ${VALID_KINDS.join(', ')}`);
     return;
   }
-  if (reason.length < 10) {
-    apiResponse.badRequest(res, 'reason must be at least 10 characters');
+  // Per-kind minimum from the hint catalogue (floor = ABSOLUTE_MIN).
+  // Keeps validator in lockstep with the placeholder text the staff
+  // just read — a `duplicate_entry` prompt that asks for context must
+  // enforce a length that can plausibly contain that context.
+  const perKindMin = Math.max(
+    ADJUSTMENT_HINTS[adjustmentKind].minReasonChars,
+    ABSOLUTE_MIN_REASON_CHARS
+  );
+  if (reason.length < perKindMin) {
+    apiResponse.badRequest(
+      res,
+      `reason must be at least ${perKindMin} characters for adjustment_kind='${adjustmentKind}'`
+    );
     return;
   }
 

@@ -11,8 +11,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mocks = vi.hoisted(() => ({ sql: vi.fn() }));
 vi.mock('@/lib/logger', () => ({
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+  createLogger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
 }));
 vi.mock('@/lib/db-pool', () => ({ sql: mocks.sql }));
+vi.mock('@/services/attendance/supervisorScope', () => ({
+  authorizedToSuperviseStaff: vi.fn().mockResolvedValue(true),
+  staffIdsSupervisedBy: vi.fn().mockResolvedValue(null),
+  canSuperviseStaff: vi.fn().mockResolvedValue(true),
+}));
 vi.mock('@/lib/auth/middleware', () => ({
   withAuth: (h: unknown) => h,
   withPermission: () => (h: unknown) => h,
@@ -21,7 +27,15 @@ vi.mock('@/lib/auth/middleware', () => ({
 import handler from '../../../../../pages/api/staff/attendance-corrections';
 
 function makeReq(query: Record<string, string> = {}, method: string = 'GET'): NextApiRequest {
-  return { method, query, headers: {}, socket: {} } as unknown as NextApiRequest;
+  return {
+    method,
+    query,
+    headers: {},
+    socket: {},
+    // Admin role bypasses the supervisor-scope branch (#1407). Handler
+    // uses role to short-circuit before calling getStaffIdForUser.
+    user: { id: 'admin-1', role: 'admin' },
+  } as unknown as NextApiRequest;
 }
 
 function makeRes() {
