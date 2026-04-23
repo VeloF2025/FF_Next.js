@@ -330,3 +330,167 @@ describe('GET /api/staff/attendance-export', () => {
     expect(nullLine.split(',')[11]).toBe('');
   });
 });
+
+describe('GET /api/staff/attendance-export (dry_run=true preview)', () => {
+  it('returns JSON summary without writing a lock or streaming bytes', async () => {
+    // Only ONE sql call expected (the SELECT). Lock UPSERT must NOT run.
+    // Second mock call answers lookupActiveLock → null (no existing lock).
+    mocks.sql
+      .mockResolvedValueOnce([
+        {
+          ...SAMPLE_ROW,
+          staff_id: 's1',
+          regular_hrs: '8.00',
+          overtime_hrs: '2.00',
+          sunday_hrs: '0.00',
+          holiday_hrs: '0.00',
+          night_hrs: '1.50',
+          wage_amount_cents: '96000',
+          hourly_rate_snapshot_cents: '12000',
+          exceptions_count: 1,
+        },
+        {
+          ...SAMPLE_ROW,
+          staff_id: 's2',
+          regular_hrs: '9.00',
+          overtime_hrs: '0.00',
+          sunday_hrs: '0.00',
+          holiday_hrs: '0.00',
+          night_hrs: '0.00',
+          wage_amount_cents: '108000',
+          hourly_rate_snapshot_cents: '12000',
+          exceptions_count: 0,
+        },
+      ])
+      .mockResolvedValueOnce([]); // lookupActiveLock → no rows
+
+    const { res, captured } = makeRes();
+    await handler(
+      makeReq({ week_start: '2026-04-20', format: 'csv', dry_run: 'true' }),
+      res
+    );
+    expect(captured.statusCode).toBe(200);
+
+    // Lock was NOT written: only two sql calls (SELECT + lookupActiveLock),
+    // not three (SELECT + UPSERT + lookup).
+    expect(mocks.sql.mock.calls.length).toBe(2);
+    for (const call of mocks.sql.mock.calls) {
+      expect(call[0].join(' ')).not.toMatch(
+        /INSERT\s+INTO\s+attendance_weekly_locks/i
+      );
+    }
+
+    const body = captured.body as {
+      data: {
+        dryRun: boolean;
+        weekStart: string;
+        weekEnd: string;
+        rowCount: number;
+        staffCount: number;
+        totals: Record<string, string | number>;
+        alreadyLocked: boolean;
+      };
+    };
+    expect(body.data.dryRun).toBe(true);
+    expect(body.data.weekStart).toBe('2026-04-20');
+    expect(body.data.weekEnd).toBe('2026-04-26');
+    expect(body.data.rowCount).toBe(2);
+    expect(body.data.staffCount).toBe(2);
+    expect(body.data.totals.regular_hrs).toBe('17.00');
+    expect(body.data.totals.overtime_hrs).toBe('2.00');
+    expect(body.data.totals.night_hrs).toBe('1.50');
+    expect(body.data.totals.wage_amount).toBe('2040.00'); // 96000 + 108000 cents → R2040
+    expect(body.data.totals.wage_amount_cents).toBe(204000);
+    expect(body.data.totals.exceptions_count).toBe(1);
+    expect(body.data.alreadyLocked).toBe(false);
+  });
+
+  it('surfaces an existing lock when ops re-previews an already-exported week', async () => {
+    mocks.sql
+      .mockResolvedValueOnce([]) // empty export — week has no rows (edge case)
+      .mockResolvedValueOnce([
+        {
+          week_start_date: '2026-04-20',
+          locked_at: '2026-04-27T08:00:00Z',
+          locked_by: 'payroll-1',
+          lock_reason: 'export:csv',
+          unlocked_at: null,
+          unlocked_by: null,
+          unlock_reason: null,
+        },
+      ]);
+
+    const { res, captured } = makeRes();
+    await handler(
+      makeReq({ week_start: '2026-04-20', format: 'xlsx', dry_run: 'true' }),
+      res
+    );
+    expect(captured.statusCode).toBe(200);
+    const body = captured.body as {
+      data: {
+        alreadyLocked: boolean;
+        existingLock: { lockedBy: string; lockReason: string } | null;
+      };
+    };
+    expect(body.data.alreadyLocked).toBe(true);
+    expect(body.data.existingLock?.lockedBy).toBe('payroll-1');
+    expect(body.data.existingLock?.lockReason).toBe('export:csv');
+  });
+
+  it('accepts truthy aliases (1, yes) for dry_run', async () => {
+    for (const v of ['1', 'yes', 'TRUE']) {
+      mocks.sql.mockReset();
+      mocks.sql.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      const { res, captured } = makeRes();
+      await handler(
+        makeReq({ week_start: '2026-04-20', format: 'csv', dry_run: v }),
+        res
+      );
+      expect(captured.statusCode).toBe(200);
+      const body = captured.body as { data: { dryRun: boolean } };
+      expect(body.data.dryRun).toBe(true);
+    }
+  });
+
+  it('dry_run=false still locks + streams (control: falsy value is the default path)', async () => {
+    // Guards against an over-eager match (e.g. any truthy string). dry_run=false
+    // should behave like the flag isn't present.
+    mockSqlForSuccessfulExport([SAMPLE_ROW]);
+    const { res, captured } = makeRes();
+    await handler(
+      makeReq({ week_start: '2026-04-20', format: 'csv', dry_run: 'false' }),
+      res
+    );
+    expect(captured.statusCode).toBe(200);
+    // Body is CSV text, not JSON — proves we took the streaming path.
+    expect(typeof captured.body).toBe('string');
+    expect(String(captured.body).startsWith('staff_id,')).toBe(true);
+    // Lock INSERT ran:
+    const hadLockCall = mocks.sql.mock.calls.some((c) =>
+      /INSERT\s+INTO\s+attendance_weekly_locks/i.test(c[0].join(' '))
+    );
+    expect(hadLockCall).toBe(true);
+  });
+
+  it('skips the lock write even when a NULL row would cause NaN if not guarded (safeNum defends the totals)', async () => {
+    // Regression guard for the safeNum helper — a null/NaN shouldn't
+    // bleed into the sum. This is a realistic path: wage_amount_cents
+    // can be NULL when staff.hourly_rate is unset (migration 324's
+    // paired-null invariant).
+    mocks.sql
+      .mockResolvedValueOnce([
+        { ...SAMPLE_ROW, wage_amount_cents: null, regular_hrs: '8.00' },
+        { ...SAMPLE_ROW, staff_id: 's2', wage_amount_cents: '5000', regular_hrs: '5.00' },
+      ])
+      .mockResolvedValueOnce([]);
+    const { res, captured } = makeRes();
+    await handler(
+      makeReq({ week_start: '2026-04-20', format: 'csv', dry_run: 'true' }),
+      res
+    );
+    const body = captured.body as { data: { totals: Record<string, string | number> } };
+    expect(body.data.totals.wage_amount_cents).toBe(5000);
+    expect(body.data.totals.wage_amount).toBe('50.00');
+    expect(body.data.totals.regular_hrs).toBe('13.00'); // 8 + 5 — no NaN corruption
+  });
+});

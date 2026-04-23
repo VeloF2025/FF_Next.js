@@ -1,5 +1,6 @@
 /**
  * GET /api/staff/attendance-export?week_start=YYYY-MM-DD&format=csv|xlsx
+ *                                 [&dry_run=true]
  *
  * Weekly payroll export. Format-agnostic columns per Phase 1b PRD:
  *   staff_id | employee_id | full_name | work_date |
@@ -22,6 +23,17 @@
  * through an HR-approved unlock. The lock row is owned by the caller's
  * user id, so downstream audit can see who froze the week.
  *
+ * Dry-run preview (dry_run=true):
+ *   - Does NOT lock the week.
+ *   - Does NOT stream CSV / XLSX bytes.
+ *   - Returns a JSON summary (rowCount, staffCount, per-bucket hour
+ *     totals, total wage in cents, open-exceptions count, existing-
+ *     lock flag).
+ *   Ops run this before the real export so they can sanity-check the
+ *   volume ("is 47 rows roughly what I expect?") without triggering
+ *   the lock side effect. Same SELECT as the real export — drift
+ *   between preview and actual is impossible.
+ *
  * Not yet: vendor adapters (Sage / VIP). Phase 1d.
  */
 
@@ -35,7 +47,10 @@ import {
   withPermission,
   type AuthenticatedNextApiRequest,
 } from '@/lib/auth/middleware';
-import { upsertWeeklyLock } from '@/modules/attendance/corrections/lockQueries';
+import {
+  lookupActiveLock,
+  upsertWeeklyLock,
+} from '@/modules/attendance/corrections/lockQueries';
 
 interface ExportRow extends Record<string, unknown> {
   staff_id: string;
@@ -136,6 +151,18 @@ function formatRate(cents: string | null): string {
   return (n / 100).toFixed(2);
 }
 
+/**
+ * Coerce a numeric-string (Postgres numeric → text) or nullable number
+ * to a finite JS number, defaulting to 0 for null / NaN / undefined.
+ * Used in the dry-run aggregator where we'd rather under-count an odd
+ * NULL row than corrupt the sum with NaN.
+ */
+function safeNum(raw: string | number | null | undefined): number {
+  if (raw == null) return 0;
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  return Number.isFinite(n) ? n : 0;
+}
+
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
@@ -157,6 +184,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, formatOrError.error);
   }
   const format = formatOrError;
+
+  // Dry-run flag — when true, skip the lock write and stream no bytes.
+  // The SELECT still runs (so ops see real numbers) and we return a
+  // JSON summary instead. Any truthy string turns it on; we accept
+  // "true"/"1"/"yes" so the flag works from a link, a curl, or a UI
+  // toggle without negotiating on the exact value.
+  const dryRun = ['true', '1', 'yes'].includes(
+    typeof req.query.dry_run === 'string' ? req.query.dry_run.toLowerCase() : ''
+  );
 
   const weekEnd = addDays(weekStart, 6);
 
@@ -208,6 +244,62 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         AND ds.work_date <= ${weekEnd}::date
       ORDER BY full_name ASC, ds.work_date ASC
     `;
+
+    // Dry-run preview — compute summary from the exact rows the real
+    // export would write, return JSON, and bail before the lock + bytes.
+    // Totals are summed in JS from the already-fetched rows so the
+    // preview cannot drift from the eventual export (same SELECT, same
+    // numbers). We surface the active-lock status so ops see upfront
+    // whether this would be the first export or a re-export attempt.
+    if (dryRun) {
+      const totals = {
+        regular_hrs: 0,
+        overtime_hrs: 0,
+        sunday_hrs: 0,
+        holiday_hrs: 0,
+        night_hrs: 0,
+        wage_amount_cents: 0,
+        exceptions_count: 0,
+      };
+      const staffIds = new Set<string>();
+      for (const r of rows) {
+        staffIds.add(r.staff_id);
+        totals.regular_hrs += safeNum(r.regular_hrs);
+        totals.overtime_hrs += safeNum(r.overtime_hrs);
+        totals.sunday_hrs += safeNum(r.sunday_hrs);
+        totals.holiday_hrs += safeNum(r.holiday_hrs);
+        totals.night_hrs += safeNum(r.night_hrs);
+        totals.wage_amount_cents += safeNum(r.wage_amount_cents);
+        totals.exceptions_count += Number(r.exceptions_count) || 0;
+      }
+      const existingLock = await lookupActiveLock(weekStart);
+      return apiResponse.success(res, {
+        dryRun: true,
+        weekStart,
+        weekEnd,
+        format,
+        rowCount: rows.length,
+        staffCount: staffIds.size,
+        totals: {
+          regular_hrs: totals.regular_hrs.toFixed(2),
+          overtime_hrs: totals.overtime_hrs.toFixed(2),
+          sunday_hrs: totals.sunday_hrs.toFixed(2),
+          holiday_hrs: totals.holiday_hrs.toFixed(2),
+          night_hrs: totals.night_hrs.toFixed(2),
+          wage_amount: (totals.wage_amount_cents / 100).toFixed(2),
+          wage_amount_cents: totals.wage_amount_cents,
+          exceptions_count: totals.exceptions_count,
+        },
+        alreadyLocked: existingLock !== null,
+        existingLock: existingLock
+          ? {
+              lockedBy: existingLock.locked_by,
+              lockedAt: existingLock.locked_at,
+              lockReason: existingLock.lock_reason,
+            }
+          : null,
+      });
+    }
 
     const records = rows.map((r) => ({
       staff_id: r.staff_id,
