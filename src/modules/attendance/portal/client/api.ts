@@ -289,3 +289,85 @@ export function revokeSelfieConsent(): Promise<{ ok: true; action: 'revoke' }> {
     body: JSON.stringify({ action: 'revoke' }),
   });
 }
+
+// =============================================================================
+// Corrections (self-service)
+// =============================================================================
+
+export type CorrectionStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+export type CorrectionStatusFilter = CorrectionStatus | 'all';
+
+export type CorrectionKind =
+  | 'forgot_clock_out'
+  | 'wrong_clock_in_time'
+  | 'wrong_clock_out_time'
+  | 'wrong_site'
+  | 'duplicate_entry'
+  | 'other';
+
+export interface CorrectionHint {
+  label: string;
+  placeholder: string;
+  hint: string;
+  minReasonChars: number;
+}
+
+export type CorrectionHints = Record<CorrectionKind, CorrectionHint>;
+
+export interface CorrectionRow {
+  id: string;
+  entry_id: string;
+  adjustment_kind: CorrectionKind;
+  adjusted_clock_in_at: string | null;
+  adjusted_clock_out_at: string | null;
+  adjusted_site_geofence_id: string | null;
+  reason: string;
+  status: CorrectionStatus;
+  review_note: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  entry_work_date?: string;
+  entry_clock_in_at?: string;
+  entry_clock_out_at?: string | null;
+}
+
+export interface CorrectionCounts {
+  pending: number;
+  approved: number;
+  rejected: number;
+  cancelled: number;
+}
+
+export function getCorrectionHints(): Promise<{
+  hints: CorrectionHints;
+  absoluteMinReasonChars: number;
+}> {
+  return request('/api/my/attendance-corrections-hints', { method: 'GET' });
+}
+
+export function listMyCorrections(args: {
+  status?: CorrectionStatusFilter;
+  limit?: number;
+} = {}): Promise<{
+  adjustments: CorrectionRow[];
+  counts: CorrectionCounts;
+  statusFilter: CorrectionStatusFilter;
+}> {
+  const qs = new URLSearchParams();
+  if (args.status) qs.set('status', args.status);
+  if (args.limit != null) qs.set('limit', String(args.limit));
+  const suffix = qs.toString();
+  return request(
+    `/api/my/attendance-corrections${suffix ? `?${suffix}` : ''}`,
+    { method: 'GET' }
+  );
+}
+
+export function cancelMyCorrection(adjustmentId: string): Promise<{
+  adjustment: CorrectionRow;
+}> {
+  return request(
+    `/api/my/attendance-corrections?adjustment_id=${encodeURIComponent(adjustmentId)}`,
+    { method: 'DELETE' }
+  );
+}

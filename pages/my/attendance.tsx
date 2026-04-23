@@ -17,7 +17,7 @@
 import React from 'react';
 import { NextPage } from 'next';
 import { useRouter } from 'next/router';
-import { Clock, History as HistoryIcon, MapPin } from 'lucide-react';
+import { Clock, Edit3, History as HistoryIcon, MapPin } from 'lucide-react';
 
 import {
   ApiError,
@@ -110,6 +110,29 @@ const MyAttendancePage: NextPage & { getLayout?: (page: React.ReactElement) => R
           </div>
 
           <RecentList entries={entries ?? []} />
+
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => router.push('/my/attendance/corrections')}
+              className="w-full flex items-center justify-between rounded-2xl bg-white border border-gray-200 shadow-sm p-4 text-left hover:border-gray-300 transition"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center">
+                  <Edit3 className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-900">
+                    My corrections
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Track pending submissions or cancel one
+                  </div>
+                </div>
+              </div>
+              <span className="text-xs text-blue-600 font-medium">Open →</span>
+            </button>
+          </div>
         </>
       )}
     </MyPortalShell>
