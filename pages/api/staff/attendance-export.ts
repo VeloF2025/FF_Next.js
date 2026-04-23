@@ -5,7 +5,7 @@
  *   staff_id | employee_id | full_name | work_date |
  *   clock_in_at | clock_out_at |
  *   regular_hrs | overtime_hrs | sunday_hrs | holiday_hrs | night_hrs |
- *   wage_amount | exceptions_count
+ *   wage_amount | hourly_rate | exceptions_count
  *
  * Rows:
  *   - Seven calendar days from week_start (ISO-week Monday enforced — we
@@ -50,6 +50,7 @@ interface ExportRow extends Record<string, unknown> {
   holiday_hrs: string;
   night_hrs: string;
   wage_amount_cents: string | null;
+  hourly_rate_snapshot_cents: string | null;
   exceptions_count: number;
 }
 
@@ -97,6 +98,7 @@ export const EXPORT_COLUMNS = [
   'holiday_hrs',
   'night_hrs',
   'wage_amount',
+  'hourly_rate',
   'exceptions_count',
 ] as const;
 
@@ -113,6 +115,21 @@ function formatHrs(raw: string | number): string {
 }
 
 function formatWage(cents: string | null): string {
+  if (cents == null) return '';
+  const n = Number(cents);
+  if (!Number.isFinite(n)) return '';
+  return (n / 100).toFixed(2);
+}
+
+/**
+ * Rate snapshot is captured by the reconcile cron at computation time
+ * (migration 324). Rendered in rand to two decimals for payroll
+ * readability; blank when no rate was set. Migration 324's paired
+ * CHECK guarantees this is null iff wage_amount_cents is null, so the
+ * two columns together tell the full audit story: either both are
+ * blank (rate unset) or both populated (wage computed from that rate).
+ */
+function formatRate(cents: string | null): string {
   if (cents == null) return '';
   const n = Number(cents);
   if (!Number.isFinite(n)) return '';
@@ -179,6 +196,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ds.holiday_hrs::text,
         ds.night_hrs::text,
         ds.wage_amount_cents::text,
+        ds.hourly_rate_snapshot_cents::text,
         COALESCE(wx.exceptions_count, 0) AS exceptions_count
       FROM attendance_daily_summaries ds
       JOIN staff s ON s.id = ds.staff_id
@@ -204,6 +222,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       holiday_hrs: formatHrs(r.holiday_hrs),
       night_hrs: formatHrs(r.night_hrs),
       wage_amount: formatWage(r.wage_amount_cents),
+      hourly_rate: formatRate(r.hourly_rate_snapshot_cents),
       exceptions_count: r.exceptions_count,
     }));
 

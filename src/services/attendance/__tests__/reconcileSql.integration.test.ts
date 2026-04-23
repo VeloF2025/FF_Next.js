@@ -320,6 +320,53 @@ const TEMPLATES: Template[] = [
     params: [SAMPLE_UUID, 5000.0, 500, 'in'],
   },
   {
+    name: 'attendance-export weekly SELECT (summaries + exceptions + bounds CTEs)',
+    text: `
+      WITH week_exceptions AS (
+        SELECT xe.staff_id, xe.work_date, COUNT(*)::int AS exceptions_count
+        FROM attendance_exceptions x
+        JOIN attendance_entries xe ON xe.id = x.entry_id
+        WHERE xe.work_date >= $1::date
+          AND xe.work_date <= $2::date
+          AND x.resolved_at IS NULL
+        GROUP BY xe.staff_id, xe.work_date
+      ),
+      week_entry_bounds AS (
+        SELECT staff_id, work_date,
+               MIN(clock_in_at)  AS first_clock_in_at,
+               MAX(clock_out_at) AS last_clock_out_at
+        FROM attendance_entries
+        WHERE work_date >= $1::date
+          AND work_date <= $2::date
+        GROUP BY staff_id, work_date
+      )
+      SELECT
+        ds.staff_id,
+        s.employee_id,
+        TRIM(COALESCE(s.first_name, '') || ' ' || COALESCE(s.last_name, '')) AS full_name,
+        ds.work_date::text AS work_date,
+        web.first_clock_in_at::text  AS clock_in_at,
+        web.last_clock_out_at::text  AS clock_out_at,
+        ds.regular_hrs::text,
+        ds.overtime_hrs::text,
+        ds.sunday_hrs::text,
+        ds.holiday_hrs::text,
+        ds.night_hrs::text,
+        ds.wage_amount_cents::text,
+        ds.hourly_rate_snapshot_cents::text,
+        COALESCE(wx.exceptions_count, 0) AS exceptions_count
+      FROM attendance_daily_summaries ds
+      JOIN staff s ON s.id = ds.staff_id
+      LEFT JOIN week_entry_bounds web
+        ON web.staff_id = ds.staff_id AND web.work_date = ds.work_date
+      LEFT JOIN week_exceptions wx
+        ON wx.staff_id = ds.staff_id AND wx.work_date = ds.work_date
+      WHERE ds.work_date >= $1::date
+        AND ds.work_date <= $2::date
+      ORDER BY full_name ASC, ds.work_date ASC`,
+    params: [SAMPLE_DATE, SAMPLE_DATE],
+  },
+  {
     name: 'staffIdsSupervisedBy (inverse CTE)',
     text: `
       WITH RECURSIVE descendants AS (
