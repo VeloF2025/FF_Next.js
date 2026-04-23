@@ -13,6 +13,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
 import { withAuth, withPermission } from '@/lib/auth/middleware';
+import { lookupActiveLock } from '@/modules/attendance/corrections/lockQueries';
 
 interface WeekRow extends Record<string, unknown> {
   staff_id: string;
@@ -200,7 +201,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     );
 
-    return apiResponse.success(res, { weekStart, weekEnd, staff, totals });
+    // Surface the lock state so the UI can paint a banner + block edits.
+    const activeLock = await lookupActiveLock(weekStart);
+    const lock = activeLock
+      ? {
+          lockedAt: activeLock.locked_at,
+          lockedBy: activeLock.locked_by,
+          reason: activeLock.lock_reason,
+        }
+      : null;
+    return apiResponse.success(res, { weekStart, weekEnd, staff, totals, lock });
   } catch (err) {
     log.error('[staff-attendance-week] unexpected error', {
       weekStart,

@@ -34,6 +34,8 @@ import {
   closeOpenEntry,
   insertException,
 } from '@/modules/attendance/portal/clockUtils';
+import { lookupActiveLock } from '@/modules/attendance/corrections/lockQueries';
+import { isoWeekMonday } from '@/services/attendance/isoWeek';
 
 export const config = {
   api: {
@@ -105,6 +107,27 @@ export default withMySession(async (req, res, session) => {
         ErrorCode.NOT_FOUND,
         'No open attendance entry to close. Clock in first.',
         { reason: 'no_open_entry' }
+      );
+    }
+
+    // Lock guard: a staff member who clocked in before the week was
+    // exported + auto-locked must NOT be able to close the entry via the
+    // normal path — that would silently mutate a week that payroll has
+    // already sealed. Route them to the corrections workflow instead, so
+    // the clock-out change goes through supervisor review + unlock.
+    const weekMonday = isoWeekMonday(open.work_date);
+    const openWeekLock = await lookupActiveLock(weekMonday);
+    if (openWeekLock) {
+      log.warn('[my-clock-out] rejected: week is locked', {
+        staffId: session.staffId,
+        entryId: open.id,
+        weekMonday,
+      });
+      return apiResponse.error(
+        res,
+        ErrorCode.CONFLICT,
+        `Week ${weekMonday} has been locked for payroll. Ask your supervisor to submit a correction; your clock-out cannot be written directly.`,
+        { reason: 'week_locked', weekMonday, entryId: open.id }
       );
     }
 

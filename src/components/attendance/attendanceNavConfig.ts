@@ -2,10 +2,10 @@
  * AttendanceNav configuration — tab definitions and route resolution.
  *
  * Covers the back-office `/staff/attendance/*` surface:
- *   - /staff/attendance         — today's roster
- *   - /staff/attendance/week    — weekly totals + payroll export
- *
- * Phase 1c will add corrections queue and cartrack-mapping.
+ *   - /staff/attendance               — today's roster
+ *   - /staff/attendance/week          — weekly totals + payroll export
+ *   - /staff/attendance/corrections   — supervisor review queue (Phase 1c)
+ *   - /staff/attendance/locks         — weekly lock management (Phase 1c)
  */
 
 export type { Tab, DropdownItem, FlyoutSection, NavItem } from '../accounting/accountingNavConfig';
@@ -24,9 +24,21 @@ export const TABS: Tab[] = [
     label: 'Weekly',
     href: '/staff/attendance/week',
   },
+  {
+    id: 'corrections',
+    label: 'Corrections',
+    href: '/staff/attendance/corrections',
+  },
+  {
+    id: 'locks',
+    label: 'Locks',
+    href: '/staff/attendance/locks',
+  },
 ];
 
 export function getActiveTabId(pathname: string): string {
   if (pathname === '/staff/attendance/week') return 'week';
+  if (pathname.startsWith('/staff/attendance/corrections')) return 'corrections';
+  if (pathname.startsWith('/staff/attendance/locks')) return 'locks';
   return 'roster';
 }

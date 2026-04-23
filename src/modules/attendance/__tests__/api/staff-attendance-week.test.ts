@@ -81,11 +81,13 @@ describe('GET /api/staff/attendance-week', () => {
   });
 
   it('rolls up per-day buckets into weekTotals per staff', async () => {
-    mocks.sql.mockResolvedValueOnce([
-      row({ staff_id: 's1', full_name: 'Alice', work_date: '2026-04-20', regular_hrs: '8', overtime_hrs: '0' }),
-      row({ staff_id: 's1', full_name: 'Alice', work_date: '2026-04-21', regular_hrs: '9', overtime_hrs: '2', night_hrs: '3' }),
-      row({ staff_id: 's2', full_name: 'Bob',   work_date: '2026-04-20', regular_hrs: '7', overtime_hrs: '0' }),
-    ]);
+    mocks.sql
+      .mockResolvedValueOnce([
+        row({ staff_id: 's1', full_name: 'Alice', work_date: '2026-04-20', regular_hrs: '8', overtime_hrs: '0' }),
+        row({ staff_id: 's1', full_name: 'Alice', work_date: '2026-04-21', regular_hrs: '9', overtime_hrs: '2', night_hrs: '3' }),
+        row({ staff_id: 's2', full_name: 'Bob',   work_date: '2026-04-20', regular_hrs: '7', overtime_hrs: '0' }),
+      ])
+      .mockResolvedValueOnce([]); // lookupActiveLock — unlocked
     const { res, captured } = makeRes();
     await handler(makeReq({ week_start: '2026-04-20' }), res);
     expect(captured.statusCode).toBe(200);
@@ -111,11 +113,13 @@ describe('GET /api/staff/attendance-week', () => {
   });
 
   it('staff returned sorted alphabetically by full_name', async () => {
-    mocks.sql.mockResolvedValueOnce([
-      row({ staff_id: 's-zoe', full_name: 'Zoe Zebra' }),
-      row({ staff_id: 's-ada', full_name: 'Ada Anteater' }),
-      row({ staff_id: 's-bob', full_name: 'Bob Badger' }),
-    ]);
+    mocks.sql
+      .mockResolvedValueOnce([
+        row({ staff_id: 's-zoe', full_name: 'Zoe Zebra' }),
+        row({ staff_id: 's-ada', full_name: 'Ada Anteater' }),
+        row({ staff_id: 's-bob', full_name: 'Bob Badger' }),
+      ])
+      .mockResolvedValueOnce([]);
     const { res, captured } = makeRes();
     await handler(makeReq({ week_start: '2026-04-20' }), res);
     const body = captured.body as {
@@ -129,12 +133,15 @@ describe('GET /api/staff/attendance-week', () => {
   });
 
   it('exceptions_count subquery filters to unresolved (resolved_at IS NULL)', async () => {
-    mocks.sql.mockResolvedValueOnce([]);
+    mocks.sql
+      .mockResolvedValueOnce([]) // main week query
+      .mockResolvedValueOnce([]); // lookupActiveLock
     const { res } = makeRes();
     await handler(makeReq({ week_start: '2026-04-20' }), res);
-    expect(mocks.sql).toHaveBeenCalledTimes(1);
-    const [strings] = mocks.sql.mock.calls[0] as [readonly string[], ...unknown[]];
-    const sqlText = strings.join(' ');
+    // The main week-aggregation query is the FIRST call; subsequent call is
+    // the lock lookup.
+    const firstCall = mocks.sql.mock.calls[0] as [readonly string[], ...unknown[]];
+    const sqlText = firstCall[0].join(' ');
     expect(sqlText).toMatch(/resolved_at\s+IS\s+NULL/i);
   });
 
@@ -150,16 +157,50 @@ describe('GET /api/staff/attendance-week', () => {
     expect(captured.statusCode).toBe(500);
   });
 
-  it('empty result returns staff=[] and zeroed totals', async () => {
-    mocks.sql.mockResolvedValueOnce([]);
+  it('empty result returns staff=[] and zeroed totals + lock=null', async () => {
+    mocks.sql
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]); // lookupActiveLock
     const { res, captured } = makeRes();
     await handler(makeReq({ week_start: '2026-04-20' }), res);
     expect(captured.statusCode).toBe(200);
     const body = captured.body as {
-      data: { staff: unknown[]; totals: { regularHrs: number; staffCount: number } };
+      data: {
+        staff: unknown[];
+        totals: { regularHrs: number; staffCount: number };
+        lock: unknown;
+      };
     };
     expect(body.data.staff).toEqual([]);
     expect(body.data.totals.regularHrs).toBe(0);
     expect(body.data.totals.staffCount).toBe(0);
+    expect(body.data.lock).toBe(null);
+  });
+
+  it('exposes active lock metadata in payload.lock when the week is locked', async () => {
+    mocks.sql
+      .mockResolvedValueOnce([]) // data
+      .mockResolvedValueOnce([
+        {
+          week_start_date: '2026-04-20',
+          locked_at: '2026-04-21T09:00:00Z',
+          locked_by: 'admin-1',
+          lock_reason: 'export:csv',
+          unlocked_at: null,
+          unlocked_by: null,
+          unlock_reason: null,
+        },
+      ]);
+    const { res, captured } = makeRes();
+    await handler(makeReq({ week_start: '2026-04-20' }), res);
+    expect(captured.statusCode).toBe(200);
+    const body = captured.body as {
+      data: {
+        lock: { lockedAt: string; lockedBy: string; reason: string | null } | null;
+      };
+    };
+    expect(body.data.lock).not.toBeNull();
+    expect(body.data.lock!.lockedBy).toBe('admin-1');
+    expect(body.data.lock!.reason).toBe('export:csv');
   });
 });

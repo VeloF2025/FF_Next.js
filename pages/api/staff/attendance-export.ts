@@ -16,7 +16,13 @@
  *
  * RBAC: `people.staff.attendance.manage` view permission.
  *
- * Not yet: vendor adapters (Sage / VIP) and week-locking. Both are Phase 1c.
+ * Side effect: every successful export locks the payroll week (idempotent
+ * upsert on attendance_weekly_locks). That's the documented PRD contract
+ * — an export pass downstream means corrections for that week must route
+ * through an HR-approved unlock. The lock row is owned by the caller's
+ * user id, so downstream audit can see who froze the week.
+ *
+ * Not yet: vendor adapters (Sage / VIP). Phase 1d.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -24,7 +30,12 @@ import * as XLSX from 'xlsx';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
-import { withAuth, withPermission } from '@/lib/auth/middleware';
+import {
+  withAuth,
+  withPermission,
+  type AuthenticatedNextApiRequest,
+} from '@/lib/auth/middleware';
+import { upsertWeeklyLock } from '@/modules/attendance/corrections/lockQueries';
 
 interface ExportRow extends Record<string, unknown> {
   staff_id: string;
@@ -195,6 +206,33 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       wage_amount: formatWage(r.wage_amount_cents),
       exceptions_count: r.exceptions_count,
     }));
+
+    // Lock the week BEFORE streaming bytes. If the lock write fails, the
+    // payroll vendor would import an unfrozen week — any correction
+    // submitted afterwards would silently mutate data that should have
+    // been sealed by the export. Loud 500 on lock failure beats silent
+    // drift between the CSV file and the DB.
+    const actor = (req as AuthenticatedNextApiRequest).user?.id;
+    if (!actor) {
+      return apiResponse.unauthorized(res);
+    }
+    try {
+      await upsertWeeklyLock({
+        weekStartDate: weekStart,
+        lockedBy: actor,
+        lockReason: `export:${format}`,
+      });
+    } catch (lockErr) {
+      log.error(
+        '[staff-attendance-export] weekly lock write failed — refusing to stream export to keep CSV+DB in sync',
+        {
+          weekStart,
+          format,
+          error: lockErr instanceof Error ? lockErr.message : String(lockErr),
+        }
+      );
+      return apiResponse.internalError(res, lockErr);
+    }
 
     const filename = `attendance-week-${weekStart}.${format}`;
 

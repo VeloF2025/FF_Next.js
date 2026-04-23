@@ -22,8 +22,34 @@ vi.mock('@/lib/auth/middleware', () => ({
 
 import handler from '../../../../../pages/api/staff/attendance-export';
 
-function makeReq(query: Record<string, string> = {}, method: string = 'GET'): NextApiRequest {
-  return { method, query, headers: {}, socket: {} } as unknown as NextApiRequest;
+function makeReq(
+  query: Record<string, string> = {},
+  method: string = 'GET',
+  userId: string | null = 'actor-1'
+): NextApiRequest {
+  const r: Partial<NextApiRequest> & {
+    user?: { id: string };
+    socket?: NextApiRequest['socket'];
+  } = {
+    method,
+    query,
+    headers: {},
+    socket: {} as unknown as NextApiRequest['socket'],
+  };
+  if (userId) r.user = { id: userId };
+  return r as NextApiRequest;
+}
+
+/**
+ * Every success-path export test now needs TWO `sql` mock responses: the
+ * main data query first, then the weekly-lock UPSERT (hardened: lock runs
+ * BEFORE streaming so a failure 500s rather than silently shipping an
+ * unfrozen week).
+ */
+function mockSqlForSuccessfulExport(dataRows: unknown[]) {
+  mocks.sql
+    .mockResolvedValueOnce(dataRows)
+    .mockResolvedValueOnce([{ week_start_date: '2026-04-20', locked_at: 'x', locked_by: 'actor-1', lock_reason: 'export', unlocked_at: null, unlocked_by: null, unlock_reason: null }]);
 }
 
 function makeRes() {
@@ -89,7 +115,7 @@ describe('GET /api/staff/attendance-export', () => {
   });
 
   it('defaults format to csv when omitted', async () => {
-    mocks.sql.mockResolvedValueOnce([SAMPLE_ROW]);
+    mockSqlForSuccessfulExport([SAMPLE_ROW]);
     const { res, captured } = makeRes();
     await handler(makeReq({ week_start: '2026-04-20' }), res);
     expect(captured.statusCode).toBe(200);
@@ -100,7 +126,7 @@ describe('GET /api/staff/attendance-export', () => {
   });
 
   it('CSV body starts with the expected header row', async () => {
-    mocks.sql.mockResolvedValueOnce([SAMPLE_ROW]);
+    mockSqlForSuccessfulExport([SAMPLE_ROW]);
     const { res, captured } = makeRes();
     await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }), res);
     const body = String(captured.body);
@@ -114,7 +140,7 @@ describe('GET /api/staff/attendance-export', () => {
   });
 
   it('CSV escapes values containing commas + double-quotes', async () => {
-    mocks.sql.mockResolvedValueOnce([
+    mockSqlForSuccessfulExport([
       {
         ...SAMPLE_ROW,
         full_name: 'Smith, Jr. "Bob"',
@@ -127,7 +153,7 @@ describe('GET /api/staff/attendance-export', () => {
   });
 
   it('xlsx returns a non-empty Buffer parseable back into rows', async () => {
-    mocks.sql.mockResolvedValueOnce([SAMPLE_ROW, { ...SAMPLE_ROW, staff_id: 's2' }]);
+    mockSqlForSuccessfulExport([SAMPLE_ROW, { ...SAMPLE_ROW, staff_id: 's2' }]);
     const { res, captured } = makeRes();
     await handler(makeReq({ week_start: '2026-04-20', format: 'xlsx' }), res);
     expect(captured.statusCode).toBe(200);
@@ -148,7 +174,7 @@ describe('GET /api/staff/attendance-export', () => {
   });
 
   it('empty result still emits the header row (CSV)', async () => {
-    mocks.sql.mockResolvedValueOnce([]);
+    mockSqlForSuccessfulExport([]);
     const { res, captured } = makeRes();
     await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }), res);
     expect(captured.statusCode).toBe(200);
@@ -158,7 +184,7 @@ describe('GET /api/staff/attendance-export', () => {
   });
 
   it('wage_amount_cents formatted as decimal rands (cents → R)', async () => {
-    mocks.sql.mockResolvedValueOnce([
+    mockSqlForSuccessfulExport([
       { ...SAMPLE_ROW, wage_amount_cents: '123456' },
     ]);
     const { res, captured } = makeRes();
@@ -182,10 +208,10 @@ describe('GET /api/staff/attendance-export', () => {
   });
 
   it('CSV empty-week header matches populated-week header exactly (column order parity)', async () => {
-    mocks.sql.mockResolvedValueOnce([]);
+    mockSqlForSuccessfulExport([]);
     const { res: r1, captured: c1 } = makeRes();
     await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }), r1);
-    mocks.sql.mockResolvedValueOnce([SAMPLE_ROW]);
+    mockSqlForSuccessfulExport([SAMPLE_ROW]);
     const { res: r2, captured: c2 } = makeRes();
     await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }), r2);
 
@@ -195,7 +221,7 @@ describe('GET /api/staff/attendance-export', () => {
   });
 
   it('xlsx column order matches the canonical schema', async () => {
-    mocks.sql.mockResolvedValueOnce([SAMPLE_ROW]);
+    mockSqlForSuccessfulExport([SAMPLE_ROW]);
     const { res, captured } = makeRes();
     await handler(makeReq({ week_start: '2026-04-20', format: 'xlsx' }), res);
     const buffer = captured.body as Buffer;
@@ -223,7 +249,7 @@ describe('GET /api/staff/attendance-export', () => {
   it('CSV escapes fields containing embedded carriage returns and line feeds', async () => {
     // RFC 4180: any field containing CR, LF, or " must be quoted, with "
     // doubled. We already test comma+quote; lock CR and LF explicitly.
-    mocks.sql.mockResolvedValueOnce([
+    mockSqlForSuccessfulExport([
       { ...SAMPLE_ROW, full_name: 'Line1\rLine2' },
     ]);
     const { res, captured } = makeRes();
@@ -235,7 +261,7 @@ describe('GET /api/staff/attendance-export', () => {
   it('NaN-valued hours render as blank (not silently 0.00)', async () => {
     // If the DB ever returns a corrupt numeric, rendering 0.00 looks like
     // "worked nothing" to payroll. Blank + server log is the audit signal.
-    mocks.sql.mockResolvedValueOnce([
+    mockSqlForSuccessfulExport([
       { ...SAMPLE_ROW, regular_hrs: 'not-a-number' },
     ]);
     const { res, captured } = makeRes();
@@ -247,8 +273,48 @@ describe('GET /api/staff/attendance-export', () => {
     expect(cells[6]).toBe('');
   });
 
+  it('successful export writes a weekly lock owned by the caller (freeze-on-export contract)', async () => {
+    mockSqlForSuccessfulExport([SAMPLE_ROW]);
+    const { res, captured } = makeRes();
+    await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }), res);
+    expect(captured.statusCode).toBe(200);
+    const calls = mocks.sql.mock.calls as [readonly string[], ...unknown[]][];
+    const lockCall = calls.find((c) =>
+      /INSERT\s+INTO\s+attendance_weekly_locks/i.test(c[0].join(' '))
+    );
+    expect(lockCall).toBeDefined();
+    const params = lockCall![0].join(' ');
+    // The lock SQL must include ON CONFLICT DO UPDATE semantics — export is
+    // idempotent on an already-locked week.
+    expect(params).toMatch(/ON\s+CONFLICT/i);
+    // Caller user id and lock reason flow through as params.
+    expect(lockCall!.slice(1)).toContain('2026-04-20');
+    expect(lockCall!.slice(1)).toContain('actor-1');
+    expect(lockCall!.slice(1)).toContain('export:csv');
+  });
+
+  it('500 when lock write fails (refuses to ship an unfrozen export)', async () => {
+    mocks.sql
+      .mockResolvedValueOnce([SAMPLE_ROW]) // data query
+      .mockRejectedValueOnce(new Error('lock write failed')); // upsert throws
+    const { res, captured } = makeRes();
+    await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }), res);
+    expect(captured.statusCode).toBe(500);
+  });
+
+  it('401 when no authenticated user on the request (defence-in-depth)', async () => {
+    // Mock the main data query so the 401 check (which runs after it) is
+    // reached cleanly. withAuth middleware normally blocks this before the
+    // handler; the guard here is for the case that wrapper ever bypasses
+    // (mocked to identity in these tests).
+    mocks.sql.mockResolvedValueOnce([SAMPLE_ROW]);
+    const { res, captured } = makeRes();
+    await handler(makeReq({ week_start: '2026-04-20', format: 'csv' }, 'GET', null), res);
+    expect(captured.statusCode).toBe(401);
+  });
+
   it('wage=0 cents renders as "0.00", null wage renders as "" — audit-signal preserved', async () => {
-    mocks.sql.mockResolvedValueOnce([
+    mockSqlForSuccessfulExport([
       { ...SAMPLE_ROW, staff_id: 's-zero', wage_amount_cents: '0' },
       { ...SAMPLE_ROW, staff_id: 's-null', wage_amount_cents: null },
     ]);

@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   closeOpenEntry: vi.fn(),
   insertException: vi.fn().mockResolvedValue(undefined),
   storeSelfie: vi.fn(),
+  lookupActiveLock: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -28,6 +29,9 @@ vi.mock('@/modules/attendance/portal/clockUtils', () => ({
 }));
 vi.mock('@/modules/attendance/portal/selfieUtils', () => ({
   storeSelfie: mocks.storeSelfie,
+}));
+vi.mock('@/modules/attendance/corrections/lockQueries', () => ({
+  lookupActiveLock: mocks.lookupActiveLock,
 }));
 
 import handler from '../../../../../pages/api/my/attendance/clock-out';

@@ -83,6 +83,20 @@ describe('isoWeekMonday', () => {
     // Fri 2027-01-01 shares the ISO week with 2026-12-28
     expect(isoWeekMonday('2027-01-01')).toBe('2026-12-28');
   });
+  it('agrees with the lockQueries re-export (consolidated implementation)', async () => {
+    // Post-hardening there is ONE implementation in src/services/attendance/
+    // isoWeek.ts, re-exported by both reconcile.ts (via this module) AND
+    // lockQueries.ts. Import the lockQueries export dynamically to prove
+    // identity rather than accidental string equality.
+    const { isoWeekMonday: lockVariant } = await import(
+      '@/modules/attendance/corrections/lockQueries'
+    );
+    expect(lockVariant('2026-04-26')).toBe(isoWeekMonday('2026-04-26'));
+    expect(lockVariant('2026-12-31')).toBe(isoWeekMonday('2026-12-31'));
+  });
+  it('throws on malformed YYYY-MM-DD input', () => {
+    expect(() => isoWeekMonday('not-a-date')).toThrow(/YYYY-MM-DD/);
+  });
 });
 
 // ---------------------------------------------------------------------------

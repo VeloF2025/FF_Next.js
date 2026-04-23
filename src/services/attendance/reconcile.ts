@@ -94,17 +94,11 @@ function addDays(ymd: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/**
- * ISO-week Monday for the given YYYY-MM-DD. Pure, no timezone dependency —
- * the input is already a SAST calendar day.
- */
-export function isoWeekMonday(ymd: string): string {
-  const d = new Date(`${ymd}T00:00:00Z`);
-  const dow = d.getUTCDay(); // 0 Sun..6 Sat
-  const deltaToMon = dow === 0 ? -6 : 1 - dow;
-  d.setUTCDate(d.getUTCDate() + deltaToMon);
-  return d.toISOString().slice(0, 10);
-}
+// Re-export so existing importers (including tests) that reach for
+// `isoWeekMonday` from this module keep working. The canonical
+// implementation lives in ./isoWeek.
+import { isoWeekMonday } from './isoWeek';
+export { isoWeekMonday };
 
 async function runAutoClose(
   autoCloseAfterHrs: number,
