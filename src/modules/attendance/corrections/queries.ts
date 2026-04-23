@@ -95,6 +95,44 @@ export async function transitionAdjustmentStatus(args: {
 }
 
 /**
+ * Staff-initiated cancellation of a pending correction they submitted
+ * themselves. Atomic — the UPDATE's JOIN + WHERE clauses enforce both
+ * (a) the adjustment exists and belongs to this staff via the linked
+ * attendance_entries row, and (b) it's still `status='pending'`.
+ *
+ * Returns the cancelled row, or null when the preconditions fail
+ * (wrong owner, not found, or already non-pending). Callers may
+ * follow up with a targeted 404-vs-409 read if the UI wants a
+ * specific message; the happy path only needs "did this apply".
+ *
+ * `reviewed_by` is set to the staff's own id (as a UUID — migration
+ * 320 points this FK at staff.id, not users.id) so the audit trail
+ * reads "self-cancelled" without a special NULL sentinel. Note
+ * review_note carries the phrase "self-cancelled" so a reviewer
+ * scanning the audit log can spot voluntary withdrawals at a glance.
+ */
+export async function cancelOwnAdjustment(args: {
+  adjustmentId: string;
+  staffId: string;
+}): Promise<AdjustmentRow | null> {
+  const rows = await sql<AdjustmentRow>`
+    UPDATE attendance_adjustments a
+    SET status      = 'cancelled',
+        reviewed_by = ${args.staffId},
+        reviewed_at = NOW(),
+        review_note = 'self-cancelled by staff',
+        updated_at  = NOW()
+    FROM attendance_entries e
+    WHERE a.id       = ${args.adjustmentId}
+      AND a.entry_id = e.id
+      AND e.staff_id = ${args.staffId}
+      AND a.status   = 'pending'
+    RETURNING a.*
+  `;
+  return rows[0] ?? null;
+}
+
+/**
  * Staff-side own-submissions listing. Respects staff_id on the linked
  * attendance_entries so a requester-impersonator cannot see someone else's.
  */

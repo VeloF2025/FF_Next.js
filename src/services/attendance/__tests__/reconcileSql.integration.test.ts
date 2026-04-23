@@ -320,6 +320,23 @@ const TEMPLATES: Template[] = [
     params: [SAMPLE_UUID, 5000.0, 500, 'in'],
   },
   {
+    name: 'cancelOwnAdjustment (atomic UPDATE with ownership + pending join)',
+    text: `
+      UPDATE attendance_adjustments a
+      SET status      = 'cancelled',
+          reviewed_by = $2::uuid,
+          reviewed_at = NOW(),
+          review_note = 'self-cancelled by staff',
+          updated_at  = NOW()
+      FROM attendance_entries e
+      WHERE a.id       = $1::uuid
+        AND a.entry_id = e.id
+        AND e.staff_id = $2::uuid
+        AND a.status   = 'pending'
+      RETURNING a.*`,
+    params: [SAMPLE_UUID, SAMPLE_UUID],
+  },
+  {
     name: 'listOwnAdjustments — default (status=all) branch with pending-first ordering',
     text: `
       SELECT a.*,

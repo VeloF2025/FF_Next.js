@@ -24,6 +24,7 @@ import {
   insertAdjustment,
   listOwnAdjustments,
   countOwnAdjustmentsByStatus,
+  cancelOwnAdjustment,
   type AdjustmentKind,
   type AdjustmentStatus,
 } from '@/modules/attendance/corrections/queries';
@@ -202,6 +203,63 @@ async function handleGet(
   }
 }
 
+async function handleDelete(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  session: AttendanceSession
+): Promise<void> {
+  const adjustmentId =
+    typeof req.query.adjustment_id === 'string' ? req.query.adjustment_id : '';
+  if (!adjustmentId) {
+    apiResponse.badRequest(res, 'adjustment_id query param is required');
+    return;
+  }
+
+  try {
+    const cancelled = await cancelOwnAdjustment({
+      adjustmentId,
+      staffId: session.staffId,
+    });
+    if (cancelled) {
+      apiResponse.success(res, { adjustment: cancelled });
+      return;
+    }
+    // The atomic UPDATE returned zero rows — one of three reasons. Do
+    // a single disambiguating read so the UI can render the right
+    // message ("not yours / not found" vs "already approved — talk to
+    // your supervisor if you need to reverse it"). IDOR-safe: we
+    // 404 on both "truly missing" and "exists but not yours" so a
+    // caller can't enumerate other staff's adjustment ids.
+    const rows = await sql<{ status: AdjustmentStatus; staff_id: string }>`
+      SELECT a.status, e.staff_id
+      FROM attendance_adjustments a
+      JOIN attendance_entries e ON e.id = a.entry_id
+      WHERE a.id = ${adjustmentId}
+      LIMIT 1
+    `;
+    const row = rows[0];
+    if (!row || row.staff_id !== session.staffId) {
+      log.warn('[my-corrections] cancel 404 — not found or not owner', {
+        sessionStaffId: session.staffId,
+        adjustmentId,
+      });
+      apiResponse.notFound(res, 'Adjustment', adjustmentId);
+      return;
+    }
+    apiResponse.conflict(
+      res,
+      `Adjustment is already ${row.status}; only pending adjustments can be self-cancelled`
+    );
+  } catch (err) {
+    log.error('[my-corrections] cancel failed', {
+      staffId: session.staffId,
+      adjustmentId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    apiResponse.internalError(res, err);
+  }
+}
+
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
@@ -209,7 +267,12 @@ async function handler(
 ): Promise<void> {
   if (req.method === 'POST') return handlePost(req, res, session);
   if (req.method === 'GET') return handleGet(req, res, session);
-  apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET', 'POST']);
+  if (req.method === 'DELETE') return handleDelete(req, res, session);
+  apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', [
+    'GET',
+    'POST',
+    'DELETE',
+  ]);
 }
 
 export default withMySession(handler);

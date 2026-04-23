@@ -18,6 +18,7 @@ vi.mock('@/lib/db-pool', () => ({
 import {
   listOwnAdjustments,
   countOwnAdjustmentsByStatus,
+  cancelOwnAdjustment,
 } from '../queries';
 
 const S = '00000000-0000-0000-0000-000000000001';
@@ -98,5 +99,48 @@ describe('countOwnAdjustmentsByStatus', () => {
     const counts = await countOwnAdjustmentsByStatus(S);
     expect(counts.rejected).toBe(7);
     expect(typeof counts.rejected).toBe('number');
+  });
+});
+
+describe('cancelOwnAdjustment', () => {
+  it('returns the cancelled row when the atomic UPDATE succeeds', async () => {
+    mocks.sql.mockResolvedValueOnce([
+      { id: 'a-1', status: 'cancelled', review_note: 'self-cancelled by staff' },
+    ]);
+    const row = await cancelOwnAdjustment({ adjustmentId: 'a-1', staffId: S });
+    expect(row).not.toBeNull();
+    expect(row!.status).toBe('cancelled');
+    expect(row!.review_note).toBe('self-cancelled by staff');
+  });
+
+  it('returns null when the UPDATE matches zero rows (wrong owner / non-pending)', async () => {
+    mocks.sql.mockResolvedValueOnce([]);
+    const row = await cancelOwnAdjustment({ adjustmentId: 'a-1', staffId: S });
+    expect(row).toBeNull();
+  });
+
+  it('SQL enforces ownership + pending status in a single atomic UPDATE', async () => {
+    mocks.sql.mockResolvedValueOnce([]);
+    await cancelOwnAdjustment({ adjustmentId: 'a-1', staffId: S });
+    const template = mocks.sql.mock.calls[0]![0].join(' ');
+    // Ownership via JOIN to attendance_entries. The `sql` mock receives
+    // raw template strings with holes — `$N` placeholders appear only
+    // after tag interpolation. Assert the structural SQL and that the
+    // staff-id parameter lands in the params list (verified in the
+    // parameterisation test below).
+    expect(template).toMatch(/FROM\s+attendance_entries\s+e/i);
+    expect(template).toMatch(/e\.staff_id\s*=/i);
+    // Pending-only precondition in the same statement:
+    expect(template).toMatch(/a\.status\s*=\s*'pending'/i);
+    // Writes the self-cancelled audit note:
+    expect(template).toMatch(/review_note\s*=\s*'self-cancelled by staff'/i);
+  });
+
+  it('parameterises the adjustment_id and staff_id positionally', async () => {
+    mocks.sql.mockResolvedValueOnce([]);
+    await cancelOwnAdjustment({ adjustmentId: 'a-1', staffId: S });
+    const params = mocks.sql.mock.calls[0]!.slice(1);
+    expect(params).toContain('a-1');
+    expect(params).toContain(S);
   });
 });

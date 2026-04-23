@@ -250,3 +250,49 @@ describe('GET /api/my/attendance-corrections', () => {
     expect(body.data.statusFilter).toBe('all');
   });
 });
+
+describe('DELETE /api/my/attendance-corrections', () => {
+  it('400 when adjustment_id query param missing', async () => {
+    const { res, captured } = makeRes();
+    await handler(makeReq({}, 'DELETE', {}), res);
+    expect(captured.statusCode).toBe(400);
+  });
+
+  it('200 when the atomic UPDATE cancels the staff own pending adjustment', async () => {
+    mocks.sql.mockResolvedValueOnce([
+      { id: 'adj-1', status: 'cancelled', review_note: 'self-cancelled by staff' },
+    ]);
+    const { res, captured } = makeRes();
+    await handler(makeReq({}, 'DELETE', { adjustment_id: 'adj-1' }), res);
+    expect(captured.statusCode).toBe(200);
+    const body = captured.body as { data: { adjustment: { status: string } } };
+    expect(body.data.adjustment.status).toBe('cancelled');
+  });
+
+  it('404 when the adjustment does not exist (IDOR-safe)', async () => {
+    mocks.sql
+      .mockResolvedValueOnce([]) // UPDATE matched 0 rows
+      .mockResolvedValueOnce([]); // disambiguating SELECT found nothing
+    const { res, captured } = makeRes();
+    await handler(makeReq({}, 'DELETE', { adjustment_id: 'unknown' }), res);
+    expect(captured.statusCode).toBe(404);
+  });
+
+  it('404 when the adjustment belongs to another staff (IDOR-safe — does not leak existence)', async () => {
+    mocks.sql
+      .mockResolvedValueOnce([]) // UPDATE matched 0 rows
+      .mockResolvedValueOnce([{ status: 'pending', staff_id: 'someone-else' }]);
+    const { res, captured } = makeRes();
+    await handler(makeReq({}, 'DELETE', { adjustment_id: 'adj-foreign' }), res);
+    expect(captured.statusCode).toBe(404);
+  });
+
+  it('409 when the adjustment is already non-pending (approved / rejected / cancelled)', async () => {
+    mocks.sql
+      .mockResolvedValueOnce([]) // UPDATE matched 0 rows
+      .mockResolvedValueOnce([{ status: 'approved', staff_id: 'staff-1' }]);
+    const { res, captured } = makeRes();
+    await handler(makeReq({}, 'DELETE', { adjustment_id: 'adj-approved' }), res);
+    expect(captured.statusCode).toBe(409);
+  });
+});
