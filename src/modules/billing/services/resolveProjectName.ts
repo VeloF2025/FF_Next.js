@@ -108,9 +108,23 @@ function tokensFuzzySubset(sub: string[], sup: string[]): boolean {
     if (/^\d+$/.test(t)) return sup.includes(t);
     return sup.some(u => {
       if (/^\d+$/.test(u)) return false;
-      return editDistance(t, u) <= FUZZY_TOKEN_DISTANCE;
+      if (editDistance(t, u) <= FUZZY_TOKEN_DISTANCE) return true;
+      // Abbreviation subsequence: "tem" ↔ "thembisa" — every char of t
+      // appears in u in order. Min length 3 so we don't over-match.
+      if (t.length >= 3 && isSubsequence(t, u)) return true;
+      return false;
     });
   });
+}
+
+/** True when every char of `needle` appears in `hay` in order (not necessarily contiguous). */
+function isSubsequence(needle: string, hay: string): boolean {
+  let i = 0;
+  for (const c of hay) {
+    if (c === needle[i]) i++;
+    if (i === needle.length) return true;
+  }
+  return i === needle.length;
 }
 
 /**

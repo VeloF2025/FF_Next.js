@@ -117,4 +117,21 @@ describe('resolveProjectNameAgainst', () => {
       expect(r.matched).toBe(false);
     });
   });
+
+  describe('abbreviation prefix', () => {
+    it('resolves "TEM POP01" to "Thembisa POP 1" via prefix match', () => {
+      const r = resolveProjectNameAgainst('TEM POP01', PROJECTS);
+      expect(r.matched).toBe(true);
+      expect(r.project?.name).toBe('Thembisa POP 1');
+    });
+
+    it('does not prefix-match 2-char tokens (too ambiguous)', () => {
+      const twoProjects: BillableProject[] = [
+        { id: '1', name: 'Lawley' },
+        { id: '2', name: 'Laketown' },
+      ];
+      const r = resolveProjectNameAgainst('La', twoProjects);
+      expect(r.matched).toBe(false);
+    });
+  });
 });

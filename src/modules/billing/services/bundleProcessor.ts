@@ -86,14 +86,26 @@ function extractHint(filename: string, kind: 'payment' | 'notes' | 'uptake'): st
   if (kind === 'uptake') {
     // "Lawley_installation uptake per zone_260405" → "Lawley"
     const m = base.match(/^(.+?)_installation\s+uptake/i);
-    if (m && m[1]) return m[1].trim();
+    if (m && m[1]) return stripSitePrefix(m[1].trim());
   }
   if (kind === 'payment' || kind === 'notes') {
     // "Lawley WE260405", "Lawley WE260405 notes" → "Lawley"
     const m = base.match(/^(.*?)\s+WE(?:\d|\s)/i);
-    if (m && m[1]) return m[1].trim();
+    if (m && m[1]) return stripSitePrefix(m[1].trim());
   }
-  return base;
+  // Fallback: strip trailing " notes" / " note" so misnamed notes files
+  // ("059 TEM POP01 notes") still produce a usable hint ("TEM POP01").
+  const deNoted = base.replace(/\s+notes?\s*$/i, '').trim();
+  return stripSitePrefix(deNoted);
+}
+
+/**
+ * Strip a leading FT-internal site code ("059 ", "123-") from a project hint.
+ * These 3-digit codes aren't in our projects table and otherwise pollute
+ * the token set so resolution misses.
+ */
+function stripSitePrefix(s: string): string {
+  return s.replace(/^\d{2,4}[\s_-]+/, '').trim();
 }
 
 // ─── Grouping ───────────────────────────────────────────────────────────────
