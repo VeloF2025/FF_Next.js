@@ -24,6 +24,15 @@ export interface ClosedEntryRow extends Record<string, unknown> {
   clock_out_at: string;
   bcea_applicable: boolean;
   ordinarily_works_sundays: boolean;
+  /**
+   * numeric(8,2) from staff.hourly_rate as a text string (or null when
+   * the staff has no rate set — typical for salaried staff not yet
+   * converted to hourly tracking). Threaded through to wageCalculator.
+   * Captured AT RECONCILE TIME, not at clock_in — a rate change between
+   * clock-in and reconcile applies the newer rate. True point-in-time
+   * rates would need a separate staff_rate_history table (deferred).
+   */
+  hourly_rate: string | null;
 }
 
 interface DefaultRuleRow extends Record<string, unknown> {
@@ -96,7 +105,8 @@ export async function loadClosedEntriesMissingSummary(
            e.clock_in_at::text,
            e.clock_out_at::text,
            COALESCE(s.bcea_applicable, true) AS bcea_applicable,
-           COALESCE(s.ordinarily_works_sundays, false) AS ordinarily_works_sundays
+           COALESCE(s.ordinarily_works_sundays, false) AS ordinarily_works_sundays,
+           s.hourly_rate::text AS hourly_rate
     FROM attendance_entries e
     JOIN staff s ON s.id = e.staff_id
     LEFT JOIN attendance_daily_summaries ds

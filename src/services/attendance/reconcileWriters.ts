@@ -73,31 +73,52 @@ export async function autoCloseOneEntry(
   }
 }
 
+export interface UpsertSummaryExtras {
+  /**
+   * Wage (cents) computed by wageCalculator.computeWageCents. Null
+   * when we couldn't compute (missing rate / incomplete summary).
+   * Migration 324's CHECK constraint pairs this with the rate snapshot
+   * — both must be null or both non-null.
+   */
+  wageAmountCents: number | null;
+  hourlyRateSnapshotCents: number | null;
+}
+
 export async function upsertSummary(
   staffId: string,
   workDate: string,
-  summary: DailySummary
+  summary: DailySummary,
+  extras: UpsertSummaryExtras = {
+    wageAmountCents: null,
+    hourlyRateSnapshotCents: null,
+  }
 ): Promise<void> {
   await sql`
     INSERT INTO attendance_daily_summaries (
       staff_id, work_date,
       regular_hrs, overtime_hrs, sunday_hrs, holiday_hrs, night_hrs,
-      rule_id, computation_mode, computed_at
+      rule_id, computation_mode,
+      wage_amount_cents, hourly_rate_snapshot_cents,
+      computed_at
     ) VALUES (
       ${staffId}, ${workDate}::date,
       ${summary.regularHrs}, ${summary.overtimeHrs},
       ${summary.sundayHrs}, ${summary.holidayHrs}, ${summary.nightHrs},
-      ${summary.ruleId}, ${summary.computationMode}, NOW()
+      ${summary.ruleId}, ${summary.computationMode},
+      ${extras.wageAmountCents}, ${extras.hourlyRateSnapshotCents},
+      NOW()
     )
     ON CONFLICT (staff_id, work_date) DO UPDATE
-      SET regular_hrs      = EXCLUDED.regular_hrs,
-          overtime_hrs     = EXCLUDED.overtime_hrs,
-          sunday_hrs       = EXCLUDED.sunday_hrs,
-          holiday_hrs      = EXCLUDED.holiday_hrs,
-          night_hrs        = EXCLUDED.night_hrs,
-          rule_id          = EXCLUDED.rule_id,
-          computation_mode = EXCLUDED.computation_mode,
-          computed_at      = EXCLUDED.computed_at
+      SET regular_hrs                = EXCLUDED.regular_hrs,
+          overtime_hrs               = EXCLUDED.overtime_hrs,
+          sunday_hrs                 = EXCLUDED.sunday_hrs,
+          holiday_hrs                = EXCLUDED.holiday_hrs,
+          night_hrs                  = EXCLUDED.night_hrs,
+          rule_id                    = EXCLUDED.rule_id,
+          computation_mode           = EXCLUDED.computation_mode,
+          wage_amount_cents          = EXCLUDED.wage_amount_cents,
+          hourly_rate_snapshot_cents = EXCLUDED.hourly_rate_snapshot_cents,
+          computed_at                = EXCLUDED.computed_at
   `;
 }
 

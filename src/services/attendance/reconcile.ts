@@ -44,6 +44,10 @@ import {
   upsertSummary,
   raiseCapViolation,
 } from './reconcileWriters';
+import {
+  computeWageCents,
+  hourlyRateCentsFromDbValue,
+} from './wageCalculator';
 
 export interface ReconcileOptions {
   /** If set, only reconcile entries whose work_date is >= this ISO date. Default: last 14 days. */
@@ -198,7 +202,27 @@ export async function reconcile(options: ReconcileOptions = {}): Promise<Reconci
           );
           continue;
         }
-        await upsertSummary(staffId, row.work_date, summary);
+
+        // Wage snapshot. Captured at reconcile time per the Phase 1b+
+        // policy; historical rate changes between clock-in and reconcile
+        // favour the newer rate. Null-rate staff (salaried / not yet
+        // hourly-converted) get wage_amount_cents=NULL, which the
+        // migration-324 CHECK pairs with a NULL snapshot.
+        const hourlyRateCents = hourlyRateCentsFromDbValue(row.hourly_rate);
+        const wageAmountCents =
+          hourlyRateCents !== null
+            ? computeWageCents({
+                summary,
+                rule,
+                hourlyRateCents,
+                ordinarilyWorksSundays: row.ordinarily_works_sundays,
+              })
+            : null;
+
+        await upsertSummary(staffId, row.work_date, summary, {
+          wageAmountCents,
+          hourlyRateSnapshotCents: wageAmountCents === null ? null : hourlyRateCents,
+        });
         report.summariesUpserted += 1;
 
         // Advance the running counter AS SOON AS the summary is persisted,

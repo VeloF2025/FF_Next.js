@@ -88,7 +88,8 @@ const TEMPLATES: Template[] = [
              e.clock_in_at::text,
              e.clock_out_at::text,
              COALESCE(s.bcea_applicable, true) AS bcea_applicable,
-             COALESCE(s.ordinarily_works_sundays, false) AS ordinarily_works_sundays
+             COALESCE(s.ordinarily_works_sundays, false) AS ordinarily_works_sundays,
+             s.hourly_rate::text AS hourly_rate
       FROM attendance_entries e
       JOIN staff s ON s.id = e.staff_id
       LEFT JOIN attendance_daily_summaries ds
@@ -151,23 +152,41 @@ const TEMPLATES: Template[] = [
       INSERT INTO attendance_daily_summaries (
         staff_id, work_date,
         regular_hrs, overtime_hrs, sunday_hrs, holiday_hrs, night_hrs,
-        rule_id, computation_mode, computed_at
+        rule_id, computation_mode,
+        wage_amount_cents, hourly_rate_snapshot_cents,
+        computed_at
       ) VALUES (
-        $1, $2::date,
+        $1::uuid, $2::date,
         $3, $4,
         $5, $6, $7,
-        $8, $9, NOW()
+        $8::uuid, $9,
+        $10::bigint, $11::bigint,
+        NOW()
       )
       ON CONFLICT (staff_id, work_date) DO UPDATE
-        SET regular_hrs      = EXCLUDED.regular_hrs,
-            overtime_hrs     = EXCLUDED.overtime_hrs,
-            sunday_hrs       = EXCLUDED.sunday_hrs,
-            holiday_hrs      = EXCLUDED.holiday_hrs,
-            night_hrs        = EXCLUDED.night_hrs,
-            rule_id          = EXCLUDED.rule_id,
-            computation_mode = EXCLUDED.computation_mode,
-            computed_at      = EXCLUDED.computed_at`,
-    params: [SAMPLE_UUID, SAMPLE_DATE, 8, 0, 0, 0, 0, SAMPLE_UUID, 'bcea'],
+        SET regular_hrs                = EXCLUDED.regular_hrs,
+            overtime_hrs               = EXCLUDED.overtime_hrs,
+            sunday_hrs                 = EXCLUDED.sunday_hrs,
+            holiday_hrs                = EXCLUDED.holiday_hrs,
+            night_hrs                  = EXCLUDED.night_hrs,
+            rule_id                    = EXCLUDED.rule_id,
+            computation_mode           = EXCLUDED.computation_mode,
+            wage_amount_cents          = EXCLUDED.wage_amount_cents,
+            hourly_rate_snapshot_cents = EXCLUDED.hourly_rate_snapshot_cents,
+            computed_at                = EXCLUDED.computed_at`,
+    params: [
+      SAMPLE_UUID,
+      SAMPLE_DATE,
+      8,
+      0,
+      0,
+      0,
+      0,
+      SAMPLE_UUID,
+      'bcea_default',
+      96000,
+      12000,
+    ],
   },
   {
     name: 'raiseCapViolation',

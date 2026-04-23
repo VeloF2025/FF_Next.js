@@ -59,6 +59,7 @@ function closedEntry(overrides: Partial<Record<string, unknown>> = {}) {
     clock_out_at: overrides.clock_out_at ?? '2026-04-20T14:00:00+00:00',
     bcea_applicable: overrides.bcea_applicable ?? true,
     ordinarily_works_sundays: overrides.ordinarily_works_sundays ?? false,
+    hourly_rate: overrides.hourly_rate ?? null,
     ...overrides,
   };
 }
@@ -224,6 +225,64 @@ describe('reconcile — compute summaries', () => {
     // The calculator produced regular=8 for an 8h shift; it should appear
     // as a param on this upsert. Locks down the calculator wiring.
     expect(paramsOf(upsertCalls[0]!)).toContain(8);
+    // No hourly_rate provided → wage_amount_cents + snapshot both null.
+    expect(paramsOf(upsertCalls[0]!)).toContain(null);
+  });
+
+  it('threads wage_amount_cents + hourly_rate_snapshot_cents when staff.hourly_rate is set', async () => {
+    // Regression for PR #1406: the wage calculator result + rate snapshot
+    // must land on the upsert so downstream payroll can read them. R120/hr
+    // × 8h weekday = R960 → 96000 cents; snapshot = 12000 cents/hr.
+    sqlMock
+      .mockResolvedValueOnce([]) // no auto-close candidates
+      .mockResolvedValueOnce([DEFAULT_RULE_ROW])
+      .mockResolvedValueOnce([]) // holidays
+      .mockResolvedValueOnce([
+        closedEntry({
+          id: 'e1',
+          clock_in_at: '2026-04-20T06:00:00+00:00',
+          clock_out_at: '2026-04-20T14:00:00+00:00',
+          hourly_rate: '120.00',
+        }),
+      ])
+      .mockResolvedValueOnce([{ total: '0' }])
+      .mockResolvedValueOnce([]);
+
+    await reconcile({ fromDate: '2026-04-20', toDate: '2026-04-20' });
+
+    const upsertCalls = findCalls(/INSERT\s+INTO\s+attendance_daily_summaries/i);
+    expect(upsertCalls).toHaveLength(1);
+    const params = paramsOf(upsertCalls[0]!);
+    expect(params).toContain(96000); // wage_amount_cents
+    expect(params).toContain(12000); // hourly_rate_snapshot_cents
+  });
+
+  it('bcea_exempt staff with rate: wage = regularHrs × rate only (no stacking)', async () => {
+    // Exempt staff above s6 threshold. An 11h shift: calculator returns
+    // regular=11, overtime/sunday/holiday/night=0, computation_mode='bcea_exempt'.
+    // Wage at R120/hr = 11 × 12000 = 132000 cents.
+    sqlMock
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([DEFAULT_RULE_ROW])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        closedEntry({
+          id: 'e1',
+          clock_in_at: '2026-04-20T04:00:00+00:00', // 06:00 SAST
+          clock_out_at: '2026-04-20T15:00:00+00:00', // 17:00 SAST = 11h
+          bcea_applicable: false,
+          hourly_rate: '120.00',
+        }),
+      ])
+      .mockResolvedValueOnce([{ total: '0' }])
+      .mockResolvedValueOnce([]);
+
+    await reconcile({ fromDate: '2026-04-20', toDate: '2026-04-20' });
+
+    const upsertCalls = findCalls(/INSERT\s+INTO\s+attendance_daily_summaries/i);
+    const params = paramsOf(upsertCalls[0]!);
+    expect(params).toContain(132000); // 11 × 12000 cents, no 1.5x OT stacking
+    expect(params).toContain(12000); // rate snapshot
   });
 
   it('loadPersistedWeeklyOtBefore is called with the first recomputing date (NOT <> ALL exclude-list)', async () => {
