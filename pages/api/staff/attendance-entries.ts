@@ -18,7 +18,12 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
-import { withAuth, withPermission } from '@/lib/auth/middleware';
+import {
+  withAuth,
+  withPermission,
+  type AuthenticatedNextApiRequest,
+} from '@/lib/auth/middleware';
+import { authorizedToSuperviseStaff } from '@/services/attendance/supervisorScope';
 
 const DEFAULT_DAYS = 30;
 const MAX_DAYS = 90;
@@ -59,6 +64,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const staffId = typeof req.query.staffId === 'string' ? req.query.staffId.trim() : '';
   if (!/^[0-9a-f-]{36}$/i.test(staffId)) {
     return apiResponse.badRequest(res, 'staffId must be a UUID');
+  }
+
+  // Scope gate: a user with view permission may still only see entries
+  // for staff they supervise (reports_to ancestor OR same-dept manager).
+  // Super_admin / admin bypass. Self-view works via the V===T branch.
+  const scopeOk = await authorizedToSuperviseStaff(
+    (req as AuthenticatedNextApiRequest).user,
+    staffId
+  );
+  if (!scopeOk) {
+    return apiResponse.forbidden(
+      res,
+      'You are not in the supervisor chain for this staff member'
+    );
   }
 
   const daysRaw = typeof req.query.days === 'string' ? Number.parseInt(req.query.days, 10) : NaN;

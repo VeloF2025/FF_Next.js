@@ -300,6 +300,41 @@ const TEMPLATES: Template[] = [
       RETURNING id`,
     params: [SAMPLE_UUID, 5000.0, 500, 'in'],
   },
+  {
+    name: 'canSuperviseStaff (recursive CTE + department fallback)',
+    text: `
+      WITH RECURSIVE ancestors AS (
+        SELECT reports_to AS ancestor_id, 1 AS depth
+        FROM staff
+        WHERE id = $1::uuid
+
+        UNION ALL
+
+        SELECT s.reports_to, a.depth + 1
+        FROM staff s
+        JOIN ancestors a ON s.id = a.ancestor_id
+        WHERE a.ancestor_id IS NOT NULL
+          AND a.depth < $3::int
+      )
+      SELECT (
+        EXISTS (
+          SELECT 1 FROM ancestors WHERE ancestor_id = $2::uuid
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM staff v, staff t
+          WHERE v.id = $2::uuid
+            AND t.id = $1::uuid
+            AND v.department IS NOT NULL
+            AND t.department IS NOT NULL
+            AND v.department = t.department
+            AND EXISTS (
+              SELECT 1 FROM staff r WHERE r.reports_to = v.id
+            )
+        )
+      ) AS allowed`,
+    params: [SAMPLE_UUID, SAMPLE_UUID, 10],
+  },
 ];
 
 describe.skipIf(!INTEGRATION_ENABLED)(

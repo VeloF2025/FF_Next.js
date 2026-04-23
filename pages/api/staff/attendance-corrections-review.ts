@@ -42,6 +42,7 @@ import {
   isoWeekMonday,
   lookupActiveLock,
 } from '@/modules/attendance/corrections/lockQueries';
+import { authorizedToSuperviseStaff } from '@/services/attendance/supervisorScope';
 
 async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method !== 'POST') {
@@ -80,6 +81,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     const existing = await loadAdjustmentWithEntry(adjustmentId);
     if (!existing) {
       apiResponse.notFound(res, 'Adjustment', adjustmentId);
+      return;
+    }
+    // Scope gate: a reviewer with the RBAC permission may still only
+    // act on staff they supervise (reports_to ancestor OR same-dept
+    // manager). Super_admin / admin bypass this check.
+    const authedUser = (req as AuthenticatedNextApiRequest).user;
+    const scopeOk = await authorizedToSuperviseStaff(
+      authedUser,
+      existing.entry.staff_id
+    );
+    if (!scopeOk) {
+      apiResponse.forbidden(
+        res,
+        'You are not in the supervisor chain for this staff member'
+      );
       return;
     }
     if (existing.adjustment.status !== 'pending') {

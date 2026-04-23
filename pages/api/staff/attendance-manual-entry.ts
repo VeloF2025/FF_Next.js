@@ -33,6 +33,7 @@ import {
   isoWeekMonday,
   lookupActiveLock,
 } from '@/modules/attendance/corrections/lockQueries';
+import { authorizedToSuperviseStaff } from '@/services/attendance/supervisorScope';
 
 async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method !== 'POST') {
@@ -55,6 +56,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   if (!staffId) {
     apiResponse.badRequest(res, 'staff_id is required');
+    return;
+  }
+  // Scope gate: supervisor can only act on staff in their supervisor
+  // chain. Super_admin / admin bypass.
+  const scopeOk = await authorizedToSuperviseStaff(
+    (req as AuthenticatedNextApiRequest).user,
+    staffId
+  );
+  if (!scopeOk) {
+    apiResponse.forbidden(
+      res,
+      'You are not in the supervisor chain for this staff member'
+    );
     return;
   }
   if (!clockInRaw || !clockOutRaw) {
