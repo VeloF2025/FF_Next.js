@@ -140,9 +140,39 @@ export function generateFeedbackMessage(
     lines.push('');
   }
 
-  // Photo coverage
-  const { covered, missing } = validations.stepCoverage;
-  lines.push(`*Photo Coverage:* ${covered.length}/12 steps`);
+  // Photo coverage — split live from photoResults so the feedback always
+  // reflects the current state (including human PASS/FAIL/step overrides).
+  // A step is "passed" if it has ≥1 PASS photo, "failed" if it has photos
+  // but all FAIL, "missing" if no photo is assigned to it.
+  const passedSet = new Set<number>();
+  const anySet = new Set<number>();
+  for (const p of photoResults) {
+    // Skip synthetic "missing step" placeholder rows — they represent the
+    // absence of a photo, not a photo that failed.
+    if (p.filename.startsWith('missing_step_')) continue;
+    if (p.step >= 1 && p.step <= 12) {
+      anySet.add(p.step);
+      if (p.decision === 'PASS') passedSet.add(p.step);
+    }
+  }
+  const passedSteps: number[] = [];
+  const failedSteps: number[] = [];
+  const missing: number[] = [];
+  for (let s = 1; s <= 12; s++) {
+    if (passedSet.has(s)) passedSteps.push(s);
+    else if (anySet.has(s)) failedSteps.push(s);
+    else missing.push(s);
+  }
+
+  lines.push(
+    `*Photo Coverage:* ${passedSteps.length}/12 passed · ${failedSteps.length} failed · ${missing.length} missing`
+  );
+  if (failedSteps.length > 0) {
+    const failedLabels = failedSteps
+      .map((s) => STEP_LABELS[s] || `Step ${s}`)
+      .join(', ');
+    lines.push(`*Failed Steps:* ${failedLabels}`);
+  }
   if (missing.length > 0) {
     const missingLabels = missing
       .map((s) => STEP_LABELS[s] || `Step ${s}`)
