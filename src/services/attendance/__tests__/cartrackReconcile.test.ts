@@ -494,24 +494,19 @@ describe('cartrackReconcile — end-to-end through real adapter', () => {
     expect(report.perEntryErrors).toHaveLength(0);
   });
 
-  it('real adapter pagination throw lands in perEntryErrors, does not crash the run', async () => {
+  it('real adapter HTTP error lands in perEntryErrors, does not crash the run', async () => {
+    // Previously this test asserted a pagination throw. Post #1404 the
+    // adapter follows pagination, so the "throw lands here cleanly"
+    // contract is now proven via any other Cartrack HTTP error — a 500
+    // here stands in for the class of transient transport failures the
+    // reconcile cron must survive without aborting the whole batch.
     const { cartrackClient } = await import('../../tracking/cartrack/client');
 
     const fetchImpl = (async () =>
       ({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          data: [
-            {
-              vehicle_id: 544522263,
-              event_ts: '2026-04-20 05:59:45',
-              latitude: -26.2,
-              longitude: 28.0,
-            },
-          ],
-          meta: { current_page: 1, last_page: 5, total: 4800 },
-        }),
+        ok: false,
+        status: 500,
+        json: async () => ({ error: 'upstream' }),
       }) as unknown as Response) as typeof fetch;
 
     const realClient = cartrackClient({
@@ -544,6 +539,6 @@ describe('cartrackReconcile — end-to-end through real adapter', () => {
     });
     expect(report.rowsMatch).toBe(0);
     expect(report.perEntryErrors).toHaveLength(1);
-    expect(report.perEntryErrors[0]!.error).toMatch(/paginated/i);
+    expect(report.perEntryErrors[0]!.error).toMatch(/HTTP 500/);
   });
 });

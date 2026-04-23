@@ -327,22 +327,61 @@ describe('fetchPositionAt — pagination + shape guards (P0/P1 hardening)', () =
     password: 'p',
   };
 
-  it('throws when meta.last_page > 1 (silent truncation guard)', async () => {
-    // A 50-vehicle fleet at 60 pings/min busy window can exceed 1000
-    // events. Cartrack time-sorts; the dropped tail is often the events
-    // CLOSEST to the clock time — which would silently flip match → no_data.
+  it('follows pagination: concatenates data across pages and picks nearest overall', async () => {
+    // Regression test: prior to pagination following, this adapter threw on
+    // any `meta.last_page > 1` response — Cartrack time-sorts, so the tail
+    // (closest events to the clock time) silently dropped before. Now we
+    // follow to `last_page` and aggregate, letting pickNearestSample pick
+    // from the full candidate set.
     const fetchImpl = mockFetch([
       jsonResponse(200, {
         data: [
-          { vehicle_id: 1, event_ts: '2026-04-20 05:59:45', latitude: -26.2, longitude: 28.0 },
+          { vehicle_id: 1, event_ts: '2026-04-20 05:55:00', latitude: -26.21, longitude: 28.0 },
         ],
         meta: { current_page: 1, last_page: 3, total: 2500 },
       }),
+      jsonResponse(200, {
+        data: [
+          { vehicle_id: 1, event_ts: '2026-04-20 05:58:00', latitude: -26.205, longitude: 28.0 },
+        ],
+        meta: { current_page: 2, last_page: 3, total: 2500 },
+      }),
+      jsonResponse(200, {
+        data: [
+          { vehicle_id: 1, event_ts: '2026-04-20 05:59:55', latitude: -26.2001, longitude: 28.0 },
+        ],
+        meta: { current_page: 3, last_page: 3, total: 2500 },
+      }),
     ]);
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
+    const result = await client.fetchPositionAt(
+      '1',
+      new Date('2026-04-20T06:00:00Z')
+    );
+    // Nearest to 06:00:00Z across all three pages is page 3's 05:59:55Z sample.
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      expect(result.sample.lat).toBeCloseTo(-26.2001);
+      expect(result.sample.ts.toISOString()).toBe('2026-04-20T05:59:55.000Z');
+    }
+  });
+
+  it('rejects when pagination exceeds MAX_PAGES (runaway guard)', async () => {
+    // Build 12 responses all advertising last_page=12 so the adapter
+    // tries to keep going past the MAX_PAGES=10 cap. Throws on page 11.
+    const responses = Array.from({ length: 11 }, (_, i) =>
+      jsonResponse(200, {
+        data: [
+          { vehicle_id: 1, event_ts: '2026-04-20 05:55:00', latitude: -26.2, longitude: 28.0 },
+        ],
+        meta: { current_page: i + 1, last_page: 12, total: 12000 },
+      })
+    );
+    const fetchImpl = mockFetch(responses);
     const client = cartrackClient({ ...baseOpts, fetchImpl });
     await expect(
       client.fetchPositionAt('1', new Date('2026-04-20T06:00:00Z'))
-    ).rejects.toThrow(/paginated/i);
+    ).rejects.toThrow(/MAX_PAGES=10/);
   });
 
   it('throws on empty vehicleId input (defence against empty cartrack_vehicle_id column)', async () => {
@@ -489,15 +528,37 @@ describe('listVehicles — pagination + shape + fallback (P0/P1 hardening)', () 
     password: 'p',
   };
 
-  it('throws when meta.last_page > 1 (silent truncation guard)', async () => {
+  it('follows pagination: assembles full fleet across pages', async () => {
+    // Regression test: previously the adapter threw on any paginated
+    // /vehicles response, silently truncating large fleets. Now we follow
+    // to last_page and assemble the full list.
     const fetchImpl = mockFetch([
       jsonResponse(200, {
         data: [{ vehicle_id: 1, vehicle_name: 'MW67LFGP' }],
         meta: { current_page: 1, last_page: 2, total: 600 },
       }),
+      jsonResponse(200, {
+        data: [{ vehicle_id: 2, vehicle_name: 'NX12PXGP' }],
+        meta: { current_page: 2, last_page: 2, total: 600 },
+      }),
     ]);
     const client = cartrackClient({ ...baseOpts, fetchImpl });
-    await expect(client.listVehicles()).rejects.toThrow(/paginated/i);
+    const fleet = await client.listVehicles();
+    expect(fleet).toHaveLength(2);
+    expect(fleet.map((v) => v.cartrackId)).toEqual(['1', '2']);
+    expect(fleet.map((v) => v.registration)).toEqual(['MW67LFGP', 'NX12PXGP']);
+  });
+
+  it('rejects when pagination exceeds MAX_PAGES (runaway fleet guard)', async () => {
+    const responses = Array.from({ length: 11 }, (_, i) =>
+      jsonResponse(200, {
+        data: [{ vehicle_id: i + 1, vehicle_name: `V${i + 1}` }],
+        meta: { current_page: i + 1, last_page: 12, total: 6000 },
+      })
+    );
+    const fetchImpl = mockFetch(responses);
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
+    await expect(client.listVehicles()).rejects.toThrow(/MAX_PAGES=10/);
   });
 
   it('throws on data: null or non-array (symmetric shape check)', async () => {

@@ -39,9 +39,18 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 const MAX_EVENTS_PER_PAGE = 1000;
 /**
  * Per-request page size for fleet list. Cartrack accepts up to 500 per
- * page on /vehicles; same pagination guard as events applies.
+ * page on /vehicles.
  */
 const MAX_VEHICLES_PER_PAGE = 500;
+/**
+ * Hard cap on pagination depth per call. Our ±5 min events window
+ * should not produce more than ~1–2 pages even for a large fleet; a
+ * value of 10 is generous headroom before we treat the response as
+ * pathological (e.g. tenant misconfigured, stale baseUrl, runaway
+ * pagination). For /vehicles this caps the effective fleet size at
+ * MAX_PAGES * MAX_VEHICLES_PER_PAGE = 5000 vehicles.
+ */
+const MAX_PAGES = 10;
 /**
  * Warn threshold: if more than this fraction of events returned for the
  * target vehicle within the window lack a GPS fix (null lat/lon), log
@@ -132,59 +141,16 @@ class HttpCartrackClient implements CartrackClient {
     // Date format per docs: `YYYY-MM-DD hh:mm:ss` (no timezone, assumed UTC).
     const from = cartrackTsFormat(new Date(at.getTime() - toleranceMs));
     const to = cartrackTsFormat(new Date(at.getTime() + toleranceMs));
-    const url =
+    const buildUrl = (page: number) =>
       `${trimSlash(this.opts.baseUrl)}/vehicles/events` +
       `?start_timestamp=${encodeURIComponent(from)}` +
       `&end_timestamp=${encodeURIComponent(to)}` +
-      `&limit=${MAX_EVENTS_PER_PAGE}`;
+      `&limit=${MAX_EVENTS_PER_PAGE}` +
+      `&page=${page}`;
 
-    let res: Response;
-    try {
-      res = await this.doFetch(url);
-    } catch (err) {
-      throw new CartrackError('network', err instanceof Error ? err.message : String(err));
-    }
-    if (!res.ok) {
-      throw new CartrackError('http', `Cartrack events: HTTP ${res.status}`);
-    }
-    let body: EventsResponse;
-    try {
-      body = (await res.json()) as EventsResponse;
-    } catch (parseErr) {
-      throw new CartrackError(
-        'http',
-        `Cartrack events: malformed JSON body (${
-          parseErr instanceof Error ? parseErr.message : String(parseErr)
-        })`
-      );
-    }
-    // Symmetric shape validation — null, undefined, and non-array all
-    // throw. Previously only non-array threw; null and undefined silently
-    // produced `no_data` via `?? []`, hiding upstream contract breakage.
-    if (!Array.isArray(body.data)) {
-      throw new CartrackError(
-        'http',
-        `Cartrack events: expected data[] array, got ${
-          body.data === undefined ? 'undefined' : body.data === null ? 'null' : typeof body.data
-        }`
-      );
-    }
-
-    // Pagination guard. Cartrack caps per-page at MAX_EVENTS_PER_PAGE;
-    // if `meta.last_page > 1` comes back, the tail (often the events
-    // CLOSEST to `at` since Cartrack time-sorts) silently drops and
-    // `match` verdicts flip to `no_data` / `mismatch`. Throw so the
-    // reconcile's per-entry catch records it and the circuit-breaker
-    // can trip if the condition persists.
-    if (body.meta?.last_page !== undefined && body.meta.last_page > 1) {
-      throw new CartrackError(
-        'http',
-        `Cartrack events: paginated response (page ${
-          body.meta.current_page ?? '?'
-        }/${body.meta.last_page}); adapter does not follow pagination yet. ` +
-          `Shrink the tolerance window or upgrade the adapter.`
-      );
-    }
+    const { data: events, pages } = await this.fetchAllPages<
+      NonNullable<EventsResponse['data']>[number]
+    >(buildUrl, 'Cartrack events');
 
     // Malformed payload: an event row without a vehicle_id can't be
     // routed to any staff member — throw rather than silently drop.
@@ -192,7 +158,7 @@ class HttpCartrackClient implements CartrackClient {
     // Cartrack is allowed to return rows for vehicles we don't care
     // about, but rows without a vehicle_id at all indicate a contract
     // breach.
-    for (const e of body.data) {
+    for (const e of events) {
       if (e.vehicle_id === undefined || e.vehicle_id === null) {
         throw new CartrackError(
           'http',
@@ -204,7 +170,7 @@ class HttpCartrackClient implements CartrackClient {
     // Filter by vehicle_id. Both number and string are accepted (Cartrack
     // returns numeric IDs; stored mappings are strings). `String(…)` on a
     // validated non-null value is total.
-    const forVehicle = body.data.filter(
+    const forVehicle = events.filter(
       (e) => String(e.vehicle_id) === vehicleId
     );
     const samples = forVehicle
@@ -226,6 +192,7 @@ class HttpCartrackClient implements CartrackClient {
           withFix: samples.length,
           windowStart: from,
           windowEnd: to,
+          pagesFetched: pages,
         }
       );
     }
@@ -236,43 +203,18 @@ class HttpCartrackClient implements CartrackClient {
   }
 
   async listVehicles(): Promise<CartrackVehicleSummary[]> {
-    const url =
+    const buildUrl = (page: number) =>
       `${trimSlash(this.opts.baseUrl)}/vehicles` +
-      `?limit=${MAX_VEHICLES_PER_PAGE}`;
-    const res = await this.doFetch(url);
-    if (!res.ok) {
-      throw new CartrackError('http', `Cartrack vehicles list: HTTP ${res.status}`);
-    }
-    const body = (await res.json()) as VehiclesResponse & {
-      meta?: { total?: number; current_page?: number; last_page?: number };
-    };
-
-    // Same symmetric shape check + pagination guard as fetchPositionAt.
-    // A silently-truncated fleet list hides vehicles from the admin
-    // mapping UI — supervisors pick the wrong Cartrack ID and every
-    // verification for that staff member becomes `vehicle_not_mapped`.
-    if (!Array.isArray(body.data)) {
-      throw new CartrackError(
-        'http',
-        `Cartrack vehicles: expected data[] array, got ${
-          body.data === undefined ? 'undefined' : body.data === null ? 'null' : typeof body.data
-        }`
-      );
-    }
-    if (body.meta?.last_page !== undefined && body.meta.last_page > 1) {
-      throw new CartrackError(
-        'http',
-        `Cartrack vehicles: paginated response (page ${
-          body.meta.current_page ?? '?'
-        }/${body.meta.last_page}); adapter does not follow pagination yet. ` +
-          `Fleet has more than ${MAX_VEHICLES_PER_PAGE} vehicles — upgrade the adapter.`
-      );
-    }
+      `?limit=${MAX_VEHICLES_PER_PAGE}` +
+      `&page=${page}`;
+    const { data: rows } = await this.fetchAllPages<
+      NonNullable<VehiclesResponse['data']>[number]
+    >(buildUrl, 'Cartrack vehicles');
 
     // TODO(multi-tenant): vehicle_name is the real plate in the SA tenant
     // but may be a nickname/VIN in other regions where `registration`
     // holds the actual plate. Revisit when expanding beyond ZA.
-    return body.data
+    return rows
       .map((v) => ({
         cartrackId: String(v.vehicle_id ?? ''),
         registration: v.vehicle_name ?? v.client_vehicle_description ?? null,
@@ -280,6 +222,83 @@ class HttpCartrackClient implements CartrackClient {
           [v.manufacturer, v.model].filter(Boolean).join(' ').trim() || null,
       }))
       .filter((v) => v.cartrackId.length > 0);
+  }
+
+  /**
+   * Follows Cartrack pagination. Sequential (not concurrent) so we don't
+   * hammer the tenant. Aggregates `data[]` across all pages. Hard-caps
+   * at `MAX_PAGES` and throws if that's exceeded — an unbounded loop on
+   * a nightly cron is worse than failing loud.
+   *
+   * Shape invariants enforced on every page:
+   *   - HTTP 2xx
+   *   - body.data is Array<T> (symmetric null/undefined throw)
+   *   - body.meta.last_page is a positive int when present (defaults to 1)
+   *
+   * Returns the flat list plus the count of pages actually fetched so
+   * callers can telemeter deep pagination.
+   */
+  private async fetchAllPages<T>(
+    buildUrl: (page: number) => string,
+    errorPrefix: string
+  ): Promise<{ data: T[]; pages: number }> {
+    const all: T[] = [];
+    let page = 1;
+    while (true) {
+      let res: Response;
+      try {
+        res = await this.doFetch(buildUrl(page));
+      } catch (err) {
+        throw new CartrackError(
+          'network',
+          err instanceof Error ? err.message : String(err)
+        );
+      }
+      if (!res.ok) {
+        throw new CartrackError(
+          'http',
+          `${errorPrefix}: HTTP ${res.status} (page ${page})`
+        );
+      }
+      let body: {
+        data?: T[] | null;
+        meta?: { current_page?: number; last_page?: number };
+      };
+      try {
+        body = await res.json();
+      } catch (parseErr) {
+        throw new CartrackError(
+          'http',
+          `${errorPrefix}: malformed JSON body on page ${page} (${
+            parseErr instanceof Error ? parseErr.message : String(parseErr)
+          })`
+        );
+      }
+      if (!Array.isArray(body.data)) {
+        throw new CartrackError(
+          'http',
+          `${errorPrefix}: expected data[] array on page ${page}, got ${
+            body.data === undefined
+              ? 'undefined'
+              : body.data === null
+                ? 'null'
+                : typeof body.data
+          }`
+        );
+      }
+      all.push(...body.data);
+      const lastPage = body.meta?.last_page ?? 1;
+      if (page >= lastPage) return { data: all, pages: page };
+      page += 1;
+      if (page > MAX_PAGES) {
+        throw new CartrackError(
+          'http',
+          `${errorPrefix}: pagination exceeded MAX_PAGES=${MAX_PAGES} ` +
+            `(fetched through page ${page - 1} of ${lastPage}; ` +
+            `shrink the window or raise the cap)`
+        );
+      }
+    }
   }
 
   private async doFetch(url: string): Promise<Response> {
