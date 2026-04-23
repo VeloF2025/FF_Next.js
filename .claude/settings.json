@@ -47,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if echo \"$TOOL_INPUT\" | grep -q 'git commit'; then npx ts-node .claude/hooks/pre-commit.ts 2>&1 || true; fi",
+            "command": "if echo \"$TOOL_INPUT\" | grep -q 'git commit'; then node .claude/hooks/pre-commit.js 2>&1 || true; fi",
             "timeout": 120,
             "statusMessage": "Running pre-commit validation..."
           }
@@ -58,7 +58,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if echo \"$TOOL_INPUT\" | grep -q '/src/modules/'; then TOOL_INPUT=\"$TOOL_INPUT\" npx ts-node .claude/hooks/tdd-reminder.ts 2>&1 || true; TOOL_INPUT=\"$TOOL_INPUT\" npx ts-node .claude/hooks/skill-gap-detector.ts 2>&1 || true; fi",
+            "command": "if echo \"$TOOL_INPUT\" | grep -q '/src/modules/'; then TOOL_INPUT=\"$TOOL_INPUT\" node .claude/hooks/tdd-reminder.js 2>&1 || true; TOOL_INPUT=\"$TOOL_INPUT\" node .claude/hooks/skill-gap-detector.js 2>&1 || true; fi",
             "timeout": 5,
             "statusMessage": "Checking TDD & skill coverage..."
           }
@@ -69,7 +69,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if echo \"$TOOL_INPUT\" | grep -q '/src/modules/'; then TOOL_INPUT=\"$TOOL_INPUT\" npx ts-node .claude/hooks/tdd-reminder.ts 2>&1 || true; TOOL_INPUT=\"$TOOL_INPUT\" npx ts-node .claude/hooks/skill-gap-detector.ts 2>&1 || true; fi",
+            "command": "if echo \"$TOOL_INPUT\" | grep -q '/src/modules/'; then TOOL_INPUT=\"$TOOL_INPUT\" node .claude/hooks/tdd-reminder.js 2>&1 || true; TOOL_INPUT=\"$TOOL_INPUT\" node .claude/hooks/skill-gap-detector.js 2>&1 || true; fi",
             "timeout": 5,
             "statusMessage": "Checking TDD & skill coverage..."
           }
@@ -81,7 +81,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx ts-node .claude/hooks/token-tracker.ts 2>/dev/null || true",
+            "command": "node .claude/hooks/token-tracker.js 2>/dev/null || true",
             "timeout": 5,
             "statusMessage": "Tracking tokens..."
           }
@@ -92,13 +92,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "TOOL_INPUT=\"$TOOL_INPUT\" TOOL_RESULT=\"$TOOL_RESULT\" node .claude/hooks/verified-workflow-trigger.ts 2>&1 || true",
+            "command": "TOOL_INPUT=\"$TOOL_INPUT\" TOOL_RESULT=\"$TOOL_RESULT\" node .claude/hooks/verified-workflow-trigger.js 2>&1 || true",
             "timeout": 3,
             "statusMessage": "Checking verified status..."
           },
           {
             "type": "command",
-            "command": "TOOL_INPUT=\"$TOOL_INPUT\" TOOL_RESULT=\"$TOOL_RESULT\" node .claude/hooks/auto-skill-creator.ts 2>&1 || true",
+            "command": "TOOL_INPUT=\"$TOOL_INPUT\" TOOL_RESULT=\"$TOOL_RESULT\" node .claude/hooks/auto-skill-creator.js 2>&1 || true",
             "timeout": 3,
             "statusMessage": "Checking skill creation..."
           }
@@ -109,13 +109,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "TOOL_INPUT=\"$TOOL_INPUT\" TOOL_RESULT=\"$TOOL_RESULT\" node .claude/hooks/verified-workflow-trigger.ts 2>&1 || true",
+            "command": "TOOL_INPUT=\"$TOOL_INPUT\" TOOL_RESULT=\"$TOOL_RESULT\" node .claude/hooks/verified-workflow-trigger.js 2>&1 || true",
             "timeout": 3,
             "statusMessage": "Checking verified status..."
           },
           {
             "type": "command",
-            "command": "TOOL_INPUT=\"$TOOL_INPUT\" TOOL_RESULT=\"$TOOL_RESULT\" node .claude/hooks/auto-skill-creator.ts 2>&1 || true",
+            "command": "TOOL_INPUT=\"$TOOL_INPUT\" TOOL_RESULT=\"$TOOL_RESULT\" node .claude/hooks/auto-skill-creator.js 2>&1 || true",
             "timeout": 3,
             "statusMessage": "Checking skill creation..."
           }
@@ -126,7 +126,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "TOOL_RESULT=\"$TOOL_RESULT\" node .claude/hooks/failed-task-analyzer.ts 2>&1 || true",
+            "command": "TOOL_RESULT=\"$TOOL_RESULT\" node .claude/hooks/failed-task-analyzer.js 2>&1 || true",
             "timeout": 3,
             "statusMessage": "Analyzing task result..."
           }
