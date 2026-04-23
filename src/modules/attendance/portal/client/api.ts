@@ -371,3 +371,29 @@ export function cancelMyCorrection(adjustmentId: string): Promise<{
     { method: 'DELETE' }
   );
 }
+
+export interface SubmitMyCorrectionArgs {
+  entryId: string;
+  adjustmentKind: CorrectionKind;
+  /** ISO-8601 string or null. Null means "don't change this side". */
+  adjustedClockInAt: string | null;
+  adjustedClockOutAt: string | null;
+  adjustedSiteGeofenceId: string | null;
+  reason: string;
+}
+
+export function submitMyCorrection(
+  args: SubmitMyCorrectionArgs
+): Promise<{ adjustment: CorrectionRow }> {
+  return request('/api/my/attendance-corrections', {
+    method: 'POST',
+    body: JSON.stringify({
+      entry_id: args.entryId,
+      adjustment_kind: args.adjustmentKind,
+      adjusted_clock_in_at: args.adjustedClockInAt,
+      adjusted_clock_out_at: args.adjustedClockOutAt,
+      adjusted_site_geofence_id: args.adjustedSiteGeofenceId,
+      reason: args.reason,
+    }),
+  });
+}

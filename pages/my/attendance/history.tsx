@@ -7,7 +7,7 @@
 import React from 'react';
 import { NextPage } from 'next';
 import { useRouter } from 'next/router';
-import { Clock } from 'lucide-react';
+import { Clock, Edit3 } from 'lucide-react';
 
 import {
   ApiError,
@@ -91,10 +91,25 @@ const MyHistoryPage: NextPage & { getLayout?: (page: React.ReactElement) => Reac
                   <StatusBadge status={e.status} />
                 </div>
               </div>
-              <div className="text-right">
-                <div className="text-sm font-semibold text-gray-900">
-                  {e.durationMs != null ? formatDuration(e.durationMs) : '—'}
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="text-right">
+                  <div className="text-sm font-semibold text-gray-900">
+                    {e.durationMs != null ? formatDuration(e.durationMs) : '—'}
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(
+                      `/my/attendance/corrections/new?entry_id=${encodeURIComponent(e.entryId)}`
+                    )
+                  }
+                  aria-label="Request correction for this shift"
+                  title="Request correction"
+                  className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-blue-700 hover:bg-blue-50 transition"
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
               </div>
             </li>
           ))}
