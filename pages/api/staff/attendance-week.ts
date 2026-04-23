@@ -26,7 +26,10 @@ interface WeekRow extends Record<string, unknown> {
   holiday_hrs: string;
   night_hrs: string;
   exceptions_count: number;
+  gps_verdict: 'match' | 'mismatch' | 'no_data' | 'vehicle_not_mapped' | null;
 }
+
+type GpsVerdict = 'match' | 'mismatch' | 'no_data' | 'vehicle_not_mapped';
 
 interface DayTotals {
   workDate: string;
@@ -36,6 +39,7 @@ interface DayTotals {
   holidayHrs: number;
   nightHrs: number;
   exceptionsCount: number;
+  gpsVerdict: GpsVerdict | null;
 }
 
 interface StaffWeekRow {
@@ -101,6 +105,35 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           AND xe.work_date <= ${weekEnd}::date
           AND x.resolved_at IS NULL
         GROUP BY xe.staff_id, xe.work_date
+      ),
+      -- Cartrack verdict rollup per (staff, work_date). A day has a
+      -- mismatch if ANY verification for that day is a mismatch; else
+      -- match if all present are match; else the presence of no_data or
+      -- vehicle_not_mapped dominates. Match/mismatch are the actionable
+      -- signals; no_data/not_mapped are informational so supervisors know
+      -- the cross-check was attempted.
+      -- Cartrack verdict rollup per (staff, work_date). Precedence:
+      --   mismatch  — any side shows a mismatch (actionable, highest)
+      --   match     — at least one side matched AND no side mismatched
+      --                 (so a half-covered day still surfaces the match signal
+      --                  instead of regressing to no_data via BOOL_AND)
+      --   vehicle_not_mapped — admin-fixable state dominates over no_data
+      --   no_data   — ambient (sensor silence); lowest signal value
+      -- Do NOT flip the first two arms: match-wins-over-mismatch would hide
+      -- every real mismatch from the supervisor queue.
+      week_verifications AS (
+        SELECT e.staff_id, e.work_date,
+               CASE
+                 WHEN BOOL_OR(v.verdict = 'mismatch') THEN 'mismatch'
+                 WHEN BOOL_OR(v.verdict = 'match') THEN 'match'
+                 WHEN BOOL_OR(v.verdict = 'vehicle_not_mapped') THEN 'vehicle_not_mapped'
+                 ELSE 'no_data'
+               END AS verdict
+        FROM attendance_gps_verifications v
+        JOIN attendance_entries e ON e.id = v.entry_id
+        WHERE e.work_date >= ${weekStart}::date
+          AND e.work_date <= ${weekEnd}::date
+        GROUP BY e.staff_id, e.work_date
       )
       SELECT
         ds.staff_id,
@@ -112,11 +145,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ds.sunday_hrs::text,
         ds.holiday_hrs::text,
         ds.night_hrs::text,
-        COALESCE(wx.exceptions_count, 0) AS exceptions_count
+        COALESCE(wx.exceptions_count, 0) AS exceptions_count,
+        wv.verdict AS gps_verdict
       FROM attendance_daily_summaries ds
       JOIN staff s ON s.id = ds.staff_id
       LEFT JOIN week_exceptions wx
         ON wx.staff_id = ds.staff_id AND wx.work_date = ds.work_date
+      LEFT JOIN week_verifications wv
+        ON wv.staff_id = ds.staff_id AND wv.work_date = ds.work_date
       WHERE ds.work_date >= ${weekStart}::date
         AND ds.work_date <= ${weekEnd}::date
       ORDER BY full_name ASC, ds.work_date ASC
@@ -148,6 +184,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         holidayHrs: Number(r.holiday_hrs),
         nightHrs: Number(r.night_hrs),
         exceptionsCount: r.exceptions_count,
+        gpsVerdict: r.gps_verdict ?? null,
       };
       const existing = byStaff.get(r.staff_id);
       if (existing) {

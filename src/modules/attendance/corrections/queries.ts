@@ -305,6 +305,18 @@ export async function applyApprovedAdjustmentTxn(args: {
       [args.staffId, args.workDate]
     );
 
+    // Phase 2: a corrected clock_in_at / clock_out_at invalidates any
+    // previously-reconciled Cartrack GPS verifications — the adjusted
+    // timestamps change which Cartrack sample was nearest. Delete the
+    // verification rows so the next cartrack-reconcile cron tick
+    // re-computes with the updated timestamps. Safe no-op when
+    // attendance_gps_verifications has no rows for this entry (e.g., the
+    // entry didn't have a vehicle assignment).
+    await txn.query(
+      `DELETE FROM attendance_gps_verifications WHERE entry_id = $1`,
+      [args.entryId]
+    );
+
     const row = transitioned[0];
     if (!row) {
       // Defence-in-depth: transitioned.length > 0 was checked, so this

@@ -34,11 +34,17 @@ export const TABS: Tab[] = [
     label: 'Locks',
     href: '/staff/attendance/locks',
   },
+  {
+    id: 'cartrack',
+    label: 'Cartrack',
+    href: '/staff/attendance/cartrack-mapping',
+  },
 ];
 
 export function getActiveTabId(pathname: string): string {
   if (pathname === '/staff/attendance/week') return 'week';
   if (pathname.startsWith('/staff/attendance/corrections')) return 'corrections';
   if (pathname.startsWith('/staff/attendance/locks')) return 'locks';
+  if (pathname.startsWith('/staff/attendance/cartrack-mapping')) return 'cartrack';
   return 'roster';
 }

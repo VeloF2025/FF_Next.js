@@ -7,6 +7,8 @@
  * renders what the page hands it.
  */
 
+export type GpsVerdict = 'match' | 'mismatch' | 'no_data' | 'vehicle_not_mapped';
+
 export interface DayTotals {
   workDate: string;
   regularHrs: number;
@@ -15,6 +17,8 @@ export interface DayTotals {
   holidayHrs: number;
   nightHrs: number;
   exceptionsCount: number;
+  /** Cartrack GPS corroboration verdict for this day, if reconciled. */
+  gpsVerdict: GpsVerdict | null;
 }
 
 export interface StaffWeekRow {
@@ -42,6 +46,34 @@ function shortDay(ymd: string): string {
     day: '2-digit',
     month: 'short',
   });
+}
+
+/**
+ * Cartrack GPS verdict badge. Framing matters: `mismatch` is corroboration
+ * flagged for supervisor attention, NOT a fraud allegation. A driver
+ * clocking in from their private car legitimately produces a mismatch.
+ */
+export function GpsBadge({ verdict }: { verdict: GpsVerdict }) {
+  const tone = {
+    match: { bg: 'bg-emerald-500/10', border: 'border-emerald-700', text: 'text-emerald-400', label: '✓' },
+    mismatch: { bg: 'bg-amber-500/10', border: 'border-amber-700', text: 'text-amber-400', label: '≠' },
+    no_data: { bg: 'bg-neutral-500/10', border: 'border-neutral-700', text: 'text-neutral-400', label: '∅' },
+    vehicle_not_mapped: { bg: 'bg-neutral-500/10', border: 'border-neutral-700', text: 'text-neutral-500', label: '–' },
+  }[verdict];
+  const titleMap = {
+    match: 'Cartrack vehicle GPS matches device',
+    mismatch: 'Cartrack vehicle GPS differs (corroboration, not fraud)',
+    no_data: 'No Cartrack position samples in window',
+    vehicle_not_mapped: 'Fleet vehicle not mapped to Cartrack',
+  };
+  return (
+    <span
+      title={titleMap[verdict]}
+      className={`inline-flex items-center px-1 py-0 rounded text-[10px] font-mono border ${tone.bg} ${tone.border} ${tone.text}`}
+    >
+      {tone.label}
+    </span>
+  );
 }
 
 export function Metric({
@@ -121,12 +153,16 @@ function StaffWeekTableRow({ s, days }: { s: StaffWeekRow; days: string[] }) {
         const dt = byDate.get(d);
         const totalHrs = dt ? dt.regularHrs + dt.overtimeHrs : 0;
         const hasException = dt ? dt.exceptionsCount > 0 : false;
+        const verdict = dt?.gpsVerdict ?? null;
         return (
           <td
             key={d}
             className={`text-right px-2 py-2 ${hasException ? 'text-amber-400' : ''}`}
           >
-            {formatHrs(totalHrs)}
+            <div className="flex items-center justify-end gap-1">
+              <span>{formatHrs(totalHrs)}</span>
+              {verdict && <GpsBadge verdict={verdict} />}
+            </div>
           </td>
         );
       })}

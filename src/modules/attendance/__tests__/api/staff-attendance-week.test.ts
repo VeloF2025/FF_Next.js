@@ -177,6 +177,28 @@ describe('GET /api/staff/attendance-week', () => {
     expect(body.data.lock).toBe(null);
   });
 
+  it('gps_verdict CTE: mismatch precedence is encoded ahead of match in the SQL text', async () => {
+    // Regression guard: if someone reorders the CASE arms so match wins
+    // over mismatch, every real mismatch disappears from the supervisor
+    // queue. The SQL text ordering is the contract.
+    mocks.sql
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]); // lock lookup
+    const { res } = makeRes();
+    await handler(makeReq({ week_start: '2026-04-20' }), res);
+    const firstCall = mocks.sql.mock.calls[0] as [readonly string[], ...unknown[]];
+    const sqlText = firstCall[0].join(' ');
+    const mismatchIdx = sqlText.search(/BOOL_OR\s*\(\s*v\.verdict\s*=\s*'mismatch'\s*\)/i);
+    const matchIdx = sqlText.search(/BOOL_OR\s*\(\s*v\.verdict\s*=\s*'match'\s*\)/i);
+    expect(mismatchIdx).toBeGreaterThan(-1);
+    expect(matchIdx).toBeGreaterThan(-1);
+    // Mismatch arm must appear EARLIER in the CASE than match.
+    expect(mismatchIdx).toBeLessThan(matchIdx);
+    // Match precedence is BOOL_OR (not BOOL_AND) so half-covered days
+    // still show the match signal — lock down the BOOL_OR form here.
+    expect(sqlText).not.toMatch(/BOOL_AND\s*\(\s*v\.verdict\s*=\s*'match'\s*\)/i);
+  });
+
   it('exposes active lock metadata in payload.lock when the week is locked', async () => {
     mocks.sql
       .mockResolvedValueOnce([]) // data
