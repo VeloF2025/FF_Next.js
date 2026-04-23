@@ -6,15 +6,16 @@
  * exports hit the DB and belong in an integration test.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@/lib/logger', () => ({
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock('@/lib/db-pool', () => ({ sql: vi.fn() }));
+const mocks = vi.hoisted(() => ({ sql: vi.fn() }));
+vi.mock('@/lib/db-pool', () => ({ sql: mocks.sql }));
 
-import { sastWorkDate } from '../clockUtils';
+import { captureRateAtClockIn, sastWorkDate } from '../clockUtils';
 
 describe('sastWorkDate', () => {
   it('returns the SAST calendar date for a UTC midnight instant', () => {
@@ -49,5 +50,42 @@ describe('sastWorkDate', () => {
     expect(() => sastWorkDate(new Date('not-a-date'))).toThrow(/invalid Date/);
     // @ts-expect-error — runtime guard against non-Date argument
     expect(() => sastWorkDate(null)).toThrow(/invalid Date/);
+  });
+});
+
+describe('captureRateAtClockIn', () => {
+  beforeEach(() => {
+    mocks.sql.mockReset();
+  });
+
+  it('emits the INSERT … SELECT with ON CONFLICT DO NOTHING and NULL-rate skip', async () => {
+    mocks.sql.mockResolvedValueOnce([]);
+    await captureRateAtClockIn('e-1', 's-1');
+    expect(mocks.sql).toHaveBeenCalledOnce();
+    const template = mocks.sql.mock.calls[0]![0].join(' ');
+    expect(template).toMatch(/INSERT\s+INTO\s+staff_rate_at_clock_in/i);
+    expect(template).toMatch(/FROM\s+staff\s+WHERE\s+id\s*=/i);
+    // NULL-rate staff are skipped by the WHERE clause, not by a NOT NULL
+    // CHECK (which would fail the INSERT loudly).
+    expect(template).toMatch(/hourly_rate\s+IS\s+NOT\s+NULL/i);
+    // Idempotent: repeat clock-ins on the same entry (shouldn't happen
+    // — partial unique index prevents two open entries — but defensive).
+    expect(template).toMatch(/ON\s+CONFLICT\s*\(\s*entry_id\s*\)\s+DO\s+NOTHING/i);
+  });
+
+  it('parameterises entry_id and staff_id', async () => {
+    mocks.sql.mockResolvedValueOnce([]);
+    await captureRateAtClockIn('e-1', 's-1');
+    const params = mocks.sql.mock.calls[0]!.slice(1);
+    expect(params).toContain('e-1');
+    expect(params).toContain('s-1');
+  });
+
+  it('swallows DB errors (best-effort write — reconcile falls back)', async () => {
+    // The snapshot is an audit nice-to-have; failure must NOT propagate
+    // so the clock-in itself succeeds. Reconcile will fall back to
+    // reading live staff.hourly_rate (the PR #1406 behaviour).
+    mocks.sql.mockRejectedValueOnce(new Error('DB offline'));
+    await expect(captureRateAtClockIn('e-1', 's-1')).resolves.toBeUndefined();
   });
 });

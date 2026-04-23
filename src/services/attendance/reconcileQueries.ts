@@ -98,6 +98,13 @@ export async function loadClosedEntriesMissingSummary(
   fromDate: string,
   toDate: string
 ): Promise<ClosedEntryRow[]> {
+  // Rate preference (migration 325): snapshot-at-clock-in dominates the
+  // live staff.hourly_rate. rac.hourly_rate_cents is already in cents
+  // (BIGINT); we divide by 100 and cast to TEXT so the column type
+  // matches the live-staff branch (numeric → text). A mid-period rate
+  // change after this clock-in won't retroactively reprice the shift.
+  // Pre-migration entries have no rac row → fall back to staff.hourly_rate
+  // via COALESCE (preserves PR #1406 behaviour, no regression).
   return sql<ClosedEntryRow>`
     SELECT e.id,
            e.staff_id,
@@ -106,9 +113,13 @@ export async function loadClosedEntriesMissingSummary(
            e.clock_out_at::text,
            COALESCE(s.bcea_applicable, true) AS bcea_applicable,
            COALESCE(s.ordinarily_works_sundays, false) AS ordinarily_works_sundays,
-           s.hourly_rate::text AS hourly_rate
+           COALESCE(
+             (rac.hourly_rate_cents::numeric / 100)::text,
+             s.hourly_rate::text
+           ) AS hourly_rate
     FROM attendance_entries e
     JOIN staff s ON s.id = e.staff_id
+    LEFT JOIN staff_rate_at_clock_in rac ON rac.entry_id = e.id
     LEFT JOIN attendance_daily_summaries ds
       ON ds.staff_id = e.staff_id AND ds.work_date = e.work_date
     WHERE e.status IN ('closed', 'auto_closed', 'manual')

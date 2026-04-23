@@ -89,9 +89,13 @@ const TEMPLATES: Template[] = [
              e.clock_out_at::text,
              COALESCE(s.bcea_applicable, true) AS bcea_applicable,
              COALESCE(s.ordinarily_works_sundays, false) AS ordinarily_works_sundays,
-             s.hourly_rate::text AS hourly_rate
+             COALESCE(
+               (rac.hourly_rate_cents::numeric / 100)::text,
+               s.hourly_rate::text
+             ) AS hourly_rate
       FROM attendance_entries e
       JOIN staff s ON s.id = e.staff_id
+      LEFT JOIN staff_rate_at_clock_in rac ON rac.entry_id = e.id
       LEFT JOIN attendance_daily_summaries ds
         ON ds.staff_id = e.staff_id AND ds.work_date = e.work_date
       WHERE e.status IN ('closed', 'auto_closed', 'manual')
@@ -101,6 +105,17 @@ const TEMPLATES: Template[] = [
         AND ds.computed_at IS NULL
       ORDER BY e.staff_id ASC, e.work_date ASC, e.clock_in_at ASC`,
     params: [SAMPLE_DATE, SAMPLE_DATE],
+  },
+  {
+    name: 'captureRateAtClockIn (snapshot INSERT … SELECT with NULL-rate skip)',
+    text: `
+      INSERT INTO staff_rate_at_clock_in (entry_id, hourly_rate_cents)
+      SELECT $1::uuid, ROUND(hourly_rate * 100)::bigint
+      FROM staff
+      WHERE id = $2::uuid
+        AND hourly_rate IS NOT NULL
+      ON CONFLICT (entry_id) DO NOTHING`,
+    params: [SAMPLE_UUID, SAMPLE_UUID],
   },
   {
     name: 'loadPersistedWeeklyOtBefore',

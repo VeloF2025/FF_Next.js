@@ -35,6 +35,9 @@ vi.mock('@/modules/attendance/portal/clockUtils', () => ({
   insertClockIn: mocks.insertClockIn,
   insertException: mocks.insertException,
   sastWorkDate: mocks.sastWorkDate,
+  // New in #325 — best-effort rate snapshot. Always no-op in these tests;
+  // dedicated coverage lives in clockUtils.test.ts.
+  captureRateAtClockIn: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/modules/attendance/portal/geofenceUtils', () => ({

@@ -33,6 +33,7 @@ import {
   findOpenEntry,
   findActiveVehicleAssignment,
   getSelfieConsentState,
+  captureRateAtClockIn,
   insertClockIn,
   insertException,
   sastWorkDate,
@@ -181,6 +182,12 @@ export default withMySession(async (req, res, session) => {
       deviceFingerprint,
       deviceUserAgent: req.headers['user-agent']?.slice(0, 512) ?? null,
     });
+
+    // Post-INSERT hourly-rate snapshot (migration 325). Best-effort:
+    // a failure logs and the reconcile cron falls back to reading the
+    // current staff.hourly_rate at compute time (PR #1406 behaviour).
+    stage = 'rate_snapshot';
+    await captureRateAtClockIn(entry.id, session.staffId);
 
     // Post-INSERT exception logging — non-blocking (insertException
     // swallows its own errors to a log.error, see clockUtils.ts).

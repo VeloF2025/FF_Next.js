@@ -125,6 +125,46 @@ export async function insertClockIn(args: {
 }
 
 /**
+ * Capture staff.hourly_rate at clock-in time into staff_rate_at_clock_in
+ * (migration 325). Best-effort — a failure here does NOT roll back the
+ * clock-in because the reconcile cron can still fall back to reading
+ * the current staff.hourly_rate at compute time (the original PR #1406
+ * behaviour). Log on failure so ops see the drift.
+ *
+ * NULL-rate staff (salaried / unrated) skip the INSERT entirely — the
+ * snapshot table enforces NOT NULL so we can't write a sentinel row.
+ * Reconcile handles the missing-snapshot case natively by falling back.
+ *
+ * This is a single INSERT … SELECT so the rate-read and snapshot-write
+ * happen in one round-trip; no TOCTOU between reading staff.hourly_rate
+ * and inserting it.
+ */
+export async function captureRateAtClockIn(
+  entryId: string,
+  staffId: string
+): Promise<void> {
+  try {
+    await sql`
+      INSERT INTO staff_rate_at_clock_in (entry_id, hourly_rate_cents)
+      SELECT ${entryId}::uuid, ROUND(hourly_rate * 100)::bigint
+      FROM staff
+      WHERE id = ${staffId}::uuid
+        AND hourly_rate IS NOT NULL
+      ON CONFLICT (entry_id) DO NOTHING
+    `;
+  } catch (err) {
+    log.error(
+      '[attendance-clock-in] rate snapshot write failed — reconcile will fall back to live staff.hourly_rate',
+      {
+        entryId,
+        staffId,
+        error: err instanceof Error ? err.message : String(err),
+      }
+    );
+  }
+}
+
+/**
  * Close the given open entry with clock-out data.
  * Returns null when the entry isn't actually open (already closed, wrong
  * staff, doesn't exist) so the caller can return a clean 409 rather
