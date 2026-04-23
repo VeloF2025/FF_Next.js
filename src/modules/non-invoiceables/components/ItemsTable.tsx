@@ -88,8 +88,8 @@ function ItemRow({ item, isSelected, showCategory, showProject, onToggle }: RowP
       {showProject && <td className="px-3 py-2 text-gray-300 hidden md:table-cell">{item.project}</td>}
       <td className="px-3 py-2">{statusBadge(item.action_status)}</td>
       <td className="px-3 py-2 hidden sm:table-cell">
-        {item.ticket_uid
-          ? <a href={`/noc/tickets/${item.ticket_uid}`} className="text-blue-400 hover:underline font-mono text-xs">{item.ticket_uid}</a>
+        {item.ticket_uid && item.ticket_id
+          ? <a href={`/noc/tickets/${item.ticket_id}`} className="text-blue-400 hover:underline font-mono text-xs">{item.ticket_uid}</a>
           : DASH}
       </td>
       <td className="px-3 py-2 hidden lg:table-cell">{daysOpenCell(item.days_open)}</td>

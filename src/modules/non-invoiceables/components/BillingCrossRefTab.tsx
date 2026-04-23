@@ -27,6 +27,7 @@ interface CrossRefRow {
   note_type: string;       // 'note1' … 'note5'
   category: NonInvoiceableCategory;
   action_status: 'actioned' | 'missed' | 'actioned_late';
+  ticket_id: string | null;
   ticket_uid: string | null;
   oes_status: 'Active' | 'Inactive' | null;
   signal_dbm: number | null;
@@ -138,7 +139,7 @@ function Row({ row: r }: { row: CrossRefRow }) {
       <td className="px-3 py-2"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${nc}`}>{NOTE_LABEL[r.note_type] ?? r.note_type}</span></td>
       <td className="px-3 py-2 hidden sm:table-cell"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLORS[r.category]}`}>{CATEGORY_LABELS[r.category]}</span></td>
       <td className="px-3 py-2"><ActionBadge status={r.action_status} /></td>
-      <td className="px-3 py-2 hidden md:table-cell">{r.ticket_uid ? <a href={`/noc/tickets/${r.ticket_uid}`} className="text-blue-400 hover:underline font-mono text-xs">{r.ticket_uid}</a> : DASH}</td>
+      <td className="px-3 py-2 hidden md:table-cell">{r.ticket_uid && r.ticket_id ? <a href={`/noc/tickets/${r.ticket_id}`} className="text-blue-400 hover:underline font-mono text-xs">{r.ticket_uid}</a> : DASH}</td>
       <td className="px-3 py-2 hidden lg:table-cell">{r.oes_status ? <span className={`text-xs font-medium ${oesC}`}>{r.oes_status}</span> : DASH}</td>
       <td className="px-3 py-2 hidden lg:table-cell">{r.signal_dbm != null ? <span className={`text-xs tabular-nums ${sigC}`}>{r.signal_dbm} dBm</span> : DASH}</td>
       <td className="px-3 py-2 text-center">{r.has_dr ? <span className="text-green-400 text-sm">✓</span> : <span className="text-red-400 text-sm">✕</span>}</td>

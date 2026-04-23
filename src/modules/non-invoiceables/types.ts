@@ -83,8 +83,8 @@ export interface NonInvoiceableItem {
   // -- OLT investigation data --
   olt_fix_status: string | null;
 
-  // -- QContact ticket linkage --
-  ticket_id: number | null;
+  // -- Maintenance ticket linkage (UUID from maintenance_tickets.id) --
+  ticket_id: string | null;
   ticket_uid: string | null;
   ticket_status: string | null;
 

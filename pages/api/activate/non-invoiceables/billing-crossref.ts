@@ -32,6 +32,8 @@ interface CrossRefRow {
   id: string; dr_number: string; deduction_note: string;
   serial_number: string | null; team: string | null; deduction_reason: string | null;
   oes_status: string | null; oes_activation_date: string | null; oes_signal_dbm: number | null;
+  // Current ONT RX (latest polled reading) — prefer over oes_signal_dbm for offline ONTs.
+  current_ont_rx: number | null;
   olt_record_id: string | null; olt_fix_status: string | null;
   olt_ticket_id: string | null; olt_ticket_uid: string | null;
   olt_ticket_status: string | null; olt_ticket_created_at: string | null;
@@ -57,7 +59,7 @@ interface CrossRefItem {
   dr_number: string; note_type: string;
   category: NonInvoiceableCategory;
   action_status: 'actioned' | 'missed' | 'actioned_late';
-  ticket_uid: string | null; ticket_status: string | null; ticket_created_at: string | null;
+  ticket_id: string | null; ticket_uid: string | null; ticket_status: string | null; ticket_created_at: string | null;
   oes_status: string | null; signal_dbm: number | null; has_dr: boolean;
   // Note 5 offline evidence
   offline_confirmed: boolean;
@@ -72,7 +74,8 @@ interface CrossRefItem {
 // conditional fragments). The $1 parameter is always the billing_week_id UUID.
 const CROSSREF_SQL = `
 SELECT d.id, d.dr_number, d.deduction_note, d.serial_number, d.team, d.deduction_reason,
-  oa.status AS oes_status, oa.activation_date AS oes_activation_date, oa.ont_rx_sig_dbm AS oes_signal_dbm,
+  oa.status AS oes_status, oa.activation_date AS oes_activation_date,
+  oa.ont_rx_sig_dbm AS oes_signal_dbm, oa.current_ont_rx AS current_ont_rx,
   olt.id AS olt_record_id, olt.fix_status AS olt_fix_status,
   olt.maintenance_ticket_id AS olt_ticket_id, olt_mt.ticket_uid AS olt_ticket_uid,
   olt_mt.status AS olt_ticket_status, olt_mt.created_at AS olt_ticket_created_at,
@@ -211,6 +214,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
     const items: CrossRefItem[] = rows.map((row) => {
       const action_status = computeActionStatus(row, week!.week_ending);
       // First non-null ticket wins — priority: OLT > PP > offline
+      const ticket_id     = row.olt_ticket_id     ?? row.pp_ticket_id     ?? row.offline_ticket_id     ?? null;
       const ticket_uid    = row.olt_ticket_uid    ?? row.pp_ticket_uid    ?? row.offline_ticket_uid    ?? null;
       const ticket_status = row.olt_ticket_uid    ? row.olt_ticket_status
                           : row.pp_ticket_uid     ? row.pp_ticket_status
@@ -219,16 +223,24 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
                                : row.pp_ticket_uid     ? row.pp_ticket_created_at
                                : row.offline_ticket_uid ? row.offline_ticket_created_at : null;
 
+      // For offline ONTs, prefer the latest-polled RX (current_ont_rx) over the
+      // activation-date RX (ticket VF-20260422-002). Active ONTs keep the
+      // activation-date reading which is the authoritative billing value.
+      const signal_dbm = row.oes_status === 'Inactive'
+        ? (row.current_ont_rx ?? row.oes_signal_dbm)
+        : row.oes_signal_dbm;
+
       return {
         dr_number: row.dr_number,
         note_type: row.deduction_note,
         category: NOTE_TO_CATEGORY[row.deduction_note] ?? 'serial_mismatch',
         action_status,
+        ticket_id,
         ticket_uid,
         ticket_status,
         ticket_created_at: ticket_created_at ? String(ticket_created_at) : null,
         oes_status: row.oes_status,
-        signal_dbm: row.oes_signal_dbm,
+        signal_dbm,
         has_dr: row.has_dr_record,
         offline_confirmed: row.od_note5_id !== null,
         offline_reason: row.od_note5_reason ?? null,

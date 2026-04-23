@@ -54,35 +54,40 @@ async function handler(
       return apiResponse.badRequest(res, 'id is required');
     }
 
-    // Get the offline device record
+    // Get the offline device record. Accept both serial-mismatch and pure-offline
+    // rows — the Non-Invoiceable Action Centre routes all offline_devices items here.
     const deviceResult = await pool.query(
       `SELECT
         id, drop_number, zone, planned_pon, address,
-        serial_number, expected_serial, serial_mismatch_type,
+        serial_number, expected_serial, serial_mismatch, serial_mismatch_type,
         mismatch_status, mismatch_ticket_id, last_down_reason,
-        days_since_last_inform
+        days_since_last_inform, offline_bucket
       FROM offline_devices
-      WHERE id = $1 AND serial_mismatch = true`,
+      WHERE id = $1`,
       [id]
     );
 
     if (deviceResult.rows.length === 0) {
-      return apiResponse.notFound(res, 'Serial mismatch record', id);
+      return apiResponse.notFound(res, 'Offline device record', id);
     }
 
     const device = deviceResult.rows[0];
+    const isMismatch = device.serial_mismatch === true;
 
     // Check if ticket already exists
     if (device.mismatch_ticket_id) {
       return apiResponse.success(res, {
         success: false,
-        message: 'Ticket already exists for this mismatch',
+        message: isMismatch
+          ? 'Ticket already exists for this mismatch'
+          : 'Ticket already exists for this offline device',
         ticket_id: String(device.mismatch_ticket_id),
       });
     }
 
-    // Build description
-    const ticketDescription = `
+    // Build description — branch on whether this is a serial mismatch or a pure offline device.
+    const ticketDescription = isMismatch
+      ? `
 **Serial Mismatch Detected**
 
 **DR Number:** ${device.drop_number}
@@ -105,13 +110,37 @@ ${notes ?? 'Please investigate the serial number discrepancy. Possible causes: O
 2. Check if ONT was replaced
 3. Update 1Map or OES records accordingly
 4. Report findings
+`.trim()
+      : `
+**Offline Device Detected**
+
+**DR Number:** ${device.drop_number}
+**Zone:** ${device.zone ?? 'N/A'}
+**PON:** ${device.planned_pon ?? 'N/A'}
+**Address:** ${device.address ?? 'N/A'}
+
+**ONT Serial:** ${device.serial_number ?? 'N/A'}
+**Days Offline:** ${device.days_since_last_inform ?? 0}
+**Offline Bucket:** ${device.offline_bucket ?? 'N/A'}
+**Last Down Reason:** ${device.last_down_reason ?? 'Unknown'}
+
+**Investigation Notes:**
+${notes ?? 'Please investigate why this device is offline. Possible causes: fiber break, ONT failure, power loss, or service suspension.'}
+
+**Action Required:**
+1. Verify ONT power and fiber connection at site
+2. Check OLT for port status and LOS alarms
+3. Test fiber link budget
+4. Report findings and restore service if possible
 `.trim();
 
     // Create ticket via standard service
     const ticket = await createTicket({
       source: TicketSource.QA_REVIEW,
       ticket_type: TicketType.MAINTENANCE,
-      title: `Serial Mismatch Investigation: ${device.drop_number}`,
+      title: isMismatch
+        ? `Serial Mismatch Investigation: ${device.drop_number}`
+        : `Offline Device Investigation: ${device.drop_number}`,
       description: ticketDescription,
       priority: PRIORITY_MAP[priority] || TicketPriority.NORMAL,
       dr_number: device.drop_number,
@@ -133,12 +162,13 @@ ${notes ?? 'Please investigate the serial number discrepancy. Possible causes: O
       [ticket.id, id]
     );
 
-    log.info(`Created ticket for mismatch ${device.drop_number}`, {
+    log.info(`Created ticket for ${isMismatch ? 'mismatch' : 'offline device'} ${device.drop_number}`, {
       deviceId: id,
       dropNumber: device.drop_number,
       ticketId: ticket.id,
       ticketUid: ticket.ticket_uid,
       priority,
+      isMismatch,
     }, 'SerialMismatchTicket');
 
 
