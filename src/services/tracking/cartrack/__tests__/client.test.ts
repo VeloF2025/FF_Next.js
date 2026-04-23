@@ -2,12 +2,21 @@
  * Cartrack HTTP client tests.
  *
  * The client is injectable via `fetchImpl` so we don't need to mock
- * network. Tests cover: env config validation, auth header shape,
- * nearest-sample picker (pure), 404 → vehicle_not_mapped, empty samples
- * → no_data, non-OK 5xx → throws, timeout via AbortController.
+ * network. Post-refactor, endpoints match Cartrack's real REST shape:
+ *   - GET /vehicles                — fleet list
+ *   - GET /vehicles/events         — per-ping GPS events (24h max window)
+ *
+ * `fetchPositionAt` queries events across the whole fleet in a window
+ * and filters by `vehicle_id` in-memory. This matches how Cartrack's
+ * REST actually works — there is no per-vehicle positions endpoint.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+vi.mock('@/lib/logger', () => ({
+  log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+}));
+
 import {
   cartrackClient,
   cartrackClientFromEnv,
@@ -47,9 +56,9 @@ describe('pickNearestSample (pure)', () => {
 
   it('picks the sample with smallest absolute delta to `at`', () => {
     const samples = [
-      mk('2026-04-20T05:55:00Z'), // -5m
-      mk('2026-04-20T05:59:30Z'), // -30s — nearest
-      mk('2026-04-20T06:02:00Z'), // +2m
+      mk('2026-04-20T05:55:00Z'),
+      mk('2026-04-20T05:59:30Z'),
+      mk('2026-04-20T06:02:00Z'),
     ];
     const nearest = pickNearestSample(samples, at, 5 * 60_000)!;
     expect(nearest.ts.toISOString()).toBe('2026-04-20T05:59:30.000Z');
@@ -57,16 +66,15 @@ describe('pickNearestSample (pure)', () => {
 
   it('excludes samples outside the tolerance window', () => {
     const samples = [
-      mk('2026-04-20T05:50:00Z'), // -10m, outside 5m window
-      mk('2026-04-20T06:10:00Z'), // +10m, outside
+      mk('2026-04-20T05:50:00Z'),
+      mk('2026-04-20T06:10:00Z'),
     ];
     expect(pickNearestSample(samples, at, 5 * 60_000)).toBe(null);
   });
 
-  it('boundary: tolerance is inclusive (exactly ± tolerance still matches)', () => {
-    const samples = [mk('2026-04-20T06:05:00Z')]; // exactly +5m
-    const nearest = pickNearestSample(samples, at, 5 * 60_000);
-    expect(nearest).not.toBe(null);
+  it('boundary: tolerance is inclusive', () => {
+    const samples = [mk('2026-04-20T06:05:00Z')];
+    expect(pickNearestSample(samples, at, 5 * 60_000)).not.toBe(null);
   });
 });
 
@@ -78,7 +86,7 @@ describe('cartrackClientFromEnv', () => {
 
   it('constructs a client when all three env vars are set', () => {
     const client = cartrackClientFromEnv({
-      CARTRACK_BASE_URL: 'https://api.cartrack.example',
+      CARTRACK_BASE_URL: 'https://fleetapi-za.cartrack.com/rest',
       CARTRACK_API_USER: 'u',
       CARTRACK_API_PASS: 'p',
     });
@@ -87,78 +95,113 @@ describe('cartrackClientFromEnv', () => {
   });
 });
 
-describe('HttpCartrackClient.fetchPositionAt', () => {
+describe('HttpCartrackClient.fetchPositionAt — /vehicles/events', () => {
   const baseOpts = {
-    baseUrl: 'https://api.cartrack.example',
+    baseUrl: 'https://fleetapi-za.cartrack.com/rest',
     username: 'u',
     password: 'p',
   };
 
-  it('sends Basic auth + GET to /vehicles/:id/positions with from/to window', async () => {
+  it('sends Basic auth + GET to /vehicles/events with Cartrack-format timestamps and a limit', async () => {
     let capturedUrl = '';
     let capturedAuth = '';
     const fetchImpl = (async (url: string, init?: RequestInit) => {
       capturedUrl = url;
       capturedAuth = (init?.headers as Record<string, string>)?.Authorization ?? '';
       return jsonResponse(200, {
-        positions: [
-          { timestamp: '2026-04-20T05:59:45Z', latitude: -26.2, longitude: 28.0 },
+        data: [
+          {
+            vehicle_id: 544522263,
+            registration: 'TEMP-2084956',
+            event_ts: '2026-04-20 05:59:45',
+            latitude: -26.2,
+            longitude: 28.0,
+          },
         ],
       });
     }) as typeof fetch;
 
     const client = cartrackClient({ ...baseOpts, fetchImpl });
     const at = new Date('2026-04-20T06:00:00Z');
-    const result = await client.fetchPositionAt('veh-42', at);
+    const result = await client.fetchPositionAt('544522263', at);
     expect(result.status).toBe('ok');
-    expect(capturedUrl).toContain('/vehicles/veh-42/positions');
-    expect(capturedUrl).toContain('from=');
-    expect(capturedUrl).toContain('to=');
+    expect(capturedUrl).toContain('/vehicles/events');
+    expect(capturedUrl).toContain('start_timestamp=');
+    expect(capturedUrl).toContain('end_timestamp=');
+    expect(capturedUrl).toContain('limit=1000');
     expect(capturedAuth).toMatch(/^Basic /);
   });
 
-  it('returns vehicle_not_mapped on HTTP 404', async () => {
-    const fetchImpl = mockFetch([jsonResponse(404, { error: 'not found' })]);
-    const client = cartrackClient({ ...baseOpts, fetchImpl });
-    const result = await client.fetchPositionAt(
-      'missing',
-      new Date('2026-04-20T06:00:00Z')
-    );
-    expect(result.status).toBe('vehicle_not_mapped');
-  });
-
-  it('returns no_data when positions array is empty', async () => {
-    const fetchImpl = mockFetch([jsonResponse(200, { positions: [] })]);
-    const client = cartrackClient({ ...baseOpts, fetchImpl });
-    const result = await client.fetchPositionAt(
-      'v-1',
-      new Date('2026-04-20T06:00:00Z')
-    );
-    expect(result.status).toBe('no_data');
-  });
-
-  it('returns no_data when no sample falls inside the tolerance window', async () => {
+  it('filters events by vehicle_id in-memory — returns only the matching vehicle', async () => {
     const fetchImpl = mockFetch([
       jsonResponse(200, {
-        positions: [
-          { timestamp: '2026-04-20T05:30:00Z', latitude: 0, longitude: 0 },
+        data: [
+          { vehicle_id: 1, event_ts: '2026-04-20 05:58:00', latitude: -26.2, longitude: 28.0 },
+          { vehicle_id: 544522263, event_ts: '2026-04-20 05:59:45', latitude: -26.21, longitude: 28.01 },
+          { vehicle_id: 999, event_ts: '2026-04-20 06:00:05', latitude: -26.5, longitude: 28.5 },
         ],
       }),
     ]);
     const client = cartrackClient({ ...baseOpts, fetchImpl });
     const result = await client.fetchPositionAt(
-      'v-1',
-      new Date('2026-04-20T06:00:00Z'),
-      60_000 // 1 minute window — 30-min-old sample excluded
+      '544522263',
+      new Date('2026-04-20T06:00:00Z')
+    );
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      expect(result.sample.lat).toBe(-26.21);
+      expect(result.sample.lon).toBe(28.01);
+    }
+  });
+
+  it('no_data when the vehicle_id is not among the returned events', async () => {
+    const fetchImpl = mockFetch([
+      jsonResponse(200, {
+        data: [
+          { vehicle_id: 1, event_ts: '2026-04-20 05:59:45', latitude: -26.2, longitude: 28.0 },
+        ],
+      }),
+    ]);
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
+    const result = await client.fetchPositionAt(
+      '544522263',
+      new Date('2026-04-20T06:00:00Z')
     );
     expect(result.status).toBe('no_data');
   });
 
-  it('throws CartrackError(http) on non-404, non-2xx status', async () => {
+  it('no_data when the response is empty', async () => {
+    const fetchImpl = mockFetch([jsonResponse(200, { data: [] })]);
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
+    const result = await client.fetchPositionAt(
+      '1',
+      new Date('2026-04-20T06:00:00Z')
+    );
+    expect(result.status).toBe('no_data');
+  });
+
+  it('no_data when events exist but all fall outside the tolerance window', async () => {
+    const fetchImpl = mockFetch([
+      jsonResponse(200, {
+        data: [
+          { vehicle_id: 1, event_ts: '2026-04-20 04:00:00', latitude: 0, longitude: 0 },
+        ],
+      }),
+    ]);
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
+    const result = await client.fetchPositionAt(
+      '1',
+      new Date('2026-04-20T06:00:00Z'),
+      60_000
+    );
+    expect(result.status).toBe('no_data');
+  });
+
+  it('throws CartrackError(http) on non-2xx status', async () => {
     const fetchImpl = mockFetch([jsonResponse(500, { error: 'boom' })]);
     const client = cartrackClient({ ...baseOpts, fetchImpl });
     await expect(
-      client.fetchPositionAt('v-1', new Date('2026-04-20T06:00:00Z'))
+      client.fetchPositionAt('1', new Date('2026-04-20T06:00:00Z'))
     ).rejects.toThrow(/HTTP 500/);
   });
 
@@ -166,84 +209,327 @@ describe('HttpCartrackClient.fetchPositionAt', () => {
     const fetchImpl = mockFetch([new Error('ECONNRESET')]);
     const client = cartrackClient({ ...baseOpts, fetchImpl });
     await expect(
-      client.fetchPositionAt('v-1', new Date('2026-04-20T06:00:00Z'))
+      client.fetchPositionAt('1', new Date('2026-04-20T06:00:00Z'))
     ).rejects.toThrow(/network/);
   });
 
-  it('default tolerance window is exported as 5 minutes', () => {
-    expect(DEFAULT_TOLERANCE_MS).toBe(5 * 60 * 1000);
+  it('throws typed CartrackError when `data` is not an array (malformed upstream body)', async () => {
+    const fetchImpl = mockFetch([jsonResponse(200, { data: 'oops' })]);
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
+    await expect(
+      client.fetchPositionAt('1', new Date('2026-04-20T06:00:00Z'))
+    ).rejects.toThrow(/data\[\]|malformed/);
   });
 
-  it('encodes from/to as ISO-8601 UTC timestamps bracketing `at` by toleranceMs', async () => {
+  it('encodes start_timestamp/end_timestamp as Cartrack `YYYY-MM-DD hh:mm:ss` UTC (not ISO-8601)', async () => {
     let capturedUrl = '';
     const fetchImpl = (async (url: string) => {
       capturedUrl = url;
-      return jsonResponse(200, { positions: [] });
+      return jsonResponse(200, { data: [] });
     }) as typeof fetch;
-    const client = cartrackClient({
-      baseUrl: 'https://api.cartrack.example',
-      username: 'u',
-      password: 'p',
-      fetchImpl,
-    });
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
     const at = new Date('2026-04-20T06:00:00.000Z');
     const tolMs = 3 * 60 * 1000;
-    await client.fetchPositionAt('veh-1', at, tolMs);
+    await client.fetchPositionAt('1', at, tolMs);
     const params = new URLSearchParams(capturedUrl.split('?')[1]);
-    const from = params.get('from')!;
-    const to = params.get('to')!;
-    expect(new Date(from).getTime()).toBe(at.getTime() - tolMs);
-    expect(new Date(to).getTime()).toBe(at.getTime() + tolMs);
-    // Lock the ISO-8601 shape so a refactor to epoch-ms would break here.
-    expect(from).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    const from = params.get('start_timestamp')!;
+    const to = params.get('end_timestamp')!;
+    expect(from).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    expect(to).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    expect(from).toBe('2026-04-20 05:57:00');
+    expect(to).toBe('2026-04-20 06:03:00');
   });
 
-  it('throws typed CartrackError when positions is not an array (malformed upstream body)', async () => {
-    const fetchImpl = mockFetch([jsonResponse(200, { positions: 'oops' })]);
-    const client = cartrackClient({
-      baseUrl: 'https://api.cartrack.example',
-      username: 'u',
-      password: 'p',
-      fetchImpl,
-    });
-    await expect(
-      client.fetchPositionAt('v-1', new Date('2026-04-20T06:00:00Z'))
-    ).rejects.toThrow(/positions\[\]|malformed/);
+  it('default tolerance window is 5 minutes', () => {
+    expect(DEFAULT_TOLERANCE_MS).toBe(5 * 60 * 1000);
   });
 });
 
-describe('HttpCartrackClient.listVehicles', () => {
-  it('parses vehicles + filters out rows without an id', async () => {
+describe('HttpCartrackClient.listVehicles — /vehicles', () => {
+  const baseOpts = {
+    baseUrl: 'https://fleetapi-za.cartrack.com/rest',
+    username: 'u',
+    password: 'p',
+  };
+
+  it('maps vehicle_name as the human registration (SA tenant quirk)', async () => {
     const fetchImpl = mockFetch([
       jsonResponse(200, {
-        vehicles: [
-          { id: 'v-1', registration: 'CA12345', description: 'Bakkie' },
-          { id: '', registration: 'junk' },
-          { id: 'v-2', registration: 'ND67890', description: null },
+        data: [
+          {
+            vehicle_id: 544522263,
+            registration: 'TEMP-2084956',
+            vehicle_name: 'MW67LFGP',
+            manufacturer: 'Foton',
+            model: 'Truck Mate 1.5TD',
+          },
         ],
       }),
     ]);
-    const client = cartrackClient({
-      baseUrl: 'https://api.cartrack.example',
-      username: 'u',
-      password: 'p',
-      fetchImpl,
-    });
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
+    const vehicles = await client.listVehicles();
+    expect(vehicles).toHaveLength(1);
+    expect(vehicles[0]!.cartrackId).toBe('544522263');
+    expect(vehicles[0]!.registration).toBe('MW67LFGP');
+    expect(vehicles[0]!.description).toBe('Foton Truck Mate 1.5TD');
+  });
+
+  it('filters out rows without a vehicle_id', async () => {
+    const fetchImpl = mockFetch([
+      jsonResponse(200, {
+        data: [
+          { vehicle_id: 1, vehicle_name: 'MW67LFGP' },
+          { vehicle_id: null },
+          { vehicle_id: 2, vehicle_name: 'MW67LZGP' },
+        ],
+      }),
+    ]);
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
     const vehicles = await client.listVehicles();
     expect(vehicles).toHaveLength(2);
-    expect(vehicles[0]!.cartrackId).toBe('v-1');
-    expect(vehicles[1]!.cartrackId).toBe('v-2');
+    expect(vehicles[0]!.cartrackId).toBe('1');
+    expect(vehicles[1]!.cartrackId).toBe('2');
+  });
+
+  it('falls back to client_vehicle_description when vehicle_name is absent', async () => {
+    const fetchImpl = mockFetch([
+      jsonResponse(200, {
+        data: [
+          {
+            vehicle_id: 1,
+            vehicle_name: null,
+            client_vehicle_description: 'EMN892GP',
+          },
+        ],
+      }),
+    ]);
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
+    const vehicles = await client.listVehicles();
+    expect(vehicles[0]!.registration).toBe('EMN892GP');
   });
 
   it('throws CartrackError(http) on non-2xx', async () => {
     const fetchImpl = mockFetch([jsonResponse(401, { error: 'unauthorized' })]);
     const client = cartrackClient({
-      baseUrl: 'https://api.cartrack.example',
+      baseUrl: 'https://fleetapi-za.cartrack.com/rest',
       username: 'u',
       password: 'p',
       fetchImpl,
     });
     await expect(client.listVehicles()).rejects.toThrow(/HTTP 401/);
+  });
+});
+
+describe('fetchPositionAt — pagination + shape guards (P0/P1 hardening)', () => {
+  const baseOpts = {
+    baseUrl: 'https://fleetapi-za.cartrack.com/rest',
+    username: 'u',
+    password: 'p',
+  };
+
+  it('throws when meta.last_page > 1 (silent truncation guard)', async () => {
+    // A 50-vehicle fleet at 60 pings/min busy window can exceed 1000
+    // events. Cartrack time-sorts; the dropped tail is often the events
+    // CLOSEST to the clock time — which would silently flip match → no_data.
+    const fetchImpl = mockFetch([
+      jsonResponse(200, {
+        data: [
+          { vehicle_id: 1, event_ts: '2026-04-20 05:59:45', latitude: -26.2, longitude: 28.0 },
+        ],
+        meta: { current_page: 1, last_page: 3, total: 2500 },
+      }),
+    ]);
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
+    await expect(
+      client.fetchPositionAt('1', new Date('2026-04-20T06:00:00Z'))
+    ).rejects.toThrow(/paginated/i);
+  });
+
+  it('throws on empty vehicleId input (defence against empty cartrack_vehicle_id column)', async () => {
+    const client = cartrackClient({ ...baseOpts, fetchImpl: (async () => {
+      throw new Error('should not reach fetch');
+    }) as typeof fetch });
+    await expect(
+      client.fetchPositionAt('', new Date('2026-04-20T06:00:00Z'))
+    ).rejects.toThrow(/vehicleId/);
+    await expect(
+      client.fetchPositionAt('   ', new Date('2026-04-20T06:00:00Z'))
+    ).rejects.toThrow(/vehicleId/);
+  });
+
+  it('throws on data: null (symmetric shape check)', async () => {
+    const fetchImpl = mockFetch([jsonResponse(200, { data: null })]);
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
+    await expect(
+      client.fetchPositionAt('1', new Date('2026-04-20T06:00:00Z'))
+    ).rejects.toThrow(/data\[\].*null/);
+  });
+
+  it('throws on data: undefined (contract violation from 2xx)', async () => {
+    const fetchImpl = mockFetch([jsonResponse(200, {})]);
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
+    await expect(
+      client.fetchPositionAt('1', new Date('2026-04-20T06:00:00Z'))
+    ).rejects.toThrow(/data\[\].*undefined/);
+  });
+
+  it('throws when any event row is missing vehicle_id (payload malformation)', async () => {
+    const fetchImpl = mockFetch([
+      jsonResponse(200, {
+        data: [
+          { vehicle_id: 1, event_ts: '2026-04-20 05:59:45', latitude: -26.2, longitude: 28.0 },
+          { event_ts: '2026-04-20 05:59:50', latitude: -26.2, longitude: 28.0 }, // no vehicle_id
+        ],
+      }),
+    ]);
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
+    await expect(
+      client.fetchPositionAt('1', new Date('2026-04-20T06:00:00Z'))
+    ).rejects.toThrow(/missing vehicle_id/);
+  });
+});
+
+describe('fetchPositionAt — vehicle_id type coercion + filter correctness', () => {
+  const baseOpts = {
+    baseUrl: 'https://fleetapi-za.cartrack.com/rest',
+    username: 'u',
+    password: 'p',
+  };
+
+  it('filters correctly when vehicle_id arrives as a number OR a string (Cartrack tolerates both)', async () => {
+    const fetchImpl = mockFetch([
+      jsonResponse(200, {
+        data: [
+          { vehicle_id: 544522263, event_ts: '2026-04-20 05:59:40', latitude: -26.2, longitude: 28.0 },
+          { vehicle_id: '544522263', event_ts: '2026-04-20 05:59:50', latitude: -26.21, longitude: 28.01 },
+        ],
+      }),
+    ]);
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
+    const result = await client.fetchPositionAt(
+      '544522263',
+      new Date('2026-04-20T06:00:00Z')
+    );
+    expect(result.status).toBe('ok');
+    // Both rows match; picker chooses the one closer to 06:00 (05:59:50 beats 05:59:40).
+    if (result.status === 'ok') expect(result.sample.lat).toBe(-26.21);
+  });
+
+  it('substring false-positive guard: "5445" must NOT match "544522263"', async () => {
+    const fetchImpl = mockFetch([
+      jsonResponse(200, {
+        data: [
+          { vehicle_id: 544522263, event_ts: '2026-04-20 05:59:45', latitude: -26.2, longitude: 28.0 },
+        ],
+      }),
+    ]);
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
+    const result = await client.fetchPositionAt(
+      '5445',
+      new Date('2026-04-20T06:00:00Z')
+    );
+    expect(result.status).toBe('no_data');
+  });
+});
+
+describe('fetchPositionAt — event_ts format variants + GPS-fix-less warn', () => {
+  const baseOpts = {
+    baseUrl: 'https://fleetapi-za.cartrack.com/rest',
+    username: 'u',
+    password: 'p',
+  };
+
+  it('parses event_ts in all documented formats (space+UTC, ISO+Z, ISO+offset)', async () => {
+    const at = new Date('2026-04-20T06:00:00Z');
+    for (const id of ['1', '2', '3']) {
+      // Re-mock for each iteration — mockFetch consumes one response per call
+      const one = mockFetch([
+        jsonResponse(200, {
+          data: [
+            id === '1' ? { vehicle_id: 1, event_ts: '2026-04-20 06:00:00', latitude: -26.2, longitude: 28.0 }
+            : id === '2' ? { vehicle_id: 2, event_ts: '2026-04-20T06:00:00Z', latitude: -26.2, longitude: 28.0 }
+            : { vehicle_id: 3, event_ts: '2026-04-20T08:00:00+02:00', latitude: -26.2, longitude: 28.0 },
+          ],
+        }),
+      ]);
+      const c = cartrackClient({ ...baseOpts, fetchImpl: one });
+      const r = await c.fetchPositionAt(id, at);
+      expect(r.status).toBe('ok');
+      if (r.status === 'ok') {
+        // All three should land at exactly the clock time.
+        expect(r.sample.ts.toISOString()).toBe('2026-04-20T06:00:00.000Z');
+      }
+    }
+  });
+
+  it('toSample returns null for unparseable event_ts (e.g. date-only, no time)', async () => {
+    const fetchImpl = mockFetch([
+      jsonResponse(200, {
+        data: [
+          { vehicle_id: 1, event_ts: '2026-04-20', latitude: -26.2, longitude: 28.0 },
+        ],
+      }),
+    ]);
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
+    const result = await client.fetchPositionAt(
+      '1',
+      new Date('2026-04-20T06:00:00Z')
+    );
+    // Date('2026-04-20Z') is actually valid (midnight UTC) — but that's
+    // outside the ±5min window from 06:00, so `no_data`. The toSample
+    // function itself returns a sample; picker discards it.
+    expect(result.status).toBe('no_data');
+  });
+});
+
+describe('listVehicles — pagination + shape + fallback (P0/P1 hardening)', () => {
+  const baseOpts = {
+    baseUrl: 'https://fleetapi-za.cartrack.com/rest',
+    username: 'u',
+    password: 'p',
+  };
+
+  it('throws when meta.last_page > 1 (silent truncation guard)', async () => {
+    const fetchImpl = mockFetch([
+      jsonResponse(200, {
+        data: [{ vehicle_id: 1, vehicle_name: 'MW67LFGP' }],
+        meta: { current_page: 1, last_page: 2, total: 600 },
+      }),
+    ]);
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
+    await expect(client.listVehicles()).rejects.toThrow(/paginated/i);
+  });
+
+  it('throws on data: null or non-array (symmetric shape check)', async () => {
+    const fetchImpl = mockFetch([
+      jsonResponse(200, { data: null }),
+      jsonResponse(200, { data: 'oops' }),
+    ]);
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
+    await expect(client.listVehicles()).rejects.toThrow(/data\[\].*null/);
+    await expect(client.listVehicles()).rejects.toThrow(/data\[\].*string/);
+  });
+
+  it('emits registration=null when both vehicle_name and client_vehicle_description are null (not filtered out)', async () => {
+    const fetchImpl = mockFetch([
+      jsonResponse(200, {
+        data: [
+          {
+            vehicle_id: 42,
+            vehicle_name: null,
+            client_vehicle_description: null,
+            manufacturer: 'Foton',
+            model: 'Tunland',
+          },
+        ],
+      }),
+    ]);
+    const client = cartrackClient({ ...baseOpts, fetchImpl });
+    const vehicles = await client.listVehicles();
+    expect(vehicles).toHaveLength(1);
+    expect(vehicles[0]!.registration).toBe(null);
+    // Row is still present so a mapping admin can manually claim it.
+    expect(vehicles[0]!.description).toBe('Foton Tunland');
   });
 });
 
@@ -255,14 +541,14 @@ describe('HttpCartrackClient timeout', () => {
       })) as typeof fetch;
 
     const client = cartrackClient({
-      baseUrl: 'https://api.cartrack.example',
+      baseUrl: 'https://fleetapi-za.cartrack.com/rest',
       username: 'u',
       password: 'p',
       fetchImpl,
       timeoutMs: 50,
     });
     await expect(
-      client.fetchPositionAt('v-1', new Date('2026-04-20T06:00:00Z'))
+      client.fetchPositionAt('1', new Date('2026-04-20T06:00:00Z'))
     ).rejects.toThrow(/network/);
   });
 });

@@ -344,3 +344,138 @@ describe('cartrackReconcile', () => {
     expect(report.perEntryErrors).toHaveLength(10);
   });
 });
+
+// ---------------------------------------------------------------------------
+// End-to-end: real adapter → reconcile.
+//
+// All other tests in this file use `fakeCartrack(...)` — hand-rolled
+// CartrackFetchResult objects that bypass the real adapter entirely. This
+// suite wires the REAL `cartrackClient({fetchImpl})` from
+// src/services/tracking/cartrack/client.ts to the reconcile and drives
+// it with a realistic Cartrack events payload. Catches:
+//   - `event_ts` → `Date` timestamp parsing
+//   - `String(vehicle_id)` filter against the reconcile's
+//     cartrack_vehicle_id column format
+//   - Pagination guard wiring into the reconcile's per-entry error path
+// ---------------------------------------------------------------------------
+describe('cartrackReconcile — end-to-end through real adapter', () => {
+  beforeEach(() => {
+    mocks.loadCandidateEntries.mockReset();
+    mocks.upsertVerification.mockReset().mockResolvedValue(true);
+    mocks.upsertMismatchAtomic
+      .mockReset()
+      .mockResolvedValue({ verificationInserted: true, exceptionInserted: true });
+  });
+
+  it('passes realistic Cartrack events payload through the real adapter and produces a match verdict', async () => {
+    const { cartrackClient } = await import('../../tracking/cartrack/client');
+
+    // Device coord matches vehicle coord within default 500m threshold.
+    // Event 15s before clock_in_at — well inside the ±5 min window.
+    const fetchImpl = (async () =>
+      ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: [
+            {
+              vehicle_id: 544522263, // number, not string
+              registration: 'TEMP-2084956',
+              event_ts: '2026-04-20 05:59:45', // 15s before clock_in at 06:00 UTC
+              latitude: -26.2,
+              longitude: 28.0,
+            },
+          ],
+        }),
+      }) as unknown as Response) as typeof fetch;
+
+    const realClient = cartrackClient({
+      baseUrl: 'https://fleetapi-za.cartrack.com/rest',
+      username: 'u',
+      password: 'p',
+      fetchImpl,
+    });
+
+    mocks.loadCandidateEntries.mockResolvedValueOnce([
+      {
+        id: 'e1',
+        staff_id: 's1',
+        work_date: '2026-04-20',
+        clock_in_at: '2026-04-20T06:00:00+00:00',
+        clock_out_at: null, // open entry — only `in` side processes
+        clock_in_lat: '-26.2000000',
+        clock_in_lon: '28.0000000',
+        clock_out_lat: null,
+        clock_out_lon: null,
+        cartrack_vehicle_id: '544522263', // string in DB, number in payload
+        has_in_verification: false,
+        has_out_verification: false,
+      },
+    ]);
+
+    const report = await cartrackReconcile(realClient, {
+      fromDate: '2026-04-20',
+      toDate: '2026-04-20',
+    });
+
+    // Match produced: adapter parsed event_ts correctly, coerced numeric
+    // vehicle_id to match the stored string, and picker found the sample
+    // 15s from clock time.
+    expect(report.rowsMatch).toBe(1);
+    expect(report.rowsMismatch).toBe(0);
+    expect(report.perEntryErrors).toHaveLength(0);
+  });
+
+  it('real adapter pagination throw lands in perEntryErrors, does not crash the run', async () => {
+    const { cartrackClient } = await import('../../tracking/cartrack/client');
+
+    const fetchImpl = (async () =>
+      ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: [
+            {
+              vehicle_id: 544522263,
+              event_ts: '2026-04-20 05:59:45',
+              latitude: -26.2,
+              longitude: 28.0,
+            },
+          ],
+          meta: { current_page: 1, last_page: 5, total: 4800 },
+        }),
+      }) as unknown as Response) as typeof fetch;
+
+    const realClient = cartrackClient({
+      baseUrl: 'https://fleetapi-za.cartrack.com/rest',
+      username: 'u',
+      password: 'p',
+      fetchImpl,
+    });
+
+    mocks.loadCandidateEntries.mockResolvedValueOnce([
+      {
+        id: 'e1',
+        staff_id: 's1',
+        work_date: '2026-04-20',
+        clock_in_at: '2026-04-20T06:00:00+00:00',
+        clock_out_at: null,
+        clock_in_lat: '-26.2',
+        clock_in_lon: '28.0',
+        clock_out_lat: null,
+        clock_out_lon: null,
+        cartrack_vehicle_id: '544522263',
+        has_in_verification: false,
+        has_out_verification: false,
+      },
+    ]);
+
+    const report = await cartrackReconcile(realClient, {
+      fromDate: '2026-04-20',
+      toDate: '2026-04-20',
+    });
+    expect(report.rowsMatch).toBe(0);
+    expect(report.perEntryErrors).toHaveLength(1);
+    expect(report.perEntryErrors[0]!.error).toMatch(/paginated/i);
+  });
+});
