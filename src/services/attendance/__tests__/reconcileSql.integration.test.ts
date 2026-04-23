@@ -384,6 +384,24 @@ const TEMPLATES: Template[] = [
     params: [SAMPLE_UUID, 'pending', 30],
   },
   {
+    name: 'countSupervisedAdjustmentsByStatus — scoped (ANY uuid[] filter)',
+    text: `
+      SELECT a.status, COUNT(*)::text AS count
+      FROM attendance_adjustments a
+      JOIN attendance_entries e ON e.id = a.entry_id
+      WHERE e.staff_id = ANY($1::uuid[])
+      GROUP BY a.status`,
+    params: [[SAMPLE_UUID]],
+  },
+  {
+    name: 'countSupervisedAdjustmentsByStatus — unscoped (super_admin path)',
+    text: `
+      SELECT a.status, COUNT(*)::text AS count
+      FROM attendance_adjustments a
+      GROUP BY a.status`,
+    params: [],
+  },
+  {
     name: 'countOwnAdjustmentsByStatus (GROUP BY status)',
     text: `
       SELECT a.status, COUNT(*)::text AS count

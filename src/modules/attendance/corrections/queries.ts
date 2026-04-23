@@ -185,6 +185,53 @@ export interface OwnAdjustmentStatusCounts {
   cancelled: number;
 }
 
+/**
+ * Supervisor-side status counts. Mirrors countOwnAdjustmentsByStatus
+ * but takes the same `scopedToStaffIds` parameter as
+ * listAdjustmentsForReview so the count reflects the supervisor's
+ * actual visible queue, not the whole org.
+ *
+ *   null | undefined  — no scope filter (super_admin / admin path)
+ *   []                — short-circuit to all-zeros, no DB round-trip
+ *   [...ids]          — WHERE e.staff_id = ANY($ids::uuid[])
+ */
+export async function countSupervisedAdjustmentsByStatus(
+  scopedToStaffIds: string[] | null | undefined
+): Promise<OwnAdjustmentStatusCounts> {
+  const zero: OwnAdjustmentStatusCounts = {
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+    cancelled: 0,
+  };
+  if (
+    scopedToStaffIds !== null &&
+    scopedToStaffIds !== undefined &&
+    scopedToStaffIds.length === 0
+  ) {
+    return zero;
+  }
+  const rows =
+    scopedToStaffIds === null || scopedToStaffIds === undefined
+      ? await sql<{ status: AdjustmentStatus; count: string }>`
+          SELECT a.status, COUNT(*)::text AS count
+          FROM attendance_adjustments a
+          GROUP BY a.status
+        `
+      : await sql<{ status: AdjustmentStatus; count: string }>`
+          SELECT a.status, COUNT(*)::text AS count
+          FROM attendance_adjustments a
+          JOIN attendance_entries e ON e.id = a.entry_id
+          WHERE e.staff_id = ANY(${scopedToStaffIds}::uuid[])
+          GROUP BY a.status
+        `;
+  const out = { ...zero };
+  for (const r of rows) {
+    out[r.status] = Number(r.count);
+  }
+  return out;
+}
+
 export async function countOwnAdjustmentsByStatus(
   staffId: string
 ): Promise<OwnAdjustmentStatusCounts> {

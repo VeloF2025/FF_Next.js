@@ -15,6 +15,7 @@ import {
 } from '@/lib/auth/middleware';
 import {
   listAdjustmentsForReview,
+  countSupervisedAdjustmentsByStatus,
   type AdjustmentStatus,
 } from '@/modules/attendance/corrections/queries';
 import { staffIdsSupervisedBy } from '@/services/attendance/supervisorScope';
@@ -58,12 +59,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
         : [];
     }
 
-    const adjustments = await listAdjustmentsForReview({
-      statusFilter,
-      limit,
-      scopedToStaffIds,
-    });
-    apiResponse.success(res, { adjustments, statusFilter });
+    // List + counts in parallel — counts power the UI tab badges and
+    // must always reflect the FULL supervised total, not the filtered
+    // page, so the badge doesn't lie when the supervisor is viewing
+    // e.g. status=approved.
+    const [adjustments, counts] = await Promise.all([
+      listAdjustmentsForReview({ statusFilter, limit, scopedToStaffIds }),
+      countSupervisedAdjustmentsByStatus(scopedToStaffIds),
+    ]);
+    apiResponse.success(res, { adjustments, counts, statusFilter });
   } catch (err) {
     log.error('[staff-corrections-list] failed', {
       statusFilter,

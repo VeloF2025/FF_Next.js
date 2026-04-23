@@ -71,22 +71,53 @@ describe('GET /api/staff/attendance-corrections', () => {
   });
 
   it('defaults to status=pending (parameterises to sql)', async () => {
-    mocks.sql.mockResolvedValueOnce([]);
+    // Handler now fires list + counts in parallel — mock both. Order
+    // across Promise.all isn't guaranteed, so find the list call by
+    // looking for LIMIT.
+    mocks.sql.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     const { res, captured } = makeRes();
     await handler(makeReq({}), res);
     expect(captured.statusCode).toBe(200);
-    const call = mocks.sql.mock.calls[0] as [readonly string[], ...unknown[]];
-    expect(call.slice(1)).toContain('pending');
+    const calls = mocks.sql.mock.calls as Array<[readonly string[], ...unknown[]]>;
+    const listCall = calls.find((c) => /LIMIT/i.test(c[0].join(' ')));
+    expect(listCall).toBeDefined();
+    expect(listCall!.slice(1)).toContain('pending');
     const body = captured.body as { data: { statusFilter: string } };
     expect(body.data.statusFilter).toBe('pending');
   });
 
   it("status='all' uses the union-of-all query (no WHERE a.status = $1)", async () => {
-    mocks.sql.mockResolvedValueOnce([]);
+    mocks.sql.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     const { res } = makeRes();
     await handler(makeReq({ status: 'all' }), res);
-    const call = mocks.sql.mock.calls[0] as [readonly string[], ...unknown[]];
-    const sqlText = call[0].join(' ');
+    const calls = mocks.sql.mock.calls as Array<[readonly string[], ...unknown[]]>;
+    const listCall = calls.find((c) => /LIMIT/i.test(c[0].join(' ')));
+    expect(listCall).toBeDefined();
+    const sqlText = listCall![0].join(' ');
     expect(sqlText).not.toMatch(/WHERE\s+a\.status\s*=\s*\$/i);
+  });
+
+  it('response includes counts alongside adjustments + statusFilter', async () => {
+    // The list + counts aggregator both return rows. Order across
+    // Promise.all isn't deterministic, but since we only care about
+    // the final shape we can return the same pair for both positions.
+    mocks.sql
+      .mockResolvedValueOnce([]) // list
+      .mockResolvedValueOnce([
+        { status: 'pending', count: '5' },
+        { status: 'approved', count: '12' },
+      ]);
+    const { res, captured } = makeRes();
+    await handler(makeReq({}), res);
+    expect(captured.statusCode).toBe(200);
+    const body = captured.body as {
+      data: { counts: Record<string, number> };
+    };
+    expect(body.data.counts).toEqual({
+      pending: 5,
+      approved: 12,
+      rejected: 0,
+      cancelled: 0,
+    });
   });
 });

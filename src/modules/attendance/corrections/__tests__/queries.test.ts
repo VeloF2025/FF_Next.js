@@ -18,6 +18,7 @@ vi.mock('@/lib/db-pool', () => ({
 import {
   listOwnAdjustments,
   countOwnAdjustmentsByStatus,
+  countSupervisedAdjustmentsByStatus,
   cancelOwnAdjustment,
 } from '../queries';
 
@@ -142,5 +143,43 @@ describe('cancelOwnAdjustment', () => {
     const params = mocks.sql.mock.calls[0]!.slice(1);
     expect(params).toContain('a-1');
     expect(params).toContain(S);
+  });
+});
+
+describe('countSupervisedAdjustmentsByStatus', () => {
+  it('null scope → no filter (super_admin / admin path)', async () => {
+    mocks.sql.mockResolvedValueOnce([
+      { status: 'pending', count: '8' },
+      { status: 'approved', count: '27' },
+    ]);
+    const counts = await countSupervisedAdjustmentsByStatus(null);
+    expect(counts).toEqual({ pending: 8, approved: 27, rejected: 0, cancelled: 0 });
+    const template = mocks.sql.mock.calls[0]![0].join(' ');
+    expect(template).not.toMatch(/WHERE\s+e\.staff_id/i);
+  });
+
+  it('undefined scope behaves like null (callers that forget the arg)', async () => {
+    mocks.sql.mockResolvedValueOnce([]);
+    const counts = await countSupervisedAdjustmentsByStatus(undefined);
+    expect(counts).toEqual({ pending: 0, approved: 0, rejected: 0, cancelled: 0 });
+    const template = mocks.sql.mock.calls[0]![0].join(' ');
+    expect(template).not.toMatch(/WHERE\s+e\.staff_id/i);
+  });
+
+  it('empty array → all-zeros, short-circuits without a DB round-trip', async () => {
+    const counts = await countSupervisedAdjustmentsByStatus([]);
+    expect(counts).toEqual({ pending: 0, approved: 0, rejected: 0, cancelled: 0 });
+    expect(mocks.sql).not.toHaveBeenCalled();
+  });
+
+  it('scoped array → WHERE e.staff_id = ANY(uuid[])', async () => {
+    mocks.sql.mockResolvedValueOnce([
+      { status: 'pending', count: '3' },
+    ]);
+    const counts = await countSupervisedAdjustmentsByStatus([S, 'other']);
+    expect(counts.pending).toBe(3);
+    const template = mocks.sql.mock.calls[0]![0].join(' ');
+    expect(template).toMatch(/WHERE\s+e\.staff_id\s*=\s*ANY/i);
+    expect(template).toMatch(/uuid\[\]/i);
   });
 });
