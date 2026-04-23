@@ -109,6 +109,44 @@ function parseArg(name: string): string | undefined {
           .join(',')}`
       );
     }
+
+    // Best-effort WA alert. Send failure MUST NOT change the cron's
+    // exit code — the reconcile already succeeded. Defaults match
+    // the convention in src/lib/dbCircuitBreaker.ts (Velo Test group)
+    // so an unconfigured install still routes somewhere visible.
+    try {
+      const { sendCartrackReconcileAlert, DEFAULT_MISMATCH_THRESHOLD } =
+        await import('../../src/modules/attendance/alerts/cartrackWaAlert');
+      const { sendWhatsAppGroup } = await import(
+        '../../src/modules/notifications/services/whatsappDelivery'
+      );
+      const groupJid =
+        process.env.ATTENDANCE_OPS_WA_GROUP_JID ||
+        process.env.WA_INFRA_GROUP_JID ||
+        '120363421664266245@g.us';
+      const thresholdRaw = process.env.ATTENDANCE_WA_MISMATCH_THRESHOLD;
+      const threshold =
+        thresholdRaw && Number.isFinite(Number(thresholdRaw))
+          ? Math.max(0, Math.trunc(Number(thresholdRaw)))
+          : DEFAULT_MISMATCH_THRESHOLD;
+      await sendCartrackReconcileAlert({
+        report,
+        groupJid,
+        mismatchThreshold: threshold,
+        send: sendWhatsAppGroup,
+        logger: {
+          info: (msg) => stderr(msg),
+          error: (msg) => stderr(msg),
+        },
+      });
+    } catch (alertErr) {
+      stderr(
+        `[cartrack-reconcile] WA alerter crashed (non-fatal): ${
+          alertErr instanceof Error ? alertErr.message : String(alertErr)
+        }`
+      );
+    }
+
     process.exit(0);
   } catch (err) {
     stderr(
