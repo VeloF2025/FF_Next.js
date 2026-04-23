@@ -15,6 +15,11 @@ import type { Tab } from '../accounting/accountingNavConfig';
 
 export const TABS: Tab[] = [
   {
+    id: 'overview',
+    label: 'Overview',
+    href: '/staff/attendance/overview',
+  },
+  {
     id: 'roster',
     label: 'Roster',
     href: '/staff/attendance',
@@ -42,6 +47,7 @@ export const TABS: Tab[] = [
 ];
 
 export function getActiveTabId(pathname: string): string {
+  if (pathname.startsWith('/staff/attendance/overview')) return 'overview';
   if (pathname === '/staff/attendance/week') return 'week';
   if (pathname.startsWith('/staff/attendance/corrections')) return 'corrections';
   if (pathname.startsWith('/staff/attendance/locks')) return 'locks';
