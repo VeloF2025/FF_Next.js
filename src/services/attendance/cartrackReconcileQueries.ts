@@ -47,7 +47,7 @@ export async function loadCandidateEntries(
       ) AS has_out_verification
     FROM attendance_entries e
     JOIN vehicle_assignments va ON va.id = e.vehicle_assignment_id
-    JOIN fleet_vehicles fv ON fv.id = va.vehicle_id
+    JOIN fleet_vehicles fv ON fv.id = va.fleet_vehicle_id
     WHERE e.status IN ('closed', 'auto_closed', 'manual')
       AND e.vehicle_assignment_id IS NOT NULL
       AND e.work_date >= ${fromDate}::date
