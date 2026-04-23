@@ -18,6 +18,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 import {
   AlertTriangle,
   Check,
@@ -87,6 +88,19 @@ const STATUS_TABS: readonly { key: StatusFilter; label: string }[] = [
   { key: 'all', label: 'All' },
 ];
 
+const VALID_STATUS_FILTERS: readonly StatusFilter[] = STATUS_TABS.map(
+  (t) => t.key
+);
+
+const DEFAULT_STATUS_FILTER: StatusFilter = 'pending';
+
+function parseStatusParam(raw: unknown): StatusFilter {
+  return typeof raw === 'string' &&
+    VALID_STATUS_FILTERS.includes(raw as StatusFilter)
+    ? (raw as StatusFilter)
+    : DEFAULT_STATUS_FILTER;
+}
+
 function parseApiError(body: unknown, status: number): string {
   const e = (body as { error?: { message?: string } | string } | null)?.error;
   if (typeof e === 'string') return e;
@@ -111,7 +125,10 @@ function prettyKind(kind: string): string {
 }
 
 export default function StaffAttendanceCorrectionsPage() {
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
+  const router = useRouter();
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(
+    DEFAULT_STATUS_FILTER
+  );
   const [adjustments, setAdjustments] = useState<AdjustmentRow[] | null>(null);
   const [counts, setCounts] = useState<Counts>(ZERO_COUNTS);
   const [hints, setHints] = useState<HintCatalogue | null>(null);
@@ -120,6 +137,33 @@ export default function StaffAttendanceCorrectionsPage() {
   const [reviewing, setReviewing] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState('');
+
+  // URL ↔ tab sync: the ?status= query param is the source of truth.
+  // Mirrors /my/attendance/corrections (#1412 sibling page). router.replace
+  // keeps same-page tab flips out of the history stack.
+  useEffect(() => {
+    if (!router.isReady) return;
+    const next = parseStatusParam(router.query.status);
+    setStatusFilter((prev) => (prev === next ? prev : next));
+  }, [router.isReady, router.query.status]);
+
+  const handleTabChange = useCallback(
+    (next: StatusFilter) => {
+      setStatusFilter(next);
+      if (!router.isReady) return;
+      const { status: _prev, ...restQuery } = router.query;
+      const nextQuery =
+        next === DEFAULT_STATUS_FILTER
+          ? restQuery
+          : { ...restQuery, status: next };
+      router.replace(
+        { pathname: router.pathname, query: nextQuery },
+        undefined,
+        { shallow: true }
+      );
+    },
+    [router]
+  );
 
   // Hints only fetched once — static catalogue, deploy-busted.
   useEffect(() => {
@@ -262,7 +306,7 @@ export default function StaffAttendanceCorrectionsPage() {
                 role="tab"
                 aria-selected={isActive}
                 type="button"
-                onClick={() => setStatusFilter(tab.key)}
+                onClick={() => handleTabChange(tab.key)}
                 className={`px-3 py-1.5 rounded-full border text-sm font-medium transition ${
                   isActive
                     ? 'bg-blue-600 border-blue-600 text-white'
