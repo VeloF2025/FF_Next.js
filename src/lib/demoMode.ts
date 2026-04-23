@@ -78,8 +78,38 @@ function shouldSkipString(s: string): boolean {
   if (s.startsWith('http://') || s.startsWith('https://')) return true;
   if (s.startsWith('/api/') || s.startsWith('/storage/') || s.startsWith('/static/')) return true;
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-/.test(s)) return true; // UUID-ish
+  // Path-like strings (e.g. "tonga/VTN_TOG.../photo.jpg" or ".../v20260317..-abc123"):
+  // a project name in the leading path segment must not be rewritten, or the proxy
+  // call that follows will 404. This catches storage keys that arrive through
+  // arbitrary JSON fields without relying on the key name alone.
+  if (/^[^/\s]+\/[^/\s]+\/.+$/.test(s)) return true;
   return false;
 }
+
+/** Field names whose string values are opaque identifiers (storage paths, filenames,
+ *  external refs) and must never be rewritten by demo-mode sanitisation, even if
+ *  `shouldSkipString` would otherwise allow it. Matched case-insensitively. */
+const PRESERVED_KEYS = new Set<string>([
+  'storage_key',
+  'storagekey',
+  'storage_path',
+  'storagepath',
+  'filename',
+  'file_name',
+  'file_path',
+  'filepath',
+  'path',
+  'url',
+  'href',
+  'src',
+  'sharepoint_item_id',
+  'sharepoint_drive_id',
+  'minio_key',
+  'minio_path',
+  'qfield_path',
+  'object_key',
+  's3_key',
+]);
 
 function sanitizeString(s: string, compiled: CompiledMap): string {
   if (shouldSkipString(s)) return s;
@@ -106,7 +136,11 @@ function sanitizeTree(value: unknown, compiled: CompiledMap, depth = 0): unknown
   if (typeof value === 'object') {
     const out: Record<string, unknown> = {};
     for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
-      out[key] = sanitizeTree(v, compiled, depth + 1);
+      if (PRESERVED_KEYS.has(key.toLowerCase()) && typeof v === 'string') {
+        out[key] = v;
+      } else {
+        out[key] = sanitizeTree(v, compiled, depth + 1);
+      }
     }
     return out;
   }
