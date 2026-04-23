@@ -98,8 +98,27 @@ export async function transitionAdjustmentStatus(args: {
  * Staff-side own-submissions listing. Respects staff_id on the linked
  * attendance_entries so a requester-impersonator cannot see someone else's.
  */
-export async function listOwnAdjustments(staffId: string, limit: number): Promise<AdjustmentRow[]> {
+export async function listOwnAdjustments(
+  staffId: string,
+  limit: number,
+  statusFilter: AdjustmentStatus | 'all' = 'all'
+): Promise<AdjustmentRow[]> {
   const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
+  if (statusFilter === 'all') {
+    return sql<AdjustmentRow>`
+      SELECT a.*,
+             e.staff_id   AS entry_staff_id,
+             e.work_date::text AS entry_work_date,
+             e.clock_in_at::text  AS entry_clock_in_at,
+             e.clock_out_at::text AS entry_clock_out_at
+      FROM attendance_adjustments a
+      JOIN attendance_entries e ON e.id = a.entry_id
+      WHERE e.staff_id = ${staffId}
+      ORDER BY CASE a.status WHEN 'pending' THEN 0 ELSE 1 END ASC,
+               a.created_at DESC
+      LIMIT ${safeLimit}
+    `;
+  }
   return sql<AdjustmentRow>`
     SELECT a.*,
            e.staff_id   AS entry_staff_id,
@@ -109,9 +128,45 @@ export async function listOwnAdjustments(staffId: string, limit: number): Promis
     FROM attendance_adjustments a
     JOIN attendance_entries e ON e.id = a.entry_id
     WHERE e.staff_id = ${staffId}
+      AND a.status = ${statusFilter}
     ORDER BY a.created_at DESC
     LIMIT ${safeLimit}
   `;
+}
+
+/**
+ * Returns a compact { status → count } map for the given staff's
+ * adjustments. Powers the /my portal's corrections badge ("3 pending,
+ * 12 resolved"). One row per status; statuses with zero rows are
+ * omitted by the GROUP BY, so callers must default-zero on read.
+ */
+export interface OwnAdjustmentStatusCounts {
+  pending: number;
+  approved: number;
+  rejected: number;
+  cancelled: number;
+}
+
+export async function countOwnAdjustmentsByStatus(
+  staffId: string
+): Promise<OwnAdjustmentStatusCounts> {
+  const rows = await sql<{ status: AdjustmentStatus; count: string }>`
+    SELECT a.status, COUNT(*)::text AS count
+    FROM attendance_adjustments a
+    JOIN attendance_entries e ON e.id = a.entry_id
+    WHERE e.staff_id = ${staffId}
+    GROUP BY a.status
+  `;
+  const out: OwnAdjustmentStatusCounts = {
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+    cancelled: 0,
+  };
+  for (const r of rows) {
+    out[r.status] = Number(r.count);
+  }
+  return out;
 }
 
 /**

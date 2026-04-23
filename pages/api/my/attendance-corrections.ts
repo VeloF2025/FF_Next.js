@@ -23,7 +23,9 @@ import type { AttendanceSession } from '@/modules/attendance/portal/types';
 import {
   insertAdjustment,
   listOwnAdjustments,
+  countOwnAdjustmentsByStatus,
   type AdjustmentKind,
+  type AdjustmentStatus,
 } from '@/modules/attendance/corrections/queries';
 import {
   isoWeekMonday,
@@ -136,19 +138,49 @@ async function handlePost(
   }
 }
 
+const VALID_STATUSES: readonly (AdjustmentStatus | 'all')[] = [
+  'pending',
+  'approved',
+  'rejected',
+  'cancelled',
+  'all',
+];
+
 async function handleGet(
   req: NextApiRequest,
   res: NextApiResponse,
   session: AttendanceSession
 ): Promise<void> {
-  const limitRaw = typeof req.query.limit === 'string' ? Number(req.query.limit) : 20;
-  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.trunc(limitRaw) : 20;
+  const limitRaw = typeof req.query.limit === 'string' ? Number(req.query.limit) : 30;
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.trunc(limitRaw) : 30;
+
+  const rawStatus = typeof req.query.status === 'string' ? req.query.status : 'all';
+  if (!VALID_STATUSES.includes(rawStatus as AdjustmentStatus | 'all')) {
+    apiResponse.badRequest(
+      res,
+      `status must be one of: ${VALID_STATUSES.join(', ')}`
+    );
+    return;
+  }
+  const statusFilter = rawStatus as AdjustmentStatus | 'all';
+
   try {
-    const rows = await listOwnAdjustments(session.staffId, limit);
-    apiResponse.success(res, { adjustments: rows });
+    // List + counts in parallel — counts power the UI badge ("3 pending")
+    // and must always reflect the full per-staff total, not the filtered
+    // page, so the badge doesn't lie when the staff is viewing `status=approved`.
+    const [rows, counts] = await Promise.all([
+      listOwnAdjustments(session.staffId, limit, statusFilter),
+      countOwnAdjustmentsByStatus(session.staffId),
+    ]);
+    apiResponse.success(res, {
+      adjustments: rows,
+      counts,
+      statusFilter,
+    });
   } catch (err) {
     log.error('[my-corrections] list failed', {
       staffId: session.staffId,
+      statusFilter,
       error: err instanceof Error ? err.message : String(err),
     });
     apiResponse.internalError(res, err);

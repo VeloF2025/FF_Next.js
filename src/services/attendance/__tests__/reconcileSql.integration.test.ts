@@ -320,6 +320,48 @@ const TEMPLATES: Template[] = [
     params: [SAMPLE_UUID, 5000.0, 500, 'in'],
   },
   {
+    name: 'listOwnAdjustments — default (status=all) branch with pending-first ordering',
+    text: `
+      SELECT a.*,
+             e.staff_id   AS entry_staff_id,
+             e.work_date::text AS entry_work_date,
+             e.clock_in_at::text  AS entry_clock_in_at,
+             e.clock_out_at::text AS entry_clock_out_at
+      FROM attendance_adjustments a
+      JOIN attendance_entries e ON e.id = a.entry_id
+      WHERE e.staff_id = $1::uuid
+      ORDER BY CASE a.status WHEN 'pending' THEN 0 ELSE 1 END ASC,
+               a.created_at DESC
+      LIMIT $2::int`,
+    params: [SAMPLE_UUID, 30],
+  },
+  {
+    name: 'listOwnAdjustments — scoped-to-status branch',
+    text: `
+      SELECT a.*,
+             e.staff_id   AS entry_staff_id,
+             e.work_date::text AS entry_work_date,
+             e.clock_in_at::text  AS entry_clock_in_at,
+             e.clock_out_at::text AS entry_clock_out_at
+      FROM attendance_adjustments a
+      JOIN attendance_entries e ON e.id = a.entry_id
+      WHERE e.staff_id = $1::uuid
+        AND a.status = $2::text
+      ORDER BY a.created_at DESC
+      LIMIT $3::int`,
+    params: [SAMPLE_UUID, 'pending', 30],
+  },
+  {
+    name: 'countOwnAdjustmentsByStatus (GROUP BY status)',
+    text: `
+      SELECT a.status, COUNT(*)::text AS count
+      FROM attendance_adjustments a
+      JOIN attendance_entries e ON e.id = a.entry_id
+      WHERE e.staff_id = $1::uuid
+      GROUP BY a.status`,
+    params: [SAMPLE_UUID],
+  },
+  {
     name: 'attendance-export weekly SELECT (summaries + exceptions + bounds CTEs)',
     text: `
       WITH week_exceptions AS (
