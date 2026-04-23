@@ -10,6 +10,9 @@
  *   mismatch           — distance > threshold_m (raises vehicle_gps_mismatch exception)
  *   no_data            — Cartrack returned no sample in ±5 min window
  *   vehicle_not_mapped — fleet_vehicles.cartrack_vehicle_id IS NULL or 404
+ *   device_gps_off     — clock_in/out had no device lat/lon (phone GPS off);
+ *                        Cartrack not called because corroboration is
+ *                        impossible without a device side to compare to
  *
  * Framing: this is CORROBORATION, not fraud detection. Mismatch exceptions
  * are 'info' severity — a driver clocking in from their private car is
@@ -65,6 +68,7 @@ export interface CartrackReconcileReport {
   rowsMismatch: number;
   rowsNoData: number;
   rowsVehicleNotMapped: number;
+  rowsDeviceGpsOff: number;
   rowsSkipped: number;
   mismatchExceptionsRaised: number;
   perEntryErrors: Array<{ entryId: string; error: string }>;
@@ -126,6 +130,29 @@ async function reconcileOneSide(args: {
     return;
   }
 
+  // Device-GPS-off short-circuit. `parseLatLon` returning null means the
+  // clock_*_lat/lon columns were NULL or non-finite — typically the
+  // staff member clocked in with location services disabled. No amount
+  // of Cartrack data can corroborate an absent device side, so skip the
+  // HTTP call entirely and persist a distinct verdict so supervisors
+  // can tell driver-GPS-off apart from Cartrack-silence (`no_data`).
+  // Remediation paths differ: `device_gps_off` is a training / policy
+  // issue; `no_data` is an ops / tenancy issue.
+  if (!args.deviceCoords) {
+    const ok = await upsertVerification({
+      entryId: args.entryId,
+      checkType: args.checkType,
+      verdict: 'device_gps_off',
+      vehicleCartrackId: args.vehicleCartrackId,
+      vehicleLat: null, vehicleLon: null, vehicleTs: null,
+      deviceLat: null, deviceLon: null,
+      distanceM: null,
+      thresholdM: args.thresholdM,
+    });
+    if (ok) args.report.rowsDeviceGpsOff += 1;
+    return;
+  }
+
   let fetchResult: CartrackFetchResult;
   try {
     fetchResult = await args.cartrack.fetchPositionAt(
@@ -179,24 +206,14 @@ async function reconcileOneSide(args: {
     return;
   }
 
-  // fetchResult.status === 'ok'
+  // Unreachable: the device-GPS-off short-circuit above would have
+  // returned already if deviceCoords were null. Narrow the type for
+  // TypeScript and throw if we ever reach here via a refactor that
+  // bypasses the short-circuit.
   if (!args.deviceCoords) {
-    // Vehicle sample present but device coords missing — shouldn't happen
-    // post-Phase-1a but defend anyway. Record as no_data so we don't retry.
-    const ok = await upsertVerification({
-      entryId: args.entryId,
-      checkType: args.checkType,
-      verdict: 'no_data',
-      vehicleCartrackId: args.vehicleCartrackId,
-      vehicleLat: fetchResult.sample.lat,
-      vehicleLon: fetchResult.sample.lon,
-      vehicleTs: fetchResult.sample.ts,
-      deviceLat: null, deviceLon: null,
-      distanceM: null,
-      thresholdM: args.thresholdM,
-    });
-    if (ok) args.report.rowsNoData += 1;
-    return;
+    throw new Error(
+      '[cartrack-reconcile] invariant broken: deviceCoords null after device_gps_off short-circuit'
+    );
   }
 
   const distanceM = haversineDistanceM(args.deviceCoords, {
@@ -316,6 +333,7 @@ export async function cartrackReconcile(
     rowsMismatch: 0,
     rowsNoData: 0,
     rowsVehicleNotMapped: 0,
+    rowsDeviceGpsOff: 0,
     rowsSkipped: 0,
     mismatchExceptionsRaised: 0,
     perEntryErrors: [],

@@ -97,6 +97,7 @@ function parseArg(name: string): string | undefined {
         `entries=${report.entriesConsidered} ` +
         `match=${report.rowsMatch} mismatch=${report.rowsMismatch} ` +
         `no_data=${report.rowsNoData} not_mapped=${report.rowsVehicleNotMapped} ` +
+        `device_gps_off=${report.rowsDeviceGpsOff} ` +
         `skipped=${report.rowsSkipped} mismatchExceptions=${report.mismatchExceptionsRaised} ` +
         `perEntryErrors=${report.perEntryErrors.length} ` +
         `durationMs=${Date.now() - startedAt}`

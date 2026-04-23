@@ -187,6 +187,74 @@ describe('cartrackReconcile', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it('device_gps_off: device lat/lon are NULL — Cartrack NOT called, verdict=device_gps_off', async () => {
+    mocks.loadCandidateEntries.mockResolvedValueOnce([
+      entryRow({
+        clock_in_lat: null,
+        clock_in_lon: null,
+        clock_out_lat: null,
+        clock_out_lon: null,
+      }),
+    ]);
+    const fetchSpy = vi.fn(
+      async (): Promise<CartrackFetchResult> => sample(-26.2, 28.0)
+    );
+    const client = fakeCartrack(fetchSpy);
+    const report = await cartrackReconcile(client, {
+      fromDate: '2026-04-20',
+      toDate: '2026-04-20',
+    });
+    expect(report.rowsDeviceGpsOff).toBe(2);
+    expect(report.rowsNoData).toBe(0);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    for (const call of mocks.upsertVerification.mock.calls) {
+      expect(call[0].verdict).toBe('device_gps_off');
+      expect(call[0].deviceLat).toBeNull();
+      expect(call[0].deviceLon).toBeNull();
+    }
+  });
+
+  it('device_gps_off: non-finite coords also route to device_gps_off', async () => {
+    // Belt for parseLatLon's Number.isFinite guard — lat of 'NaN' persisted
+    // due to a broken clock-in payload must not produce a phantom match.
+    mocks.loadCandidateEntries.mockResolvedValueOnce([
+      entryRow({
+        clock_in_lat: 'not-a-number',
+        clock_in_lon: '28.0',
+        clock_out_lat: '-26.2',
+        clock_out_lon: 'NaN',
+      }),
+    ]);
+    const client = fakeCartrack(async () => sample(-26.2, 28.0));
+    const report = await cartrackReconcile(client, {
+      fromDate: '2026-04-20',
+      toDate: '2026-04-20',
+    });
+    expect(report.rowsDeviceGpsOff).toBe(2);
+    expect(report.rowsMatch).toBe(0);
+  });
+
+  it('device_gps_off short-circuits above vehicle_not_mapped check only when vehicle IS mapped', async () => {
+    // Precedence invariant: vehicle_not_mapped is FIRST (admin-level
+    // dominates driver-level), then device_gps_off. When both are true,
+    // verdict must be vehicle_not_mapped.
+    mocks.loadCandidateEntries.mockResolvedValueOnce([
+      entryRow({
+        cartrack_vehicle_id: null,
+        clock_in_lat: null,
+        clock_in_lon: null,
+        clock_out_lat: null,
+        clock_out_lon: null,
+      }),
+    ]);
+    const report = await cartrackReconcile(
+      fakeCartrack(async () => sample(-26.2, 28.0)),
+      { fromDate: '2026-04-20', toDate: '2026-04-20' }
+    );
+    expect(report.rowsVehicleNotMapped).toBe(2);
+    expect(report.rowsDeviceGpsOff).toBe(0);
+  });
+
   it('vehicle_not_mapped from Cartrack 404: API returns status=vehicle_not_mapped', async () => {
     mocks.loadCandidateEntries.mockResolvedValueOnce([entryRow()]);
     const client = fakeCartrack(async () => ({ status: 'vehicle_not_mapped' }));

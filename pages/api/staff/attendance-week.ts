@@ -26,10 +26,21 @@ interface WeekRow extends Record<string, unknown> {
   holiday_hrs: string;
   night_hrs: string;
   exceptions_count: number;
-  gps_verdict: 'match' | 'mismatch' | 'no_data' | 'vehicle_not_mapped' | null;
+  gps_verdict:
+    | 'match'
+    | 'mismatch'
+    | 'no_data'
+    | 'vehicle_not_mapped'
+    | 'device_gps_off'
+    | null;
 }
 
-type GpsVerdict = 'match' | 'mismatch' | 'no_data' | 'vehicle_not_mapped';
+type GpsVerdict =
+  | 'match'
+  | 'mismatch'
+  | 'no_data'
+  | 'vehicle_not_mapped'
+  | 'device_gps_off';
 
 interface DayTotals {
   workDate: string;
@@ -113,12 +124,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       -- signals; no_data/not_mapped are informational so supervisors know
       -- the cross-check was attempted.
       -- Cartrack verdict rollup per (staff, work_date). Precedence:
-      --   mismatch  — any side shows a mismatch (actionable, highest)
-      --   match     — at least one side matched AND no side mismatched
-      --                 (so a half-covered day still surfaces the match signal
-      --                  instead of regressing to no_data via BOOL_AND)
-      --   vehicle_not_mapped — admin-fixable state dominates over no_data
-      --   no_data   — ambient (sensor silence); lowest signal value
+      --   mismatch           — any side shows a mismatch (actionable, highest)
+      --   match              — at least one side matched AND no side mismatched
+      --                         (so a half-covered day still surfaces the match
+      --                          signal instead of regressing to no_data)
+      --   vehicle_not_mapped — admin-fixable state (per-vehicle), dominates
+      --                         over driver-level and no_data signals because
+      --                         it blocks ALL future verifications for the
+      --                         linked vehicle until an admin maps it
+      --   device_gps_off     — driver-level: phone had no GPS at clock time.
+      --                         Distinct remediation path from no_data
+      --                         (train staff vs Cartrack ops), so not collapsed
+      --   no_data            — ambient (sensor silence); lowest signal value
       -- Do NOT flip the first two arms: match-wins-over-mismatch would hide
       -- every real mismatch from the supervisor queue.
       week_verifications AS (
@@ -127,6 +144,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                  WHEN BOOL_OR(v.verdict = 'mismatch') THEN 'mismatch'
                  WHEN BOOL_OR(v.verdict = 'match') THEN 'match'
                  WHEN BOOL_OR(v.verdict = 'vehicle_not_mapped') THEN 'vehicle_not_mapped'
+                 WHEN BOOL_OR(v.verdict = 'device_gps_off') THEN 'device_gps_off'
                  ELSE 'no_data'
                END AS verdict
         FROM attendance_gps_verifications v

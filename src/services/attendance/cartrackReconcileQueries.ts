@@ -56,7 +56,24 @@ export async function loadCandidateEntries(
   `;
 }
 
-export type Verdict = 'match' | 'mismatch' | 'no_data' | 'vehicle_not_mapped';
+/**
+ * Verdict granularity (see migration 323):
+ *   match              — device within threshold of vehicle at clock time
+ *   mismatch           — device > threshold (raises supervisor exception)
+ *   no_data            — Cartrack returned no samples in window
+ *   vehicle_not_mapped — admin-level: fleet_vehicle has no cartrack_vehicle_id
+ *   device_gps_off     — driver-level: clock_in/out lat+lon were null or
+ *                        non-finite, so corroboration is impossible
+ *                        regardless of what Cartrack did. Distinct from
+ *                        `no_data` because remediation differs (train
+ *                        staff / enforce location permission, not ops).
+ */
+export type Verdict =
+  | 'match'
+  | 'mismatch'
+  | 'no_data'
+  | 'vehicle_not_mapped'
+  | 'device_gps_off';
 
 /**
  * Idempotent upsert via ON CONFLICT DO NOTHING on (entry_id, check_type).

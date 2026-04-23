@@ -7,7 +7,12 @@
  * renders what the page hands it.
  */
 
-export type GpsVerdict = 'match' | 'mismatch' | 'no_data' | 'vehicle_not_mapped';
+export type GpsVerdict =
+  | 'match'
+  | 'mismatch'
+  | 'no_data'
+  | 'vehicle_not_mapped'
+  | 'device_gps_off';
 
 export interface DayTotals {
   workDate: string;
@@ -59,12 +64,14 @@ export function GpsBadge({ verdict }: { verdict: GpsVerdict }) {
     mismatch: { bg: 'bg-amber-500/10', border: 'border-amber-700', text: 'text-amber-400', label: '≠' },
     no_data: { bg: 'bg-neutral-500/10', border: 'border-neutral-700', text: 'text-neutral-400', label: '∅' },
     vehicle_not_mapped: { bg: 'bg-neutral-500/10', border: 'border-neutral-700', text: 'text-neutral-500', label: '–' },
+    device_gps_off: { bg: 'bg-sky-500/10', border: 'border-sky-700', text: 'text-sky-400', label: '⌖' },
   }[verdict];
   const titleMap = {
     match: 'Cartrack vehicle GPS matches device',
     mismatch: 'Cartrack vehicle GPS differs (corroboration, not fraud)',
     no_data: 'No Cartrack position samples in window',
     vehicle_not_mapped: 'Fleet vehicle not mapped to Cartrack',
+    device_gps_off: 'Device had no GPS fix at clock time (train driver / enable location)',
   };
   return (
     <span
