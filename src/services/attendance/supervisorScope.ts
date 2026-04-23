@@ -114,3 +114,66 @@ export async function authorizedToSuperviseStaff(
   if (!viewerStaffId) return false;
   return canSuperviseStaff(viewerStaffId, targetStaffId);
 }
+
+/**
+ * Inverse of `canSuperviseStaff`: returns the full set of staff_ids the
+ * viewer can supervise. Used by list-scoped APIs (e.g. corrections
+ * review queue) to filter at the SQL layer instead of fetching the
+ * full list and filtering row-by-row.
+ *
+ * The set includes:
+ *   - the viewer themselves (self-view)
+ *   - every descendant via reports_to chain (bounded depth)
+ *   - every staff in the viewer's department IFF the viewer has at
+ *     least one direct report (mirrors the department-manager branch
+ *     in canSuperviseStaff)
+ *
+ * Returns an empty array when the viewer has no subordinates and no
+ * qualifying department members — callers should treat that as "nothing
+ * to show" rather than failing.
+ */
+export async function staffIdsSupervisedBy(
+  viewerStaffId: string
+): Promise<string[]> {
+  if (!viewerStaffId) return [];
+  const rows = await sql<{ id: string }>`
+    WITH RECURSIVE descendants AS (
+      -- Direct reports.
+      SELECT id, 1 AS depth
+      FROM staff
+      WHERE reports_to = ${viewerStaffId}
+
+      UNION ALL
+
+      -- Transitive reports, bounded to MAX_REPORTS_TO_DEPTH levels.
+      SELECT s.id, d.depth + 1
+      FROM staff s
+      JOIN descendants d ON s.reports_to = d.id
+      WHERE d.depth < ${MAX_REPORTS_TO_DEPTH}
+    ),
+    viewer AS (
+      SELECT id, department
+      FROM staff
+      WHERE id = ${viewerStaffId}
+    ),
+    viewer_has_reports AS (
+      SELECT EXISTS (
+        SELECT 1 FROM staff WHERE reports_to = ${viewerStaffId}
+      ) AS yes
+    )
+    -- Self
+    SELECT id FROM viewer
+    UNION
+    -- Descendants via reports_to chain
+    SELECT id FROM descendants
+    UNION
+    -- Same-department fallback (only when viewer has direct reports)
+    SELECT s.id
+    FROM staff s, viewer v, viewer_has_reports vhr
+    WHERE vhr.yes
+      AND v.department IS NOT NULL
+      AND s.department IS NOT NULL
+      AND s.department = v.department
+  `;
+  return rows.map((r) => r.id);
+}

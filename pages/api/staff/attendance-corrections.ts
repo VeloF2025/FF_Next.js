@@ -8,11 +8,17 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth, withPermission } from '@/lib/auth/middleware';
+import {
+  withAuth,
+  withPermission,
+  type AuthenticatedNextApiRequest,
+} from '@/lib/auth/middleware';
 import {
   listAdjustmentsForReview,
   type AdjustmentStatus,
 } from '@/modules/attendance/corrections/queries';
+import { staffIdsSupervisedBy } from '@/services/attendance/supervisorScope';
+import { getStaffIdForUser } from '@/services/staff/staffAccessService';
 
 const VALID_STATUSES: readonly (AdjustmentStatus | 'all')[] = [
   'pending',
@@ -37,7 +43,26 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.trunc(limitRaw) : 50;
 
   try {
-    const adjustments = await listAdjustmentsForReview({ statusFilter, limit });
+    // Scope the review queue to staff the viewer supervises. super_admin
+    // / admin see everything (scope=null disables the filter). A viewer
+    // without a linked staff record OR with no supervisees gets an empty
+    // list — consistent with the per-item gate on corrections-review.
+    const user = (req as AuthenticatedNextApiRequest).user;
+    let scopedToStaffIds: string[] | null;
+    if (user.role === 'super_admin' || user.role === 'admin') {
+      scopedToStaffIds = null;
+    } else {
+      const viewerStaffId = await getStaffIdForUser(user.id);
+      scopedToStaffIds = viewerStaffId
+        ? await staffIdsSupervisedBy(viewerStaffId)
+        : [];
+    }
+
+    const adjustments = await listAdjustmentsForReview({
+      statusFilter,
+      limit,
+      scopedToStaffIds,
+    });
     apiResponse.success(res, { adjustments, statusFilter });
   } catch (err) {
     log.error('[staff-corrections-list] failed', {

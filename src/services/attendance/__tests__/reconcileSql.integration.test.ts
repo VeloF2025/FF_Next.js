@@ -320,6 +320,61 @@ const TEMPLATES: Template[] = [
     params: [SAMPLE_UUID, 5000.0, 500, 'in'],
   },
   {
+    name: 'staffIdsSupervisedBy (inverse CTE)',
+    text: `
+      WITH RECURSIVE descendants AS (
+        SELECT id, 1 AS depth
+        FROM staff
+        WHERE reports_to = $1::uuid
+
+        UNION ALL
+
+        SELECT s.id, d.depth + 1
+        FROM staff s
+        JOIN descendants d ON s.reports_to = d.id
+        WHERE d.depth < $2::int
+      ),
+      viewer AS (
+        SELECT id, department
+        FROM staff
+        WHERE id = $1::uuid
+      ),
+      viewer_has_reports AS (
+        SELECT EXISTS (
+          SELECT 1 FROM staff WHERE reports_to = $1::uuid
+        ) AS yes
+      )
+      SELECT id FROM viewer
+      UNION
+      SELECT id FROM descendants
+      UNION
+      SELECT s.id
+      FROM staff s, viewer v, viewer_has_reports vhr
+      WHERE vhr.yes
+        AND v.department IS NOT NULL
+        AND s.department IS NOT NULL
+        AND s.department = v.department`,
+    params: [SAMPLE_UUID, 10],
+  },
+  {
+    name: 'listAdjustmentsForReview — scoped-to-staff branch (any(uuid[]) filter)',
+    text: `
+      SELECT a.*,
+             e.staff_id   AS entry_staff_id,
+             e.work_date::text AS entry_work_date,
+             e.clock_in_at::text  AS entry_clock_in_at,
+             e.clock_out_at::text AS entry_clock_out_at,
+             TRIM(COALESCE(s.first_name,'') || ' ' || COALESCE(s.last_name,'')) AS staff_full_name
+      FROM attendance_adjustments a
+      JOIN attendance_entries e ON e.id = a.entry_id
+      JOIN staff s ON s.id = e.staff_id
+      WHERE a.status = $1::text
+        AND e.staff_id = ANY($2::uuid[])
+      ORDER BY a.created_at DESC
+      LIMIT $3::int`,
+    params: ['pending', [SAMPLE_UUID], 50],
+  },
+  {
     name: 'canSuperviseStaff (recursive CTE + department fallback)',
     text: `
       WITH RECURSIVE ancestors AS (

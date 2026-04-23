@@ -121,9 +121,43 @@ export async function listOwnAdjustments(staffId: string, limit: number): Promis
 export async function listAdjustmentsForReview(args: {
   statusFilter: AdjustmentStatus | 'all';
   limit: number;
+  /**
+   * When provided, filter to adjustments whose `entry.staff_id` is in
+   * this set. Callers that bypass scope (super_admin / admin) pass
+   * `null` to disable the filter. Empty array means "no scope — return
+   * zero rows" (the viewer has no supervisees).
+   *
+   * Kept as an explicit parameter rather than a role check here so
+   * this helper stays policy-free; the API handler composes scope +
+   * RBAC.
+   */
+  scopedToStaffIds?: string[] | null;
 }): Promise<AdjustmentRow[]> {
   const safeLimit = Math.min(Math.max(Math.trunc(args.limit), 1), 200);
+  const scope = args.scopedToStaffIds;
+
+  // Scope is explicit null → no filter (super_admin/admin path).
+  // Scope is empty array → zero rows without a DB round-trip.
+  if (scope !== null && scope !== undefined && scope.length === 0) {
+    return [];
+  }
+
   if (args.statusFilter === 'all') {
+    if (scope === null || scope === undefined) {
+      return sql<AdjustmentRow>`
+        SELECT a.*,
+               e.staff_id   AS entry_staff_id,
+               e.work_date::text AS entry_work_date,
+               e.clock_in_at::text  AS entry_clock_in_at,
+               e.clock_out_at::text AS entry_clock_out_at,
+               TRIM(COALESCE(s.first_name,'') || ' ' || COALESCE(s.last_name,'')) AS staff_full_name
+        FROM attendance_adjustments a
+        JOIN attendance_entries e ON e.id = a.entry_id
+        JOIN staff s ON s.id = e.staff_id
+        ORDER BY CASE a.status WHEN 'pending' THEN 0 ELSE 1 END ASC, a.created_at DESC
+        LIMIT ${safeLimit}
+      `;
+    }
     return sql<AdjustmentRow>`
       SELECT a.*,
              e.staff_id   AS entry_staff_id,
@@ -134,7 +168,25 @@ export async function listAdjustmentsForReview(args: {
       FROM attendance_adjustments a
       JOIN attendance_entries e ON e.id = a.entry_id
       JOIN staff s ON s.id = e.staff_id
+      WHERE e.staff_id = ANY(${scope}::uuid[])
       ORDER BY CASE a.status WHEN 'pending' THEN 0 ELSE 1 END ASC, a.created_at DESC
+      LIMIT ${safeLimit}
+    `;
+  }
+
+  if (scope === null || scope === undefined) {
+    return sql<AdjustmentRow>`
+      SELECT a.*,
+             e.staff_id   AS entry_staff_id,
+             e.work_date::text AS entry_work_date,
+             e.clock_in_at::text  AS entry_clock_in_at,
+             e.clock_out_at::text AS entry_clock_out_at,
+             TRIM(COALESCE(s.first_name,'') || ' ' || COALESCE(s.last_name,'')) AS staff_full_name
+      FROM attendance_adjustments a
+      JOIN attendance_entries e ON e.id = a.entry_id
+      JOIN staff s ON s.id = e.staff_id
+      WHERE a.status = ${args.statusFilter}
+      ORDER BY a.created_at DESC
       LIMIT ${safeLimit}
     `;
   }
@@ -149,6 +201,7 @@ export async function listAdjustmentsForReview(args: {
     JOIN attendance_entries e ON e.id = a.entry_id
     JOIN staff s ON s.id = e.staff_id
     WHERE a.status = ${args.statusFilter}
+      AND e.staff_id = ANY(${scope}::uuid[])
     ORDER BY a.created_at DESC
     LIMIT ${safeLimit}
   `;

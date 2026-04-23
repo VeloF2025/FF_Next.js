@@ -23,6 +23,7 @@ vi.mock('@/services/staff/staffAccessService', () => ({
 import {
   canSuperviseStaff,
   authorizedToSuperviseStaff,
+  staffIdsSupervisedBy,
 } from '../supervisorScope';
 
 function authUser(overrides: Partial<AuthUser> = {}): AuthUser {
@@ -126,5 +127,30 @@ describe('authorizedToSuperviseStaff (auth-aware wrapper)', () => {
     );
     expect(ok).toBe(false);
     expect(mocks.getStaffIdForUser).not.toHaveBeenCalled();
+  });
+});
+
+describe('staffIdsSupervisedBy', () => {
+  it('returns [] when viewerStaffId is empty (no DB round-trip)', async () => {
+    const ids = await staffIdsSupervisedBy('');
+    expect(ids).toEqual([]);
+    expect(mocks.sql).not.toHaveBeenCalled();
+  });
+
+  it('maps returned rows to their ids', async () => {
+    mocks.sql.mockResolvedValueOnce([
+      { id: V },
+      { id: T },
+      { id: 'x' },
+    ]);
+    const ids = await staffIdsSupervisedBy(V);
+    expect(ids).toEqual([V, T, 'x']);
+    expect(mocks.sql).toHaveBeenCalledOnce();
+  });
+
+  it('returns [] when the SQL returns no rows (viewer has no supervisees)', async () => {
+    mocks.sql.mockResolvedValueOnce([]);
+    const ids = await staffIdsSupervisedBy(V);
+    expect(ids).toEqual([]);
   });
 });
