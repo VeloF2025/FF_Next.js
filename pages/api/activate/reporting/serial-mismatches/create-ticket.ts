@@ -17,6 +17,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
+import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 import { log } from '@/lib/logger';
 import { createTicket } from '@/modules/noc/services/ticketService';
 import {
@@ -46,6 +47,9 @@ async function handler(
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
+
+  // withAuth populates req.user; cast once so we can forward it to createTicket.
+  const authedReq = req as AuthenticatedNextApiRequest;
 
   try {
     const { id, priority = 'normal', notes } = req.body as CreateTicketBody;
@@ -148,6 +152,7 @@ ${notes ?? 'Please investigate why this device is offline. Possible causes: fibe
       pon_number: device.planned_pon?.toString() || undefined,
       address: device.address || undefined,
       ont_serial: device.serial_number || undefined,
+      created_by: authedReq.user.id,
     });
 
     // Update offline_devices with ticket reference
