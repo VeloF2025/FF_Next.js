@@ -135,100 +135,69 @@ interface LoadedImage {
 }
 
 /**
- * Read the EXIF Orientation tag (0x0112) from a JPEG blob. Returns 1 (default)
- * if the blob isn't a JPEG, has no EXIF, or parsing fails for any reason.
+ * Load an image URL and return it already oriented upright, with its
+ * *post-orientation* dimensions so callers can letterbox-fit into a slot.
  *
- * We parse the bytes manually because:
- *   - jsPDF doesn't honour EXIF — it draws raw pixels
- *   - Safari doesn't support `createImageBitmap(..., { imageOrientation })`
- *   - Pulling in a full EXIF library is overkill for one tag
- */
-async function readExifOrientation(blob: Blob): Promise<number> {
-  if (!/image\/jpe?g/i.test(blob.type)) return 1;
-  // First 128 KB is more than enough to cover the EXIF segment
-  const buf = await blob.slice(0, 131072).arrayBuffer();
-  const view = new DataView(buf);
-  if (view.byteLength < 4 || view.getUint16(0) !== 0xFFD8) return 1;
-
-  let offset = 2;
-  while (offset + 4 < view.byteLength) {
-    const marker = view.getUint16(offset);
-    if ((marker & 0xFF00) !== 0xFF00) return 1;
-    const segSize = view.getUint16(offset + 2);
-    if (marker === 0xFFE1) {
-      // APP1 — look for "Exif\0\0" at offset+4
-      if (offset + 10 > view.byteLength) return 1;
-      if (view.getUint32(offset + 4) !== 0x45786966) return 1;
-      const tiff = offset + 10;
-      if (tiff + 8 > view.byteLength) return 1;
-      const little = view.getUint16(tiff) === 0x4949;
-      const ifdOffset = view.getUint32(tiff + 4, little);
-      const entriesAt = tiff + ifdOffset;
-      if (entriesAt + 2 > view.byteLength) return 1;
-      const entries = view.getUint16(entriesAt, little);
-      for (let i = 0; i < entries; i++) {
-        const entry = entriesAt + 2 + i * 12;
-        if (entry + 10 > view.byteLength) break;
-        if (view.getUint16(entry, little) === 0x0112) {
-          return view.getUint16(entry + 8, little) || 1;
-        }
-      }
-      return 1;
-    }
-    offset += 2 + segSize;
-  }
-  return 1;
-}
-
-/**
- * Load an image URL, apply EXIF orientation via a canvas, and return the
- * normalised PNG/JPEG data URL plus its *corrected* dimensions. Callers then
- * use width/height to letterbox-fit the image into a fixed layout slot while
- * keeping aspect ratio.
+ * Strategy (primary path): `createImageBitmap(blob, { imageOrientation: 'from-image' })`.
+ * This is the only reliable cross-browser way to apply EXIF orientation when
+ * drawing via canvas — the plain `<img>` element auto-rotates in some
+ * browser/version combos and doesn't in others, which caused the previous
+ * attempt to double-rotate already-corrected images.
+ *
+ * Supported: Chrome 79+, Edge 79+, Firefox 77+, Safari 15.4+.
+ *
+ * Fallback (older browsers): decode via `<img>` and draw as-is. This drops
+ * orientation correction but is better than crashing — modern browsers will
+ * hit the primary path 99% of the time.
  */
 async function loadOrientedImage(url: string): Promise<LoadedImage | null> {
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
     const blob = await res.blob();
-    const orientation = await readExifOrientation(blob);
 
-    const blobUrl = URL.createObjectURL(blob);
-    let img: HTMLImageElement;
-    try {
-      img = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const el = new Image();
-        el.onload = () => resolve(el);
-        el.onerror = () => reject(new Error('image load failed'));
-        el.src = blobUrl;
-      });
-    } finally {
-      URL.revokeObjectURL(blobUrl);
+    let source: CanvasImageSource;
+    let sourceW: number;
+    let sourceH: number;
+
+    // Primary: createImageBitmap applies EXIF when { imageOrientation: 'from-image' }
+    // is honoured. Browsers that don't support the option still resolve with the
+    // raw orientation — which is better than the previous manual-rotation path
+    // that double-rotated images <img> had already auto-corrected.
+    if (typeof createImageBitmap === 'function') {
+      const bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' });
+      source = bitmap;
+      sourceW = bitmap.width;
+      sourceH = bitmap.height;
+    } else {
+      // Fallback for environments without createImageBitmap (very old browsers)
+      const blobUrl = URL.createObjectURL(blob);
+      try {
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const el = new Image();
+          el.onload = () => resolve(el);
+          el.onerror = () => reject(new Error('image load failed'));
+          el.src = blobUrl;
+        });
+        source = img;
+        sourceW = img.naturalWidth;
+        sourceH = img.naturalHeight;
+      } finally {
+        URL.revokeObjectURL(blobUrl);
+      }
     }
 
-    const w = img.naturalWidth;
-    const h = img.naturalHeight;
-    if (!w || !h) return null;
+    if (!sourceW || !sourceH) return null;
 
-    const swap = orientation >= 5 && orientation <= 8;
     const canvas = document.createElement('canvas');
-    canvas.width  = swap ? h : w;
-    canvas.height = swap ? w : h;
+    canvas.width = sourceW;
+    canvas.height = sourceH;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
-
-    // Apply the EXIF transform so the canvas contains upright pixel data.
-    switch (orientation) {
-      case 2: ctx.translate(w, 0); ctx.scale(-1, 1); break;
-      case 3: ctx.translate(w, h); ctx.rotate(Math.PI); break;
-      case 4: ctx.translate(0, h); ctx.scale(1, -1); break;
-      case 5: ctx.rotate(0.5 * Math.PI); ctx.scale(1, -1); break;
-      case 6: ctx.rotate(0.5 * Math.PI); ctx.translate(0, -h); break;
-      case 7: ctx.rotate(-0.5 * Math.PI); ctx.translate(-w, h); ctx.scale(-1, 1); break;
-      case 8: ctx.rotate(-0.5 * Math.PI); ctx.translate(-w, 0); break;
-      default: break; // 1 = no-op
+    ctx.drawImage(source, 0, 0);
+    if ('close' in source && typeof source.close === 'function') {
+      source.close();
     }
-    ctx.drawImage(img, 0, 0);
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
     return { dataUrl, width: canvas.width, height: canvas.height };
