@@ -123,17 +123,115 @@ async function loadLogoAsBase64(): Promise<string | null> {
   } catch { return null; }
 }
 
-async function loadImageAsBase64(url: string): Promise<string | null> {
+/**
+ * Image loaded with its EXIF orientation normalised out (pixels rotated/flipped
+ * to match the orientation tag). Width/height are the *post-orientation*
+ * dimensions so aspect-preserving layout can use them directly.
+ */
+interface LoadedImage {
+  dataUrl: string;
+  width: number;
+  height: number;
+}
+
+/**
+ * Read the EXIF Orientation tag (0x0112) from a JPEG blob. Returns 1 (default)
+ * if the blob isn't a JPEG, has no EXIF, or parsing fails for any reason.
+ *
+ * We parse the bytes manually because:
+ *   - jsPDF doesn't honour EXIF — it draws raw pixels
+ *   - Safari doesn't support `createImageBitmap(..., { imageOrientation })`
+ *   - Pulling in a full EXIF library is overkill for one tag
+ */
+async function readExifOrientation(blob: Blob): Promise<number> {
+  if (!/image\/jpe?g/i.test(blob.type)) return 1;
+  // First 128 KB is more than enough to cover the EXIF segment
+  const buf = await blob.slice(0, 131072).arrayBuffer();
+  const view = new DataView(buf);
+  if (view.byteLength < 4 || view.getUint16(0) !== 0xFFD8) return 1;
+
+  let offset = 2;
+  while (offset + 4 < view.byteLength) {
+    const marker = view.getUint16(offset);
+    if ((marker & 0xFF00) !== 0xFF00) return 1;
+    const segSize = view.getUint16(offset + 2);
+    if (marker === 0xFFE1) {
+      // APP1 — look for "Exif\0\0" at offset+4
+      if (offset + 10 > view.byteLength) return 1;
+      if (view.getUint32(offset + 4) !== 0x45786966) return 1;
+      const tiff = offset + 10;
+      if (tiff + 8 > view.byteLength) return 1;
+      const little = view.getUint16(tiff) === 0x4949;
+      const ifdOffset = view.getUint32(tiff + 4, little);
+      const entriesAt = tiff + ifdOffset;
+      if (entriesAt + 2 > view.byteLength) return 1;
+      const entries = view.getUint16(entriesAt, little);
+      for (let i = 0; i < entries; i++) {
+        const entry = entriesAt + 2 + i * 12;
+        if (entry + 10 > view.byteLength) break;
+        if (view.getUint16(entry, little) === 0x0112) {
+          return view.getUint16(entry + 8, little) || 1;
+        }
+      }
+      return 1;
+    }
+    offset += 2 + segSize;
+  }
+  return 1;
+}
+
+/**
+ * Load an image URL, apply EXIF orientation via a canvas, and return the
+ * normalised PNG/JPEG data URL plus its *corrected* dimensions. Callers then
+ * use width/height to letterbox-fit the image into a fixed layout slot while
+ * keeping aspect ratio.
+ */
+async function loadOrientedImage(url: string): Promise<LoadedImage | null> {
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
     const blob = await res.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
+    const orientation = await readExifOrientation(blob);
+
+    const blobUrl = URL.createObjectURL(blob);
+    let img: HTMLImageElement;
+    try {
+      img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => resolve(el);
+        el.onerror = () => reject(new Error('image load failed'));
+        el.src = blobUrl;
+      });
+    } finally {
+      URL.revokeObjectURL(blobUrl);
+    }
+
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    if (!w || !h) return null;
+
+    const swap = orientation >= 5 && orientation <= 8;
+    const canvas = document.createElement('canvas');
+    canvas.width  = swap ? h : w;
+    canvas.height = swap ? w : h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    // Apply the EXIF transform so the canvas contains upright pixel data.
+    switch (orientation) {
+      case 2: ctx.translate(w, 0); ctx.scale(-1, 1); break;
+      case 3: ctx.translate(w, h); ctx.rotate(Math.PI); break;
+      case 4: ctx.translate(0, h); ctx.scale(1, -1); break;
+      case 5: ctx.rotate(0.5 * Math.PI); ctx.scale(1, -1); break;
+      case 6: ctx.rotate(0.5 * Math.PI); ctx.translate(0, -h); break;
+      case 7: ctx.rotate(-0.5 * Math.PI); ctx.translate(-w, h); ctx.scale(-1, 1); break;
+      case 8: ctx.rotate(-0.5 * Math.PI); ctx.translate(-w, 0); break;
+      default: break; // 1 = no-op
+    }
+    ctx.drawImage(img, 0, 0);
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+    return { dataUrl, width: canvas.width, height: canvas.height };
   } catch { return null; }
 }
 
@@ -286,8 +384,10 @@ export async function generateSnagCloseoutPdf(data: CloseoutReportData): Promise
   // SNAG DETAIL PAGES
   // ══════════════════════════════════════════════════════════════════════════
 
-  // Pre-load all photos (batch — limit to thumbnails for speed)
-  const photoCache = new Map<string, string>();
+  // Pre-load all photos (batch — limit to thumbnails for speed).
+  // Stored oriented (EXIF normalised) + with corrected width/height so the
+  // draw step can letterbox-fit into the fixed photo slot.
+  const photoCache = new Map<string, LoadedImage>();
   const photoUrls: Array<{ id: string; url: string }> = [];
   for (const snag of data.snags) {
     for (const photo of snag.photos) {
@@ -301,8 +401,8 @@ export async function generateSnagCloseoutPdf(data: CloseoutReportData): Promise
     const batch = photoUrls.slice(i, i + 10);
     const results = await Promise.allSettled(
       batch.map(async ({ id, url }) => {
-        const b64 = await loadImageAsBase64(url);
-        if (b64) photoCache.set(id, b64);
+        const loaded = await loadOrientedImage(url);
+        if (loaded) photoCache.set(id, loaded);
       })
     );
     // Log failures but continue
@@ -391,15 +491,31 @@ export async function generateSnagCloseoutPdf(data: CloseoutReportData): Promise
       doc.text('AFTER', ML + photoW + 6 + photoW / 2, y, { align: 'center' });
       y += 4;
 
+      // Letterbox-fit helper: draws the loaded image centred inside the slot
+      // (slotX, slotY, photoW × photoH) while preserving the image's aspect
+      // ratio, so portrait photos appear upright with whitespace above/below
+      // and landscape photos fill the slot edge-to-edge.
+      const drawIntoSlot = (loaded: LoadedImage, slotX: number, slotY: number) => {
+        const pad = 1;
+        const innerW = photoW - pad * 2;
+        const innerH = photoH - pad * 2;
+        const scale = Math.min(innerW / loaded.width, innerH / loaded.height);
+        const drawW = loaded.width * scale;
+        const drawH = loaded.height * scale;
+        const offX = slotX + pad + (innerW - drawW) / 2;
+        const offY = slotY + pad + (innerH - drawH) / 2;
+        try { doc.addImage(loaded.dataUrl, 'JPEG', offX, offY, drawW, drawH); } catch { /* skip */ }
+      };
+
       // Before photo
       doc.setDrawColor(...B.line);
       doc.setLineWidth(0.3);
       doc.rect(ML, y, photoW, photoH);
 
       if (beforePhotos.length > 0 && beforePhotos[0]) {
-        const b64 = photoCache.get(beforePhotos[0].id);
-        if (b64) {
-          try { doc.addImage(b64, 'JPEG', ML + 1, y + 1, photoW - 2, photoH - 2); } catch { /* skip */ }
+        const loaded = photoCache.get(beforePhotos[0].id);
+        if (loaded) {
+          drawIntoSlot(loaded, ML, y);
         } else {
           doc.setFontSize(7);
           doc.setTextColor(...B.light);
@@ -416,9 +532,9 @@ export async function generateSnagCloseoutPdf(data: CloseoutReportData): Promise
       doc.rect(afterX, y, photoW, photoH);
 
       if (afterPhotos.length > 0 && afterPhotos[0]) {
-        const b64 = photoCache.get(afterPhotos[0].id);
-        if (b64) {
-          try { doc.addImage(b64, 'JPEG', afterX + 1, y + 1, photoW - 2, photoH - 2); } catch { /* skip */ }
+        const loaded = photoCache.get(afterPhotos[0].id);
+        if (loaded) {
+          drawIntoSlot(loaded, afterX, y);
         } else {
           doc.setFontSize(7);
           doc.setTextColor(...B.light);
