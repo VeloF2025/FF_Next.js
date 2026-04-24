@@ -25,14 +25,20 @@ export function handleAuthError(options?: {
 
   const currentPath = window.location.pathname + window.location.search;
 
-  // Don't redirect if already on sign-in, auth pages, or public pages (fleet portal, snag resolve)
+  // Don't redirect if already on sign-in, auth pages, or public pages
+  // (fleet portal, snag resolve, staff attendance portal)
   if (
     currentPath.startsWith('/sign-in') ||
     currentPath.startsWith('/auth/') ||
     currentPath.startsWith('/fleet/portal') ||
     currentPath.startsWith('/fleet/check-in') ||
     currentPath.startsWith('/fleet/vehicles/') ||
-    currentPath.startsWith('/snag/resolve')
+    currentPath.startsWith('/snag/resolve') ||
+    // /my is the staff attendance portal with its own PIN/OTP login.
+    // The portal handles its own 401s (redirects to /my to re-login).
+    // Sending field staff to the admin /sign-in would trap them in a
+    // login form they can't complete.
+    currentPath.startsWith('/my')
   ) {
     return;
   }
@@ -118,13 +124,19 @@ export function installAuthInterceptor() {
       // - Auth check endpoints (expected 401 when not logged in)
       // - Portal endpoints (use plate-based auth, not user auth)
       // - Fleet check-in/vehicle APIs (support portal session auth)
+      // - Staff attendance portal APIs (own PIN/OTP session, 401 is normal
+      //   on the login page before sign-in)
+      // - Web-vitals telemetry (posts on every page, 401 shouldn't bounce
+      //   unauthenticated visitors off their current flow)
       const isExcludedPath =
         url.includes('/api/auth/me') ||
         url.includes('/api/auth/check-email') ||
         url.includes('/api/fleet/portal/') ||
         url.includes('/api/fleet/check-in/') ||
         url.includes('/api/fleet/vehicles/') ||
-        url.includes('/api/snags/shared/');
+        url.includes('/api/snags/shared/') ||
+        url.includes('/api/my/') ||
+        url.includes('/api/analytics/');
 
       if (!isExcludedPath) {
         handleAuthError();
