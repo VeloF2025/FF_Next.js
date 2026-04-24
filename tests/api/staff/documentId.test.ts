@@ -89,12 +89,16 @@ describe('Staff Document API - /api/staff-documents/[documentId]', () => {
       await handler(req as NextApiRequest, res as NextApiResponse);
 
       expect(res.status).toHaveBeenCalledWith(200);
+      // Response shape is { success, data } (not { success, document }) — the
+      // DocumentVerificationModal reads `data.data`. Keep this key stable;
+      // flipping it back to `document` was the cause of VF-20260417-016.
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
-          document: expect.objectContaining({
+          data: expect.objectContaining({
             id: 'doc-123',
             documentType: 'id_document',
+            fileName: expect.any(String),
           }),
         })
       );
@@ -137,6 +141,51 @@ describe('Staff Document API - /api/staff-documents/[documentId]', () => {
           error: 'Failed to fetch document',
         })
       );
+    });
+
+    // Regression guard for VF-20260417-016: the DocumentVerificationModal
+    // reads fileName, ocrMetadata, notes, staffName and the response needs
+    // to live under `data` — if any of these shift, the modal shows
+    // "Document not found" even when the document exists.
+    it('should expose the exact fields the DocumentVerificationModal reads', async () => {
+      mockSql.mockResolvedValueOnce([
+        {
+          id: 'doc-123',
+          staff_id: 'staff-456',
+          document_type: 'drivers_license',
+          document_name: 'CamScanner 04-16-2026',
+          file_name: 'license.pdf',
+          file_url: 'https://example.com/license.pdf',
+          file_size: 2048,
+          mime_type: 'application/pdf',
+          verification_status: 'pending',
+          verification_notes: 'Needs review',
+          ocr_metadata: { confidence: 0.92, documentNumber: 'D1234567' },
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          staff_name: 'Patrick Sithole',
+        },
+      ]);
+
+      await handler(req as NextApiRequest, res as NextApiResponse);
+
+      const jsonMock = res.json as unknown as ReturnType<typeof vi.fn>;
+      const payload = jsonMock.mock.calls[0]?.[0] as { data: Record<string, unknown> };
+      expect(payload).toBeDefined();
+      expect(payload.data).toMatchObject({
+        id: 'doc-123',
+        documentType: 'drivers_license',
+        fileName: 'license.pdf',
+        fileUrl: 'https://example.com/license.pdf',
+        verificationStatus: 'pending',
+        staffName: 'Patrick Sithole',
+        notes: 'Needs review',
+        ocrConfidence: 0.92,
+      });
+      expect(payload.data.ocrMetadata).toEqual({
+        confidence: 0.92,
+        documentNumber: 'D1234567',
+      });
     });
   });
 
