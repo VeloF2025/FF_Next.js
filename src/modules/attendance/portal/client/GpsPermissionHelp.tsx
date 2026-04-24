@@ -15,6 +15,7 @@
 
 import React from 'react';
 import { MapPin, RefreshCw } from 'lucide-react';
+import { queryGeolocationPermission } from '@/modules/fleet/offline/gpsCapture';
 
 type Platform = 'ios-safari' | 'ios-other' | 'android-chrome' | 'desktop-chrome' | 'desktop-safari' | 'desktop-firefox' | 'unknown';
 
@@ -45,8 +46,9 @@ function stepsFor(platform: Platform): Step[] {
     case 'ios-safari':
       return [
         { step: 'Tap the "ⓐA" icon on the left of the address bar.' },
-        { step: 'Tap Website Settings.' },
-        { step: 'Set Location to Allow, then close and reload this page.' },
+        { step: 'Tap Website Settings → Location → Allow.' },
+        { step: 'Tap the button below to reload with a fresh page.' },
+        { step: 'Still blocked? iOS Settings → Safari → Advanced → Website Data → swipe-delete any "fibreflow.app" entry, then reopen the site.' },
       ];
     case 'ios-other':
       return [
@@ -82,16 +84,46 @@ function stepsFor(platform: Platform): Step[] {
   }
 }
 
+/**
+ * Force a fresh document load that bypasses the tab's in-memory cache.
+ *
+ * Why this is needed: iOS Safari keeps the loaded document (and the
+ * Permissions-Policy header attached to it) in tab memory even after a
+ * pull-to-refresh. If the page was originally served with
+ * `Permissions-Policy: geolocation=()` (our old policy, pre-#1441),
+ * WebKit's stored Permission state for the origin becomes "denied" and
+ * per-site toggles don't override it. The only escape is to load a new
+ * URL that WebKit hasn't cached — a query-string cache-buster forces a
+ * distinct cache key.
+ *
+ * We use `location.replace` (not `assign`) so we don't pollute history.
+ */
+function forceFreshReload(): void {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  url.searchParams.set('_cb', Date.now().toString(36));
+  window.location.replace(url.toString());
+}
+
 export function GpsPermissionHelp({
   onRetry,
 }: {
+  /** Optional retry handler — the "Try again in page" button. */
   onRetry?: () => void;
 }) {
   // Platform detection runs client-side only to avoid an SSR/hydration
   // mismatch on the userAgent string.
   const [platform, setPlatform] = React.useState<Platform>('unknown');
+  // Raw Permissions API state — shown in the diagnostic panel so we can
+  // debug remotely via screenshots. Without this, a user reporting "still
+  // blocked after I set it to Allow" leaves us guessing which layer is
+  // stuck.
+  const [permState, setPermState] = React.useState<string>('checking…');
+  const [showDiag, setShowDiag] = React.useState(false);
+
   React.useEffect(() => {
     setPlatform(detectPlatform());
+    void queryGeolocationPermission().then((s) => setPermState(s));
   }, []);
 
   const steps = stepsFor(platform);
@@ -109,22 +141,47 @@ export function GpsPermissionHelp({
           <p className="mt-1 text-xs text-amber-300">
             We can&rsquo;t re-ask for permission &mdash; the browser won&rsquo;t let
             us prompt again once it&rsquo;s been denied. Allow location for this
-            site, then come back here:
+            site, then tap the reload button below.
           </p>
           <ol className="mt-3 space-y-1.5 text-xs text-amber-100 list-decimal list-inside">
             {steps.map((s, i) => (
               <li key={i}>{s.step}</li>
             ))}
           </ol>
-          {onRetry && (
+          <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={onRetry}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-amber-50 text-xs font-medium px-3 py-1.5"
+              onClick={forceFreshReload}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-amber-50 text-xs font-medium px-3 py-1.5"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              Try again
+              Reload with fresh page
             </button>
+            {onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-700 text-amber-200 hover:bg-amber-900/40 text-xs font-medium px-3 py-1.5"
+              >
+                Try without reload
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowDiag((v) => !v)}
+            className="mt-3 text-[11px] text-amber-400 hover:text-amber-200 underline"
+          >
+            {showDiag ? 'Hide' : 'Show'} technical details
+          </button>
+          {showDiag && (
+            <pre className="mt-2 text-[10px] text-amber-200 bg-amber-950/60 border border-amber-800 rounded p-2 overflow-x-auto whitespace-pre-wrap break-all">
+              {`Permissions API: ${permState}
+Platform: ${platform}
+UA: ${typeof navigator !== 'undefined' ? navigator.userAgent : ''}
+Time: ${new Date().toISOString()}`}
+            </pre>
           )}
         </div>
       </div>
