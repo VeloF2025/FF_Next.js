@@ -251,7 +251,15 @@ export default withMySession(async (req, res, session) => {
         uploadedSelfiePath,
       });
       if (uploadedSelfiePath) {
-        await cleanupOrphanSelfie(session.staffId, uploadedSelfiePath).catch(() => {});
+        await cleanupOrphanSelfie(session.staffId, uploadedSelfiePath).catch((cleanupErr) => {
+          // Best-effort cleanup — the selfie is orphaned on failure but the
+          // user's clock-in already won the race, so we just warn.
+          log.warn('[my-clock-in] orphan selfie cleanup failed', {
+            staffId: session.staffId,
+            uploadedSelfiePath,
+            error: cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
+          });
+        });
       }
       // Look up the winning entry so the UI can show the user they're
       // already clocked in.
@@ -269,13 +277,30 @@ export default withMySession(async (req, res, session) => {
       );
     }
 
+    // See #1434 rationale — @/lib/logger is in-memory in prod. Mirror to
+    // stderr so the next 500 lands in the systemd journal for ops.
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const errStack = err instanceof Error ? err.stack : undefined;
     log.error('[my-clock-in] unexpected error', {
       staffId: session.staffId,
       stage,
       uploadedSelfiePath,
-      error: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : undefined,
+      error: errMsg,
+      stack: errStack,
     });
+    process.stderr.write(
+      JSON.stringify({
+        level: 'ERROR',
+        component: 'attendance-clock-in',
+        event: 'unexpected_error',
+        staffId: session.staffId,
+        stage,
+        uploadedSelfiePath,
+        error: errMsg,
+        stack: errStack,
+        timestamp: new Date().toISOString(),
+      }) + '\n'
+    );
     return apiResponse.internalError(res, err);
   }
 });
