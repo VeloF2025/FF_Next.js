@@ -169,7 +169,18 @@ function getArcjetProtection(pathname: string, method: string) {
   }
 
   // Auth endpoints - strict limits (10/min)
-  if (pathname.startsWith('/api/auth/')) {
+  // Includes /api/auth/* (admin login, check-email) and the staff attendance
+  // portal login / OTP routes under /api/my/login/. Both are credential-
+  // verification surfaces where brute-force protection matters and 10/min
+  // is comfortably above legitimate UI use (a human cannot fail login ten
+  // times a minute). Matters most for the first-time PIN path, where a
+  // staff row without a credentials row has no per-account lockout signal
+  // to rely on — the IP-scoped Arcjet limit is the sole brake.
+  if (
+    pathname.startsWith('/api/auth/') ||
+    pathname === '/api/my/login' ||
+    pathname.startsWith('/api/my/login/')
+  ) {
     return ajAuth;
   }
 
