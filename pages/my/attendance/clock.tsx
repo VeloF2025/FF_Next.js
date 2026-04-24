@@ -9,7 +9,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 
-import { captureGPS } from '@/modules/fleet/offline/gpsCapture';
+import { captureGPS, queryGeolocationPermission } from '@/modules/fleet/offline/gpsCapture';
 import { ApiError, grantSelfieConsent, getSession } from '@/modules/attendance/portal/client/api';
 import { submitClockEventWithOfflineFallback } from '@/modules/attendance/portal/client/offline/submitClockEvent';
 import { useAttendanceSync } from '@/modules/attendance/portal/client/offline/useAttendanceSync';
@@ -20,6 +20,7 @@ import { ConsentModal, GpsSnapshot, GpsStep, SelfieStep } from '@/modules/attend
 import { NotSavedView, QueuedView, SuccessView } from '@/modules/attendance/portal/client/clockResults';
 import { OfflineBanner, PendingQueueBanner, QueueUnavailableBanner } from '@/modules/attendance/portal/client/clockBanners';
 import { mapConsentError, mapImageError } from '@/modules/attendance/portal/client/clockErrors';
+import { GpsPermissionHelp } from '@/modules/attendance/portal/client/GpsPermissionHelp';
 
 type Action = 'in' | 'out';
 type FlowState =
@@ -45,6 +46,12 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
   const [state, setState] = React.useState<FlowState>('idle');
   const [error, setError] = React.useState<string | null>(null);
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
+  // True when the browser has a persistent "deny" for geolocation on this
+  // origin. Set either by the Permissions API check on mount (iOS 16+,
+  // Chrome, Firefox) or by a live PERMISSION_DENIED from getCurrentPosition.
+  // When true, we don't hit getCurrentPosition (iOS Safari silently hangs
+  // in that state); we render GpsPermissionHelp instead.
+  const [gpsDenied, setGpsDenied] = React.useState(false);
 
   const { online, pendingCount, syncing, queueUnavailable, syncNow, refreshPendingCount } =
     useAttendanceSync();
@@ -80,6 +87,20 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
     if (selfiePreview) URL.revokeObjectURL(selfiePreview);
   }, [selfiePreview]);
 
+  // Preflight the geolocation permission so that if the browser has a
+  // stored deny for this origin, we render the help banner instead of
+  // calling getCurrentPosition (which on iOS Safari just hangs forever
+  // without firing the error callback).
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const state = await queryGeolocationPermission();
+      if (cancelled) return;
+      if (state === 'denied') setGpsDenied(true);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const captureGpsOnce = React.useCallback(async () => {
     if (gpsInFlight.current) return;
     gpsInFlight.current = true;
@@ -87,12 +108,18 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
     try {
       const result = await captureGPS(10_000, true);
       if (result.success && result.coordinates) {
+        setGpsDenied(false);
         setGps({
           lat: result.coordinates.latitude,
           lon: result.coordinates.longitude,
           accuracyM: result.coordinates.accuracy,
           capturedAt: new Date(result.coordinates.timestamp).toISOString(),
         });
+        setState('idle');
+      } else if (result.errorKind === 'denied') {
+        // Don't treat a deny as a general error — surface the platform-
+        // specific help instead so the user knows how to unstick it.
+        setGpsDenied(true);
         setState('idle');
       } else {
         setState('error');
@@ -262,7 +289,11 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
             className="hidden"
             onChange={handleSelfieChange}
           />
-          <GpsStep gps={gps} capturing={state === 'gps'} onRetry={captureGpsOnce} />
+          {gpsDenied ? (
+            <GpsPermissionHelp onRetry={() => { setGpsDenied(false); void captureGpsOnce(); }} />
+          ) : (
+            <GpsStep gps={gps} capturing={state === 'gps'} onRetry={captureGpsOnce} />
+          )}
           {error && (
             <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800 mb-3">
               {error}

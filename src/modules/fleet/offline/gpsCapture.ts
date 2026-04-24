@@ -10,10 +10,34 @@ export interface GPSCoordinates {
   timestamp: number;
 }
 
+/**
+ * Discriminated failure kind so callers can render specific UI without
+ * string-matching the message.
+ *
+ *   - 'denied'      — PERMISSION_DENIED. The user (or browser policy) said
+ *                     no. The platform will not re-prompt until the user
+ *                     clears the deny in OS/browser settings.
+ *   - 'unavailable' — POSITION_UNAVAILABLE. Sensors failed; e.g. no GPS
+ *                     lock indoors.
+ *   - 'timeout'     — TIMEOUT. The sensor is trying but hasn't produced a
+ *                     fix in time. Retry usually helps.
+ *   - 'unsupported' — navigator.geolocation not present (rare).
+ *   - 'unknown'     — anything else.
+ */
+export type GPSErrorKind =
+  | 'denied'
+  | 'unavailable'
+  | 'timeout'
+  | 'unsupported'
+  | 'unknown';
+
 export interface GPSCaptureResult {
   success: boolean;
   coordinates?: GPSCoordinates;
+  /** Human-readable message (safe to show in a generic error banner). */
   error?: string;
+  /** Machine-readable kind for branching UI. Only set when success=false. */
+  errorKind?: GPSErrorKind;
 }
 
 /**
@@ -36,6 +60,7 @@ export async function captureGPS(
     return {
       success: false,
       error: 'Geolocation not available',
+      errorKind: 'unsupported',
     };
   }
 
@@ -54,20 +79,25 @@ export async function captureGPS(
       },
       (error) => {
         let errorMessage = 'Unknown error';
+        let errorKind: GPSErrorKind = 'unknown';
         switch (error.code) {
           case error.PERMISSION_DENIED:
             errorMessage = 'Location permission denied';
+            errorKind = 'denied';
             break;
           case error.POSITION_UNAVAILABLE:
             errorMessage = 'Location unavailable';
+            errorKind = 'unavailable';
             break;
           case error.TIMEOUT:
             errorMessage = 'Location request timed out';
+            errorKind = 'timeout';
             break;
         }
         resolve({
           success: false,
           error: errorMessage,
+          errorKind,
         });
       },
       {
@@ -77,6 +107,34 @@ export async function captureGPS(
       }
     );
   });
+}
+
+/**
+ * Query the Permissions API to learn the current geolocation permission
+ * state WITHOUT triggering a prompt. Returns `'unsupported'` when the
+ * Permissions API isn't available (some older browsers).
+ *
+ * Use this on mount to detect a pre-existing deny — calling
+ * `getCurrentPosition` in that state will silently hang on iOS Safari
+ * instead of firing the error callback, so pre-checking prevents a
+ * locked UI.
+ */
+export async function queryGeolocationPermission(): Promise<
+  'granted' | 'denied' | 'prompt' | 'unsupported'
+> {
+  if (typeof navigator === 'undefined') return 'unsupported';
+  // Permissions API availability varies: Safari added it late (iOS 16+),
+  // and some wrappers don't support the 'geolocation' descriptor. Wrap
+  // both the presence check and the call itself.
+  const perms = (navigator as Navigator & { permissions?: Permissions })
+    .permissions;
+  if (!perms || typeof perms.query !== 'function') return 'unsupported';
+  try {
+    const status = await perms.query({ name: 'geolocation' as PermissionName });
+    return status.state as 'granted' | 'denied' | 'prompt';
+  } catch {
+    return 'unsupported';
+  }
 }
 
 /**
