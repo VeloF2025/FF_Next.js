@@ -24,6 +24,7 @@ export interface CloseoutSnag {
   description: string;
   category: string;
   severity: string;
+  /** Effective status (derives from linked NOC ticket when present). */
   status: string;
   pole_references: string[] | null;
   assigned_to_name: string | null;
@@ -39,6 +40,8 @@ export interface CloseoutSnag {
   pon_no: number | null;
   noc_ticket_id: string | null;
   noc_ticket_uid: string | null;
+  /** Current NOC ticket status ("in_progress", "qa_in_progress", etc.) when linked. */
+  noc_ticket_status: string | null;
   photos: CloseoutPhoto[];
   notes: CloseoutNote[];
 }
@@ -141,6 +144,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         (u.first_name || ' ' || u.last_name) AS assigned_to_name,
         sr.report_number, sr.audit_date,
         mt.ticket_uid AS noc_ticket_uid,
+        mt.status AS ticket_status,
         mt.created_at AS ticket_created_at,
         mt.resolved_at AS ticket_resolved_at,
         mt.closed_at AS ticket_closed_at,
@@ -329,13 +333,31 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const assignedToName = (s.assigned_to_name as string | null)
         ?? (s.ticket_assignee_name as string | null);
 
+      const rawSnagStatus = s.status as string;
+      const ticketStatus = (s.ticket_status as string | null) ?? null;
+
+      // Derive the *effective* status — mirrors /api/snags/count-summary so the
+      // cover-page tiles match the UI's count tiles. When a snag has a linked
+      // NOC ticket, the ticket's status is authoritative; snag.status is only
+      // a fallback for unlinked snags.
+      let effectiveStatus = rawSnagStatus;
+      if (ticketStatus) {
+        if (ticketStatus === 'open') effectiveStatus = 'open';
+        else if (ticketStatus === 'assigned') effectiveStatus = 'assigned';
+        else if (['in_progress', 'qa_rejected'].includes(ticketStatus)) effectiveStatus = 'in_progress';
+        else if (['pending_qa', 'qa_in_progress'].includes(ticketStatus)) effectiveStatus = 'pending_qa';
+        else if (['qa_approved', 'pending_handover', 'handed_to_ops', 'resolved'].includes(ticketStatus)) effectiveStatus = 'resolved';
+        else if (ticketStatus === 'verified') effectiveStatus = 'verified';
+        else if (['closed', 'cancelled'].includes(ticketStatus)) effectiveStatus = 'closed';
+      }
+
       return {
         id: s.id as string,
         snag_number: s.snag_number as number,
         description: s.description as string,
         category: s.category as string,
         severity: s.severity as string,
-        status: s.status as string,
+        status: effectiveStatus,
         pole_references: s.pole_references as string[] | null,
         assigned_to_name: assignedToName,
         verification_notes: s.verification_notes as string | null,
@@ -350,12 +372,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         pon_no: s.pon_no !== null ? Number(s.pon_no) : null,
         noc_ticket_id: ticketId,
         noc_ticket_uid: s.noc_ticket_uid as string | null,
+        noc_ticket_status: ticketStatus,
         photos: mergedPhotos,
         notes: ticketId ? (notesByTicket.get(ticketId) ?? []) : [],
       };
     });
 
-    // 7. Summary counts
+    // 7. Summary counts — uses the *effective* status so cover tiles match the
+    // live count-summary API used by the UI.
     const summary = {
       total: snags.length,
       open: snags.filter((s) => ['open', 'reopened'].includes(s.status)).length,
@@ -367,10 +391,27 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       closed: snags.filter((s) => s.status === 'closed').length,
     };
 
+    // Try to pull a proper job title from the staff record linked to this user.
+    // Falls back to the formatted role (e.g. "Super Admin") when no staff
+    // record exists — "Super Admin" reads fine on the closeout, but a real
+    // job title like "Civil Site Manager" is better when we have it.
+    let submitterTitle: string | null = formatRole(authUser?.role);
+    if (authUser?.id) {
+      try {
+        const staffRows = await sql`
+          SELECT position FROM staff WHERE user_id = ${authUser.id} LIMIT 1
+        ` as Array<{ position: string | null }>;
+        const position = staffRows[0]?.position?.trim();
+        if (position) submitterTitle = position;
+      } catch (err) {
+        log.warn('Failed to look up staff.position for closeout submitter', { err });
+      }
+    }
+
     const submitter: CloseoutReportSubmitter | null = authUser
       ? {
           name: authUser.name || `${authUser.firstName ?? ''} ${authUser.lastName ?? ''}`.trim() || authUser.email,
-          title: formatRole(authUser.role),
+          title: submitterTitle,
         }
       : null;
 
