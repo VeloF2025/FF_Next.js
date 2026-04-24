@@ -32,12 +32,19 @@ export function mapSubmitError(err: unknown, action: ClockAction): ErrorHandling
 
   const reason = (err.details as { reason?: string } | undefined)?.reason;
 
-  // Consent gate — "missing", "revoked", and "revoked_mid_shift" all land on
-  // the same re-prompt modal. PR3's clock-out handler grandfathers revoked
-  // consent (logs manual_override) but clock-in rightly blocks.
+  // Consent gate — the server returns `reason: 'consent_required'` for
+  // every not-yet-granted state (pending first-time, revoked, etc.), with
+  // the specific state in `consentState`. The older reason strings
+  // ('consent_missing', 'consent_revoked', 'consent_revoked_mid_shift')
+  // were never actually emitted by the handlers — they're retained here as
+  // defence-in-depth in case the contract changes back. Without
+  // 'consent_required' in this list, the modal never shows and users see
+  // the raw server message "Selfie consent is required..." as a generic
+  // error, which is exactly what Hein hit on first clock-in.
   if (
     err.status === 403 &&
-    (reason === 'consent_missing' ||
+    (reason === 'consent_required' ||
+      reason === 'consent_missing' ||
       reason === 'consent_revoked' ||
       reason === 'consent_revoked_mid_shift')
   ) {

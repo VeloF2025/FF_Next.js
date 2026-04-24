@@ -27,6 +27,18 @@ describe('mapImageError', () => {
 });
 
 describe('mapSubmitError', () => {
+  it('routes 403 consent_required to consent modal (actual server reason)', () => {
+    // This is the reason string the server handlers actually emit for
+    // every not-yet-granted state (pending, revoked, missing). Regression
+    // guard for the bug where the mapper only knew older strings and the
+    // modal never showed, leaving the user staring at the raw 403 message.
+    const err = new ApiError(403, 'FORBIDDEN', 'Selfie consent is required', {
+      reason: 'consent_required',
+      consentState: 'revoked',
+    });
+    expect(mapSubmitError(err, 'in')).toEqual({ kind: 'consent_required' });
+  });
+
   it('routes 403 consent_missing to consent modal', () => {
     const err = new ApiError(403, 'FORBIDDEN', 'Consent required', { reason: 'consent_missing' });
     expect(mapSubmitError(err, 'in')).toEqual({ kind: 'consent_required' });
