@@ -72,13 +72,13 @@ const MyAttendancePage: NextPage & { getLayout?: (page: React.ReactElement) => R
       staffName={session?.profile?.name ?? null}
     >
       {loadError && (
-        <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800 mb-4">
+        <div role="alert" className="rounded-lg bg-red-950/50 border border-red-800 px-3 py-2 text-sm text-red-200 mb-4">
           {loadError}
         </div>
       )}
 
       {!session && !loadError && (
-        <div className="flex items-center justify-center py-16 text-sm text-gray-500">
+        <div className="flex items-center justify-center py-16 text-sm text-neutral-400">
           Loading…
         </div>
       )}
@@ -86,17 +86,17 @@ const MyAttendancePage: NextPage & { getLayout?: (page: React.ReactElement) => R
       {session?.profile && (
         <>
           <div className="mb-5">
-            <h1 className="text-2xl font-semibold">
+            <h1 className="text-2xl font-semibold text-neutral-100">
               Hi, {firstName(session.profile.name)} 👋
             </h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-neutral-400">
               {openEntry
                 ? 'You are clocked in. Tap below when you are ready to finish your shift.'
                 : 'Ready to start your shift?'}
             </p>
           </div>
 
-          <div className="rounded-2xl bg-white border border-gray-200 shadow-sm p-5 mb-4">
+          <div className="rounded-2xl bg-neutral-900 border border-neutral-800 p-5 mb-4">
             {openEntry ? (
               <OpenEntryCard
                 entry={openEntry}
@@ -115,22 +115,22 @@ const MyAttendancePage: NextPage & { getLayout?: (page: React.ReactElement) => R
             <button
               type="button"
               onClick={() => router.push('/my/attendance/corrections')}
-              className="w-full flex items-center justify-between rounded-2xl bg-white border border-gray-200 shadow-sm p-4 text-left hover:border-gray-300 transition"
+              className="w-full flex items-center justify-between rounded-2xl bg-neutral-900 border border-neutral-800 p-4 text-left hover:border-neutral-700 transition"
             >
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-full bg-amber-900/40 text-amber-300 flex items-center justify-center">
                   <Edit3 className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-gray-900">
+                  <div className="text-sm font-medium text-neutral-100">
                     My corrections
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-neutral-400">
                     Track pending submissions or cancel one
                   </div>
                 </div>
               </div>
-              <span className="text-xs text-blue-600 font-medium">Open →</span>
+              <span className="text-xs text-blue-400 font-medium">Open →</span>
             </button>
           </div>
         </>
@@ -164,12 +164,12 @@ function OpenEntryCard({
   return (
     <>
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-full bg-emerald-900/50 text-emerald-300 flex items-center justify-center">
           <Clock className="w-5 h-5" />
         </div>
         <div>
-          <div className="text-xs uppercase tracking-wide text-green-700 font-semibold">On shift</div>
-          <div className="text-sm text-gray-600">
+          <div className="text-xs uppercase tracking-wide text-emerald-300 font-semibold">On shift</div>
+          <div className="text-sm text-neutral-300">
             Since {formatTime(entry.clockInAt)} · {formatDuration(elapsed)}
           </div>
         </div>
@@ -177,7 +177,7 @@ function OpenEntryCard({
       <button
         type="button"
         onClick={onClockOut}
-        className="w-full py-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-lg font-bold shadow-sm"
+        className="w-full py-4 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-lg font-bold shadow-lg shadow-orange-600/20"
       >
         Clock out
       </button>
@@ -189,18 +189,18 @@ function ClosedEntryCard({ onClockIn }: { onClockIn: () => void }) {
   return (
     <>
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-full bg-blue-900/50 text-blue-300 flex items-center justify-center">
           <Clock className="w-5 h-5" />
         </div>
         <div>
-          <div className="text-xs uppercase tracking-wide text-blue-700 font-semibold">Off shift</div>
-          <div className="text-sm text-gray-600">No active entry</div>
+          <div className="text-xs uppercase tracking-wide text-blue-300 font-semibold">Off shift</div>
+          <div className="text-sm text-neutral-300">No active entry</div>
         </div>
       </div>
       <button
         type="button"
         onClick={onClockIn}
-        className="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold shadow-sm"
+        className="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-lg font-bold shadow-lg shadow-blue-600/20"
       >
         Clock in
       </button>
@@ -211,29 +211,29 @@ function ClosedEntryCard({ onClockIn }: { onClockIn: () => void }) {
 function RecentList({ entries }: { entries: ClockEntry[] }) {
   if (entries.length === 0) {
     return (
-      <div className="text-center text-sm text-gray-500 py-6">
+      <div className="text-center text-sm text-neutral-500 py-6">
         No recent shifts.
       </div>
     );
   }
   return (
     <div>
-      <h2 className="text-sm font-semibold text-gray-700 px-1 mb-2 flex items-center gap-2">
+      <h2 className="text-sm font-semibold text-neutral-300 px-1 mb-2 flex items-center gap-2">
         <HistoryIcon className="w-4 h-4" />
         Recent shifts
       </h2>
-      <ul className="rounded-2xl bg-white border border-gray-200 divide-y divide-gray-100 overflow-hidden">
+      <ul className="rounded-2xl bg-neutral-900 border border-neutral-800 divide-y divide-neutral-800 overflow-hidden">
         {entries.slice(0, 3).map((e) => (
           <li key={e.entryId} className="p-3 flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium">{formatWorkDate(e.workDate)}</div>
-              <div className="text-xs text-gray-500 flex items-center gap-1">
+              <div className="text-sm font-medium text-neutral-100">{formatWorkDate(e.workDate)}</div>
+              <div className="text-xs text-neutral-400 flex items-center gap-1">
                 <MapPin className="w-3 h-3" />
                 {formatTime(e.clockInAt)}{' '}
                 {e.clockOutAt ? `→ ${formatTime(e.clockOutAt)}` : '(open)'}
               </div>
             </div>
-            <div className="text-sm text-gray-700 font-medium">
+            <div className="text-sm text-neutral-200 font-medium">
               {e.durationMs != null ? formatDuration(e.durationMs) : '—'}
             </div>
           </li>

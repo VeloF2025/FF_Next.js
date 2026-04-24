@@ -301,7 +301,7 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
             <GpsStep gps={gps} capturing={state === 'gps'} onRetry={captureGpsOnce} />
           )}
           {error && (
-            <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800 mb-3">
+            <div role="alert" className="rounded-lg bg-red-950/50 border border-red-800 px-3 py-2 text-sm text-red-200 mb-3">
               {error}
             </div>
           )}

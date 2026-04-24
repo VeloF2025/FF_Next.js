@@ -159,7 +159,7 @@ const NewCorrectionPage: NextPage & {
       <button
         type="button"
         onClick={() => router.back()}
-        className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 mb-3"
+        className="inline-flex items-center gap-1 text-sm text-neutral-400 hover:text-neutral-200 mb-3"
       >
         <ArrowLeft className="w-4 h-4" />
         Back
@@ -168,7 +168,7 @@ const NewCorrectionPage: NextPage & {
       {loadError && (
         <div
           role="alert"
-          className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800 mb-4"
+          className="rounded-lg bg-red-950/50 border border-red-800 px-3 py-2 text-sm text-red-200 mb-4"
         >
           {loadError}
         </div>
@@ -177,7 +177,7 @@ const NewCorrectionPage: NextPage & {
       {!entryId && (
         <div
           role="alert"
-          className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-900 mb-4"
+          className="rounded-lg bg-amber-950/40 border border-amber-800 px-3 py-2 text-sm text-amber-200 mb-4"
         >
           Missing <code className="font-mono">entry_id</code>. Open the
           correction form from your history screen.
@@ -185,7 +185,7 @@ const NewCorrectionPage: NextPage & {
       )}
 
       {!session && !loadError && (
-        <div className="flex items-center justify-center py-16 text-sm text-gray-500">
+        <div className="flex items-center justify-center py-16 text-sm text-neutral-400">
           Loading…
         </div>
       )}
@@ -195,13 +195,13 @@ const NewCorrectionPage: NextPage & {
           <EntryContextCard entry={entry} entryId={entryId} />
 
           <label className="block">
-            <span className="block text-sm font-medium text-gray-700 mb-1">
+            <span className="block text-sm font-medium text-neutral-300 mb-1">
               What needs correcting?
             </span>
             <select
               value={kind}
               onChange={(e) => setKind(e.target.value as CorrectionKind)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-lg border border-neutral-700 bg-neutral-900 text-neutral-100 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             >
               {KIND_ORDER.map((k) => (
                 <option key={k} value={k}>
@@ -210,41 +210,41 @@ const NewCorrectionPage: NextPage & {
               ))}
             </select>
             {activeHint?.hint && (
-              <p className="mt-1 text-xs text-gray-500">{activeHint.hint}</p>
+              <p className="mt-1 text-xs text-neutral-400">{activeHint.hint}</p>
             )}
           </label>
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="block text-sm font-medium text-gray-700 mb-1">
+              <span className="block text-sm font-medium text-neutral-300 mb-1">
                 Correct clock-in
               </span>
               <input
                 type="datetime-local"
                 value={adjustedIn}
                 onChange={(e) => setAdjustedIn(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-lg border border-neutral-700 bg-neutral-900 text-neutral-100 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
             </label>
             <label className="block">
-              <span className="block text-sm font-medium text-gray-700 mb-1">
+              <span className="block text-sm font-medium text-neutral-300 mb-1">
                 Correct clock-out
               </span>
               <input
                 type="datetime-local"
                 value={adjustedOut}
                 onChange={(e) => setAdjustedOut(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-lg border border-neutral-700 bg-neutral-900 text-neutral-100 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
             </label>
           </div>
-          <p className="text-xs text-gray-500 -mt-2">
+          <p className="text-xs text-neutral-400 -mt-2">
             Leave blank the side you don't need to change. You must change at
             least one.
           </p>
 
           <label className="block">
-            <span className="block text-sm font-medium text-gray-700 mb-1">
+            <span className="block text-sm font-medium text-neutral-300 mb-1">
               Why? (min {minChars} chars)
             </span>
             <textarea
@@ -252,14 +252,14 @@ const NewCorrectionPage: NextPage & {
               onChange={(e) => setReason(e.target.value)}
               placeholder={activeHint?.placeholder ?? ''}
               rows={4}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-lg border border-neutral-700 bg-neutral-900 text-neutral-100 placeholder:text-neutral-500 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
             <div className="mt-1 flex items-center justify-between text-xs">
               <span
                 className={
                   reasonOk
-                    ? 'text-gray-500'
-                    : 'text-amber-700 font-medium'
+                    ? 'text-neutral-400'
+                    : 'text-amber-300 font-medium'
                 }
               >
                 {reasonOk
@@ -268,7 +268,7 @@ const NewCorrectionPage: NextPage & {
                       minChars - reasonTrimmed.length === 1 ? '' : 's'
                     } needed.`}
               </span>
-              <span className="text-gray-400 tabular-nums">
+              <span className="text-neutral-500 tabular-nums">
                 {reasonTrimmed.length} / {minChars}
               </span>
             </div>
@@ -277,7 +277,7 @@ const NewCorrectionPage: NextPage & {
           {submitError && (
             <div
               role="alert"
-              className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800"
+              className="flex items-start gap-2 rounded-lg bg-red-950/50 border border-red-800 px-3 py-2 text-sm text-red-200"
             >
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
               <span>{submitError}</span>
@@ -287,13 +287,13 @@ const NewCorrectionPage: NextPage & {
           <button
             type="submit"
             disabled={!canSubmit}
-            className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-lg shadow-blue-600/20 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Send className="w-4 h-4" />
             {submitting ? 'Submitting…' : 'Submit for review'}
           </button>
 
-          <p className="text-xs text-gray-500 text-center">
+          <p className="text-xs text-neutral-400 text-center">
             Your supervisor will review this and either approve, reject, or
             you can cancel it from{' '}
             <span className="underline">My corrections</span> while it's
@@ -314,15 +314,15 @@ function EntryContextCard({
 }) {
   if (!entry) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+      <div className="rounded-xl border border-neutral-800 bg-neutral-900 px-3 py-2 text-xs text-neutral-400">
         Entry <code className="font-mono">{entryId.slice(0, 8)}…</code> —
         not in your last 30 shifts; details will be fetched by the reviewer.
       </div>
     );
   }
   return (
-    <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">
-      <div className="font-medium text-gray-900">
+    <div className="rounded-xl border border-neutral-800 bg-neutral-900 px-3 py-2 text-xs text-neutral-300">
+      <div className="font-medium text-neutral-100">
         Correcting shift on {formatWorkDate(entry.workDate)}
       </div>
       <div className="mt-0.5">
