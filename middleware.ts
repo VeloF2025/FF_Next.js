@@ -45,7 +45,16 @@ function setSecurityHeaders(response: NextResponse) {
   response.headers.set('X-Frame-Options', 'SAMEORIGIN');
   response.headers.set('X-XSS-Protection', '1; mode=block');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  // Permissions-Policy: allow same-origin use of camera and geolocation.
+  // The attendance portal (/my/attendance/clock) needs both — selfies and
+  // GPS location at clock in/out. Fleet portal also uses geolocation for
+  // check-in coordinates. `self` is the same-origin allowlist; third-party
+  // frames still get nothing. Microphone stays disabled — nothing in the
+  // app needs it.
+  response.headers.set(
+    'Permissions-Policy',
+    'camera=(self), microphone=(), geolocation=(self)'
+  );
   response.headers.set('Content-Security-Policy', [
     "frame-ancestors 'self'",
     "base-uri 'self'",
