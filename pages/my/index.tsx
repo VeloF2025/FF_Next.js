@@ -78,23 +78,23 @@ const MyLoginPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
       showHeader={false}
     >
       <div className="flex flex-col items-center pt-8 pb-6">
-        <div className="w-20 h-20 rounded-2xl bg-white border border-gray-200 flex items-center justify-center shadow-lg p-2">
+        <div className="w-20 h-20 rounded-2xl bg-white border border-neutral-800 flex items-center justify-center shadow-lg p-2">
           <img
             src="/assets/vf/vf-logo.svg"
             alt="Velocity Fibre"
             className="w-full h-full object-contain"
           />
         </div>
-        <h1 className="mt-4 text-2xl font-semibold">Velocity Fibre Attendance</h1>
-        <p className="mt-1 text-sm text-gray-500">Clock in & out for your shift</p>
+        <h1 className="mt-4 text-2xl font-semibold text-neutral-100">Velocity Fibre Attendance</h1>
+        <p className="mt-1 text-sm text-neutral-400">Clock in & out for your shift</p>
       </div>
 
-      <div className="flex rounded-xl border border-gray-200 bg-white p-1 mb-5 shadow-sm">
+      <div className="flex rounded-xl border border-neutral-800 bg-neutral-900 p-1 mb-5">
         <button
           type="button"
           onClick={() => { setMethod('pin'); setCredential(''); setError(null); }}
           className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
-            method === 'pin' ? 'bg-blue-600 text-white' : 'text-gray-600'
+            method === 'pin' ? 'bg-blue-600 text-white' : 'text-neutral-400 hover:text-neutral-200'
           }`}
         >
           Phone + PIN
@@ -103,7 +103,7 @@ const MyLoginPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
           type="button"
           onClick={() => { setMethod('password'); setCredential(''); setError(null); }}
           className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
-            method === 'password' ? 'bg-blue-600 text-white' : 'text-gray-600'
+            method === 'password' ? 'bg-blue-600 text-white' : 'text-neutral-400 hover:text-neutral-200'
           }`}
         >
           Email + password
@@ -112,7 +112,7 @@ const MyLoginPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <label className="block">
-          <span className="text-sm font-medium text-gray-700">
+          <span className="text-sm font-medium text-neutral-300">
             {method === 'pin' ? 'Phone number' : 'Email address'}
           </span>
           <input
@@ -122,13 +122,13 @@ const MyLoginPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
             placeholder={method === 'pin' ? '082 123 4567' : 'you@company.co.za'}
-            className="mt-1 w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-base"
+            className="mt-1 w-full px-4 py-3 rounded-xl border border-neutral-700 bg-neutral-900 text-neutral-100 placeholder:text-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none text-base"
             required
           />
         </label>
 
         <label className="block">
-          <span className="text-sm font-medium text-gray-700">
+          <span className="text-sm font-medium text-neutral-300">
             {method === 'pin' ? '6-digit PIN' : 'Password'}
           </span>
           <input
@@ -140,7 +140,7 @@ const MyLoginPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
             value={credential}
             onChange={(e) => setCredential(e.target.value)}
             placeholder={method === 'pin' ? '••••••' : '••••••••'}
-            className="mt-1 w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-base tracking-widest"
+            className="mt-1 w-full px-4 py-3 rounded-xl border border-neutral-700 bg-neutral-900 text-neutral-100 placeholder:text-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none text-base tracking-widest"
             required
           />
         </label>
@@ -148,7 +148,7 @@ const MyLoginPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
         {error && (
           <div
             role="alert"
-            className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800"
+            className="rounded-lg bg-red-950/50 border border-red-800 px-3 py-2 text-sm text-red-200"
           >
             {error}
           </div>
@@ -157,7 +157,7 @@ const MyLoginPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
         <button
           type="submit"
           disabled={submitting}
-          className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-base shadow-sm"
+          className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-base shadow-lg shadow-blue-600/20"
         >
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>
@@ -167,7 +167,7 @@ const MyLoginPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
         <div className="text-center mt-6">
           <Link
             href="/my/onboard"
-            className="text-sm font-medium text-blue-600 hover:text-blue-700"
+            className="text-sm font-medium text-blue-400 hover:text-blue-300"
           >
             First time? Set up your PIN
           </Link>

@@ -53,16 +53,16 @@ export function MyPortalShell({
   }, [loggingOut, router]);
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
+    <div className="min-h-screen bg-neutral-950 text-neutral-100">
       <Head>
         <title>{title} · Velocity Fibre</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta name="theme-color" content="#1e40af" />
+        <meta name="theme-color" content="#0a0a0a" />
         <link rel="manifest" href="/manifest-my.json" />
       </Head>
 
       {showHeader && (
-        <header className="bg-blue-700 text-white px-4 py-3 flex items-center justify-between shadow">
+        <header className="bg-neutral-900 text-neutral-100 border-b border-neutral-800 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <img
               src="/assets/vf/vf-logo.svg"
@@ -71,7 +71,7 @@ export function MyPortalShell({
               className="w-9 h-9 shrink-0 rounded-lg bg-white p-1"
             />
             <div className="min-w-0">
-              <div className="text-xs uppercase tracking-wide opacity-80">Velocity Fibre</div>
+              <div className="text-xs uppercase tracking-wide text-neutral-400">Velocity Fibre</div>
               <div className="text-base font-semibold truncate">{title}</div>
             </div>
           </div>
@@ -82,7 +82,7 @@ export function MyPortalShell({
                 type="button"
                 onClick={handleLogout}
                 disabled={loggingOut}
-                className="mt-0.5 inline-flex items-center gap-1 text-xs opacity-90 hover:opacity-100 underline disabled:opacity-50"
+                className="mt-0.5 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-200 underline disabled:opacity-50"
               >
                 <LogOut className="w-3 h-3" />
                 {loggingOut ? 'Signing out…' : 'Sign out'}
@@ -97,7 +97,7 @@ export function MyPortalShell({
       </main>
 
       {showFooterNav && (
-        <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 px-2 py-2 safe-area-pb">
+        <nav className="fixed bottom-0 inset-x-0 bg-neutral-900 border-t border-neutral-800 px-2 py-2 safe-area-pb">
           <div className="max-w-lg mx-auto grid grid-cols-2 gap-2">
             <FooterLink href="/my/attendance" label="Clock" icon={<Clock className="w-5 h-5" />} />
             <FooterLink
@@ -120,7 +120,7 @@ function FooterLink({ href, label, icon }: { href: string; label: string; icon: 
       type="button"
       onClick={() => router.push(href)}
       className={`flex flex-col items-center justify-center py-2 rounded-lg text-xs font-medium transition-colors ${
-        active ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'
+        active ? 'bg-blue-600/20 text-blue-300' : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'
       }`}
     >
       {icon}
