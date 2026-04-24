@@ -10,7 +10,13 @@ import Link from 'next/link';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 
 import { captureGPSWithFallback, queryGeolocationPermission } from '@/modules/fleet/offline/gpsCapture';
-import { ApiError, grantSelfieConsent, getSession } from '@/modules/attendance/portal/client/api';
+import {
+  ApiError,
+  grantSelfieConsent,
+  getSession,
+  getReverseGeocode,
+  type GeocodeResult,
+} from '@/modules/attendance/portal/client/api';
 import { submitClockEventWithOfflineFallback } from '@/modules/attendance/portal/client/offline/submitClockEvent';
 import { useAttendanceSync } from '@/modules/attendance/portal/client/offline/useAttendanceSync';
 import { fileToResizedBase64 } from '@/modules/attendance/portal/client/imageUtils';
@@ -43,6 +49,10 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
   const [selfieFile, setSelfieFile] = React.useState<File | null>(null);
   const [selfiePreview, setSelfiePreview] = React.useState<string | null>(null);
   const [gps, setGps] = React.useState<GpsSnapshot | null>(null);
+  // Resolved human-readable address for the current gps fix, e.g.
+  // "Somerset West, Western Cape". Purely informational — null while the
+  // lookup is pending OR failed. Clock-in submit never waits on this.
+  const [gpsAddress, setGpsAddress] = React.useState<string | null>(null);
   const [state, setState] = React.useState<FlowState>('idle');
   const [error, setError] = React.useState<string | null>(null);
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
@@ -100,6 +110,21 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // Reverse-geocode the captured gps fix so the user sees a readable
+  // "Somerset West, Western Cape" under the raw coordinates. Fire-and-
+  // forget — never blocks submit. Clears on new capture so an old
+  // address from an earlier fix doesn't linger next to new coords.
+  React.useEffect(() => {
+    if (!gps) { setGpsAddress(null); return; }
+    let cancelled = false;
+    (async () => {
+      const result: GeocodeResult | null = await getReverseGeocode(gps.lat, gps.lon);
+      if (cancelled || !result) return;
+      setGpsAddress(formatGeocode(result));
+    })();
+    return () => { cancelled = true; };
+  }, [gps]);
 
   const captureGpsOnce = React.useCallback(async () => {
     if (gpsInFlight.current) return;
@@ -298,7 +323,12 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
           {gpsDenied ? (
             <GpsPermissionHelp onRetry={() => { setGpsDenied(false); void captureGpsOnce(); }} />
           ) : (
-            <GpsStep gps={gps} capturing={state === 'gps'} onRetry={captureGpsOnce} />
+            <GpsStep
+              gps={gps}
+              capturing={state === 'gps'}
+              onRetry={captureGpsOnce}
+              address={gpsAddress}
+            />
           )}
           {error && (
             <div role="alert" className="rounded-lg bg-red-950/50 border border-red-800 px-3 py-2 text-sm text-red-200 mb-3">
@@ -325,6 +355,23 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
     </MyPortalShell>
   );
 };
+
+/**
+ * Format the Nominatim proxy result into a compact one-liner for
+ * display under the raw coordinates. Preferred form is
+ * "<city>, <province>" (e.g. "Somerset West, Western Cape"); falls
+ * back to province-only if the geocoder returned its "Unknown City"
+ * sentinel; returns empty string if neither field is usable, which
+ * makes the caller hide the line.
+ */
+function formatGeocode(r: GeocodeResult): string {
+  const cityRaw = r.city?.trim() ?? '';
+  const provinceRaw = r.province?.trim() ?? '';
+  const city = cityRaw && cityRaw !== 'Unknown City' ? cityRaw : '';
+  const province = provinceRaw;
+  if (city && province) return `${city}, ${province}`;
+  return city || province || '';
+}
 
 MyClockPage.getLayout = (page: React.ReactElement) => page;
 

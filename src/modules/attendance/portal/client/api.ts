@@ -273,6 +273,40 @@ export function getHistory(limit = 14): Promise<{ entries: ClockEntry[]; limit: 
 }
 
 // =============================================================================
+// Reverse geocoding (coords → "Somerset West, Western Cape")
+// =============================================================================
+
+export interface GeocodeResult {
+  city: string;
+  municipalDistrict: string;
+  province: string;
+}
+
+/**
+ * Resolve lat/lon to a structured SA address via our server-side
+ * Nominatim proxy. Returns `null` on any failure — the caller should
+ * silently hide the address line, never block submit on it.
+ *
+ * Swallows ApiError so a geocode outage can't propagate into the clock
+ * flow. The server-side endpoint itself also masks upstream failures
+ * as `{ geocode: null }`, but belt-and-braces here for network errors.
+ */
+export async function getReverseGeocode(
+  lat: number,
+  lon: number
+): Promise<GeocodeResult | null> {
+  try {
+    const resp = await request<{ geocode: GeocodeResult | null; cached: boolean }>(
+      `/api/my/geocode?lat=${encodeURIComponent(String(lat))}&lon=${encodeURIComponent(String(lon))}`,
+      { method: 'GET' }
+    );
+    return resp.geocode;
+  } catch {
+    return null;
+  }
+}
+
+// =============================================================================
 // POPIA selfie consent
 // =============================================================================
 

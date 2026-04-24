@@ -68,10 +68,18 @@ export function GpsStep({
   gps,
   capturing,
   onRetry,
+  address,
 }: {
   gps: GpsSnapshot | null;
   capturing: boolean;
   onRetry: () => void;
+  /**
+   * Human-readable address resolved from the coords. Rendered under the
+   * numeric lat/lon as a quick sanity-check for staff ("yes I'm at
+   * Somerset West"). Pass `null` or omit while the lookup is pending or
+   * failed — the line is simply hidden.
+   */
+  address?: string | null;
 }) {
   return (
     <div className="mb-4">
@@ -93,6 +101,9 @@ export function GpsStep({
               <div className="text-neutral-100 font-medium">
                 {gps.lat.toFixed(5)}, {gps.lon.toFixed(5)}
               </div>
+              {address && (
+                <div className="text-xs text-neutral-300 mt-0.5">{address}</div>
+              )}
               <div className="text-xs text-neutral-400 mt-0.5">
                 Accuracy {Math.round(gps.accuracyM)} m
                 {gps.accuracyM > 100 && (
