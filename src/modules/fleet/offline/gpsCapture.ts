@@ -64,10 +64,35 @@ export async function captureGPS(
     };
   }
 
+  // Wall-clock watchdog on top of the built-in geolocation `timeout`.
+  // iOS Safari has been observed to silently ignore the spec timeout in
+  // certain configurations (permission just-granted, weak GPS signal,
+  // maximumAge edge cases) — the error callback never fires. Without a
+  // second timer the UI would hang on a spinner forever. The watchdog
+  // is 2s longer than the spec timeout so normal timeouts still surface
+  // as errorKind: 'timeout'; only truly hung calls hit the watchdog.
+  const watchdogMs = timeout + 2000;
+
   return new Promise((resolve) => {
+    let settled = false;
+    const done = (r: GPSCaptureResult) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(watchdog);
+      resolve(r);
+    };
+
+    const watchdog = setTimeout(() => {
+      done({
+        success: false,
+        error: 'Location request stalled — your browser did not respond within the timeout.',
+        errorKind: 'timeout',
+      });
+    }, watchdogMs);
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        resolve({
+        done({
           success: true,
           coordinates: {
             latitude: position.coords.latitude,
@@ -94,7 +119,7 @@ export async function captureGPS(
             errorKind = 'timeout';
             break;
         }
-        resolve({
+        done({
           success: false,
           error: errorMessage,
           errorKind,
@@ -107,6 +132,31 @@ export async function captureGPS(
       }
     );
   });
+}
+
+/**
+ * Capture GPS with an automatic low-accuracy fallback.
+ *
+ * Tries high-accuracy GPS first (<timeout>ms), and if that returns a
+ * 'timeout' or 'unavailable' result, automatically retries once with
+ * enableHighAccuracy=false and a slightly longer budget. Low-accuracy
+ * mode lets the browser use wifi/cell-tower triangulation, which
+ * usually works indoors or when the GPS chip can't get a fix, at the
+ * cost of a wider accuracy radius (~50-500m instead of ~5-20m).
+ *
+ * Leaves 'denied' and 'unsupported' results alone — retrying with
+ * different accuracy won't help those.
+ */
+export async function captureGPSWithFallback(
+  highAccuracyTimeout = 10000,
+  lowAccuracyTimeout = 15000
+): Promise<GPSCaptureResult> {
+  const first = await captureGPS(highAccuracyTimeout, true);
+  if (first.success) return first;
+  if (first.errorKind !== 'timeout' && first.errorKind !== 'unavailable') {
+    return first;
+  }
+  return captureGPS(lowAccuracyTimeout, false);
 }
 
 /**

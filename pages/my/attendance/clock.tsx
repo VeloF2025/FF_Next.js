@@ -9,7 +9,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 
-import { captureGPS, queryGeolocationPermission } from '@/modules/fleet/offline/gpsCapture';
+import { captureGPSWithFallback, queryGeolocationPermission } from '@/modules/fleet/offline/gpsCapture';
 import { ApiError, grantSelfieConsent, getSession } from '@/modules/attendance/portal/client/api';
 import { submitClockEventWithOfflineFallback } from '@/modules/attendance/portal/client/offline/submitClockEvent';
 import { useAttendanceSync } from '@/modules/attendance/portal/client/offline/useAttendanceSync';
@@ -106,7 +106,13 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
     gpsInFlight.current = true;
     setState('gps');
     try {
-      const result = await captureGPS(10_000, true);
+      // High-accuracy first with a 10s budget, then auto-fall-back to
+      // network/wifi-based low-accuracy with 15s. Indoor clock-ins where
+      // the GPS chip can't get a fix previously stuck on the spinner —
+      // the fallback lets the browser use cell-tower / wifi triangulation
+      // instead. Accuracy may widen to ~50-500m; the summary-view banner
+      // in GpsStep already flags "Low accuracy" when the radius > 100m.
+      const result = await captureGPSWithFallback(10_000, 15_000);
       if (result.success && result.coordinates) {
         setGpsDenied(false);
         setGps({
