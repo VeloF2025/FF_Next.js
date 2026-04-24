@@ -75,6 +75,13 @@ export default function NewGRNPage() {
   // Form state
   const [selectedPOId, setSelectedPOId] = useState<string>('');
   const [supplierId, setSupplierId] = useState<number | ''>('');
+  // When linked from a PO that isn't in the available-pos list (e.g. status
+  // filter excludes it) we still need to show the PO number + supplier name
+  // in the locked header. Populate these from the PO detail API.
+  const [linkedPODetail, setLinkedPODetail] = useState<{
+    poNumber: string;
+    supplierName: string;
+  } | null>(null);
   const [warehouseId, setWarehouseId] = useState<string>('');
   const [deliveryNoteNumber, setDeliveryNoteNumber] = useState('');
   const [carrier, setCarrier] = useState('');
@@ -149,43 +156,83 @@ export default function NewGRNPage() {
     loadData();
   }, [purchaseOrderId]);
 
-  // When PO is selected, auto-fill supplier and load PO items
+  // When a PO is selected (manually or via ?po= URL), pull supplier + line
+  // items from the PO detail endpoint. This is the source of truth; the
+  // available-pos list is a display convenience that can legitimately omit
+  // POs the user still navigated to from a PO detail page.
   useEffect(() => {
-    if (selectedPOId) {
-      const po = purchaseOrders.find((p) => p.id === selectedPOId);
-      if (po) {
-        setSupplierId(po.supplierId);
-      }
-      // Load PO line items to pre-populate GRN items grid
-      fetch(`/api/procurement/purchase-orders/${selectedPOId}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.success && data.data?.items?.length > 0) {
-            const poItems: FormItem[] = data.data.items.map((item: {
-              id: string;
-              itemCode: string | null;
-              itemDescription: string;
-              quantityOrdered: number;
-              quantityReceived: number;
-              uom: string;
-            }) => ({
+    if (!selectedPOId) {
+      setLinkedPODetail(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    fetch(`/api/procurement/purchase-orders/${selectedPOId}`)
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return;
+        if (!data?.success || !data.data) {
+          setError(
+            `Couldn't load PO ${selectedPOId.slice(0, 8)}… — supplier and items weren't pre-filled. Please refresh or pick a PO manually.`
+          );
+          return;
+        }
+
+        const po = data.data as {
+          poNumber?: string;
+          supplierId?: number;
+          supplierName?: string;
+          items?: Array<{
+            id: string;
+            itemCode: string | null;
+            description: string;
+            quantityOrdered: number;
+            quantityReceived: number;
+            quantityPending?: number;
+            unitOfMeasure: string;
+          }>;
+        };
+
+        if (typeof po.supplierId === 'number') {
+          setSupplierId(po.supplierId);
+        }
+        setLinkedPODetail({
+          poNumber: po.poNumber || `PO #${selectedPOId}`,
+          supplierName: po.supplierName || 'Unknown Supplier',
+        });
+
+        if (po.items && po.items.length > 0) {
+          const poItems: FormItem[] = po.items.map(item => {
+            const outstanding = typeof item.quantityPending === 'number'
+              ? item.quantityPending
+              : Math.max(0, (item.quantityOrdered || 0) - (item.quantityReceived || 0));
+            return {
               id: crypto.randomUUID(),
               poItemId: item.id,
               itemCode: item.itemCode || '',
-              itemDescription: item.itemDescription || '',
-              quantityExpected: String(Math.max(0, (item.quantityOrdered || 0) - (item.quantityReceived || 0))),
+              itemDescription: item.description || '',
+              quantityExpected: outstanding,
               quantityReceived: '',
               quantityRejected: '',
-              uom: item.uom || 'units',
+              uom: item.unitOfMeasure || 'units',
               lotNumber: '',
               notes: '',
-            }));
-            setItems(poItems);
-          }
-        })
-        .catch(err => log.error('Failed to load PO items', err));
-    }
-  }, [selectedPOId, purchaseOrders]);
+            };
+          });
+          setItems(poItems);
+        }
+      })
+      .catch(err => {
+        if (cancelled) return;
+        log.error('Failed to load PO detail', { error: err });
+        setError(
+          `Couldn't load PO ${selectedPOId.slice(0, 8)}… — supplier and items weren't pre-filled. Please refresh or pick a PO manually.`
+        );
+      });
+
+    return () => { cancelled = true; };
+  }, [selectedPOId]);
 
   // Item management
   const addItem = () => {
@@ -386,18 +433,24 @@ export default function NewGRNPage() {
                 </span>
               )}
             </div>
-            {isLinkedFromPO && selectedPOId && (
-              <div className="mb-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                <p className="text-sm text-emerald-400 font-medium">
-                  {purchaseOrders.find((p) => p.id === selectedPOId)
-                    ? `GRN linked to ${purchaseOrders.find((p) => p.id === selectedPOId)!.poNumber} — ${purchaseOrders.find((p) => p.id === selectedPOId)!.supplierName}`
-                    : `GRN linked to PO #${selectedPOId}`}
-                </p>
-                <p className="text-xs text-[var(--ff-text-tertiary)] mt-0.5">
-                  PO and supplier are pre-filled from the source purchase order and cannot be changed.
-                </p>
-              </div>
-            )}
+            {isLinkedFromPO && selectedPOId && (() => {
+              const poFromList = purchaseOrders.find((p) => p.id === selectedPOId);
+              const poNumber = poFromList?.poNumber || linkedPODetail?.poNumber;
+              const supplierName = poFromList?.supplierName || linkedPODetail?.supplierName;
+              const headerText = poNumber && supplierName
+                ? `GRN linked to ${poNumber} — ${supplierName}`
+                : poNumber
+                  ? `GRN linked to ${poNumber}`
+                  : `GRN linked to PO #${selectedPOId}`;
+              return (
+                <div className="mb-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                  <p className="text-sm text-emerald-400 font-medium">{headerText}</p>
+                  <p className="text-xs text-[var(--ff-text-tertiary)] mt-0.5">
+                    PO and supplier are pre-filled from the source purchase order and cannot be changed.
+                  </p>
+                </div>
+              );
+            })()}
             <div className="relative">
               <select
                 value={selectedPOId}
