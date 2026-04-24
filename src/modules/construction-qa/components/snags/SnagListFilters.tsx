@@ -1,24 +1,39 @@
 /**
  * SnagListFilters — Filter bar for the all-projects snag list page.
- * Project, Status, Category, Severity dropdowns.
+ *
+ * Project stays single-select (drives zone/PON cascade and the closeout report).
+ * All secondary filters (Zone, PON, Status, Category, Severity) are multi-select:
+ * an empty array means "no filter" (All).
  */
 
 'use client';
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MultiSelectFilter } from '@/components/ui/multi-select-filter';
+
+/** Slice of the hook's filter state that the filter bar reads + edits. */
+export interface SnagListFilterValues {
+  projectId: string;
+  status: string[];
+  category: string[];
+  severity: string[];
+  zone_no: string[];
+  pon_no: string[];
+}
 
 interface SnagListFiltersProps {
-  filters: { projectId: string; status: string; category: string; severity: string; zone_no?: string; pon_no?: string };
+  /** Accepts a superset of SnagListFilterValues (the hook's full state). */
+  filters: SnagListFilterValues;
   projects: Array<{ id: string; name: string }>;
   zones: number[];
   pons: Array<{ zone_no: number | null; pon_no: number | null }>;
-  onChange: (key: string, value: string) => void;
+  /** Typed callback — caller may widen to its own key set; we only use the ones above. */
+  onChange: (key: keyof SnagListFilterValues, value: string | string[]) => void;
 }
 
 const ALL = '__all__';
 
 const STATUS_OPTIONS = [
-  { value: ALL, label: 'All Statuses' },
   { value: 'open', label: 'Open' },
   { value: 'assigned', label: 'Assigned' },
   { value: 'in_progress', label: 'In Progress' },
@@ -30,7 +45,6 @@ const STATUS_OPTIONS = [
 ];
 
 const CATEGORY_OPTIONS = [
-  { value: ALL, label: 'All Categories' },
   { value: 'quality', label: 'Quality' },
   { value: 'safety', label: 'Safety' },
   { value: 'health', label: 'Health' },
@@ -39,46 +53,42 @@ const CATEGORY_OPTIONS = [
 ];
 
 const SEVERITY_OPTIONS = [
-  { value: ALL, label: 'All Severities' },
   { value: 'critical', label: 'Critical' },
   { value: 'major', label: 'Major' },
   { value: 'minor', label: 'Minor' },
 ];
 
-/** Convert ALL sentinel to empty string for API */
-function toFilter(v: string): string {
-  return v === ALL ? '' : v;
-}
-
-/** Convert empty string to ALL sentinel for Select */
-function fromFilter(v: string): string {
-  return v === '' ? ALL : v;
-}
-
 /** Filter bar for the all-projects snag list view */
 export function SnagListFilters({ filters, projects, zones, pons, onChange }: SnagListFiltersProps) {
   const hasProject = !!filters.projectId;
-  const selectedZone = filters.zone_no ?? '';
 
-  // PON options filtered by selected zone
-  const ponOptions = selectedZone
-    ? [...new Set(pons.filter((p) => p.zone_no === Number(selectedZone) && p.pon_no !== null).map((p) => p.pon_no!))].sort((a, b) => a - b)
+  // Zones active for "current" filter — if none selected, all zones in scope
+  const selectedZones = filters.zone_no.map(Number);
+
+  // PON options filtered by selected zones (if any)
+  const ponOptions = selectedZones.length > 0
+    ? [...new Set(
+        pons
+          .filter((p) => p.zone_no !== null && selectedZones.includes(p.zone_no) && p.pon_no !== null)
+          .map((p) => p.pon_no!)
+      )].sort((a, b) => a - b)
     : [...new Set(pons.filter((p) => p.pon_no !== null).map((p) => p.pon_no!))].sort((a, b) => a - b);
+
+  const zoneOptions = zones.map((z) => ({ value: String(z), label: `Zone ${z}` }));
+  const ponSelectOptions = ponOptions.map((p) => ({ value: String(p), label: `PON ${p}` }));
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {/* Project filter */}
+      {/* Project filter — single-select (drives cascade + closeout report) */}
       <Select
-        value={fromFilter(filters.projectId)}
-        onValueChange={(v) => onChange('projectId', toFilter(v))}
+        value={filters.projectId === '' ? ALL : filters.projectId}
+        onValueChange={(v) => onChange('projectId', v === ALL ? '' : v)}
       >
-        <SelectTrigger className="w-48 bg-zinc-800 border-zinc-700 text-zinc-100">
+        <SelectTrigger className="w-48 h-9 bg-zinc-800 border-zinc-700 text-zinc-100">
           <SelectValue placeholder="All Projects" />
         </SelectTrigger>
         <SelectContent className="bg-zinc-800 border-zinc-700">
-          <SelectItem value={ALL} className="text-zinc-100">
-            All Projects
-          </SelectItem>
+          <SelectItem value={ALL} className="text-zinc-100">All Projects</SelectItem>
           {projects.map((p) => (
             <SelectItem key={p.id} value={p.id} className="text-zinc-100">
               {p.name}
@@ -87,94 +97,47 @@ export function SnagListFilters({ filters, projects, zones, pons, onChange }: Sn
         </SelectContent>
       </Select>
 
-      {/* Zone filter — enabled when project selected */}
-      <Select
-        value={fromFilter(selectedZone)}
-        onValueChange={(v) => onChange('zone_no', toFilter(v))}
-        disabled={!hasProject || zones.length === 0}
-      >
-        <SelectTrigger className="w-36 bg-zinc-800 border-zinc-700 text-zinc-100 disabled:opacity-40">
-          <SelectValue placeholder="All Zones" />
-        </SelectTrigger>
-        <SelectContent className="bg-zinc-800 border-zinc-700">
-          <SelectItem value={ALL} className="text-zinc-100">All Zones</SelectItem>
-          {zones.map((z) => (
-            <SelectItem key={z} value={String(z)} className="text-zinc-100">
-              Zone {z}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <MultiSelectFilter
+        label="Zones"
+        options={zoneOptions}
+        selected={filters.zone_no}
+        onChange={(v) => onChange('zone_no', v)}
+        disabled={!hasProject || zoneOptions.length === 0}
+        triggerClassName="w-36"
+      />
 
-      {/* PON filter — enabled when project selected */}
-      <Select
-        value={fromFilter(filters.pon_no ?? '')}
-        onValueChange={(v) => onChange('pon_no', toFilter(v))}
-        disabled={!hasProject || ponOptions.length === 0}
-      >
-        <SelectTrigger className="w-36 bg-zinc-800 border-zinc-700 text-zinc-100 disabled:opacity-40">
-          <SelectValue placeholder="All PONs" />
-        </SelectTrigger>
-        <SelectContent className="bg-zinc-800 border-zinc-700">
-          <SelectItem value={ALL} className="text-zinc-100">All PONs</SelectItem>
-          {ponOptions.map((p) => (
-            <SelectItem key={p} value={String(p)} className="text-zinc-100">
-              PON {p}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <MultiSelectFilter
+        label="PONs"
+        options={ponSelectOptions}
+        selected={filters.pon_no}
+        onChange={(v) => onChange('pon_no', v)}
+        disabled={!hasProject || ponSelectOptions.length === 0}
+        triggerClassName="w-36"
+      />
 
-      {/* Status filter */}
-      <Select
-        value={fromFilter(filters.status)}
-        onValueChange={(v) => onChange('status', toFilter(v))}
-      >
-        <SelectTrigger className="w-40 bg-zinc-800 border-zinc-700 text-zinc-100">
-          <SelectValue placeholder="Status" />
-        </SelectTrigger>
-        <SelectContent className="bg-zinc-800 border-zinc-700">
-          {STATUS_OPTIONS.map((o) => (
-            <SelectItem key={o.value} value={o.value} className="text-zinc-100">
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <MultiSelectFilter
+        label="Statuses"
+        options={STATUS_OPTIONS}
+        selected={filters.status}
+        onChange={(v) => onChange('status', v)}
+        triggerClassName="w-40"
+      />
 
-      {/* Category filter */}
-      <Select
-        value={fromFilter(filters.category)}
-        onValueChange={(v) => onChange('category', toFilter(v))}
-      >
-        <SelectTrigger className="w-40 bg-zinc-800 border-zinc-700 text-zinc-100">
-          <SelectValue placeholder="Category" />
-        </SelectTrigger>
-        <SelectContent className="bg-zinc-800 border-zinc-700">
-          {CATEGORY_OPTIONS.map((o) => (
-            <SelectItem key={o.value} value={o.value} className="text-zinc-100">
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <MultiSelectFilter
+        label="Categories"
+        options={CATEGORY_OPTIONS}
+        selected={filters.category}
+        onChange={(v) => onChange('category', v)}
+        triggerClassName="w-40"
+      />
 
-      {/* Severity filter */}
-      <Select
-        value={fromFilter(filters.severity)}
-        onValueChange={(v) => onChange('severity', toFilter(v))}
-      >
-        <SelectTrigger className="w-36 bg-zinc-800 border-zinc-700 text-zinc-100">
-          <SelectValue placeholder="Severity" />
-        </SelectTrigger>
-        <SelectContent className="bg-zinc-800 border-zinc-700">
-          {SEVERITY_OPTIONS.map((o) => (
-            <SelectItem key={o.value} value={o.value} className="text-zinc-100">
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <MultiSelectFilter
+        label="Severities"
+        options={SEVERITY_OPTIONS}
+        selected={filters.severity}
+        onChange={(v) => onChange('severity', v)}
+        triggerClassName="w-36"
+      />
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -57,6 +58,12 @@ export interface CloseoutNote {
   created_at: string;
 }
 
+export interface CloseoutReportSubmitter {
+  name: string;
+  title: string | null;
+  signature_data_url?: string | null;
+}
+
 export interface CloseoutReportData {
   project_name: string;
   project_id: string;
@@ -73,6 +80,15 @@ export interface CloseoutReportData {
     closed: number;
   };
   snags: CloseoutSnag[];
+  submitter: CloseoutReportSubmitter | null;
+}
+
+function formatRole(role: string | undefined): string | null {
+  if (!role) return null;
+  return role
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -80,11 +96,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.methodNotAllowed(res, req.method ?? 'Unknown', ['GET']);
   }
 
+  const authUser = (req as AuthenticatedNextApiRequest).user;
   const { projectId, status, zone_no, pon_no } = req.query;
 
   if (!projectId || typeof projectId !== 'string') {
     return apiResponse.error(res, 400 as never, 'projectId is required');
   }
+
+  const parseCsv = (v: unknown): string[] => {
+    if (!v) return [];
+    if (Array.isArray(v)) return v.flatMap((x) => String(x).split(',')).map((x) => x.trim()).filter(Boolean);
+    return String(v).split(',').map((x) => x.trim()).filter(Boolean);
+  };
+  const parseCsvInt = (v: unknown): number[] =>
+    parseCsv(v).map((s) => parseInt(s, 10)).filter((n) => Number.isFinite(n));
 
   try {
     // 1. Project info
@@ -96,9 +121,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.notFound(res, 'Project', projectId);
     }
 
-    const statusFilter = typeof status === 'string' && status ? status : null;
-    const zoneFilter = typeof zone_no === 'string' && zone_no ? parseInt(zone_no, 10) : null;
-    const ponFilter = typeof pon_no === 'string' && pon_no ? parseInt(pon_no, 10) : null;
+    const statusArr = parseCsv(status);
+    const zoneArr   = parseCsvInt(zone_no);
+    const ponArr    = parseCsvInt(pon_no);
+    const statusParam = statusArr.length > 0 ? statusArr : null;
+    const zoneParam   = zoneArr.length   > 0 ? zoneArr   : null;
+    const ponParam    = ponArr.length    > 0 ? ponArr    : null;
 
     // 2. Snags with joins
     const snagRows = await sql`
@@ -119,9 +147,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       LEFT JOIN poles pole ON pole.id = s.pole_ids[1]
       LEFT JOIN drops dr ON dr.id = s.drop_id
       WHERE s.project_id = ${projectId}
-        AND (${statusFilter}::text IS NULL OR s.status = ${statusFilter})
-        AND (${zoneFilter}::int IS NULL OR COALESCE(pole.zone_no, dr.zone_no) = ${zoneFilter})
-        AND (${ponFilter}::int IS NULL OR COALESCE(pole.pon_no, dr.pon_no) = ${ponFilter})
+        AND (${statusParam}::text[] IS NULL OR s.status = ANY(${statusParam}::text[]))
+        AND (${zoneParam}::int[]    IS NULL OR COALESCE(pole.zone_no, dr.zone_no) = ANY(${zoneParam}::int[]))
+        AND (${ponParam}::int[]     IS NULL OR COALESCE(pole.pon_no, dr.pon_no)   = ANY(${ponParam}::int[]))
       ORDER BY COALESCE(pole.zone_no, dr.zone_no) ASC NULLS LAST,
                COALESCE(pole.pon_no, dr.pon_no) ASC NULLS LAST,
                s.snag_number ASC
@@ -221,17 +249,26 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       closed: snags.filter((s) => s.status === 'closed').length,
     };
 
+    const submitter: CloseoutReportSubmitter | null = authUser
+      ? {
+          name: authUser.name || `${authUser.firstName ?? ''} ${authUser.lastName ?? ''}`.trim() || authUser.email,
+          title: formatRole(authUser.role),
+        }
+      : null;
+
     const data: CloseoutReportData = {
       project_name: projectRows[0]!.project_name,
       project_id: projectId,
       generated_at: new Date().toISOString(),
       filters: {
-        status: statusFilter ?? undefined,
-        zone_no: zoneFilter ?? undefined,
-        pon_no: ponFilter ?? undefined,
+        // Preserve a display-friendly summary of the filters used to build the PDF.
+        status: statusArr.length > 0 ? statusArr.join(',') : undefined,
+        zone_no: zoneArr.length === 1 ? zoneArr[0] : undefined,
+        pon_no: ponArr.length === 1 ? ponArr[0]  : undefined,
       },
       summary,
       snags,
+      submitter,
     };
 
     return apiResponse.success(res, data);

@@ -51,6 +51,15 @@ interface CloseoutSnag {
   notes: CloseoutNote[];
 }
 
+export interface CloseoutReportSubmitter {
+  /** Full name of the Velocity Fibre person submitting the report */
+  name: string;
+  /** Job title shown under the name (e.g. "Civil Site Manager") */
+  title?: string | null;
+  /** Optional data URL (image/png or image/jpeg) of the submitter's signature */
+  signature_data_url?: string | null;
+}
+
 export interface CloseoutReportData {
   project_name: string;
   project_id: string;
@@ -67,6 +76,8 @@ export interface CloseoutReportData {
     closed: number;
   };
   snags: CloseoutSnag[];
+  /** Populated from the logged-in user when the report is generated. */
+  submitter?: CloseoutReportSubmitter | null;
 }
 import { log } from '@/lib/logger';
 
@@ -499,6 +510,150 @@ export async function generateSnagCloseoutPdf(data: CloseoutReportData): Promise
       }
     }
   }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // DECLARATION & SIGN-OFF PAGE
+  // ══════════════════════════════════════════════════════════════════════════
+
+  newPage();
+
+  // Logo on sign-off page (matches cover page layout)
+  if (logoData) {
+    doc.addImage(logoData, 'JPEG', ML, y, 40, 20);
+  }
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...B.mid);
+  doc.text('Velocity Fibre (Pty) Ltd', PW - MR, y + 6, { align: 'right' });
+  doc.setFontSize(7);
+  doc.text('www.velocityfibre.co.za', PW - MR, y + 11, { align: 'right' });
+  y += 28;
+
+  // Navy divider
+  doc.setDrawColor(...B.navy);
+  doc.setLineWidth(1);
+  doc.line(ML, y, PW - MR, y);
+  y += 12;
+
+  // Section title
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...B.navy);
+  doc.text('Declaration & Sign-Off', ML, y);
+  y += 10;
+
+  // Declaration paragraph
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...B.dark);
+  const declaration =
+    'I, the undersigned, confirm that the photographic evidence presented in this report ' +
+    'accurately reflects the before and after status of each snag item. Velocity Fibre (Pty) Ltd ' +
+    'accepts responsibility for all outstanding items and commits to providing close-out ' +
+    'photographs upon completion.';
+  const declLines = doc.splitTextToSize(declaration, CW);
+  doc.text(declLines, ML, y);
+  y += declLines.length * 5 + 8;
+
+  // Two sign-off columns: Submitted by (Velocity) | Reviewed by (Client)
+  const colGap = 10;
+  const colW = (CW - colGap) / 2;
+  const leftX = ML;
+  const rightX = ML + colW + colGap;
+  const colTop = y;
+  const colH = 58;
+
+  // Column headers
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...B.navy);
+  doc.text('Submitted by:', leftX, colTop);
+  doc.text('Reviewed by (Fibertime):', rightX, colTop);
+
+  // ── Left column: Velocity Fibre side ───────────────────────────────────────
+  const submitterName = data.submitter?.name?.trim() || 'Velocity Fibre Representative';
+  const submitterTitle = data.submitter?.title?.trim() || null;
+  const submittedDate = fmtDate(data.generated_at);
+
+  let ly = colTop + 7;
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...B.dark);
+  doc.text(submitterName, leftX, ly);
+  ly += 6;
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...B.mid);
+  if (submitterTitle) {
+    doc.text(submitterTitle, leftX, ly);
+    ly += 5;
+  }
+  doc.text('Velocity Fibre (Pty) Ltd', leftX, ly);
+  ly += 5;
+  doc.text(`Date: ${submittedDate}`, leftX, ly);
+  ly += 10;
+
+  // Signature label + line for Velocity side
+  const leftSigLineY = colTop + colH - 8;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...B.mid);
+  doc.text('Signature:', leftX, leftSigLineY);
+  doc.setDrawColor(...B.line);
+  doc.setLineWidth(0.4);
+  doc.line(leftX + 18, leftSigLineY, leftX + colW, leftSigLineY);
+
+  // If a signature image was supplied, stamp it above the line
+  if (data.submitter?.signature_data_url) {
+    try {
+      const fmt = data.submitter.signature_data_url.startsWith('data:image/png')
+        ? 'PNG'
+        : 'JPEG';
+      doc.addImage(
+        data.submitter.signature_data_url,
+        fmt,
+        leftX + 20,
+        leftSigLineY - 16,
+        40,
+        16,
+      );
+    } catch {
+      // Fall through silently — the line is still drawn for a wet signature.
+    }
+  }
+
+  // ── Right column: Fibertime/Client side (blank fields to fill in) ──────────
+  let ry = colTop + 7;
+  const fieldLineX = rightX + 22;
+  const fieldLineEnd = rightX + colW;
+
+  const drawField = (label: string, yy: number) => {
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...B.mid);
+    doc.text(label, rightX, yy);
+    doc.setDrawColor(...B.line);
+    doc.setLineWidth(0.4);
+    doc.line(fieldLineX, yy, fieldLineEnd, yy);
+  };
+
+  drawField('Name:',      ry + 3); ry += 11;
+  drawField('Date:',      ry);     ry += 11;
+  drawField('Reference:', ry);     ry += 11;
+  drawField('Signature:', ry);
+
+  y = colTop + colH + 14;
+
+  // Confidential footer note above the page footer
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(...B.light);
+  const confidential =
+    'Velocity Fibre (Pty) Ltd  |  26 Centenary Road, Lorraine, Gqeberha  |  ' +
+    'info@velocityfibre.co.za  |  Confidential — intended for named recipient only.';
+  const confLines = doc.splitTextToSize(confidential, CW);
+  doc.text(confLines, PW / 2, y, { align: 'center' });
 
   // Final page footer
   drawFooter();
