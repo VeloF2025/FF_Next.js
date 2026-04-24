@@ -137,6 +137,37 @@ async function generateAssetNumber(categoryCode: string): Promise<string> {
   return `${prefix}-${nextNum.toString().padStart(5, '0')}`;
 }
 
+/**
+ * Map a Postgres unique_violation (23505) to a human-readable, field-specific message.
+ * Returns null if the error isn't a unique_violation we recognise.
+ */
+export function mapAssetUniqueViolation(error: unknown): string | null {
+  if (!error || typeof error !== 'object') return null;
+  const err = error as { code?: string; constraint?: string; detail?: string; message?: string };
+  if (err.code !== '23505') return null;
+
+  const constraint = err.constraint || '';
+  const detail = err.detail || err.message || '';
+
+  // detail format: Key (barcode)=(CIDLI209685) already exists.
+  const detailMatch = detail.match(/Key \(([^)]+)\)=\(([^)]+)\) already exists/i);
+  const field = detailMatch?.[1];
+  const value = detailMatch?.[2];
+
+  if (constraint === 'assets_barcode_key' || field === 'barcode') {
+    return value
+      ? `An asset with barcode "${value}" already exists. Please use a different barcode.`
+      : 'An asset with this barcode already exists. Please use a different barcode.';
+  }
+  if (constraint === 'assets_asset_number_key' || field === 'asset_number') {
+    return 'Asset number collision — please retry.';
+  }
+  if (field) {
+    return `An asset with this ${field.replace(/_/g, ' ')} already exists.`;
+  }
+  return 'This asset conflicts with an existing record. Please check for duplicates.';
+}
+
 export const assetService = {
   /**
    * Get all assets with filtering and pagination
@@ -333,8 +364,20 @@ export const assetService = {
         };
       }
 
-      // Generate asset number
-      const assetNumber = await generateAssetNumber(category.code);
+      // Pre-check for duplicate barcode so we can surface a friendly error
+      // without relying on the generic catch block.
+      if (input.barcode) {
+        const [existing] = await sql`
+          SELECT id FROM assets WHERE barcode = ${input.barcode} LIMIT 1
+        `;
+        if (existing) {
+          return {
+            success: false,
+            data: null,
+            error: `An asset with barcode "${input.barcode}" already exists. Please use a different barcode.`,
+          };
+        }
+      }
 
       // Calculate next calibration date if applicable
       let nextCalibrationDate = input.nextCalibrationDate;
@@ -345,54 +388,70 @@ export const assetService = {
         nextCalibrationDate = date.toISOString().split('T')[0];
       }
 
-      const [row] = await sql`
-        INSERT INTO assets (
-          asset_number, serial_number, barcode, category_id, name, description,
-          manufacturer, model, model_number, purchase_date, purchase_price,
-          currency, supplier_id, warranty_end_date, useful_life_years, salvage_value,
-          current_location, warehouse_location, bin_location,
-          requires_calibration, last_calibration_date, next_calibration_date, calibration_provider,
-          maintenance_interval_days, specifications, notes, tags, primary_image_url,
-          created_by
-        ) VALUES (
-          ${assetNumber},
-          ${input.serialNumber || null},
-          ${input.barcode || null},
-          ${input.categoryId},
-          ${input.name},
-          ${input.description || null},
-          ${input.manufacturer || null},
-          ${input.model || null},
-          ${input.modelNumber || null},
-          ${input.purchaseDate || null},
-          ${input.purchasePrice || null},
-          ${input.currency || 'ZAR'},
-          ${input.supplierId || null},
-          ${input.warrantyEndDate || null},
-          ${input.usefulLifeYears || null},
-          ${input.salvageValue || 0},
-          ${input.currentLocation || null},
-          ${input.warehouseLocation || null},
-          ${input.binLocation || null},
-          ${category.requires_calibration},
-          ${input.lastCalibrationDate || null},
-          ${nextCalibrationDate || null},
-          ${input.calibrationProvider || null},
-          ${input.maintenanceIntervalDays || null},
-          ${JSON.stringify(input.specifications || {})},
-          ${input.notes || null},
-          ${JSON.stringify(input.tags || [])},
-          ${input.primaryImageUrl || null},
-          ${createdBy}
-        )
-        RETURNING *
-      `;
+      // Retry once if asset_number collision occurs (race between MAX query and insert).
+      let row: Record<string, unknown> | undefined;
+      let lastError: unknown = null;
+      for (let attempt = 0; attempt < 2 && !row; attempt++) {
+        const assetNumber = await generateAssetNumber(category.code);
+        try {
+          [row] = await sql`
+            INSERT INTO assets (
+              asset_number, serial_number, barcode, category_id, name, description,
+              manufacturer, model, model_number, purchase_date, purchase_price,
+              currency, supplier_id, warranty_end_date, useful_life_years, salvage_value,
+              current_location, warehouse_location, bin_location,
+              requires_calibration, last_calibration_date, next_calibration_date, calibration_provider,
+              maintenance_interval_days, specifications, notes, tags, primary_image_url,
+              created_by
+            ) VALUES (
+              ${assetNumber},
+              ${input.serialNumber || null},
+              ${input.barcode || null},
+              ${input.categoryId},
+              ${input.name},
+              ${input.description || null},
+              ${input.manufacturer || null},
+              ${input.model || null},
+              ${input.modelNumber || null},
+              ${input.purchaseDate || null},
+              ${input.purchasePrice || null},
+              ${input.currency || 'ZAR'},
+              ${input.supplierId || null},
+              ${input.warrantyEndDate || null},
+              ${input.usefulLifeYears || null},
+              ${input.salvageValue || 0},
+              ${input.currentLocation || null},
+              ${input.warehouseLocation || null},
+              ${input.binLocation || null},
+              ${category.requires_calibration},
+              ${input.lastCalibrationDate || null},
+              ${nextCalibrationDate || null},
+              ${input.calibrationProvider || null},
+              ${input.maintenanceIntervalDays || null},
+              ${JSON.stringify(input.specifications || {})},
+              ${input.notes || null},
+              ${JSON.stringify(input.tags || [])},
+              ${input.primaryImageUrl || null},
+              ${createdBy}
+            )
+            RETURNING *
+          `;
+        } catch (insertError) {
+          lastError = insertError;
+          const pgErr = insertError as { code?: string; constraint?: string };
+          // Retry only on asset_number race; any other unique violation is a real duplicate.
+          if (pgErr.code === '23505' && pgErr.constraint === 'assets_asset_number_key' && attempt === 0) {
+            continue;
+          }
+          throw insertError;
+        }
+      }
 
       if (!row) {
         return {
           success: false,
           data: null,
-          error: 'Failed to create asset',
+          error: mapAssetUniqueViolation(lastError) ?? 'Failed to create asset',
         };
       }
 
@@ -403,10 +462,11 @@ export const assetService = {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       log.error('Failed to create asset', { error: errorMessage, input }, 'assetService');
+      const friendly = mapAssetUniqueViolation(error);
       return {
         success: false,
         data: null,
-        error: 'Failed to create asset. Please try again or contact support.',
+        error: friendly ?? 'Failed to create asset. Please try again or contact support.',
       };
     }
   },

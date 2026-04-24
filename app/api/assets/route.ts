@@ -89,7 +89,10 @@ export async function POST(req: NextRequest) {
     const result = await assetService.create(validation.data, createdBy);
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
+      // Duplicate-value errors: return 409 Conflict so clients can distinguish
+      // "bad input" from "uniqueness collision".
+      const isDuplicate = /already exists/i.test(result.error || '');
+      return NextResponse.json({ error: result.error }, { status: isDuplicate ? 409 : 400 });
     }
 
     // Revalidate asset pages (new asset affects counts)
