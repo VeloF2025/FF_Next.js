@@ -22,7 +22,7 @@ import {
   hashPromptContent,
 } from '@/services/vlmLearningService';
 import type { RecordCorrectionInput } from '@/types/vlm-learning';
-import { VLM_CHAT_ENDPOINT, VLM_EXTRACTION_MODEL, VLM_TIMEOUT_DOCUMENT, VLM_TEMPERATURE } from '@/lib/vlm';
+import { VLM_CHAT_ENDPOINT, VLM_EXTRACTION_MODEL, VLM_TIMEOUT_DOCUMENT, VLM_TEMPERATURE, VLM_MAX_TOKENS_DOCUMENT } from '@/lib/vlm';
 
 // ============================================================================
 // CONFIGURATION
@@ -248,7 +248,7 @@ async function callVlmApi(imageDataUrl: string, prompt?: string): Promise<string
         },
       ],
       temperature: VLM_TEMPERATURE,
-      max_tokens: 2000,
+      max_tokens: VLM_MAX_TOKENS_DOCUMENT,
     };
 
     const response = await fetch(VLM_CHAT_ENDPOINT, {

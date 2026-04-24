@@ -99,6 +99,9 @@ export const VLM_MAX_TOKENS_DOCUMENT = 4000;
 /** Max tokens for quick extractions (plate, odometer, fuel) */
 export const VLM_MAX_TOKENS_QUICK = 500;
 
+/** Max tokens for orientation detection — response is a single number (0/90/180/270) */
+export const VLM_MAX_TOKENS_ORIENTATION = 10;
+
 /** Max tokens for OCR/ID extraction */
 export const VLM_MAX_TOKENS_OCR = 1000;
 

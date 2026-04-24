@@ -13,6 +13,7 @@
 
 import { EvaluationResult } from '../types';
 import { createLogger } from '@/lib/logger';
+import { VLM_MAX_TOKENS_QA } from '@/lib/vlm';
 import fs from 'fs';
 import path from 'path';
 
@@ -365,7 +366,7 @@ async function callVlmApiBatch(drNumber: string, photoUrls: string[]): Promise<V
         ],
       },
     ],
-    max_tokens: 2000,
+    max_tokens: VLM_MAX_TOKENS_QA,
     temperature: 0.1, // Low temperature for consistent evaluation
   };
 
