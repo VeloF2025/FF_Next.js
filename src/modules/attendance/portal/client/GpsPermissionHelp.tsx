@@ -44,15 +44,23 @@ interface Step {
 function stepsFor(platform: Platform): Step[] {
   switch (platform) {
     case 'ios-safari':
+      // The FIRST step is the one that actually matters and is the
+      // least-obvious: iOS has a system-level Location Services master
+      // switch for Safari, separate from the per-site permission in
+      // Website Settings. Without this ON, geolocation silently fails
+      // even when the Permissions API reports "granted" for the site.
+      // Hein hit this on 2026-04-24 — putting it first so field staff
+      // don't waste time on the Safari-only toggle.
       return [
-        { step: 'Tap the "ⓐA" icon on the left of the address bar.' },
+        { step: 'iOS Settings → Privacy & Security → Location Services → Safari Websites → set to "While Using the App".' },
+        { step: 'Back in Safari: tap the "ⓐA" icon on the left of the address bar.' },
         { step: 'Tap Website Settings → Location → Allow.' },
         { step: 'Tap the button below to reload with a fresh page.' },
         { step: 'Still blocked? iOS Settings → Safari → Advanced → Website Data → swipe-delete any "fibreflow.app" entry, then reopen the site.' },
       ];
     case 'ios-other':
       return [
-        { step: 'Open iOS Settings → Safari → Location → set to Ask.' },
+        { step: 'iOS Settings → Privacy & Security → Location Services → Safari Websites → set to "While Using the App".' },
         { step: 'Reload this page and try clocking in again.' },
       ];
     case 'android-chrome':
