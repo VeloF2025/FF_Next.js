@@ -35,6 +35,7 @@ import {
   type SessionResponse,
 } from '@/modules/attendance/portal/client/api';
 import { MyPortalShell } from '@/modules/attendance/portal/client/MyPortalShell';
+import { useStatusFilterUrlSync } from '@/modules/attendance/corrections/useStatusFilterUrl';
 
 const STATUS_TABS: readonly { key: CorrectionStatusFilter; label: string }[] = [
   { key: 'pending', label: 'Pending' },
@@ -49,13 +50,6 @@ const VALID_STATUS_FILTERS: readonly CorrectionStatusFilter[] =
 
 const DEFAULT_STATUS_FILTER: CorrectionStatusFilter = 'pending';
 
-function parseStatusParam(raw: unknown): CorrectionStatusFilter {
-  return typeof raw === 'string' &&
-    VALID_STATUS_FILTERS.includes(raw as CorrectionStatusFilter)
-    ? (raw as CorrectionStatusFilter)
-    : DEFAULT_STATUS_FILTER;
-}
-
 const ZERO_COUNTS: CorrectionCounts = {
   pending: 0,
   approved: 0,
@@ -69,42 +63,16 @@ const MyCorrectionsPage: NextPage & {
   const router = useRouter();
   const [session, setSession] = React.useState<SessionResponse | null>(null);
   const [hints, setHints] = React.useState<CorrectionHints | null>(null);
-  const [statusFilter, setStatusFilter] = React.useState<CorrectionStatusFilter>(
-    DEFAULT_STATUS_FILTER
-  );
+  const { statusFilter, setStatusFilter: handleTabChange } =
+    useStatusFilterUrlSync<CorrectionStatusFilter>(
+      VALID_STATUS_FILTERS,
+      DEFAULT_STATUS_FILTER
+    );
   const [rows, setRows] = React.useState<CorrectionRow[] | null>(null);
   const [counts, setCounts] = React.useState<CorrectionCounts>(ZERO_COUNTS);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [cancellingId, setCancellingId] = React.useState<string | null>(null);
   const [cancelError, setCancelError] = React.useState<string | null>(null);
-
-  // URL ↔ tab sync: the ?status= query param is the source of truth.
-  // Handles deep-links, bookmarks, and browser back from nested routes
-  // (e.g. corrections/new). Same-page tab clicks use router.replace so
-  // we don't pollute history with every click.
-  React.useEffect(() => {
-    if (!router.isReady) return;
-    const next = parseStatusParam(router.query.status);
-    setStatusFilter((prev) => (prev === next ? prev : next));
-  }, [router.isReady, router.query.status]);
-
-  const handleTabChange = React.useCallback(
-    (next: CorrectionStatusFilter) => {
-      setStatusFilter(next);
-      if (!router.isReady) return;
-      const { status: _prev, ...restQuery } = router.query;
-      const nextQuery =
-        next === DEFAULT_STATUS_FILTER
-          ? restQuery
-          : { ...restQuery, status: next };
-      router.replace(
-        { pathname: router.pathname, query: nextQuery },
-        undefined,
-        { shallow: true }
-      );
-    },
-    [router]
-  );
 
   // Session + hints — fetched once on mount.
   React.useEffect(() => {
