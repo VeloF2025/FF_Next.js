@@ -121,10 +121,60 @@ export function GpsPermissionHelp({
   const [permState, setPermState] = React.useState<string>('checking…');
   const [showDiag, setShowDiag] = React.useState(false);
 
+  // Auto-recovery: when the user toggles permission in browser settings
+  // and returns to the tab, we want the banner to clear itself without a
+  // manual tap. PermissionStatus dispatches a `change` event when the
+  // state transitions, and we also poll on every visibilitychange (user
+  // returning from Settings).
   React.useEffect(() => {
     setPlatform(detectPlatform());
-    void queryGeolocationPermission().then((s) => setPermState(s));
-  }, []);
+
+    let cancelled = false;
+    let statusRef: PermissionStatus | null = null;
+
+    const check = async () => {
+      const s = await queryGeolocationPermission();
+      if (cancelled) return;
+      setPermState(s);
+      if (s === 'granted' && onRetry) {
+        // Permission has been granted since the banner was shown. Dismiss
+        // ourselves by re-running the capture flow — clock.tsx will set
+        // gpsDenied=false and call captureGpsOnce, which now succeeds.
+        onRetry();
+      }
+    };
+
+    // Wire up live change detection via the Permissions API, if supported.
+    const perms = (navigator as Navigator & { permissions?: Permissions }).permissions;
+    if (perms && typeof perms.query === 'function') {
+      perms
+        .query({ name: 'geolocation' as PermissionName })
+        .then((status) => {
+          if (cancelled) return;
+          statusRef = status;
+          status.addEventListener('change', check);
+        })
+        .catch(() => {
+          // older browsers — onvisibilitychange below is still a working fallback
+        });
+    }
+
+    // Fallback: the user coming back to the tab after visiting Settings
+    // on iOS often doesn't fire the PermissionStatus change event reliably.
+    // Re-check whenever the tab becomes visible.
+    const onVis = () => {
+      if (document.visibilityState === 'visible') void check();
+    };
+    document.addEventListener('visibilitychange', onVis);
+
+    void check();
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVis);
+      if (statusRef) statusRef.removeEventListener('change', check);
+    };
+  }, [onRetry]);
 
   const steps = stepsFor(platform);
 
@@ -136,12 +186,14 @@ export function GpsPermissionHelp({
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-semibold text-amber-200">
-            Location is blocked for this site
+            {permState === 'granted'
+              ? 'Permission granted — refreshing…'
+              : 'Location is blocked for this site'}
           </h3>
           <p className="mt-1 text-xs text-amber-300">
-            We can&rsquo;t re-ask for permission &mdash; the browser won&rsquo;t let
-            us prompt again once it&rsquo;s been denied. Allow location for this
-            site, then tap the reload button below.
+            {permState === 'granted'
+              ? 'Your browser now reports location access is allowed. Re-trying capture automatically.'
+              : 'We can’t re-ask for permission — the browser won’t let us prompt again once it’s been denied. Allow location for this site, then tap the reload button below.'}
           </p>
           <ol className="mt-3 space-y-1.5 text-xs text-amber-100 list-decimal list-inside">
             {steps.map((s, i) => (
