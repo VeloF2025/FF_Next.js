@@ -241,8 +241,11 @@ export function CreateTicketModal({
       setFlaggedItems(flagged);
 
       if (flagged.length === 0) {
-        // Nothing to review — go straight to creation.
+        // Nothing to review — go straight to creation, then close.
+        // submitReviewed() handles onSuccess/closeModal on the other branch.
         await submitCreations(clean);
+        onSuccess();
+        closeModal();
       } else {
         setStep('review-duplicates');
       }
@@ -255,12 +258,14 @@ export function CreateTicketModal({
     }
   };
 
-  /** Issue the actual create calls to the per-source endpoints. */
+  /**
+   * Issue the actual create calls to the per-source endpoints.
+   * Caller is responsible for onSuccess()/closeModal() — we only do the work
+   * and show a toast so success and failure paths can be composed.
+   */
   const submitCreations = async (items: SelectedItem[]) => {
     if (items.length === 0) {
       toast.success('No new tickets needed (all items were linked or skipped).');
-      onSuccess();
-      closeModal();
       return;
     }
 
