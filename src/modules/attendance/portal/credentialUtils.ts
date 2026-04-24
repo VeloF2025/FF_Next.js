@@ -129,19 +129,25 @@ export async function findAuthRowByPhone(phone: string): Promise<StaffAuthRow | 
   const subscriberDigits = normalised.slice(3);        // '821234567'
   const localTrunkDigits = '0' + subscriberDigits;     // '0821234567'
 
+  // LEFT JOIN so first-time staff (no credentials row yet) still match and
+  // can receive an onboarding OTP. The OTP upsert creates the credentials
+  // row on demand. Migration 318 relaxed the CHECK constraint to allow a
+  // row with only pending_otp_hash, so this is safe.
+  // COALESCE on the auth-state columns so consumers always see concrete
+  // values for a brand-new (no-credentials) staff member.
   const rows = await sql<StaffAuthRow>`
     SELECT
-      c.staff_id,
+      s.id              AS staff_id,
       c.pin_hash,
       c.password_hash,
-      c.failed_attempts,
+      COALESCE(c.failed_attempts, 0) AS failed_attempts,
       c.locked_until,
-      s.status         AS staff_status,
+      s.status          AS staff_status,
       TRIM(COALESCE(s.first_name, '') || ' ' || COALESCE(s.last_name, '')) AS staff_name,
-      s.phone          AS staff_phone,
-      s.email          AS staff_email
+      s.phone           AS staff_phone,
+      s.email           AS staff_email
     FROM staff s
-    JOIN attendance_credentials c ON c.staff_id = s.id
+    LEFT JOIN attendance_credentials c ON c.staff_id = s.id
     WHERE LOWER(s.status) = 'active'
       AND regexp_replace(COALESCE(s.phone, ''), '\\D', '', 'g') IN (
         ${e164Digits},
