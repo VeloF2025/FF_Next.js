@@ -78,10 +78,14 @@ const MyLoginPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
       showHeader={false}
     >
       <div className="flex flex-col items-center pt-8 pb-6">
-        <div className="w-16 h-16 rounded-2xl bg-blue-700 text-white flex items-center justify-center text-3xl font-bold shadow-lg">
-          FF
+        <div className="w-20 h-20 rounded-2xl bg-white border border-gray-200 flex items-center justify-center shadow-lg p-2">
+          <img
+            src="/assets/vf/vf-logo.svg"
+            alt="Velocity Fibre"
+            className="w-full h-full object-contain"
+          />
         </div>
-        <h1 className="mt-4 text-2xl font-semibold">FibreFlow Attendance</h1>
+        <h1 className="mt-4 text-2xl font-semibold">Velocity Fibre Attendance</h1>
         <p className="mt-1 text-sm text-gray-500">Clock in & out for your shift</p>
       </div>
 

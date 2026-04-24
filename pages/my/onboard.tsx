@@ -145,9 +145,16 @@ const MyOnboardPage: NextPage & { getLayout?: (page: React.ReactElement) => Reac
         </Link>
       </div>
 
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Set up your PIN</h1>
-        <p className="mt-1 text-sm text-gray-500">
+      <div className="flex flex-col items-center mb-6">
+        <div className="w-16 h-16 rounded-2xl bg-white border border-gray-200 flex items-center justify-center shadow-sm p-2">
+          <img
+            src="/assets/vf/vf-logo.svg"
+            alt="Velocity Fibre"
+            className="w-full h-full object-contain"
+          />
+        </div>
+        <h1 className="mt-3 text-2xl font-semibold">Set up your PIN</h1>
+        <p className="mt-1 text-sm text-gray-500 text-center">
           {step === 'phone'
             ? 'We will send a 6-digit code to the phone we have on file.'
             : step === 'verify'

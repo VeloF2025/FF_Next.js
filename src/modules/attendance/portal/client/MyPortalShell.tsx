@@ -55,7 +55,7 @@ export function MyPortalShell({
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
       <Head>
-        <title>{title} · FibreFlow</title>
+        <title>{title} · Velocity Fibre</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="theme-color" content="#1e40af" />
         <link rel="manifest" href="/manifest-my.json" />
@@ -63,9 +63,17 @@ export function MyPortalShell({
 
       {showHeader && (
         <header className="bg-blue-700 text-white px-4 py-3 flex items-center justify-between shadow">
-          <div>
-            <div className="text-xs uppercase tracking-wide opacity-80">FibreFlow</div>
-            <div className="text-base font-semibold">{title}</div>
+          <div className="flex items-center gap-3 min-w-0">
+            <img
+              src="/assets/vf/vf-logo.svg"
+              alt=""
+              aria-hidden="true"
+              className="w-9 h-9 shrink-0 rounded-lg bg-white p-1"
+            />
+            <div className="min-w-0">
+              <div className="text-xs uppercase tracking-wide opacity-80">Velocity Fibre</div>
+              <div className="text-base font-semibold truncate">{title}</div>
+            </div>
           </div>
           {staffName && (
             <div className="text-right">
