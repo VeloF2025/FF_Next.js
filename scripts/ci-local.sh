@@ -102,9 +102,25 @@ echo -e "\n${CYAN}── Gate 4: Zero Tolerance (changed files) ──${NC}\n"
 ZT_FAILED=false
 CHANGED_FILES=$(git diff --name-only HEAD 2>/dev/null || true)
 if [ -n "$CHANGED_FILES" ]; then
-  # Check for console.log in changed .ts/.tsx files
+  # Check for console.log in changed .ts/.tsx files.
+  # Honours:
+  #   - leading-// comment lines (pre-existing)
+  #   - `// eslint-disable-line no-console` same-line pragma
+  #   - `// eslint-disable-next-line no-console` on the previous line
+  # The awk keeps a sliding one-line window so it can see the prior line.
   CONSOLE_HITS=$(echo "$CHANGED_FILES" | { grep -E '\.(ts|tsx)$' || true; } | { grep -v '.test.' || true; } | { grep -v '.spec.' || true; } | while read -r f; do
-    [ -f "$f" ] && grep -n 'console\.\(log\|error\|warn\|info\|debug\)' "$f" 2>/dev/null | grep -v '^\s*//' | sed "s|^|$f:|" || true
+    [ -f "$f" ] && awk -v file="$f" '
+      {
+        line = $0
+        if (line ~ /console\.(log|error|warn|info|debug)/ \
+            && line !~ /^[[:space:]]*\/\// \
+            && line !~ /eslint-disable-line[[:space:]]+(no-console|.*,[[:space:]]*no-console)/ \
+            && prev !~ /eslint-disable-next-line[[:space:]]+(no-console|.*,[[:space:]]*no-console)/) {
+          print file ":" NR ":" line
+        }
+        prev = line
+      }
+    ' "$f"
   done)
 
   if [ -n "$CONSOLE_HITS" ]; then
