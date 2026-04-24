@@ -53,7 +53,7 @@ export function MyPortalShell({
   }, [loggingOut, router]);
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
+    <div className="min-h-screen bg-gray-50 text-gray-900">
       <Head>
         <title>{title} · Velocity Fibre</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -92,7 +92,7 @@ export function MyPortalShell({
         </header>
       )}
 
-      <main className="flex-1 w-full max-w-lg mx-auto px-4 py-4 pb-24">
+      <main className="w-full max-w-lg mx-auto px-4 py-4 pb-24">
         {children}
       </main>
 
