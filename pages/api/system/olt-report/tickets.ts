@@ -20,6 +20,9 @@ const logger = createLogger('olt-report:tickets');
 const VALID_TICKET_TYPES: string[] = [
   TicketType.MAINTENANCE,
   TicketType.ACTIVATIONS,
+  TicketType.OPTICAL,
+  TicketType.CIVILS,
+  TicketType.UNSPECIFIED,
 ];
 
 const VALID_CATEGORIES: string[] = [...PP_OLT_SUBTYPES];
