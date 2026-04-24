@@ -48,10 +48,14 @@ export const OTP_MAX_ATTEMPTS = 5;                 // before the OTP is burned
 // years, and are compared on every verify request. Cost 10 is still > 50 ms.
 const OTP_BCRYPT_ROUNDS = 10;
 
+// The WA bridge on the VPS is the only service that actually exposes a
+// working /send-message endpoint. The wa-feedback-service on Velocity:8092
+// only proxies a narrow subset (health, digest posts) — not DMs. Env-var
+// overrides are preserved for test / future reroute.
 const WA_SENDER_URL =
-  process.env.WA_FEEDBACK_URL ||
   process.env.WA_BRIDGE_URL ||
-  'http://100.96.203.105:8092';
+  process.env.WA_FEEDBACK_URL ||
+  'http://72.61.197.178:8083';
 
 // =============================================================================
 // OTP lifecycle
@@ -271,27 +275,34 @@ export async function commitPinAndClearOtp(params: {
 // =============================================================================
 
 /**
- * Format a normalised SA phone (+27XXXXXXXXX) into a WhatsApp chatId. We use
- * the `@s.whatsapp.net` suffix (the `@c.us` suffix is WAHA's legacy alias for
- * the same JID — both route to individual DMs).
+ * Format a normalised SA phone (+27XXXXXXXXX) into an individual WhatsApp
+ * JID. `@s.whatsapp.net` is the direct-user suffix (`@c.us` is WAHA's legacy
+ * alias for the same JID; `@g.us` would be a group). OTPs always go direct
+ * to the staff member — no groups involved.
  */
-function phoneToChatId(e164: string): string {
+function phoneToJid(e164: string): string {
   const digits = e164.replace(/\D/g, '');
   return `${digits}@s.whatsapp.net`;
 }
 
 /**
- * Send the OTP via the WA sender proxy on Velocity:8092. Throws on network
- * or non-2xx response so the caller can decide whether to retry; the caller
- * always swallows delivery errors into a generic 200 to preserve the
- * "unknown vs known identifier" symmetry.
+ * Send the OTP via the WA bridge on VPS:8083. Throws on network or non-2xx
+ * response so the caller can decide whether to retry; the caller always
+ * swallows delivery errors into a generic 200 to preserve the "unknown vs
+ * known identifier" symmetry.
+ *
+ * NOTE: the bridge's POST body key is `group_jid` even for DMs. It's a
+ * misnomer from when the bridge only did group broadcasts — it now accepts
+ * any JID, including `@s.whatsapp.net` individual chats. Other callers
+ * (circuitBreaker alerts, qfield notifications, escalation service) use
+ * the same key. See dbCircuitBreaker.ts line 160 for precedent.
  */
 export async function sendOtpViaWhatsApp(params: {
   phone: string;        // expected to be already normalised (+27XXXXXXXXX)
   otp: string;
   staffName?: string | null;
 }): Promise<void> {
-  const chatId = phoneToChatId(params.phone);
+  const jid = phoneToJid(params.phone);
   const who = params.staffName?.trim() ? `, ${params.staffName.trim()}` : '';
   const message =
     `Hi${who} — your FibreFlow attendance verification code is ${params.otp}.\n` +
@@ -301,7 +312,7 @@ export async function sendOtpViaWhatsApp(params: {
   const response = await fetch(`${WA_SENDER_URL}/send-message`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chatId, message }),
+    body: JSON.stringify({ group_jid: jid, message }),
     signal: AbortSignal.timeout(15_000),
   });
 
