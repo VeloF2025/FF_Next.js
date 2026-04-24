@@ -32,6 +32,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           sd.file_path, sd.file_size, sd.file_name, sd.mime_type, sd.expiry_date,
           sd.issued_date, sd.issuing_authority, sd.document_number,
           sd.verification_status, sd.verified_by, sd.verified_at, sd.verification_notes,
+          sd.ocr_metadata,
           sd.created_at, sd.updated_at,
           s.name as staff_name,
           v.name as verifier_name
@@ -47,7 +48,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       return res.status(200).json({
         success: true,
-        document: mapDbToDocument(document),
+        data: mapDbToDocument(document),
       });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -155,12 +156,30 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
 export default withAuth(withArcjetProtection(handler, aj));
 
-// Map database row to StaffDocument interface
+// Map database row to the StaffDocument shape the UI expects.
+// The DocumentVerificationModal reads: id, documentType, fileName, fileUrl,
+// verificationStatus, ocrConfidence, ocrMetadata, notes, createdAt, staffName.
+// We also keep the legacy fields (documentName, verificationNotes, staff{})
+// for other callers that may still depend on them.
 function mapDbToDocument(row: Record<string, unknown>) {
+  const ocrMetadata = (row.ocr_metadata ?? null) as Record<string, unknown> | null;
+  // ocr_confidence isn't stored as its own column; callers extract from
+  // metadata if present.
+  const ocrConfidence =
+    ocrMetadata && typeof ocrMetadata.confidence === 'number'
+      ? (ocrMetadata.confidence as number)
+      : null;
+
   return {
     id: row.id,
     staffId: row.staff_id,
     documentType: row.document_type,
+    // Prefer the real uploaded filename; fall back to the friendly
+    // document name or a generic label so the modal never shows "undefined".
+    fileName:
+      (row.file_name as string | null) ??
+      (row.document_name as string | null) ??
+      'Document',
     documentName: row.document_name,
     fileUrl: row.file_url,
     fileSize: row.file_size,
@@ -173,8 +192,12 @@ function mapDbToDocument(row: Record<string, unknown>) {
     verifiedBy: row.verified_by,
     verifiedAt: row.verified_at ? new Date(row.verified_at as string).toISOString() : undefined,
     verificationNotes: row.verification_notes,
+    notes: row.verification_notes,
+    ocrMetadata,
+    ocrConfidence,
     createdAt: new Date(row.created_at as string).toISOString(),
     updatedAt: new Date(row.updated_at as string).toISOString(),
+    staffName: row.staff_name ?? null,
     staff: row.staff_name ? { id: row.staff_id, name: row.staff_name } : undefined,
     verifier: row.verifier_name ? { id: row.verified_by, name: row.verifier_name } : undefined,
   };
