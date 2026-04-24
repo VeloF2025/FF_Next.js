@@ -52,10 +52,44 @@ const OTP_BCRYPT_ROUNDS = 10;
 // working /send-message endpoint. The wa-feedback-service on Velocity:8092
 // only proxies a narrow subset (health, digest posts) — not DMs. Env-var
 // overrides are preserved for test / future reroute.
-const WA_SENDER_URL =
+//
+// Renamed from WA_SENDER_URL: the local const name now matches the
+// endpoint it actually hits (the bridge, not a "sender" proxy).
+const WA_BRIDGE_URL =
   process.env.WA_BRIDGE_URL ||
   process.env.WA_FEEDBACK_URL ||
   'http://72.61.197.178:8083';
+
+// Allowlist of hosts the OTP sender is permitted to call. A misconfigured
+// env var could otherwise exfiltrate the OTP + phone to an arbitrary host
+// — this is a defence-in-depth guard, not the primary control.
+// Accepts host[:port] form; the resolved URL is rejected if its authority
+// isn't in this set.
+const WA_BRIDGE_ALLOWLIST = new Set([
+  '72.61.197.178:8083',  // VPS wa-bridge (prod primary)
+  '100.96.203.105:8092', // Velocity wa-feedback (legacy, retained for fallback)
+  '100.96.203.105:8081', // Velocity wa-sender (legacy alias)
+  'localhost:8083',
+  'localhost:8092',
+  'localhost:8081',
+  '127.0.0.1:8083',
+  '127.0.0.1:8092',
+  '127.0.0.1:8081',
+]);
+
+function assertAllowlistedBridgeUrl(url: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`WA bridge URL is not a valid URL: ${url}`);
+  }
+  if (!WA_BRIDGE_ALLOWLIST.has(parsed.host)) {
+    throw new Error(
+      `WA bridge host ${parsed.host} is not in the allowlist — refusing to send OTP`
+    );
+  }
+}
 
 // =============================================================================
 // OTP lifecycle
@@ -302,6 +336,8 @@ export async function sendOtpViaWhatsApp(params: {
   otp: string;
   staffName?: string | null;
 }): Promise<void> {
+  assertAllowlistedBridgeUrl(WA_BRIDGE_URL);
+
   const jid = phoneToJid(params.phone);
   const who = params.staffName?.trim() ? `, ${params.staffName.trim()}` : '';
   const message =
@@ -309,11 +345,14 @@ export async function sendOtpViaWhatsApp(params: {
     `It expires in ${Math.round(OTP_TTL_MS / 60_000)} minutes. ` +
     `Do not share this code. FibreFlow staff will never ask for it.`;
 
-  const response = await fetch(`${WA_SENDER_URL}/send-message`, {
+  // 8s: the bridge's upstream WAHA call typically ACKs in <3s. 15s mostly
+  // meant callers waited longer for the generic 200 when the bridge was
+  // hung; 8s still comfortably covers p99.
+  const response = await fetch(`${WA_BRIDGE_URL}/send-message`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ group_jid: jid, message }),
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(8_000),
   });
 
   if (!response.ok) {
