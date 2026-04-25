@@ -38,6 +38,7 @@ import {
   insertException,
   sastWorkDate,
 } from '@/modules/attendance/portal/clockUtils';
+import { syncStaffProfilePhotoFromSelfie } from '@/services/staff/profilePhotoFromSelfie';
 
 export const config = {
   api: {
@@ -188,6 +189,21 @@ export default withMySession(async (req, res, session) => {
     // current staff.hourly_rate at compute time (PR #1406 behaviour).
     stage = 'rate_snapshot';
     await captureRateAtClockIn(entry.id, session.staffId);
+
+    // Profile-photo sync (Phase 4 polish). Best-effort: if the staff
+    // member has no profile_photo_url OR their current one is itself
+    // a previous attendance selfie, refresh it to the new selfie.
+    // HR-curated photos (any non-attendance storage path) are kept.
+    // A failure here MUST NOT block the clock-in.
+    try {
+      await syncStaffProfilePhotoFromSelfie(session.staffId, selfie.url);
+    } catch (err) {
+      log.error('[my-clock-in] profile_photo_sync failed', {
+        staffId: session.staffId,
+        entryId: entry.id,
+        err: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     // Post-INSERT exception logging — non-blocking (insertException
     // swallows its own errors to a log.error, see clockUtils.ts).
