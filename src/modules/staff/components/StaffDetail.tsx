@@ -17,6 +17,7 @@ import {
   Lock,
   BarChart3,
   Clock,
+  Receipt,
 } from 'lucide-react';
 import { useStaffMember, useDeleteStaff } from '@/hooks/useStaff';
 import { useStaffAccess } from '@/hooks/staff/useStaffAccess';
@@ -410,6 +411,16 @@ export function StaffDetail() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {can('receipts.review', 'view') && (
+                <button
+                  onClick={() => router.push(`/staff/receipts?staffId=${id}`)}
+                  className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)]"
+                  title="View this staff member's submitted receipts"
+                >
+                  <Receipt className="w-4 h-4 mr-1" />
+                  Receipts
+                </button>
+              )}
               <button
                 onClick={() => router.push(`/staff/${id}/edit`)}
                 className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)]"
