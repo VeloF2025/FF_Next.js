@@ -16,6 +16,7 @@ import {
 } from '@/modules/attendance/portal/clockUtils';
 import { countOwnAdjustmentsByStatus } from '@/modules/attendance/corrections/queries';
 import { findLatestPayslipForStaff } from '@/modules/payslips/queries';
+import { findLatestReceiptForStaff } from '@/modules/receipts/queries';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '4kb' } },
@@ -37,6 +38,12 @@ export interface HubSummary {
     payPeriodEnd: string;
     hasPdf: boolean;
   } | null;
+  latestReceipt: {
+    id: string;
+    vendor: string | null;
+    totalCents: number;
+    capturedAt: string;
+  } | null;
   pendingCorrectionsCount: number;
   recentEntryCount: number;
 }
@@ -47,7 +54,7 @@ export default withMySession(async (req, res, session) => {
   }
 
   try {
-    const [openEntry, vehicle, correctionCounts, recentRows, latestPayslip] = await Promise.all([
+    const [openEntry, vehicle, correctionCounts, recentRows, latestPayslip, latestReceipt] = await Promise.all([
       findOpenEntry(session.staffId),
       findActiveVehicleAssignment(session.staffId),
       countOwnAdjustmentsByStatus(session.staffId),
@@ -58,6 +65,7 @@ export default withMySession(async (req, res, session) => {
           AND clock_in_at >= NOW() - INTERVAL '14 days'
       `,
       findLatestPayslipForStaff(session.staffId),
+      findLatestReceiptForStaff(session.staffId),
     ]);
 
     const now = Date.now();
@@ -74,6 +82,7 @@ export default withMySession(async (req, res, session) => {
         ? { id: vehicle.id, registration: vehicle.vehicle_registration }
         : null,
       latestPayslip,
+      latestReceipt,
       pendingCorrectionsCount: correctionCounts.pending,
       recentEntryCount: Number(recentRows[0]?.count ?? '0'),
     };

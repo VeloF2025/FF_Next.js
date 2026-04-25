@@ -170,6 +170,12 @@ export interface HubSummaryResponse {
     payPeriodEnd: string;
     hasPdf: boolean;
   } | null;
+  latestReceipt: {
+    id: string;
+    vendor: string | null;
+    totalCents: number;
+    capturedAt: string;
+  } | null;
   pendingCorrectionsCount: number;
   recentEntryCount: number;
 }

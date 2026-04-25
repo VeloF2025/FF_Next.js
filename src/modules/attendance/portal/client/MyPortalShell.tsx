@@ -10,7 +10,7 @@
 import React from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { Clock, Home, History, LogOut, RefreshCw } from 'lucide-react';
+import { Clock, Home, History, LogOut, RefreshCw, Receipt } from 'lucide-react';
 
 import { logout } from './api';
 import { useMyServiceWorker } from './useServiceWorker';
@@ -137,9 +137,10 @@ export function MyPortalShell({
 
       {showFooterNav && (
         <nav className="fixed bottom-0 inset-x-0 bg-neutral-900 border-t border-neutral-800 px-2 py-2 safe-area-pb">
-          <div className="max-w-lg mx-auto grid grid-cols-3 gap-2">
+          <div className="max-w-lg mx-auto grid grid-cols-4 gap-2">
             <FooterLink href="/my" label="Home" icon={<Home className="w-5 h-5" />} />
             <FooterLink href="/my/attendance" label="Clock" icon={<Clock className="w-5 h-5" />} />
+            <FooterLink href="/my/receipts" label="Receipts" icon={<Receipt className="w-5 h-5" />} />
             <FooterLink
               href="/my/attendance/history"
               label="History"

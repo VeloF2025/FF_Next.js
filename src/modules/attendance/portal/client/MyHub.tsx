@@ -18,6 +18,7 @@ import {
   Clock as ClockIcon,
   Car,
   FileText,
+  Receipt,
   History as HistoryIcon,
   AlertCircle,
 } from 'lucide-react';
@@ -108,6 +109,7 @@ export function MyHub({ profile }: MyHubProps) {
           onClick={handleVehicleTap}
         />
         <PayslipsTile summary={summary} onClick={() => router.push('/my/payslips')} />
+        <ReceiptsTile summary={summary} onClick={() => router.push('/my/receipts')} />
         <CorrectionsTile
           summary={summary}
           onClick={() => router.push('/my/attendance/corrections')}
@@ -235,6 +237,47 @@ function payslipMonth(iso: string): string {
   const monthIdx = Number(month) - 1;
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return `${months[monthIdx] ?? month} ${year}`;
+}
+
+function ReceiptsTile({
+  summary,
+  onClick,
+}: {
+  summary: HubSummary | null;
+  onClick: () => void;
+}) {
+  const latest = summary?.latestReceipt;
+  if (!latest) {
+    return (
+      <Tile
+        onClick={onClick}
+        icon={<Receipt className="w-5 h-5" />}
+        iconClass="bg-neutral-800 text-neutral-500"
+        title="Receipts"
+        subtitle={summary === null ? 'Loading…' : 'Capture your first slip'}
+      />
+    );
+  }
+  const subtitle = latest.vendor
+    ? `${latest.vendor} · ${formatRand(latest.totalCents)}`
+    : `Latest · ${formatRand(latest.totalCents)}`;
+  return (
+    <Tile
+      onClick={onClick}
+      icon={<Receipt className="w-5 h-5" />}
+      iconClass="bg-emerald-500/15 text-emerald-300"
+      title="Receipts"
+      subtitle={subtitle}
+    />
+  );
+}
+
+function formatRand(cents: number): string {
+  return new Intl.NumberFormat('en-ZA', {
+    style: 'currency',
+    currency: 'ZAR',
+    minimumFractionDigits: 2,
+  }).format(cents / 100);
 }
 
 function CorrectionsTile({
