@@ -171,17 +171,9 @@ function VehicleTile({
   pending: boolean;
   onClick: () => void;
 }) {
-  if (!hasVehicle) {
-    return (
-      <Tile
-        icon={<Car className="w-5 h-5" />}
-        iconClass="bg-neutral-800 text-neutral-500"
-        title="My Vehicle"
-        subtitle="No vehicle assigned"
-        disabled
-      />
-    );
-  }
+  // PRD §4.2 + FR-HUB-01: office staff with no vehicle should NOT
+  // see the vehicle tile at all (was rendering as a disabled placeholder).
+  if (!hasVehicle) return null;
 
   const reg = summary?.assignedVehicle?.registration ?? '…';
   return (
@@ -203,18 +195,22 @@ function PayslipsTile({
   summary: HubSummary | null;
   onClick: () => void;
 }) {
+  // PRD §7.1 FR-HUB-01: "Payslips (if any)" — hide when summary has
+  // loaded with no payslips. While loading we still render a
+  // placeholder so the slot doesn't pop in suddenly.
   const latest = summary?.latestPayslip;
-  if (!latest) {
+  if (summary === null) {
     return (
       <Tile
         onClick={onClick}
         icon={<FileText className="w-5 h-5" />}
         iconClass="bg-neutral-800 text-neutral-500"
         title="Payslips"
-        subtitle={summary === null ? 'Loading…' : 'No payslips yet'}
+        subtitle="Loading…"
       />
     );
   }
+  if (!latest) return null;
   return (
     <Tile
       onClick={onClick}
