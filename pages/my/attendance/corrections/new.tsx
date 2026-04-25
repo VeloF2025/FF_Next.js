@@ -155,6 +155,7 @@ const NewCorrectionPage: NextPage & {
     <MyPortalShell
       title="New correction"
       staffName={session?.profile?.name ?? null}
+      staffPhotoUrl={session?.profile?.profilePhotoUrl ?? null}
     >
       <button
         type="button"

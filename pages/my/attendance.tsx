@@ -70,6 +70,7 @@ const MyAttendancePage: NextPage & { getLayout?: (page: React.ReactElement) => R
     <MyPortalShell
       title="Attendance"
       staffName={session?.profile?.name ?? null}
+      staffPhotoUrl={session?.profile?.profilePhotoUrl ?? null}
     >
       {loadError && (
         <div role="alert" className="rounded-lg bg-red-950/50 border border-red-800 px-3 py-2 text-sm text-red-200 mb-4">

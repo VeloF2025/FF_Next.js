@@ -400,8 +400,25 @@ export function StaffDetail() {
         <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="h-16 w-16 bg-blue-500/20 rounded-full flex items-center justify-center">
-                <span className="text-xl font-medium text-blue-400">
+              <div className="h-16 w-16 rounded-full bg-blue-500/20 overflow-hidden flex items-center justify-center shrink-0">
+                {staff.profilePhotoUrl ? (
+                  <img
+                    src={staff.profilePhotoUrl}
+                    alt={staff.name}
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      // If the photo URL 404s, swap to the initials fallback
+                      // by hiding the broken image and revealing the sibling.
+                      (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                      if (fallback) fallback.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <span
+                  className="text-xl font-medium text-blue-400 h-full w-full items-center justify-center"
+                  style={{ display: staff.profilePhotoUrl ? 'none' : 'flex' }}
+                >
                   {staff.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                 </span>
               </div>

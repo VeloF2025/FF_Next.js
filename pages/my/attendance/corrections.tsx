@@ -176,6 +176,7 @@ const MyCorrectionsPage: NextPage & {
     <MyPortalShell
       title="My corrections"
       staffName={session?.profile?.name ?? null}
+      staffPhotoUrl={session?.profile?.profilePhotoUrl ?? null}
     >
       {!session && !loadError && (
         <div className="flex items-center justify-center py-16 text-sm text-neutral-400">

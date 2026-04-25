@@ -46,6 +46,7 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
   const action: Action = router.query.action === 'out' ? 'out' : 'in';
 
   const [staffName, setStaffName] = React.useState<string | null>(null);
+  const [staffPhotoUrl, setStaffPhotoUrl] = React.useState<string | null>(null);
   const [selfieFile, setSelfieFile] = React.useState<File | null>(null);
   const [selfiePreview, setSelfiePreview] = React.useState<string | null>(null);
   const [gps, setGps] = React.useState<GpsSnapshot | null>(null);
@@ -80,6 +81,7 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
           return;
         }
         setStaffName(sess.profile?.name ?? null);
+        setStaffPhotoUrl(sess.profile?.profilePhotoUrl ?? null);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
@@ -269,7 +271,7 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
   const submitDisabled = !selfieFile || !gps || state === 'submitting' || state === 'gps';
 
   return (
-    <MyPortalShell title={headingLabel} staffName={staffName} showFooterNav={false}>
+    <MyPortalShell title={headingLabel} staffName={staffName} staffPhotoUrl={staffPhotoUrl} showFooterNav={false}>
       <div className="pt-2 pb-3">
         <Link href="/my/attendance" className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700">
           <ArrowLeft className="w-4 h-4" />

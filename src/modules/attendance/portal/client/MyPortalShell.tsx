@@ -18,6 +18,10 @@ import { useMyServiceWorker } from './useServiceWorker';
 export interface MyPortalShellProps {
   title: string;
   staffName?: string | null;
+  /** Optional avatar URL — typically `profile.profilePhotoUrl`. Renders
+   *  the photo at the right of the header strip; falls back to initials
+   *  when missing or when the URL fails to load. */
+  staffPhotoUrl?: string | null;
   /** Hide the footer nav on the login / onboard screens. */
   showFooterNav?: boolean;
   /** Hide the header on the login / onboard screens. */
@@ -25,9 +29,34 @@ export interface MyPortalShellProps {
   children: React.ReactNode;
 }
 
+function staffInitials(name: string): string {
+  return name.split(/\s+/).filter(Boolean).map((p) => p[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function StaffAvatar({ name, photoUrl }: { name: string; photoUrl?: string | null }) {
+  const [showFallback, setShowFallback] = React.useState(!photoUrl);
+  const initials = staffInitials(name);
+  return (
+    <div className="relative h-10 w-10 shrink-0 rounded-full bg-blue-500/20 overflow-hidden flex items-center justify-center">
+      {photoUrl && !showFallback && (
+        <img
+          src={photoUrl}
+          alt={name}
+          className="h-full w-full object-cover"
+          onError={() => setShowFallback(true)}
+        />
+      )}
+      {(!photoUrl || showFallback) && (
+        <span className="text-sm font-semibold text-blue-200">{initials || '?'}</span>
+      )}
+    </div>
+  );
+}
+
 export function MyPortalShell({
   title,
   staffName,
+  staffPhotoUrl,
   showFooterNav = true,
   showHeader = true,
   children,
@@ -97,6 +126,7 @@ export function MyPortalShell({
           </button>
           {staffName && (
             <div className="flex items-center gap-2">
+              <StaffAvatar name={staffName} photoUrl={staffPhotoUrl} />
               <div className="text-right hidden sm:block">
                 <div className="text-sm font-medium leading-tight">{staffName}</div>
               </div>

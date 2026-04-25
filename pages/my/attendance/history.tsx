@@ -21,6 +21,7 @@ const MyHistoryPage: NextPage & { getLayout?: (page: React.ReactElement) => Reac
   const router = useRouter();
 
   const [staffName, setStaffName] = React.useState<string | null>(null);
+  const [staffPhotoUrl, setStaffPhotoUrl] = React.useState<string | null>(null);
   const [entries, setEntries] = React.useState<ClockEntry[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -35,6 +36,7 @@ const MyHistoryPage: NextPage & { getLayout?: (page: React.ReactElement) => Reac
           return;
         }
         setStaffName(sess.profile?.name ?? null);
+        setStaffPhotoUrl(sess.profile?.profilePhotoUrl ?? null);
         const hist = await getHistory(14);
         if (cancelled) return;
         setEntries(hist.entries);
@@ -52,7 +54,7 @@ const MyHistoryPage: NextPage & { getLayout?: (page: React.ReactElement) => Reac
   }, [router]);
 
   return (
-    <MyPortalShell title="History" staffName={staffName}>
+    <MyPortalShell title="History" staffName={staffName} staffPhotoUrl={staffPhotoUrl}>
       {error && (
         <div role="alert" className="rounded-lg bg-red-950/50 border border-red-800 px-3 py-2 text-sm text-red-200 mb-3">
           {error}

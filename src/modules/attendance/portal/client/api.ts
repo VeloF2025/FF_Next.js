@@ -138,6 +138,7 @@ export interface AttendanceProfile {
   email: string | null;
   homeSiteId: string | null;
   hasAssignedVehicle: boolean;
+  profilePhotoUrl: string | null;
 }
 
 export interface SessionResponse {

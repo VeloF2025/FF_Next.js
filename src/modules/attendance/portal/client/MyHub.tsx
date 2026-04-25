@@ -77,7 +77,7 @@ export function MyHub({ profile }: MyHubProps) {
   }, []);
 
   return (
-    <MyPortalShell title="My Hub" staffName={profile.name} showFooterNav={false}>
+    <MyPortalShell title="My Hub" staffName={profile.name} staffPhotoUrl={profile.profilePhotoUrl} showFooterNav={false}>
       <InstallPrompt />
 
       {loadError && (

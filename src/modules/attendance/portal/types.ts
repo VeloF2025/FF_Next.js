@@ -22,4 +22,5 @@ export interface AttendanceSessionProfile {
   email: string | null;
   homeSiteId: string | null;
   hasAssignedVehicle: boolean;
+  profilePhotoUrl: string | null;
 }

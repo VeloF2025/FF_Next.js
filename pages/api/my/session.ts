@@ -36,6 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       email: string | null;
       home_site_id: string | null;
       has_vehicle: boolean;
+      profile_photo_url: string | null;
     }>`
       SELECT
         s.id,
@@ -43,6 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         s.phone,
         s.email,
         s.home_site_id,
+        s.profile_photo_url,
         EXISTS (
           SELECT 1 FROM vehicle_assignments va
           WHERE va.staff_id = s.id AND va.is_active = true
@@ -63,6 +65,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       email: row.email,
       homeSiteId: row.home_site_id,
       hasAssignedVehicle: row.has_vehicle,
+      profilePhotoUrl: row.profile_photo_url,
     };
 
     return apiResponse.success(res, {
