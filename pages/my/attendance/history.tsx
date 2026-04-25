@@ -106,7 +106,7 @@ const MyHistoryPage: NextPage & { getLayout?: (page: React.ReactElement) => Reac
                   }
                   aria-label="Request correction for this shift"
                   title="Request correction"
-                  className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-neutral-400 hover:text-blue-300 hover:bg-blue-900/30 transition"
+                  className="inline-flex items-center justify-center w-12 h-12 rounded-lg text-neutral-400 hover:text-blue-300 hover:bg-blue-900/30 transition"
                 >
                   <Edit3 className="w-4 h-4" />
                 </button>

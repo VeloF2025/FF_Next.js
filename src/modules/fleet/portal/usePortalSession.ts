@@ -104,6 +104,7 @@ export function usePortalSession(): UsePortalSessionReturn {
                 driverPhone: result.driver?.phone || null,
                 createdAt: new Date().toISOString(),
                 expiresAt: result.session.expiresAt,
+                ...(result.session.source ? { source: result.session.source } : {}),
               });
             }
 

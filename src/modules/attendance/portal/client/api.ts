@@ -151,6 +151,81 @@ export function getSession(): Promise<SessionResponse> {
 }
 
 // =============================================================================
+// Hub
+// =============================================================================
+
+export interface HubSummaryResponse {
+  openEntry: {
+    id: string;
+    clockInAt: string;
+    durationMs: number;
+  } | null;
+  assignedVehicle: {
+    id: string;
+    registration: string | null;
+  } | null;
+  latestPayslip: {
+    id: string;
+    payPeriodStart: string;
+    payPeriodEnd: string;
+    hasPdf: boolean;
+  } | null;
+  pendingCorrectionsCount: number;
+  recentEntryCount: number;
+}
+
+export function getHubSummary(): Promise<HubSummaryResponse> {
+  return request<HubSummaryResponse>('/api/my/hub-summary', { method: 'GET' });
+}
+
+// =============================================================================
+// Payslips (PRD-040 Phase 3)
+// =============================================================================
+
+export interface PayslipListItem {
+  id: string;
+  payPeriodStart: string;
+  payPeriodEnd: string;
+  grossCents: number;
+  deductionsCents: number;
+  netCents: number;
+  hasPdf: boolean;
+  importedAt: string;
+}
+
+export function listMyPayslips(): Promise<{ items: PayslipListItem[] }> {
+  return request<{ items: PayslipListItem[] }>('/api/my/payslips', { method: 'GET' });
+}
+
+/**
+ * Build the URL the browser should hit to download a payslip PDF. The
+ * server proxies VF Storage so the underlying storage URL never reaches
+ * the client (POPIA — payslips are personal financial data).
+ */
+export function payslipDownloadUrl(payslipId: string): string {
+  return `/api/my/payslips/${encodeURIComponent(payslipId)}/download`;
+}
+
+// =============================================================================
+// Fleet handoff (PRD-040 Phase 2)
+// =============================================================================
+
+export interface FleetHandoffResponse {
+  sessionId: string;
+  vehicleRegistration: string | null;
+  expiresAt: string;
+}
+
+/**
+ * Mint a fleet portal session from the current /my session and return
+ * the assigned vehicle's registration. Caller should navigate to
+ * /fleet/portal after this resolves so the page sees the new cookie.
+ */
+export function requestFleetHandoff(): Promise<FleetHandoffResponse> {
+  return request<FleetHandoffResponse>('/api/my/fleet-handoff', { method: 'POST' });
+}
+
+// =============================================================================
 // OTP onboarding (PR2b)
 // =============================================================================
 

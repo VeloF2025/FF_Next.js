@@ -267,7 +267,7 @@ function StatusTabs({
             aria-selected={isActive}
             type="button"
             onClick={() => onChange(tab.key)}
-            className={`shrink-0 px-3 py-1.5 rounded-full border text-sm font-medium transition ${
+            className={`shrink-0 inline-flex items-center min-h-[48px] px-4 py-2 rounded-full border text-sm font-medium transition ${
               isActive
                 ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
                 : 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:border-neutral-700 hover:text-neutral-100'
@@ -341,7 +341,7 @@ function CorrectionListItem({
             type="button"
             onClick={() => onCancel(row.id)}
             disabled={cancelling}
-            className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-neutral-700 text-xs font-medium text-neutral-300 hover:border-red-800 hover:text-red-300 disabled:opacity-50"
+            className="shrink-0 inline-flex items-center gap-1 min-h-[48px] px-3 py-2 rounded-lg border border-neutral-700 text-sm font-medium text-neutral-300 hover:border-red-800 hover:text-red-300 disabled:opacity-50"
             aria-label={`Cancel ${kindLabel} correction`}
           >
             <X className="w-3.5 h-3.5" />

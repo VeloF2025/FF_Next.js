@@ -121,6 +121,18 @@ self.addEventListener('message', (event) => {
     const urls = event.data.urls || [];
     caches.open(CACHE_NAME).then((cache) => cache.addAll(urls));
   }
+
+  if (event.data?.type === 'CLEAR_SESSION_CACHE') {
+    // Called from logout: drop the cached /api/my/session response so an
+    // offline reload can't serve a stale "you're logged in" payload.
+    caches.open(OFFLINE_CACHE).then((cache) => {
+      cache.keys().then((keys) => {
+        keys
+          .filter((req) => new URL(req.url).pathname === '/api/my/session')
+          .forEach((req) => cache.delete(req));
+      });
+    });
+  }
 });
 
 console.log('[SW-my] Loaded');

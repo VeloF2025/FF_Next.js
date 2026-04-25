@@ -1,183 +1,76 @@
 /**
- * /my — login screen.
+ * /my — root entry for the Velocity Fibre staff portal.
  *
- * Two flows behind one form:
- *   - Phone + 6-digit PIN (field staff)
- *   - Email + password     (office staff clocking in via the same portal)
+ * Renders one of three states based on the current portal session:
+ *   - loading  → blank shell (avoids flicker between SSR and first session check)
+ *   - guest    → MyLoginScreen (extracted from this file in PRD-040 PR 2)
+ *   - authed   → MyHub tile grid
  *
- * Errors from the API surface are intentionally flat: the server returns a
- * single "Invalid credentials" message for unknown/wrong/locked/inactive
- * accounts (enumeration-oracle closure from PR #1374). We show that message
- * verbatim — no "account locked" hints, no "no such user". Staff who are
- * legitimately locked out will ask their supervisor.
- *
- * "First time?" on this screen deep-links into the OTP onboarding page,
- * which uses /api/my/login/request-otp + verify-otp to set the PIN without
- * any admin-side bootstrapping.
+ * Session is checked client-side via /api/my/session. SSR renders the
+ * loading shell so the page is cacheable in the SW without leaking
+ * authed/guest state into the cached HTML.
  */
 
 import React from 'react';
 import { NextPage } from 'next';
-import { useRouter } from 'next/router';
-import Link from 'next/link';
 
-import { ApiError, login } from '@/modules/attendance/portal/client/api';
-import { useDeviceFingerprint } from '@/modules/attendance/portal/client/useDeviceFingerprint';
+import { getSession } from '@/modules/attendance/portal/client/api';
+import type {
+  AttendanceProfile,
+  SessionResponse,
+} from '@/modules/attendance/portal/client/api';
 import { MyPortalShell } from '@/modules/attendance/portal/client/MyPortalShell';
+import { MyLoginScreen } from '@/modules/attendance/portal/client/MyLoginScreen';
+import { MyHub } from '@/modules/attendance/portal/client/MyHub';
 
-type Method = 'pin' | 'password';
+type SessionState =
+  | { kind: 'loading' }
+  | { kind: 'guest' }
+  | { kind: 'authed'; profile: AttendanceProfile };
 
-const MyLoginPage: NextPage & { getLayout?: (page: React.ReactElement) => React.ReactElement } = () => {
-  const router = useRouter();
-  const deviceFingerprint = useDeviceFingerprint();
+const MyIndexPage: NextPage & { getLayout?: (page: React.ReactElement) => React.ReactElement } = () => {
+  const [state, setState] = React.useState<SessionState>({ kind: 'loading' });
 
-  const [method, setMethod] = React.useState<Method>('pin');
-  const [identifier, setIdentifier] = React.useState('');
-  const [credential, setCredential] = React.useState('');
-  const [submitting, setSubmitting] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (submitting) return;
-    setError(null);
-
-    const trimmedIdentifier = identifier.trim();
-    if (!trimmedIdentifier || !credential) {
-      setError(method === 'pin' ? 'Enter your phone number and PIN' : 'Enter your email and password');
-      return;
-    }
-    if (method === 'pin' && !/^\d{6}$/.test(credential)) {
-      setError('PIN must be exactly 6 digits');
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      await login({
-        method,
-        identifier: trimmedIdentifier,
-        credential,
-        deviceFingerprint: deviceFingerprint ?? undefined,
+  React.useEffect(() => {
+    let cancelled = false;
+    getSession()
+      .then((res: SessionResponse) => {
+        if (cancelled) return;
+        if (res.session && res.profile) {
+          setState({ kind: 'authed', profile: res.profile });
+        } else {
+          setState({ kind: 'guest' });
+        }
+      })
+      .catch(() => {
+        // A failed session check is treated as guest — the worst-case UX
+        // is the user re-enters credentials, vs. trapping them on a
+        // blank loading screen if the server is briefly unreachable.
+        if (!cancelled) setState({ kind: 'guest' });
       });
-      await router.push('/my/attendance');
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message || 'Invalid credentials');
-      } else {
-        setError('Something went wrong. Please try again.');
-      }
-      setSubmitting(false);
-    }
-  };
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  return (
-    <MyPortalShell
-      title="Sign in"
-      showFooterNav={false}
-      showHeader={false}
-    >
-      <div className="flex flex-col items-center pt-8 pb-6">
-        <div className="w-20 h-20 rounded-2xl bg-white border border-neutral-800 flex items-center justify-center shadow-lg p-2">
-          <img
-            src="/assets/vf/vf-logo.svg"
-            alt="Velocity Fibre"
-            className="w-full h-full object-contain"
-          />
+  if (state.kind === 'loading') {
+    return (
+      <MyPortalShell title="Loading" showFooterNav={false} showHeader={false}>
+        <div className="flex items-center justify-center pt-24 text-sm text-neutral-400">
+          Loading…
         </div>
-        <h1 className="mt-4 text-2xl font-semibold text-neutral-100">Velocity Fibre Attendance</h1>
-        <p className="mt-1 text-sm text-neutral-400">Clock in & out for your shift</p>
-      </div>
+      </MyPortalShell>
+    );
+  }
 
-      <div className="flex rounded-xl border border-neutral-800 bg-neutral-900 p-1 mb-5">
-        <button
-          type="button"
-          onClick={() => { setMethod('pin'); setCredential(''); setError(null); }}
-          className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
-            method === 'pin' ? 'bg-blue-600 text-white' : 'text-neutral-400 hover:text-neutral-200'
-          }`}
-        >
-          Phone + PIN
-        </button>
-        <button
-          type="button"
-          onClick={() => { setMethod('password'); setCredential(''); setError(null); }}
-          className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
-            method === 'password' ? 'bg-blue-600 text-white' : 'text-neutral-400 hover:text-neutral-200'
-          }`}
-        >
-          Email + password
-        </button>
-      </div>
+  if (state.kind === 'guest') {
+    return <MyLoginScreen />;
+  }
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <label className="block">
-          <span className="text-sm font-medium text-neutral-300">
-            {method === 'pin' ? 'Phone number' : 'Email address'}
-          </span>
-          <input
-            type={method === 'pin' ? 'tel' : 'email'}
-            autoComplete={method === 'pin' ? 'tel' : 'email'}
-            inputMode={method === 'pin' ? 'tel' : 'email'}
-            value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
-            placeholder={method === 'pin' ? '082 123 4567' : 'you@company.co.za'}
-            className="mt-1 w-full px-4 py-3 rounded-xl border border-neutral-700 bg-neutral-900 text-neutral-100 placeholder:text-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none text-base"
-            required
-          />
-        </label>
-
-        <label className="block">
-          <span className="text-sm font-medium text-neutral-300">
-            {method === 'pin' ? '6-digit PIN' : 'Password'}
-          </span>
-          <input
-            type="password"
-            autoComplete={method === 'pin' ? 'one-time-code' : 'current-password'}
-            inputMode={method === 'pin' ? 'numeric' : 'text'}
-            maxLength={method === 'pin' ? 6 : undefined}
-            pattern={method === 'pin' ? '\\d{6}' : undefined}
-            value={credential}
-            onChange={(e) => setCredential(e.target.value)}
-            placeholder={method === 'pin' ? '••••••' : '••••••••'}
-            className="mt-1 w-full px-4 py-3 rounded-xl border border-neutral-700 bg-neutral-900 text-neutral-100 placeholder:text-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none text-base tracking-widest"
-            required
-          />
-        </label>
-
-        {error && (
-          <div
-            role="alert"
-            className="rounded-lg bg-red-950/50 border border-red-800 px-3 py-2 text-sm text-red-200"
-          >
-            {error}
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-base shadow-lg shadow-blue-600/20"
-        >
-          {submitting ? 'Signing in…' : 'Sign in'}
-        </button>
-      </form>
-
-      {method === 'pin' && (
-        <div className="text-center mt-6">
-          <Link
-            href="/my/onboard"
-            className="text-sm font-medium text-blue-400 hover:text-blue-300"
-          >
-            First time? Set up your PIN
-          </Link>
-        </div>
-      )}
-    </MyPortalShell>
-  );
+  return <MyHub profile={state.profile} />;
 };
 
 // No AppLayout — full-screen portal.
-MyLoginPage.getLayout = (page: React.ReactElement) => page;
+MyIndexPage.getLayout = (page: React.ReactElement) => page;
 
-export default MyLoginPage;
+export default MyIndexPage;

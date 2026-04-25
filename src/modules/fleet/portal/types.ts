@@ -5,6 +5,12 @@
  */
 
 /**
+ * How a portal session was created. Older sessions minted before PRD-040
+ * Phase 2 will not carry this field — readers should treat absent === 'plate'.
+ */
+export type PortalSessionSource = 'plate' | 'my';
+
+/**
  * Portal session data stored in httpOnly cookie
  */
 export interface PortalSession {
@@ -16,6 +22,11 @@ export interface PortalSession {
   driverPhone: string | null;
   createdAt: string;
   expiresAt: string;
+  /**
+   * Optional — present on sessions minted from PRD-040 Phase 2 onwards.
+   * Absent on legacy sessions; treat undefined as 'plate' for back-compat.
+   */
+  source?: PortalSessionSource;
 }
 
 /**
@@ -73,6 +84,7 @@ export interface PlateAuthResult {
   session?: {
     sessionId: string;
     expiresAt: string;
+    source?: PortalSessionSource;
   };
   vehicle?: PortalVehicle;
   driver?: PortalDriver;

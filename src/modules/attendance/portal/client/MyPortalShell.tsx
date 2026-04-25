@@ -10,7 +10,7 @@
 import React from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { Clock, History, LogOut, RefreshCw } from 'lucide-react';
+import { Clock, Home, History, LogOut, RefreshCw } from 'lucide-react';
 
 import { logout } from './api';
 import { useMyServiceWorker } from './useServiceWorker';
@@ -49,10 +49,23 @@ export function MyPortalShell({
     } catch {
       // swallow — see comment above.
     }
-    // Non-httpOnly client state (device fingerprint survives a logout, which
-    // is correct — it's a device identity, not a session secret).
-    await router.push('/my');
-  }, [loggingOut, router]);
+    // Defence in depth: tell the SW to drop the cached /api/my/session
+    // response. The httpOnly cookie is gone, but if the user is offline
+    // the SW could otherwise serve a stale "logged in" payload from
+    // OFFLINE_CACHE. Best-effort — the navigator might not be available.
+    try {
+      if (navigator.serviceWorker?.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_SESSION_CACHE' });
+      }
+    } catch {
+      // No SW yet, or postMessage rejected — fall through to the reload.
+    }
+    // Hard reload so the page remounts and the fresh (now-null) session
+    // state takes effect. router.push('/my') is a no-op when the user
+    // signs out from /my (the hub) — Next.js doesn't remount the page,
+    // so the user appears stuck on the hub until they refresh manually.
+    window.location.assign('/my');
+  }, [loggingOut]);
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
@@ -65,7 +78,12 @@ export function MyPortalShell({
 
       {showHeader && (
         <header className="bg-neutral-900 text-neutral-100 border-b border-neutral-800 px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={() => router.push('/my')}
+            aria-label="Go to hub"
+            className="flex items-center gap-3 min-w-0 text-left rounded-lg hover:bg-neutral-800/60 active:bg-neutral-800 -m-1 p-1"
+          >
             <img
               src="/assets/vf/vf-logo.svg"
               alt=""
@@ -76,18 +94,23 @@ export function MyPortalShell({
               <div className="text-xs uppercase tracking-wide text-neutral-400">Velocity Fibre</div>
               <div className="text-base font-semibold truncate">{title}</div>
             </div>
-          </div>
+          </button>
           {staffName && (
-            <div className="text-right">
-              <div className="text-sm font-medium leading-tight">{staffName}</div>
+            <div className="flex items-center gap-2">
+              <div className="text-right hidden sm:block">
+                <div className="text-sm font-medium leading-tight">{staffName}</div>
+              </div>
               <button
                 type="button"
                 onClick={handleLogout}
                 disabled={loggingOut}
-                className="mt-0.5 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-200 underline disabled:opacity-50"
+                aria-label={loggingOut ? 'Signing out' : 'Sign out'}
+                className="inline-flex items-center justify-center gap-1 min-w-[48px] min-h-[48px] px-3 rounded-lg text-xs font-medium text-neutral-300 hover:text-neutral-100 hover:bg-neutral-800 disabled:opacity-50"
               >
-                <LogOut className="w-3 h-3" />
-                {loggingOut ? 'Signing out…' : 'Sign out'}
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">
+                  {loggingOut ? 'Signing out…' : 'Sign out'}
+                </span>
               </button>
             </div>
           )}
@@ -114,7 +137,8 @@ export function MyPortalShell({
 
       {showFooterNav && (
         <nav className="fixed bottom-0 inset-x-0 bg-neutral-900 border-t border-neutral-800 px-2 py-2 safe-area-pb">
-          <div className="max-w-lg mx-auto grid grid-cols-2 gap-2">
+          <div className="max-w-lg mx-auto grid grid-cols-3 gap-2">
+            <FooterLink href="/my" label="Home" icon={<Home className="w-5 h-5" />} />
             <FooterLink href="/my/attendance" label="Clock" icon={<Clock className="w-5 h-5" />} />
             <FooterLink
               href="/my/attendance/history"

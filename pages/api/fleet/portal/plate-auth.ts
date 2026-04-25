@@ -19,9 +19,11 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { verifyLicensePlate } from '@/modules/fleet/services/fleetVlmService';
-import { serialize } from 'cookie';
+import { serialize, parse } from 'cookie';
 import crypto from 'crypto';
 import sharp from 'sharp';
+import { MY_SESSION_COOKIE } from '@/modules/attendance/portal/sessionUtils';
+import type { PortalSession } from '@/modules/fleet/portal/types';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -71,17 +73,6 @@ export const config = {
 
 interface PlateAuthRequest {
   platePhotoBase64: string;
-}
-
-interface PortalSession {
-  sessionId: string;
-  vehicleId: string;
-  vehicleRegistration: string;
-  driverId: string | null;
-  driverName: string | null;
-  driverPhone: string | null;
-  createdAt: string;
-  expiresAt: string;
 }
 
 export default async function handler(
@@ -278,7 +269,12 @@ export default async function handler(
       driver_name: string | null;
     }>;
 
-    // Step 6: Set session cookie
+    // Step 6: Set session cookie. If the request also carries an ff_my_session
+    // cookie (PRD-040 SSO flow), tag the new portal session as source='my' so
+    // logout still bounces back to /my instead of the plate-capture screen.
+    // The plate scan itself is the presence + GPS proof — staff still scan
+    // each visit, the SSO just spared them the second login.
+    const hasMySession = Boolean(parse(req.headers.cookie || '')[MY_SESSION_COOKIE]);
     const sessionData: PortalSession = {
       sessionId,
       vehicleId: vehicle.id,
@@ -288,6 +284,7 @@ export default async function handler(
       driverPhone,
       createdAt: now.toISOString(),
       expiresAt: expiresAt.toISOString(),
+      ...(hasMySession ? { source: 'my' as const } : {}),
     };
 
     // Encode session as base64 and sign with HMAC to prevent token forgery
@@ -325,6 +322,7 @@ export default async function handler(
       confidence,
       session: {
         sessionId,
+        source: sessionData.source,
         expiresAt: expiresAt.toISOString(),
       },
       vehicle: {
