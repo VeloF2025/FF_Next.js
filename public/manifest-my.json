@@ -1,25 +1,26 @@
 {
-  "name": "FibreFlow Attendance",
-  "short_name": "FF Attendance",
+  "name": "Velocity Fibre Staff",
+  "short_name": "VF Staff",
   "start_url": "/my",
   "scope": "/my",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
   "orientation": "portrait",
-  "background_color": "#f9fafb",
-  "theme_color": "#1e40af",
-  "description": "Clock in and out for your FibreFlow shift.",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "description": "Velocity Fibre staff portal — clock in, vehicle check-in, payslips.",
   "icons": [
     {
-      "src": "/icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-512.png",
-      "sizes": "512x512",
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }

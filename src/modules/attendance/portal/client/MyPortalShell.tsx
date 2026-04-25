@@ -10,9 +10,10 @@
 import React from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { Clock, History, LogOut } from 'lucide-react';
+import { Clock, History, LogOut, RefreshCw } from 'lucide-react';
 
 import { logout } from './api';
+import { useMyServiceWorker } from './useServiceWorker';
 
 export interface MyPortalShellProps {
   title: string;
@@ -33,6 +34,7 @@ export function MyPortalShell({
 }: MyPortalShellProps) {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = React.useState(false);
+  const { updateAvailable, updateServiceWorker } = useMyServiceWorker();
 
   const handleLogout = React.useCallback(async () => {
     if (loggingOut) return;
@@ -90,6 +92,20 @@ export function MyPortalShell({
             </div>
           )}
         </header>
+      )}
+
+      {updateAvailable && (
+        <div className="bg-blue-600 text-white px-4 py-2 text-sm flex items-center justify-between gap-3">
+          <span>A new version is ready.</span>
+          <button
+            type="button"
+            onClick={updateServiceWorker}
+            className="inline-flex items-center gap-1 font-medium underline"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Reload
+          </button>
+        </div>
       )}
 
       <main className="w-full max-w-lg mx-auto px-4 py-4 pb-24">
