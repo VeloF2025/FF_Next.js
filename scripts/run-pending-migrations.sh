@@ -60,6 +60,11 @@ APPLIED=$(psql "$PGURL" -t -A -c "SELECT filename FROM schema_migrations ORDER B
 PENDING=()
 for sql_file in $(ls "$MIGRATION_DIR"/*.sql 2>/dev/null | sort); do
   fname=$(basename "$sql_file")
+  # Skip rollback scripts — they are downgrade tools, applied manually
+  # if needed, never auto-run during a forward deploy.
+  if [[ "$fname" == rollback_* ]]; then
+    continue
+  fi
   if ! grep -qF "|${fname}|" <<< "|${APPLIED}"; then
     PENDING+=("$sql_file")
   fi
