@@ -36,13 +36,14 @@ import { NotesTab } from './tabs/NotesTab';
 import { ActivityTab } from './tabs/ActivityTab';
 import { PerformanceTab } from './tabs/PerformanceTab';
 import { TimeAttendanceTab } from './tabs/TimeAttendanceTab';
+import { ReceiptsTab } from './tabs/ReceiptsTab';
 import { DisciplinaryIncidentForm } from './DisciplinaryIncidentForm';
 import { VehicleAssignmentForm } from './VehicleAssignmentForm';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import type { DisciplinaryIncident, VehicleAssignment } from '@/types/staff';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
-type TabType = 'overview' | 'performance' | 'employment' | 'compliance' | 'vehicles' | 'attendance' | 'disciplinary' | 'documents' | 'projects' | 'notes' | 'activity';
+type TabType = 'overview' | 'performance' | 'employment' | 'compliance' | 'vehicles' | 'attendance' | 'disciplinary' | 'documents' | 'receipts' | 'projects' | 'notes' | 'activity';
 
 interface TabConfig {
   id: TabType;
@@ -61,6 +62,7 @@ const ALL_TABS: TabConfig[] = [
   { id: 'attendance', label: 'Attendance', icon: Clock, permissionKey: 'people.staff.tabs.attendance' },
   { id: 'disciplinary', label: 'Disciplinary', icon: AlertTriangle, requiresSensitiveAccess: true, permissionKey: 'people.staff.tabs.disciplinary' },
   { id: 'documents', label: 'Documents', icon: FileText, requiresSensitiveAccess: true, permissionKey: 'people.staff.tabs.documents' },
+  { id: 'receipts', label: 'Receipts', icon: Receipt, permissionKey: 'receipts.review' },
   { id: 'projects', label: 'Projects', icon: FolderKanban, permissionKey: 'people.staff.tabs.projects' },
   { id: 'notes', label: 'Notes', icon: MessageSquare, permissionKey: 'people.staff.tabs.notes' },
   { id: 'activity', label: 'Activity', icon: Activity, permissionKey: 'people.staff.tabs.activity' },
@@ -411,16 +413,6 @@ export function StaffDetail() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {can('receipts.review', 'view') && (
-                <button
-                  onClick={() => router.push(`/staff/receipts?staffId=${id}`)}
-                  className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)]"
-                  title="View this staff member's submitted receipts"
-                >
-                  <Receipt className="w-4 h-4 mr-1" />
-                  Receipts
-                </button>
-              )}
               <button
                 onClick={() => router.push(`/staff/${id}/edit`)}
                 className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)]"
@@ -522,6 +514,10 @@ export function StaffDetail() {
 
           {activeTab === 'documents' && canViewSensitive && (
             <StaffDocumentList staffId={id} isAdmin={canEdit} onVerify={canEdit ? handleVerifyDocument : undefined} />
+          )}
+
+          {activeTab === 'receipts' && (
+            <ReceiptsTab staffId={id} />
           )}
 
           {activeTab === 'projects' && (
