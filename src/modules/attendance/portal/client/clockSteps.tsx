@@ -40,9 +40,9 @@ export function SelfieStep({
             <button
               type="button"
               onClick={onCapture}
-              className="absolute bottom-3 right-3 px-3 py-2 rounded-lg bg-black/70 text-white text-xs font-medium inline-flex items-center gap-1"
+              className="absolute bottom-3 right-3 inline-flex items-center justify-center gap-1.5 min-h-[48px] px-4 rounded-lg bg-black/70 text-white text-sm font-medium"
             >
-              <RefreshCw className="w-3 h-3" />
+              <RefreshCw className="w-4 h-4" />
               Retake
             </button>
           </div>
@@ -166,7 +166,7 @@ export function ConsentModal({
         <button
           type="button"
           onClick={onCancel}
-          className="w-full py-2 text-sm text-neutral-400 hover:text-neutral-200"
+          className="w-full min-h-[48px] inline-flex items-center justify-center text-sm text-neutral-400 hover:text-neutral-200"
         >
           Cancel
         </button>

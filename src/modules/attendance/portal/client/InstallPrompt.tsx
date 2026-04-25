@@ -181,11 +181,11 @@ function Banner({
         type="button"
         onClick={onDismiss}
         aria-label="Dismiss install prompt"
-        className="absolute top-2 right-2 p-1 rounded text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50"
+        className="absolute top-1 right-1 inline-flex items-center justify-center min-h-[48px] min-w-[48px] rounded text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50"
       >
         <X className="w-4 h-4" />
       </button>
-      <div className="pr-6">{children}</div>
+      <div className="pr-12">{children}</div>
     </div>
   );
 }

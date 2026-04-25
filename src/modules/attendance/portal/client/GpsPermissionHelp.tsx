@@ -212,16 +212,16 @@ export function GpsPermissionHelp({
             <button
               type="button"
               onClick={forceFreshReload}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-amber-50 text-xs font-medium px-3 py-1.5"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-amber-50 text-sm font-medium px-4 min-h-[48px]"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
+              <RefreshCw className="w-4 h-4" />
               Reload with fresh page
             </button>
             {onRetry && (
               <button
                 type="button"
                 onClick={onRetry}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-700 text-amber-200 hover:bg-amber-900/40 text-xs font-medium px-3 py-1.5"
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-700 text-amber-200 hover:bg-amber-900/40 text-sm font-medium px-4 min-h-[48px]"
               >
                 Try without reload
               </button>
