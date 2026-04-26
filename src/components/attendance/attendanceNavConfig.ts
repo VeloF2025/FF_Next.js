@@ -6,7 +6,8 @@
  * sub-tab list change between phases:
  *
  *   - /staff/attendance               — Today's roster (was: Roster)
- *   - /staff/attendance/search        — Cross-staff Search (Phase A, NEW)
+ *   - /staff/attendance/search        — Cross-staff Search (Phase A)
+ *   - /staff/attendance/reports       — HR reports tile grid (Phase C, NEW)
  *   - /staff/attendance/week          — Weekly totals + payroll export
  *   - /staff/attendance/corrections   — Supervisor review queue
  *   - /staff/attendance/locks         — Weekly lock management
@@ -15,9 +16,6 @@
  * The Overview page (/staff/attendance/overview) remains routable but is
  * not surfaced as a tab — its content folds into the Today header per
  * PRD §5.3 to keep the strip from growing unbounded.
- *
- * Reports (Phase C) and the Pulse top-tab on /staff (PRD §5.2) are added
- * alongside their respective code in later PRs.
  */
 
 export type { Tab, DropdownItem, FlyoutSection, NavItem } from '../accounting/accountingNavConfig';
@@ -40,6 +38,11 @@ export const TABS: Tab[] = [
     id: 'search',
     label: 'Search',
     href: '/staff/attendance/search',
+  },
+  {
+    id: 'reports',
+    label: 'Reports',
+    href: '/staff/attendance/reports',
   },
   {
     id: 'week',
@@ -66,6 +69,7 @@ export const TABS: Tab[] = [
 export function getActiveTabId(pathname: string): string {
   if (pathname.startsWith('/staff/attendance/overview')) return 'overview';
   if (pathname.startsWith('/staff/attendance/search')) return 'search';
+  if (pathname.startsWith('/staff/attendance/reports')) return 'reports';
   if (pathname === '/staff/attendance/week') return 'week';
   if (pathname.startsWith('/staff/attendance/corrections')) return 'corrections';
   if (pathname.startsWith('/staff/attendance/locks')) return 'locks';
