@@ -82,6 +82,7 @@ async function handler(
   try {
     const allTickets: { id: string; ticket_uid: string; record_id: string }[] = [];
     let totalSkipped = 0;
+    let totalFiltered = 0;
     const projectCounts: Record<string, number> = {};
 
     for (const batch of batches) {
@@ -91,18 +92,43 @@ async function handler(
       if (record_ids.length === 0) continue;
 
       // Fetch eligible records: needs_investigation or not_found, not yet ticketed
+      // For home_installation_status category, also accept 'pending' rows because the
+      // Home Installation blocker is detected pre-fix and stored as
+      // investigation_context.reason='status_mismatch' on a still-pending row.
+      const eligibleStatuses = ticket_category === 'home_installation_status'
+        ? ['pending', 'needs_investigation', 'not_found', 'empty_serial', 'rejected']
+        : ['needs_investigation', 'not_found', 'empty_serial', 'rejected'];
+
       const eligible = await pool.query(
         `SELECT id, drop_number, olt_serial, wrong_onemap_serial, fix_status,
                 investigation_context
          FROM olt_mismatch_records
          WHERE id = ANY($1)
-           AND fix_status IN ('needs_investigation', 'not_found', 'empty_serial', 'rejected')
+           AND fix_status = ANY($2)
            AND maintenance_ticket_id IS NULL`,
-        [record_ids]
+        [record_ids, eligibleStatuses]
       );
 
-      const records = eligible.rows;
-      totalSkipped += record_ids.length - records.length;
+      const allEligible = eligible.rows;
+
+      // For home_installation_status, additionally require investigation_context.reason='status_mismatch'
+      const records = ticket_category === 'home_installation_status'
+        ? allEligible.filter((r: { investigation_context: string | object | null }) => {
+            try {
+              const ctx = typeof r.investigation_context === 'string'
+                ? JSON.parse(r.investigation_context)
+                : r.investigation_context;
+              return (ctx as { reason?: string } | null)?.reason === 'status_mismatch';
+            } catch {
+              return false;
+            }
+          })
+        : allEligible;
+
+      // "skipped" = not eligible at the SQL layer (already ticketed or wrong fix_status).
+      // "filtered" = SQL-eligible but excluded by the category-specific JS predicate.
+      totalSkipped += record_ids.length - allEligible.length;
+      totalFiltered += allEligible.length - records.length;
 
       if (records.length === 0) continue;
 
@@ -121,24 +147,48 @@ async function handler(
         const wrongSerial = record.wrong_onemap_serial as string | null;
         const status = record.fix_status as string;
 
-        // Try to get project from investigation_context
-        let project = 'Unknown';
+        // Parse investigation_context once and reuse for project lookup + category-specific
+        // title/description. pg returns jsonb as a JS object, so the string branch is only
+        // exercised when callers pass a serialised payload.
+        let parsedCtx:
+          | {
+              reason?: string;
+              currentStatus?: string;
+              expectedStatus?: string;
+              message?: string;
+              propId?: string;
+              belongsToTeam?: string;
+            }
+          | null = null;
         try {
           if (record.investigation_context) {
-            const ctx = typeof record.investigation_context === 'string'
+            parsedCtx = typeof record.investigation_context === 'string'
               ? JSON.parse(record.investigation_context)
               : record.investigation_context;
-            project = ctx.belongsToTeam || project;
           }
-        } catch { /* ignore parse errors */ }
+        } catch (err) {
+          logger.debug('Failed to parse investigation_context', {
+            recordId: record.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
 
+        const project = parsedCtx?.belongsToTeam || 'Unknown';
         projectCounts[project] = (projectCounts[project] || 0) + 1;
 
         // Build title based on mismatch type
         let title: string;
         let description: string;
 
-        if (status === 'not_found') {
+        if (ticket_category === 'home_installation_status') {
+          const currentStatus = parsedCtx?.currentStatus || 'unknown';
+          const expectedStatus = parsedCtx?.expectedStatus || 'Home Installation: Installed';
+          title = `Home Installation Status — ${dr}`;
+          description = notes
+            || `1Map prop record for ${dr} (ONT ${oltSerial}) is in status "${currentStatus}". `
+               + `OLT auto-fix is blocked until at least one prop record on this DR has status "${expectedStatus}". `
+               + `Action: update the 1Map Home Installation status, then the OLT serial fix will run automatically.`;
+        } else if (status === 'not_found') {
           title = `OLT Mismatch: ${dr} — ONT ${oltSerial} not on 1Map`;
           description = notes || `OLT report shows ONT serial ${oltSerial} for ${dr}, but this DR is not found on 1Map. Requires investigation to confirm installation status and update records.`;
         } else if (wrongSerial) {
@@ -186,10 +236,17 @@ async function handler(
       }
     }
 
-    logger.info('OLT mismatch tickets created', { created: allTickets.length, skipped: totalSkipped });
+    logger.info('OLT mismatch tickets created', {
+      created: allTickets.length,
+      skipped: totalSkipped,
+      filtered: totalFiltered,
+    });
 
     return apiResponse.success(res, {
-      created: allTickets.length, skipped: totalSkipped, tickets: allTickets,
+      created: allTickets.length,
+      skipped: totalSkipped,
+      filtered: totalFiltered,
+      tickets: allTickets,
     });
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
