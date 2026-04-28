@@ -478,6 +478,23 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
       }
     }
 
+    // PRD-062 — fire-and-forget AI history summary attached as an
+    // 'ai_summary' activity row. Feature flag (FF_AI_TICKET_SUMMARY=1) is
+    // checked inside summarizeAndAttachDrHistory; the dr_number guard here
+    // just avoids a needless dynamic import for tickets with no DR. The
+    // .catch is for the unlikely module-load / destructure failure — the
+    // service itself swallows all runtime errors.
+    if (ticket.dr_number) {
+      void import('./drHistoryService').then(({ summarizeAndAttachDrHistory }) =>
+        summarizeAndAttachDrHistory(ticket.id, ticket.dr_number!, ticket.ont_serial ?? null),
+      ).catch((err) => {
+        logger.warn('drHistorySummary dispatch failed', {
+          ticket_uid: ticket.ticket_uid,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+    }
+
     return ticket;
   } catch (error) {
     logger.error('Failed to create ticket', { error, payload });
