@@ -619,7 +619,7 @@ export default function PulseSearchPage() {
       <div className="px-6 py-6 max-w-7xl mx-auto">
         <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-neutral-100">Pulse · Search</h1>
+            <h1 className="text-2xl font-semibold">Pulse · Search</h1>
             <p className="text-sm text-neutral-500">
               Cross-staff, cross-period attendance search. Filters honour your supervisor scope.
             </p>
@@ -877,7 +877,7 @@ function PresetsBar({
             onChange={(e) => setDraftName(e.target.value)}
             placeholder="Preset name (≤ 60 chars)"
             maxLength={60}
-            className="px-3 py-1 rounded border border-neutral-700 text-sm flex-1 min-w-[200px]"
+            className="px-3 py-1 rounded border border-neutral-700 bg-neutral-900 text-neutral-100 text-sm flex-1 min-w-[200px] focus:border-emerald-600 focus:outline-none"
           />
           <label className="inline-flex items-center gap-1 text-sm text-neutral-300">
             <input
@@ -980,14 +980,14 @@ function FilterBar({
               type="date"
               value={form.dateFrom}
               onChange={(e) => commitField('dateFrom', e.target.value)}
-              className="px-2 py-1 rounded border border-neutral-700 text-sm"
+              className="px-2 py-1 rounded border border-neutral-700 bg-neutral-900 text-neutral-100 text-sm focus:border-emerald-600 focus:outline-none"
             />
             <span className="text-neutral-500 text-sm">to</span>
             <input
               type="date"
               value={form.dateTo}
               onChange={(e) => commitField('dateTo', e.target.value)}
-              className="px-2 py-1 rounded border border-neutral-700 text-sm"
+              className="px-2 py-1 rounded border border-neutral-700 bg-neutral-900 text-neutral-100 text-sm focus:border-emerald-600 focus:outline-none"
             />
           </span>
         )}
@@ -1001,7 +1001,7 @@ function FilterBar({
             value={form.departments}
             onChange={(e) => setField('departments', e.target.value)}
             placeholder="Civil, Optical"
-            className="px-3 py-2 rounded border border-neutral-700"
+            className="px-3 py-2 rounded border border-neutral-700 bg-neutral-900 text-neutral-100 focus:border-emerald-600 focus:outline-none"
           />
         </label>
 
@@ -1088,7 +1088,7 @@ function FilterBar({
                 value={form.staffIds}
                 onChange={(e) => setField('staffIds', e.target.value)}
                 placeholder="Optional — pickers ship in Phase B"
-                className="px-3 py-2 rounded border border-neutral-700 text-xs font-mono"
+                className="px-3 py-2 rounded border border-neutral-700 bg-neutral-900 text-neutral-100 text-xs font-mono focus:border-emerald-600 focus:outline-none"
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
@@ -1098,7 +1098,7 @@ function FilterBar({
                 value={form.siteIds}
                 onChange={(e) => setField('siteIds', e.target.value)}
                 placeholder="Optional — pickers ship in Phase B"
-                className="px-3 py-2 rounded border border-neutral-700 text-xs font-mono"
+                className="px-3 py-2 rounded border border-neutral-700 bg-neutral-900 text-neutral-100 text-xs font-mono focus:border-emerald-600 focus:outline-none"
               />
             </label>
           </div>

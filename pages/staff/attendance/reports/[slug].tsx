@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { ArrowLeft, Download, FileText } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Download, FileText } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AttendanceNav } from '@/components/attendance/AttendanceNav';
 import { log } from '@/lib/logger';
@@ -232,8 +232,9 @@ export default function ReportSlugPage() {
         <ReportFilterBar def={def} form={form} setForm={setForm} onRun={runFetch} loading={loading} />
 
         {error && (
-          <div role="alert" className="mt-4 rounded border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-200">
-            {error}
+          <div role="alert" className="mt-4 rounded border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-200 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+            <div>{error}</div>
           </div>
         )}
 
