@@ -12,7 +12,6 @@ import {
   CheckSquare,
   Square,
   Info,
-  Ticket,
 } from 'lucide-react';
 import type { OltRecord, InvestigationContext, DisplacedInfo } from '../../../types';
 import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
@@ -61,10 +60,6 @@ interface OltRecordTableProps {
 
   // Investigate ticketing selection
   isSelectable?: (record: OltRecord) => boolean;
-
-  // Per-row "Create Ticket" action (Fixable tab — Home Installation status blockers)
-  onCreateTicket?: (record: OltRecord) => void;
-  canCreateTicket?: (record: OltRecord) => boolean;
 }
 
 export function OltRecordTable({
@@ -91,8 +86,6 @@ export function OltRecordTable({
   displacedInfo,
   renderContextRow,
   isSelectable,
-  onCreateTicket,
-  canCreateTicket,
 }: OltRecordTableProps) {
   const showCheckboxes = mode === 'pending' || (mode === 'investigate' && !!onToggleSelect);
   if (isLoading) {
@@ -250,30 +243,18 @@ export function OltRecordTable({
                       </a>
                       {mode === 'pending' && record.olt_serial && (
                         <div className="flex flex-col items-end gap-1">
-                          {canCreateTicket?.(record) ? (
-                            <button
-                              onClick={() => onCreateTicket?.(record)}
-                              disabled={bulkFixing}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50"
-                              title="Create a Home Installation status ticket for the assigned team"
-                            >
-                              <Ticket className="w-3 h-3" />
-                              Create Ticket
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => onFix?.(record)}
-                              disabled={fixing === record.id || bulkFixing}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-[var(--ff-accent)] text-white text-xs rounded hover:bg-[var(--ff-accent)]/80 disabled:opacity-50"
-                            >
-                              {fixing === record.id ? (
-                                <InlineSpinner size="sm" />
-                              ) : (
-                                <Wrench className="w-3 h-3" />
-                              )}
-                              {isStatusMismatch(record) ? 'Fix Status' : 'Fix'}
-                            </button>
-                          )}
+                          <button
+                            onClick={() => onFix?.(record)}
+                            disabled={fixing === record.id || bulkFixing}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-[var(--ff-accent)] text-white text-xs rounded hover:bg-[var(--ff-accent)]/80 disabled:opacity-50"
+                          >
+                            {fixing === record.id ? (
+                              <InlineSpinner size="sm" />
+                            ) : (
+                              <Wrench className="w-3 h-3" />
+                            )}
+                            {isStatusMismatch(record) ? 'Fix Status' : 'Fix'}
+                          </button>
                           {fixErrors?.[record.id] && (
                             <span className="text-[10px] text-red-400 max-w-[160px] text-right leading-tight">
                               {fixErrors[record.id]}

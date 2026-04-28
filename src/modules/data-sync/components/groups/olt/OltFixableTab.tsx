@@ -6,17 +6,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { log } from '@/lib/logger';
-import toast from 'react-hot-toast';
 import {
   Wrench,
   CheckSquare,
   Square,
-  Ticket,
 } from 'lucide-react';
 import type { OltRecord, OltStats, InvestigationContext, DisplacedInfo, BulkFixResult } from '../../../types';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { OltRecordTable } from './OltRecordTable';
-import { CreateHomeInstallationTicketsModal, type HomeInstallationTicketBatch } from './CreateHomeInstallationTicketsModal';
 
 interface OltFixableTabProps {
   records: OltRecord[];
@@ -58,76 +55,11 @@ export function OltFixableTab({
   const [bulkFixResult, setBulkFixResult] = useState<BulkFixResult | null>(null);
   const [displacedInfo, setDisplacedInfo] = useState<Record<string, DisplacedInfo>>({});
 
-  // Home Installation status ticket creation
-  const [showHITicketModal, setShowHITicketModal] = useState(false);
-  const [hiTicketRecords, setHiTicketRecords] = useState<OltRecord[]>([]);
-  const [creatingHITickets, setCreatingHITickets] = useState(false);
-
   // Reset selection on tab enter
   useEffect(() => {
     setSelectedIds(new Set());
     setBulkFixResult(null);
   }, []);
-
-  // A row qualifies for ticket creation when its blocker is the Home Installation status mismatch
-  // and it doesn't already have a ticket.
-  const canCreateHITicket = (record: OltRecord): boolean =>
-    isStatusMismatch(record) && !record.maintenance_ticket_id;
-
-  const blockedSelectedRecords = records.filter(
-    (r) => selectedIds.has(r.id) && canCreateHITicket(r)
-  );
-
-  const openHITicketModal = (record?: OltRecord) => {
-    const targets = record ? [record] : blockedSelectedRecords;
-    if (targets.length === 0) return;
-    setHiTicketRecords(targets);
-    setShowHITicketModal(true);
-  };
-
-  const handleCreateHITickets = async (params: {
-    priority: string;
-    notes: string;
-    batches: HomeInstallationTicketBatch[];
-  }) => {
-    setCreatingHITickets(true);
-    try {
-      const res = await fetch('/api/system/olt-report/tickets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ticket_type: 'activations',
-          ticket_category: 'home_installation_status',
-          priority: params.priority,
-          notes: params.notes,
-          batches: params.batches.map((b) => ({
-            record_ids: b.record_ids,
-            assigned_team_id: b.assigned_team_id,
-          })),
-        }),
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error?.message || result.error || 'Failed to create tickets');
-      const { created, skipped, filtered } = result.data as { created: number; skipped: number; filtered?: number };
-      const noteParts: string[] = [];
-      if (skipped > 0) noteParts.push(`${skipped} already ticketed/ineligible`);
-      if (filtered && filtered > 0) noteParts.push(`${filtered} not Home-Installation-blocked`);
-      toast.success(
-        `Created ${created} ticket${created !== 1 ? 's' : ''}${noteParts.length ? ` (${noteParts.join(', ')})` : ''}`
-      );
-      setShowHITicketModal(false);
-      setHiTicketRecords([]);
-      setSelectedIds(new Set());
-      // status_mismatch rows live in fix_status='pending', so refetching the pending list
-      // is sufficient — ticketed rows still appear here but with their Ticket column populated.
-      await fetchRecords('pending');
-      await fetchStats();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create tickets');
-    } finally {
-      setCreatingHITickets(false);
-    }
-  };
 
   // Batch-check displaced ONT activation status when records load
   useEffect(() => {
@@ -282,17 +214,6 @@ export function OltFixableTab({
               {allSelected ? <CheckSquare className="w-4 h-4 text-[var(--ff-accent)]" /> : <Square className="w-4 h-4" />}
               {allSelected ? 'Deselect All' : 'Select All'}
             </button>
-            {blockedSelectedRecords.length > 0 && (
-              <button
-                onClick={() => openHITicketModal()}
-                disabled={bulkFixing || creatingHITickets}
-                className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Create Home Installation status tickets for selected blocked rows"
-              >
-                <Ticket className="w-4 h-4" />
-                Create {blockedSelectedRecords.length} Ticket{blockedSelectedRecords.length !== 1 ? 's' : ''}
-              </button>
-            )}
             <button
               onClick={handleBulkFix}
               disabled={selectedIds.size === 0 || bulkFixing}
@@ -328,21 +249,7 @@ export function OltFixableTab({
         isStatusMismatch={isStatusMismatch}
         getInvestigationContext={getInvestigationContext}
         displacedInfo={displacedInfo}
-        canCreateTicket={canCreateHITicket}
-        onCreateTicket={(record) => openHITicketModal(record)}
       />
-
-      {showHITicketModal && (
-        <CreateHomeInstallationTicketsModal
-          selectedRecords={hiTicketRecords}
-          onConfirm={handleCreateHITickets}
-          onClose={() => {
-            setShowHITicketModal(false);
-            setHiTicketRecords([]);
-          }}
-          loading={creatingHITickets}
-        />
-      )}
     </div>
   );
 }

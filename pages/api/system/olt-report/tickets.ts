@@ -82,7 +82,6 @@ async function handler(
   try {
     const allTickets: { id: string; ticket_uid: string; record_id: string }[] = [];
     let totalSkipped = 0;
-    let totalFiltered = 0;
     const projectCounts: Record<string, number> = {};
 
     for (const batch of batches) {
@@ -91,13 +90,10 @@ async function handler(
 
       if (record_ids.length === 0) continue;
 
-      // Fetch eligible records: needs_investigation or not_found, not yet ticketed
-      // For home_installation_status category, also accept 'pending' rows because the
-      // Home Installation blocker is detected pre-fix and stored as
-      // investigation_context.reason='status_mismatch' on a still-pending row.
-      const eligibleStatuses = ticket_category === 'home_installation_status'
-        ? ['pending', 'needs_investigation', 'not_found', 'empty_serial', 'rejected']
-        : ['needs_investigation', 'not_found', 'empty_serial', 'rejected'];
+      // Fetch eligible records: any non-fixable status, not yet ticketed.
+      // Home-Installation-blocked rows are routed to needs_investigation by
+      // process-lookup-queue / fix-1map, so they qualify automatically here.
+      const eligibleStatuses = ['needs_investigation', 'not_found', 'empty_serial', 'rejected'];
 
       const eligible = await pool.query(
         `SELECT id, drop_number, olt_serial, wrong_onemap_serial, fix_status,
@@ -109,26 +105,8 @@ async function handler(
         [record_ids, eligibleStatuses]
       );
 
-      const allEligible = eligible.rows;
-
-      // For home_installation_status, additionally require investigation_context.reason='status_mismatch'
-      const records = ticket_category === 'home_installation_status'
-        ? allEligible.filter((r: { investigation_context: string | object | null }) => {
-            try {
-              const ctx = typeof r.investigation_context === 'string'
-                ? JSON.parse(r.investigation_context)
-                : r.investigation_context;
-              return (ctx as { reason?: string } | null)?.reason === 'status_mismatch';
-            } catch {
-              return false;
-            }
-          })
-        : allEligible;
-
-      // "skipped" = not eligible at the SQL layer (already ticketed or wrong fix_status).
-      // "filtered" = SQL-eligible but excluded by the category-specific JS predicate.
-      totalSkipped += record_ids.length - allEligible.length;
-      totalFiltered += allEligible.length - records.length;
+      const records = eligible.rows;
+      totalSkipped += record_ids.length - records.length;
 
       if (records.length === 0) continue;
 
@@ -176,11 +154,20 @@ async function handler(
         const project = parsedCtx?.belongsToTeam || 'Unknown';
         projectCounts[project] = (projectCounts[project] || 0) + 1;
 
-        // Build title based on mismatch type
+        // Build title based on mismatch type. Records flagged as status_mismatch
+        // (Home Installation blocker) get the actionable instruction regardless of
+        // which category the caller sent — the field team needs the 1Map step.
+        const isHomeInstallBlocked =
+          parsedCtx?.reason === 'status_mismatch'
+          || ticket_category === 'home_installation_status';
+        const effectiveCategory = isHomeInstallBlocked
+          ? 'home_installation_status'
+          : ticket_category;
+
         let title: string;
         let description: string;
 
-        if (ticket_category === 'home_installation_status') {
+        if (isHomeInstallBlocked) {
           const currentStatus = parsedCtx?.currentStatus || 'unknown';
           const expectedStatus = parsedCtx?.expectedStatus || 'Home Installation: Installed';
           title = `Home Installation Status — ${dr}`;
@@ -203,7 +190,7 @@ async function handler(
           source: TicketSource.OLT_MISMATCH,
           title,
           ticket_type: ticket_type as TicketType,
-          ticket_category,
+          ticket_category: effectiveCategory,
           priority: ticketPriority,
           description,
           dr_number: dr,
@@ -239,13 +226,11 @@ async function handler(
     logger.info('OLT mismatch tickets created', {
       created: allTickets.length,
       skipped: totalSkipped,
-      filtered: totalFiltered,
     });
 
     return apiResponse.success(res, {
       created: allTickets.length,
       skipped: totalSkipped,
-      filtered: totalFiltered,
       tickets: allTickets,
     });
   } catch (err) {
