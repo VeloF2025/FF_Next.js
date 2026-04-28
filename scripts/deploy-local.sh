@@ -182,15 +182,22 @@ fi
 # next step with broken nginx.
 NGINX_SOURCE="$DIR/docs/VPS/vf-fibreflow.nginx.conf"
 NGINX_TARGET="/etc/nginx/sites-enabled/vf-fibreflow"
-# TIMESTAMP is defined later in the script for the .next backup; this step
-# runs earlier so it has its own inline timestamp.
+# Backups MUST live OUTSIDE sites-enabled/, otherwise nginx's `*` glob
+# pulls them in as additional server blocks (each with a duplicate
+# `default_server`), failing `nginx -t` with "duplicate default server".
+NGINX_BAK_DIR="/etc/nginx/backups"
 NGINX_BAK_TS=$(date +%Y%m%d_%H%M%S)
+# Clean up any stray backups left in the broken location by older versions
+# of this script — they break nginx -t.
+sudo rm -f /etc/nginx/sites-enabled/vf-fibreflow.bak.* 2>/dev/null || true
 if [[ -f "$NGINX_SOURCE" ]]; then
   if ! cmp -s "$NGINX_SOURCE" "$NGINX_TARGET" 2>/dev/null; then
     log "Nginx config changed — staging + testing..."
+    sudo mkdir -p "$NGINX_BAK_DIR"
     HAD_PRIOR_TARGET=false
+    NGINX_BAK_PATH="$NGINX_BAK_DIR/vf-fibreflow.bak.$NGINX_BAK_TS"
     if [[ -f "$NGINX_TARGET" ]]; then
-      sudo cp "$NGINX_TARGET" "$NGINX_TARGET.bak.$NGINX_BAK_TS"
+      sudo cp "$NGINX_TARGET" "$NGINX_BAK_PATH"
       HAD_PRIOR_TARGET=true
     fi
     sudo cp "$NGINX_SOURCE" "$NGINX_TARGET"
@@ -202,11 +209,11 @@ if [[ -f "$NGINX_SOURCE" ]]; then
       sudo /usr/bin/systemctl reload nginx
       log "Nginx config synced + reloaded."
       # Prune backups older than 7 days so they don't accumulate forever.
-      sudo find /etc/nginx/sites-enabled -name 'vf-fibreflow.bak.*' -mtime +7 -delete 2>/dev/null || true
+      sudo find "$NGINX_BAK_DIR" -name 'vf-fibreflow.bak.*' -mtime +7 -delete 2>/dev/null || true
     else
       warn "nginx -t failed (rc=$NGINX_TEST_RC) — restoring previous config and aborting deploy"
       if [[ "$HAD_PRIOR_TARGET" == "true" ]]; then
-        sudo cp "$NGINX_TARGET.bak.$NGINX_BAK_TS" "$NGINX_TARGET"
+        sudo cp "$NGINX_BAK_PATH" "$NGINX_TARGET"
       else
         sudo rm -f "$NGINX_TARGET"
       fi
