@@ -182,12 +182,15 @@ fi
 # next step with broken nginx.
 NGINX_SOURCE="$DIR/docs/VPS/vf-fibreflow.nginx.conf"
 NGINX_TARGET="/etc/nginx/sites-enabled/vf-fibreflow"
+# TIMESTAMP is defined later in the script for the .next backup; this step
+# runs earlier so it has its own inline timestamp.
+NGINX_BAK_TS=$(date +%Y%m%d_%H%M%S)
 if [[ -f "$NGINX_SOURCE" ]]; then
   if ! cmp -s "$NGINX_SOURCE" "$NGINX_TARGET" 2>/dev/null; then
     log "Nginx config changed — staging + testing..."
     HAD_PRIOR_TARGET=false
     if [[ -f "$NGINX_TARGET" ]]; then
-      sudo cp "$NGINX_TARGET" "$NGINX_TARGET.bak.$TIMESTAMP"
+      sudo cp "$NGINX_TARGET" "$NGINX_TARGET.bak.$NGINX_BAK_TS"
       HAD_PRIOR_TARGET=true
     fi
     sudo cp "$NGINX_SOURCE" "$NGINX_TARGET"
@@ -203,7 +206,7 @@ if [[ -f "$NGINX_SOURCE" ]]; then
     else
       warn "nginx -t failed (rc=$NGINX_TEST_RC) — restoring previous config and aborting deploy"
       if [[ "$HAD_PRIOR_TARGET" == "true" ]]; then
-        sudo cp "$NGINX_TARGET.bak.$TIMESTAMP" "$NGINX_TARGET"
+        sudo cp "$NGINX_TARGET.bak.$NGINX_BAK_TS" "$NGINX_TARGET"
       else
         sudo rm -f "$NGINX_TARGET"
       fi
