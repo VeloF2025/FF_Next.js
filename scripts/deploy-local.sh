@@ -172,6 +172,46 @@ if [[ "$MIGRATION_EXIT" -ne 0 ]]; then
   error "DB migration failed (exit $MIGRATION_EXIT). Fix the SQL and redeploy."
 fi
 
+# --- Step 3a': Sync nginx config from repo (idempotent) ---
+# The tracked snapshot at docs/VPS/vf-fibreflow.nginx.conf is the source of
+# truth for the public-facing nginx config (proxy rules + the
+# /storage/staff/payslips/ deny rule that protects payroll PDFs). If the
+# checked-in version differs from /etc/nginx/sites-enabled/vf-fibreflow we
+# stage it, run `nginx -t` as a syntax gate, and reload nginx. A failed
+# config test aborts the deploy before service restart so we never trip the
+# next step with broken nginx.
+NGINX_SOURCE="$DIR/docs/VPS/vf-fibreflow.nginx.conf"
+NGINX_TARGET="/etc/nginx/sites-enabled/vf-fibreflow"
+if [[ -f "$NGINX_SOURCE" ]]; then
+  if ! cmp -s "$NGINX_SOURCE" "$NGINX_TARGET" 2>/dev/null; then
+    log "Nginx config changed — staging + testing..."
+    HAD_PRIOR_TARGET=false
+    if [[ -f "$NGINX_TARGET" ]]; then
+      sudo cp "$NGINX_TARGET" "$NGINX_TARGET.bak.$TIMESTAMP"
+      HAD_PRIOR_TARGET=true
+    fi
+    sudo cp "$NGINX_SOURCE" "$NGINX_TARGET"
+    # Capture nginx -t exit code separately — `cmd | sed` would surface
+    # sed's exit code (almost always 0) and silently pass a broken config.
+    NGINX_TEST_OUT=$(sudo /usr/sbin/nginx -t 2>&1) && NGINX_TEST_RC=$? || NGINX_TEST_RC=$?
+    echo "$NGINX_TEST_OUT" | sed 's/^/  /'
+    if [[ "$NGINX_TEST_RC" -eq 0 ]]; then
+      sudo /usr/bin/systemctl reload nginx
+      log "Nginx config synced + reloaded."
+      # Prune backups older than 7 days so they don't accumulate forever.
+      sudo find /etc/nginx/sites-enabled -name 'vf-fibreflow.bak.*' -mtime +7 -delete 2>/dev/null || true
+    else
+      warn "nginx -t failed (rc=$NGINX_TEST_RC) — restoring previous config and aborting deploy"
+      if [[ "$HAD_PRIOR_TARGET" == "true" ]]; then
+        sudo cp "$NGINX_TARGET.bak.$TIMESTAMP" "$NGINX_TARGET"
+      else
+        sudo rm -f "$NGINX_TARGET"
+      fi
+      error "Nginx config invalid. See output above and fix docs/VPS/vf-fibreflow.nginx.conf."
+    fi
+  fi
+fi
+
 # --- Step 3b: Run lint gates (Zero Tolerance) ---
 if [[ "$FORCE" != true ]]; then
   log "Running lint gates..."
