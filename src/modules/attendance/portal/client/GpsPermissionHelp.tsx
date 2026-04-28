@@ -16,26 +16,7 @@
 import React from 'react';
 import { MapPin, RefreshCw } from 'lucide-react';
 import { queryGeolocationPermission } from '@/modules/fleet/offline/gpsCapture';
-
-type Platform = 'ios-safari' | 'ios-other' | 'android-chrome' | 'desktop-chrome' | 'desktop-safari' | 'desktop-firefox' | 'unknown';
-
-function detectPlatform(): Platform {
-  if (typeof navigator === 'undefined') return 'unknown';
-  const ua = navigator.userAgent;
-  const isIos = /iPad|iPhone|iPod/.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(ua));
-  const isAndroid = /Android/.test(ua);
-  const isSafari = /Safari/.test(ua) && !/Chrome|CriOS|FxiOS/.test(ua);
-  const isChrome = /Chrome/.test(ua) || /CriOS/.test(ua);
-  const isFirefox = /Firefox/.test(ua) || /FxiOS/.test(ua);
-
-  if (isIos && isSafari) return 'ios-safari';
-  if (isIos) return 'ios-other';
-  if (isAndroid && isChrome) return 'android-chrome';
-  if (isChrome) return 'desktop-chrome';
-  if (isSafari) return 'desktop-safari';
-  if (isFirefox) return 'desktop-firefox';
-  return 'unknown';
-}
+import { detectPlatform, type Platform } from './gpsPlatform';
 
 interface Step {
   step: string;
@@ -68,6 +49,17 @@ function stepsFor(platform: Platform): Step[] {
         { step: 'Tap the lock icon (🔒) next to the address bar.' },
         { step: 'Tap Permissions → Location → Allow.' },
         { step: 'Reload this page.' },
+      ];
+    case 'android-samsung':
+      // Samsung Internet labels its per-site permissions menu differently
+      // from Chrome and the lock-icon shortcut sometimes only exposes
+      // "Cookies and site data" on older versions. The menu path is the
+      // reliable route on every Samsung Internet build we've seen.
+      return [
+        { step: 'Tap the lock icon (🔒) next to the address bar, then tap Permissions → Location → Allow.' },
+        { step: 'If that menu is missing: tap ☰ (bottom-right) → Settings → Sites and downloads → Site permissions → Location.' },
+        { step: 'Find app.fibreflow.app, set to Allow, then reload this page.' },
+        { step: 'Still blocked? Android Settings → Apps → Samsung Internet → Permissions → Location → Allow only while using the app.' },
       ];
     case 'desktop-chrome':
       return [
@@ -128,6 +120,16 @@ export function GpsPermissionHelp({
   // stuck.
   const [permState, setPermState] = React.useState<string>('checking…');
   const [showDiag, setShowDiag] = React.useState(false);
+  // One-shot guard: auto-retry exactly once when the live permission state
+  // becomes 'granted' (e.g. user toggled it in browser settings). We do
+  // NOT auto-retry on 'prompt' — getCurrentPosition called from a
+  // visibilitychange/PermissionStatus.change handler has no user-gesture
+  // context, and iOS Safari requires a user gesture to display the
+  // permission prompt. The 'prompt' case is handled by the canRePrompt
+  // UI below, which surfaces an "Allow location" button — the user's
+  // tap on that button IS a user gesture, so the in-app prompt fires
+  // correctly.
+  const autoRetriedRef = React.useRef(false);
 
   // Auto-recovery: when the user toggles permission in browser settings
   // and returns to the tab, we want the banner to clear itself without a
@@ -144,10 +146,13 @@ export function GpsPermissionHelp({
       const s = await queryGeolocationPermission();
       if (cancelled) return;
       setPermState(s);
-      if (s === 'granted' && onRetry) {
-        // Permission has been granted since the banner was shown. Dismiss
-        // ourselves by re-running the capture flow — clock.tsx will set
-        // gpsDenied=false and call captureGpsOnce, which now succeeds.
+      // Auto-dismiss only when state is actually 'granted' — the user
+      // toggled permission in browser settings and returned to the tab.
+      // For 'prompt' we let the user tap "Allow location" (user gesture
+      // required for iOS Safari to display the prompt). One-shot guard
+      // keeps us from looping if PermissionStatus 'change' re-fires.
+      if (s === 'granted' && onRetry && !autoRetriedRef.current) {
+        autoRetriedRef.current = true;
         onRetry();
       }
     };
@@ -185,6 +190,11 @@ export function GpsPermissionHelp({
   }, [onRetry]);
 
   const steps = stepsFor(platform);
+  // When the Permissions API reports 'prompt', the browser will still
+  // show the native prompt on the next getCurrentPosition call. Don't
+  // tell the user the site is blocked — guide them to tap "Allow
+  // location" instead, which fires the in-app prompt.
+  const canRePrompt = permState === 'prompt';
 
   return (
     <div className="rounded-2xl bg-amber-950/30 border border-amber-800 p-4 my-3">
@@ -196,28 +206,46 @@ export function GpsPermissionHelp({
           <h3 className="text-sm font-semibold text-amber-200">
             {permState === 'granted'
               ? 'Permission granted — refreshing…'
-              : 'Location is blocked for this site'}
+              : canRePrompt
+                ? 'We need your location to clock in'
+                : 'Location is blocked for this site'}
           </h3>
           <p className="mt-1 text-xs text-amber-300">
             {permState === 'granted'
               ? 'Your browser now reports location access is allowed. Re-trying capture automatically.'
-              : 'We can’t re-ask for permission — the browser won’t let us prompt again once it’s been denied. Allow location for this site, then tap the reload button below.'}
+              : canRePrompt
+                ? 'Tap "Allow location" below — your browser will ask for permission. Choose Allow (or "While using this site") to continue.'
+                : 'We can’t re-ask for permission — the browser won’t let us prompt again once it’s been denied. Allow location for this site, then tap the reload button below.'}
           </p>
-          <ol className="mt-3 space-y-1.5 text-xs text-amber-100 list-decimal list-inside">
-            {steps.map((s, i) => (
-              <li key={i}>{s.step}</li>
-            ))}
-          </ol>
+          {!canRePrompt && (
+            <ol className="mt-3 space-y-1.5 text-xs text-amber-100 list-decimal list-inside">
+              {steps.map((s, i) => (
+                <li key={i}>{s.step}</li>
+              ))}
+            </ol>
+          )}
           <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={forceFreshReload}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-amber-50 text-sm font-medium px-4 min-h-[48px]"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Reload with fresh page
-            </button>
-            {onRetry && (
+            {canRePrompt && onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-amber-50 text-sm font-medium px-4 min-h-[48px]"
+              >
+                <MapPin className="w-4 h-4" />
+                Allow location
+              </button>
+            )}
+            {!canRePrompt && (
+              <button
+                type="button"
+                onClick={forceFreshReload}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-amber-50 text-sm font-medium px-4 min-h-[48px]"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Reload with fresh page
+              </button>
+            )}
+            {!canRePrompt && onRetry && (
               <button
                 type="button"
                 onClick={onRetry}

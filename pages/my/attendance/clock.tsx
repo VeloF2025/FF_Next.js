@@ -27,6 +27,7 @@ import { NotSavedView, QueuedView, SuccessView } from '@/modules/attendance/port
 import { OfflineBanner, PendingQueueBanner, QueueUnavailableBanner } from '@/modules/attendance/portal/client/clockBanners';
 import { mapConsentError, mapImageError } from '@/modules/attendance/portal/client/clockErrors';
 import { GpsPermissionHelp } from '@/modules/attendance/portal/client/GpsPermissionHelp';
+import { classifyDenialFollowup } from '@/modules/attendance/portal/client/gpsPlatform';
 
 type Action = 'in' | 'out';
 type FlowState =
@@ -150,10 +151,47 @@ const MyClockPage: NextPage & { getLayout?: (page: React.ReactElement) => React.
         });
         setState('idle');
       } else if (result.errorKind === 'denied') {
-        // Don't treat a deny as a general error — surface the platform-
-        // specific help instead so the user knows how to unstick it.
-        setGpsDenied(true);
-        setState('idle');
+        // A single PERMISSION_DENIED from getCurrentPosition is not the
+        // same as the browser having a *persistent* deny on this origin.
+        // On Samsung Internet (and occasionally Android Chrome) a tap-
+        // outside on the native prompt, or a navigation race during page
+        // load, fires PERMISSION_DENIED once but leaves Permissions API
+        // state as 'prompt' (or 'granted'). Re-query the Permissions
+        // API and react accordingly:
+        //   show-help  → persistent deny / no Permissions API
+        //   retry      → 'granted' (race): retry once, no user-facing error
+        //   soft-error → 'prompt' (dismissed): ask user to tap again
+        const permState = await queryGeolocationPermission();
+        const followup = classifyDenialFollowup(permState);
+        if (followup === 'show-help') {
+          setGpsDenied(true);
+          setState('idle');
+        } else if (followup === 'retry') {
+          // Permissions API says 'granted' but getCurrentPosition fired
+          // PERMISSION_DENIED — a transient race. Try the capture
+          // exactly once more inline (NOT via captureGpsOnce — we hold
+          // the in-flight ref and want to avoid an infinite loop if the
+          // second call hits the same race). If the retry still fails,
+          // fall back to the soft error so the user has an actionable
+          // path rather than a hung spinner.
+          const retry = await captureGPSWithFallback(10_000, 15_000);
+          if (retry.success && retry.coordinates) {
+            setGpsDenied(false);
+            setGps({
+              lat: retry.coordinates.latitude,
+              lon: retry.coordinates.longitude,
+              accuracyM: retry.coordinates.accuracy,
+              capturedAt: new Date(retry.coordinates.timestamp).toISOString(),
+            });
+            setState('idle');
+          } else {
+            setState('error');
+            setError(retry.error ?? 'Could not capture location. Tap "Get location" to try again.');
+          }
+        } else {
+          setState('error');
+          setError('Location permission was dismissed. Tap "Get location" to try again.');
+        }
       } else {
         setState('error');
         setError(result.error ?? 'Could not capture location. Check GPS permission.');
