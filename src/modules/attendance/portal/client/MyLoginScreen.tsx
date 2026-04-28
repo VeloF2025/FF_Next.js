@@ -18,6 +18,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { Sparkles, ArrowRight } from 'lucide-react';
 
 import { ApiError, login } from './api';
 import { useDeviceFingerprint } from './useDeviceFingerprint';
@@ -161,26 +162,50 @@ export function MyLoginScreen() {
       </form>
 
       {/*
-        Onboarding link is shown on BOTH tabs. New staff often try the email
-        tab with their main FibreFlow password, hit the unified "Invalid
+        Onboarding card shown on BOTH tabs. New staff often try the email tab
+        with their main FibreFlow password, hit the unified "Invalid
         credentials" error (no enumeration oracle, by design), and have no
-        idea credentials must be created via the PIN/OTP flow first. The
-        link is the only first-time path — the verify-otp endpoint is what
-        creates the row in attendance_credentials. Phrasing differs per tab
-        because office staff thinking in "email + password" terms shouldn't
-        be told to "set up a PIN" when the underlying truth is "set up your
-        portal sign-in for the first time".
+        idea credentials must be created via the PIN/OTP flow first. This
+        card is the only first-time path — the verify-otp endpoint is what
+        creates the row in attendance_credentials. The previous text-link
+        treatment was missed by Lizelle and Zander on first try, so this
+        renders as a full-width bordered call-out below a divider so it
+        reads as a separate option, not buried hint text.
       */}
-      <div className="text-center mt-4">
-        <Link
-          href="/my/onboard"
-          className="inline-flex items-center justify-center min-h-[48px] px-3 text-sm font-medium text-blue-400 hover:text-blue-300"
-        >
-          {method === 'pin'
-            ? 'First time? Set up your PIN'
-            : "First time? You'll need to set up your account via WhatsApp first"}
-        </Link>
+      <div className="relative my-6" role="separator">
+        <div className="absolute inset-0 flex items-center" aria-hidden="true">
+          <div className="w-full border-t border-neutral-800" />
+        </div>
+        <div className="relative flex justify-center">
+          <span className="bg-neutral-950 px-3 text-xs uppercase tracking-wider text-neutral-500">
+            New staff?
+          </span>
+        </div>
       </div>
+
+      <Link
+        href="/my/onboard"
+        aria-label="Set up your account for the first time"
+        className="group flex items-center gap-3 w-full px-4 py-4 rounded-xl border-2 border-blue-500/40 bg-blue-950/20 hover:bg-blue-950/40 hover:border-blue-500/70 focus-visible:border-blue-400 focus-visible:ring-2 focus-visible:ring-blue-500/40 outline-none transition-colors"
+      >
+        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-600/20 border border-blue-500/40 flex items-center justify-center">
+          <Sparkles className="w-5 h-5 text-blue-300" aria-hidden="true" />
+        </div>
+        <div className="flex-1 min-w-0 text-left">
+          <div className="text-sm font-semibold text-blue-200">
+            First time signing in?
+          </div>
+          <div className="text-xs text-blue-300/80 mt-0.5">
+            {method === 'pin'
+              ? 'Set up your 6-digit PIN via WhatsApp.'
+              : "We'll send a setup code to your WhatsApp."}
+          </div>
+        </div>
+        <ArrowRight
+          className="flex-shrink-0 w-5 h-5 text-blue-300 group-hover:translate-x-0.5 transition-transform"
+          aria-hidden="true"
+        />
+      </Link>
     </MyPortalShell>
   );
 }
