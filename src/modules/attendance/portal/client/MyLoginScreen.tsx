@@ -160,16 +160,27 @@ export function MyLoginScreen() {
         </button>
       </form>
 
-      {method === 'pin' && (
-        <div className="text-center mt-4">
-          <Link
-            href="/my/onboard"
-            className="inline-flex items-center justify-center min-h-[48px] px-3 text-sm font-medium text-blue-400 hover:text-blue-300"
-          >
-            First time? Set up your PIN
-          </Link>
-        </div>
-      )}
+      {/*
+        Onboarding link is shown on BOTH tabs. New staff often try the email
+        tab with their main FibreFlow password, hit the unified "Invalid
+        credentials" error (no enumeration oracle, by design), and have no
+        idea credentials must be created via the PIN/OTP flow first. The
+        link is the only first-time path — the verify-otp endpoint is what
+        creates the row in attendance_credentials. Phrasing differs per tab
+        because office staff thinking in "email + password" terms shouldn't
+        be told to "set up a PIN" when the underlying truth is "set up your
+        portal sign-in for the first time".
+      */}
+      <div className="text-center mt-4">
+        <Link
+          href="/my/onboard"
+          className="inline-flex items-center justify-center min-h-[48px] px-3 text-sm font-medium text-blue-400 hover:text-blue-300"
+        >
+          {method === 'pin'
+            ? 'First time? Set up your PIN'
+            : "First time? You'll need to set up your account via WhatsApp first"}
+        </Link>
+      </div>
     </MyPortalShell>
   );
 }
