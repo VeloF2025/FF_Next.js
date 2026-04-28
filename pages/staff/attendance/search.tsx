@@ -619,8 +619,8 @@ export default function PulseSearchPage() {
       <div className="px-6 py-6 max-w-7xl mx-auto">
         <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Pulse · Search</h1>
-            <p className="text-sm text-gray-500">
+            <h1 className="text-2xl font-semibold text-neutral-100">Pulse · Search</h1>
+            <p className="text-sm text-neutral-500">
               Cross-staff, cross-period attendance search. Filters honour your supervisor scope.
             </p>
           </div>
@@ -629,7 +629,7 @@ export default function PulseSearchPage() {
               type="button"
               onClick={runFetch}
               disabled={loading}
-              className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 text-sm hover:bg-gray-50 disabled:opacity-50"
+              className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-neutral-700 text-sm hover:bg-neutral-800/60 disabled:opacity-50"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh
@@ -647,7 +647,7 @@ export default function PulseSearchPage() {
               type="button"
               onClick={() => onExport('csv')}
               disabled={exportLoading !== null || rows.length === 0}
-              className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-emerald-600 text-emerald-700 text-sm hover:bg-emerald-50 disabled:opacity-50"
+              className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-emerald-700 text-emerald-300 text-sm hover:bg-emerald-900/30 disabled:opacity-50"
             >
               <FileText className="h-4 w-4" />
               {exportLoading === 'csv' ? 'Exporting…' : 'CSV'}
@@ -676,7 +676,7 @@ export default function PulseSearchPage() {
         />
 
         {error && (
-          <div role="alert" className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
+          <div role="alert" className="mt-4 rounded border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-200">
             {error}
             {/Date range spans .* days/.test(error) && (
               <button
@@ -692,9 +692,9 @@ export default function PulseSearchPage() {
 
         {totals && <TotalsStrip totals={totals} scopeNote={scopeNote} />}
 
-        <div className="mt-4 overflow-x-auto bg-white border border-gray-200 rounded-xl">
+        <div className="mt-4 overflow-x-auto bg-neutral-900 border border-neutral-800 rounded-xl">
           <table className="min-w-full text-sm">
-            <thead className="bg-gray-50">
+            <thead className="bg-neutral-900">
               <tr>
                 <SortableTh label="Date" field="work_date" current={sortField} dir={sortDir} onSort={onSort} />
                 <SortableTh label="Staff" field="full_name" current={sortField} dir={sortDir} onSort={onSort} />
@@ -708,17 +708,17 @@ export default function PulseSearchPage() {
                 <Th>Exceptions</Th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-100">
+            <tbody className="bg-neutral-900 divide-y divide-neutral-800">
               {loading && rows.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-3 py-10 text-center text-sm text-gray-500">
+                  <td colSpan={10} className="px-3 py-10 text-center text-sm text-neutral-500">
                     <LoadingSpinner />
                   </td>
                 </tr>
               )}
               {!loading && rows.length === 0 && emptyMessage && (
                 <tr>
-                  <td colSpan={10} className="px-3 py-10 text-center text-sm text-gray-500">
+                  <td colSpan={10} className="px-3 py-10 text-center text-sm text-neutral-500">
                     {emptyMessage}
                   </td>
                 </tr>
@@ -731,7 +731,7 @@ export default function PulseSearchPage() {
         </div>
 
         {totalRows > 0 && (
-          <div className="mt-3 flex items-center justify-between text-sm text-gray-600">
+          <div className="mt-3 flex items-center justify-between text-sm text-neutral-400">
             <span>
               Showing {(page - 1) * pageSize + 1}
               –{Math.min(page * pageSize, totalRows)} of {totalRows.toLocaleString('en-ZA')} rows
@@ -741,7 +741,7 @@ export default function PulseSearchPage() {
                 type="button"
                 disabled={page <= 1 || loading}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="px-3 py-1 rounded border border-gray-300 disabled:opacity-50"
+                className="px-3 py-1 rounded border border-neutral-700 disabled:opacity-50"
               >
                 Previous
               </button>
@@ -752,7 +752,7 @@ export default function PulseSearchPage() {
                 type="button"
                 disabled={page >= lastPage || loading}
                 onClick={() => setPage((p) => p + 1)}
-                className="px-3 py-1 rounded border border-gray-300 disabled:opacity-50"
+                className="px-3 py-1 rounded border border-neutral-700 disabled:opacity-50"
               >
                 Next
               </button>
@@ -795,12 +795,12 @@ function PresetsBar({
   };
 
   return (
-    <div className="mb-3 rounded-xl bg-white border border-gray-200 px-4 py-3">
+    <div className="mb-3 rounded-xl bg-neutral-900 border border-neutral-800 px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs uppercase tracking-wide text-gray-500">Presets</span>
+        <span className="text-xs uppercase tracking-wide text-neutral-500">Presets</span>
 
         {presets.length === 0 && !loading && (
-          <span className="text-xs text-gray-500 italic">
+          <span className="text-xs text-neutral-500 italic">
             No saved presets yet — capture the current filter as a preset.
           </span>
         )}
@@ -812,8 +812,8 @@ function PresetsBar({
               onClick={() => onApply(p)}
               className={`px-3 py-1 rounded-full text-xs border ${
                 p.is_default
-                  ? 'bg-amber-50 border-amber-300 text-amber-800'
-                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                  ? 'bg-amber-900/40 border-amber-700 text-amber-200'
+                  : 'bg-neutral-900 border-neutral-700 text-neutral-300 hover:bg-neutral-800/60'
               }`}
               title={p.is_default ? 'Default preset — auto-loads on cold open' : 'Click to apply'}
             >
@@ -823,12 +823,12 @@ function PresetsBar({
               type="button"
               aria-label={`Preset menu for ${p.name}`}
               onClick={() => setOpenMenuId(openMenuId === p.id ? null : p.id)}
-              className="ml-0.5 px-1 py-1 text-xs text-gray-400 hover:text-gray-700"
+              className="ml-0.5 px-1 py-1 text-xs text-neutral-600 hover:text-neutral-300"
             >
               ⋯
             </button>
             {openMenuId === p.id && (
-              <div className="absolute z-10 mt-1 right-0 min-w-[180px] rounded-lg border border-gray-200 bg-white shadow-md py-1 text-sm">
+              <div className="absolute z-10 mt-1 right-0 min-w-[180px] rounded-lg border border-neutral-800 bg-neutral-900 shadow-md py-1 text-sm">
                 <PresetMenuItem
                   label={p.is_default ? 'Clear default' : 'Set as default'}
                   onClick={() => {
@@ -862,7 +862,7 @@ function PresetsBar({
         <button
           type="button"
           onClick={() => setShowSave((s) => !s)}
-          className="ml-auto px-3 py-1 rounded-lg border border-emerald-600 text-emerald-700 text-xs hover:bg-emerald-50"
+          className="ml-auto px-3 py-1 rounded-lg border border-emerald-700 text-emerald-300 text-xs hover:bg-emerald-900/30"
         >
           {showSave ? 'Cancel' : 'Save current as preset'}
         </button>
@@ -877,9 +877,9 @@ function PresetsBar({
             onChange={(e) => setDraftName(e.target.value)}
             placeholder="Preset name (≤ 60 chars)"
             maxLength={60}
-            className="px-3 py-1 rounded border border-gray-300 text-sm flex-1 min-w-[200px]"
+            className="px-3 py-1 rounded border border-neutral-700 text-sm flex-1 min-w-[200px]"
           />
-          <label className="inline-flex items-center gap-1 text-sm text-gray-700">
+          <label className="inline-flex items-center gap-1 text-sm text-neutral-300">
             <input
               type="checkbox"
               checked={draftDefault}
@@ -898,7 +898,7 @@ function PresetsBar({
       )}
 
       {actionMsg && (
-        <div className="mt-2 text-xs text-gray-600">{actionMsg}</div>
+        <div className="mt-2 text-xs text-neutral-400">{actionMsg}</div>
       )}
     </div>
   );
@@ -915,7 +915,7 @@ function PresetMenuItem({
     <button
       type="button"
       onClick={onClick}
-      className={`w-full text-left px-3 py-1.5 hover:bg-gray-50 ${destructive ? 'text-red-700' : 'text-gray-700'}`}
+      className={`w-full text-left px-3 py-1.5 hover:bg-neutral-800/60 ${destructive ? 'text-red-300' : 'text-neutral-300'}`}
     >
       {label}
     </button>
@@ -957,7 +957,7 @@ function FilterBar({
     );
 
   return (
-    <form onSubmit={onSubmit} className="rounded-xl bg-white border border-gray-200 p-4">
+    <form onSubmit={onSubmit} className="rounded-xl bg-neutral-900 border border-neutral-800 p-4">
       <div className="flex flex-wrap items-center gap-2 mb-3">
         {DATE_PRESETS.map((p) => (
           <button
@@ -968,7 +968,7 @@ function FilterBar({
             className={`px-3 py-1 rounded-full text-xs border ${
               form.dateRange === p.value
                 ? 'bg-emerald-600 border-emerald-600 text-white'
-                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                : 'bg-neutral-900 border-neutral-700 text-neutral-300 hover:bg-neutral-800/60'
             }`}
           >
             {p.label}
@@ -980,14 +980,14 @@ function FilterBar({
               type="date"
               value={form.dateFrom}
               onChange={(e) => commitField('dateFrom', e.target.value)}
-              className="px-2 py-1 rounded border border-gray-300 text-sm"
+              className="px-2 py-1 rounded border border-neutral-700 text-sm"
             />
-            <span className="text-gray-500 text-sm">to</span>
+            <span className="text-neutral-500 text-sm">to</span>
             <input
               type="date"
               value={form.dateTo}
               onChange={(e) => commitField('dateTo', e.target.value)}
-              className="px-2 py-1 rounded border border-gray-300 text-sm"
+              className="px-2 py-1 rounded border border-neutral-700 text-sm"
             />
           </span>
         )}
@@ -995,18 +995,18 @@ function FilterBar({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
         <label className="flex flex-col gap-1 text-sm">
-          <span className="text-gray-600">Departments (comma-separated)</span>
+          <span className="text-neutral-400">Departments (comma-separated)</span>
           <input
             type="text"
             value={form.departments}
             onChange={(e) => setField('departments', e.target.value)}
             placeholder="Civil, Optical"
-            className="px-3 py-2 rounded border border-gray-300"
+            className="px-3 py-2 rounded border border-neutral-700"
           />
         </label>
 
         <div className="flex flex-col gap-1 text-sm">
-          <span className="text-gray-600">Days of week</span>
+          <span className="text-neutral-400">Days of week</span>
           <div className="flex flex-wrap gap-1">
             {DAYS_OF_WEEK.map((d) => (
               <button
@@ -1015,8 +1015,8 @@ function FilterBar({
                 onClick={() => toggleDay(d.value)}
                 className={`px-2 py-1 rounded text-xs border ${
                   form.daysOfWeek.includes(d.value)
-                    ? 'bg-emerald-100 border-emerald-400 text-emerald-800'
-                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                    ? 'bg-emerald-900/40 border-emerald-600 text-emerald-200'
+                    : 'bg-neutral-900 border-neutral-700 text-neutral-300 hover:bg-neutral-800/60'
                 }`}
               >
                 {d.label}
@@ -1026,7 +1026,7 @@ function FilterBar({
         </div>
 
         <div className="flex flex-col gap-1 text-sm">
-          <span className="text-gray-600">Quick toggles</span>
+          <span className="text-neutral-400">Quick toggles</span>
           <div className="flex flex-wrap gap-3 text-sm">
             <label className="inline-flex items-center gap-1">
               <input
@@ -1057,12 +1057,12 @@ function FilterBar({
       </div>
 
       <details className="mb-3">
-        <summary className="cursor-pointer text-sm font-medium text-gray-700">
+        <summary className="cursor-pointer text-sm font-medium text-neutral-300">
           Exception filters · advanced ID filters
         </summary>
         <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="md:col-span-2">
-            <span className="text-sm text-gray-600">Exception kinds</span>
+            <span className="text-sm text-neutral-400">Exception kinds</span>
             <div className="mt-1 flex flex-wrap gap-1">
               {EXCEPTION_KINDS.map((k) => (
                 <button
@@ -1071,8 +1071,8 @@ function FilterBar({
                   onClick={() => toggleException(k.value)}
                   className={`px-2 py-1 rounded text-xs border ${
                     form.exceptionKinds.includes(k.value)
-                      ? 'bg-amber-100 border-amber-400 text-amber-800'
-                      : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                      ? 'bg-amber-900/40 border-amber-700 text-amber-200'
+                      : 'bg-neutral-900 border-neutral-700 text-neutral-300 hover:bg-neutral-800/60'
                   }`}
                 >
                   {k.label}
@@ -1082,23 +1082,23 @@ function FilterBar({
           </div>
           <div className="grid grid-cols-1 gap-2">
             <label className="flex flex-col gap-1 text-sm">
-              <span className="text-gray-600">Staff IDs (UUIDs, comma-separated)</span>
+              <span className="text-neutral-400">Staff IDs (UUIDs, comma-separated)</span>
               <input
                 type="text"
                 value={form.staffIds}
                 onChange={(e) => setField('staffIds', e.target.value)}
                 placeholder="Optional — pickers ship in Phase B"
-                className="px-3 py-2 rounded border border-gray-300 text-xs font-mono"
+                className="px-3 py-2 rounded border border-neutral-700 text-xs font-mono"
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              <span className="text-gray-600">Site IDs (UUIDs, comma-separated)</span>
+              <span className="text-neutral-400">Site IDs (UUIDs, comma-separated)</span>
               <input
                 type="text"
                 value={form.siteIds}
                 onChange={(e) => setField('siteIds', e.target.value)}
                 placeholder="Optional — pickers ship in Phase B"
-                className="px-3 py-2 rounded border border-gray-300 text-xs font-mono"
+                className="px-3 py-2 rounded border border-neutral-700 text-xs font-mono"
               />
             </label>
           </div>
@@ -1106,7 +1106,7 @@ function FilterBar({
       </details>
 
       <div className="flex items-center justify-between gap-3">
-        <div className="text-xs text-gray-500">
+        <div className="text-xs text-neutral-500">
           {confirmLong && 'Long-range queries are enabled. '}
           Times shown in SAST.
         </div>
@@ -1114,7 +1114,7 @@ function FilterBar({
           <button
             type="button"
             onClick={onReset}
-            className="px-3 py-2 rounded border border-gray-300 text-sm hover:bg-gray-50"
+            className="px-3 py-2 rounded border border-neutral-700 text-sm hover:bg-neutral-800/60"
           >
             Reset
           </button>
@@ -1148,7 +1148,7 @@ function TotalsStrip({ totals, scopeNote }: { totals: SearchTotals; scopeNote?: 
         accent={totals.totalExceptionsCount > 0 ? 'amber' : undefined}
       />
       {scopeNote && (
-        <div className="md:col-span-6 text-xs text-gray-500">
+        <div className="md:col-span-6 text-xs text-neutral-500">
           {scopeNote.kind === 'orgwide' && 'Scope: org-wide.'}
           {scopeNote.kind === 'scoped' && `Scope: ${scopeNote.staffCount.toLocaleString('en-ZA')} staff in your supervisor chain.`}
           {scopeNote.kind === 'no_scope' && scopeNote.reason}
@@ -1160,51 +1160,51 @@ function TotalsStrip({ totals, scopeNote }: { totals: SearchTotals; scopeNote?: 
 
 function Stat({ label, value, accent }: { label: string; value: string; accent?: 'amber' }) {
   const tone =
-    accent === 'amber' ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-white';
+    accent === 'amber' ? 'border-amber-800/40 bg-amber-950/20' : 'border-neutral-800 bg-neutral-900';
   return (
     <div className={`rounded-xl border ${tone} px-3 py-2`}>
-      <div className="text-xs text-gray-500">{label}</div>
-      <div className="text-base font-semibold text-gray-900">{value}</div>
+      <div className="text-xs text-neutral-500">{label}</div>
+      <div className="text-base font-semibold text-neutral-100">{value}</div>
     </div>
   );
 }
 
 function ResultRow({ row }: { row: SearchRow }) {
   return (
-    <tr className="hover:bg-gray-50">
-      <td className="px-3 py-2 whitespace-nowrap font-mono text-xs text-gray-700">
+    <tr className="hover:bg-neutral-800/60">
+      <td className="px-3 py-2 whitespace-nowrap font-mono text-xs text-neutral-300">
         {row.work_date}
       </td>
       <td className="px-3 py-2 whitespace-nowrap">
         <Link
           href={`/staff/${row.staff_id}?tab=attendance`}
-          className="text-blue-600 hover:underline"
+          className="text-emerald-400 hover:text-emerald-300"
         >
           {row.full_name}
         </Link>
-        {row.employee_id && <span className="ml-1 text-xs text-gray-400">({row.employee_id})</span>}
+        {row.employee_id && <span className="ml-1 text-xs text-neutral-600">({row.employee_id})</span>}
       </td>
-      <td className="px-3 py-2 whitespace-nowrap text-gray-700">{row.department ?? '—'}</td>
-      <td className="px-3 py-2 whitespace-nowrap text-gray-700">{row.primary_site_name ?? '—'}</td>
+      <td className="px-3 py-2 whitespace-nowrap text-neutral-300">{row.department ?? '—'}</td>
+      <td className="px-3 py-2 whitespace-nowrap text-neutral-300">{row.primary_site_name ?? '—'}</td>
       <td className="px-3 py-2 whitespace-nowrap font-mono text-xs">{fmtTime(row.first_clock_in_at)}</td>
       <td className="px-3 py-2 whitespace-nowrap font-mono text-xs">{fmtTime(row.last_clock_out_at)}</td>
       <td className="px-3 py-2 whitespace-nowrap text-right tabular-nums">
         {fmtHrs(row.regular_hrs + row.overtime_hrs)}
       </td>
       <td className="px-3 py-2 whitespace-nowrap text-right tabular-nums">
-        {row.overtime_hrs > 0 ? <span className="text-amber-700">{fmtHrs(row.overtime_hrs)}</span> : '—'}
+        {row.overtime_hrs > 0 ? <span className="text-amber-300">{fmtHrs(row.overtime_hrs)}</span> : '—'}
       </td>
       <td className="px-3 py-2 whitespace-nowrap text-right tabular-nums">
         {fmtWageCents(row.wage_amount_cents)}
       </td>
       <td className="px-3 py-2 whitespace-nowrap text-xs">
         {row.exceptions_count > 0 ? (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 text-amber-800">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-900/40 text-amber-300">
             {row.exceptions_count} · {row.exception_kinds.slice(0, 2).join(', ')}
             {row.exception_kinds.length > 2 && ` +${row.exception_kinds.length - 2}`}
           </span>
         ) : (
-          <span className="text-gray-400">—</span>
+          <span className="text-neutral-600">—</span>
         )}
       </td>
     </tr>
@@ -1215,7 +1215,7 @@ function Th({ children, numeric }: { children?: React.ReactNode; numeric?: boole
   return (
     <th
       scope="col"
-      className={`px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide ${
+      className={`px-3 py-2 text-xs font-medium text-neutral-500 uppercase tracking-wide ${
         numeric ? 'text-right' : 'text-left'
       }`}
     >
@@ -1238,15 +1238,15 @@ function SortableTh({
   return (
     <th
       scope="col"
-      className={`px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide ${
+      className={`px-3 py-2 text-xs font-medium text-neutral-500 uppercase tracking-wide ${
         numeric ? 'text-right' : 'text-left'
       }`}
     >
       <button
         type="button"
         onClick={() => onSort(field)}
-        className={`inline-flex items-center gap-1 hover:text-gray-700 ${
-          active ? 'text-gray-700' : ''
+        className={`inline-flex items-center gap-1 hover:text-neutral-300 ${
+          active ? 'text-neutral-300' : ''
         }`}
       >
         <span>{label}</span>

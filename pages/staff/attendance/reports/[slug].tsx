@@ -176,11 +176,11 @@ export default function ReportSlugPage() {
       <AppLayout>
         <AttendanceNav />
         <div className="px-6 py-10 max-w-3xl mx-auto text-center">
-          <h1 className="text-xl font-semibold text-gray-900">Unknown report</h1>
-          <p className="mt-2 text-sm text-gray-500">
+          <h1 className="text-xl font-semibold">Unknown report</h1>
+          <p className="mt-2 text-sm text-neutral-400">
             The slug &quot;{slugParam ?? ''}&quot; doesn&apos;t match any Pulse report.
           </p>
-          <Link href="/staff/attendance/reports" className="mt-4 inline-block text-emerald-700 hover:underline">
+          <Link href="/staff/attendance/reports" className="mt-4 inline-block text-emerald-400 hover:text-emerald-300">
             ← Back to reports
           </Link>
         </div>
@@ -197,15 +197,15 @@ export default function ReportSlugPage() {
       <div className="px-6 py-6 max-w-7xl mx-auto">
         <Link
           href="/staff/attendance/reports"
-          className="mb-3 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+          className="mb-3 inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-300"
         >
           <ArrowLeft className="h-3 w-3" />
           All reports
         </Link>
         <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">{def.title}</h1>
-            <p className="text-sm text-gray-500">{def.blurb}</p>
+            <h1 className="text-2xl font-semibold">{def.title}</h1>
+            <p className="text-sm text-neutral-400">{def.blurb}</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -221,7 +221,7 @@ export default function ReportSlugPage() {
               type="button"
               onClick={() => onExport('csv')}
               disabled={exporting !== null || rows.length === 0}
-              className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-emerald-600 text-emerald-700 text-sm hover:bg-emerald-50 disabled:opacity-50"
+              className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-emerald-700 text-emerald-300 text-sm hover:bg-emerald-900/30 disabled:opacity-50"
             >
               <FileText className="h-4 w-4" />
               {exporting === 'csv' ? 'Exporting…' : 'CSV'}
@@ -232,13 +232,13 @@ export default function ReportSlugPage() {
         <ReportFilterBar def={def} form={form} setForm={setForm} onRun={runFetch} loading={loading} />
 
         {error && (
-          <div role="alert" className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
+          <div role="alert" className="mt-4 rounded border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-200">
             {error}
           </div>
         )}
 
         {data && data.notes.length > 0 && (
-          <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900 space-y-1">
+          <div className="mt-3 rounded border border-amber-800/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-200 space-y-1">
             {data.notes.map((n, i) => <div key={i}>• {n}</div>)}
           </div>
         )}
@@ -248,7 +248,7 @@ export default function ReportSlugPage() {
         </div>
 
         {data?.scopeNote && (
-          <div className="mt-3 text-xs text-gray-500">
+          <div className="mt-3 text-xs text-neutral-500">
             {data.scopeNote.kind === 'orgwide' && 'Scope: org-wide.'}
             {data.scopeNote.kind === 'scoped' && `Scope: ${data.scopeNote.staffCount.toLocaleString('en-ZA')} staff in your supervisor chain.`}
             {data.scopeNote.kind === 'no_scope' && data.scopeNote.reason}

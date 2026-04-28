@@ -276,7 +276,7 @@ export default function StaffAttendanceCorrectionsPage() {
                 onClick={() => handleTabChange(tab.key)}
                 className={`px-3 py-1.5 rounded-full border text-sm font-medium transition ${
                   isActive
-                    ? 'bg-blue-600 border-blue-600 text-white'
+                    ? 'bg-emerald-600 border-emerald-600 text-white'
                     : 'bg-neutral-900 border-neutral-700 text-neutral-300 hover:border-neutral-600'
                 }`}
               >

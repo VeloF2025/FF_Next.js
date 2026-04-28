@@ -19,8 +19,8 @@ export default function ReportsIndexPage() {
       <AttendanceNav />
       <div className="px-6 py-6 max-w-6xl mx-auto">
         <header className="mb-5">
-          <h1 className="text-2xl font-semibold text-gray-900">Pulse · Reports</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-2xl font-semibold">Pulse · Reports</h1>
+          <p className="text-sm text-neutral-400">
             On-demand HR reports. Each report honours your supervisor scope and exports to XLSX or CSV.
           </p>
         </header>
@@ -30,16 +30,16 @@ export default function ReportsIndexPage() {
             <Link
               key={r.slug}
               href={`/staff/attendance/reports/${r.slug}`}
-              className="block rounded-xl border border-gray-200 bg-white p-4 hover:border-emerald-400 hover:shadow-sm transition-colors"
+              className="block rounded-xl border border-neutral-800 bg-neutral-900 p-4 hover:border-emerald-700 hover:bg-neutral-900/80 transition-colors"
             >
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-950/40 border border-emerald-800/60 text-emerald-300">
                   <BarChart3 className="h-5 w-5" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900">{r.title}</div>
-                  <div className="mt-1 text-xs text-gray-500">{r.blurb}</div>
-                  <div className="mt-2 text-[10px] uppercase tracking-wide text-gray-400 font-mono">
+                  <div className="font-medium">{r.title}</div>
+                  <div className="mt-1 text-xs text-neutral-400">{r.blurb}</div>
+                  <div className="mt-2 text-[10px] uppercase tracking-wide text-neutral-500 font-mono">
                     /{r.slug}
                   </div>
                 </div>
@@ -48,7 +48,7 @@ export default function ReportsIndexPage() {
           ))}
         </div>
 
-        <p className="mt-6 text-xs text-gray-500">
+        <p className="mt-6 text-xs text-neutral-500">
           Looking for late-arrivals? It&apos;s deferred to a follow-up release — the underlying shift
           schedule isn&apos;t recorded in attendance entries yet, so we can&apos;t compute lateness deterministically.
         </p>

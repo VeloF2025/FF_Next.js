@@ -25,7 +25,7 @@ export function ReportFilterBar({
   const onSubmit = (e: FormEvent) => { e.preventDefault(); onRun(); };
 
   return (
-    <form onSubmit={onSubmit} className="rounded-xl bg-white border border-gray-200 p-4 flex flex-wrap items-end gap-3">
+    <form onSubmit={onSubmit} className="rounded-xl bg-neutral-900 border border-neutral-800 p-4 flex flex-wrap items-end gap-3">
       {def.inputs.map((inp, i) => renderInput(inp, i, form, setField))}
       <button
         type="submit"
@@ -48,12 +48,12 @@ function renderInput<K extends keyof ReportFormState>(
     case 'month':
       return (
         <label key={idx} className="flex flex-col gap-1 text-sm">
-          <span className="text-gray-600">Month</span>
+          <span className="text-neutral-400">Month</span>
           <input
             type="month"
             value={form.month}
             onChange={(e) => setField('month' as K, e.target.value as ReportFormState[K])}
-            className="px-3 py-2 rounded border border-gray-300"
+            className="px-3 py-2 rounded border border-neutral-700 bg-neutral-900 text-neutral-100 focus:border-emerald-600 focus:outline-none"
           />
         </label>
       );
@@ -61,11 +61,11 @@ function renderInput<K extends keyof ReportFormState>(
       return (
         <div key={idx} className="flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-gray-600">Date range</span>
+            <span className="text-neutral-400">Date range</span>
             <select
               value={form.dateRange}
               onChange={(e) => setField('dateRange' as K, e.target.value as ReportFormState[K])}
-              className="px-3 py-2 rounded border border-gray-300"
+              className="px-3 py-2 rounded border border-neutral-700 bg-neutral-900 text-neutral-100 focus:border-emerald-600 focus:outline-none"
             >
               <option value="last_30d">Last 30 days</option>
               <option value="this_month">This month</option>
@@ -79,14 +79,14 @@ function renderInput<K extends keyof ReportFormState>(
                 type="date"
                 value={form.dateFrom}
                 onChange={(e) => setField('dateFrom' as K, e.target.value as ReportFormState[K])}
-                className="px-3 py-2 rounded border border-gray-300 text-sm"
+                className="px-3 py-2 rounded border border-neutral-700 bg-neutral-900 text-neutral-100 focus:border-emerald-600 focus:outline-none text-sm"
               />
-              <span className="text-gray-500 text-sm">to</span>
+              <span className="text-neutral-500 text-sm">to</span>
               <input
                 type="date"
                 value={form.dateTo}
                 onChange={(e) => setField('dateTo' as K, e.target.value as ReportFormState[K])}
-                className="px-3 py-2 rounded border border-gray-300 text-sm"
+                className="px-3 py-2 rounded border border-neutral-700 bg-neutral-900 text-neutral-100 focus:border-emerald-600 focus:outline-none text-sm"
               />
             </>
           )}
@@ -95,50 +95,50 @@ function renderInput<K extends keyof ReportFormState>(
     case 'departments_text':
       return (
         <label key={idx} className="flex flex-col gap-1 text-sm flex-1 min-w-[200px]">
-          <span className="text-gray-600">Departments (comma-separated)</span>
+          <span className="text-neutral-400">Departments (comma-separated)</span>
           <input
             type="text"
             value={form.departments}
             onChange={(e) => setField('departments' as K, e.target.value as ReportFormState[K])}
             placeholder="Civil, Optical"
-            className="px-3 py-2 rounded border border-gray-300"
+            className="px-3 py-2 rounded border border-neutral-700 bg-neutral-900 text-neutral-100 focus:border-emerald-600 focus:outline-none"
           />
         </label>
       );
     case 'sites_text':
       return (
         <label key={idx} className="flex flex-col gap-1 text-sm flex-1 min-w-[200px]">
-          <span className="text-gray-600">Site IDs (UUIDs, comma-separated)</span>
+          <span className="text-neutral-400">Site IDs (UUIDs, comma-separated)</span>
           <input
             type="text"
             value={form.siteIds}
             onChange={(e) => setField('siteIds' as K, e.target.value as ReportFormState[K])}
             placeholder="Optional"
-            className="px-3 py-2 rounded border border-gray-300 text-xs font-mono"
+            className="px-3 py-2 rounded border border-neutral-700 bg-neutral-900 text-neutral-100 focus:border-emerald-600 focus:outline-none text-xs font-mono"
           />
         </label>
       );
     case 'staff_ids_text':
       return (
         <label key={idx} className="flex flex-col gap-1 text-sm flex-1 min-w-[200px]">
-          <span className="text-gray-600">Staff IDs (UUIDs, comma-separated)</span>
+          <span className="text-neutral-400">Staff IDs (UUIDs, comma-separated)</span>
           <input
             type="text"
             value={form.staffIds}
             onChange={(e) => setField('staffIds' as K, e.target.value as ReportFormState[K])}
             placeholder="Optional"
-            className="px-3 py-2 rounded border border-gray-300 text-xs font-mono"
+            className="px-3 py-2 rounded border border-neutral-700 bg-neutral-900 text-neutral-100 focus:border-emerald-600 focus:outline-none text-xs font-mono"
           />
         </label>
       );
     case 'group_by':
       return (
         <label key={idx} className="flex flex-col gap-1 text-sm">
-          <span className="text-gray-600">Group by</span>
+          <span className="text-neutral-400">Group by</span>
           <select
             value={form.groupBy}
             onChange={(e) => setField('groupBy' as K, e.target.value as ReportFormState[K])}
-            className="px-3 py-2 rounded border border-gray-300"
+            className="px-3 py-2 rounded border border-neutral-700 bg-neutral-900 text-neutral-100 focus:border-emerald-600 focus:outline-none"
           >
             {inp.options.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>

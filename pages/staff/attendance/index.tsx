@@ -102,16 +102,16 @@ export default function StaffAttendanceRosterPage() {
       <div className="px-6 py-6 max-w-6xl mx-auto">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Attendance roster</h1>
-            <p className="text-sm text-gray-500">Who is on shift, who is out, who needs review.</p>
+            <h1 className="text-2xl font-semibold">Attendance roster</h1>
+            <p className="text-sm text-neutral-400">Who is on shift, who is out, who needs review.</p>
           </div>
           <label className="flex items-center gap-2 text-sm">
-            <span className="text-gray-600">Date</span>
+            <span className="text-neutral-400">Date</span>
             <input
               type="date"
               value={workDate}
               onChange={(e) => setWorkDate(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+              className="bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none"
             />
           </label>
         </div>
@@ -129,24 +129,25 @@ export default function StaffAttendanceRosterPage() {
           <button
             type="button"
             onClick={() => setFilter('all')}
-            className="mb-3 text-xs font-medium text-blue-600 hover:text-blue-700"
+            className="mb-3 text-xs font-medium text-emerald-400 hover:text-emerald-300"
           >
             Clear filter · show all
           </button>
         )}
 
         {error && (
-          <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800 mb-4">
-            {error}
+          <div role="alert" className="rounded border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-200 mb-4 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <div>{error}</div>
           </div>
         )}
 
         {loading && !roster && <LoadingSpinner />}
 
         {roster && !loading && (
-          <div className="overflow-x-auto bg-white border border-gray-200 rounded-xl">
+          <div className="overflow-x-auto border border-neutral-800 rounded">
             <table className="min-w-full text-sm">
-              <thead className="bg-gray-50">
+              <thead className="bg-neutral-900 text-neutral-300">
                 <tr>
                   <Th>Staff</Th>
                   <Th>Status</Th>
@@ -157,13 +158,13 @@ export default function StaffAttendanceRosterPage() {
                   <Th></Th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-100">
+              <tbody>
                 {filtered.map((r) => (
                   <RosterRow key={r.staffId} entry={r} />
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-3 py-10 text-center text-sm text-gray-500">
+                    <td colSpan={7} className="px-3 py-10 text-center text-sm text-neutral-500">
                       No staff match this filter.
                     </td>
                   </tr>
@@ -195,41 +196,45 @@ function SummaryCard({
   const active = current === filter;
   const base = 'rounded-xl border px-4 py-3 text-left transition-colors';
   const colour = highlight
-    ? active ? 'bg-yellow-100 border-yellow-400' : 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100'
-    : active ? 'bg-blue-50 border-blue-400' : 'bg-white border-gray-200 hover:bg-gray-50';
+    ? active
+      ? 'bg-amber-900/40 border-amber-600 text-amber-200'
+      : 'bg-amber-950/20 border-amber-800/40 text-amber-300 hover:bg-amber-900/30'
+    : active
+    ? 'bg-emerald-900/30 border-emerald-700 text-emerald-200'
+    : 'bg-neutral-900 border-neutral-800 hover:bg-neutral-800/60';
   return (
     <button type="button" onClick={() => onClick(filter)} className={`${base} ${colour}`}>
-      <div className="text-xs uppercase tracking-wide text-gray-500">{label}</div>
-      <div className="text-2xl font-semibold text-gray-900">{count}</div>
+      <div className="text-xs uppercase tracking-wide opacity-80">{label}</div>
+      <div className="mt-1 text-2xl font-semibold tabular-nums">{count}</div>
     </button>
   );
 }
 
 function RosterRow({ entry }: { entry: RosterEntry }) {
   return (
-    <tr className="hover:bg-gray-50">
+    <tr className="border-t border-neutral-800 hover:bg-neutral-900/50">
       <Td>
-        <Link href={`/staff/${entry.staffId}?tab=attendance`} className="text-blue-600 hover:text-blue-700 font-medium">
+        <Link href={`/staff/${entry.staffId}?tab=attendance`} className="text-emerald-400 hover:text-emerald-300 font-medium">
           {entry.name}
         </Link>
         {entry.phone && (
-          <div className="text-xs text-gray-500">{entry.phone}</div>
+          <div className="text-xs text-neutral-500">{entry.phone}</div>
         )}
       </Td>
       <Td><CategoryBadge category={entry.category} /></Td>
       <Td>{entry.clockInAt ? formatTime(entry.clockInAt) : '—'}</Td>
-      <Td>{entry.clockOutAt ? formatTime(entry.clockOutAt) : (entry.category === 'on_shift' ? <span className="text-green-700 text-xs">(live)</span> : '—')}</Td>
+      <Td>{entry.clockOutAt ? formatTime(entry.clockOutAt) : (entry.category === 'on_shift' ? <span className="text-emerald-300 text-xs">(live)</span> : '—')}</Td>
       <Td>{entry.siteName ?? entry.homeSiteName ?? '—'}</Td>
       <Td>
         {entry.openExceptionCount > 0 ? (
-          <span className="inline-flex items-center gap-1 text-yellow-800">
+          <span className="inline-flex items-center gap-1 text-amber-300">
             <AlertTriangle className="w-3 h-3" />
             {entry.openExceptionCount}
           </span>
         ) : '—'}
       </Td>
       <Td>
-        <Link href={`/staff/${entry.staffId}?tab=attendance`} className="text-xs font-medium text-blue-600 hover:text-blue-700">
+        <Link href={`/staff/${entry.staffId}?tab=attendance`} className="text-xs font-medium text-emerald-400 hover:text-emerald-300">
           View
         </Link>
       </Td>
@@ -239,10 +244,10 @@ function RosterRow({ entry }: { entry: RosterEntry }) {
 
 function CategoryBadge({ category }: { category: RosterEntry['category'] }) {
   const map: Record<RosterEntry['category'], { label: string; cls: string; icon: React.ReactNode }> = {
-    on_shift: { label: 'On shift', cls: 'bg-green-50 text-green-700 border-green-200', icon: <Clock className="w-3 h-3" /> },
-    clocked_out: { label: 'Clocked out', cls: 'bg-gray-50 text-gray-600 border-gray-200', icon: <Clock className="w-3 h-3" /> },
-    absent: { label: 'Absent', cls: 'bg-red-50 text-red-700 border-red-200', icon: <Users className="w-3 h-3" /> },
-    exception: { label: 'Exception', cls: 'bg-yellow-50 text-yellow-800 border-yellow-200', icon: <AlertTriangle className="w-3 h-3" /> },
+    on_shift: { label: 'On shift', cls: 'bg-emerald-950/40 text-emerald-300 border-emerald-800/60', icon: <Clock className="w-3 h-3" /> },
+    clocked_out: { label: 'Clocked out', cls: 'bg-neutral-900 text-neutral-400 border-neutral-700', icon: <Clock className="w-3 h-3" /> },
+    absent: { label: 'Absent', cls: 'bg-red-950/40 text-red-300 border-red-800/60', icon: <Users className="w-3 h-3" /> },
+    exception: { label: 'Exception', cls: 'bg-amber-950/40 text-amber-300 border-amber-800/60', icon: <AlertTriangle className="w-3 h-3" /> },
   };
   const { label, cls, icon } = map[category];
   return (
@@ -253,8 +258,8 @@ function CategoryBadge({ category }: { category: RosterEntry['category'] }) {
   );
 }
 
-function Th({ children }: { children: React.ReactNode }) {
-  return <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-600">{children}</th>;
+function Th({ children }: { children?: React.ReactNode }) {
+  return <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{children}</th>;
 }
 function Td({ children }: { children: React.ReactNode }) {
   return <td className="px-3 py-2 align-top">{children}</td>;
