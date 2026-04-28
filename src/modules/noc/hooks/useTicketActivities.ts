@@ -15,13 +15,18 @@ import { useQuery } from '@tanstack/react-query';
 // Activity type from API
 export interface TicketActivity {
   id: string;
-  type: 'note' | 'update' | 'status_change' | 'assignment' | 'message' | 'system';
+  type: 'note' | 'update' | 'status_change' | 'assignment' | 'message' | 'system' | 'ai_summary';
   description: string | null;
-  field_changes: Array<{
-    field: string;
-    old_value?: string;
-    new_value: string;
-  }> | null;
+  /**
+   * Legacy field-change list for `update` / `status_change` activities, OR
+   * the AI-summary audit payload `{ facts, model, latency_ms }` for
+   * `ai_summary` activities. Renderers must narrow on `activity.type` before
+   * accessing this.
+   */
+  field_changes:
+    | Array<{ field: string; old_value?: string; new_value: string }>
+    | { facts?: unknown; model?: string; latency_ms?: number; [k: string]: unknown }
+    | null;
   created_by: {
     name: string;
     email?: string;

@@ -21,9 +21,12 @@ const qcontactConfig = {
 
 interface TicketActivity {
   id: string;
-  type: 'note' | 'update' | 'status_change' | 'assignment' | 'message' | 'system';
+  type: 'note' | 'update' | 'status_change' | 'assignment' | 'message' | 'system' | 'ai_summary';
   description: string | null;
-  field_changes: { field: string; old_value?: string; new_value: string }[] | null;
+  field_changes:
+    | { field: string; old_value?: string; new_value: string }[]
+    | { facts?: unknown; model?: string; latency_ms?: number; [k: string]: unknown }
+    | null;
   created_by: { name: string; email?: string } | null;
   created_at: string;
   source: 'qcontact' | 'fibreflow';
