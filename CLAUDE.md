@@ -77,6 +77,28 @@ bash scripts/deploy-local.sh production   # After hours only, with Hein's approv
 
 ---
 
+## CI
+
+GitHub-hosted runner billing is paused on this account. CI for this repo runs on the `velo-fibreflow` self-hosted runner on `velo-server` (systemd user unit `gha-runner-fibreflow.service`, labels `self-hosted, linux, velo, fibreflow`). Workflows must target it via `runs-on: [self-hosted, linux, fibreflow]`.
+
+- Re-register: `~/bin/install-gha-runner VelocityFibre/FF_Next.js fibreflow` (idempotent — uses `--replace`).
+- Online check: `gh api repos/VelocityFibre/FF_Next.js/actions/runners`
+- Service control: `systemctl --user status|restart gha-runner-fibreflow`
+- Live logs: `journalctl --user -u gha-runner-fibreflow -f`
+
+**Standing review-and-merge rule.** When the user says "review and merge" or "review the PR":
+
+1. Always invoke `/review` (the blind-reviewer skill). Never self-review.
+   - Doc-only or single-domain PRs: single sonnet reviewer.
+   - 500+ line code PRs touching multiple domains: invoke `review-team`.
+   - Pass the reviewer the diff + relevant CLAUDE.md files only — no session reasoning.
+2. Wait for GitHub Actions on the self-hosted runner: `gh run watch <id> --exit-status`. If GHA never schedules (billing re-paused), fall back to `bash scripts/ci-local.sh` in a clean `git worktree add /tmp/ff-pr-ci origin/<branch>` and post the result as a PR comment.
+3. Merge ONLY after BOTH the blind review APPROVED and CI passed: `gh pr merge <N> --merge --delete-branch`.
+4. Branch hygiene: never edit on master. First action of any code-editing task is `git checkout -b <name>`. Parallel agents share this repo, so master must stay clean.
+5. Pre-push hook is the floor. If `npm run ci:quick` fails locally, fix it — never `--no-verify`.
+
+---
+
 ## API & Code Conventions
 
 ```typescript
