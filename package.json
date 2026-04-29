@@ -37,6 +37,8 @@
     "db:test:suite": "tsx scripts/database-testing-suite.ts",
     "db:test:schema": "tsx scripts/schema-validation-suite.ts",
     "db:optimize": "tsx neon/scripts/run-performance-migration.ts",
+    "claude-md:check": "tsx scripts/check-claude-md-paths.ts",
+    "claude-md:check:strict": "tsx scripts/check-claude-md-paths.ts --strict",
     "antihall": "node scripts/antihall-validator.cjs",
     "antihall:parse": "node scripts/antihall-validator.cjs parse",
     "antihall:check": "node scripts/antihall-validator.cjs check",
