@@ -287,6 +287,24 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
     }
   }
 
+  // Resolve pole_number → pole_id (UUID). The INSERT below maps
+  // payload.pole_number into the pole_id column, which is a uuid; passing
+  // a human-readable pole reference like "MAM.P.B605" raises 22P02.
+  let resolvedPoleId: string | null = null;
+  if (payload.pole_number) {
+    const poleRow = await queryOne<{ id: string }>(
+      `SELECT id FROM poles WHERE pole_number = $1 LIMIT 1`,
+      [payload.pole_number]
+    );
+    if (poleRow) {
+      resolvedPoleId = poleRow.id;
+    } else {
+      logger.warn('Pole not found for ticket — pole_id left null', {
+        pole_number: payload.pole_number,
+      });
+    }
+  }
+
   // 🟢 WORKING: Set defaults
   const priority = payload.priority || TicketPriority.NORMAL;
   let status = payload.status || TicketStatus.OPEN;
@@ -400,7 +418,7 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
       payload.dr_number || null,
       payload.project_id || null,
       payload.zone_id || null,
-      payload.pole_number || null,
+      resolvedPoleId,
       payload.pon_number || null,
       payload.address || null,
       payload.assigned_to || null,
