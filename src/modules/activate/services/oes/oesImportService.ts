@@ -194,6 +194,14 @@ export async function importPPData(ppRows: PPRow[], filename: string): Promise<v
     );
     const batchId = batchResult.rows[0].id as string;
 
+    // Capture re-entries: previously-activated PP rows whose serial+project re-appear
+    // in this import. These represent "DR went live, dropped from PP, then OES put it
+    // back in PP DATA again" — typically a service swap or re-provision. We reset
+    // them to not_found so a fresh ticket lifecycle kicks in, and emit a DR
+    // timeline event (pre_prov_reentered) capturing the prior DR resolution.
+    type ReentryRow = { drop_number: string | null; serial_number: string; project: string };
+    const reentryRows: ReentryRow[] = [];
+
     const BATCH_SIZE = 500;
     for (let i = 0; i < ppRows.length; i += BATCH_SIZE) {
       const chunk = ppRows.slice(i, i + BATCH_SIZE);
@@ -206,16 +214,88 @@ export async function importPPData(ppRows: PPRow[], filename: string): Promise<v
         values.push(row.serial_number, row.project, row.date_registered, batchId);
       });
 
+      // Look up which (serial, project) pairs in this chunk already exist as
+      // activated rows — those are re-entries. We capture them BEFORE the upsert
+      // so we still know the prior resolved_drop_number for the timeline event.
+      const reentryLookup = await pool.query<ReentryRow>(
+        `SELECT resolved_drop_number AS drop_number, serial_number, project
+         FROM oes_pp_data
+         WHERE (serial_number, project) IN (
+           SELECT UNNEST($1::text[]), UNNEST($2::text[])
+         )
+         AND resolution_status = 'activated'`,
+        [chunk.map(r => r.serial_number), chunk.map(r => r.project)],
+      );
+      reentryRows.push(...reentryLookup.rows);
+
       await pool.query(
         `INSERT INTO oes_pp_data (serial_number, project, date_registered, import_batch_id)
          VALUES ${placeholders.join(', ')}
          ON CONFLICT (serial_number, project) DO UPDATE SET
            date_registered = COALESCE(EXCLUDED.date_registered, oes_pp_data.date_registered),
            import_batch_id = EXCLUDED.import_batch_id,
+           -- Re-entry: an activated serial reappears in PP DATA → reset for fresh
+           -- ticket lifecycle. Prior maintenance_ticket_id stays resolved (history).
+           resolution_status = CASE
+             WHEN oes_pp_data.resolution_status = 'activated' THEN 'not_found'
+             ELSE oes_pp_data.resolution_status
+           END,
+           maintenance_ticket_id = CASE
+             WHEN oes_pp_data.resolution_status = 'activated' THEN NULL
+             ELSE oes_pp_data.maintenance_ticket_id
+           END,
+           resolved_drop_number = CASE
+             WHEN oes_pp_data.resolution_status = 'activated' THEN NULL
+             ELSE oes_pp_data.resolved_drop_number
+           END,
+           resolved_source = CASE
+             WHEN oes_pp_data.resolution_status = 'activated' THEN NULL
+             ELSE oes_pp_data.resolved_source
+           END,
+           resolved_details = CASE
+             WHEN oes_pp_data.resolution_status = 'activated' THEN NULL
+             ELSE oes_pp_data.resolved_details
+           END,
+           resolved_at = CASE
+             WHEN oes_pp_data.resolution_status = 'activated' THEN NULL
+             ELSE oes_pp_data.resolved_at
+           END,
            updated_at = NOW()
-         WHERE oes_pp_data.resolution_status = 'not_found'`,
+         WHERE oes_pp_data.resolution_status IN ('not_found', 'activated')`,
         values
       );
+    }
+
+    // Emit pre_prov_reentered timeline event per re-entry (best-effort).
+    if (reentryRows.length > 0) {
+      logger.info(`PP re-entry detected: ${reentryRows.length} previously-activated serials back in PP DATA`);
+      try {
+        const { logPreProvReentered } = await import(
+          '@/modules/activate/services/activity-log/eventLoggers'
+        );
+        await Promise.all(
+          reentryRows
+            .filter((r): r is ReentryRow & { drop_number: string } => !!r.drop_number)
+            .map((r) =>
+              logPreProvReentered(
+                r.drop_number,
+                { serialNumber: r.serial_number, project: r.project },
+                'oes-import',
+              ).catch((err: unknown) => {
+                logger.warn('logPreProvReentered failed for re-entry row', {
+                  drop_number: r.drop_number,
+                  serial_number: r.serial_number,
+                  project: r.project,
+                  error: err instanceof Error ? err.message : String(err),
+                });
+              }),
+            ),
+        );
+      } catch (e) {
+        logger.warn('Timeline log for pre_prov_reentered skipped', {
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
     }
 
     // Run local resolution — 3 sequential UPDATE queries. RETURNING captures

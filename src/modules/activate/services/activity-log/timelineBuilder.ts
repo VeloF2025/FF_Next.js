@@ -194,6 +194,11 @@ export async function getActivityTimeline(
         description = `Pre-prov ${reason}${date}`;
         break;
       }
+      case 'pre_prov_reentered': {
+        const serial = data.serialNumber ? String(data.serialNumber) : 'unknown';
+        description = `Serial ${serial} returned to PP DATA — fresh ticket lifecycle`;
+        break;
+      }
       case 'ticket_created': {
         const uid = data.ticketUid ? String(data.ticketUid) : 'ticket';
         const cat = data.category ? ` · ${data.category}` : '';
