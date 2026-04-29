@@ -31,17 +31,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       excludedOnly: excludedOnly === 'true',
     });
 
-    return res.status(200).json({
-      success: true,
-      data: result.rows,
-      pagination: {
-        page: pageNum,
-        pageSize: pageSizeNum,
-        total: result.total,
-        totalPages: Math.ceil(result.total / pageSizeNum),
-      },
-      regions: result.regions,
-    });
+    return apiResponse.paginated(res, result.rows, {
+      page: pageNum,
+      pageSize: pageSizeNum,
+      total: result.total,
+    }, undefined, { regions: result.regions });
   } catch (err) {
     log.error('Failed to list training drops', { err }, 'vlm-training');
     return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Failed to list training drops');

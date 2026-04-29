@@ -22,10 +22,11 @@ export interface TrainingDrop extends Record<string, unknown> {
 }
 
 export interface PhotoMeta {
-  step: string;
+  step: string | null;
+  field: string;
   filename: string;
   url: string;
-  size_bytes?: number;
+  attachmentId: number;
 }
 
 export interface ListParams {
@@ -120,15 +121,16 @@ export async function excludeTrainingDrop(
   reason: string,
   excludedBy: string
 ): Promise<boolean> {
-  const result = await query(
+  const rows = await query<{ drop_number: string }>(
     `UPDATE vlm_training_dataset
      SET excluded_from_training = true,
          excluded_reason = $1,
          excluded_at = NOW(),
          excluded_by = $2
      WHERE drop_number = $3
-       AND excluded_from_training = false`,
+       AND excluded_from_training = false
+     RETURNING drop_number`,
     [reason, excludedBy, dropNumber]
   );
-  return (result as unknown as { rowCount: number }).rowCount > 0;
+  return rows.length > 0;
 }

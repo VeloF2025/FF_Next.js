@@ -40,3 +40,5 @@ CREATE INDEX IF NOT EXISTS idx_vlm_training_core_steps   ON vlm_training_dataset
 CREATE INDEX IF NOT EXISTS idx_vlm_training_active
   ON vlm_training_dataset(created_at DESC)
   WHERE excluded_from_training = false;
+
+GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON vlm_training_dataset TO fibreflow_user;

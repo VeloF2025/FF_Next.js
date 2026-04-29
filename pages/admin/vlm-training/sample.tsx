@@ -19,7 +19,7 @@ interface ListResponse {
   success: boolean;
   data: TrainingDrop[];
   pagination: { page: number; pageSize: number; total: number; totalPages: number };
-  regions: string[];
+  meta: { regions: string[]; [key: string]: unknown };
 }
 
 function stepBadgeColor(count: number): string {
@@ -57,7 +57,7 @@ export default function VlmTrainingSamplePage() {
       setDrops(json.data);
       setTotal(json.pagination.total);
       setTotalPages(json.pagination.totalPages);
-      if (json.regions.length) setRegions(json.regions);
+      if (json.meta?.regions?.length) setRegions(json.meta.regions);
     } catch (err) {
       log.error('Failed to load training drops', { err }, 'vlm-training');
       setError('Failed to load training drops');
