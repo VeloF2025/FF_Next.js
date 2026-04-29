@@ -27,5 +27,6 @@ jobs:
         continue-on-error: true
 
       - name: Unit tests (non-blocking — pre-existing failures)
-        run: npm test -- --run
+        run: npm test -- --run --reporter=basic
         continue-on-error: true
+        timeout-minutes: 5
