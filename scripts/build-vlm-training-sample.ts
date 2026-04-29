@@ -181,7 +181,7 @@ function parseFeature(feature: OneMapFeature, siteCode: string, siteName: string
       const attachmentId = Number(v);
       if (isNaN(attachmentId) || usedAttachments.has(attachmentId)) continue;
       usedAttachments.add(attachmentId);
-      const filename = `${drNumber}_${field}_${attachmentId}.jpg`;
+      const filename = `${field}_${attachmentId}.jpg`;
       photosMetadata.push({
         step,
         field,
@@ -200,7 +200,7 @@ function parseFeature(feature: OneMapFeature, siteCode: string, siteName: string
     const attachmentId = Number(v);
     if (isNaN(attachmentId) || usedAttachments.has(attachmentId)) continue;
     usedAttachments.add(attachmentId);
-    const filename = `${drNumber}_${field}_${attachmentId}.jpg`;
+    const filename = `${field}_${attachmentId}.jpg`;
     photosMetadata.push({
       step: null,
       field,
