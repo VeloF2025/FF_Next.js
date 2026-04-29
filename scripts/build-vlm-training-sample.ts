@@ -156,10 +156,10 @@ function selectSample(candidates: CandidateRow[]): CandidateRow[] {
     let added = false;
     for (const region of regions) {
       if (selected.length >= TARGET_TOTAL) break outer;
-      const pool = capped.get(region)!;
+      const bucket = capped.get(region)!;
       const ptr = pointers.get(region)!;
-      if (ptr < pool.length) {
-        selected.push(pool[ptr]);
+      if (ptr < bucket.length) {
+        selected.push(bucket[ptr]);
         pointers.set(region, ptr + 1);
         added = true;
       }
@@ -271,7 +271,8 @@ async function main() {
         om?.created_at ?? null,
       ]);
       inserted++;
-    } catch {
+    } catch (err) {
+      process.stderr.write(`[vlm-sample] Insert error for ${row.drop_number}: ${err}\n`);
       skipped++;
     }
   }

@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
-import { withAuth, getAuthUser } from '@/lib/auth';
+import { withAuth, withRole, getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import {
   getTrainingDrop,
@@ -56,4 +56,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   return apiResponse.error(res, ErrorCode.METHOD_NOT_ALLOWED, 'Method not allowed');
 }
 
-export default withAuth(handler);
+export default withAuth(withRole('manager')(handler));

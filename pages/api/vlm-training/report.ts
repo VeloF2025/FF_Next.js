@@ -5,10 +5,20 @@
  * Grouped by region with drop list, step completeness, and metadata.
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { apiResponse } from '@/lib/apiResponse';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, withRole } from '@/lib/auth';
 import { query } from '@/lib/db-pool';
+
+function esc(s: string | null | undefined): string {
+  if (s == null) return '—';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 interface RegionRow extends Record<string, unknown> {
   region: string;
@@ -34,10 +44,10 @@ function buildHtml(regions: RegionRow[], drops: DropRow[], generatedAt: string):
     .map(
       (r) => `
       <tr>
-        <td>${r.region}</td>
-        <td>${r.total}</td>
-        <td>${r.avg_steps}/9</td>
-        <td>${r.full_count}</td>
+        <td>${esc(r.region)}</td>
+        <td>${esc(r.total)}</td>
+        <td>${esc(r.avg_steps)}/9</td>
+        <td>${esc(r.full_count)}</td>
       </tr>`
     )
     .join('');
@@ -54,17 +64,17 @@ function buildHtml(regions: RegionRow[], drops: DropRow[], generatedAt: string):
         .map(
           (d) => `
           <tr>
-            <td style="font-family:monospace">${d.drop_number}</td>
+            <td style="font-family:monospace">${esc(d.drop_number)}</td>
             <td>${d.core_steps_present}/9${d.dome_steps_present > 0 ? ` +${d.dome_steps_present}D` : ''}</td>
-            <td>${d.installer_name ?? '—'}</td>
-            <td>${d.installation_date ? d.installation_date.substring(0, 10) : '—'}</td>
+            <td>${esc(d.installer_name)}</td>
+            <td>${d.installation_date ? esc(d.installation_date.substring(0, 10)) : '—'}</td>
           </tr>`
         )
         .join('');
 
       return `
         <div class="region-section">
-          <h2 class="region-heading">${region} <span class="region-count">${regionDrops.length} drops</span></h2>
+          <h2 class="region-heading">${esc(region)} <span class="region-count">${regionDrops.length} drops</span></h2>
           <table class="drop-table">
             <thead>
               <tr><th>Drop #</th><th>Steps</th><th>Installer</th><th>Date</th></tr>
@@ -211,8 +221,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
   } catch (err) {
     log.error('Failed to generate VLM training report', { err }, 'vlm-training');
-    return apiResponse.error(res, 'INTERNAL_ERROR' as never, 'Failed to generate report');
+    return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Failed to generate report');
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withRole('manager')(handler));

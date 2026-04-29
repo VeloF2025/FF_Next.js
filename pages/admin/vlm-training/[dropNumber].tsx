@@ -28,7 +28,7 @@ function buildPhotos(drop: TrainingDrop): Photo[] {
   return metadata.map((m) => ({
     filename: String(m.filename ?? ''),
     url: String(m.url ?? ''),
-    step: m.step != null ? Number(m.step) : null,
+    step: m.step != null ? String(m.step) : null,
     size: m.size_bytes != null ? Number(m.size_bytes) : undefined,
   }));
 }
@@ -46,15 +46,21 @@ export default function VlmTrainingDropPage() {
 
   useEffect(() => {
     if (!dropNumber || typeof dropNumber !== 'string') return;
+    const controller = new AbortController();
     setLoading(true);
-    fetch(`/api/vlm-training/${dropNumber}`)
+    fetch(`/api/vlm-training/${dropNumber}`, { signal: controller.signal })
       .then((r) => r.json())
       .then((json) => {
         if (json.success) setDrop(json.data);
         else setError('Drop not found');
       })
-      .catch((err: unknown) => { log.error('Failed to load training drop', { err }, 'vlm-training'); setError('Failed to load drop'); })
+      .catch((err: unknown) => {
+        if ((err as { name?: string }).name === 'AbortError') return;
+        log.error('Failed to load training drop', { err }, 'vlm-training');
+        setError('Failed to load drop');
+      })
       .finally(() => setLoading(false));
+    return () => controller.abort();
   }, [dropNumber]);
 
   const handleExclude = async () => {
@@ -70,7 +76,13 @@ export default function VlmTrainingDropPage() {
       if (json.success) {
         setDrop({ ...drop, excluded_from_training: true, excluded_reason: excludeReason });
         setShowExcludeForm(false);
+      } else {
+        log.error('Failed to exclude training drop', { response: json }, 'vlm-training');
+        setError('Failed to exclude drop. Please try again.');
       }
+    } catch (err: unknown) {
+      log.error('Failed to exclude training drop', { err }, 'vlm-training');
+      setError('Failed to exclude drop. Please try again.');
     } finally {
       setExcluding(false);
     }
