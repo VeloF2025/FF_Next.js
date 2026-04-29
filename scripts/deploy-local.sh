@@ -164,6 +164,18 @@ if sudo -u velo bash -c "cd $DIR && git diff --name-only $CURRENT_COMMIT HEAD 2>
   sudo -u velo bash -c "cd $DIR && npm ci --legacy-peer-deps"
 fi
 
+# --- Step 3 (guard): Validate node_modules is usable (catches dangling symlink) ---
+# node_modules may be a symlink to the workspace; if that target was wiped the build silently
+# fails with "next: not found" (exit 127). Detect this before touching .next.
+if ! sudo -u velo bash -c "test -x '$DIR/node_modules/.bin/next'"; then
+  log "WARNING: node_modules/.bin/next not accessible — replacing with local install..."
+  sudo -u velo bash -c "rm -rf '$DIR/node_modules' && cd '$DIR' && npm ci --legacy-peer-deps"
+  if ! sudo -u velo bash -c "test -x '$DIR/node_modules/.bin/next'"; then
+    error "npm ci failed — node_modules still unusable. Cannot build."
+  fi
+  log "node_modules restored OK."
+fi
+
 # --- Step 3a: Apply pending DB migrations (fail fast before build) ---
 log "Checking DB migrations..."
 MIGRATION_EXIT=0
