@@ -23,12 +23,18 @@ const STEP_LABELS: Record<string, string> = {
   step_12_dome_joint_closed: 'Dome Joint Closed',
 };
 
+function stepNameToNumber(step: unknown): number | null {
+  if (step == null) return null;
+  const match = String(step).match(/^step_(\d+)/);
+  return match ? parseInt(match[1]!, 10) : null;
+}
+
 function buildPhotos(drop: TrainingDrop): Photo[] {
   const metadata = (drop.photos_metadata as unknown as Record<string, unknown>[]) ?? [];
   return metadata.map((m) => ({
     filename: String(m.filename ?? ''),
     url: String(m.url ?? ''),
-    step: m.step != null ? String(m.step) : null,
+    step: stepNameToNumber(m.step),
     size: m.size_bytes != null ? Number(m.size_bytes) : undefined,
   }));
 }
