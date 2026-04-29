@@ -54,7 +54,7 @@ export default function VlmTrainingDropPage() {
     if (!dropNumber || typeof dropNumber !== 'string') return;
     const controller = new AbortController();
     setLoading(true);
-    fetch(`/api/vlm-training/${dropNumber}`, { signal: controller.signal })
+    fetch(`/api/vlm-training/${dropNumber}`, { signal: controller.signal, credentials: 'include' })
       .then((r) => r.json())
       .then((json) => {
         if (json.success) setDrop(json.data);
@@ -77,6 +77,7 @@ export default function VlmTrainingDropPage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: excludeReason }),
+        credentials: 'include',
       });
       const json = await res.json();
       if (json.success) {

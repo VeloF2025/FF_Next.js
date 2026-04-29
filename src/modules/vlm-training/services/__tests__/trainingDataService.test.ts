@@ -26,8 +26,11 @@ describe('listTrainingDrops', () => {
 
     await listTrainingDrops({ page: -5, pageSize: 10 });
 
-    const countCall = mockQueryOne.mock.calls[0]!;
-    expect(countCall[0]).toContain('vlm_training_dataset');
+    // page -5 → clamped to 1 → offset = (1-1)*10 = 0
+    const dataCall = mockQuery.mock.calls[0]!;
+    const params = dataCall[1] as unknown[];
+    expect(params[params.length - 1]).toBe(0); // OFFSET = 0 (page 1)
+    expect(params[params.length - 2]).toBe(10); // LIMIT = pageSize=10
   });
 
   it('clamps pageSize to maximum 100', async () => {
@@ -36,9 +39,11 @@ describe('listTrainingDrops', () => {
 
     await listTrainingDrops({ page: 1, pageSize: 999 });
 
+    // pageSize 999 → clamped to 100 (max); offset = (1-1)*100 = 0
     const dataCall = mockQuery.mock.calls[0]!;
-    // LIMIT param should be 100, not 999
-    expect(dataCall[1]).toContain(100);
+    const params = dataCall[1] as unknown[];
+    expect(params[params.length - 2]).toBe(100); // LIMIT = 100, not 999
+    expect(params[params.length - 2]).not.toBe(999);
   });
 
   it('applies region filter when provided', async () => {
