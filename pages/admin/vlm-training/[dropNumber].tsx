@@ -31,12 +31,16 @@ function stepNameToNumber(step: unknown): number | null {
 
 function buildPhotos(drop: TrainingDrop): Photo[] {
   const metadata = (drop.photos_metadata as unknown as Record<string, unknown>[]) ?? [];
-  return metadata.map((m) => ({
-    filename: String(m.filename ?? ''),
-    url: String(m.url ?? ''),
-    step: stepNameToNumber(m.step),
-    size: m.size_bytes != null ? Number(m.size_bytes) : undefined,
-  }));
+  return metadata.map((m) => {
+    const filename = String(m.filename ?? '');
+    return {
+      filename,
+      // Proxy through our server to avoid mixed-content blocks (raw URL is HTTP on an internal IP)
+      url: `/api/activate/photo/${drop.drop_number}/${filename}`,
+      step: stepNameToNumber(m.step),
+      size: m.size_bytes != null ? Number(m.size_bytes) : undefined,
+    };
+  });
 }
 
 export default function VlmTrainingDropPage() {
