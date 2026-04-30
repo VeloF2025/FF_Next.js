@@ -59,12 +59,17 @@ const TICKET_TYPE_LABELS: Record<string, string> = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Extract the numeric source ID from a composite id like "olt_mismatch:1234". */
+/** Extract the numeric source ID from a composite id like "oes_pp_data:1234". Only use for integer-PK sources. */
 function extractNumericId(compositeId: string): number {
   const raw = compositeId.split(':').pop() ?? '';
   const parsed = parseInt(raw, 10);
   if (isNaN(parsed)) throw new Error(`Cannot parse numeric ID from: "${compositeId}"`);
   return parsed;
+}
+
+/** Extract the raw string source ID from a composite id like "olt_mismatch:uuid-here". Use for UUID-PK sources. */
+function extractRawId(compositeId: string): string {
+  return compositeId.split(':').slice(1).join(':');
 }
 
 /** POST JSON to an endpoint and throw with a useful message on failure. */
@@ -115,14 +120,13 @@ export function CreateTicketModal({
     setIsSubmitting(true);
     try {
       const ppIds: number[] = [];
-      const oltIds: number[] = [];
-      const offlineIds: number[] = [];
+      const oltIds: string[] = [];    // olt_mismatch_records.id is UUID
+      const offlineIds: string[] = []; // offline_devices.id is UUID
 
       for (const item of selectedItems) {
-        const numId = extractNumericId(item.id);
-        if (item.source === 'oes_pp_data') ppIds.push(numId);
-        else if (item.source === 'olt_mismatch') oltIds.push(numId);
-        else if (item.source === 'offline_devices') offlineIds.push(numId);
+        if (item.source === 'oes_pp_data') ppIds.push(extractNumericId(item.id));
+        else if (item.source === 'olt_mismatch') oltIds.push(extractRawId(item.id));
+        else if (item.source === 'offline_devices') offlineIds.push(extractRawId(item.id));
       }
 
       const shared = {
