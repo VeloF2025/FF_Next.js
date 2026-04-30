@@ -17,6 +17,7 @@ const OES_ACTIVATIONS_GROUP_JID =
   process.env.OES_ACTIVATIONS_WA_GROUP_JID ?? '120363321969740151@g.us';
 
 export interface OesReportResult {
+  reportDate: string;
   url: string;
   sizeBytes: number;
   rowCounts: {
@@ -105,6 +106,7 @@ export async function runNightlyOesReport(opts: {
   }
 
   return {
+    reportDate,
     url,
     sizeBytes: buffer.length,
     rowCounts: {
