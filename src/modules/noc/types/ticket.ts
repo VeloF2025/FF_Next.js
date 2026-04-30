@@ -352,7 +352,7 @@ export interface TicketFilters {
   source?: TicketSource | TicketSource[];
   assigned_to?: string; // User ID
   assigned_contractor_id?: string; // Contractor ID
-  assigned_team_id?: string; // Team ID
+  assigned_team_id?: string | string[]; // Team ID or multiple team IDs
   project_id?: string;
   dr_number?: string;
   qa_ready?: boolean;

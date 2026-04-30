@@ -64,7 +64,10 @@ async function fetchTickets(filters?: TicketFilters): Promise<TicketListResult> 
     if (filters.priority) params.append('priority', filters.priority as string);
     if (filters.source) params.append('source', filters.source as string);
     if (filters.assigned_to) params.append('assigned_to', filters.assigned_to);
-    if (filters.assigned_team_id) params.append('assigned_team_id', filters.assigned_team_id);
+    if (filters.assigned_team_id) {
+      const ids = Array.isArray(filters.assigned_team_id) ? filters.assigned_team_id : [filters.assigned_team_id];
+      ids.forEach((id) => params.append('assigned_team_id', id));
+    }
     if (filters.project_id) params.append('project_id', filters.project_id);
     if (filters.dr_number) params.append('dr_number', filters.dr_number);
     if (filters.qa_ready !== undefined) params.append('qa_ready', String(filters.qa_ready));

@@ -880,8 +880,16 @@ export async function listTickets(
     }
 
     if (filters.assigned_team_id) {
-      whereClauses.push(`assigned_team_id = $${paramCounter}`);
-      values.push(filters.assigned_team_id);
+      const teamIds = Array.isArray(filters.assigned_team_id)
+        ? filters.assigned_team_id
+        : [filters.assigned_team_id];
+      if (teamIds.length === 1) {
+        whereClauses.push(`assigned_team_id = $${paramCounter}`);
+        values.push(teamIds[0]);
+      } else {
+        whereClauses.push(`assigned_team_id = ANY($${paramCounter}::uuid[])`);
+        values.push(teamIds);
+      }
       paramCounter++;
     }
 
