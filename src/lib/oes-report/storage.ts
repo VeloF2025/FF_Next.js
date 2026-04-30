@@ -3,7 +3,7 @@ const PUBLIC_STORAGE_BASE = 'https://vf.fibreflow.app/storage';
 
 export async function uploadOesReport(buffer: Buffer, date: string): Promise<string> {
   const filename = `oes-report-${date}.xlsx`;
-  const storagePath = `oes-reports/${filename}`;
+  const storagePath = `oes/reports/${filename}`;
 
   const formData = new FormData();
   formData.append(
@@ -14,7 +14,8 @@ export async function uploadOesReport(buffer: Buffer, date: string): Promise<str
     filename
   );
 
-  const response = await fetch(`${VF_STORAGE_BASE}/upload/oes-reports`, {
+  // VF Storage upload route pattern: POST /upload/:type/:category
+  const response = await fetch(`${VF_STORAGE_BASE}/upload/oes/reports`, {
     method: 'POST',
     body: formData,
   });
