@@ -15,7 +15,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   FileText,
   AlertTriangle,
@@ -55,6 +55,11 @@ export function TicketList({
     pageSize: 20,
     ...initialFilters,
   });
+
+  // Sync external filter changes (project, discipline, scope, etc.) into local state
+  useEffect(() => {
+    setFilters((prev) => ({ ...prev, ...initialFilters, page: 1 }));
+  }, [initialFilters]);
 
   const { tickets, pagination, isLoading, isError, error, refetch } = useTickets(filters);
 
