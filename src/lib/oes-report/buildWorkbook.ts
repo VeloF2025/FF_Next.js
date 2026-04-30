@@ -5,6 +5,7 @@ import type {
   PpSiteCount,
   WaOnlyRow,
   OesOnlyRow,
+  FtDisputeRow,
   TicketMap,
   TicketRow,
 } from './queries';
@@ -78,10 +79,11 @@ export async function buildOesWorkbook(opts: {
   ppSiteCounts: PpSiteCount[];
   waOnlyRows: WaOnlyRow[];
   oesOnlyRows: OesOnlyRow[];
+  ftDisputeRows: FtDisputeRow[];
   ticketMap: TicketMap;
   reportDate: string; // YYYY-MM-DD
 }): Promise<Buffer> {
-  const { allRows, ppRows, ppSiteCounts, waOnlyRows, oesOnlyRows, ticketMap } = opts;
+  const { allRows, ppRows, ppSiteCounts, waOnlyRows, oesOnlyRows, ftDisputeRows, ticketMap } = opts;
   const wb = new ExcelJS.Workbook();
   wb.creator = 'FibreFlow';
   wb.created = new Date();
@@ -280,8 +282,67 @@ export async function buildOesWorkbook(opts: {
     addTicketCells(row, 6, r.drop_number, r.serial_number, ticketMap);
   }
 
+  // ── Tab 5: FT Dispute ────────────────────────────────────────────────────
+  // DRs that appear in BOTH OES Activations and PP DATA — Fibertime is billing
+  // them as pre-provision even though the drop is already activated.
+  const sheetDisp = wb.addWorksheet('FT Dispute');
+  const dispHeaders = [
+    'Serial Number', 'Project', 'PP Date Registered',
+    'Drop Number', 'Activation Date', 'Team', 'OES Status',
+  ];
+
+  let maxTicketColsDisp = 0;
+  for (const r of ftDisputeRows) {
+    const count = [r.drop_number?.toUpperCase(), r.serial_number?.toUpperCase()]
+      .filter(Boolean)
+      .flatMap(k => ticketMap.get(k!) ?? [])
+      .reduce((acc, t) => { acc.add(t.id); return acc; }, new Set<string>()).size;
+    if (count > maxTicketColsDisp) maxTicketColsDisp = count;
+  }
+
+  sheetDisp.columns = [
+    { key: 'serial_number',    width: 18 },
+    { key: 'project',          width: 18 },
+    { key: 'date_registered',  width: 20 },
+    { key: 'drop_number',      width: 14 },
+    { key: 'activation_date',  width: 18 },
+    { key: 'team',             width: 10 },
+    { key: 'status',           width: 14 },
+    ...Array.from({ length: maxTicketColsDisp }, () => ({ width: 20 })),
+  ];
+
+  const headerRowDisp = sheetDisp.addRow(
+    maxTicketColsDisp > 0
+      ? [...dispHeaders, ...Array.from({ length: maxTicketColsDisp }, (_, i) => `Ticket ${i + 1}`)]
+      : dispHeaders
+  );
+  styleHeader(headerRowDisp);
+
+  const DISPUTE_FILL: ExcelJS.Fill = {
+    type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3CD' },
+  };
+
+  for (const r of ftDisputeRows) {
+    const row = sheetDisp.addRow([
+      r.serial_number, r.project, r.date_registered,
+      r.drop_number, r.activation_date, r.team, r.activation_status,
+    ]);
+    row.eachCell((cell: ExcelJS.Cell) => { cell.fill = DISPUTE_FILL; });
+    const statusLower = (r.activation_status ?? '').toLowerCase();
+    const fill = OES_STATUS_FILLS[statusLower];
+    if (fill) {
+      const statusCell = row.getCell(7);
+      statusCell.fill = fill as ExcelJS.Fill;
+      statusCell.font = { color: { argb: 'FFFFFFFF' } };
+    }
+    addTicketCells(row, 8, r.drop_number, r.serial_number, ticketMap);
+  }
+
+  const totalRowDisp = sheetDisp.addRow([`${ftDisputeRows.length} to dispute`, '', '', '', '', '', '']);
+  totalRowDisp.font = { bold: true, color: { argb: 'FFDC2626' } };
+
   // ── Freeze header rows on all tabs ───────────────────────────────────────
-  for (const sheet of [sheetAll, sheetPp, sheetWa, sheetOes]) {
+  for (const sheet of [sheetAll, sheetPp, sheetWa, sheetOes, sheetDisp]) {
     sheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1, activeCell: 'A2' }];
   }
 

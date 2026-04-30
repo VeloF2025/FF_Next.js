@@ -5,6 +5,7 @@ import {
   loadPpSiteCounts,
   loadWaOnlyRows,
   loadOesOnlyRows,
+  loadFtDisputeRows,
   loadTicketsForKeys,
 } from '@/lib/oes-report/queries';
 import { buildOesWorkbook } from '@/lib/oes-report/buildWorkbook';
@@ -22,6 +23,7 @@ export interface OesReportResult {
     pp: number;
     waOnly: number;
     oesOnly: number;
+    ftDispute: number;
   };
   ticketsLinked: number;
   durationMs: number;
@@ -40,17 +42,19 @@ export async function runNightlyOesReport(opts: {
 
   log.info('OES nightly report: loading data', { date: reportDate, dryRun: opts.dryRun }, 'OesNightlyReport');
 
-  const [allRows, ppRows, ppSiteCounts, waOnlyRows, oesOnlyRows] = await Promise.all([
+  const [allRows, ppRows, ppSiteCounts, waOnlyRows, oesOnlyRows, ftDisputeRows] = await Promise.all([
     loadAllActivations(),
     loadPpData(),
     loadPpSiteCounts(),
     loadWaOnlyRows(),
     loadOesOnlyRows(),
+    loadFtDisputeRows(),
   ]);
 
   log.info('OES nightly report: data loaded', {
     all: allRows.length, pp: ppRows.length,
     waOnly: waOnlyRows.length, oesOnly: oesOnlyRows.length,
+    ftDispute: ftDisputeRows.length,
   }, 'OesNightlyReport');
 
   // Collect keys for ticket lookup
@@ -58,6 +62,7 @@ export async function runNightlyOesReport(opts: {
     ...allRows.map(r => r.drop_number),
     ...waOnlyRows.map(r => r.drop_number),
     ...oesOnlyRows.map(r => r.drop_number),
+    ...ftDisputeRows.map(r => r.drop_number),
   ].filter(Boolean) as string[];
 
   const ontSerials = [
@@ -65,6 +70,7 @@ export async function runNightlyOesReport(opts: {
     ...ppRows.map(r => r.serial_number),
     ...waOnlyRows.map(r => r.ont_serial_scanned),
     ...oesOnlyRows.map(r => r.serial_number),
+    ...ftDisputeRows.map(r => r.serial_number),
   ].filter(Boolean) as string[];
 
   const ticketMap = await loadTicketsForKeys(
@@ -77,7 +83,7 @@ export async function runNightlyOesReport(opts: {
   log.info('OES nightly report: tickets loaded', { ticketsLinked }, 'OesNightlyReport');
 
   const buffer = await buildOesWorkbook({
-    allRows, ppRows, ppSiteCounts, waOnlyRows, oesOnlyRows, ticketMap, reportDate,
+    allRows, ppRows, ppSiteCounts, waOnlyRows, oesOnlyRows, ftDisputeRows, ticketMap, reportDate,
   });
 
   const url = await uploadOesReport(buffer, reportDate);
@@ -85,7 +91,7 @@ export async function runNightlyOesReport(opts: {
 
   if (!opts.dryRun) {
     const filename = `OES-Report-${reportDate}.xlsx`;
-    const caption = `*OES Daily Report — ${reportDate}*\nAll: ${allRows.length} | PP: ${ppRows.length} | Anomalies: ${waOnlyRows.length + oesOnlyRows.length}`;
+    const caption = `*OES Daily Report — ${reportDate}*\nAll: ${allRows.length} | PP: ${ppRows.length} | WA anomaly: ${waOnlyRows.length} | OES anomaly: ${oesOnlyRows.length} | FT Dispute: ${ftDisputeRows.length}`;
     try {
       await sendWhatsAppGroupDocument(OES_ACTIVATIONS_GROUP_JID, url, filename, caption);
       log.info('OES nightly report: sent to WA group', { group: OES_ACTIVATIONS_GROUP_JID }, 'OesNightlyReport');
@@ -106,6 +112,7 @@ export async function runNightlyOesReport(opts: {
       pp: ppRows.length,
       waOnly: waOnlyRows.length,
       oesOnly: oesOnlyRows.length,
+      ftDispute: ftDisputeRows.length,
     },
     ticketsLinked,
     durationMs: Date.now() - start,
