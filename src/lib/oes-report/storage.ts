@@ -1,9 +1,9 @@
 const VF_STORAGE_BASE = process.env.VF_STORAGE_URL ?? 'http://100.96.203.105:8091';
-const PUBLIC_STORAGE_BASE = 'https://vf.fibreflow.app/storage';
+// VF Storage files are served via app.fibreflow.app/storage/<path>
+const PUBLIC_STORAGE_BASE = 'https://app.fibreflow.app/storage';
 
 export async function uploadOesReport(buffer: Buffer, date: string): Promise<string> {
   const filename = `oes-report-${date}.xlsx`;
-  const storagePath = `oes/reports/${filename}`;
 
   const formData = new FormData();
   formData.append(
@@ -25,5 +25,8 @@ export async function uploadOesReport(buffer: Buffer, date: string): Promise<str
     throw new Error(`VF Storage upload failed (${response.status}): ${text}`);
   }
 
-  return `${PUBLIC_STORAGE_BASE}/${storagePath}`;
+  // Storage API returns { path: "oes/reports/<timestamp>-<hash>.xlsx", ... }
+  const result = (await response.json()) as { path?: string };
+  const storedPath = result.path ?? `oes/reports/${filename}`;
+  return `${PUBLIC_STORAGE_BASE}/${storedPath}`;
 }
