@@ -31,7 +31,7 @@ export function StaffFilterPicker({ value, onChange }: StaffFilterPickerProps) {
   }, [users, search]);
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: Event) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
         setSearch('');
@@ -61,35 +61,40 @@ export function StaffFilterPicker({ value, onChange }: StaffFilterPickerProps) {
 
   return (
     <div className="relative flex-shrink-0" ref={containerRef}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm border transition-colors whitespace-nowrap
-          ${isActive
-            ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300'
-            : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
-          }`}
+      {/* Trigger and optional clear button as siblings inside a styled container */}
+      <div className={`flex items-center rounded-lg border transition-colors
+        ${isActive ? 'border-cyan-500/30' : 'border-[var(--ff-border-light)]'}`}
       >
-        <User className="w-3.5 h-3.5 flex-shrink-0" />
-        {selected ? (
-          <>
-            <span className="max-w-[120px] truncate">{selected.name}</span>
-            <button
-              type="button"
-              onClick={handleClear}
-              className="ml-0.5 hover:text-white transition-colors"
-              aria-label="Clear staff filter"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </>
-        ) : (
-          <>
-            <span>Staff</span>
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className={`flex items-center gap-1.5 px-2.5 py-2 text-sm transition-colors whitespace-nowrap
+            ${isActive ? 'rounded-l-lg' : 'rounded-lg'}
+            ${isActive
+              ? 'bg-cyan-500/10 text-cyan-300'
+              : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-secondary)]'
+            }`}
+        >
+          <User className="w-3.5 h-3.5 flex-shrink-0" />
+          <span className={selected ? 'max-w-[120px] truncate' : ''}>
+            {selected ? selected.name : 'Staff'}
+          </span>
+          {!selected && (
             <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
-          </>
+          )}
+        </button>
+
+        {selected && (
+          <button
+            type="button"
+            onClick={handleClear}
+            aria-label="Clear staff filter"
+            className="pr-2 pl-1 py-2 bg-cyan-500/10 rounded-r-lg text-cyan-300 hover:text-white transition-colors"
+          >
+            <X className="w-3 h-3" />
+          </button>
         )}
-      </button>
+      </div>
 
       {open && (
         <div className="absolute z-50 top-full mt-1 left-0 w-64 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg shadow-xl overflow-hidden">
@@ -132,9 +137,6 @@ export function StaffFilterPicker({ value, onChange }: StaffFilterPickerProps) {
                       <div className="text-xs text-[var(--ff-text-tertiary)] truncate">{user.role}</div>
                     )}
                   </div>
-                  {user.id === value && (
-                    <X className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" onClick={handleClear} />
-                  )}
                 </button>
               ))
             )}

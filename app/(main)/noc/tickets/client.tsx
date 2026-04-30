@@ -125,10 +125,10 @@ export default function TicketsListPageClient() {
       ticket_category: (filterCategory || undefined) as any,
       source: (filterSource || undefined) as any,
       project_id: filterProject || undefined,
-      // Mine scope locks to current user; staff filter applies when in All/Team scope
-      assigned_to: ticketScope === 'my_tickets' && currentUser?.id
-        ? currentUser.id
-        : filterStaff || undefined,
+      // Mine scope always uses current user (undefined while auth loads — not filterStaff)
+      assigned_to: ticketScope === 'my_tickets'
+        ? (currentUser?.id ?? undefined)
+        : (filterStaff || undefined),
       assigned_team_id: ticketScope === 'my_team' && teamIds.length > 0 ? teamIds : undefined,
     };
     if (dateRange.created_after) f.created_after = dateRange.created_after;
