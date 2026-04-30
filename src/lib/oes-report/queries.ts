@@ -65,9 +65,12 @@ export async function loadAllActivations(): Promise<AllRow[]> {
 }
 
 export async function loadPpData(): Promise<PpRow[]> {
+  // Only show serials with no resolution yet. Any other status (located_*, activated)
+  // means the serial has been matched — activated ones appear in the FT Dispute tab.
   const result = await pool.query<PpRow>(`
     SELECT project, serial_number, date_registered
     FROM oes_pp_data
+    WHERE resolution_status = 'not_found'
     ORDER BY project NULLS LAST, date_registered NULLS LAST
   `);
   return result.rows;
@@ -78,8 +81,32 @@ export async function loadPpSiteCounts(): Promise<PpSiteCount[]> {
     SELECT project, COUNT(*)::int AS count
     FROM oes_pp_data
     WHERE project IS NOT NULL
+      AND resolution_status = 'not_found'
     GROUP BY project
     ORDER BY project
+  `);
+  return result.rows;
+}
+
+export interface FtDisputeRow {
+  serial_number: string;
+  project: string | null;
+  date_registered: string | null;
+  drop_number: string;
+  activation_date: string | null;
+  team: string | null;
+  activation_status: string | null;
+}
+
+export async function loadFtDisputeRows(): Promise<FtDisputeRow[]> {
+  // Serials that appear in both PP DATA and OES Activations —
+  // Fibertime is billing them as pre-provision even though they are activated.
+  const result = await pool.query<FtDisputeRow>(`
+    SELECT p.serial_number, p.project, p.date_registered::text,
+           a.drop_number, a.activation_date::text, a.team, a.status AS activation_status
+    FROM oes_pp_data p
+    JOIN oes_activations a ON LOWER(a.serial_number) = LOWER(p.serial_number)
+    ORDER BY a.activation_date DESC NULLS LAST, p.project
   `);
   return result.rows;
 }

@@ -5,9 +5,11 @@ import type {
   PpSiteCount,
   WaOnlyRow,
   OesOnlyRow,
+  FtDisputeRow,
   TicketMap,
   TicketRow,
 } from './queries';
+import { addFtDisputeSheet } from './ftDisputeSheet';
 
 const TICKET_BASE_URL = 'https://app.fibreflow.app/noc/tickets/';
 
@@ -78,10 +80,11 @@ export async function buildOesWorkbook(opts: {
   ppSiteCounts: PpSiteCount[];
   waOnlyRows: WaOnlyRow[];
   oesOnlyRows: OesOnlyRow[];
+  ftDisputeRows: FtDisputeRow[];
   ticketMap: TicketMap;
   reportDate: string; // YYYY-MM-DD
 }): Promise<Buffer> {
-  const { allRows, ppRows, ppSiteCounts, waOnlyRows, oesOnlyRows, ticketMap } = opts;
+  const { allRows, ppRows, ppSiteCounts, waOnlyRows, oesOnlyRows, ftDisputeRows, ticketMap } = opts;
   const wb = new ExcelJS.Workbook();
   wb.creator = 'FibreFlow';
   wb.created = new Date();
@@ -177,7 +180,7 @@ export async function buildOesWorkbook(opts: {
     sheetPp.getColumn(8 + i).width = 20;
   }
 
-  const ppHeaders: string[] = ['Project', 'Serial', 'Date Registered', '', '', 'Project', 'Count'];
+  const ppHeaders: string[] = ['Project', 'Serial', 'Date Registered', '', '', 'Project', 'Outstanding'];
   if (maxTicketColsPp > 0) {
     ppHeaders.push(...Array.from({ length: maxTicketColsPp }, (_, i) => `Ticket ${i + 1}`));
   }
@@ -280,8 +283,11 @@ export async function buildOesWorkbook(opts: {
     addTicketCells(row, 6, r.drop_number, r.serial_number, ticketMap);
   }
 
+  // ── Tab 5: FT Dispute ────────────────────────────────────────────────────
+  const sheetDisp = addFtDisputeSheet(wb, ftDisputeRows, ticketMap);
+
   // ── Freeze header rows on all tabs ───────────────────────────────────────
-  for (const sheet of [sheetAll, sheetPp, sheetWa, sheetOes]) {
+  for (const sheet of [sheetAll, sheetPp, sheetWa, sheetOes, sheetDisp]) {
     sheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1, activeCell: 'A2' }];
   }
 
