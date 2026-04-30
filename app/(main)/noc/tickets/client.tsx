@@ -1,21 +1,6 @@
 'use client';
 
-/**
- * Ticket List Page Client Component
- *
- * Displays filterable list of all tickets with:
- * - Status, type, assignee, project filters
- * - QA Ready indicator
- * - Fault cause column
- * - Search functionality
- * - Bulk actions
- * - Create new ticket button
- * - Toggle between Table and Kanban views
- *
- * 🟢 WORKING: Ticket list page integrates TicketList and KanbanBoard components
- */
-
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ModulePage } from '@/components/module-page';
 import { nocConfig } from '@/modules/navigation';
 import { TicketList } from '@/modules/noc/components/TicketList/TicketList';
@@ -24,7 +9,7 @@ import { KanbanBoard } from '@/modules/noc/components/KanbanBoard';
 import { useMyTeams } from '@/modules/noc/hooks/useMyTeams';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
-import { Search, Users, User, X } from 'lucide-react';
+import { Search, Users, User, X, SlidersHorizontal } from 'lucide-react';
 import { TicketSummaryTiles } from '@/modules/noc/components/TicketList/TicketSummaryTiles';
 import { useProjects } from '@/hooks/useProjects';
 import { useUrlFilters } from '@/hooks/useUrlFilters';
@@ -33,7 +18,6 @@ import type { TicketFilters } from '@/modules/noc/types/ticket';
 type ViewMode = 'table' | 'kanban' | 'grid';
 type TicketScope = 'all' | 'my_tickets' | 'my_team';
 
-// Icons for view toggle
 const TableIcon = () => (
   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -53,7 +37,6 @@ const GridIcon = () => (
 );
 
 export default function TicketsListPageClient() {
-  // All filters synced bidirectionally with URL search params
   const { filters: urlFilters, setFilter, setMultiple } = useUrlFilters({
     status: '',
     type: '',
@@ -76,20 +59,25 @@ export default function TicketsListPageClient() {
   const filterProject = urlFilters.project;
   const statusFilter = urlFilters.status || undefined;
 
-  const { teamIds } = useMyTeams();
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
+
+  const { teams, teamIds, isLoading: teamsLoading } = useMyTeams();
   const { currentUser } = useAuth();
   const { data: projects = [] } = useProjects();
   const activeProjects = (projects as { id: string; name: string; code?: string; status?: string }[])
     .filter((p) => p.status === 'active' || p.status === 'in_progress')
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  // Also persist view/scope to localStorage as fallback
+  // Show the source filter if it has a value even when "more filters" is collapsed
+  useEffect(() => {
+    if (filterSource) setShowMoreFilters(true);
+  }, [filterSource]);
+
   useEffect(() => {
     if (urlFilters.view) localStorage.setItem('ticketsViewMode', urlFilters.view);
     if (urlFilters.scope) localStorage.setItem('ticketsScope', urlFilters.scope);
   }, [urlFilters.view, urlFilters.scope]);
 
-  // On mount, if URL doesn't have view/scope, load from localStorage
   useEffect(() => {
     if (!urlFilters.view) {
       const saved = localStorage.getItem('ticketsViewMode') as ViewMode | null;
@@ -106,22 +94,14 @@ export default function TicketsListPageClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleViewChange = (mode: ViewMode) => {
-    setFilter('view', mode);
-  };
+  const handleViewChange = (mode: ViewMode) => setFilter('view', mode);
+  const handleScopeChange = (scope: TicketScope) => setFilter('scope', scope);
 
-  const handleScopeChange = (scope: TicketScope) => {
-    setFilter('scope', scope);
-  };
-
-  // Compute date range from preset
   const dateRange = useMemo(() => {
     if (!filterDatePreset) return {};
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    if (filterDatePreset === 'today') {
-      return { created_after: startOfDay };
-    }
+    if (filterDatePreset === 'today') return { created_after: startOfDay };
     if (filterDatePreset === 'yesterday') {
       const yesterday = new Date(startOfDay);
       yesterday.setDate(yesterday.getDate() - 1);
@@ -140,9 +120,6 @@ export default function TicketsListPageClient() {
     return {};
   }, [filterDatePreset]);
 
-  // Create filters object for components (include status from URL sub-tabs)
-  // Note: "active"/"completed" are meta-groups for column filtering, not DB statuses.
-  // KanbanBoard already strips them; useTickets hook will also strip them before API calls.
   const filters: TicketFilters = useMemo(() => {
     const f: TicketFilters = {
       search: searchTerm || undefined,
@@ -152,7 +129,8 @@ export default function TicketsListPageClient() {
       source: (filterSource || undefined) as any,
       project_id: filterProject || undefined,
       assigned_to: ticketScope === 'my_tickets' && currentUser?.id ? currentUser.id : undefined,
-      assigned_team_id: ticketScope === 'my_team' ? (teamIds.length > 0 ? teamIds[0] : '00000000-0000-0000-0000-000000000000') : undefined,
+      // Pass ALL team IDs — backend handles array with ANY()
+      assigned_team_id: ticketScope === 'my_team' && teamIds.length > 0 ? teamIds : undefined,
     };
     if (dateRange.created_after) f.created_after = dateRange.created_after;
     if (dateRange.created_before) f.created_before = dateRange.created_before;
@@ -160,6 +138,17 @@ export default function TicketsListPageClient() {
   }, [searchTerm, statusFilter, filterType, filterCategory, filterSource, filterProject, ticketScope, teamIds, currentUser?.id, dateRange]);
 
   const hasActiveFilters = filterType || filterCategory || filterSource || filterDatePreset || filterProject;
+
+  // Team button label — show name when in single team, count when multiple
+  const teamLabel = teamsLoading
+    ? 'Team'
+    : teams.length === 0
+      ? 'Team'
+      : teams.length === 1
+        ? teams[0].name
+        : `My Teams (${teams.length})`;
+
+  const teamDisabled = !teamsLoading && teams.length === 0;
 
   return (
     <ModulePage config={nocConfig} hideHeader>
@@ -178,8 +167,7 @@ export default function TicketsListPageClient() {
                 }
               `}
             >
-              All
-              <span className="hidden sm:inline"> Tickets</span>
+              All<span className="hidden sm:inline"> Tickets</span>
             </button>
             <button
               onClick={() => handleScopeChange('my_tickets')}
@@ -195,17 +183,22 @@ export default function TicketsListPageClient() {
               Mine
             </button>
             <button
-              onClick={() => handleScopeChange('my_team')}
+              onClick={() => !teamDisabled && handleScopeChange('my_team')}
+              disabled={teamDisabled}
+              title={teamDisabled ? 'You are not a member of any team' : teamLabel}
               className={`
                 flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all whitespace-nowrap
-                ${ticketScope === 'my_team'
-                  ? 'bg-purple-500 text-white shadow-sm'
-                  : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'
+                ${teamDisabled
+                  ? 'opacity-40 cursor-not-allowed text-[var(--ff-text-tertiary)]'
+                  : ticketScope === 'my_team'
+                    ? 'bg-purple-500 text-white shadow-sm'
+                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'
                 }
               `}
             >
               <Users className="w-3.5 h-3.5" />
-              Team
+              <span className="hidden sm:inline">{teamLabel}</span>
+              <span className="sm:hidden">Team</span>
             </button>
           </div>
 
@@ -214,13 +207,8 @@ export default function TicketsListPageClient() {
             <div className="flex items-center bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg p-1">
               <button
                 onClick={() => handleViewChange('table')}
-                className={`
-                  flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-md text-sm font-medium transition-all
-                  ${viewMode === 'table'
-                    ? 'bg-[var(--ff-primary-500)] text-white shadow-sm'
-                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'
-                  }
-                `}
+                className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-md text-sm font-medium transition-all
+                  ${viewMode === 'table' ? 'bg-[var(--ff-primary-500)] text-white shadow-sm' : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'}`}
                 title="Table View"
               >
                 <TableIcon />
@@ -228,13 +216,8 @@ export default function TicketsListPageClient() {
               </button>
               <button
                 onClick={() => handleViewChange('kanban')}
-                className={`
-                  flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-md text-sm font-medium transition-all
-                  ${viewMode === 'kanban'
-                    ? 'bg-[var(--ff-primary-500)] text-white shadow-sm'
-                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'
-                  }
-                `}
+                className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-md text-sm font-medium transition-all
+                  ${viewMode === 'kanban' ? 'bg-[var(--ff-primary-500)] text-white shadow-sm' : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'}`}
                 title="Kanban View"
               >
                 <KanbanIcon />
@@ -242,13 +225,8 @@ export default function TicketsListPageClient() {
               </button>
               <button
                 onClick={() => handleViewChange('grid')}
-                className={`
-                  flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-md text-sm font-medium transition-all
-                  ${viewMode === 'grid'
-                    ? 'bg-[var(--ff-primary-500)] text-white shadow-sm'
-                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'
-                  }
-                `}
+                className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-md text-sm font-medium transition-all
+                  ${viewMode === 'grid' ? 'bg-[var(--ff-primary-500)] text-white shadow-sm' : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'}`}
                 title="Grid View"
               >
                 <GridIcon />
@@ -256,7 +234,6 @@ export default function TicketsListPageClient() {
               </button>
             </div>
 
-            {/* Create Ticket Button */}
             <Link
               href="/noc/tickets/new"
               className="px-3 sm:px-4 py-2 bg-[var(--ff-primary-500)] text-white rounded-lg hover:bg-[var(--ff-primary-600)] transition-colors text-xs sm:text-sm font-medium whitespace-nowrap"
@@ -267,9 +244,9 @@ export default function TicketsListPageClient() {
           </div>
         </div>
 
-        {/* Row 2: Search + Filter dropdowns — stacked on mobile */}
+        {/* Row 2: Search + Filters */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-4">
-          {/* Search Bar — full width on mobile */}
+          {/* Search */}
           <div className="relative flex-1 sm:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
             <input
@@ -290,18 +267,40 @@ export default function TicketsListPageClient() {
             )}
           </div>
 
-          {/* Filter Dropdowns — horizontally scrollable on mobile */}
+          {/* Filter Dropdowns */}
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible">
+            {/* Discipline (which team resolves the ticket) */}
+            <select
+              value={filterType}
+              onChange={(e) => setFilter('type', e.target.value)}
+              title="Filter by discipline — which team is responsible"
+              className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
+                ${filterType
+                  ? 'bg-blue-500/10 border-blue-500/30 text-blue-300'
+                  : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
+                }`}
+            >
+              <option value="">Discipline</option>
+              <option value="activations">Activations</option>
+              <option value="civils">Civils</option>
+              <option value="dev_ops">DevOps</option>
+              <option value="maintenance">Maintenance</option>
+              <option value="optical">Optical</option>
+              <option value="unspecified">Unspecified</option>
+            </select>
+
+            {/* Category (what kind of issue) */}
             <select
               value={filterCategory}
               onChange={(e) => setFilter('category', e.target.value)}
+              title="Filter by ticket category — what kind of issue"
               className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
                 ${filterCategory
                   ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300'
                   : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
                 }`}
             >
-              <option value="">All Categories</option>
+              <option value="">Category</option>
               <optgroup label="Operational">
                 <option value="maintenance">Maintenance</option>
                 <option value="snag">Snag</option>
@@ -320,60 +319,8 @@ export default function TicketsListPageClient() {
                 <option value="olt_investigation">OLT Investigation</option>
               </optgroup>
             </select>
-            <select
-              value={filterType}
-              onChange={(e) => setFilter('type', e.target.value)}
-              className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
-                ${filterType
-                  ? 'bg-blue-500/10 border-blue-500/30 text-blue-300'
-                  : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
-                }`}
-            >
-              <option value="">All Types</option>
-              <option value="activations">Activations</option>
-              <option value="civils">Civils</option>
-              <option value="dev_ops">DevOps</option>
-              <option value="maintenance">Maintenance</option>
-              <option value="optical">Optical</option>
-              <option value="unspecified">Unspecified</option>
-            </select>
-            <select
-              value={filterSource}
-              onChange={(e) => setFilter('source', e.target.value)}
-              className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
-                ${filterSource
-                  ? 'bg-purple-500/10 border-purple-500/30 text-purple-300'
-                  : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
-                }`}
-            >
-              <option value="">All Sources</option>
-              <option value="ad_hoc">Ad Hoc</option>
-              <option value="construction">Construction</option>
-              <option value="dev_ops">DevOps</option>
-              <option value="manual">Manual</option>
-              <option value="olt_mismatch">OLT Mismatch</option>
-              <option value="pp_data">PP Data</option>
-              <option value="qa_review">QA Review</option>
-              <option value="qcontact">QContact</option>
-              <option value="wa_maintenance">WhatsApp</option>
-              <option value="snags">Snags</option>
-              <option value="weekly_report">Weekly Report</option>
-            </select>
-            <select
-              value={filterDatePreset}
-              onChange={(e) => setFilter('date', e.target.value)}
-              className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
-                ${filterDatePreset
-                  ? 'bg-green-500/10 border-green-500/30 text-green-300'
-                  : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
-                }`}
-            >
-              <option value="">All Dates</option>
-              <option value="today">Today</option>
-              <option value="yesterday">Yesterday</option>
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
-            </select>
+
+            {/* Project */}
             <select
               value={filterProject}
               onChange={(e) => setFilter('project', e.target.value)}
@@ -383,13 +330,71 @@ export default function TicketsListPageClient() {
                   : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
                 }`}
             >
-              <option value="">All Projects</option>
+              <option value="">Project</option>
               {activeProjects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.code ? `${p.code} — ${p.name}` : p.name}
                 </option>
               ))}
             </select>
+
+            {/* Date */}
+            <select
+              value={filterDatePreset}
+              onChange={(e) => setFilter('date', e.target.value)}
+              className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
+                ${filterDatePreset
+                  ? 'bg-green-500/10 border-green-500/30 text-green-300'
+                  : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
+                }`}
+            >
+              <option value="">Date</option>
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+            </select>
+
+            {/* More filters toggle */}
+            <button
+              onClick={() => setShowMoreFilters((v) => !v)}
+              title="Source filter"
+              className={`p-2 rounded-lg text-sm border transition-colors flex-shrink-0 flex items-center gap-1
+                ${showMoreFilters || filterSource
+                  ? 'bg-purple-500/10 border-purple-500/30 text-purple-300'
+                  : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
+                }`}
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              {filterSource && <span className="text-xs hidden sm:inline">Source</span>}
+            </button>
+
+            {/* Source — only shown when expanded */}
+            {showMoreFilters && (
+              <select
+                value={filterSource}
+                onChange={(e) => setFilter('source', e.target.value)}
+                className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
+                  ${filterSource
+                    ? 'bg-purple-500/10 border-purple-500/30 text-purple-300'
+                    : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
+                  }`}
+              >
+                <option value="">All Sources</option>
+                <option value="ad_hoc">Ad Hoc</option>
+                <option value="construction">Construction</option>
+                <option value="dev_ops">DevOps</option>
+                <option value="manual">Manual</option>
+                <option value="olt_mismatch">OLT Mismatch</option>
+                <option value="pp_data">PP Data</option>
+                <option value="qa_review">QA Review</option>
+                <option value="qcontact">QContact</option>
+                <option value="wa_maintenance">WhatsApp</option>
+                <option value="snags">Snags</option>
+                <option value="weekly_report">Weekly Report</option>
+              </select>
+            )}
+
             {hasActiveFilters && (
               <button
                 onClick={() => setMultiple({ type: '', category: '', source: '', date: '', project: '' })}
@@ -402,7 +407,7 @@ export default function TicketsListPageClient() {
           </div>
         </div>
 
-        {/* Summary Tiles — reactive to current filters */}
+        {/* Summary Tiles */}
         <TicketSummaryTiles filters={filters} />
 
         {/* View Content */}
