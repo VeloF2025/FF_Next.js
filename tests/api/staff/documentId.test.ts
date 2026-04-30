@@ -220,7 +220,7 @@ describe('Staff Document API - /api/staff-documents/[documentId]', () => {
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
-          document: expect.objectContaining({
+          data: expect.objectContaining({
             documentName: 'Updated Name',
             documentNumber: 'DOC-12345',
           }),
@@ -257,7 +257,7 @@ describe('Staff Document API - /api/staff-documents/[documentId]', () => {
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
-          document: expect.objectContaining({
+          data: expect.objectContaining({
             issuingAuthority: 'Authority Corp',
           }),
         })
