@@ -60,7 +60,9 @@ export async function deliverWhatsApp(
       userId, error: errorMsg,
     }, 'WADelivery');
 
-    await logDelivery(notificationId, userId, 'whatsapp', 'failed', null, errorMsg).catch(() => {});
+    await logDelivery(notificationId, userId, 'whatsapp', 'failed', null, errorMsg).catch((logErr: unknown) => {
+      log.warn('WA delivery log failed', { logError: logErr instanceof Error ? logErr.message : String(logErr) }, 'WADelivery');
+    });
   }
 }
 
@@ -124,6 +126,36 @@ export async function sendWhatsAppGroupImage(
   if (!response.ok) {
     const text = await response.text().catch(() => 'unknown');
     throw new Error(`WA group image send failed: HTTP ${response.status} — ${text}`);
+  }
+}
+
+/**
+ * Send a document (e.g. xlsx) to a WhatsApp group.
+ * Bridge downloads document_url, uploads to WhatsApp as MediaDocument, and sends to group_jid.
+ */
+export async function sendWhatsAppGroupDocument(
+  groupJid: string,
+  documentUrl: string,
+  filename: string,
+  caption?: string,
+): Promise<void> {
+  const body = {
+    group_jid: groupJid,
+    document_url: documentUrl,
+    filename,
+    caption,
+  };
+
+  const response = await fetch(`${WA_FEEDBACK_URL}/send-document`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(60_000),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => 'unknown');
+    throw new Error(`WA group document send failed: HTTP ${response.status} — ${text}`);
   }
 }
 
