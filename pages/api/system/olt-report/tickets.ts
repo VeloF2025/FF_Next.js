@@ -20,6 +20,9 @@ const logger = createLogger('olt-report:tickets');
 const VALID_TICKET_TYPES: string[] = [
   TicketType.MAINTENANCE,
   TicketType.ACTIVATIONS,
+  TicketType.OPTICAL,
+  TicketType.CIVILS,
+  TicketType.UNSPECIFIED,
 ];
 
 const VALID_CATEGORIES: string[] = [...PP_OLT_SUBTYPES];
@@ -87,15 +90,19 @@ async function handler(
 
       if (record_ids.length === 0) continue;
 
-      // Fetch eligible records: needs_investigation or not_found, not yet ticketed
+      // Fetch eligible records: any non-fixable status, not yet ticketed.
+      // Home-Installation-blocked rows are routed to needs_investigation by
+      // process-lookup-queue / fix-1map, so they qualify automatically here.
+      const eligibleStatuses = ['needs_investigation', 'not_found', 'empty_serial', 'rejected'];
+
       const eligible = await pool.query(
         `SELECT id, drop_number, olt_serial, wrong_onemap_serial, fix_status,
                 investigation_context
          FROM olt_mismatch_records
          WHERE id = ANY($1::uuid[])
-           AND fix_status IN ('needs_investigation', 'not_found', 'empty_serial', 'rejected')
+           AND fix_status = ANY($2)
            AND maintenance_ticket_id IS NULL`,
-        [record_ids]
+        [record_ids, eligibleStatuses]
       );
 
       const records = eligible.rows;
@@ -118,24 +125,57 @@ async function handler(
         const wrongSerial = record.wrong_onemap_serial as string | null;
         const status = record.fix_status as string;
 
-        // Try to get project from investigation_context
-        let project = 'Unknown';
+        // Parse investigation_context once and reuse for project lookup + category-specific
+        // title/description. pg returns jsonb as a JS object, so the string branch is only
+        // exercised when callers pass a serialised payload.
+        let parsedCtx:
+          | {
+              reason?: string;
+              currentStatus?: string;
+              expectedStatus?: string;
+              message?: string;
+              propId?: string;
+              belongsToTeam?: string;
+            }
+          | null = null;
         try {
           if (record.investigation_context) {
-            const ctx = typeof record.investigation_context === 'string'
+            parsedCtx = typeof record.investigation_context === 'string'
               ? JSON.parse(record.investigation_context)
               : record.investigation_context;
-            project = ctx.belongsToTeam || project;
           }
-        } catch { /* ignore parse errors */ }
+        } catch (err) {
+          logger.debug('Failed to parse investigation_context', {
+            recordId: record.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
 
+        const project = parsedCtx?.belongsToTeam || 'Unknown';
         projectCounts[project] = (projectCounts[project] || 0) + 1;
 
-        // Build title based on mismatch type
+        // Build title based on mismatch type. Records flagged as status_mismatch
+        // (Home Installation blocker) get the actionable instruction regardless of
+        // which category the caller sent — the field team needs the 1Map step.
+        const isHomeInstallBlocked =
+          parsedCtx?.reason === 'status_mismatch'
+          || ticket_category === 'home_installation_status';
+        const effectiveCategory = isHomeInstallBlocked
+          ? 'home_installation_status'
+          : ticket_category;
+
         let title: string;
         let description: string;
 
-        if (status === 'not_found') {
+        if (isHomeInstallBlocked) {
+          const currentStatus = parsedCtx?.currentStatus || 'unknown';
+          const expectedStatus = parsedCtx?.expectedStatus || 'Home Installation: Installed';
+          title = `Home Installation Status — ${dr}`;
+          description = notes
+            || `1Map prop record for ${dr} (ONT ${oltSerial}) is in status "${currentStatus}". `
+               + `OLT auto-fix is blocked until at least one prop record on this DR has status "${expectedStatus}". `
+               + `Action: update the 1Map Home Installation status, then the OLT serial fix will run automatically.`;
+        } else if (status === 'not_found') {
           title = `OLT Mismatch: ${dr} — ONT ${oltSerial} not on 1Map`;
           description = notes || `OLT report shows ONT serial ${oltSerial} for ${dr}, but this DR is not found on 1Map. Requires investigation to confirm installation status and update records.`;
         } else if (wrongSerial) {
@@ -150,7 +190,7 @@ async function handler(
           source: TicketSource.OLT_MISMATCH,
           title,
           ticket_type: ticket_type as TicketType,
-          ticket_category,
+          ticket_category: effectiveCategory,
           priority: ticketPriority,
           description,
           dr_number: dr,
@@ -183,10 +223,15 @@ async function handler(
       }
     }
 
-    logger.info('OLT mismatch tickets created', { created: allTickets.length, skipped: totalSkipped });
+    logger.info('OLT mismatch tickets created', {
+      created: allTickets.length,
+      skipped: totalSkipped,
+    });
 
     return apiResponse.success(res, {
-      created: allTickets.length, skipped: totalSkipped, tickets: allTickets,
+      created: allTickets.length,
+      skipped: totalSkipped,
+      tickets: allTickets,
     });
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);

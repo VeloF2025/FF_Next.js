@@ -55,6 +55,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
+/** Parse a query param into a string[] — accepts CSV or repeated params, empty → []. */
+function parseCsvParam(v: unknown): string[] {
+  if (!v) return [];
+  if (Array.isArray(v)) return v.flatMap((s) => String(s).split(',')).map((s) => s.trim()).filter(Boolean);
+  return String(v).split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+/** Parse CSV integer list. Invalid entries dropped. */
+function parseCsvIntParam(v: unknown): number[] {
+  return parseCsvParam(v)
+    .map((s) => parseInt(s, 10))
+    .filter((n) => Number.isFinite(n));
+}
+
 async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   const {
     reportId,
@@ -73,15 +87,17 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   const pageSizeNum = Math.min(200, parseInt(pageSize as string, 10));
   const offset = (pageNum - 1) * pageSizeNum;
   const searchTerm = search && typeof search === 'string' ? `%${search}%` : null;
-  const zoneNoNum = zone_no && typeof zone_no === 'string' ? parseInt(zone_no, 10) : undefined;
-  const ponNoNum  = pon_no  && typeof pon_no  === 'string' ? parseInt(pon_no,  10) : undefined;
+
+  const statusArr   = parseCsvParam(status);
+  const categoryArr = parseCsvParam(category);
+  const severityArr = parseCsvParam(severity);
+  const zoneArr     = parseCsvIntParam(zone_no);
+  const ponArr      = parseCsvIntParam(pon_no);
 
   if (reportId && typeof reportId === 'string') {
     return querySnagsByReport(
       res, reportId,
-      status as string | undefined,
-      category as string | undefined,
-      severity as string | undefined,
+      statusArr, categoryArr, severityArr,
       searchTerm,
       pageNum, pageSizeNum, offset
     );
@@ -89,20 +105,17 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
   if (projectId && typeof projectId === 'string') {
     // When zone_no/pon_no are present, use the hierarchy-aware query
-    if (zoneNoNum !== undefined || ponNoNum !== undefined) {
+    if (zoneArr.length > 0 || ponArr.length > 0) {
       return querySnagsByProjectAndZone(
         res, projectId,
-        zoneNoNum,
-        ponNoNum,
-        status as string | undefined,
+        zoneArr, ponArr,
+        statusArr,
         pageNum, pageSizeNum, offset
       );
     }
     return querySnagsByProject(
       res, projectId,
-      status as string | undefined,
-      category as string | undefined,
-      severity as string | undefined,
+      statusArr, categoryArr, severityArr,
       pageNum, pageSizeNum, offset
     );
   }

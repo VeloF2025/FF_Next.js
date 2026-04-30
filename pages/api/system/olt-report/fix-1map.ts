@@ -405,7 +405,12 @@ async function fixSingleDR(
       // Detect 1Map silent-drop (tenant ACL / record lock). 1Map returns
       // success=true with zero rows written; oneMapApiService flags it explicitly.
       const silentlyRejected = result.error?.toLowerCase().includes('silently rejected') ?? false;
-      const newStatus = silentlyRejected ? 'rejected' : 'pending';
+      const homeInstallBlocked = result.error
+        ? /home installation:\s*installed status\s*(?:—|-)\s*write blocked/i.test(result.error)
+        : false;
+      // Permanently-blocked rows belong in Investigate, not stuck in Fixable.
+      // Transient errors stay 'pending' for retry.
+      const newStatus = (silentlyRejected || homeInstallBlocked) ? 'needs_investigation' : 'pending';
 
       // Record failure in offline_devices (if exists)
       await client.query(
@@ -414,19 +419,21 @@ async function fixSingleDR(
              onemap_fix_result = $1,
              onemap_fix_at = NOW()
          WHERE drop_number = $2`,
-        [silentlyRejected ? 'rejected' : 'failed', drNumber]
+        [(silentlyRejected || homeInstallBlocked) ? 'rejected' : 'failed', drNumber]
       );
 
-      // Record failure in olt_mismatch_records. For silent drops, flip status to
-      // 'rejected' so bulk-fix buttons skip them — retrying is pointless until the
-      // underlying 1Map tenant permission is resolved.
+      // Record failure in olt_mismatch_records. Permanently-blocked rows are routed
+      // to 'needs_investigation' so they appear in the Investigate tab where they
+      // can be ticketed — retrying is pointless until 1Map advances the prop status.
+      // status_mismatch rows already arrive as needs_investigation from the queue,
+      // so accept either status when recording a fresh attempt.
       await client.query(
         `UPDATE olt_mismatch_records
          SET fix_status = $1,
              fix_attempted_at = NOW(),
              fix_result = $2
          WHERE drop_number = $3
-           AND fix_status = 'pending'`,
+           AND fix_status IN ('pending', 'needs_investigation')`,
         [newStatus, result.error || 'Unknown error', drNumber]
       );
 

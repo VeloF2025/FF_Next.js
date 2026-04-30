@@ -28,6 +28,7 @@ const VALID_TICKET_TYPES: string[] = [
   TicketType.ACTIVATIONS,
   TicketType.OPTICAL,
   TicketType.CIVILS,
+  TicketType.UNSPECIFIED,
 ];
 
 const VALID_CATEGORIES: string[] = [...PP_OLT_SUBTYPES];

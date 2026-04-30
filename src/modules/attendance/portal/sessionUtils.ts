@@ -4,9 +4,17 @@
  * Separate from the fleet portal's session layer:
  *   - different cookie name (ff_my_session vs ff_portal_session)
  *   - different signing secret (MY_PORTAL_SESSION_SECRET)
- *   - different path scope (/my vs /fleet)
- *   - 12-hour shifts vs 8-hour (field crews run longer)
+ *   - different session duration (12h vs 8h — field crews run longer)
  *   - DB row lives in attendance_auth_sessions, not fleet_portal_sessions
+ *
+ * Cookie path is '/' (sent on every request). It used to be '/my' on the
+ * theory that the session is only relevant to /my pages, but that broke
+ * authentication entirely: the session-validation endpoints live at
+ * /api/my/*, whose URL path doesn't start with /my, so the browser never
+ * sent the cookie. Login would 200 + set the cookie, the next GET
+ * /api/my/session would see no cookie, return {session: null}, and the
+ * client would bounce back to /my. ff_portal_session (fleet) also uses
+ * Path=/ for the same reason — see src/lib/auth/middleware.ts:413.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -17,7 +25,7 @@ import { log } from '@/lib/logger';
 import type { AttendanceSession, LoginMethod } from './types';
 
 export const MY_SESSION_COOKIE = 'ff_my_session';
-export const MY_SESSION_PATH = '/my';
+export const MY_SESSION_PATH = '/';
 const SESSION_DURATION_MS = 12 * 60 * 60 * 1000; // 12h
 const SECRET = process.env.MY_PORTAL_SESSION_SECRET;
 

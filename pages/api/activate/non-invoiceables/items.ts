@@ -159,7 +159,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
           `SELECT r.id, r.drop_number, ri.project, r.olt_serial, r.wrong_onemap_serial,
                   r.fix_status, r.maintenance_ticket_id, r.created_at,
                   mt.ticket_uid AS ticket_uid, mt.status AS ticket_status,
-                  oa.serial_number AS oes_serial, dr.ont_serial_scanned AS wa_serial, d.zone,
+                  oa.serial_number AS oes_serial, dr.ont_serial_scanned AS wa_serial, d.zone_no AS zone,
                   (SELECT COUNT(*) FROM ft_billing_deductions bd
                    WHERE bd.dr_number = r.drop_number AND bd.deduction_note = 'note4') AS billing_count,
                   (SELECT MAX(bd.week_ending) FROM ft_billing_deductions bd
@@ -201,7 +201,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
                   od.mismatch_status, od.mismatch_ticket_id, od.olt_serial, od.created_at,
                   od.last_down_reason, od.offline_bucket,
                   mt.ticket_uid AS ticket_uid, mt.status AS ticket_status,
-                  oa.serial_number AS oes_serial, dr.ont_serial_scanned AS wa_serial, d.zone
+                  oa.serial_number AS oes_serial, dr.ont_serial_scanned AS wa_serial, od.zone
            FROM offline_devices od
            LEFT JOIN maintenance_tickets mt ON mt.id = od.mismatch_ticket_id
            LEFT JOIN oes_activations oa ON oa.drop_number = od.drop_number
@@ -242,7 +242,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse): 
           `SELECT od.id, od.drop_number, COALESCE(p.project_name, 'Unknown') AS project,
                   od.serial_number,
                   od.last_down_reason, od.offline_bucket, od.match_status, od.created_at,
-                  oa.ont_rx_sig_dbm AS signal_dbm, d.zone
+                  oa.current_ont_rx AS signal_dbm, od.zone
            FROM offline_devices od
            LEFT JOIN oes_activations oa ON oa.drop_number = od.drop_number
            LEFT JOIN drops d ON d.drop_number = od.drop_number

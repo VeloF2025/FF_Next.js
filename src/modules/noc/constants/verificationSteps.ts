@@ -883,6 +883,43 @@ export function getStepsForTicketType(ticketType: string): VerificationStepTempl
 }
 
 /**
+ * Return verification steps using ticket_category as the primary signal and
+ * discipline (type) as the tiebreaker. This correctly handles the two-axis
+ * taxonomy where the same discipline can belong to different categories
+ * (e.g. Maintenance+Civils vs Snag+Civils must get different steps).
+ *
+ * @param category - maintenance_tickets.ticket_category
+ * @param discipline - maintenance_tickets.type (the discipline value)
+ */
+export function getStepsForCategoryAndDiscipline(
+  category: string | null,
+  discipline: string
+): VerificationStepTemplate[] {
+  switch (category) {
+    case 'maintenance':
+      // All maintenance tickets (civils/optical/activations) use fault-repair flow
+      return FAULT_REPAIR_STEPS;
+    case 'hse_incident':
+      return HSE_INCIDENT_STEPS;
+    case 'hse_near_miss':
+      return HSE_NEAR_MISS_STEPS;
+    case 'snag':
+    case 'internal_snag':
+      // Optical snags follow the OTDR/splicing workflow; civils/activations use snag checklist
+      return discipline === 'optical'
+        ? OPTICAL_STEPS
+        : (VERIFICATION_STEPS_BY_TICKET_TYPE['snag'] ?? FAULT_REPAIR_STEPS);
+    case 'sales_lead':
+      return VERIFICATION_STEPS_BY_TICKET_TYPE['sales_lead'] ?? FAULT_REPAIR_STEPS;
+    case 'unspecified':
+      return VERIFICATION_STEPS_BY_TICKET_TYPE['unspecified'] ?? FAULT_REPAIR_STEPS;
+    default:
+      // dev_ops, legacy keys, and anything without a category fall back to discipline lookup
+      return getStepsForTicketType(discipline);
+  }
+}
+
+/**
  * Helper functions
  * // WORKING: Utility functions for verification steps
  */

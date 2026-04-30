@@ -7,7 +7,7 @@ export function AttendanceNav() {
       tabs={TABS}
       getActiveTabId={getActiveTabId}
       accentColor="emerald"
-      navLabel="Attendance navigation"
+      navLabel="Pulse navigation"
     />
   );
 }

@@ -164,12 +164,74 @@ if sudo -u velo bash -c "cd $DIR && git diff --name-only $CURRENT_COMMIT HEAD 2>
   sudo -u velo bash -c "cd $DIR && npm ci --legacy-peer-deps"
 fi
 
+# --- Step 3 (guard): Validate node_modules is usable (catches dangling symlink) ---
+# node_modules may be a symlink to the workspace; if that target was wiped the build silently
+# fails with "next: not found" (exit 127). Detect this before touching .next.
+if ! sudo -u velo bash -c "test -x '$DIR/node_modules/.bin/next'"; then
+  log "WARNING: node_modules/.bin/next not accessible — replacing with local install..."
+  sudo -u velo bash -c "rm -rf '$DIR/node_modules' && cd '$DIR' && npm ci --legacy-peer-deps"
+  if ! sudo -u velo bash -c "test -x '$DIR/node_modules/.bin/next'"; then
+    error "npm ci failed — node_modules still unusable. Cannot build."
+  fi
+  log "node_modules restored OK."
+fi
+
 # --- Step 3a: Apply pending DB migrations (fail fast before build) ---
 log "Checking DB migrations..."
 MIGRATION_EXIT=0
 sudo -u velo bash -c "cd $DIR && bash scripts/run-pending-migrations.sh 2>&1 | sed 's/^/  /'" || MIGRATION_EXIT=$?
 if [[ "$MIGRATION_EXIT" -ne 0 ]]; then
   error "DB migration failed (exit $MIGRATION_EXIT). Fix the SQL and redeploy."
+fi
+
+# --- Step 3a': Sync nginx config from repo (idempotent) ---
+# The tracked snapshot at docs/VPS/vf-fibreflow.nginx.conf is the source of
+# truth for the public-facing nginx config (proxy rules + the
+# /storage/staff/payslips/ deny rule that protects payroll PDFs). If the
+# checked-in version differs from /etc/nginx/sites-enabled/vf-fibreflow we
+# stage it, run `nginx -t` as a syntax gate, and reload nginx. A failed
+# config test aborts the deploy before service restart so we never trip the
+# next step with broken nginx.
+NGINX_SOURCE="$DIR/docs/VPS/vf-fibreflow.nginx.conf"
+NGINX_TARGET="/etc/nginx/sites-enabled/vf-fibreflow"
+# Backups MUST live OUTSIDE sites-enabled/, otherwise nginx's `*` glob
+# pulls them in as additional server blocks (each with a duplicate
+# `default_server`), failing `nginx -t` with "duplicate default server".
+NGINX_BAK_DIR="/etc/nginx/backups"
+NGINX_BAK_TS=$(date +%Y%m%d_%H%M%S)
+# Clean up any stray backups left in the broken location by older versions
+# of this script — they break nginx -t.
+sudo rm -f /etc/nginx/sites-enabled/vf-fibreflow.bak.* 2>/dev/null || true
+if [[ -f "$NGINX_SOURCE" ]]; then
+  if ! cmp -s "$NGINX_SOURCE" "$NGINX_TARGET" 2>/dev/null; then
+    log "Nginx config changed — staging + testing..."
+    sudo mkdir -p "$NGINX_BAK_DIR"
+    HAD_PRIOR_TARGET=false
+    NGINX_BAK_PATH="$NGINX_BAK_DIR/vf-fibreflow.bak.$NGINX_BAK_TS"
+    if [[ -f "$NGINX_TARGET" ]]; then
+      sudo cp "$NGINX_TARGET" "$NGINX_BAK_PATH"
+      HAD_PRIOR_TARGET=true
+    fi
+    sudo cp "$NGINX_SOURCE" "$NGINX_TARGET"
+    # Capture nginx -t exit code separately — `cmd | sed` would surface
+    # sed's exit code (almost always 0) and silently pass a broken config.
+    NGINX_TEST_OUT=$(sudo /usr/sbin/nginx -t 2>&1) && NGINX_TEST_RC=$? || NGINX_TEST_RC=$?
+    echo "$NGINX_TEST_OUT" | sed 's/^/  /'
+    if [[ "$NGINX_TEST_RC" -eq 0 ]]; then
+      sudo /usr/bin/systemctl reload nginx
+      log "Nginx config synced + reloaded."
+      # Prune backups older than 7 days so they don't accumulate forever.
+      sudo find "$NGINX_BAK_DIR" -name 'vf-fibreflow.bak.*' -mtime +7 -delete 2>/dev/null || true
+    else
+      warn "nginx -t failed (rc=$NGINX_TEST_RC) — restoring previous config and aborting deploy"
+      if [[ "$HAD_PRIOR_TARGET" == "true" ]]; then
+        sudo cp "$NGINX_BAK_PATH" "$NGINX_TARGET"
+      else
+        sudo rm -f "$NGINX_TARGET"
+      fi
+      error "Nginx config invalid. See output above and fix docs/VPS/vf-fibreflow.nginx.conf."
+    fi
+  fi
 fi
 
 # --- Step 3b: Run lint gates (Zero Tolerance) ---

@@ -17,6 +17,7 @@ import {
   Lock,
   BarChart3,
   Clock,
+  Receipt,
 } from 'lucide-react';
 import { useStaffMember, useDeleteStaff } from '@/hooks/useStaff';
 import { useStaffAccess } from '@/hooks/staff/useStaffAccess';
@@ -35,13 +36,14 @@ import { NotesTab } from './tabs/NotesTab';
 import { ActivityTab } from './tabs/ActivityTab';
 import { PerformanceTab } from './tabs/PerformanceTab';
 import { TimeAttendanceTab } from './tabs/TimeAttendanceTab';
+import { ReceiptsTab } from './tabs/ReceiptsTab';
 import { DisciplinaryIncidentForm } from './DisciplinaryIncidentForm';
 import { VehicleAssignmentForm } from './VehicleAssignmentForm';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import type { DisciplinaryIncident, VehicleAssignment } from '@/types/staff';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
-type TabType = 'overview' | 'performance' | 'employment' | 'compliance' | 'vehicles' | 'attendance' | 'disciplinary' | 'documents' | 'projects' | 'notes' | 'activity';
+type TabType = 'overview' | 'performance' | 'employment' | 'compliance' | 'vehicles' | 'attendance' | 'disciplinary' | 'documents' | 'receipts' | 'projects' | 'notes' | 'activity';
 
 interface TabConfig {
   id: TabType;
@@ -60,6 +62,7 @@ const ALL_TABS: TabConfig[] = [
   { id: 'attendance', label: 'Attendance', icon: Clock, permissionKey: 'people.staff.tabs.attendance' },
   { id: 'disciplinary', label: 'Disciplinary', icon: AlertTriangle, requiresSensitiveAccess: true, permissionKey: 'people.staff.tabs.disciplinary' },
   { id: 'documents', label: 'Documents', icon: FileText, requiresSensitiveAccess: true, permissionKey: 'people.staff.tabs.documents' },
+  { id: 'receipts', label: 'Receipts', icon: Receipt, permissionKey: 'receipts.review' },
   { id: 'projects', label: 'Projects', icon: FolderKanban, permissionKey: 'people.staff.tabs.projects' },
   { id: 'notes', label: 'Notes', icon: MessageSquare, permissionKey: 'people.staff.tabs.notes' },
   { id: 'activity', label: 'Activity', icon: Activity, permissionKey: 'people.staff.tabs.activity' },
@@ -397,8 +400,25 @@ export function StaffDetail() {
         <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="h-16 w-16 bg-blue-500/20 rounded-full flex items-center justify-center">
-                <span className="text-xl font-medium text-blue-400">
+              <div className="h-16 w-16 rounded-full bg-blue-500/20 overflow-hidden flex items-center justify-center shrink-0">
+                {staff.profilePhotoUrl ? (
+                  <img
+                    src={staff.profilePhotoUrl}
+                    alt={staff.name}
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      // If the photo URL 404s, swap to the initials fallback
+                      // by hiding the broken image and revealing the sibling.
+                      (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                      if (fallback) fallback.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <span
+                  className="text-xl font-medium text-blue-400 h-full w-full items-center justify-center"
+                  style={{ display: staff.profilePhotoUrl ? 'none' : 'flex' }}
+                >
                   {staff.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                 </span>
               </div>
@@ -511,6 +531,10 @@ export function StaffDetail() {
 
           {activeTab === 'documents' && canViewSensitive && (
             <StaffDocumentList staffId={id} isAdmin={canEdit} onVerify={canEdit ? handleVerifyDocument : undefined} />
+          )}
+
+          {activeTab === 'receipts' && (
+            <ReceiptsTab staffId={id} />
           )}
 
           {activeTab === 'projects' && (

@@ -122,7 +122,8 @@ export async function GET(req: NextRequest) {
       filters.assigned_to = searchParams.get('assigned_to')!;
     }
     if (searchParams.has('assigned_team_id')) {
-      filters.assigned_team_id = searchParams.get('assigned_team_id')!;
+      const teamIds = searchParams.getAll('assigned_team_id');
+      filters.assigned_team_id = teamIds.length === 1 ? teamIds[0] : teamIds;
     }
     if (searchParams.has('project_id')) {
       filters.project_id = searchParams.get('project_id')!;

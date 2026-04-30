@@ -12,6 +12,7 @@ import {
   VLM_CHAT_ENDPOINT as VLM_API_ENDPOINT,
   VLM_EXTRACTION_MODEL as VLM_MODEL,
   VLM_TIMEOUT_DEFAULT as VLM_TIMEOUT_MS,
+  VLM_MAX_TOKENS_OCR,
   stripThinkTags,
 } from '@/lib/vlm';
 import { optimizeForVlm } from '@/modules/activate/services/imagePreprocessService';
@@ -279,7 +280,7 @@ async function extractOntSerials(fullResBase64: string, rowCount: number): Promi
             { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${enhancedBase64}` } },
           ],
         }],
-        max_tokens: 1024,
+        max_tokens: VLM_MAX_TOKENS_OCR,
         temperature: 0,
       }),
       signal: AbortSignal.timeout(VLM_TIMEOUT_MS),

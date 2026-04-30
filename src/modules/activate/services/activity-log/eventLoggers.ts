@@ -287,6 +287,21 @@ export async function logPreProvResolved(
 }
 
 /**
+ * Previously-activated ONT serial reappeared in OES PP DATA.
+ * Emitted when the OES import ingests a serial+project pair that was already
+ * activated — i.e. the DR went live, dropped from PP, then OES re-listed it
+ * (typical for a service swap or re-provision). The PP row is reset to
+ * not_found and a fresh ticket lifecycle starts.
+ */
+export async function logPreProvReentered(
+  drNumber: string,
+  payload: { serialNumber: string; project: string },
+  actor: string
+): Promise<string> {
+  return logActivity(drNumber, 'pre_prov_reentered', payload, actor);
+}
+
+/**
  * NOC ticket created and bound to this DR.
  */
 export async function logTicketCreated(

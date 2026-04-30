@@ -9,6 +9,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, Lock, Unlock } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AttendanceNav } from '@/components/attendance/AttendanceNav';
+import { BulkLockSection } from '@/components/attendance/BulkLockSection';
+import { thisWeekMondaySast } from '@/components/attendance/dateUtils';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 
@@ -41,27 +43,40 @@ function formatTs(ts: string | null): string {
   }
 }
 
-function thisWeekMonday(): string {
-  const today = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Africa/Johannesburg',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
-  const d = new Date(`${today}T00:00:00Z`);
-  const dow = d.getUTCDay();
-  const deltaToMon = dow === 0 ? -6 : 1 - dow;
-  d.setUTCDate(d.getUTCDate() + deltaToMon);
-  return d.toISOString().slice(0, 10);
-}
-
 export default function StaffAttendanceLocksPage() {
   const [locks, setLocks] = useState<LockRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
-  const [newWeek, setNewWeek] = useState(thisWeekMonday());
+  const [newWeek, setNewWeek] = useState(thisWeekMondaySast());
   const [newReason, setNewReason] = useState('');
+  // Server is the authority on permissions; this is just to hide the
+  // bulk-lock UI for users who'd hit a 403 anyway. Probed via a HEAD-style
+  // call once the page mounts; conservatively defaults to false until known.
+  const [canBulkLock, setCanBulkLock] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+        if (cancelled || !res.ok) return;
+        const body = await res.json().catch(() => null) as
+          | { success: true; data: { user: { role: string } } }
+          | null;
+        // Server-side guard is what enforces — this is just to hide the
+        // form for users who'd hit a 403 anyway. Mirrors migration 332's
+        // grants: super_admin and admin only.
+        const role = body?.success ? body.data.user.role : null;
+        if (role === 'super_admin' || role === 'admin') setCanBulkLock(true);
+      } catch (err) {
+        log.warn('[locks] role probe failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -158,6 +173,8 @@ export default function StaffAttendanceLocksPage() {
             <div>{error}</div>
           </div>
         )}
+
+        {canBulkLock && <BulkLockSection onCommitted={load} />}
 
         <section className="rounded border border-neutral-800 bg-neutral-900 p-3 space-y-2 max-w-xl">
           <div className="text-sm font-medium">Manually lock a week</div>
@@ -277,3 +294,4 @@ export default function StaffAttendanceLocksPage() {
     </AppLayout>
   );
 }
+

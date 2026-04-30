@@ -21,6 +21,7 @@ const MyHistoryPage: NextPage & { getLayout?: (page: React.ReactElement) => Reac
   const router = useRouter();
 
   const [staffName, setStaffName] = React.useState<string | null>(null);
+  const [staffPhotoUrl, setStaffPhotoUrl] = React.useState<string | null>(null);
   const [entries, setEntries] = React.useState<ClockEntry[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -35,6 +36,7 @@ const MyHistoryPage: NextPage & { getLayout?: (page: React.ReactElement) => Reac
           return;
         }
         setStaffName(sess.profile?.name ?? null);
+        setStaffPhotoUrl(sess.profile?.profilePhotoUrl ?? null);
         const hist = await getHistory(14);
         if (cancelled) return;
         setEntries(hist.entries);
@@ -52,21 +54,21 @@ const MyHistoryPage: NextPage & { getLayout?: (page: React.ReactElement) => Reac
   }, [router]);
 
   return (
-    <MyPortalShell title="History" staffName={staffName}>
+    <MyPortalShell title="History" staffName={staffName} staffPhotoUrl={staffPhotoUrl}>
       {error && (
-        <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800 mb-3">
+        <div role="alert" className="rounded-lg bg-red-950/50 border border-red-800 px-3 py-2 text-sm text-red-200 mb-3">
           {error}
         </div>
       )}
 
       {!entries && !error && (
-        <div className="flex items-center justify-center py-16 text-sm text-gray-500">
+        <div className="flex items-center justify-center py-16 text-sm text-neutral-400">
           Loading…
         </div>
       )}
 
       {entries && entries.length === 0 && (
-        <div className="text-center text-sm text-gray-500 py-10">
+        <div className="text-center text-sm text-neutral-400 py-10">
           No shifts recorded yet.
         </div>
       )}
@@ -76,15 +78,15 @@ const MyHistoryPage: NextPage & { getLayout?: (page: React.ReactElement) => Reac
           {entries.map((e) => (
             <li
               key={e.entryId}
-              className="rounded-2xl bg-white border border-gray-200 p-4 flex items-center justify-between"
+              className="rounded-2xl bg-neutral-900 border border-neutral-800 p-4 flex items-center justify-between"
             >
               <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center flex-shrink-0">
+                <div className="w-9 h-9 rounded-full bg-blue-900/40 text-blue-300 flex items-center justify-center flex-shrink-0">
                   <Clock className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-sm font-semibold">{formatWorkDate(e.workDate)}</div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-sm font-semibold text-neutral-100">{formatWorkDate(e.workDate)}</div>
+                  <div className="text-xs text-neutral-400">
                     {formatTime(e.clockInAt)}{' '}
                     {e.clockOutAt ? `→ ${formatTime(e.clockOutAt)}` : '(open)'}
                   </div>
@@ -93,7 +95,7 @@ const MyHistoryPage: NextPage & { getLayout?: (page: React.ReactElement) => Reac
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <div className="text-right">
-                  <div className="text-sm font-semibold text-gray-900">
+                  <div className="text-sm font-semibold text-neutral-100">
                     {e.durationMs != null ? formatDuration(e.durationMs) : '—'}
                   </div>
                 </div>
@@ -106,7 +108,7 @@ const MyHistoryPage: NextPage & { getLayout?: (page: React.ReactElement) => Reac
                   }
                   aria-label="Request correction for this shift"
                   title="Request correction"
-                  className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-blue-700 hover:bg-blue-50 transition"
+                  className="inline-flex items-center justify-center w-12 h-12 rounded-lg text-neutral-400 hover:text-blue-300 hover:bg-blue-900/30 transition"
                 >
                   <Edit3 className="w-4 h-4" />
                 </button>
@@ -121,11 +123,11 @@ const MyHistoryPage: NextPage & { getLayout?: (page: React.ReactElement) => Reac
 
 function StatusBadge({ status }: { status: ClockEntry['status'] }) {
   const style: Record<ClockEntry['status'], string> = {
-    open: 'bg-green-50 text-green-700 border-green-200',
-    closed: 'bg-gray-50 text-gray-600 border-gray-200',
-    auto_closed: 'bg-yellow-50 text-yellow-800 border-yellow-200',
-    disputed: 'bg-red-50 text-red-700 border-red-200',
-    manual: 'bg-purple-50 text-purple-700 border-purple-200',
+    open: 'bg-emerald-950/40 text-emerald-300 border-emerald-800',
+    closed: 'bg-neutral-800 text-neutral-300 border-neutral-700',
+    auto_closed: 'bg-yellow-950/40 text-yellow-300 border-yellow-800',
+    disputed: 'bg-red-950/40 text-red-300 border-red-800',
+    manual: 'bg-purple-950/40 text-purple-300 border-purple-800',
   };
   const label: Record<ClockEntry['status'], string> = {
     open: 'On shift',

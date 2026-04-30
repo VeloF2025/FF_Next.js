@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle, Clock, FileText, Ticket as TicketIcon, TrendingUp } from 'lucide-react';
+import { PulseSignals } from './PulseSignals';
 
 interface Overview {
   generatedAt: string;
@@ -193,6 +194,8 @@ export function OverviewTab() {
           )}
         </section>
       </div>
+
+      <PulseSignals />
     </div>
   );
 }

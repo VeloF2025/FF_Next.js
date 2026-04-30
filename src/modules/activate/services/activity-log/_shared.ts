@@ -52,6 +52,7 @@ export type ActivityEventType =
   | 'non_invoiceable_resolved'
   | 'pre_prov_added'
   | 'pre_prov_resolved'
+  | 'pre_prov_reentered'
   | 'ticket_created'
   | 'ticket_status_changed'
   | 'ticket_auto_closed'
@@ -331,6 +332,11 @@ export const EVENT_METADATA: Record<ActivityEventType, { title: string; icon: st
     title: 'Pre-provisioned resolved',
     icon: '✓',
     iconColor: 'text-green-500',
+  },
+  pre_prov_reentered: {
+    title: 'Pre-provisioned re-entered',
+    icon: '↻',
+    iconColor: 'text-amber-500',
   },
   ticket_created: {
     title: 'NOC ticket raised',

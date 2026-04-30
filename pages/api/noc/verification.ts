@@ -15,7 +15,7 @@ import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 import {
-  getStepsForTicketType,
+  getStepsForCategoryAndDiscipline,
 } from '@/modules/noc/constants/verificationSteps';
 import type {
   VerificationStep,
@@ -27,11 +27,14 @@ const sql = neon(process.env.DATABASE_URL!);
 
 /**
  * Initialize type-specific verification steps for a ticket if they don't exist.
- * Reads the ticket's `type` column to select the correct step checklist.
+ * Uses ticket_category as the primary signal and discipline (type) as the
+ * tiebreaker so that e.g. Maintenance+Civils gets fault-repair steps instead
+ * of the snag checklist that civils tickets default to.
  */
 async function initializeVerificationSteps(
   ticketId: string,
-  ticketType: string
+  ticketCategory: string | null,
+  ticketDiscipline: string
 ): Promise<VerificationStep[]> {
   // Check if steps already exist
   const existing = await sql`
@@ -68,8 +71,8 @@ async function initializeVerificationSteps(
     return existing as VerificationStep[];
   }
 
-  // Resolve the correct step list for this ticket type
-  const templates = getStepsForTicketType(ticketType);
+  // Resolve the correct step list using category + discipline
+  const templates = getStepsForCategoryAndDiscipline(ticketCategory, ticketDiscipline);
 
   // Insert each step sequentially
   for (const template of templates) {
@@ -112,7 +115,8 @@ async function initializeVerificationSteps(
 
   log.info('Initialized verification steps for ticket', {
     ticketId,
-    ticketType,
+    ticketCategory,
+    ticketDiscipline,
     count: created.length,
   });
 
@@ -157,19 +161,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   // GET - Fetch verification steps
   if (req.method === 'GET') {
     try {
-      // Verify ticket exists and fetch its type
       const ticket = await sql`
-        SELECT id, type FROM maintenance_tickets WHERE id = ${ticketId}
+        SELECT id, type, ticket_category FROM maintenance_tickets WHERE id = ${ticketId}
       `;
 
       if (ticket.length === 0) {
         return apiResponse.notFound(res, 'Ticket', ticketId);
       }
 
-      const ticketType = String(ticket[0]?.type ?? 'new_installation');
+      const ticketDiscipline = String(ticket[0]?.type ?? 'new_installation');
+      const ticketCategory = (ticket[0]?.ticket_category as string | null) ?? null;
 
-      // Get or initialize steps
-      const steps = await initializeVerificationSteps(ticketId, ticketType);
+      const steps = await initializeVerificationSteps(ticketId, ticketCategory, ticketDiscipline);
 
       return apiResponse.success(res, steps);
     } catch (error) {
@@ -181,21 +184,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   // POST - Get verification progress
   if (req.method === 'POST') {
     try {
-      // Verify ticket exists and fetch its type
       const ticket = await sql`
-        SELECT id, type FROM maintenance_tickets WHERE id = ${ticketId}
+        SELECT id, type, ticket_category FROM maintenance_tickets WHERE id = ${ticketId}
       `;
 
       if (ticket.length === 0) {
         return apiResponse.notFound(res, 'Ticket', ticketId);
       }
 
-      const ticketType = String(ticket[0]?.type ?? 'new_installation');
+      const ticketDiscipline = String(ticket[0]?.type ?? 'new_installation');
+      const ticketCategory = (ticket[0]?.ticket_category as string | null) ?? null;
 
-      // Get or initialize steps
-      const steps = await initializeVerificationSteps(ticketId, ticketType);
-
-      // Calculate progress
+      const steps = await initializeVerificationSteps(ticketId, ticketCategory, ticketDiscipline);
       const progress = calculateProgress(steps);
 
       return apiResponse.success(res, progress);

@@ -40,6 +40,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { usePortalSession } from '@/modules/fleet/portal';
+import { log } from '@/lib/logger';
 import { VehicleCalibrationModal } from '@/modules/fleet/check-in/components/VehicleCalibrationModal';
 import {
   OfflineBanner,
@@ -127,7 +128,7 @@ export default function VehiclePortalPage() {
   // Initialize offline storage on mount
   useEffect(() => {
     offlineStorage.init().catch((err) => {
-      console.error('[Portal] Failed to init offline storage:', err);
+      log.error('[Portal] Failed to init offline storage', { err });
     });
   }, []);
 
@@ -139,9 +140,15 @@ export default function VehiclePortalPage() {
   const [verificationResult, setVerificationResult] = useState<PlateVerificationResult | null>(null);
   const [verifiedVehicle, setVerifiedVehicle] = useState<Vehicle | null>(null);
 
-  // When already authenticated (session exists), skip to verified step
+  // When already authenticated (session exists), skip to verified step.
+  // EXCEPT for PRD-040 SSO sessions (source='my') — those users still need
+  // to scan the plate as presence + GPS proof. Their assigned vehicle is
+  // already loaded into the session, so the scan acts as a confirmation
+  // ("the plate I see matches the vehicle assigned to me") rather than a
+  // login. Skipping it would lose the GPS capture point and the proof.
   useEffect(() => {
-    if (isAuthenticated && portalVehicle && !verifiedVehicle) {
+    const ssoSession = session?.source === 'my';
+    if (!ssoSession && isAuthenticated && portalVehicle && !verifiedVehicle) {
       // Map portal vehicle to local Vehicle type
       setVerifiedVehicle({
         id: portalVehicle.id,
@@ -159,7 +166,7 @@ export default function VehiclePortalPage() {
       });
       setStep('verified');
     }
-  }, [isAuthenticated, portalVehicle, verifiedVehicle]);
+  }, [isAuthenticated, portalVehicle, verifiedVehicle, session?.source]);
 
   // Fuel form state
   const [fuelForm, setFuelForm] = useState<FuelFormData>({
@@ -338,8 +345,19 @@ export default function VehiclePortalPage() {
 
   // Reset and try again (logout)
   const handleReset = () => {
+    // PRD-040 Phase 2: SSO sessions originate from /my. Sending those
+    // users back to the plate-capture screen on sign-out is wrong — they
+    // never used the plate flow in the first place. Bounce them back to
+    // their hub instead.
+    const sessionSource = session?.source;
+
     // Clear portal session
     logout();
+
+    if (sessionSource === 'my') {
+      window.location.assign('/my');
+      return;
+    }
 
     setStep('capture');
     setPlatePhotoUrl(null);
@@ -439,7 +457,7 @@ export default function VehiclePortalPage() {
       );
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      console.error('[Receipt Scan Error]', err);
+      log.error('[Receipt Scan Error]', { err });
       toast.error(`Failed to scan receipt: ${errorMessage}`);
     } finally {
       setScanningReceipt(false);
@@ -606,13 +624,13 @@ export default function VehiclePortalPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        console.error('Upload failed:', data.error?.message);
+        log.error('[Portal] Upload failed', { message: data.error?.message });
         return null;
       }
 
       return data.data?.url || null;
     } catch (error) {
-      console.error('Upload error:', error);
+      log.error('[Portal] Upload error', { error });
       return null;
     }
   };
@@ -804,31 +822,59 @@ export default function VehiclePortalPage() {
       {/* Offline Status Banner */}
       <OfflineBanner className="sticky top-0 z-50" />
 
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-        {/* Header */}
-        <div className="bg-white dark:bg-gray-800 shadow-sm">
-          <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Car className="w-8 h-8 text-blue-600" />
-              <div>
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                  Vehicle Portal
-                </h1>
-                {isAuthenticated && session && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {session.driverName || session.vehicleRegistration}
-                  </p>
-                )}
-              </div>
-            </div>
-            {step !== 'capture' && (
+      <div className="min-h-screen bg-neutral-950 text-neutral-100">
+        {/* Header — matches MyPortalShell for a uniform PWA feel.
+             Logo + title is a button when the user came from /my, so a
+             single tap takes them back to the hub. Contractors don't see
+             the back-to-hub affordance — they're not /my-authenticated. */}
+        <div className="bg-neutral-900 border-b border-neutral-800">
+          <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+            {session?.source === 'my' ? (
               <button
-                onClick={handleReset}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center gap-2"
-                title="Logout / Switch Vehicle"
+                type="button"
+                onClick={() => window.location.assign('/my')}
+                aria-label="Back to hub"
+                className="flex items-center gap-3 min-w-0 text-left rounded-lg hover:bg-neutral-800/60 active:bg-neutral-800 -m-1 p-1"
               >
-                <LogOut className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                <img
+                  src="/assets/vf/vf-logo.svg"
+                  alt=""
+                  aria-hidden="true"
+                  className="w-9 h-9 shrink-0 rounded-lg bg-white p-1"
+                />
+                <div className="min-w-0">
+                  <div className="text-xs uppercase tracking-wide text-neutral-400">Velocity Fibre</div>
+                  <div className="text-base font-semibold truncate">Vehicle Portal</div>
+                </div>
               </button>
+            ) : (
+              <div className="flex items-center gap-3 min-w-0">
+                <img
+                  src="/assets/vf/vf-logo.svg"
+                  alt=""
+                  aria-hidden="true"
+                  className="w-9 h-9 shrink-0 rounded-lg bg-white p-1"
+                />
+                <div className="min-w-0">
+                  <div className="text-xs uppercase tracking-wide text-neutral-400">Velocity Fibre</div>
+                  <div className="text-base font-semibold truncate">Vehicle Portal</div>
+                </div>
+              </div>
+            )}
+            {isAuthenticated && session && step !== 'capture' && (
+              <div className="text-right">
+                <div className="text-sm font-medium leading-tight truncate max-w-[160px]">
+                  {session.driverName || session.vehicleRegistration}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="mt-0.5 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-200 underline"
+                >
+                  <LogOut className="w-3 h-3" />
+                  Sign out
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -838,7 +884,7 @@ export default function VehiclePortalPage() {
           {sessionLoading && step === 'capture' && (
             <div className="flex flex-col items-center justify-center py-20">
               <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-              <p className="text-gray-600 dark:text-gray-400">Checking session...</p>
+              <p className="text-neutral-400">Checking session...</p>
             </div>
           )}
 
@@ -846,13 +892,13 @@ export default function VehiclePortalPage() {
           {!sessionLoading && step === 'capture' && (
             <div className="space-y-6">
               <div className="text-center">
-                <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Camera className="w-10 h-10 text-blue-600 dark:text-blue-400" />
+                <div className="w-20 h-20 bg-blue-500/15 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Camera className="w-10 h-10 text-blue-300" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                <h2 className="text-2xl font-bold text-neutral-100 mb-2">
                   Scan License Plate
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-neutral-400">
                   Take a photo of the vehicle's license plate to get started
                 </p>
               </div>
@@ -879,14 +925,14 @@ export default function VehiclePortalPage() {
               {/* Verification error */}
               {verificationResult && !verificationResult.success && (
                 verificationResult.error === 'NETWORK_ERROR' ? (
-                  <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+                  <div className="p-4 bg-amber-950/50 border border-amber-800 rounded-xl">
                     <div className="flex items-start gap-3">
                       <AlertTriangle className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" />
                       <div className="flex-1">
-                        <p className="font-medium text-amber-800 dark:text-amber-200">
+                        <p className="font-medium text-amber-200">
                           Connection Problem
                         </p>
-                        <p className="text-sm text-amber-600 dark:text-amber-300 mt-1">
+                        <p className="text-sm text-amber-300 mt-1">
                           Could not reach the server. Please check your mobile data or WiFi connection and try again.
                         </p>
                         <button
@@ -910,18 +956,18 @@ export default function VehiclePortalPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+                  <div className="p-4 bg-red-950/50 border border-red-800 rounded-xl">
                     <div className="flex items-start gap-3">
                       <XCircle className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="font-medium text-red-800 dark:text-red-200">
+                        <p className="font-medium text-red-200">
                           Verification Failed
                         </p>
-                        <p className="text-sm text-red-600 dark:text-red-300 mt-1">
+                        <p className="text-sm text-red-300 mt-1">
                           {verificationResult.error || 'Could not identify vehicle'}
                         </p>
                         {verificationResult.extractedPlate && (
-                          <p className="text-sm text-red-600 dark:text-red-300 mt-1">
+                          <p className="text-sm text-red-300 mt-1">
                             Detected: {verificationResult.extractedPlate}
                           </p>
                         )}
@@ -956,7 +1002,7 @@ export default function VehiclePortalPage() {
               </div>
 
               {/* Info text */}
-              <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-center text-sm text-neutral-400">
                 For best results, ensure the plate is clearly visible and well-lit
               </p>
             </div>
@@ -966,14 +1012,14 @@ export default function VehiclePortalPage() {
           {step === 'verified' && verifiedVehicle && (
             <div className="space-y-6">
               {/* Success banner */}
-              <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl">
+              <div className="p-4 bg-emerald-950/50 border border-emerald-800 rounded-xl">
                 <div className="flex items-center gap-3">
                   <CheckCircle className="w-8 h-8 text-green-500" />
                   <div>
-                    <p className="font-bold text-green-800 dark:text-green-200 text-lg">
+                    <p className="font-bold text-emerald-200 text-lg">
                       Vehicle Verified
                     </p>
-                    <p className="text-sm text-green-600 dark:text-green-300">
+                    <p className="text-sm text-emerald-300">
                       {verificationResult?.confidence
                         ? `${Math.round(verificationResult.confidence * 100)}% confidence`
                         : 'Plate matched'}
@@ -983,22 +1029,22 @@ export default function VehiclePortalPage() {
               </div>
 
               {/* Vehicle details card */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5">
+              <div className="bg-neutral-900 rounded-xl shadow-lg p-5">
                 <div className="flex items-start gap-4">
-                  <div className="w-14 h-14 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
-                    <Car className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                  <div className="w-14 h-14 bg-blue-500/15 rounded-xl flex items-center justify-center">
+                    <Car className="w-8 h-8 text-blue-300" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    <h3 className="text-2xl font-bold text-neutral-100">
                       {verifiedVehicle.registration}
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <p className="text-neutral-400">
                       {[verifiedVehicle.make, verifiedVehicle.model, verifiedVehicle.year]
                         .filter(Boolean)
                         .join(' ')}
                     </p>
                     {verifiedVehicle.color && (
-                      <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
+                      <p className="text-sm text-neutral-500 mt-1">
                         Color: {verifiedVehicle.color}
                       </p>
                     )}
@@ -1007,30 +1053,30 @@ export default function VehiclePortalPage() {
 
                 {/* Last Readings */}
                 {(verifiedVehicle.lastOdometer || verifiedVehicle.lastFuel) && (
-                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
+                  <div className="mt-4 pt-4 border-t border-neutral-800">
+                    <div className="flex items-center gap-2 text-sm text-neutral-400 mb-2">
                       <Gauge className="w-4 h-4" />
                       <span className="font-medium">Last Recorded Readings</span>
                     </div>
                     <div className="flex flex-wrap gap-4 text-sm">
                       {verifiedVehicle.lastOdometer && (
-                        <div className="bg-gray-50 dark:bg-gray-700/50 px-3 py-2 rounded-lg">
-                          <span className="text-gray-500 dark:text-gray-400">Odometer: </span>
-                          <span className="font-semibold text-gray-900 dark:text-white">
+                        <div className="bg-neutral-800/50 px-3 py-2 rounded-lg">
+                          <span className="text-neutral-400">Odometer: </span>
+                          <span className="font-semibold text-neutral-100">
                             {verifiedVehicle.lastOdometer.reading?.toLocaleString()} km
                           </span>
-                          <span className="text-gray-400 dark:text-gray-500 text-xs ml-1">
+                          <span className="text-neutral-500 text-xs ml-1">
                             ({new Date(verifiedVehicle.lastOdometer.recordedAt).toLocaleDateString()})
                           </span>
                         </div>
                       )}
                       {verifiedVehicle.lastFuel && (
-                        <div className="bg-gray-50 dark:bg-gray-700/50 px-3 py-2 rounded-lg">
-                          <span className="text-gray-500 dark:text-gray-400">Fuel: </span>
-                          <span className="font-semibold text-gray-900 dark:text-white">
+                        <div className="bg-neutral-800/50 px-3 py-2 rounded-lg">
+                          <span className="text-neutral-400">Fuel: </span>
+                          <span className="font-semibold text-neutral-100">
                             {verifiedVehicle.lastFuel.level}%
                           </span>
-                          <span className="text-gray-400 dark:text-gray-500 text-xs ml-1">
+                          <span className="text-neutral-500 text-xs ml-1">
                             ({new Date(verifiedVehicle.lastFuel.recordedAt).toLocaleDateString()})
                           </span>
                         </div>
@@ -1042,23 +1088,23 @@ export default function VehiclePortalPage() {
 
               {/* Registered Driver Card */}
               {verifiedVehicle.assignedDriver && (
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5">
-                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 mb-3">
+                <div className="bg-neutral-900 rounded-xl shadow-lg p-5">
+                  <div className="flex items-center gap-2 text-neutral-400 mb-3">
                     <User className="w-5 h-5" />
                     <span className="font-medium">Registered Driver</span>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                    <p className="text-lg font-semibold text-neutral-100">
                       {verifiedVehicle.assignedDriver.name}
                     </p>
                     {verifiedVehicle.assignedDriver.idNumber && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <div className="flex items-center gap-2 text-sm text-neutral-400">
                         <CreditCard className="w-4 h-4" />
                         <span>ID: {verifiedVehicle.assignedDriver.idNumber}</span>
                       </div>
                     )}
                     {verifiedVehicle.assignedDriver.phone && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <div className="flex items-center gap-2 text-sm text-neutral-400">
                         <Phone className="w-4 h-4" />
                         <span>{verifiedVehicle.assignedDriver.phone}</span>
                       </div>
@@ -1069,34 +1115,34 @@ export default function VehiclePortalPage() {
 
               {/* Last Check-In Card */}
               {verifiedVehicle.lastCheckIn && (
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5">
-                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 mb-3">
+                <div className="bg-neutral-900 rounded-xl shadow-lg p-5">
+                  <div className="flex items-center gap-2 text-neutral-400 mb-3">
                     <Clock className="w-5 h-5" />
                     <span className="font-medium">Last Check-In</span>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">Type:</span>
-                      <span className="text-sm font-medium text-gray-900 dark:text-white capitalize">
+                      <span className="text-sm text-neutral-400">Type:</span>
+                      <span className="text-sm font-medium text-neutral-100 capitalize">
                         {verifiedVehicle.lastCheckIn.checkType.replace('_', ' ')}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">Status:</span>
+                      <span className="text-sm text-neutral-400">Status:</span>
                       <span className={`text-sm font-medium capitalize ${
                         verifiedVehicle.lastCheckIn.status === 'completed'
-                          ? 'text-green-600 dark:text-green-400'
+                          ? 'text-emerald-300'
                           : verifiedVehicle.lastCheckIn.status === 'in_progress'
-                          ? 'text-yellow-600 dark:text-yellow-400'
-                          : 'text-gray-600 dark:text-gray-400'
+                          ? 'text-amber-300'
+                          : 'text-neutral-400'
                       }`}>
                         {verifiedVehicle.lastCheckIn.status.replace('_', ' ')}
                       </span>
                     </div>
                     {verifiedVehicle.lastCheckIn.completedAt && (
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-500 dark:text-gray-400">Date:</span>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        <span className="text-sm text-neutral-400">Date:</span>
+                        <span className="text-sm font-medium text-neutral-100">
                           {new Date(verifiedVehicle.lastCheckIn.completedAt).toLocaleDateString('en-ZA', {
                             day: 'numeric',
                             month: 'short',
@@ -1109,8 +1155,8 @@ export default function VehiclePortalPage() {
                     )}
                     {verifiedVehicle.lastCheckIn.completedBy && (
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-500 dark:text-gray-400">By:</span>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        <span className="text-sm text-neutral-400">By:</span>
+                        <span className="text-sm font-medium text-neutral-100">
                           {verifiedVehicle.lastCheckIn.completedBy}
                         </span>
                       </div>
@@ -1120,11 +1166,11 @@ export default function VehiclePortalPage() {
               )}
 
               {/* Fleet Manager Contact Notice */}
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+              <div className="p-4 bg-blue-950/50 border border-blue-800 rounded-xl">
                 <div className="flex items-start gap-3">
-                  <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                  <Info className="w-5 h-5 text-blue-300 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <p className="text-sm text-blue-200">
                       If any of the above details are incorrect or in case of emergency, please contact the{' '}
                       <span className="font-semibold">Fleet Manager</span>.
                     </p>
@@ -1134,23 +1180,23 @@ export default function VehiclePortalPage() {
 
               {/* Action selection */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                <h3 className="text-lg font-semibold text-neutral-100 mb-4">
                   What would you like to do?
                 </h3>
                 <div className="space-y-3">
                   {/* Fuel Fill-up */}
                   <button
                     onClick={() => handleActionSelect('fuel')}
-                    className="w-full p-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-green-400 dark:hover:border-green-500 rounded-xl flex items-center gap-4 transition-colors group"
+                    className="w-full p-4 bg-neutral-900 border-2 border-neutral-800 hover:border-emerald-500 rounded-xl flex items-center gap-4 transition-colors group"
                   >
-                    <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Fuel className="w-7 h-7 text-green-600 dark:text-green-400" />
+                    <div className="w-12 h-12 bg-emerald-500/15 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Fuel className="w-7 h-7 text-emerald-300" />
                     </div>
                     <div className="flex-1 text-left">
-                      <p className="font-semibold text-gray-900 dark:text-white">
+                      <p className="font-semibold text-neutral-100">
                         Fuel Fill-up
                       </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                      <p className="text-sm text-neutral-400">
                         Record fuel purchase with receipt
                       </p>
                     </div>
@@ -1159,16 +1205,16 @@ export default function VehiclePortalPage() {
                   {/* Daily Check-In */}
                   <button
                     onClick={() => handleCheckInRedirect('daily')}
-                    className="w-full p-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 rounded-xl flex items-center gap-4 transition-colors group"
+                    className="w-full p-4 bg-neutral-900 border-2 border-neutral-800 hover:border-blue-500 rounded-xl flex items-center gap-4 transition-colors group"
                   >
-                    <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <ClipboardCheck className="w-7 h-7 text-blue-600 dark:text-blue-400" />
+                    <div className="w-12 h-12 bg-blue-500/15 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <ClipboardCheck className="w-7 h-7 text-blue-300" />
                     </div>
                     <div className="flex-1 text-left">
-                      <p className="font-semibold text-gray-900 dark:text-white">
+                      <p className="font-semibold text-neutral-100">
                         Daily Check-In
                       </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                      <p className="text-sm text-neutral-400">
                         Quick pre-trip inspection
                       </p>
                     </div>
@@ -1177,41 +1223,41 @@ export default function VehiclePortalPage() {
                   {/* Weekly Check-In */}
                   <button
                     onClick={() => handleCheckInRedirect('weekly')}
-                    className="w-full p-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-500 rounded-xl flex items-center gap-4 transition-colors group"
+                    className="w-full p-4 bg-neutral-900 border-2 border-neutral-800 hover:border-purple-500 rounded-xl flex items-center gap-4 transition-colors group"
                   >
-                    <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <CalendarCheck className="w-7 h-7 text-purple-600 dark:text-purple-400" />
+                    <div className="w-12 h-12 bg-purple-500/15 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <CalendarCheck className="w-7 h-7 text-purple-300" />
                     </div>
                     <div className="flex-1 text-left">
-                      <p className="font-semibold text-gray-900 dark:text-white">
+                      <p className="font-semibold text-neutral-100">
                         Weekly Check-In
                       </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                      <p className="text-sm text-neutral-400">
                         Comprehensive weekly inspection
                       </p>
                     </div>
                   </button>
 
                   {/* Separator */}
-                  <div className="my-2 border-t border-gray-200 dark:border-gray-700" />
+                  <div className="my-2 border-t border-neutral-800" />
 
                   {/* Check-In History (moved to bottom) */}
                   <button
                     onClick={() => router.push(`/fleet/vehicles/${verifiedVehicle.id}/check-in-history`)}
-                    className="w-full p-4 bg-gray-50 dark:bg-gray-800/50 border-2 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500 rounded-xl flex items-center gap-4 transition-colors"
+                    className="w-full p-4 bg-neutral-800/50 border-2 border-neutral-800 hover:border-neutral-500 rounded-xl flex items-center gap-4 transition-colors"
                   >
-                    <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center">
-                      <History className="w-6 h-6 text-gray-500 dark:text-gray-400" />
+                    <div className="w-12 h-12 bg-neutral-800 rounded-xl flex items-center justify-center">
+                      <History className="w-6 h-6 text-neutral-400" />
                     </div>
                     <div className="flex-1 text-left">
-                      <p className="font-medium text-gray-700 dark:text-gray-300">
+                      <p className="font-medium text-neutral-300">
                         View Check-In History
                       </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                      <p className="text-sm text-neutral-400">
                         See all past inspections
                       </p>
                     </div>
-                    <ExternalLink className="w-5 h-5 text-gray-400" />
+                    <ExternalLink className="w-5 h-5 text-neutral-500" />
                   </button>
                 </div>
               </div>
@@ -1237,29 +1283,29 @@ export default function VehiclePortalPage() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setStep('verified')}
-                  className="p-2 hover:bg-white/50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                  className="p-2 hover:bg-neutral-800 rounded-lg transition-colors"
                 >
-                  <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                  <ArrowLeft className="w-5 h-5 text-neutral-400" />
                 </button>
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  <h2 className="text-xl font-bold text-neutral-100">
                     Fuel Fill-up
                   </h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-sm text-neutral-400">
                     {verifiedVehicle.registration}
                   </p>
                 </div>
               </div>
 
               {/* Receipt scan section */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5">
+              <div className="bg-neutral-900 rounded-xl shadow-lg p-5">
                 <div className="flex items-center gap-3 mb-3">
                   <Receipt className="w-5 h-5 text-green-600" />
-                  <h3 className="font-semibold text-gray-900 dark:text-white">
+                  <h3 className="font-semibold text-neutral-100">
                     Scan Receipt
                   </h3>
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                <p className="text-sm text-neutral-400 mb-4">
                   Take a photo of your fuel receipt to auto-fill the details
                 </p>
 
@@ -1306,7 +1352,7 @@ export default function VehiclePortalPage() {
                     <button
                       type="button"
                       onClick={() => receiptCameraRef.current?.click()}
-                      className="flex-1 py-3 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                      className="flex-1 py-3 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
                       <Camera className="w-5 h-5" />
                       Camera
@@ -1326,7 +1372,7 @@ export default function VehiclePortalPage() {
                     <button
                       type="button"
                       onClick={() => receiptUploadRef.current?.click()}
-                      className="flex-1 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                      className="flex-1 py-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
                       <Upload className="w-5 h-5" />
                       Upload
@@ -1336,15 +1382,15 @@ export default function VehiclePortalPage() {
               </div>
 
               {/* Odometer photo section */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5">
+              <div className="bg-neutral-900 rounded-xl shadow-lg p-5">
                 <div className="flex items-center gap-3 mb-3">
                   <Gauge className="w-5 h-5 text-blue-600" />
-                  <h3 className="font-semibold text-gray-900 dark:text-white">
+                  <h3 className="font-semibold text-neutral-100">
                     Odometer Photo
                   </h3>
-                  <span className="text-xs text-gray-400">(Optional)</span>
+                  <span className="text-xs text-neutral-500">(Optional)</span>
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                <p className="text-sm text-neutral-400 mb-4">
                   Take a photo of your odometer to auto-fill the reading
                 </p>
 
@@ -1395,7 +1441,7 @@ export default function VehiclePortalPage() {
                     <button
                       type="button"
                       onClick={() => odometerCameraRef.current?.click()}
-                      className="flex-1 py-3 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                      className="flex-1 py-3 bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
                       <Camera className="w-5 h-5" />
                       Camera
@@ -1414,7 +1460,7 @@ export default function VehiclePortalPage() {
                     <button
                       type="button"
                       onClick={() => odometerUploadRef.current?.click()}
-                      className="flex-1 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                      className="flex-1 py-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
                       <Upload className="w-5 h-5" />
                       Upload
@@ -1424,15 +1470,15 @@ export default function VehiclePortalPage() {
               </div>
 
               {/* Fuel gauge photo section */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5">
+              <div className="bg-neutral-900 rounded-xl shadow-lg p-5">
                 <div className="flex items-center gap-3 mb-3">
                   <Fuel className="w-5 h-5 text-orange-600" />
-                  <h3 className="font-semibold text-gray-900 dark:text-white">
+                  <h3 className="font-semibold text-neutral-100">
                     Fuel Gauge Photo
                   </h3>
-                  <span className="text-xs text-gray-400">(Optional)</span>
+                  <span className="text-xs text-neutral-500">(Optional)</span>
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                <p className="text-sm text-neutral-400 mb-4">
                   Take a photo of your dashboard fuel gauge to auto-fill the tank level
                 </p>
 
@@ -1483,7 +1529,7 @@ export default function VehiclePortalPage() {
                     <button
                       type="button"
                       onClick={() => fuelGaugeCameraRef.current?.click()}
-                      className="flex-1 py-3 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                      className="flex-1 py-3 bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
                       <Camera className="w-5 h-5" />
                       Camera
@@ -1502,7 +1548,7 @@ export default function VehiclePortalPage() {
                     <button
                       type="button"
                       onClick={() => fuelGaugeUploadRef.current?.click()}
-                      className="flex-1 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                      className="flex-1 py-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
                       <Upload className="w-5 h-5" />
                       Upload
@@ -1512,9 +1558,9 @@ export default function VehiclePortalPage() {
               </div>
 
               {/* Form fields */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5 space-y-4">
+              <div className="bg-neutral-900 rounded-xl shadow-lg p-5 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-neutral-300 mb-1">
                     Date *
                   </label>
                   <input
@@ -1523,13 +1569,13 @@ export default function VehiclePortalPage() {
                     onChange={(e) =>
                       setFuelForm({ ...fuelForm, transactionDate: e.target.value })
                     }
-                    className="w-full px-4 py-3 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700"
+                    className="w-full px-4 py-3 rounded-lg bg-neutral-900 border border-neutral-700 text-neutral-100 placeholder:text-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-neutral-300 mb-1">
                       Amount (R) *
                     </label>
                     <input
@@ -1540,11 +1586,11 @@ export default function VehiclePortalPage() {
                       onChange={(e) =>
                         setFuelForm({ ...fuelForm, amountRand: e.target.value })
                       }
-                      className="w-full px-4 py-3 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700"
+                      className="w-full px-4 py-3 rounded-lg bg-neutral-900 border border-neutral-700 text-neutral-100 placeholder:text-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-neutral-300 mb-1">
                       Litres *
                     </label>
                     <input
@@ -1555,14 +1601,14 @@ export default function VehiclePortalPage() {
                       onChange={(e) =>
                         setFuelForm({ ...fuelForm, litres: e.target.value })
                       }
-                      className="w-full px-4 py-3 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700"
+                      className="w-full px-4 py-3 rounded-lg bg-neutral-900 border border-neutral-700 text-neutral-100 placeholder:text-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-neutral-300 mb-1">
                       Price/L
                     </label>
                     <input
@@ -1573,11 +1619,11 @@ export default function VehiclePortalPage() {
                       onChange={(e) =>
                         setFuelForm({ ...fuelForm, pricePerLitre: e.target.value })
                       }
-                      className="w-full px-4 py-3 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700"
+                      className="w-full px-4 py-3 rounded-lg bg-neutral-900 border border-neutral-700 text-neutral-100 placeholder:text-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-neutral-300 mb-1">
                       Odometer (km)
                     </label>
                     <input
@@ -1587,13 +1633,13 @@ export default function VehiclePortalPage() {
                       onChange={(e) =>
                         setFuelForm({ ...fuelForm, odometerReading: e.target.value })
                       }
-                      className="w-full px-4 py-3 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700"
+                      className="w-full px-4 py-3 rounded-lg bg-neutral-900 border border-neutral-700 text-neutral-100 placeholder:text-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-neutral-300 mb-1">
                     Station Name
                   </label>
                   <input
@@ -1603,12 +1649,12 @@ export default function VehiclePortalPage() {
                     onChange={(e) =>
                       setFuelForm({ ...fuelForm, stationName: e.target.value })
                     }
-                    className="w-full px-4 py-3 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700"
+                    className="w-full px-4 py-3 rounded-lg bg-neutral-900 border border-neutral-700 text-neutral-100 placeholder:text-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-neutral-300 mb-1">
                     Tank Level After (%)
                   </label>
                   <input
@@ -1620,9 +1666,9 @@ export default function VehiclePortalPage() {
                     onChange={(e) =>
                       setFuelForm({ ...fuelForm, fuelLevelAfter: e.target.value })
                     }
-                    className="w-full px-4 py-3 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700"
+                    className="w-full px-4 py-3 rounded-lg bg-neutral-900 border border-neutral-700 text-neutral-100 placeholder:text-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none"
                   />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-xs text-neutral-400 mt-1">
                     Optional - Updates the fuel gauge reading
                   </p>
                 </div>
@@ -1630,9 +1676,9 @@ export default function VehiclePortalPage() {
 
               {/* Receipt required warning */}
               {!receiptPhotoFile && (
-                <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                <div className="p-4 bg-amber-950/50 border border-amber-800 rounded-xl flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-300 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-300">
                     Receipt photo is required. Please scan or upload your fuel receipt above.
                   </p>
                 </div>
