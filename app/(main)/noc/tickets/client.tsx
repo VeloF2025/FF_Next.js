@@ -18,8 +18,6 @@ import type { TicketFilters } from '@/modules/noc/types/ticket';
 type ViewMode = 'table' | 'kanban' | 'grid';
 type TicketScope = 'all' | 'my_tickets' | 'my_team';
 
-// Encoded value: "t:<ticket_type>", "c:<category>", "s:<source>"
-type ClassificationValue = '' | `t:${string}` | `c:${string}` | `s:${string}`;
 
 const TableIcon = () => (
   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -93,27 +91,6 @@ export default function TicketsListPageClient() {
   const handleViewChange = (mode: ViewMode) => setFilter('view', mode);
   const handleScopeChange = (scope: TicketScope) => setFilter('scope', scope);
 
-  // Combined classification value from whichever axis is active
-  const classificationValue: ClassificationValue = filterType
-    ? `t:${filterType}`
-    : filterCategory
-      ? `c:${filterCategory}`
-      : filterSource
-        ? `s:${filterSource}`
-        : '';
-
-  const handleClassificationChange = (val: string) => {
-    if (!val) {
-      setMultiple({ type: '', category: '', source: '' });
-    } else if (val.startsWith('t:')) {
-      setMultiple({ type: val.slice(2), category: '', source: '' });
-    } else if (val.startsWith('c:')) {
-      setMultiple({ type: '', category: val.slice(2), source: '' });
-    } else {
-      setMultiple({ type: '', category: '', source: val.slice(2) });
-    }
-  };
-
   const dateRange = useMemo(() => {
     if (!filterDatePreset) return {};
     const now = new Date();
@@ -154,7 +131,6 @@ export default function TicketsListPageClient() {
   }, [searchTerm, statusFilter, filterType, filterCategory, filterSource, filterProject, ticketScope, teamIds, currentUser?.id, dateRange]);
 
   const hasActiveFilters = filterType || filterCategory || filterSource || filterDatePreset || filterProject;
-  const classificationActive = !!(filterType || filterCategory || filterSource);
 
   const teamLabel = teamsLoading
     ? 'Team'
@@ -270,52 +246,80 @@ export default function TicketsListPageClient() {
 
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible">
 
-            {/* Combined classification — Discipline / Category / Source in one grouped select */}
+            {/* Discipline — which team is responsible for resolving */}
             <select
-              value={classificationValue}
-              onChange={(e) => handleClassificationChange(e.target.value)}
+              value={filterType}
+              onChange={(e) => setFilter('type', e.target.value)}
+              title="Discipline — which team resolves this ticket"
               className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
-                ${classificationActive
+                ${filterType
                   ? 'bg-blue-500/10 border-blue-500/30 text-blue-300'
                   : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
                 }`}
             >
-              <option value="">All Types</option>
+              <option value="">Discipline</option>
+              <option value="activations">Activations</option>
+              <option value="civils">Civils</option>
+              <option value="maintenance">Maintenance</option>
+              <option value="optical">Optical</option>
+              <option value="dev_ops">DevOps</option>
+              <option value="unspecified">Unspecified</option>
+            </select>
 
-              <optgroup label="── Discipline (who resolves)">
-                <option value="t:activations">Activations</option>
-                <option value="t:civils">Civils</option>
-                <option value="t:maintenance">Maintenance</option>
-                <option value="t:optical">Optical</option>
-                <option value="t:dev_ops">DevOps</option>
+            {/* Category — what kind of issue, with PP/OLT subcategories */}
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilter('category', e.target.value)}
+              title="Category — what kind of issue this is"
+              className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
+                ${filterCategory
+                  ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300'
+                  : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
+                }`}
+            >
+              <option value="">Category</option>
+              <optgroup label="Operational">
+                <option value="maintenance">Maintenance</option>
+                <option value="snag">Snag</option>
+                <option value="hse_incident">HSE</option>
+                <option value="dev_ops">DevOps</option>
+                <option value="sales_lead">Sales Lead</option>
+                <option value="unspecified">Unspecified</option>
               </optgroup>
+              <optgroup label="PP Data / OLT">
+                <option value="pre_provision">Pre-Provision</option>
+                <option value="fault_repair">Fault Repair</option>
+                <option value="modification">Modification</option>
+                <option value="ont_swap">ONT Swap</option>
+                <option value="new_installation">New Installation</option>
+                <option value="serial_mismatch">Serial Mismatch</option>
+                <option value="olt_investigation">OLT Investigation</option>
+              </optgroup>
+            </select>
 
-              <optgroup label="── Category (what kind)">
-                <option value="c:maintenance">Maintenance ticket</option>
-                <option value="c:snag">Snag</option>
-                <option value="c:hse_incident">HSE</option>
-                <option value="c:sales_lead">Sales Lead</option>
-                <option value="c:pre_provision">Pre-Provision</option>
-                <option value="c:fault_repair">Fault Repair</option>
-                <option value="c:modification">Modification</option>
-                <option value="c:ont_swap">ONT Swap</option>
-                <option value="c:new_installation">New Installation</option>
-                <option value="c:serial_mismatch">Serial Mismatch</option>
-                <option value="c:olt_investigation">OLT Investigation</option>
-              </optgroup>
-
-              <optgroup label="── Origin (how created)">
-                <option value="s:manual">Manual</option>
-                <option value="s:ad_hoc">Ad Hoc</option>
-                <option value="s:wa_maintenance">WhatsApp</option>
-                <option value="s:qcontact">QContact</option>
-                <option value="s:construction">Construction</option>
-                <option value="s:snags">Snags</option>
-                <option value="s:qa_review">QA Review</option>
-                <option value="s:pp_data">PP Data</option>
-                <option value="s:olt_mismatch">OLT Mismatch</option>
-                <option value="s:weekly_report">Weekly Report</option>
-              </optgroup>
+            {/* Origin — how the ticket was created / where it came from */}
+            <select
+              value={filterSource}
+              onChange={(e) => setFilter('source', e.target.value)}
+              title="Origin — how this ticket was created"
+              className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
+                ${filterSource
+                  ? 'bg-purple-500/10 border-purple-500/30 text-purple-300'
+                  : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
+                }`}
+            >
+              <option value="">Origin</option>
+              <option value="manual">Manual</option>
+              <option value="ad_hoc">Ad Hoc</option>
+              <option value="wa_maintenance">WhatsApp</option>
+              <option value="qcontact">QContact</option>
+              <option value="construction">Construction</option>
+              <option value="snags">Snags</option>
+              <option value="qa_review">QA Review</option>
+              <option value="pp_data">PP Data</option>
+              <option value="olt_mismatch">OLT Mismatch</option>
+              <option value="weekly_report">Weekly Report</option>
+              <option value="dev_ops">DevOps</option>
             </select>
 
             {/* Project */}
