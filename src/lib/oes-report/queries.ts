@@ -144,6 +144,18 @@ export async function loadOesOnlyRows(): Promise<OesOnlyRow[]> {
   return result.rows;
 }
 
+export async function loadLatestOesReportDate(): Promise<string> {
+  const result = await pool.query<{ report_date: string }>(`
+    SELECT report_date::text
+    FROM oes_import_batches
+    WHERE report_date IS NOT NULL
+    ORDER BY report_date DESC
+    LIMIT 1
+  `);
+  return result.rows[0]?.report_date
+    ?? new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Johannesburg' });
+}
+
 export async function loadTicketsForKeys(
   drNumbers: string[],
   ontSerials: string[]
