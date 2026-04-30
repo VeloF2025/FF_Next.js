@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { ModulePage } from '@/components/module-page';
 import { nocConfig } from '@/modules/navigation';
 import { TicketList } from '@/modules/noc/components/TicketList/TicketList';
@@ -9,7 +9,7 @@ import { KanbanBoard } from '@/modules/noc/components/KanbanBoard';
 import { useMyTeams } from '@/modules/noc/hooks/useMyTeams';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
-import { Search, Users, User, X, SlidersHorizontal } from 'lucide-react';
+import { Search, Users, User, X } from 'lucide-react';
 import { TicketSummaryTiles } from '@/modules/noc/components/TicketList/TicketSummaryTiles';
 import { useProjects } from '@/hooks/useProjects';
 import { useUrlFilters } from '@/hooks/useUrlFilters';
@@ -17,6 +17,9 @@ import type { TicketFilters } from '@/modules/noc/types/ticket';
 
 type ViewMode = 'table' | 'kanban' | 'grid';
 type TicketScope = 'all' | 'my_tickets' | 'my_team';
+
+// Encoded value: "t:<ticket_type>", "c:<category>", "s:<source>"
+type ClassificationValue = '' | `t:${string}` | `c:${string}` | `s:${string}`;
 
 const TableIcon = () => (
   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -59,19 +62,12 @@ export default function TicketsListPageClient() {
   const filterProject = urlFilters.project;
   const statusFilter = urlFilters.status || undefined;
 
-  const [showMoreFilters, setShowMoreFilters] = useState(false);
-
   const { teams, teamIds, isLoading: teamsLoading } = useMyTeams();
   const { currentUser } = useAuth();
   const { data: projects = [] } = useProjects();
   const activeProjects = (projects as { id: string; name: string; code?: string; status?: string }[])
     .filter((p) => p.status === 'active' || p.status === 'in_progress')
     .sort((a, b) => a.name.localeCompare(b.name));
-
-  // Show the source filter if it has a value even when "more filters" is collapsed
-  useEffect(() => {
-    if (filterSource) setShowMoreFilters(true);
-  }, [filterSource]);
 
   useEffect(() => {
     if (urlFilters.view) localStorage.setItem('ticketsViewMode', urlFilters.view);
@@ -96,6 +92,27 @@ export default function TicketsListPageClient() {
 
   const handleViewChange = (mode: ViewMode) => setFilter('view', mode);
   const handleScopeChange = (scope: TicketScope) => setFilter('scope', scope);
+
+  // Combined classification value from whichever axis is active
+  const classificationValue: ClassificationValue = filterType
+    ? `t:${filterType}`
+    : filterCategory
+      ? `c:${filterCategory}`
+      : filterSource
+        ? `s:${filterSource}`
+        : '';
+
+  const handleClassificationChange = (val: string) => {
+    if (!val) {
+      setMultiple({ type: '', category: '', source: '' });
+    } else if (val.startsWith('t:')) {
+      setMultiple({ type: val.slice(2), category: '', source: '' });
+    } else if (val.startsWith('c:')) {
+      setMultiple({ type: '', category: val.slice(2), source: '' });
+    } else {
+      setMultiple({ type: '', category: '', source: val.slice(2) });
+    }
+  };
 
   const dateRange = useMemo(() => {
     if (!filterDatePreset) return {};
@@ -129,7 +146,6 @@ export default function TicketsListPageClient() {
       source: (filterSource || undefined) as any,
       project_id: filterProject || undefined,
       assigned_to: ticketScope === 'my_tickets' && currentUser?.id ? currentUser.id : undefined,
-      // Pass ALL team IDs — backend handles array with ANY()
       assigned_team_id: ticketScope === 'my_team' && teamIds.length > 0 ? teamIds : undefined,
     };
     if (dateRange.created_after) f.created_after = dateRange.created_after;
@@ -138,8 +154,8 @@ export default function TicketsListPageClient() {
   }, [searchTerm, statusFilter, filterType, filterCategory, filterSource, filterProject, ticketScope, teamIds, currentUser?.id, dateRange]);
 
   const hasActiveFilters = filterType || filterCategory || filterSource || filterDatePreset || filterProject;
+  const classificationActive = !!(filterType || filterCategory || filterSource);
 
-  // Team button label — show name when in single team, count when multiple
   const teamLabel = teamsLoading
     ? 'Team'
     : teams.length === 0
@@ -155,29 +171,18 @@ export default function TicketsListPageClient() {
       <div className="flex flex-col h-full">
         {/* Row 1: Scope toggle + View toggle + Create */}
         <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 mb-3">
-          {/* Ticket Scope Toggle */}
           <div className="flex items-center bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg p-1 overflow-x-auto">
             <button
               onClick={() => handleScopeChange('all')}
-              className={`
-                flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all whitespace-nowrap
-                ${ticketScope === 'all'
-                  ? 'bg-[var(--ff-primary-500)] text-white shadow-sm'
-                  : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'
-                }
-              `}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all whitespace-nowrap
+                ${ticketScope === 'all' ? 'bg-[var(--ff-primary-500)] text-white shadow-sm' : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'}`}
             >
               All<span className="hidden sm:inline"> Tickets</span>
             </button>
             <button
               onClick={() => handleScopeChange('my_tickets')}
-              className={`
-                flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all whitespace-nowrap
-                ${ticketScope === 'my_tickets'
-                  ? 'bg-blue-500 text-white shadow-sm'
-                  : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'
-                }
-              `}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all whitespace-nowrap
+                ${ticketScope === 'my_tickets' ? 'bg-blue-500 text-white shadow-sm' : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'}`}
             >
               <User className="w-3.5 h-3.5" />
               Mine
@@ -186,15 +191,13 @@ export default function TicketsListPageClient() {
               onClick={() => !teamDisabled && handleScopeChange('my_team')}
               disabled={teamDisabled}
               title={teamDisabled ? 'You are not a member of any team' : teamLabel}
-              className={`
-                flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all whitespace-nowrap
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all whitespace-nowrap
                 ${teamDisabled
                   ? 'opacity-40 cursor-not-allowed text-[var(--ff-text-tertiary)]'
                   : ticketScope === 'my_team'
                     ? 'bg-purple-500 text-white shadow-sm'
                     : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'
-                }
-              `}
+                }`}
             >
               <Users className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{teamLabel}</span>
@@ -203,7 +206,6 @@ export default function TicketsListPageClient() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* View Toggle */}
             <div className="flex items-center bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg p-1">
               <button
                 onClick={() => handleViewChange('table')}
@@ -244,9 +246,8 @@ export default function TicketsListPageClient() {
           </div>
         </div>
 
-        {/* Row 2: Search + Filters */}
+        {/* Row 2: Search + Filters (3 dropdowns instead of 5) */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-4">
-          {/* Search */}
           <div className="relative flex-1 sm:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
             <input
@@ -267,56 +268,53 @@ export default function TicketsListPageClient() {
             )}
           </div>
 
-          {/* Filter Dropdowns */}
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible">
-            {/* Discipline (which team resolves the ticket) */}
+
+            {/* Combined classification — Discipline / Category / Source in one grouped select */}
             <select
-              value={filterType}
-              onChange={(e) => setFilter('type', e.target.value)}
-              title="Filter by discipline — which team is responsible"
+              value={classificationValue}
+              onChange={(e) => handleClassificationChange(e.target.value)}
               className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
-                ${filterType
+                ${classificationActive
                   ? 'bg-blue-500/10 border-blue-500/30 text-blue-300'
                   : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
                 }`}
             >
-              <option value="">Discipline</option>
-              <option value="activations">Activations</option>
-              <option value="civils">Civils</option>
-              <option value="dev_ops">DevOps</option>
-              <option value="maintenance">Maintenance</option>
-              <option value="optical">Optical</option>
-              <option value="unspecified">Unspecified</option>
-            </select>
+              <option value="">All Types</option>
 
-            {/* Category (what kind of issue) */}
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilter('category', e.target.value)}
-              title="Filter by ticket category — what kind of issue"
-              className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
-                ${filterCategory
-                  ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300'
-                  : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
-                }`}
-            >
-              <option value="">Category</option>
-              <optgroup label="Operational">
-                <option value="maintenance">Maintenance</option>
-                <option value="snag">Snag</option>
-                <option value="hse_incident">HSE</option>
-                <option value="dev_ops">DevOps</option>
-                <option value="sales_lead">Sales Lead</option>
-                <option value="unspecified">Unspecified</option>
+              <optgroup label="── Discipline (who resolves)">
+                <option value="t:activations">Activations</option>
+                <option value="t:civils">Civils</option>
+                <option value="t:maintenance">Maintenance</option>
+                <option value="t:optical">Optical</option>
+                <option value="t:dev_ops">DevOps</option>
               </optgroup>
-              <optgroup label="PP Data / OLT">
-                <option value="pre_provision">Pre-Provision</option>
-                <option value="fault_repair">Fault Repair</option>
-                <option value="modification">Modification</option>
-                <option value="ont_swap">ONT Swap</option>
-                <option value="new_installation">New Installation</option>
-                <option value="serial_mismatch">Serial Mismatch</option>
-                <option value="olt_investigation">OLT Investigation</option>
+
+              <optgroup label="── Category (what kind)">
+                <option value="c:maintenance">Maintenance ticket</option>
+                <option value="c:snag">Snag</option>
+                <option value="c:hse_incident">HSE</option>
+                <option value="c:sales_lead">Sales Lead</option>
+                <option value="c:pre_provision">Pre-Provision</option>
+                <option value="c:fault_repair">Fault Repair</option>
+                <option value="c:modification">Modification</option>
+                <option value="c:ont_swap">ONT Swap</option>
+                <option value="c:new_installation">New Installation</option>
+                <option value="c:serial_mismatch">Serial Mismatch</option>
+                <option value="c:olt_investigation">OLT Investigation</option>
+              </optgroup>
+
+              <optgroup label="── Origin (how created)">
+                <option value="s:manual">Manual</option>
+                <option value="s:ad_hoc">Ad Hoc</option>
+                <option value="s:wa_maintenance">WhatsApp</option>
+                <option value="s:qcontact">QContact</option>
+                <option value="s:construction">Construction</option>
+                <option value="s:snags">Snags</option>
+                <option value="s:qa_review">QA Review</option>
+                <option value="s:pp_data">PP Data</option>
+                <option value="s:olt_mismatch">OLT Mismatch</option>
+                <option value="s:weekly_report">Weekly Report</option>
               </optgroup>
             </select>
 
@@ -354,46 +352,6 @@ export default function TicketsListPageClient() {
               <option value="7d">Last 7 Days</option>
               <option value="30d">Last 30 Days</option>
             </select>
-
-            {/* More filters toggle */}
-            <button
-              onClick={() => setShowMoreFilters((v) => !v)}
-              title="Source filter"
-              className={`p-2 rounded-lg text-sm border transition-colors flex-shrink-0 flex items-center gap-1
-                ${showMoreFilters || filterSource
-                  ? 'bg-purple-500/10 border-purple-500/30 text-purple-300'
-                  : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
-                }`}
-            >
-              <SlidersHorizontal className="w-4 h-4" />
-              {filterSource && <span className="text-xs hidden sm:inline">Source</span>}
-            </button>
-
-            {/* Source — only shown when expanded */}
-            {showMoreFilters && (
-              <select
-                value={filterSource}
-                onChange={(e) => setFilter('source', e.target.value)}
-                className={`px-2.5 py-2 rounded-lg text-sm border transition-colors flex-shrink-0
-                  ${filterSource
-                    ? 'bg-purple-500/10 border-purple-500/30 text-purple-300'
-                    : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
-                  }`}
-              >
-                <option value="">All Sources</option>
-                <option value="ad_hoc">Ad Hoc</option>
-                <option value="construction">Construction</option>
-                <option value="dev_ops">DevOps</option>
-                <option value="manual">Manual</option>
-                <option value="olt_mismatch">OLT Mismatch</option>
-                <option value="pp_data">PP Data</option>
-                <option value="qa_review">QA Review</option>
-                <option value="qcontact">QContact</option>
-                <option value="wa_maintenance">WhatsApp</option>
-                <option value="snags">Snags</option>
-                <option value="weekly_report">Weekly Report</option>
-              </select>
-            )}
 
             {hasActiveFilters && (
               <button
