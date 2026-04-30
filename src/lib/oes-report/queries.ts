@@ -99,13 +99,22 @@ export interface FtDisputeRow {
 }
 
 export async function loadFtDisputeRows(): Promise<FtDisputeRow[]> {
-  // Serials that appear in both PP DATA and OES Activations —
-  // Fibertime is billing them as pre-provision even though they are activated.
+  // Serials that appear in Fibertime's LATEST PP DATA import for each project
+  // AND are already activated in OES. Scoping to the latest batch per project
+  // avoids showing historical rows that Fibertime already removed from their list.
   const result = await pool.query<FtDisputeRow>(`
+    WITH latest_batch_per_project AS (
+      SELECT project, MAX(import_batch_id) AS latest_batch_id
+      FROM oes_pp_data
+      WHERE project IS NOT NULL
+      GROUP BY project
+    )
     SELECT p.serial_number, p.project, p.date_registered::text,
            a.drop_number, a.activation_date::text, a.team, a.status AS activation_status
     FROM oes_pp_data p
     JOIN oes_activations a ON LOWER(a.serial_number) = LOWER(p.serial_number)
+    JOIN latest_batch_per_project lb
+      ON p.project = lb.project AND p.import_batch_id = lb.latest_batch_id
     ORDER BY a.activation_date DESC NULLS LAST, p.project
   `);
   return result.rows;
