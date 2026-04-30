@@ -56,10 +56,13 @@ export function TicketList({
     ...initialFilters,
   });
 
-  // Sync external filter changes (project, discipline, scope, etc.) into local state
+  // Sync external filter changes (project, discipline, scope, etc.) into local state.
+  // JSON.stringify avoids firing on every render when the parent passes a new object
+  // reference with identical contents (e.g. default `= {}` or non-memoised call-sites).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     setFilters((prev) => ({ ...prev, ...initialFilters, page: 1 }));
-  }, [initialFilters]);
+  }, [JSON.stringify(initialFilters)]);
 
   const { tickets, pagination, isLoading, isError, error, refetch } = useTickets(filters);
 
