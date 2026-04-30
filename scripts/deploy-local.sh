@@ -371,17 +371,23 @@ sudo -u velo bash -c "cd $DIR && ls -dt .next-backup-* 2>/dev/null | tail -n +4 
 # Scan commit messages in the window just deployed for VF-YYYYMMDD-NNN refs.
 # Any ticket still in assigned/in_progress is marked resolved. Fail-open: a
 # DB error never blocks the summary or Sentry step.
+#
+# Security note: TICKET_UID values are validated by grep to match
+# VF-[0-9]{8}-[0-9]+ (digits and hyphens only). psql -v is used for
+# defence-in-depth parameterization regardless.
 RESOLVED_TICKETS=""
 if [[ "$CURRENT_COMMIT" != "$NEW_COMMIT" ]]; then
-  TICKET_REFS=$(sudo -u velo bash -c "cd $DIR && git log $CURRENT_COMMIT..$NEW_COMMIT --format='%B' 2>/dev/null" \
-    | grep -oE '\bVF-[0-9]{8}-[0-9]+\b' | sort -u 2>/dev/null || true)
-  if [[ -n "$TICKET_REFS" ]]; then
+  mapfile -t TICKET_REFS < <(
+    sudo -u velo bash -c "cd '$DIR' && git log '$CURRENT_COMMIT'..'$NEW_COMMIT' --format='%B' 2>/dev/null" \
+      | grep -oE '\bVF-[0-9]{8}-[0-9]+\b' | sort -u 2>/dev/null
+  ) || true
+
+  if [[ ${#TICKET_REFS[@]} -gt 0 ]]; then
     PGURL=$(sudo -u velo bash -c "grep '^DATABASE_URL=' '$DIR/.env.local' 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\"'" 2>/dev/null || true)
     if [[ -n "$PGURL" ]]; then
-      for TICKET_UID in $TICKET_REFS; do
-        # TICKET_UID is validated by grep to VF-[0-9]{8}-[0-9]+ — safe to interpolate
+      for TICKET_UID in "${TICKET_REFS[@]}"; do
         UPDATED=$(sudo -u velo bash -c \
-          "psql '$PGURL' -t -q -c \"UPDATE maintenance_tickets SET status='resolved', updated_at=NOW() WHERE ticket_uid='$TICKET_UID' AND status IN ('assigned','in_progress') RETURNING ticket_uid\" 2>/dev/null" \
+          "psql \"$PGURL\" -t -q -v \"uid=$TICKET_UID\" -c \"UPDATE maintenance_tickets SET status='resolved', updated_at=NOW() WHERE ticket_uid=:'uid' AND status IN ('assigned','in_progress') RETURNING ticket_uid\" 2>/dev/null" \
           | tr -d ' \n' || true)
         if [[ -n "$UPDATED" ]]; then
           log "Ticket $TICKET_UID → resolved"

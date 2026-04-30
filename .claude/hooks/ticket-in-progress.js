@@ -38,17 +38,17 @@ function isBranchCreationCommand(command) {
 }
 
 function markInProgress(ticketUid) {
-  // ticketUid is validated to be VF-DDDDDDDD-N (digits and hyphens only).
-  // Passed as a literal in the remote SQL — no injection risk.
+  // ticketUid is validated by TICKET_UID_RE to contain only digits and hyphens
+  // after the VF- prefix (e.g. VF-20260430-001). Use psql -v for defence-in-depth.
   const remoteCmd = [
     `PGURL=$(grep '^DATABASE_URL=' /home/velo/fibreflow-dev/.env.local 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"')`,
     `[ -n "$PGURL" ] || exit 0`,
-    `psql "$PGURL" -t -q -c "UPDATE maintenance_tickets SET status='in_progress', updated_at=NOW() WHERE ticket_uid='${ticketUid}' AND status='assigned' RETURNING ticket_uid" 2>/dev/null`,
+    `psql "$PGURL" -t -q -v "uid=${ticketUid}" -c "UPDATE maintenance_tickets SET status='in_progress', updated_at=NOW() WHERE ticket_uid=:'uid' AND status='assigned' RETURNING ticket_uid" 2>/dev/null`,
   ].join(' && ');
 
   try {
     const result = execFileSync('ssh', [
-      '-o', 'StrictHostKeyChecking=no',
+      '-o', 'StrictHostKeyChecking=accept-new',
       '-o', 'ConnectTimeout=5',
       '-o', 'BatchMode=yes',
       'velo@100.96.203.105',
