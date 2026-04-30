@@ -28,6 +28,8 @@ log "WARNING: $APP_DIR/.next/BUILD_ID is missing!"
 LATEST_BACKUP=$(ls -dt "$APP_DIR"/.next-backup-* "$APP_DIR"/.next-healthcheck-backup 2>/dev/null | head -1)
 if [ -n "$LATEST_BACKUP" ] && [ -f "$LATEST_BACKUP/BUILD_ID" ]; then
     log "Restoring from backup: $LATEST_BACKUP"
+    # Remove the partial .next first — mv won't replace a directory, it'll nest inside it
+    rm -rf "$APP_DIR/.next"
     mv "$LATEST_BACKUP" "$APP_DIR/.next"
     chown -R velo:velo "$APP_DIR/.next"
     log "Restored .next from backup — service can start"
