@@ -7,6 +7,7 @@
  * used for the "My Team's Tickets" filter toggle.
  */
 
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 interface Team {
@@ -32,9 +33,11 @@ export function useMyTeams() {
     refetchOnWindowFocus: false,
   });
 
+  const teamIds = useMemo(() => (query.data || []).map((t) => t.id), [query.data]);
+
   return {
     teams: query.data || [],
-    teamIds: (query.data || []).map((t) => t.id),
+    teamIds,
     isLoading: query.isLoading,
   };
 }
