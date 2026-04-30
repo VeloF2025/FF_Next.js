@@ -164,7 +164,7 @@ export default function TicketsListPageClient() {
               Mine
             </button>
             <button
-              onClick={() => !teamDisabled && handleScopeChange('my_team')}
+              onClick={() => handleScopeChange('my_team')}
               disabled={teamDisabled}
               title={teamDisabled ? 'You are not a member of any team' : teamLabel}
               className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all whitespace-nowrap
