@@ -6,6 +6,7 @@ import { nocConfig } from '@/modules/navigation';
 import { TicketList } from '@/modules/noc/components/TicketList/TicketList';
 import { TicketGridView } from '@/modules/noc/components/TicketList/TicketGridView';
 import { KanbanBoard } from '@/modules/noc/components/KanbanBoard';
+import { StaffFilterPicker } from '@/modules/noc/components/TicketList/StaffFilterPicker';
 import { useMyTeams } from '@/modules/noc/hooks/useMyTeams';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
@@ -45,6 +46,7 @@ export default function TicketsListPageClient() {
     source: '',
     date: '',
     project: '',
+    staff: '',
     scope: '',
     view: '',
     search: '',
@@ -58,6 +60,7 @@ export default function TicketsListPageClient() {
   const filterSource = urlFilters.source;
   const filterDatePreset = urlFilters.date;
   const filterProject = urlFilters.project;
+  const filterStaff = urlFilters.staff;
   const statusFilter = urlFilters.status || undefined;
 
   const { teams, teamIds, isLoading: teamsLoading } = useMyTeams();
@@ -122,15 +125,18 @@ export default function TicketsListPageClient() {
       ticket_category: (filterCategory || undefined) as any,
       source: (filterSource || undefined) as any,
       project_id: filterProject || undefined,
-      assigned_to: ticketScope === 'my_tickets' && currentUser?.id ? currentUser.id : undefined,
+      // Mine scope locks to current user; staff filter applies when in All/Team scope
+      assigned_to: ticketScope === 'my_tickets' && currentUser?.id
+        ? currentUser.id
+        : filterStaff || undefined,
       assigned_team_id: ticketScope === 'my_team' && teamIds.length > 0 ? teamIds : undefined,
     };
     if (dateRange.created_after) f.created_after = dateRange.created_after;
     if (dateRange.created_before) f.created_before = dateRange.created_before;
     return f;
-  }, [searchTerm, statusFilter, filterType, filterCategory, filterSource, filterProject, ticketScope, teamIds, currentUser?.id, dateRange]);
+  }, [searchTerm, statusFilter, filterType, filterCategory, filterSource, filterProject, filterStaff, ticketScope, teamIds, currentUser?.id, dateRange]);
 
-  const hasActiveFilters = filterType || filterCategory || filterSource || filterDatePreset || filterProject;
+  const hasActiveFilters = filterType || filterCategory || filterSource || filterDatePreset || filterProject || filterStaff;
 
   const teamLabel = teamsLoading
     ? 'Team'
@@ -357,9 +363,15 @@ export default function TicketsListPageClient() {
               <option value="30d">Last 30 Days</option>
             </select>
 
+            {/* Staff member picker — searchable, not a dropdown */}
+            <StaffFilterPicker
+              value={filterStaff}
+              onChange={(id) => setFilter('staff', id)}
+            />
+
             {hasActiveFilters && (
               <button
-                onClick={() => setMultiple({ type: '', category: '', source: '', date: '', project: '' })}
+                onClick={() => setMultiple({ type: '', category: '', source: '', date: '', project: '', staff: '' })}
                 className="p-1.5 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] rounded hover:bg-[var(--ff-bg-secondary)]"
                 title="Clear all filters"
               >
