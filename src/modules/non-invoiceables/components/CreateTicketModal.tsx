@@ -99,7 +99,7 @@ const TICKET_TYPE_LABELS: Record<string, string> = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Extract the source id from a composite id like "olt_mismatch:1234". */
+/** Extract the source id from a composite id like "oes_pp_data:1234". For integer-PK sources only. */
 function extractSourceId(compositeId: string): string {
   return compositeId.split(':').pop() ?? '';
 }
@@ -110,10 +110,16 @@ function extractNumericId(compositeId: string): number {
   return parsed;
 }
 
+/** Extract the raw string ID for UUID-PK sources (olt_mismatch, offline_devices). */
+function extractRawId(compositeId: string): string {
+  return compositeId.split(':').slice(1).join(':');
+}
+
 /** Best-available ONT serial for duplicate matching. */
 function bestSerial(item: SelectedItem): string | undefined {
   return item.offline_serial || item.oes_serial || item.olt_serial || undefined;
 }
+
 
 async function postJson(url: string, body: Record<string, unknown>): Promise<void> {
   const res = await fetch(url, {
@@ -149,9 +155,9 @@ async function fetchDuplicates(item: SelectedItem): Promise<DuplicateTicket[]> {
 
 /** Map our three sources to the payload shape the link endpoint expects. */
 function linkPayload(item: SelectedItem, targetTicketId: string) {
-  const source_id = item.source === 'oes_pp_data' || item.source === 'olt_mismatch'
+  const source_id = item.source === 'oes_pp_data'
     ? extractNumericId(item.id)
-    : extractSourceId(item.id);
+    : extractRawId(item.id);
 
   if (item.source === 'offline_devices') {
     // Default to the "plain offline" variant — mismatch variant only applies
@@ -270,13 +276,13 @@ export function CreateTicketModal({
     }
 
     const ppIds: number[] = [];
-    const oltIds: number[] = [];
-    const offlineIds: string[] = [];
+    const oltIds: string[] = [];  // olt_mismatch_records.id is UUID
+    const offlineIds: string[] = [];  // offline_devices.id is UUID
 
     for (const item of items) {
       if (item.source === 'oes_pp_data') ppIds.push(extractNumericId(item.id));
-      else if (item.source === 'olt_mismatch') oltIds.push(extractNumericId(item.id));
-      else if (item.source === 'offline_devices') offlineIds.push(extractSourceId(item.id));
+      else if (item.source === 'olt_mismatch') oltIds.push(extractRawId(item.id));
+      else if (item.source === 'offline_devices') offlineIds.push(extractRawId(item.id));
     }
 
     const shared = {

@@ -13,7 +13,7 @@ import { createTicket } from '@/modules/noc/services/ticketService';
 import { TicketSource, TicketType, TicketPriority, TicketStatus } from '@/modules/noc/types/ticket';
 import { PP_OLT_SUBTYPES } from '@/modules/noc/constants/ticketCategories';
 import { createLogger } from '@/lib/logger';
-import { normalizeOltTicketBatches } from '@/modules/activate/services/ticketBatchService';
+import { normalizeOltTicketBatches, type OltTicketBatchInput } from '@/modules/activate/services/ticketBatchService';
 
 const logger = createLogger('olt-report:tickets');
 
@@ -43,7 +43,7 @@ async function handler(
   } = req.body;
 
   const batches = normalizeOltTicketBatches(req.body);
-  const totalIds = batches.reduce((sum: number, b: { ids: number[] }) => sum + b.ids.length, 0);
+  const totalIds = batches.reduce((sum: number, b: OltTicketBatchInput) => sum + b.ids.length, 0);
   if (totalIds === 0) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid record_ids');
   }
@@ -99,7 +99,7 @@ async function handler(
         `SELECT id, drop_number, olt_serial, wrong_onemap_serial, fix_status,
                 investigation_context
          FROM olt_mismatch_records
-         WHERE id = ANY($1)
+         WHERE id = ANY($1::uuid[])
            AND fix_status = ANY($2)
            AND maintenance_ticket_id IS NULL`,
         [record_ids, eligibleStatuses]

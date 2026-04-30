@@ -10,6 +10,11 @@ export interface TicketBatchInput {
   assigned_team_id?: string;
 }
 
+export interface OltTicketBatchInput {
+  ids: string[]; // UUID primary keys
+  assigned_team_id?: string;
+}
+
 export function normalizePPTicketBatches(body: Record<string, unknown>): TicketBatchInput[] {
   if (Array.isArray(body.batches)) {
     return (body.batches as Record<string, unknown>[]).map((b) => ({
@@ -20,14 +25,14 @@ export function normalizePPTicketBatches(body: Record<string, unknown>): TicketB
   return [{ ids: (body.pp_data_ids as number[]) ?? [], assigned_team_id: (body.assigned_team_id as string | undefined) ?? undefined }];
 }
 
-export function normalizeOltTicketBatches(body: Record<string, unknown>): TicketBatchInput[] {
+export function normalizeOltTicketBatches(body: Record<string, unknown>): OltTicketBatchInput[] {
   if (Array.isArray(body.batches)) {
     return (body.batches as Record<string, unknown>[]).map((b) => ({
-      ids: (b.record_ids as number[]) ?? [],
+      ids: (b.record_ids as string[]) ?? [],
       assigned_team_id: (b.assigned_team_id as string | undefined) ?? undefined,
     }));
   }
-  return [{ ids: (body.record_ids as number[]) ?? [], assigned_team_id: (body.assigned_team_id as string | undefined) ?? undefined }];
+  return [{ ids: (body.record_ids as string[]) ?? [], assigned_team_id: (body.assigned_team_id as string | undefined) ?? undefined }];
 }
 
 /**
