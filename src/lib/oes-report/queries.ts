@@ -65,7 +65,8 @@ export async function loadAllActivations(): Promise<AllRow[]> {
 }
 
 export async function loadPpData(): Promise<PpRow[]> {
-  // Only show serials not yet found in OES — exclude once activated
+  // Only show serials with no resolution yet. Any other status (located_*, activated)
+  // means the serial has been matched — activated ones appear in the FT Dispute tab.
   const result = await pool.query<PpRow>(`
     SELECT project, serial_number, date_registered
     FROM oes_pp_data
