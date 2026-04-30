@@ -52,8 +52,6 @@ export default async function handler(
     const result = await runNightlyOesReport({ date, dryRun });
     return apiResponse.success(res, result, dryRun ? 'OES report generated (dry run)' : 'OES report sent');
   } catch (error: unknown) {
-    // eslint-disable-next-line no-console
-    console.error('[OES-NIGHTLY-DEBUG]', error);
     log.error('OES nightly report failed', {
       error: error instanceof Error ? error.message : String(error),
     }, 'oes-nightly-report');
