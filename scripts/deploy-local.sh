@@ -367,6 +367,33 @@ fi
 # --- Step 10: Clean old backups (keep last 3) ---
 sudo -u velo bash -c "cd $DIR && ls -dt .next-backup-* 2>/dev/null | tail -n +4 | xargs -r rm -rf"
 
+# --- Step 10b: Resolve deployed tickets ---
+# Scan commit messages in the window just deployed for VF-YYYYMMDD-NNN refs.
+# Any ticket still in assigned/in_progress is marked resolved. Fail-open: a
+# DB error never blocks the summary or Sentry step.
+RESOLVED_TICKETS=""
+if [[ "$CURRENT_COMMIT" != "$NEW_COMMIT" ]]; then
+  TICKET_REFS=$(sudo -u velo bash -c "cd $DIR && git log $CURRENT_COMMIT..$NEW_COMMIT --format='%B' 2>/dev/null" \
+    | grep -oE '\bVF-[0-9]{8}-[0-9]+\b' | sort -u 2>/dev/null || true)
+  if [[ -n "$TICKET_REFS" ]]; then
+    PGURL=$(sudo -u velo bash -c "grep '^DATABASE_URL=' '$DIR/.env.local' 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\"'" 2>/dev/null || true)
+    if [[ -n "$PGURL" ]]; then
+      for TICKET_UID in $TICKET_REFS; do
+        # TICKET_UID is validated by grep to VF-[0-9]{8}-[0-9]+ — safe to interpolate
+        UPDATED=$(sudo -u velo bash -c \
+          "psql '$PGURL' -t -q -c \"UPDATE maintenance_tickets SET status='resolved', updated_at=NOW() WHERE ticket_uid='$TICKET_UID' AND status IN ('assigned','in_progress') RETURNING ticket_uid\" 2>/dev/null" \
+          | tr -d ' \n' || true)
+        if [[ -n "$UPDATED" ]]; then
+          log "Ticket $TICKET_UID → resolved"
+          RESOLVED_TICKETS="${RESOLVED_TICKETS} $TICKET_UID"
+        fi
+      done
+    else
+      warn "Ticket resolution skipped — DATABASE_URL not found in $DIR/.env.local"
+    fi
+  fi
+fi
+
 # --- Summary ---
 DEPLOY_END=$(date +%s)
 DURATION=$((DEPLOY_END - DEPLOY_START))
@@ -380,6 +407,9 @@ echo -e "  Duration:    ${DURATION}s"
 echo -e "  URL:         $URL"
 echo -e "  Health:      HTTP $HTTP_CODE"
 echo -e "  Time:        $(TZ=$TIMEZONE date '+%Y-%m-%d %H:%M %Z')"
+if [[ -n "$RESOLVED_TICKETS" ]]; then
+  echo -e "  Resolved:   ${GREEN}${RESOLVED_TICKETS}${NC}"
+fi
 echo "==============================="
 
 # --- Step 11: Finalize Sentry release (BL-54, fail-open) ---

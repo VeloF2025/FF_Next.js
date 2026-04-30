@@ -129,6 +129,12 @@
             "command": "TOOL_RESULT=\"$TOOL_RESULT\" node .claude/hooks/failed-task-analyzer.js 2>&1 || true",
             "timeout": 3,
             "statusMessage": "Analyzing task result..."
+          },
+          {
+            "type": "command",
+            "command": "if echo \"$TOOL_INPUT\" | grep -qE '\"git (worktree add|checkout -b|switch -c)'; then TOOL_INPUT=\"$TOOL_INPUT\" node .claude/hooks/ticket-in-progress.js 2>&1 || true; fi",
+            "timeout": 15,
+            "statusMessage": "Updating ticket to in_progress..."
           }
         ]
       }
