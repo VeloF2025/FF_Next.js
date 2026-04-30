@@ -7,6 +7,7 @@ import {
   loadOesOnlyRows,
   loadFtDisputeRows,
   loadTicketsForKeys,
+  loadLatestOesReportDate,
 } from '@/lib/oes-report/queries';
 import { buildOesWorkbook } from '@/lib/oes-report/buildWorkbook';
 import { uploadOesReport } from '@/lib/oes-report/storage';
@@ -35,10 +36,9 @@ export async function runNightlyOesReport(opts: {
 }): Promise<OesReportResult> {
   const start = Date.now();
 
-  // Date for filename/caption — SAST context, but we just use what was passed or today
-  const reportDate =
-    opts.date ??
-    new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Johannesburg' }); // YYYY-MM-DD
+  // Date comes from the latest OES import batch's report_date — the date Fibertime
+  // published the file on SharePoint, not today's date.
+  const reportDate = opts.date ?? await loadLatestOesReportDate();
 
   log.info('OES nightly report: loading data', { date: reportDate, dryRun: opts.dryRun }, 'OesNightlyReport');
 
