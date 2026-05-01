@@ -42,7 +42,7 @@ export function CortexReviewPanel() {
       const res = await fetch('/api/cortex-review');
       if (!res.ok) throw new Error(`${res.status}`);
       const json = (await res.json()) as { data: ReviewItem[] };
-      setItems(json.data);
+      setItems(Array.isArray(json.data) ? json.data : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
