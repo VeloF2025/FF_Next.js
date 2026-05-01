@@ -27,16 +27,18 @@ The screenshot must show the actual working state, not just the app loading.
 
 ## Step 2 — Attach screenshot to ticket
 
-Upload the screenshot to VF Storage and record it in `maintenance_attachments`:
+Upload the screenshot to VF Storage and record it in `maintenance_attachments`.
+Note: `uploaded_by` is a NOT NULL UUID FK — use Hein's UUID (`28ab98c1-df21-48f8-a30a-489cd09a0d39`).
 
 ```sql
 INSERT INTO maintenance_attachments
-  (ticket_id, file_url, storage_url, filename, file_type, mime_type,
-   uploaded_by_name, is_evidence)
+  (ticket_id, file_url, storage_url, storage_path, filename, file_type, mime_type,
+   uploaded_by, is_evidence)
 VALUES
   ('<ticket_uuid>', '<storage_url>', '<storage_url>',
-   '<TICKET_UID>-resolution.png', 'image', 'image/png',
-   'Claude Code', true);
+   'maintenance/ticket-attachments/<TICKET_UID>-resolution.png',
+   '<TICKET_UID>-resolution.png', 'photo', 'image/png',
+   '28ab98c1-df21-48f8-a30a-489cd09a0d39', true);
 ```
 
 ---
@@ -75,14 +77,14 @@ INSERT INTO maintenance_activities
   (ticket_id, activity_type, description, created_by_name, created_by_email, source, created_at)
 VALUES
   ('<ticket_uuid>', 'status_change',
-   'Status changed assigned → in_progress — fix in PR #<N>',
-   'Claude Code', 'claude@fibreflow.app', 'system', NOW() - INTERVAL '2 hours'),
+   'Status changed assigned → in_progress — fix implemented in PR #<N>',
+   'Claude Code', 'claude@fibreflow.app', 'fibreflow', NOW()),
   ('<ticket_uuid>', 'status_change',
    'Status changed in_progress → resolved — PR #<N> merged and deployed to dev.fibreflow.app',
-   'Claude Code', 'claude@fibreflow.app', 'system', NOW()),
+   'Claude Code', 'claude@fibreflow.app', 'fibreflow', NOW()),
   ('<ticket_uuid>', 'note_added',
    'Resolution: <describe root cause and fix>. Verified on dev.fibreflow.app.',
-   'Claude Code', 'claude@fibreflow.app', 'system', NOW());
+   'Claude Code', 'claude@fibreflow.app', 'fibreflow', NOW());
 ```
 
 ---
@@ -101,7 +103,8 @@ Open the ticket in dev.fibreflow.app and confirm:
 
 ```bash
 ssh velo@100.96.203.105
-PGPASSWORD='ff_x8Km2pQr9vLn' psql -h localhost -p 5437 -U fibreflow_user -d fibreflow
+# Password from .claude/credentials.local.md (fibreflow_user entry)
+psql -h localhost -p 5437 -U fibreflow_user -d fibreflow
 ```
 
 Hein's user UUID: `28ab98c1-df21-48f8-a30a-489cd09a0d39`
@@ -110,9 +113,10 @@ Hein's user UUID: `28ab98c1-df21-48f8-a30a-489cd09a0d39`
 
 ## Schema gotchas
 
-- `maintenance_activities` has NO `created_by` UUID column — use `created_by_name` + `created_by_email`
+- `maintenance_activities` has NO `created_by` UUID column — use `created_by_name` + `created_by_email`; valid `source` values: `'fibreflow'`, `'qcontact'`, `'system'`
+- `maintenance_attachments.uploaded_by` is a NOT NULL UUID FK — cannot be null or a name string
 - `dev_ticket_details.agent_approved_by` is a UUID FK to `users(id)` — never a name string
-- `maintenance_tickets` uses `ticket_uid` (not `ticket_number` or `ticket_ref`)
+- `maintenance_tickets` uses `ticket_uid` (not `ticket_number` or `ticket_ref`); has both `resolved_at` and `closed_at` columns
 
 ---
 
