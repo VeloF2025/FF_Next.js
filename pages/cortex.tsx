@@ -21,6 +21,7 @@ export default function CortexPage() {
   );
 }
 
+// Auth enforced client-side via AppLayout — consistent with other non-sensitive pages.
 export const getServerSideProps = async () => {
   return { props: {} };
 };
