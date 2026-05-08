@@ -17,6 +17,7 @@ import {
   isValidReceiptCategory,
   type ReceiptCategory,
 } from '@/modules/receipts/categories';
+import { sendReceiptSubmittedEmail } from '@/modules/receipts/email';
 import { insertReceipt, type PaymentMethod } from '@/modules/receipts/queries';
 
 export const config = {
@@ -122,6 +123,9 @@ export default withMySession(async (req, res, session) => {
       ocrCategoryGuess: body.ocrCategoryGuess ?? null,
       ocrConfidence: body.ocrConfidence ?? null,
     });
+
+    // Best-effort notify accounting. SMTP failures must not block submit.
+    void sendReceiptSubmittedEmail(row);
 
     return apiResponse.success(res, {
       id: row.id,
