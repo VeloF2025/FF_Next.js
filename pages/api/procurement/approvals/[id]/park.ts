@@ -56,10 +56,14 @@ export default withAuth(withErrorHandler(async (
 
     const request = existing[0]!;
 
-    // Caller must be the assigned approver, super_admin, or hold the
-    // procurement.sourcing edit permission. Anyone else is forbidden — even
-    // for their own requests, since a requester silently parking their own
-    // approval would be a workflow-bypass risk.
+    // Authz: caller must be the assigned approver, super_admin, or hold the
+    // procurement.sourcing edit permission. The asymmetry vs resume.ts —
+    // resume also accepts the original parker — is intentional: parking is
+    // an active gate, so only the approver-side may decide to hold; resuming
+    // includes the parker so they can undo their own pause without needing
+    // to be the approver themselves.
+    // Requesters cannot park their own request: that would be a workflow-
+    // bypass (silently stalling the chain).
     const isAssignee = request.assigned_to && String(request.assigned_to) === String(userId);
     const isSuperAdmin = authReq.user.role === 'super_admin';
     const hasProcurementEdit = isSuperAdmin
