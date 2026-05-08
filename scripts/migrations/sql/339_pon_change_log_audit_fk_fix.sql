@@ -2,6 +2,12 @@
 -- Spec: docs/superpowers/specs/2026-05-08-project-tracker-workspace-design.md §11 Q4
 -- Plan: docs/superpowers/plans/2026-05-08-tracker-workspace-1.0a-schema-foundation.md
 --
+-- Numbering note: migration 338 was reserved by plan 1.0a Task 4 for an
+-- optional "master_tracker_align" migration that turned out unnecessary
+-- (the existing master_tracker schema already matched the spec). The gap is
+-- intentional — do not renumber this migration; the runner sorts numerically
+-- and the gap is harmless. See plan 1.0a Task 4 for the audit result.
+--
 -- Two fixes from the blind code review on PR #1558:
 --   1. (HIGH) ON DELETE CASCADE on pon_change_log FKs is wrong for an audit log —
 --      deleting a PON or drop would silently erase its history. Switch to SET NULL
