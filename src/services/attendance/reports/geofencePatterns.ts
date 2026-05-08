@@ -15,13 +15,13 @@
  */
 
 import { sql } from '@/lib/db-pool';
+import { log } from '@/lib/logger';
 import { ReportTooLargeError, REPORT_ROW_CAP } from './runner';
+import { makeParamBuilder } from './sqlHelpers';
 import type { ReportColumn, ReportInput, ReportRunResult } from './types';
 import { suggestArchetype, type ArchetypeMetrics } from '../archetype/suggestArchetype';
-import {
-  proposedDepartmentDefault,
-  type ArchetypeKind,
-} from '../archetype/proposedDepartmentDefaults';
+import { proposedDepartmentDefault } from '../archetype/proposedDepartmentDefaults';
+import type { ArchetypeResolved } from '../archetype/types';
 
 const COLUMNS: ReadonlyArray<ReportColumn> = [
   { key: 'staff', label: 'Staff' },
@@ -58,8 +58,8 @@ interface DbRow extends Record<string, unknown> {
   inside_office: number;
   unmatched: number;
   distinct_polygons_hit: number;
-  max_single_project_pct: number;
-  per_project_pct_json: string;
+  /** project_id (text) → raw clock-in hit count. Percentages computed in TS. */
+  per_project_hits_json: string | Record<string, number> | null;
 }
 
 /**
@@ -67,22 +67,17 @@ interface DbRow extends Record<string, unknown> {
  * assert structure without hitting a DB.
  */
 export function buildGeofencePatternsSql(args: InputArgs): { text: string; params: unknown[] } {
-  const params: unknown[] = [];
-  const next = (v: unknown): string => {
-    params.push(v);
-    return `$${params.length}`;
-  };
-
-  const dateFromP = next(args.dateFrom);
-  const dateToP = next(args.dateTo);
+  const pb = makeParamBuilder();
+  const dateFromP = pb.next(args.dateFrom);
+  const dateToP = pb.next(args.dateTo);
 
   const deptClause =
     args.departments.length > 0
-      ? `AND s.department = ANY(${next(args.departments)}::text[])`
+      ? `AND s.department = ANY(${pb.next(args.departments)}::text[])`
       : '';
   const staffScopeClause =
     args.scopedStaffIds !== null
-      ? `AND s.id = ANY(${next(args.scopedStaffIds)}::uuid[])`
+      ? `AND s.id = ANY(${pb.next(args.scopedStaffIds)}::uuid[])`
       : '';
 
   const text = `
@@ -154,22 +149,12 @@ export function buildGeofencePatternsSql(args: InputArgs): { text: string; param
           FILTER (WHERE m.matched_project_id IS NOT NULL)            AS distinct_polygons_hit,
         COALESCE(
           (
-            SELECT MAX(hits) * 100.0 / NULLIF(COUNT(*) OVER (), 0)
-              FROM per_project_counts ppc
-             WHERE ppc.staff_id = m.staff_id
-          ), 0
-        )                                                            AS max_single_project_pct,
-        COALESCE(
-          (
-            SELECT jsonb_object_agg(
-                     ppc.matched_project_id::text,
-                     ROUND((ppc.hits::numeric * 100.0) / NULLIF(COUNT(*) OVER (), 0), 2)
-                   )
+            SELECT jsonb_object_agg(ppc.matched_project_id::text, ppc.hits)
               FROM per_project_counts ppc
              WHERE ppc.staff_id = m.staff_id
           ),
           '{}'::jsonb
-        )                                                            AS per_project_pct_json
+        )                                                            AS per_project_hits_json
       FROM per_staff_clock_in_first_match m
       GROUP BY m.staff_id
     )
@@ -187,18 +172,17 @@ export function buildGeofencePatternsSql(args: InputArgs): { text: string; param
       COALESCE(psa.inside_office, 0)::int                     AS inside_office,
       COALESCE(psa.unmatched, 0)::int                         AS unmatched,
       COALESCE(psa.distinct_polygons_hit, 0)::int             AS distinct_polygons_hit,
-      COALESCE(psa.max_single_project_pct, 0)::float          AS max_single_project_pct,
-      COALESCE(psa.per_project_pct_json, '{}'::jsonb)         AS per_project_pct_json
+      COALESCE(psa.per_project_hits_json, '{}'::jsonb)        AS per_project_hits_json
     FROM staff s
     LEFT JOIN per_staff_aggregates psa ON psa.staff_id = s.id
     WHERE s.status = 'active'
       ${deptClause}
       ${staffScopeClause}
     ORDER BY full_name ASC
-    LIMIT ${next(REPORT_ROW_CAP + 1)}
+    LIMIT ${pb.next(REPORT_ROW_CAP + 1)}
   `;
 
-  return { text, params };
+  return { text, params: pb.params };
 }
 
 export async function runGeofencePatterns(input: ReportInput): Promise<ReportRunResult> {
@@ -224,23 +208,28 @@ export async function runGeofencePatterns(input: ReportInput): Promise<ReportRun
     const pctInsideOffice = total > 0 ? (r.inside_office * 100) / total : 0;
     const pctUnmatched = total > 0 ? (r.unmatched * 100) / total : 0;
 
-    const perProjectPct: Record<string, number> = (() => {
-      const v = r.per_project_pct_json;
-      if (typeof v === 'string') return JSON.parse(v) as Record<string, number>;
-      return (v as unknown as Record<string, number>) ?? {};
-    })();
+    const perProjectHits = parsePerProjectHits(r);
+    const perProjectPct: Record<string, number> = {};
+    let maxSingleProjectPct = 0;
+    if (total > 0) {
+      for (const [projectId, hits] of Object.entries(perProjectHits)) {
+        const pct = (hits * 100) / total;
+        perProjectPct[projectId] = pct;
+        if (pct > maxSingleProjectPct) maxSingleProjectPct = pct;
+      }
+    }
 
     const metrics: ArchetypeMetrics = {
       totalClockIns: total,
       pctInsideAnyAssignedPolygon,
       pctInsideOffice,
       pctUnmatched,
-      maxSingleProjectPct: r.max_single_project_pct,
+      maxSingleProjectPct,
       distinctProjectPolygonsHit: r.distinct_polygons_hit,
       perProjectPct,
     };
     const { archetype: suggested, lowSignal } = suggestArchetype(metrics);
-    const proposed: ArchetypeKind = proposedDepartmentDefault(r.department);
+    const proposed: ArchetypeResolved = proposedDepartmentDefault(r.department);
     const mismatch = suggested !== proposed;
     const dataGapNoAssignments = suggested === 'project' && r.active_assignment_count === 0;
     const dataGapNoHomeSite = suggested === 'office' && r.home_site_id === null;
@@ -253,7 +242,7 @@ export async function runGeofencePatterns(input: ReportInput): Promise<ReportRun
       pct_inside_office: roundPct(pctInsideOffice),
       pct_unmatched: roundPct(pctUnmatched),
       distinct_polygons_hit: r.distinct_polygons_hit,
-      max_single_project_pct: roundPct(r.max_single_project_pct),
+      max_single_project_pct: roundPct(maxSingleProjectPct),
       suggested_archetype: suggested,
       proposed_default_archetype: proposed,
       mismatch: mismatch ? 'yes' : 'no',
@@ -268,4 +257,28 @@ export async function runGeofencePatterns(input: ReportInput): Promise<ReportRun
 
 function roundPct(n: number): number {
   return Math.round(n * 10) / 10;
+}
+
+/**
+ * Read per_project_hits_json as a {project_id: hits} record. The pg driver
+ * may auto-parse JSONB to an object or return it as a string depending on
+ * pool config — handle both, and don't let one malformed row poison the
+ * whole report.
+ */
+function parsePerProjectHits(r: DbRow): Record<string, number> {
+  const v = r.per_project_hits_json;
+  if (v == null) return {};
+  if (typeof v === 'string') {
+    try {
+      return JSON.parse(v) as Record<string, number>;
+    } catch {
+      log.warn(
+        '[geofencePatterns] per_project_hits_json parse failed; treating as empty',
+        { staff_id: r.staff_id, raw: v.slice(0, 200) },
+        'GeofencePatterns',
+      );
+      return {};
+    }
+  }
+  return v;
 }

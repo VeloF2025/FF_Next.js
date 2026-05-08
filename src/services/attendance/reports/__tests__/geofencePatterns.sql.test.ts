@@ -48,4 +48,32 @@ describe('geofencePatterns SQL shape', () => {
     });
     expect(text).not.toMatch(/s\.department\s*=\s*ANY/);
   });
+
+  it('emits a staff-scope filter when scopedStaffIds is non-null', () => {
+    const ids = ['11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222'];
+    const { text, params } = buildGeofencePatternsSql({
+      dateFrom: '2026-04-08',
+      dateTo: '2026-05-08',
+      departments: [],
+      scopedStaffIds: ids,
+    });
+    expect(text).toMatch(/s\.id\s*=\s*ANY\s*\(\s*\$\d+::uuid\[\]\s*\)/);
+    expect(params).toContainEqual(ids);
+  });
+
+  it('returns aggregated raw hits (not pre-computed percentages) so TS does the math', () => {
+    // Per the post-review fix, the SQL should NOT reference COUNT(*) OVER ()
+    // (which counted projects-hit, not total clock-ins) and should not return
+    // max_single_project_pct from SQL. Instead it returns per_project_hits_json
+    // and the runner computes percentages against total_clock_ins.
+    const { text } = buildGeofencePatternsSql({
+      dateFrom: '2026-04-08',
+      dateTo: '2026-05-08',
+      departments: [],
+      scopedStaffIds: null,
+    });
+    expect(text).toMatch(/per_project_hits_json/);
+    expect(text).not.toMatch(/COUNT\(\*\)\s+OVER\s*\(\s*\)/);
+    expect(text).not.toMatch(/max_single_project_pct/);
+  });
 });
