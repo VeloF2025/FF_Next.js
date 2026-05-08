@@ -9,7 +9,7 @@ import type { EodVlmExtraction, EodSavePayload, EodSlotStatus, EodSheetSlot } fr
 
 interface EodBatchQueueProps {
   files: File[];
-  onAllDone: () => void;
+  onAllDone: (savedSlots: EodSheetSlot[]) => void;
 }
 
 const SLOT_COLOR: Record<EodSlotStatus, string> = {
@@ -76,7 +76,9 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
   }, [slots, reviewIndex]);
 
   useEffect(() => {
-    if (slots.length > 0 && slots.every((s) => TERMINAL.includes(s.status))) onAllDoneRef.current();
+    if (slots.length > 0 && slots.every((s) => TERMINAL.includes(s.status))) {
+      onAllDoneRef.current(slots.filter((s) => s.status === 'saved'));
+    }
   }, [slots]);
 
   const advanceReview = useCallback(() => {
