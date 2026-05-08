@@ -480,3 +480,10 @@ export interface EodReconciliationSummary {
   matched_all: number;
   discrepancies: number;
 }
+
+export interface EodSavePayload {
+  sheetDate: string;
+  technicianName: string | null;
+  technicianId: string | null;
+  entries: EodVlmEntry[];
+}

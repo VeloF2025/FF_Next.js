@@ -1,17 +1,15 @@
 'use client';
 
+/**
+ * EOD Sheet Reviewer
+ * Editable review pane for a single VLM-extracted install sheet
+ */
+
 import { useState } from 'react';
 import { CheckCircle, XCircle, SkipForward } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EodEntryTable } from './EodEntryTable';
-import type { EodVlmExtraction, EodVlmEntry } from '../../../types';
-
-interface SavePayload {
-  sheetDate: string;
-  technicianName: string | null;
-  technicianId: string | null;
-  entries: EodVlmEntry[];
-}
+import type { EodVlmExtraction, EodVlmEntry, EodSavePayload } from '../../../types';
 
 interface EodSheetReviewerProps {
   extraction: EodVlmExtraction;
@@ -19,10 +17,15 @@ interface EodSheetReviewerProps {
   totalSheets: number;
   saving: boolean;
   error: string | null;
-  onSave: (payload: SavePayload) => Promise<void>;
+  onSave: (payload: EodSavePayload) => Promise<void>;
   onSkip: () => void;
 }
 
+/**
+ * Review pane for a single EOD install sheet.
+ * IMPORTANT: Pass key={sheetIndex} from the parent so React remounts this
+ * component on each sheet transition and resets local state from the new extraction.
+ */
 export function EodSheetReviewer({
   extraction,
   sheetIndex,
