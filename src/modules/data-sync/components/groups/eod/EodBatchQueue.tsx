@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { EodSheetReviewer } from './EodSheetReviewer';
@@ -82,15 +82,17 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [matchedTotal, setMatchedTotal] = useState(0);
+  const extractingRef = useRef(false);
+  const onAllDoneRef = useRef(onAllDone);
+  useEffect(() => { onAllDoneRef.current = onAllDone; });
 
   // Pipeline: keep exactly one slot extracting at a time
   useEffect(() => {
-    const hasExtracting = slots.some((s) => s.status === 'extracting');
-    if (hasExtracting) return;
-
+    if (extractingRef.current) return;
     const nextPending = slots.findIndex((s) => s.status === 'pending');
     if (nextPending === -1) return;
 
+    extractingRef.current = true;
     setSlots((prev) =>
       prev.map((s, i) => (i === nextPending ? { ...s, status: 'extracting' } : s))
     );
@@ -111,26 +113,27 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
               : s
           )
         );
+      })
+      .finally(() => {
+        extractingRef.current = false;
       });
   }, [slots]);
 
-  // Check if all done
+  // Check if all done — fires exactly once via stable ref
   useEffect(() => {
     const allSettled = slots.every((s) =>
       s.status === 'saved' || s.status === 'skipped' || s.status === 'failed'
     );
-    if (allSettled && slots.length > 0) onAllDone();
-  }, [slots, onAllDone]);
+    if (allSettled && slots.length > 0) onAllDoneRef.current();
+  }, [slots]);
 
   const advanceReview = useCallback(() => {
-    setReviewIndex((prev) => {
-      const next = slots.findIndex(
-        (s, i) => i > prev && s.status !== 'saved' && s.status !== 'skipped'
-      );
-      return next === -1 ? prev + 1 : next;
-    });
+    const next = slots.findIndex(
+      (s, i) => i > reviewIndex && s.status !== 'saved' && s.status !== 'skipped'
+    );
+    setReviewIndex(next === -1 ? reviewIndex + 1 : next);
     setSaveError(null);
-  }, [slots]);
+  }, [slots, reviewIndex]);
 
   const handleSave = useCallback(
     async (payload: EodSavePayload) => {
