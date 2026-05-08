@@ -15,6 +15,7 @@ import {
   VLM_MAX_TOKENS_OCR,
   stripThinkTags,
 } from '@/lib/vlm';
+import { neon } from '@/lib/db-neon';
 import { optimizeForVlm } from '@/modules/activate/services/imagePreprocessService';
 import { scanAllBarcodes } from '@/modules/activate/services/enhancedBarcodeService';
 import { normalizeSerial } from '@/modules/activate/services/serialExtractor';
@@ -198,7 +199,40 @@ function validatePon(pon: string | null): string | null {
   if (!pon) return null;
   const num = parseInt(pon.replace(/[^0-9]/g, ''), 10);
   if (num >= 100 && num <= 200) return num.toString();
-  return pon;
+  return null;
+}
+
+/** Look up pon_no from HLD drops table for entries missing a PON */
+async function enrichWithHldPon(entries: EodVlmEntry[]): Promise<EodVlmEntry[]> {
+  const needsPon = entries.filter((e) => !e.pon_number && e.dr_number);
+  if (needsPon.length === 0) return entries;
+
+  const drNumbers = needsPon.map((e) => e.dr_number!);
+
+  try {
+    const sql = neon();
+    const rows = await sql<Array<{ drop_number: string; pon_no: number }>>`
+      SELECT drop_number, pon_no
+      FROM drops
+      WHERE drop_number = ANY(${drNumbers})
+        AND pon_no IS NOT NULL
+    `;
+
+    const ponMap = new Map<string, string>();
+    for (const row of rows) ponMap.set(row.drop_number, row.pon_no.toString());
+
+    log.info('[EOD-HLD] PON lookup', { queried: drNumbers.length, found: ponMap.size });
+
+    return entries.map((e) => {
+      if (!e.pon_number && e.dr_number && ponMap.has(e.dr_number)) {
+        return { ...e, pon_number: ponMap.get(e.dr_number)! };
+      }
+      return e;
+    });
+  } catch (err) {
+    log.warn('[EOD-HLD] PON lookup failed', { error: err });
+    return entries;
+  }
 }
 
 /** Detect if numbers form a sequential pattern (incrementing by 1) */
@@ -411,8 +445,16 @@ export async function extractEodSheet(
       }
       const gzSet = new Set(parsed.entries.map((e) => e.gizzu_serial).filter(Boolean));
       if (gzSet.size === 1) {
-        log.warn('[EOD] All Gizzu identical — hallucination');
-        parsed.entries = parsed.entries.map((e) => ({ ...e, gizzu_serial: null }));
+        const singleGz = [...gzSet][0]!;
+        // Only clear if it's a full-length serial (has unique suffix) — short prefix reads
+        // like "GU18W12V" are legitimate partial reads when technicians abbreviate
+        const isFullSerial = singleGz.length >= 15 || HALLUCINATION_BLOCKLIST.has(singleGz);
+        if (isFullSerial) {
+          log.warn('[EOD] All Gizzu identical full serial — hallucination');
+          parsed.entries = parsed.entries.map((e) => ({ ...e, gizzu_serial: null }));
+        } else {
+          log.info('[EOD] All Gizzu share prefix (partial reads) — keeping');
+        }
       }
 
       // ONT serials: only clear if ALL identical AND in blocklist (let partial reads through)
@@ -456,6 +498,9 @@ export async function extractEodSheet(
         log.info(`[EOD] ONT focused pass filled ${ontMap.size} serials`);
       }
     }
+
+    // Pass 4: HLD PON enrichment — fill missing PON from drops table
+    parsed.entries = await enrichWithHldPon(parsed.entries);
 
     log.info('[EOD] Done', {
       entries: parsed.entries.length, barcodes: barcodeHints.length,
