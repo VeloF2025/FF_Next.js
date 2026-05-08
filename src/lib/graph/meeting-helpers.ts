@@ -120,17 +120,18 @@ export async function fetchAndStoreTranscript(
 
 /**
  * Downloads the first recording for an online meeting and persists the path + size.
+ * Returns true if a recording was found and stored, false if none exist.
  */
 export async function fetchAndStoreRecording(
   meetingId: number,
   organizerUserId: string,
   onlineMeetingId: string
-): Promise<void> {
+): Promise<boolean> {
   const recordings = await listRecordings(organizerUserId, onlineMeetingId);
 
   if (recordings.length === 0) {
     log.info('No recordings available', { meetingId, onlineMeetingId }, LOGGER);
-    return;
+    return false;
   }
 
   const { filePath, sizeBytes } = await downloadRecordingToDisk(
@@ -149,13 +150,16 @@ export async function fetchAndStoreRecording(
   `;
 
   log.info('Recording stored', { meetingId, filePath, sizeBytes }, LOGGER);
+  return true;
 }
 
 const RECORDINGS_BASE =
   process.env.MEETING_RECORDINGS_PATH || '/home/velo/meeting-recordings';
 
-/** Time window (ms) for matching OneDrive recordings to meetings */
-const ONEDRIVE_MATCH_WINDOW_MS = 2 * 60 * 60 * 1000;
+// Teams recording filenames use the organizer's local timezone (SAST = UTC+2).
+// We parse them as UTC in parseRecordingFilename, introducing a 2h offset.
+// Using a 4h window covers that offset plus a reasonable scheduling buffer.
+const ONEDRIVE_MATCH_WINDOW_MS = 4 * 60 * 60 * 1000;
 
 /**
  * Fallback: searches participants' OneDrive /Recordings/ folders for a recording

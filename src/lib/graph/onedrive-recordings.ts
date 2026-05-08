@@ -207,8 +207,8 @@ export async function scrapeOneDriveRecordings(
           const parsed = parseRecordingFilename(item.name);
           const recordingDate = parsed.date || itemDate;
 
-          // Try to match to existing meeting by date (± 2 hours) that lacks a recording
-          const windowMs = 2 * 60 * 60 * 1000;
+          // Match window: 4h covers SAST→UTC offset (2h) plus scheduling buffer
+          const windowMs = 4 * 60 * 60 * 1000;
           const dateStart = new Date(recordingDate.getTime() - windowMs).toISOString();
           const dateEnd = new Date(recordingDate.getTime() + windowMs).toISOString();
 
