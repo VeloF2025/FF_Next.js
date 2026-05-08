@@ -33,7 +33,7 @@ interface WriteBackResult {
   logged_count: number;
 }
 
-async function writeBackDrSerials(
+export async function writeBackDrSerials(
   entries: CreateSheetInput['entries'],
   sheetId: string,
   uploadedBy: string

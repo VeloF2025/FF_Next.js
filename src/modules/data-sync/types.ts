@@ -487,3 +487,12 @@ export interface EodSavePayload {
   technicianId: string | null;
   entries: EodVlmEntry[];
 }
+
+export type EodSlotStatus = 'pending' | 'extracting' | 'ready' | 'saving' | 'saved' | 'failed' | 'skipped';
+
+export interface EodSheetSlot {
+  file: File;
+  status: EodSlotStatus;
+  extraction: EodVlmExtraction | null;
+  error: string | null;
+}
