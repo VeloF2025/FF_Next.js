@@ -26,13 +26,13 @@ project trackers (Lawley, Mohadin, Mamelodi, …).
   All joins from `pon_stage_tracking` MUST use `LEFT JOIN`.
 
 ### Audit log — `pon_change_log`
-- Mig 337. Append-only at the application layer.
+- Mig 337 creates the table; mig 339 corrects the FKs to `ON DELETE SET NULL`
+  and drops `chk_pon_or_drop` so audit history survives parent deletion.
+- Append-only at the application layer.
 - `source` ∈ {`ui`, `1map`, `oes`, `nokia`, `sp_sync`, `import`, `migration`}.
-- Constraint enforces at least one of `pon_stage_id` / `drop_id` is set.
-- **Open question for plan 1.0b:** the FKs are `ON DELETE CASCADE`. For a
-  true audit log this risks silent history loss on PON deletion. Decide
-  between `SET NULL` (preserve orphaned history) or `RESTRICT` (force
-  archive-then-delete) before any audit data accumulates.
+- Resolved Q4 (cascade vs set null): SET NULL — preserves orphaned history
+  while still allowing parent deletion. Anomalous rows surface as
+  `pon_stage_id IS NULL` joins.
 
 ### Master tracker — existing `master_tracker` table
 - Already exists with the 73-column Excel shape (no view created).
