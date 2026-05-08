@@ -486,13 +486,15 @@ export interface EodSavePayload {
   technicianName: string | null;
   technicianId: string | null;
   entries: EodVlmEntry[];
+  photoHash?: string | null;
 }
 
-export type EodSlotStatus = 'pending' | 'extracting' | 'ready' | 'saving' | 'saved' | 'failed' | 'skipped';
+export type EodSlotStatus = 'pending' | 'extracting' | 'ready' | 'saving' | 'saved' | 'failed' | 'skipped' | 'duplicate';
 
 export interface EodSheetSlot {
   file: File;
   status: EodSlotStatus;
   extraction: EodVlmExtraction | null;
+  photoHash: string | null;
   error: string | null;
 }

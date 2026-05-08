@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { CheckCircle, AlertCircle, RefreshCw, Copy } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { EodSheetReviewer } from './EodSheetReviewer';
 import { extractSheetFile, saveEodSheet } from '../../../services/eodBatchService';
@@ -20,13 +20,14 @@ const SLOT_COLOR: Record<EodSlotStatus, string> = {
   saved:      'bg-green-500/20 text-green-400',
   failed:     'bg-red-500/20 text-red-400',
   skipped:    'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)] line-through',
+  duplicate:  'bg-amber-500/10 text-amber-500/70 line-through',
 };
 
-const TERMINAL: EodSlotStatus[] = ['saved', 'skipped', 'failed'];
+const TERMINAL: EodSlotStatus[] = ['saved', 'skipped', 'failed', 'duplicate'];
 
 export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
   const [slots, setSlots] = useState<EodSheetSlot[]>(() =>
-    files.map((file) => ({ file, status: 'pending', extraction: null, error: null }))
+    files.map((file) => ({ file, status: 'pending', extraction: null, photoHash: null, error: null }))
   );
   const [reviewIndex, setReviewIndex] = useState(0);
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
@@ -43,8 +44,19 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
     extractingRef.current = true;
     setSlots((prev) => prev.map((s, i) => (i === nextPending ? { ...s, status: 'extracting' } : s)));
     extractSheetFile(slots[nextPending]!.file)
-      .then((extraction: EodVlmExtraction) => {
-        setSlots((prev) => prev.map((s, i) => (i === nextPending ? { ...s, status: 'ready', extraction } : s)));
+      .then((result) => {
+        if (result.duplicate) {
+          // Auto-skip — mark as duplicate and advance review index past this slot
+          setSlots((prev) => prev.map((s, i) =>
+            i === nextPending
+              ? { ...s, status: 'duplicate', photoHash: result.photoHash, error: `Already uploaded on ${result.existingSheetDate}` }
+              : s
+          ));
+        } else {
+          setSlots((prev) => prev.map((s, i) =>
+            i === nextPending ? { ...s, status: 'ready', extraction: result.extraction, photoHash: result.photoHash } : s
+          ));
+        }
       })
       .catch((err: unknown) => {
         setSlots((prev) => prev.map((s, i) =>
@@ -53,6 +65,15 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
       })
       .finally(() => { extractingRef.current = false; });
   }, [slots]);
+
+  // Auto-advance reviewIndex past duplicate/terminal slots — clamped to slots.length
+  useEffect(() => {
+    const current = slots[reviewIndex];
+    if (current && TERMINAL.includes(current.status) && current.status !== 'saved') {
+      const next = slots.findIndex((s, i) => i > reviewIndex && !TERMINAL.includes(s.status));
+      setReviewIndex(Math.min(next === -1 ? reviewIndex + 1 : next, slots.length));
+    }
+  }, [slots, reviewIndex]);
 
   useEffect(() => {
     if (slots.length > 0 && slots.every((s) => TERMINAL.includes(s.status))) onAllDoneRef.current();
@@ -67,8 +88,9 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
   const handleSave = useCallback(async (payload: EodSavePayload) => {
     setSavingIndex(reviewIndex);
     setSaveError(null);
+    const slot = slots[reviewIndex];
     try {
-      const result = await saveEodSheet(payload);
+      const result = await saveEodSheet({ ...payload, photoHash: slot?.photoHash ?? null });
       setMatchedTotal((t) => t + (result.matched_count ?? 0));
       setSlots((prev) => prev.map((s, i) => (i === reviewIndex ? { ...s, status: 'saved' } : s)));
       advanceReview();
@@ -77,7 +99,7 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
     } finally {
       setSavingIndex(null);
     }
-  }, [reviewIndex, advanceReview]);
+  }, [reviewIndex, advanceReview, slots]);
 
   const handleSkip = useCallback(() => {
     setSlots((prev) => prev.map((s, i) => (i === reviewIndex ? { ...s, status: 'skipped' } : s)));
@@ -86,21 +108,28 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
   }, [reviewIndex, advanceReview]);
 
   const handleRetry = useCallback((index: number) => {
-    setSlots((prev) => prev.map((s, i) => (i === index ? { ...s, status: 'pending', error: null } : s)));
+    setSlots((prev) => prev.map((s, i) => (i === index ? { ...s, status: 'pending', error: null, photoHash: null } : s)));
   }, []);
 
   const currentSlot = slots[reviewIndex];
   const savedCount = slots.filter((s) => s.status === 'saved').length;
-  const nonSkipped = slots.filter((s) => s.status !== 'skipped').length;
+  const dupCount = slots.filter((s) => s.status === 'duplicate').length;
+  // Exclude skipped and duplicate from the denominator — "X of Y saved" should only count actionable sheets
+  const nonSkipped = slots.filter((s) => s.status !== 'skipped' && s.status !== 'duplicate').length;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap gap-2">
         {slots.map((slot, i) => (
-          <div key={i} className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${SLOT_COLOR[slot.status]} ${i === reviewIndex ? 'ring-1 ring-[var(--ff-accent)]' : ''}`}>
+          <div
+            key={i}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${SLOT_COLOR[slot.status]} ${i === reviewIndex ? 'ring-1 ring-[var(--ff-accent)]' : ''}`}
+            title={slot.status === 'duplicate' ? slot.error ?? 'Duplicate' : undefined}
+          >
             {slot.status === 'extracting' && <InlineSpinner size="sm" />}
             {slot.status === 'saved' && <CheckCircle className="w-3 h-3" />}
             {slot.status === 'failed' && <AlertCircle className="w-3 h-3" />}
+            {slot.status === 'duplicate' && <Copy className="w-3 h-3" />}
             <span>{slot.file.name.replace(/\.[^.]+$/, '').slice(0, 20)}</span>
             {slot.status === 'failed' && (
               <button onClick={() => handleRetry(i)} className="ml-1 hover:text-white" title="Retry">
@@ -110,6 +139,12 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
           </div>
         ))}
       </div>
+
+      {dupCount > 0 && (
+        <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-sm text-amber-400">
+          {dupCount} sheet{dupCount !== 1 ? 's' : ''} already uploaded — skipped automatically.
+        </div>
+      )}
 
       {matchedTotal > 0 && (
         <div className="px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-lg text-sm text-green-400">
@@ -151,7 +186,9 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
 
       {slots.every((s) => TERMINAL.includes(s.status)) && (
         <div className="text-center py-4 text-sm text-[var(--ff-text-secondary)]">
-          {savedCount} of {nonSkipped} sheets saved.{matchedTotal > 0 && ` ${matchedTotal} DR↔ONT matches recorded.`}
+          {savedCount} of {nonSkipped} sheets saved.
+          {matchedTotal > 0 && ` ${matchedTotal} DR↔ONT matches recorded.`}
+          {dupCount > 0 && ` ${dupCount} duplicate${dupCount !== 1 ? 's' : ''} skipped.`}
           <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">Check the Reconciliation tab to compare with WA DRs and OES activations.</p>
         </div>
       )}
