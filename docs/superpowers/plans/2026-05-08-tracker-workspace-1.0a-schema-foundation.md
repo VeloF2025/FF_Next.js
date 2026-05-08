@@ -95,12 +95,14 @@ Expected: last numeric prefix is `334`. If it is not 334, **stop and ask Hein** 
 cd /home/hein/Workspace/FF_Next.js-tracker-redesign
 mkdir -p tmp/tracker-foundation-snapshots
 psql "$(grep '^DATABASE_URL=' .env.local | cut -d= -f2- | tr -d '\"' )" -c "\d pon_stage_tracking" > tmp/tracker-foundation-snapshots/pon_stage_tracking-before.txt
-psql "$(grep '^DATABASE_URL=' .env.local | cut -d= -f2- | tr -d '\"' )" -c "\d pon_tracker_entries" > tmp/tracker-foundation-snapshots/pon_tracker_entries-before.txt
-psql "$(grep '^DATABASE_URL=' .env.local | cut -d= -f2- | tr -d '\"' )" -c "SELECT COUNT(*) FROM pon_tracker_entries; SELECT COUNT(*) FROM pon_stage_tracking;" > tmp/tracker-foundation-snapshots/counts-before.txt
+psql "$(grep '^DATABASE_URL=' .env.local | cut -d= -f2- | tr -d '\"' )" -c "\d pon_tracker" > tmp/tracker-foundation-snapshots/pon_tracker-before.txt   # NOTE: pon_tracker (not _entries) is the actually-deployed table
+psql "$(grep '^DATABASE_URL=' .env.local | cut -d= -f2- | tr -d '\"' )" -c "SELECT COUNT(*) FROM pon_tracker; SELECT COUNT(*) FROM pon_stage_tracking;" > tmp/tracker-foundation-snapshots/counts-before.txt
 cat tmp/tracker-foundation-snapshots/counts-before.txt
 ```
 
 Record the row counts for verification later. **Do not commit `tmp/`**; it is in `.gitignore` already.
+
+> **NOTE 2026-05-08:** the original P-4 referenced `pon_tracker_entries` — that table does not exist on prod. The corrected commands above reference `pon_tracker`, the actually-deployed table.
 
 ---
 

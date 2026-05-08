@@ -28,7 +28,7 @@ The goal is one interactive per-project tracker workspace inside FibreFlow that 
 | Q3 | Primary users = PM + Ops Lead + QA (multi-role office team). RBAC and lane-based views per role. | brainstorm |
 | Q4 | **Soft cutover with snapshot import.** v1 imports a frozen Lawley snapshot once. SP cron + FF run in parallel for 2–3 weeks for cross-check. After parallel period, Excel is retired and SP cron disabled. | brainstorm |
 | L1 | Canonical PON entity = **`pon_stage_tracking`** (existing, 1Map+OES sourced, has full pipeline). Extended with manual-override columns. | data audit |
-| L2 | Master tracker = **denormalised view `vw_master_tracker`** joining drops × sow_poles × pon_stage_tracking × oes_activations × contractor_invoices × onemap_*. Edits route to owning table. | data audit |
+| L2 | Master tracker = **existing `master_tracker` table** (real, empty, 73-col Excel shape — see §3.4 audit). Lawley importer (1.0d) populates it; workspace UI reads/writes its rows directly. Service-layer broadcast keeps it in sync with `drops` / `sow_poles` / `pon_stage_tracking` / `oes_activations` writes. **Amended 2026-05-08** — original L2 said "denormalised view `vw_master_tracker`"; the live audit found the table already existed. | data audit + live DB audit |
 | L3 | API stack standardised on **pages-router + `pg.Pool`**. Existing app-router tracker endpoints rewritten, not extended. | CLAUDE.md guidance |
 | L4 | New UI lives under **`src/modules/projects/tracker-workspace/`**. Both legacy UI sets stay available behind a feature flag during cutover, then archived. | brainstorm |
 | L5 | Layout = **D (dashboard hub) home + B (phase wizard) navigator + A (dense grid) editing + C (map) lens**. Phased: v1.0 ships D + A; v1.1 adds B; v1.2 adds C and finalises cutover. | brainstorm |
@@ -208,6 +208,12 @@ SELECT
   pst.optical_complete, pst.optical_target_date,
   pst.activation_complete, pst.activation_target_date,
   pst.blockage,
+  -- manual overrides (LEFT JOIN — lazy insert per §4.1)
+  pmo.civil_contractor,
+  pmo.stringing_contractor,
+  pmo.optical_contractor,
+  pmo.optical_splitter,
+  pmo.optical_type,
   -- activation
   oa.activation_date,
   oa.activation_status,
@@ -216,10 +222,11 @@ SELECT
   ci.invoice_number     AS pole_invoice_number,
   ci.paid_at            AS pole_paid_date
 FROM drops d
-LEFT JOIN sow_poles p           ON p.project_id = d.project_id AND p.pole_number = d.pole_number
-LEFT JOIN pon_stage_tracking pst ON pst.project_id = d.project_id AND pst.zone_no = d.zone_no AND pst.pon_no = d.pon_no
-LEFT JOIN oes_activations oa     ON oa.drop_number = d.drop_number
-LEFT JOIN contractor_invoices ci ON ci.pole_id = p.id;
+LEFT JOIN sow_poles p              ON p.project_id = d.project_id AND p.pole_number = d.pole_number
+LEFT JOIN pon_stage_tracking pst   ON pst.project_id = d.project_id AND pst.zone_no = d.zone_no AND pst.pon_no = d.pon_no
+LEFT JOIN pon_manual_overrides pmo ON pmo.pon_stage_id = pst.id
+LEFT JOIN oes_activations oa       ON oa.drop_number = d.drop_number
+LEFT JOIN contractor_invoices ci   ON ci.pole_id = p.id;
 ```
 
 The view above is **deprecated** by §4.3's amended approach. It is kept only as documentation of the join shape — runtime queries use the `master_tracker` table.
@@ -260,7 +267,7 @@ All new endpoints land on the **pages-router + `pg.Pool`** stack. No new app-rou
 | GET | `/api/projects/[projectId]/tracker/pons` | List all PONs with stage rollup, filters: `zone`, `stage`, `blocked` |
 | GET | `/api/projects/[projectId]/tracker/pon/[ponId]` | Full PON detail (rollup + manual overrides + recent daily log + change history) |
 | PATCH | `/api/projects/[projectId]/tracker/pon/[ponId]` | Edit PON fields (RBAC enforced; routes writes to `pon_stage_tracking` or `pon_manual_overrides`) |
-| GET | `/api/projects/[projectId]/tracker/master` | Master grid rows from `vw_master_tracker`, server-side filter/sort/page |
+| GET | `/api/projects/[projectId]/tracker/master` | Master grid rows from `master_tracker` table, server-side filter/sort/page |
 | PATCH | `/api/projects/[projectId]/tracker/master/[dropId]` | Edit a master row; dispatches per-field to owning table |
 | POST | `/api/projects/[projectId]/tracker/import-snapshot` | One-shot Lawley xlsx → drops/poles/PONs (admin only) |
 | GET | `/api/projects/[projectId]/tracker/export-handover` | Generates handover xlsx in client format |
@@ -378,7 +385,7 @@ src/modules/projects/tracker-workspace/
 
 - Excel becomes read-only (lock the workbook in SharePoint).
 - SP cron disabled.
-- `pon_tracker_entries`, `sp_pon_tracker`, `sp_project_summary` archived (renamed `_archive_*`, dropped after a 90-day retention window).
+- `pon_tracker` (1-row deprecated table), `sp_pon_tracker`, `sp_project_summary` archived (renamed `_archive_*`, dropped after a 90-day retention window).
 - App-router tracker endpoints deleted; legacy UI modules deleted; feature flag removed.
 
 ## 8. Handover export
@@ -398,8 +405,8 @@ Generated on demand from `/api/projects/[projectId]/tracker/export-handover`:
 
 ### v1.0 — Foundation (4–6 weeks)
 
-1. Schema migration: extend `pon_stage_tracking`, create `pon_manual_overrides`, create `pon_change_log`, create `vw_master_tracker`.
-2. Forward-port `pon_tracker_entries` data; mark legacy tables as read-only at the application layer.
+1. Schema migration: extend `pon_stage_tracking`, create `pon_manual_overrides`, create `pon_change_log`. Audit existing `master_tracker` table for column alignment with the Excel shape.
+2. Mark legacy tables read-only at the application layer (`pon_tracker`, `sp_pon_tracker`, `sp_project_summary`).
 3. Pages-router endpoints: home, pons, pon detail (RW), master grid (RW), daily log (RW), import-snapshot (admin), export-handover.
 4. UI: `TrackerWorkspacePage` shell + Home (D) + Master grid (A) + PON drawer + Imports + Reports tabs.
 5. Snapshot importer for Lawley xlsx → drops / poles / pons.

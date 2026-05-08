@@ -11,18 +11,28 @@
 
 BEGIN;
 
--- Idempotent guard: ensures the trigger function exists even on a fresh DB
--- where it has not yet been created by an earlier bootstrap step. No-op on
--- the live DB where the function (from the original mig 179 bootstrap) is
--- already present and identical.
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER
-LANGUAGE plpgsql AS $$
+-- Idempotent guard: ensures the trigger function exists for fresh-DB bootstraps
+-- without disturbing the live DB. The DO block creates the function only if
+-- it is absent — preserving any SECURITY DEFINER, search_path, or other
+-- attributes the original mig 179 bootstrap may carry.
+DO $bootstrap$
 BEGIN
-  NEW.updated_at = CURRENT_TIMESTAMP;
-  RETURN NEW;
-END;
-$$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE p.proname = 'update_updated_at_column' AND n.nspname = 'public'
+  ) THEN
+    CREATE FUNCTION update_updated_at_column()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql AS $body$
+    BEGIN
+      NEW.updated_at = CURRENT_TIMESTAMP;
+      RETURN NEW;
+    END;
+    $body$;
+  END IF;
+END
+$bootstrap$;
 
 CREATE TABLE IF NOT EXISTS pon_manual_overrides (
   pon_stage_id          uuid PRIMARY KEY REFERENCES pon_stage_tracking(id) ON DELETE CASCADE,
