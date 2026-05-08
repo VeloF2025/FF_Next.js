@@ -3,7 +3,7 @@
  * CRUD operations for eod_install_sheets and eod_install_sheet_entries
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import type { EodInstallSheet, EodInstallSheetEntry } from '../types';
 import { logSerialChange } from '@/modules/activate/services/activity-log/serialHistory';
@@ -62,19 +62,19 @@ async function writeBackDrSerials(
 
     const currentOnt = (rows[0] as { ont_serial_scanned: string | null }).ont_serial_scanned ?? null;
 
-    // Fill null serials only — never overwrite an existing serial
-    if (currentOnt === null) {
-      await sql`
-        UPDATE dr_photo_unified_reviews
-        SET ont_serial_scanned = ${eodOnt}
-        WHERE drop_number = ${drNumber}
-      `;
-      matched_count++;
-    }
+    // Atomic fill: UPDATE only if the column is still null (guards against concurrent writes)
+    const updated = await sql`
+      UPDATE dr_photo_unified_reviews
+      SET ont_serial_scanned = ${eodOnt}
+      WHERE drop_number = ${drNumber}
+        AND ont_serial_scanned IS NULL
+      RETURNING 1
+    `;
+    if (updated.length > 0) matched_count++;
 
     // Log to serial_change_history + dr_activity_log regardless of whether we updated
     try {
-      await logSerialChange(
+      const result = await logSerialChange(
         drNumber,
         'ont_serial',
         currentOnt,
@@ -84,7 +84,7 @@ async function writeBackDrSerials(
         'technician_update',
         { eod_sheet_id: sheetId, eod_entry_row: entry.rowNumber }
       );
-      logged_count++;
+      if (result.historyId) logged_count++;
     } catch (err) {
       log.warn('[EOD-WriteBack] logSerialChange failed', { drNumber, error: err });
     }
