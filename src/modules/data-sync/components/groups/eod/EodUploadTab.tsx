@@ -1,315 +1,185 @@
-/**
- * EOD Upload Tab
- * Photo upload of physical install sheets with VLM extraction and review
- */
-
+// src/modules/data-sync/components/groups/eod/EodUploadTab.tsx
 'use client';
 
-import { useState, useRef } from 'react';
-import { Upload, CheckCircle, Camera, XCircle, AlertTriangle } from 'lucide-react';
-import { InlineSpinner } from '@/components/ui/LoadingSpinner';
+import { useState, useRef, useCallback } from 'react';
+import { Upload, Camera, FolderOpen, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { EodVlmExtraction, EodVlmEntry } from '../../../types';
-import { EodEntryTable } from './EodEntryTable';
+import { log } from '@/lib/logger';
+import { EodBatchQueue } from './EodBatchQueue';
+
+function isImageFile(file: File): boolean {
+  return file.type.startsWith('image/') || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name);
+}
+
+async function readDirectoryFiles(entry: FileSystemDirectoryEntry): Promise<File[]> {
+  return new Promise((resolve, reject) => {
+    const reader = entry.createReader();
+    const collected: File[] = [];
+
+    const readBatch = () => {
+      reader.readEntries(async (entries) => {
+        if (entries.length === 0) {
+          resolve(collected);
+          return;
+        }
+        for (const e of entries) {
+          if (e.isFile) {
+            const file = await new Promise<File>((res, rej) => (e as FileSystemFileEntry).file(res, rej));
+            if (isImageFile(file)) collected.push(file);
+          } else if (e.isDirectory) {
+            const sub = await readDirectoryFiles(e as FileSystemDirectoryEntry);
+            collected.push(...sub);
+          }
+        }
+        readBatch();
+      }, reject);
+    };
+    readBatch();
+  });
+}
+
+function deduplicateFiles(existing: File[], incoming: File[]): File[] {
+  const keys = new Set(existing.map((f) => `${f.name}|${f.size}`));
+  return [...existing, ...incoming.filter((f) => !keys.has(`${f.name}|${f.size}`))];
+}
 
 export function EodUploadTab() {
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [extracting, setExtracting] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [extraction, setExtraction] = useState<EodVlmExtraction | null>(null);
-  const [entries, setEntries] = useState<EodVlmEntry[]>([]);
-  const [sheetDate, setSheetDate] = useState('');
-  const [techName, setTechName] = useState('');
-  const [techId, setTechId] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-  const [lowRes, setLowRes] = useState(false);
-  const [imageRes, setImageRes] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [done, setDone] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement | null>(null);
 
-  const handleFile = async (f: File) => {
-    setFile(f);
-    setError(null);
-    setSaved(false);
-    setExtraction(null);
-    setLowRes(false);
+  const addFiles = useCallback((incoming: File[]) => {
+    const images = incoming.filter(isImageFile);
+    if (images.length === 0) return;
+    setFiles((prev) => deduplicateFiles(prev, images));
+  }, []);
 
-    // Check image resolution
-    const img = new Image();
-    img.onload = () => {
-      const mp = (img.width * img.height) / 1_000_000;
-      setImageRes(`${img.width}x${img.height} (${mp.toFixed(1)}MP)`);
-      if (mp < 2) setLowRes(true);
-    };
-
-    // Create preview
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      setPreview(dataUrl);
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(f);
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) addFiles(Array.from(e.target.files));
+    e.target.value = '';
   };
 
-  const handleExtract = async () => {
-    if (!preview) return;
-    setExtracting(true);
-    setError(null);
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.currentTarget.classList.remove('border-[var(--ff-accent)]');
 
-    try {
-      const base64 = preview.split(',')[1];
-      const res = await fetch('/api/eod/extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64 }),
-      });
-      const json = await res.json();
+    const items = Array.from(e.dataTransfer.items);
+    const collected: File[] = [];
 
-      if (!json.success) {
-        setError(json.message || 'Extraction failed');
-        return;
+    for (const item of items) {
+      const entry = item.webkitGetAsEntry?.();
+      if (!entry) continue;
+      try {
+        if (entry.isFile) {
+          const file = await new Promise<File>((res, rej) => (entry as FileSystemFileEntry).file(res, rej));
+          if (isImageFile(file)) collected.push(file);
+        } else if (entry.isDirectory) {
+          const sub = await readDirectoryFiles(entry as FileSystemDirectoryEntry);
+          collected.push(...sub);
+        }
+      } catch (err) {
+        log.warn('[EOD] Failed to read dropped entry', { name: entry.name, error: err });
       }
-
-      const data = json.data as EodVlmExtraction;
-      setExtraction(data);
-      setEntries(data.entries);
-      if (data.date) setSheetDate(data.date);
-      if (data.technician_name) setTechName(data.technician_name);
-      if (data.technician_id) setTechId(data.technician_id);
-    } catch (err) {
-      setError('Failed to extract data from photo');
-    } finally {
-      setExtracting(false);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!sheetDate || entries.length === 0) {
-      setError('Date and at least one entry required');
-      return;
     }
 
-    setSaving(true);
-    setError(null);
-
-    try {
-      const res = await fetch('/api/eod/sheets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sheetDate,
-          technicianName: techName || null,
-          technicianId: techId || null,
-          vlmRawJson: extraction,
-          entries: entries.map((e) => ({
-            row_number: e.row_number,
-            ont_serial: e.ont_serial,
-            gizzu_serial: e.gizzu_serial,
-            dr_number: e.dr_number,
-            pon_number: e.pon_number,
-            address: e.address,
-          })),
-        }),
-      });
-      const json = await res.json();
-
-      if (!json.success) {
-        setError(json.message || 'Failed to save');
-        return;
-      }
-
-      setSaved(true);
-    } catch (err) {
-      setError('Failed to save sheet');
-    } finally {
-      setSaving(false);
-    }
+    addFiles(collected);
   };
 
   const reset = () => {
-    setFile(null);
-    setPreview(null);
-    setExtraction(null);
-    setEntries([]);
-    setSheetDate('');
-    setTechName('');
-    setTechId('');
-    setError(null);
-    setSaved(false);
+    setFiles([]);
+    setDone(false);
   };
 
-  if (saved) {
+  if (done) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <CheckCircle className="w-16 h-16 text-green-400 mb-4" />
-        <h3 className="text-xl font-semibold text-[var(--ff-text-primary)] mb-2">Sheet Saved</h3>
+        <h3 className="text-xl font-semibold text-[var(--ff-text-primary)] mb-2">All Sheets Processed</h3>
         <p className="text-[var(--ff-text-secondary)] mb-6">
-          {entries.length} entries saved for {sheetDate}. Check Reconciliation tab to compare with WA DRs and OES.
+          Check the Reconciliation tab to compare EOD entries with WA DRs and OES activations.
         </p>
-        <Button variant="primary" onClick={reset}>
-          Upload Another Sheet
-        </Button>
+        <Button variant="primary" onClick={reset}>Upload More Sheets</Button>
+      </div>
+    );
+  }
+
+  if (files.length > 0) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-[var(--ff-text-secondary)]">
+            {files.length} sheet{files.length !== 1 ? 's' : ''} queued
+          </p>
+          <button onClick={reset} className="text-xs text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]">
+            Clear all
+          </button>
+        </div>
+        <EodBatchQueue files={files} onAllDone={() => setDone(true)} />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Upload Zone */}
-      {!extraction && (
-        <div
-          onClick={() => fileRef.current?.click()}
-          onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-[var(--ff-accent)]'); }}
-          onDragLeave={(e) => { e.currentTarget.classList.remove('border-[var(--ff-accent)]'); }}
-          onDrop={(e) => {
-            e.preventDefault();
-            e.currentTarget.classList.remove('border-[var(--ff-accent)]');
-            const f = e.dataTransfer.files[0];
-            if (f && f.type.startsWith('image/')) handleFile(f);
-          }}
-          className="border-2 border-dashed border-[var(--ff-border-medium)] rounded-lg p-8 text-center cursor-pointer hover:border-[var(--ff-accent)] transition-colors"
-        >
+    <div className="space-y-4">
+      {/* Drop zone */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-[var(--ff-accent)]'); }}
+        onDragLeave={(e) => { e.currentTarget.classList.remove('border-[var(--ff-accent)]'); }}
+        onDrop={(e) => { void handleDrop(e); }}
+        className="border-2 border-dashed border-[var(--ff-border-medium)] rounded-lg p-10 text-center hover:border-[var(--ff-accent)] transition-colors"
+      >
+        <div className="flex justify-center gap-4 mb-4">
+          <Camera className="w-10 h-10 text-[var(--ff-text-tertiary)]" />
+          <Upload className="w-10 h-10 text-[var(--ff-text-tertiary)]" />
+          <FolderOpen className="w-10 h-10 text-[var(--ff-text-tertiary)]" />
+        </div>
+        <p className="text-[var(--ff-text-secondary)] mb-1">
+          Drag & drop EOD sheets or a folder here
+        </p>
+        <p className="text-xs text-[var(--ff-text-tertiary)] mb-6">
+          JPG, PNG — VLM extracts all fields automatically
+        </p>
+
+        <div className="flex justify-center gap-3">
+          {/* Multi-file pick */}
           <input
             ref={fileRef}
             type="file"
             accept="image/*"
-            capture="environment"
+            multiple
             className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) handleFile(f);
+            onChange={handleFileInput}
+          />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="px-4 py-2 text-sm border border-[var(--ff-border-medium)] rounded-lg text-[var(--ff-text-secondary)] hover:border-[var(--ff-accent)] hover:text-[var(--ff-text-primary)] transition-colors"
+          >
+            Select files
+          </button>
+
+          {/* Folder pick — webkitdirectory is not in React types, set via ref callback */}
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handleFileInput}
+            ref={(el) => {
+              folderRef.current = el;
+              if (el) el.setAttribute('webkitdirectory', '');
             }}
           />
-          {preview ? (
-            <div className="space-y-4">
-              <img src={preview} alt="EOD sheet" className="max-h-64 mx-auto rounded-lg" />
-              <p className="text-sm text-[var(--ff-text-secondary)]">{file?.name} {imageRes && `\u2014 ${imageRes}`}</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex justify-center gap-4">
-                <Camera className="w-10 h-10 text-[var(--ff-text-tertiary)]" />
-                <Upload className="w-10 h-10 text-[var(--ff-text-tertiary)]" />
-              </div>
-              <p className="text-[var(--ff-text-secondary)]">
-                Take a photo or drag & drop the EOD install sheet
-              </p>
-              <p className="text-xs text-[var(--ff-text-tertiary)]">
-                Supports JPG, PNG — the VLM will extract all fields automatically
-              </p>
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={() => folderRef.current?.click()}
+            className="px-4 py-2 text-sm border border-[var(--ff-border-medium)] rounded-lg text-[var(--ff-text-secondary)] hover:border-[var(--ff-accent)] hover:text-[var(--ff-text-primary)] transition-colors"
+          >
+            Select folder
+          </button>
         </div>
-      )}
-
-      {/* Low Resolution Warning */}
-      {lowRes && preview && !extraction && (
-        <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-          <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-amber-400">Low resolution image ({imageRes})</p>
-            <p className="text-xs text-[var(--ff-text-secondary)] mt-1">
-              WhatsApp compresses photos to low resolution, making barcode stickers unreadable.
-              For better ONT serial extraction, ask the field team to send the <strong>original photo</strong> from
-              their camera roll (not via WhatsApp), or take the photo directly using the camera button above.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Extract Button */}
-      {preview && !extraction && (
-        <button
-          onClick={handleExtract}
-          disabled={extracting}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[var(--ff-accent)] text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          {extracting ? (
-            <>
-              <InlineSpinner size="sm" />
-              Extracting with VLM...
-            </>
-          ) : (
-            <>Extract Data</>
-          )}
-        </button>
-      )}
-
-      {/* Error */}
-      {error && (
-        <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-          <XCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-          <p className="text-sm text-red-400">{error}</p>
-        </div>
-      )}
-
-      {/* Review extracted data */}
-      {extraction && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
-              Review Extracted Data
-            </h3>
-            <span className="text-xs text-[var(--ff-text-tertiary)]">
-              Confidence: {Math.round(extraction.overall_confidence * 100)}%
-            </span>
-          </div>
-
-          {/* Header fields */}
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="text-xs text-[var(--ff-text-secondary)] mb-1 block">Date</label>
-              <input
-                type="date"
-                value={sheetDate}
-                onChange={(e) => setSheetDate(e.target.value)}
-                className="w-full bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded px-3 py-2 text-sm text-[var(--ff-text-primary)] focus:outline-none focus:border-[var(--ff-accent)]"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-[var(--ff-text-secondary)] mb-1 block">Technician Name</label>
-              <input
-                value={techName}
-                onChange={(e) => setTechName(e.target.value)}
-                className="w-full bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded px-3 py-2 text-sm text-[var(--ff-text-primary)] focus:outline-none focus:border-[var(--ff-accent)]"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-[var(--ff-text-secondary)] mb-1 block">Technician ID</label>
-              <input
-                value={techId}
-                onChange={(e) => setTechId(e.target.value)}
-                className="w-full bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded px-3 py-2 text-sm text-[var(--ff-text-primary)] focus:outline-none focus:border-[var(--ff-accent)]"
-              />
-            </div>
-          </div>
-
-          {/* Entries table */}
-          <EodEntryTable entries={entries} editable onChange={setEntries} />
-
-          {/* Save */}
-          <div className="flex gap-3">
-            <Button
-              variant="primary"
-              onClick={() => { void handleSave(); }}
-              disabled={saving || !sheetDate}
-              loading={saving}
-              className="flex-1"
-            >
-              <CheckCircle className="w-5 h-5" />
-              Save Sheet ({entries.length} entries)
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={reset}
-            >
-              Start Over
-            </Button>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

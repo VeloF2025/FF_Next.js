@@ -75,7 +75,8 @@ export type SerialChangeSource =
   | 'vlm_extraction'
   | 'wa_photo_vlm'
   | 'swap_correction'
-  | 'migration';
+  | 'migration'
+  | 'eod_sheet';
 
 /**
  * Serial change reason types

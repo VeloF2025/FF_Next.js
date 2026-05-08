@@ -480,3 +480,19 @@ export interface EodReconciliationSummary {
   matched_all: number;
   discrepancies: number;
 }
+
+export interface EodSavePayload {
+  sheetDate: string;
+  technicianName: string | null;
+  technicianId: string | null;
+  entries: EodVlmEntry[];
+}
+
+export type EodSlotStatus = 'pending' | 'extracting' | 'ready' | 'saving' | 'saved' | 'failed' | 'skipped';
+
+export interface EodSheetSlot {
+  file: File;
+  status: EodSlotStatus;
+  extraction: EodVlmExtraction | null;
+  error: string | null;
+}
