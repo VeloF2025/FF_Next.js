@@ -90,11 +90,18 @@ function fileExtensionFromMime(mime: string | null | undefined): string {
   return 'jpg';
 }
 
+// Hard cap on attached image size. Receipts captured on the /my PWA are
+// resized client-side; anything bigger than this is either a misconfigured
+// upload or hostile, and we'd rather drop the attachment than let a single
+// email exhaust process memory or stall a slow SMTP send.
+const MAX_RECEIPT_IMAGE_BYTES = 20 * 1024 * 1024;
+const RECEIPT_FETCH_TIMEOUT_MS = 10_000;
+
 async function fetchReceiptImage(receipt: ReceiptRow): Promise<{ buffer: Buffer; filename: string } | null> {
   if (!receipt.image_url) return null;
   try {
     const url = resolveReceiptFetchUrl(receipt.image_url);
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(RECEIPT_FETCH_TIMEOUT_MS) });
     if (!response.ok) {
       log.warn('[receipts/email] image fetch returned non-OK', {
         receiptId: receipt.id,
@@ -102,7 +109,24 @@ async function fetchReceiptImage(receipt: ReceiptRow): Promise<{ buffer: Buffer;
       });
       return null;
     }
+    const declaredLength = Number(response.headers.get('content-length') ?? '0');
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_RECEIPT_IMAGE_BYTES) {
+      log.warn('[receipts/email] image exceeds size cap; skipping attachment', {
+        receiptId: receipt.id,
+        declaredLength,
+        cap: MAX_RECEIPT_IMAGE_BYTES,
+      });
+      return null;
+    }
     const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > MAX_RECEIPT_IMAGE_BYTES) {
+      log.warn('[receipts/email] buffered image exceeds size cap; skipping attachment', {
+        receiptId: receipt.id,
+        bytes: arrayBuffer.byteLength,
+        cap: MAX_RECEIPT_IMAGE_BYTES,
+      });
+      return null;
+    }
     const ext = fileExtensionFromMime(receipt.image_mime);
     return {
       buffer: Buffer.from(arrayBuffer),
@@ -114,6 +138,28 @@ async function fetchReceiptImage(receipt: ReceiptRow): Promise<{ buffer: Buffer;
   }
 }
 
+const ALLOWED_ATTACHMENT_MIMES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'application/pdf',
+]);
+
+function safeAttachmentMime(mime: string | null | undefined): string {
+  if (!mime) return 'application/octet-stream';
+  const trimmed = mime.split(';')[0]?.trim().toLowerCase() ?? '';
+  return ALLOWED_ATTACHMENT_MIMES.has(trimmed) ? trimmed : 'application/octet-stream';
+}
+
+// Strip CR/LF/NUL so user-submitted text (vendor, staff name) cannot inject
+// extra mail headers via the Subject line. Nodemailer sanitises this too,
+// but defence in depth: do it ourselves so the contract is explicit.
+function sanitizeHeaderValue(value: string): string {
+  return value.replace(/[\r\n\0]+/g, ' ').trim();
+}
+
 interface MailOptions {
   to: string;
   subject: string;
@@ -122,35 +168,50 @@ interface MailOptions {
   attachments?: Array<{ filename: string; content: Buffer; contentType?: string }>;
 }
 
+// Cached at module level so we don't create a fresh SMTP transporter per
+// email. Lazy: only initialised when SMTP env vars are actually present.
+let cachedTransporter: { sendMail: (msg: unknown) => Promise<unknown> } | null = null;
+
+function getTransporter(): typeof cachedTransporter {
+  if (cachedTransporter) return cachedTransporter;
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER) return null;
+
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const nodemailer = require(/* webpackIgnore: true */ 'nodemailer');
+  cachedTransporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+    tls: {
+      rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED !== 'false',
+    },
+  });
+  return cachedTransporter;
+}
+
 async function sendMail(options: MailOptions): Promise<boolean> {
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER) {
+  const transporter = getTransporter();
+  if (!transporter) {
     log.warn('[receipts/email] SMTP not configured; skipping send', { to: options.to, subject: options.subject });
     return false;
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const nodemailer = require(/* webpackIgnore: true */ 'nodemailer');
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587', 10),
-      secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-      tls: {
-        rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED !== 'false',
-      },
-    });
-
     await transporter.sendMail({
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to: options.to,
-      subject: options.subject,
+      subject: sanitizeHeaderValue(options.subject),
       html: options.html,
       text: options.text,
-      attachments: options.attachments,
+      attachments: options.attachments?.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: safeAttachmentMime(a.contentType),
+      })),
     });
     return true;
   } catch (err) {
