@@ -6,6 +6,8 @@ import { Upload, Camera, FolderOpen, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { log } from '@/lib/logger';
 import { EodBatchQueue } from './EodBatchQueue';
+import { EodEntryTable } from './EodEntryTable';
+import type { EodSheetSlot } from '../../../types';
 
 function isImageFile(file: File): boolean {
   return file.type.startsWith('image/') || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name);
@@ -45,7 +47,7 @@ function deduplicateFiles(existing: File[], incoming: File[]): File[] {
 
 export function EodUploadTab() {
   const [files, setFiles] = useState<File[]>([]);
-  const [done, setDone] = useState(false);
+  const [savedSlots, setSavedSlots] = useState<EodSheetSlot[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement | null>(null);
 
@@ -88,18 +90,51 @@ export function EodUploadTab() {
 
   const reset = () => {
     setFiles([]);
-    setDone(false);
+    setSavedSlots([]);
   };
 
-  if (done) {
+  // Post-upload summary — show saved sheets read-only
+  if (savedSlots.length > 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <CheckCircle className="w-16 h-16 text-green-400 mb-4" />
-        <h3 className="text-xl font-semibold text-[var(--ff-text-primary)] mb-2">All Sheets Processed</h3>
-        <p className="text-[var(--ff-text-secondary)] mb-6">
-          Check the Reconciliation tab to compare EOD entries with WA DRs and OES activations.
-        </p>
-        <Button variant="primary" onClick={reset}>Upload More Sheets</Button>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <CheckCircle className="w-6 h-6 text-green-400 flex-shrink-0" />
+            <div>
+              <h3 className="text-base font-semibold text-[var(--ff-text-primary)]">
+                {savedSlots.length} sheet{savedSlots.length !== 1 ? 's' : ''} saved
+              </h3>
+              <p className="text-xs text-[var(--ff-text-secondary)]">
+                Check Reconciliation tab to compare with WA DRs and OES activations.
+              </p>
+            </div>
+          </div>
+          <Button variant="secondary" size="sm" onClick={reset}>Upload More</Button>
+        </div>
+
+        {savedSlots.map((slot, i) => (
+          <div key={i} className="border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
+            <div className="px-4 py-2 bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] flex items-center justify-between">
+              <span className="text-sm font-medium text-[var(--ff-text-primary)]">
+                {slot.file.name}
+              </span>
+              {slot.extraction && (
+                <span className="text-xs text-[var(--ff-text-tertiary)]">
+                  {slot.extraction.entries.length} entries
+                  {slot.extraction.technician_name ? ` · ${slot.extraction.technician_name}` : ''}
+                  {slot.extraction.date ? ` · ${slot.extraction.date}` : ''}
+                </span>
+              )}
+            </div>
+            {slot.extraction && slot.extraction.entries.length > 0 ? (
+              <div className="px-4 py-2">
+                <EodEntryTable entries={slot.extraction.entries} editable={false} />
+              </div>
+            ) : (
+              <p className="px-4 py-3 text-sm text-[var(--ff-text-tertiary)]">No entries</p>
+            )}
+          </div>
+        ))}
       </div>
     );
   }
@@ -115,7 +150,7 @@ export function EodUploadTab() {
             Clear all
           </button>
         </div>
-        <EodBatchQueue files={files} onAllDone={() => setDone(true)} />
+        <EodBatchQueue files={files} onAllDone={(slots) => { setFiles([]); setSavedSlots(slots); }} />
       </div>
     );
   }
