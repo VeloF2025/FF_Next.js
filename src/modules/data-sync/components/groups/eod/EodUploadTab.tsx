@@ -4,6 +4,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Upload, Camera, FolderOpen, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { log } from '@/lib/logger';
 import { EodBatchQueue } from './EodBatchQueue';
 
 function isImageFile(file: File): boolean {
@@ -11,7 +12,7 @@ function isImageFile(file: File): boolean {
 }
 
 async function readDirectoryFiles(entry: FileSystemDirectoryEntry): Promise<File[]> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const reader = entry.createReader();
     const collected: File[] = [];
 
@@ -23,7 +24,7 @@ async function readDirectoryFiles(entry: FileSystemDirectoryEntry): Promise<File
         }
         for (const e of entries) {
           if (e.isFile) {
-            const file = await new Promise<File>((res) => (e as FileSystemFileEntry).file(res));
+            const file = await new Promise<File>((res, rej) => (e as FileSystemFileEntry).file(res, rej));
             if (isImageFile(file)) collected.push(file);
           } else if (e.isDirectory) {
             const sub = await readDirectoryFiles(e as FileSystemDirectoryEntry);
@@ -31,7 +32,7 @@ async function readDirectoryFiles(entry: FileSystemDirectoryEntry): Promise<File
           }
         }
         readBatch();
-      });
+      }, reject);
     };
     readBatch();
   });
@@ -69,12 +70,16 @@ export function EodUploadTab() {
     for (const item of items) {
       const entry = item.webkitGetAsEntry?.();
       if (!entry) continue;
-      if (entry.isFile) {
-        const file = await new Promise<File>((res) => (entry as FileSystemFileEntry).file(res));
-        if (isImageFile(file)) collected.push(file);
-      } else if (entry.isDirectory) {
-        const sub = await readDirectoryFiles(entry as FileSystemDirectoryEntry);
-        collected.push(...sub);
+      try {
+        if (entry.isFile) {
+          const file = await new Promise<File>((res, rej) => (entry as FileSystemFileEntry).file(res, rej));
+          if (isImageFile(file)) collected.push(file);
+        } else if (entry.isDirectory) {
+          const sub = await readDirectoryFiles(entry as FileSystemDirectoryEntry);
+          collected.push(...sub);
+        }
+      } catch (err) {
+        log.warn('[EOD] Failed to read dropped entry', { name: entry.name, error: err });
       }
     }
 
@@ -147,6 +152,7 @@ export function EodUploadTab() {
             onChange={handleFileInput}
           />
           <button
+            type="button"
             onClick={() => fileRef.current?.click()}
             className="px-4 py-2 text-sm border border-[var(--ff-border-medium)] rounded-lg text-[var(--ff-text-secondary)] hover:border-[var(--ff-accent)] hover:text-[var(--ff-text-primary)] transition-colors"
           >
@@ -166,6 +172,7 @@ export function EodUploadTab() {
             }}
           />
           <button
+            type="button"
             onClick={() => folderRef.current?.click()}
             className="px-4 py-2 text-sm border border-[var(--ff-border-medium)] rounded-lg text-[var(--ff-text-secondary)] hover:border-[var(--ff-accent)] hover:text-[var(--ff-text-primary)] transition-colors"
           >
