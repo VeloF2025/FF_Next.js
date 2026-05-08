@@ -2,12 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
   proposedDepartmentDefault,
   PROPOSED_DEPARTMENT_DEFAULTS,
-  type ArchetypeKind,
+  type ArchetypeResolved,
 } from '../proposedDepartmentDefaults';
 
 describe('proposedDepartmentDefault', () => {
   it('maps every department from the spec to a valid archetype', () => {
-    const validKinds: ReadonlyArray<ArchetypeKind> = ['project', 'mobile', 'office'];
+    const validKinds: ReadonlyArray<ArchetypeResolved> = ['project', 'mobile', 'office'];
     for (const dept of [
       'Civil', 'Optical', 'field_operations',
       'NOC', 'Maintenance', 'Project Management',
@@ -24,9 +24,17 @@ describe('proposedDepartmentDefault', () => {
     expect(proposedDepartmentDefault('')).toBe('office');
   });
 
-  it('matches the spec seed values exactly', () => {
+  it('matches the spec seed values exactly for all 10 departments', () => {
+    // Guards against transposition errors (e.g. accidentally flipping Maintenance to office).
     expect(PROPOSED_DEPARTMENT_DEFAULTS['Civil']).toBe('project');
+    expect(PROPOSED_DEPARTMENT_DEFAULTS['Optical']).toBe('project');
+    expect(PROPOSED_DEPARTMENT_DEFAULTS['field_operations']).toBe('project');
     expect(PROPOSED_DEPARTMENT_DEFAULTS['NOC']).toBe('mobile');
+    expect(PROPOSED_DEPARTMENT_DEFAULTS['Maintenance']).toBe('mobile');
+    expect(PROPOSED_DEPARTMENT_DEFAULTS['Project Management']).toBe('mobile');
     expect(PROPOSED_DEPARTMENT_DEFAULTS['Procurement']).toBe('office');
+    expect(PROPOSED_DEPARTMENT_DEFAULTS['Commercial & Strategy']).toBe('office');
+    expect(PROPOSED_DEPARTMENT_DEFAULTS['Planning']).toBe('office');
+    expect(PROPOSED_DEPARTMENT_DEFAULTS['General']).toBe('office');
   });
 });

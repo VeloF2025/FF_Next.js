@@ -10,7 +10,7 @@
  *   4. office (low signal) — <5 clock-ins OR no rule met
  */
 
-import type { ArchetypeKind } from './proposedDepartmentDefaults';
+import type { ArchetypeResolved } from './types';
 
 export interface ArchetypeMetrics {
   totalClockIns: number;
@@ -25,7 +25,7 @@ export interface ArchetypeMetrics {
 }
 
 export interface ArchetypeSuggestion {
-  archetype: ArchetypeKind;
+  archetype: ArchetypeResolved;
   lowSignal: boolean;
 }
 

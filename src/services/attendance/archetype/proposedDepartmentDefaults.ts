@@ -8,9 +8,12 @@
  * remains as the fallback when no DB seed row exists for a department.
  */
 
-export type ArchetypeKind = 'project' | 'mobile' | 'office';
+import type { ArchetypeResolved } from './types';
+export type { Archetype, ArchetypeResolved } from './types';
+/** @deprecated Use `ArchetypeResolved` from `./types` instead. Kept for one cycle for callers that haven't been updated. */
+export type ArchetypeKind = ArchetypeResolved;
 
-export const PROPOSED_DEPARTMENT_DEFAULTS: Readonly<Record<string, ArchetypeKind>> = {
+export const PROPOSED_DEPARTMENT_DEFAULTS: Readonly<Record<string, ArchetypeResolved>> = {
   Civil: 'project',
   Optical: 'project',
   field_operations: 'project',
@@ -29,7 +32,7 @@ export const PROPOSED_DEPARTMENT_DEFAULTS: Readonly<Record<string, ArchetypeKind
  * Falls back to 'office' for unknown, empty, or null department values — the
  * safest assumption when we have no location signal.
  */
-export function proposedDepartmentDefault(department: string | null | undefined): ArchetypeKind {
+export function proposedDepartmentDefault(department: string | null | undefined): ArchetypeResolved {
   if (!department) return 'office';
   return PROPOSED_DEPARTMENT_DEFAULTS[department] ?? 'office';
 }
