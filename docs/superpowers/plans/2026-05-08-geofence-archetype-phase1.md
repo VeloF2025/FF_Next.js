@@ -18,7 +18,7 @@
 
 | Path | Action | Responsibility |
 |---|---|---|
-| `scripts/migrations/245_postgis_polygon_geom.sql` | Create | Enables PostGIS, adds `geom MultiPolygon(4326)` columns to `zone_boundaries` and `pon_boundaries`, backfills from `geojson`, adds GIST indexes. JSONB `geojson` column stays — `geom` is additive. |
+| `scripts/migrations/sql/335_postgis_polygon_geom.sql` | Create | Enables PostGIS, adds `geom MultiPolygon(4326)` columns to `zone_boundaries` and `pon_boundaries`, backfills from `geojson`, adds GIST indexes. JSONB `geojson` column stays — `geom` is additive. |
 | `src/lib/qfield/gpkg-import-spatial.ts` | Modify | Update zone_boundaries + pon_boundaries INSERTs to also write `geom` (computed from the same GeoJSON the row already carries) so future imports don't drift. |
 | `src/services/attendance/archetype/proposedDepartmentDefaults.ts` | Create | Hardcoded `Record<string, ArchetypeKind>` matching the spec's Phase 2 seed proposal. Used by Phase 1 to compute "proposed default archetype" before any DB-backed seed exists. |
 | `src/services/attendance/archetype/suggestArchetype.ts` | Create | Pure function `suggestArchetype(metrics) → { archetype, lowSignal }` implementing the deterministic four-rule ladder from the spec (≥80 % primary → project, ≥3 polygons each >10 % → mobile, ≥80 % office → office, else low-signal). |
@@ -35,12 +35,12 @@
 ### Task 1: Migration 245 — PostGIS extension, geom columns, backfill
 
 **Files:**
-- Create: `scripts/migrations/245_postgis_polygon_geom.sql`
+- Create: `scripts/migrations/sql/335_postgis_polygon_geom.sql`
 
 - [ ] **Step 1: Write the migration SQL**
 
 ```sql
--- 245_postgis_polygon_geom.sql
+-- 335_postgis_polygon_geom.sql
 -- Add PostGIS-backed polygon geometry alongside existing GeoJSON.
 -- Phase 1 of geofence archetype matching (spec 2026-05-08).
 
@@ -98,7 +98,7 @@ This migration is **not** auto-run by the normal deploy. It's an after-hours, He
 For local sanity-check only, dry-run against a fresh local Postgres if you have PostGIS available:
 
 ```bash
-psql -h localhost -U postgres -d fibreflow_local < scripts/migrations/245_postgis_polygon_geom.sql
+psql -h localhost -U postgres -d fibreflow_local < scripts/migrations/sql/335_postgis_polygon_geom.sql
 ```
 
 Expected: `BEGIN`, several `NOTICE` lines (zero or low backfill failure counts), `COMMIT`. No `ERROR`.
@@ -108,7 +108,7 @@ If you don't have a local PostGIS, skip this step and rely on the dev DB run —
 - [ ] **Step 3: Commit**
 
 ```bash
-git add scripts/migrations/245_postgis_polygon_geom.sql
+git add scripts/migrations/sql/335_postgis_polygon_geom.sql
 git commit -m "migration(245): postgis + polygon geom columns
 
 Adds PostGIS extension and geometry(MultiPolygon, 4326) columns to
@@ -651,6 +651,15 @@ npx vitest run src/services/attendance/reports/__tests__/geofencePatterns.sql.te
 Expected: FAIL — `buildGeofencePatternsSql` not exported.
 
 - [ ] **Step 3: Implement the runner with the SQL builder extracted**
+
+> **SUPERSEDED — see the shipped implementation, not this draft.**
+> The TypeScript / SQL block below is the original draft from plan
+> authoring. It has known issues (`per_project_pct_json` column name was
+> renamed to `per_project_hits_json` and percentage math was moved
+> client-side; `COUNT(*) OVER ()` divides by project-hit rows rather than
+> total clock-ins). The merged code at
+> `src/services/attendance/reports/geofencePatterns.ts` is the source of
+> truth — copy from there, not from this draft.
 
 ```typescript
 // src/services/attendance/reports/geofencePatterns.ts

@@ -98,8 +98,7 @@ export function buildGeofencePatternsSql(args: InputArgs): { text: string; param
       SELECT
         ci.staff_id,
         ci.id AS clock_in_id,
-        sp.project_id,
-        TRUE AS hit
+        sp.project_id
       FROM clock_ins ci
       JOIN staff_projects sp ON sp.staff_id = ci.staff_id AND sp.is_active = true
       JOIN zone_boundaries zb ON zb.project_id = sp.project_id AND zb.geom IS NOT NULL
@@ -122,9 +121,12 @@ export function buildGeofencePatternsSql(args: InputArgs): { text: string; param
         ci.id AS clock_in_id,
         ci.staff_id,
         (
+          -- Deterministic order so overlapping-polygon clock-ins always
+          -- attribute to the same project across runs.
           SELECT psh.project_id
             FROM per_staff_polygon_hits psh
            WHERE psh.clock_in_id = ci.id
+           ORDER BY psh.project_id
            LIMIT 1
         ) AS matched_project_id,
         EXISTS (SELECT 1 FROM per_staff_office_hits psoh WHERE psoh.clock_in_id = ci.id) AS hit_office
@@ -135,6 +137,12 @@ export function buildGeofencePatternsSql(args: InputArgs): { text: string; param
         FROM per_staff_clock_in_first_match
        WHERE matched_project_id IS NOT NULL
        GROUP BY staff_id, matched_project_id
+    ),
+    active_assignments AS (
+      SELECT staff_id, COUNT(*)::int AS active_assignment_count
+        FROM staff_projects
+       WHERE is_active = true
+       GROUP BY staff_id
     ),
     per_staff_aggregates AS (
       SELECT
@@ -163,10 +171,7 @@ export function buildGeofencePatternsSql(args: InputArgs): { text: string; param
       TRIM(COALESCE(s.first_name,'') || ' ' || COALESCE(s.last_name,'')) AS full_name,
       s.department,
       s.home_site_id::text                                    AS home_site_id,
-      (
-        SELECT COUNT(*) FROM staff_projects sp
-         WHERE sp.staff_id = s.id AND sp.is_active = true
-      )::int                                                  AS active_assignment_count,
+      COALESCE(aa.active_assignment_count, 0)::int           AS active_assignment_count,
       COALESCE(psa.total_clock_ins, 0)::int                   AS total_clock_ins,
       COALESCE(psa.inside_any_assigned, 0)::int               AS inside_any_assigned,
       COALESCE(psa.inside_office, 0)::int                     AS inside_office,
@@ -175,6 +180,7 @@ export function buildGeofencePatternsSql(args: InputArgs): { text: string; param
       COALESCE(psa.per_project_hits_json, '{}'::jsonb)        AS per_project_hits_json
     FROM staff s
     LEFT JOIN per_staff_aggregates psa ON psa.staff_id = s.id
+    LEFT JOIN active_assignments aa ON aa.staff_id = s.id
     WHERE s.status = 'active'
       ${deptClause}
       ${staffScopeClause}
