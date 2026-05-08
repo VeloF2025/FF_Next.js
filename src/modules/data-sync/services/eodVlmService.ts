@@ -203,30 +203,25 @@ function cleanGizzuSerial(serial: string | null): string | null {
 // Readings shorter than this are just the shared prefix — not hallucinated, just partial.
 const GIZZU_FULL_SERIAL_MIN_LEN = 15;
 
+// 99.6% of devices in the DB use this prefix (3,965 / 3,979).
+// Used as fallback when no full serial appears on the sheet.
+const GIZZU_DEFAULT_PREFIX = 'GU18W12V25-';
+
 /**
- * Reconstruct abbreviated Gizzu serials using the prefix from the first full serial found.
- * Technicians typically write the full serial on row 1 ("GU18W12V25-0923242") and only
- * the suffix on subsequent rows ("-0923246", "-09023249", …).
+ * Reconstruct abbreviated Gizzu serials.
+ * Technicians write the full serial on row 1 ("GU18W12V25-0923242") and only the
+ * suffix on subsequent rows ("-0923246", "09023249", …). When no full serial exists
+ * on the sheet at all, GIZZU_DEFAULT_PREFIX is used as the fallback.
  */
 function reconstructGizzuSerials(entries: EodVlmEntry[]): EodVlmEntry[] {
+  // Prefer the prefix from any full serial written on the sheet; fall back to default
   const fullSerial = entries
     .map((e) => e.gizzu_serial)
     .find((s) => s && s.startsWith('GU') && s.length >= GIZZU_FULL_SERIAL_MIN_LEN);
 
-  if (!fullSerial) {
-    // No full serial → cannot reconstruct suffix-only values → null them to avoid corrupt serials
-    const nulled = entries.filter((e) => e.gizzu_serial && !e.gizzu_serial.startsWith('GU')).length;
-    if (nulled > 0) log.info('[EOD] Gizzu: no prefix found, nulling suffix-only values', { nulled });
-    return entries.map((e) =>
-      e.gizzu_serial && !e.gizzu_serial.startsWith('GU') ? { ...e, gizzu_serial: null } : e
-    );
-  }
+  const prefixMatch = fullSerial?.match(/^(GU[A-Z0-9]+-)/i);
+  const prefix = prefixMatch ? prefixMatch[1]! : GIZZU_DEFAULT_PREFIX;
 
-  // Extract the prefix up to and including the separating dash: "GU18W12V25-"
-  const prefixMatch = fullSerial.match(/^(GU[A-Z0-9]+-)/i);
-  if (!prefixMatch) return entries;
-
-  const prefix = prefixMatch[1]!;
   let count = 0;
   const result = entries.map((e) => {
     if (!e.gizzu_serial || e.gizzu_serial.startsWith('GU')) return e;
@@ -236,7 +231,10 @@ function reconstructGizzuSerials(entries: EodVlmEntry[]): EodVlmEntry[] {
     return { ...e, gizzu_serial: `${prefix}${suffix}` };
   });
 
-  if (count > 0) log.info('[EOD] Gizzu reconstruction', { prefix, count });
+  if (count > 0) {
+    const usedDefault = !prefixMatch;
+    (usedDefault ? log.warn : log.info)('[EOD] Gizzu reconstruction', { prefix, count, usedDefault });
+  }
   return result;
 }
 
