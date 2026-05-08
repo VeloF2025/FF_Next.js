@@ -2,7 +2,7 @@
 
 - **Date:** 2026-05-08
 - **Author:** Hein + Claude (brainstorm)
-- **Status:** Draft, awaiting review
+- **Status:** Draft — amended 2026-05-08 after live DB audit (see §3.4)
 - **Branch:** `spec/tracker-redesign`
 
 ---
@@ -57,6 +57,37 @@ Permissions → Poles Planted → CWC → Optical → ATP → Activation → Mai
 
 Stage definitions match the existing `pon_stage_tracking.overall_stage` constraint. Each stage has `_total`, `_complete`, `_first_date`, `_last_date`, `_target_date` fields. **Overall stage = the latest stage that is 100% complete.**
 
+### 3.4 Live-DB audit (added 2026-05-08, supersedes §1 inventory)
+
+The §1 inventory was assembled from migration files in the repo. A live `\dt` audit against the shared dev+prod DB on 2026-05-08 09:36 SAST revealed the real state — meaningfully different. **Use this section, not §1, when reasoning about what already exists.**
+
+**Tables and views actually present:**
+
+| Object | Rows | Status |
+|--------|------|--------|
+| `pon_stage_tracking` | exists (small) | Canonical PON entity. Spec keeps this. |
+| `pon_daily_log` | exists | Daily activity log. Spec keeps this. |
+| `project_monthly_targets` | exists | Spec keeps this. |
+| `pon_tracker` | **1 row (test data)** | Same column shape as the `pon_tracker_entries` migration file but renamed in prod. `project_id` is `text` (storing uuids as strings). Treat as deprecated — not retained beyond 1.0a. |
+| `pon_tracker_entries` | **does not exist** | Migration file in repo was never applied. Spec mentions are obsolete. |
+| `master_tracker` | **0 rows, 73-col schema** | Already-built table with the exact column shape of the Excel `LAWLEY MASTER TRACKER` sheet. `project_id` is `text`. Empty but ready to populate. |
+| `pon_boundaries` | **1,617 rows** | PON polygon shapes (geom + geojson). Reuse for the C-lens map (v1.2). |
+| `v_pole_completion` | view, sources `pole_completion` | Computes per-pole completion across civil/optical/stringing disciplines with step-key granularity. Reuse for QA + dashboard. |
+| `v_pon_pole_progress` | view, **1,713 rows** | Aggregates `v_pole_completion` to PON level. Reuse for the home dashboard. |
+| `tracker_selectlists` | 31 rows | SelectList admin source. Keep, no change. |
+| `sp_pon_tracker` / `sp_project_summary` / `sp_tracker_config` | exists | SharePoint sync targets. Plan unchanged: parallel-cutover read-only, retire in 1.2. |
+| `sharepoint_tracker_home` | 0 rows | Dormant SP sync target. Note for 1.2 archive. |
+| `sharepoint_tracker_pole` | **4,965 rows** | Live SP sync target with `raw_data jsonb`. Worth preserving in 1.2 archive (don't drop without snapshot). |
+| `onemap.drops` / `onemap.poles` / `onemap.pons` (634 rows) / `onemap.zones` / `onemap.projects` / `onemap.transactions` / `onemap.sync_log` / `onemap.photo_downloads` | exists | OneMap raw-import schema. Read-only feeders. Spec unchanged. |
+| `drops` (`public`) | exists, project_id is uuid | Row source for master tracker. |
+| `sow_poles` | exists, has `pon_no`, `zone_no` | Join source. |
+| `oes_activations` | exists | Nokia/OES feed. |
+| `contractor_invoices` | exists | Billing join. |
+
+**Free wins:** `v_pole_completion`, `v_pon_pole_progress`, and `pon_boundaries` already provide aggregations and geometry the spec assumed we'd build. Plans 1.0c (home dashboard) and 1.2 (map lens) consume them rather than reimplement.
+
+**Schema heterogeneity gotcha:** `pon_tracker.project_id` and `master_tracker.project_id` are `text`; everything else uses `uuid`. The Lawley importer (plan 1.0d) writes uuids-as-text into `master_tracker.project_id` — application code must always cast at the boundary. A future cleanup migration may convert these columns to `uuid` once all writers are FF-internal.
+
 ### 3.3 Data sources per stage (from the Excel `Index` sheet)
 
 | Stage | Source | Existing FF feed |
@@ -109,19 +140,51 @@ CREATE TABLE IF NOT EXISTS pon_manual_overrides (
 );
 ```
 
-### 4.2 Migration of legacy data
+### 4.2 Migration of legacy data (amended after §3.4 audit)
 
-Identifier note: `pon_stage_tracking.pon_no` is the **zone-level** PON number (the Excel `Z PON` column). `pon_tracker_entries.hld_pon` is the **project-level** HLD PON. The migration matches on `(project_id, zone_no, z_pon → pon_no)`.
+Identifier note: `pon_stage_tracking.pon_no` is the **zone-level** PON number (the Excel `Z PON` column). `pon_tracker.hld_pon` is the **project-level** HLD PON. Any future forward-port matches on `(project_id, zone_no, z_pon → pon_no)`.
 
-1. **`pon_tracker_entries`** → forward-port any rows not already represented in `pon_stage_tracking`, joined on `(project_id, zone_no, z_pon)` mapped to `(project_id, zone_no, pon_no)`. Populate the new override columns from `blockage`, `olt_port`, `homes_po`, etc. Drop the table after the migration runner reports zero rows missing.
+1. **`pon_tracker`** (the actually-deployed table; `pon_tracker_entries` does not exist on prod) holds **1 test row**. No real production data to forward-port. Treat as deprecated; flag for retirement once any UI references are removed in plan 1.0c. Skip the bulk-forward-port script; instead the documentation in 1.0a notes that `pon_tracker` is dormant.
 2. **`sp_pon_tracker`** → kept read-only during the parallel-cutover window (only the SP cron writes to it; UI never reads). After cutover, archive (rename `sp_pon_tracker` → `_archive_sp_pon_tracker`, drop the SP sync cron).
-3. **`sp_project_summary`** → replaced by a server-computed view rolling up `pon_stage_tracking` for the project. Drop after cutover.
+3. **`sp_project_summary`** → replaced by a server-computed rollup of `pon_stage_tracking` for the project. Drop after cutover.
+4. **`sharepoint_tracker_pole`** (4,965 rows) → snapshot to `_archive_sharepoint_tracker_pole` in 1.2 before drop. Don't drop without a snapshot — that's real historical data.
 
-The migration is idempotent (re-runnable) and writes a row to `pon_change_log` with `source = 'migration'` for every value forward-ported, so any post-migration drift is auditable.
+### 4.3 Master tracker — use the existing `master_tracker` table (amended)
 
-### 4.3 Master tracker view
+**Original spec proposed a denormalised view `vw_master_tracker`. The §3.4 audit found that `master_tracker` already exists as a real, empty, 73-column table with the exact Excel shape.** The amended approach uses that table directly:
+
+- **Canonical row storage** is `public.master_tracker` (existing table). Do not create a duplicate view.
+- The Lawley snapshot importer (plan 1.0d) inserts directly into `master_tracker`.
+- The workspace UI (plan 1.0c) reads and writes `master_tracker` rows directly.
+- Updates from automated feeds (1Map, OES, Nokia) propagate into `master_tracker` rows via service-layer broadcast (a per-feed handler that updates the relevant `master_tracker` rows when a `drops` / `sow_poles` / `pon_stage_tracking` / `oes_activations` row changes). The exact broadcast shape is plan 1.0b's concern.
+- Plan 1.0a's responsibility is **not** creating a view; it's auditing the existing `master_tracker` schema and adding any missing columns to bring it fully aligned with the spec's column inventory.
+
+A reference query that mimics the originally-proposed view (kept for documentation and as a fallback should we ever need an on-the-fly join):
 
 ```sql
+-- Reference: the join shape that produces a denormalised master row.
+-- NOT a deployed view; runtime queries hit master_tracker directly.
+-- SELECT
+--   d.id AS drop_id, d.project_id, d.drop_number, d.pon_no, d.zone_no,
+--   d.pole_number, d.address, d.latitude, d.longitude,
+--   p.pole_type, p.permission_date AS pole_permission_date, ...
+--   pst.overall_stage, pst.olt_port, pmo.civil_contractor, ...
+--   oa.activation_date, oa.activation_status, ...
+--   ci.invoice_number AS pole_invoice_number, ci.paid_at AS pole_paid_date
+-- FROM drops d
+-- LEFT JOIN sow_poles p             ON p.project_id = d.project_id AND p.pole_number = d.pole_number
+-- LEFT JOIN pon_stage_tracking pst  ON pst.project_id = d.project_id AND pst.zone_no = d.zone_no AND pst.pon_no = d.pon_no
+-- LEFT JOIN pon_manual_overrides pmo ON pmo.pon_stage_id = pst.id
+-- LEFT JOIN oes_activations oa      ON oa.drop_number = d.drop_number
+-- LEFT JOIN contractor_invoices ci  ON ci.pole_id = p.id;
+```
+
+Edits in the workspace write **only** to `master_tracker`. Source-of-truth for the granular tables (`drops`, `sow_poles`, `pon_stage_tracking`, …) remains the granular tables; service-layer broadcast keeps `master_tracker` in sync after their writes. A nightly reconcile job verifies invariants (`master_tracker` row exists for every `drops` row in the project; key fields agree).
+
+#### Original-spec view (now deprecated, kept commented for context):
+
+```sql
+-- DEPRECATED: not deployed. Use the master_tracker table instead.
 CREATE OR REPLACE VIEW vw_master_tracker AS
 SELECT
   d.id                  AS drop_id,
@@ -159,7 +222,7 @@ LEFT JOIN oes_activations oa     ON oa.drop_number = d.drop_number
 LEFT JOIN contractor_invoices ci ON ci.pole_id = p.id;
 ```
 
-The exact column list will be expanded during implementation to cover all 73 Master Tracker columns; the view definition above is the structural blueprint. **Edits never write to the view** — UI dispatches them to the owning table (drop fields → `drops`, pole fields → `sow_poles`, PON-level fields → `pon_stage_tracking` / `pon_manual_overrides`, etc.).
+The view above is **deprecated** by §4.3's amended approach. It is kept only as documentation of the join shape — runtime queries use the `master_tracker` table.
 
 ### 4.4 Daily progress
 
@@ -292,8 +355,8 @@ src/modules/projects/tracker-workspace/
 
 ### 6.4 Map lens (v1.2)
 
-- PON regions rendered as polygons (boundaries derived from member poles' convex hull or supplied GIS layer).
-- Pole pins coloured by current stage.
+- PON regions rendered from `pon_boundaries.geom` (already populated, 1,617 rows — no convex-hull computation needed).
+- Pole pins from `sow_poles.latitude`/`.longitude`, coloured by `pon_stage_tracking.overall_stage`.
 - Click a region → PON drawer; click a pole → drop list filtered to that pole.
 - Reuses the existing FF map stack (the same library already used by `src/modules/onemap/` and `src/modules/projects/pole-tracker/`). Confirm exact library when implementation begins; do not introduce a new mapping dependency.
 

@@ -2,9 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Lay the database foundation that every other tracker-workspace deliverable depends on — extend `pon_stage_tracking` to be the canonical PON entity, add the manual-override and audit-log companion tables, expose the denormalised Master Tracker view, and forward-port `pon_tracker_entries` data so the table can be retired.
+**Goal:** Lay the database foundation that every other tracker-workspace deliverable depends on — extend `pon_stage_tracking` to be the canonical PON entity, add manual-override and audit-log companion tables, and verify the existing `master_tracker` table is column-aligned with the spec.
 
-**Architecture:** Four additive SQL migrations applied in filename order through the existing `npm run db:migrate` runner (`scripts/migrations/run.ts`). One TypeScript forward-port script run once via `tsx`. No application code changes — the API and UI consolidation work belongs to plans 1.0b and 1.0c.
+**Architecture:** Three additive SQL migrations (335–337) applied in filename order through `npm run db:migrate`, plus an audit task that confirms `master_tracker` already matches the Excel shape (and emits a fourth small migration if any columns are missing). No application code changes — the API and UI consolidation work belongs to plans 1.0b and 1.0c.
+
+**⚠ Amendment 2026-05-08 (after live DB audit):** The original plan included `vw_master_tracker` (view) and a `pon_tracker_entries` forward-port script. The audit (spec §3.4) showed `master_tracker` already exists as an empty 73-column table and `pon_tracker_entries` was never deployed (`pon_tracker` is the actual table, with 1 test row). Tasks 4–6 are amended below — see the **AMENDED** banner on each. Original tasks remain in git history at commit `5bbcb16d6`.
 
 **Tech Stack:** PostgreSQL 15 (self-hosted Supabase, Velocity `100.96.203.105:5437`), `pg` driver via `@/lib/db` singleton, `tsx` for one-off scripts, `vitest` for unit tests, existing migration runner at `scripts/migrations/run.ts`.
 
@@ -14,22 +16,24 @@
 
 ## File Structure
 
-**New files:**
+**New files (amended):**
 - `scripts/migrations/sql/335_pon_workspace_extend_stage_tracking.sql` — adds `olt_port`, `hld_pon`, `z_pon`, `scope_string`, `sign_ups`, `homes_po`, `homes_recon`, `available`, `pct_original`, `pct_recon` to `pon_stage_tracking`.
 - `scripts/migrations/sql/336_pon_manual_overrides.sql` — new companion table for manual-only string fields.
 - `scripts/migrations/sql/337_pon_change_log.sql` — new audit log table.
-- `scripts/migrations/sql/338_vw_master_tracker.sql` — new view joining `drops × sow_poles × pon_stage_tracking × oes_activations × contractor_invoices × onemap_*`.
-- `scripts/migrations/sql/rollback_335_pon_workspace_extend_stage_tracking.sql` — rollback companion.
-- `scripts/migrations/sql/rollback_336_pon_manual_overrides.sql` — rollback companion.
-- `scripts/migrations/sql/rollback_337_pon_change_log.sql` — rollback companion.
-- `scripts/migrations/sql/rollback_338_vw_master_tracker.sql` — rollback companion.
-- `scripts/tracker/forward-port-pon-tracker-entries.ts` — one-shot data migration script.
-- `tests/unit/tracker/forward-port-pon-tracker-entries.test.ts` — unit tests for the script's pure logic.
+- `scripts/migrations/sql/rollback_335_pon_workspace_extend_stage_tracking.sql`
+- `scripts/migrations/sql/rollback_336_pon_manual_overrides.sql`
+- `scripts/migrations/sql/rollback_337_pon_change_log.sql`
+- `scripts/migrations/sql/338_master_tracker_align.sql` — *only if Task 4's audit reveals missing columns; otherwise omit.*
+- `scripts/migrations/sql/rollback_338_master_tracker_align.sql` — *paired with above, only if 338 is created.*
 - `.claude/modules/tracker-workspace.md` — full reference doc for the new module.
 - `src/modules/projects/tracker-workspace/.claude.md` — quick reference (≤50 lines) auto-loaded when working in this module.
 
-**Modified files:**
-- `package.json` — add one npm script `tracker:forward-port` to run the forward-port script.
+**Files removed from this plan vs. original:**
+- ~~`scripts/migrations/sql/338_vw_master_tracker.sql`~~ — replaced by use of the existing `master_tracker` table.
+- ~~`scripts/tracker/forward-port-pon-tracker-entries.ts`~~ — `pon_tracker_entries` doesn't exist on prod; `pon_tracker` has 1 test row, treated as dormant.
+- ~~`tests/unit/tracker/forward-port-pon-tracker-entries.test.ts`~~ — same reason.
+
+**Modified files:** none in `package.json` (no new npm scripts needed).
 
 **No application code is touched in this plan.** API routes and UI components are owned by plans 1.0b and 1.0c.
 
@@ -37,7 +41,24 @@
 
 ## Pre-flight
 
-- [ ] **P-1: Confirm worktree and branch**
+> **Status: P-1 to P-4 already executed by the controller on 2026-05-08 09:36–09:48 SAST.** Results below for traceability. Implementer subagents do not need to re-run these.
+
+**Recorded outputs:**
+- P-1: branch `spec/tracker-redesign`, working tree clean (only `.superpowers/` untracked).
+- P-2: `.env.local` copied from main worktree; `DATABASE_URL` present.
+- P-3: last applied migration is `334_vlm_training_dataset.sql`. Next number is **335**, as planned.
+- P-4: row counts captured in `tmp/tracker-foundation-snapshots/counts-before.txt`. Key findings:
+  - `pon_tracker_entries` does **not** exist on prod (migration file in repo never applied).
+  - `pon_tracker` exists with **1 test row**.
+  - `master_tracker` exists with **0 rows** but a 73-column schema.
+  - `pon_stage_tracking`, `pon_daily_log`, `sp_pon_tracker`, `drops`, `sow_poles`, `oes_activations`, `contractor_invoices` all present.
+  - Bonus existing assets: `pon_boundaries` (1,617 rows), `v_pole_completion`, `v_pon_pole_progress` (1,713 rows), `tracker_selectlists` (31 rows), `sharepoint_tracker_pole` (4,965 rows), `onemap.pons` (634 rows).
+
+These findings drove the spec amendment (§3.4) and this plan's amended Task 4. Implementers proceed from Task 1.
+
+#### Original pre-flight (kept for reference)
+
+- [x] **P-1: Confirm worktree and branch**
 
 ```bash
 cd /home/hein/Workspace/FF_Next.js-tracker-redesign
@@ -398,635 +419,224 @@ git commit -m "feat(tracker): mig 337 add pon_change_log audit table"
 
 ---
 
-## Task 4 · Migration 338 — `vw_master_tracker`
+## Task 4 · **AMENDED** — Audit `master_tracker` schema, add missing columns only if needed
 
-**Files:**
-- Create: `scripts/migrations/sql/338_vw_master_tracker.sql`
-- Create: `scripts/migrations/sql/rollback_338_vw_master_tracker.sql`
+> **Replaces** the original "Migration 338 — `vw_master_tracker`". The existing `master_tracker` table already has the 73-column Excel shape (see spec §3.4). This task **verifies** alignment and emits a small migration only if any spec-required columns are missing.
 
-- [ ] **Step 1: Confirm join targets exist**
+**Files (conditional):**
+- Create only if needed: `scripts/migrations/sql/338_master_tracker_align.sql`
+- Create only if 338 is created: `scripts/migrations/sql/rollback_338_master_tracker_align.sql`
 
-This view depends on tables created by other modules. Confirm each one exists before writing the view:
-
-```bash
-psql "$DATABASE_URL" -c "\dt drops sow_poles oes_activations contractor_invoices"
-```
-
-Expected: all four tables listed. If any are missing, **stop**: a dependency we assumed is not present. Search the codebase (`grep -r "CREATE TABLE.*<missing>" scripts migrations`) for the real table name and adjust the view accordingly before proceeding.
-
-- [ ] **Step 2: Write the failing verification query**
+- [ ] **Step 1: Capture the current `master_tracker` columns**
 
 ```bash
-psql "$DATABASE_URL" -c "SELECT 1 FROM vw_master_tracker LIMIT 0;"
+cd /home/hein/Workspace/FF_Next.js-tracker-redesign
+DBURL=$(grep '^DATABASE_URL=' .env.local | cut -d= -f2- | sed 's/^"//' | sed 's/"$//')
+psql "$DBURL" -t -c "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='master_tracker' ORDER BY ordinal_position;" \
+  | sed 's/ //g' | grep -v '^$' \
+  | tee tmp/tracker-foundation-snapshots/master_tracker-columns.txt
 ```
 
-Expected: `ERROR: relation "vw_master_tracker" does not exist`.
+Expected: prints exactly **73** column names. If the count differs, **stop and report** as DONE_WITH_CONCERNS — the table has drifted from the audit captured in spec §3.4.
 
-- [ ] **Step 3: Write the migration**
+- [ ] **Step 2: Compare against the spec's required column set**
 
-Create `scripts/migrations/sql/338_vw_master_tracker.sql`. The column list below covers the v1.0 read path; later phases extend it via a new migration.
+The spec (§3.1, §3.2, §4.3) implies the master tracker row needs these columns. Cross-check each one against `tmp/tracker-foundation-snapshots/master_tracker-columns.txt`:
+
+```
+id, project_id, site, phase, dr, zone_no, hld_pon, zone_pon,
+pole_label, unique_pole_label, pole_scope, pole_type, pole_route_type,
+pole_permission_date, pole_install_date, pole_cwc_date,
+pole_contractor, pole_rate, pole_paid_date, pole_invoice_no, pole_comment,
+civil_description, civil_rate, civil_qty, civil_total,
+civil_invoice_no, civil_invoice_date, civil_comment,
+stringing_description, stringing_rate, stringing_qty, stringing_total,
+stringing_invoice_no, stringing_date, stringing_comment,
+signup_date, home_install_date, home_contractor, home_rate, home_paid_date, home_invoice_no,
+activation_code, activation_date, activation_team, activation_rate, activation_paid_date, activation_invoice_no,
+remittance, remittance_date,
+cwc_pole_status, cwc_stringing_status, cwc_qa_submit_date, cwc_qa_approved_date,
+qa_home_recon_no, exfo_exchange,
+optical_contractor, optical_type, optical_splitter, optical_prepping, optical_splicing,
+qa_photos_loaded, atp_qa_submit_date, atp_qa_approved_date,
+testing_status, test_submitted, olt_port_activation, olt_port_activated, pon_status,
+optical_rate, optical_invoice_date, optical_invoice_no,
+created_at, updated_at
+```
+
+A scriptable diff:
+
+```bash
+cd /home/hein/Workspace/FF_Next.js-tracker-redesign
+cat > tmp/tracker-foundation-snapshots/required-cols.txt <<'EOF'
+id
+project_id
+site
+phase
+dr
+zone_no
+hld_pon
+zone_pon
+pole_label
+unique_pole_label
+pole_scope
+pole_type
+pole_route_type
+pole_permission_date
+pole_install_date
+pole_cwc_date
+pole_contractor
+pole_rate
+pole_paid_date
+pole_invoice_no
+pole_comment
+civil_description
+civil_rate
+civil_qty
+civil_total
+civil_invoice_no
+civil_invoice_date
+civil_comment
+stringing_description
+stringing_rate
+stringing_qty
+stringing_total
+stringing_invoice_no
+stringing_date
+stringing_comment
+signup_date
+home_install_date
+home_contractor
+home_rate
+home_paid_date
+home_invoice_no
+activation_code
+activation_date
+activation_team
+activation_rate
+activation_paid_date
+activation_invoice_no
+remittance
+remittance_date
+cwc_pole_status
+cwc_stringing_status
+cwc_qa_submit_date
+cwc_qa_approved_date
+qa_home_recon_no
+exfo_exchange
+optical_contractor
+optical_type
+optical_splitter
+optical_prepping
+optical_splicing
+qa_photos_loaded
+atp_qa_submit_date
+atp_qa_approved_date
+testing_status
+test_submitted
+olt_port_activation
+olt_port_activated
+pon_status
+optical_rate
+optical_invoice_date
+optical_invoice_no
+created_at
+updated_at
+EOF
+
+sort tmp/tracker-foundation-snapshots/required-cols.txt > tmp/req-sorted.txt
+sort tmp/tracker-foundation-snapshots/master_tracker-columns.txt > tmp/got-sorted.txt
+diff tmp/req-sorted.txt tmp/got-sorted.txt
+```
+
+Expected: empty diff (all required columns present). The 73 columns in `master_tracker` likely match exactly.
+
+If diff shows **lines starting with `<`** (required but missing), proceed to Step 3 to write a migration adding those columns.
+
+If diff shows **lines starting with `>`** (extra columns we didn't list as required), that's fine — they're project-specific extras retained for parity. Don't drop them.
+
+If diff is empty, **skip Steps 3–6** and go straight to Step 7 (commit verification artifacts only).
+
+- [ ] **Step 3: Write migration 338 (only if Step 2 reports missing columns)**
+
+Create `scripts/migrations/sql/338_master_tracker_align.sql`. Replace `<list>` with the actual missing column names from the diff:
 
 ```sql
--- Migration 338: vw_master_tracker — denormalised master tracker view
--- Spec: docs/superpowers/specs/2026-05-08-project-tracker-workspace-design.md §4.3
+-- Migration 338: Align master_tracker columns with tracker-workspace spec
+-- Spec: docs/superpowers/specs/2026-05-08-project-tracker-workspace-design.md §4.3 (amended)
 --
--- One row per drop, with pole / PON / activation / billing fields joined.
--- Read-only: workspace edits dispatch to the owning table per the spec.
--- If query latency exceeds 500ms p95 we promote this to a MATERIALIZED VIEW
--- per spec risk R3.
+-- Adds any spec-required columns missing from the existing master_tracker table.
+-- Only runs if the Task 4 audit found drift; if the table already matched, no
+-- 338 migration is created and this file is absent.
 
 BEGIN;
 
-CREATE OR REPLACE VIEW vw_master_tracker AS
-SELECT
-  d.id                     AS drop_id,
-  d.project_id,
-  d.drop_number,
-  d.pon_no,
-  d.zone_no,
-  d.pole_number,
-  d.address,
-  d.latitude,
-  d.longitude,
-
-  -- Pole columns (denormalised; only meaningful on the first drop per pole in Excel parity)
-  p.id                     AS pole_id,
-  p.pole_type,
-  p.pole_route_type,
-  p.permission_date        AS pole_permission_date,
-  p.installation_date      AS pole_installation_date,
-  p.cwc_date               AS pole_cwc_date,
-  p.contractor_id          AS pole_contractor_id,
-
-  -- PON stage rollup
-  pst.id                   AS pon_stage_id,
-  pst.overall_stage,
-  pst.cwc_complete,
-  pst.cwc_target_date,
-  pst.optical_complete,
-  pst.optical_target_date,
-  pst.activation_complete,
-  pst.activation_target_date,
-  pst.olt_port,
-  pst.blockage             AS pon_blockage,
-
-  -- Manual overrides
-  pmo.civil_contractor,
-  pmo.stringing_contractor,
-  pmo.optical_contractor,
-  pmo.optical_splitter,
-  pmo.optical_type,
-
-  -- Activation feed
-  oa.activation_date,
-  oa.activation_status,
-  oa.olt_port_activated,
-
-  -- Billing references
-  ci.invoice_number        AS pole_invoice_number,
-  ci.paid_at               AS pole_paid_date
-
-FROM drops d
-LEFT JOIN sow_poles            p   ON p.project_id = d.project_id AND p.pole_number = d.pole_number
-LEFT JOIN pon_stage_tracking   pst ON pst.project_id = d.project_id AND pst.zone_no = d.zone_no AND pst.pon_no = d.pon_no
-LEFT JOIN pon_manual_overrides pmo ON pmo.pon_stage_id = pst.id
-LEFT JOIN oes_activations      oa  ON oa.drop_number = d.drop_number
-LEFT JOIN contractor_invoices  ci  ON ci.pole_id = p.id;
-
-COMMENT ON VIEW vw_master_tracker IS
-  'Read-only denormalised projection over drops × sow_poles × pon_stage_tracking × pon_manual_overrides × oes_activations × contractor_invoices. Edits go to the owning table.';
+ALTER TABLE master_tracker
+  ADD COLUMN IF NOT EXISTS <missing_col_1> <type>,
+  ADD COLUMN IF NOT EXISTS <missing_col_2> <type>;
 
 COMMIT;
 ```
 
-> **Safeguard:** if `psql` reports an error like `column "x" does not exist on relation "y"` for a join target, **do not invent a substitute column**. Stop and inspect the real schema with `\d <table>`; the join condition was wrong, not the column name. Adjust the join and re-apply.
+For each missing column, choose the type by reference to the corresponding Excel column intent (dates → `date`, free text → `text`, currency → `numeric`, counts → `integer`, booleans → `boolean`).
 
-- [ ] **Step 4: Write the rollback**
+If you are uncertain about a column's type, **stop and ask the controller** — do not guess. Report status DONE_WITH_CONCERNS naming the unknown columns.
 
-Create `scripts/migrations/sql/rollback_338_vw_master_tracker.sql`:
+- [ ] **Step 4: Write the rollback (only if Step 3 created 338)**
 
 ```sql
 -- Rollback for Migration 338
 BEGIN;
-DROP VIEW IF EXISTS vw_master_tracker;
+ALTER TABLE master_tracker
+  DROP COLUMN IF EXISTS <missing_col_1>,
+  DROP COLUMN IF EXISTS <missing_col_2>;
 COMMIT;
 ```
 
-- [ ] **Step 5: Apply the migration**
+- [ ] **Step 5: Apply (only if Step 3 created 338)**
 
 ```bash
-cd /home/hein/Workspace/FF_Next.js-tracker-redesign
 npm run db:migrate
 ```
 
-Expected: `Migration 338 applied`.
-
-- [ ] **Step 6: Re-run verification — must PASS**
+- [ ] **Step 6: Re-run the diff (only if Step 3 created 338)**
 
 ```bash
-psql "$DATABASE_URL" -c "SELECT COUNT(*) FROM vw_master_tracker;"
-psql "$DATABASE_URL" -c "SELECT drop_id, drop_number, pole_number, pon_no, overall_stage, activation_date FROM vw_master_tracker WHERE project_id = (SELECT id FROM projects WHERE project_name = 'Lawley') LIMIT 5;"
+psql "$DBURL" -t -c "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='master_tracker' ORDER BY ordinal_position;" \
+  | sed 's/ //g' | grep -v '^$' | sort > tmp/got-sorted.txt
+diff tmp/req-sorted.txt tmp/got-sorted.txt
 ```
 
-Expected: first query returns the same number as `SELECT COUNT(*) FROM drops`; second query returns ≤ 5 sample rows for Lawley.
-
-- [ ] **Step 7: Sanity-check query latency**
-
-```bash
-psql "$DATABASE_URL" -c "EXPLAIN ANALYZE SELECT * FROM vw_master_tracker WHERE project_id = (SELECT id FROM projects WHERE project_name = 'Lawley');"
-```
-
-Note the "Execution Time" line. If it is **> 500 ms p95**, the spec's risk R3 is triggered — flag this in the commit message so plan 1.0b knows to promote to `MATERIALIZED VIEW` with refresh triggers. **Do not change the view in this plan** — the trigger work belongs to 1.0b.
-
-- [ ] **Step 8: Commit**
-
-```bash
-git add scripts/migrations/sql/338_vw_master_tracker.sql \
-        scripts/migrations/sql/rollback_338_vw_master_tracker.sql
-git commit -m "feat(tracker): mig 338 add vw_master_tracker denormalised view"
-```
-
----
-
-## Task 5 · Forward-port script — write tests first
-
-**Files:**
-- Create: `tests/unit/tracker/forward-port-pon-tracker-entries.test.ts`
-
-The forward-port script's central piece of pure logic is mapping a `pon_tracker_entries` row onto the `(pon_stage_tracking, pon_manual_overrides)` pair. Test that mapping in isolation; the DB plumbing is exercised by the live run in Task 7.
-
-- [ ] **Step 1: Write the failing test**
-
-Create `tests/unit/tracker/forward-port-pon-tracker-entries.test.ts`:
-
-```typescript
-import { describe, it, expect } from 'vitest';
-import {
-  mapEntryToCanonical,
-  type PonTrackerEntryRow,
-  type CanonicalUpdate,
-} from '@/scripts/tracker/forward-port-pon-tracker-entries';
-
-describe('mapEntryToCanonical', () => {
-  const baseEntry: PonTrackerEntryRow = {
-    id: 'entry-1',
-    project_id: 'proj-lawley',
-    zone_no: 1,
-    hld_pon: 1,
-    z_pon: 1,
-    olt_port: 'LAW.FTS.16.AGG.DM.MH.A004-OLT.01.C1P1',
-    scope_poles: 20,
-    scope_drops: 120,
-    pole_permission: '2026-01-12',
-    poles_planted: 20,
-    cwc_poles_date: '2026-01-12',
-    cwc_stringing_date: '2026-01-12',
-    ready_for_optical: '2026-01-12',
-    cwc_qa: true,
-    optical_splicing_date: '2026-01-12',
-    optical_submitted_date: '2026-01-13',
-    optical_activated_date: '2026-01-14',
-    atp_qa: true,
-    sign_ups: 98,
-    homes_po: 120,
-    homes_recon: 77,
-    activated: 70,
-    available: 50,
-    blockage: 'Ward 8 (restricted resources)',
-    updated_by: 'pm@velocityfibre.co.za',
-  };
-
-  it('routes scope/count fields onto pon_stage_tracking', () => {
-    const result: CanonicalUpdate = mapEntryToCanonical(baseEntry);
-    expect(result.stage).toMatchObject({
-      project_id: 'proj-lawley',
-      zone_no: 1,
-      pon_no: 1,                 // z_pon → pon_no per spec §4.2
-      hld_pon: 1,
-      z_pon: 1,
-      olt_port: 'LAW.FTS.16.AGG.DM.MH.A004-OLT.01.C1P1',
-      scope_string: null,        // not present in entry, must be null not undefined
-      sign_ups: 98,
-      homes_po: 120,
-      homes_recon: 77,
-      available: 50,
-    });
-  });
-
-  it('routes blockage string onto pon_manual_overrides, not pon_stage_tracking', () => {
-    const result = mapEntryToCanonical(baseEntry);
-    expect(result.overrides.blockage).toBe('Ward 8 (restricted resources)');
-    expect(result.overrides.updated_by).toBe('pm@velocityfibre.co.za');
-    expect((result.stage as Record<string, unknown>).blockage).toBeUndefined();
-  });
-
-  it('matches join key on (project_id, zone_no, z_pon→pon_no)', () => {
-    const result = mapEntryToCanonical(baseEntry);
-    expect(result.matchKey).toEqual({
-      project_id: 'proj-lawley',
-      zone_no: 1,
-      pon_no: 1,
-    });
-  });
-
-  it('returns null overrides when entry has no manual fields set', () => {
-    const lean: PonTrackerEntryRow = {
-      ...baseEntry,
-      blockage: null,
-    };
-    const result = mapEntryToCanonical(lean);
-    expect(result.overrides).toBeNull();
-  });
-
-  it('emits a change-log entry per non-null field that lands on the canonical side', () => {
-    const result = mapEntryToCanonical(baseEntry);
-    expect(result.changeLog).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ field: 'sign_ups',    new_value: '98',  source: 'migration' }),
-        expect.objectContaining({ field: 'homes_po',    new_value: '120', source: 'migration' }),
-        expect.objectContaining({ field: 'olt_port',    source: 'migration' }),
-        expect.objectContaining({ field: 'blockage',    new_value: 'Ward 8 (restricted resources)', source: 'migration' }),
-      ]),
-    );
-  });
-
-  it('skips fields where value is null (no spurious change-log rows)', () => {
-    const lean: PonTrackerEntryRow = {
-      ...baseEntry,
-      sign_ups: null,
-      blockage: null,
-    };
-    const result = mapEntryToCanonical(lean);
-    const fields = result.changeLog.map((c) => c.field);
-    expect(fields).not.toContain('sign_ups');
-    expect(fields).not.toContain('blockage');
-  });
-});
-```
-
-- [ ] **Step 2: Run the test to verify it fails**
-
-```bash
-cd /home/hein/Workspace/FF_Next.js-tracker-redesign
-npx vitest run tests/unit/tracker/forward-port-pon-tracker-entries.test.ts
-```
-
-Expected: FAIL with module-not-found error pointing at `@/scripts/tracker/forward-port-pon-tracker-entries`. (Path alias resolves the import; the test runner discovers the file does not yet exist.)
-
-- [ ] **Step 3: Commit the failing test**
-
-```bash
-git add tests/unit/tracker/forward-port-pon-tracker-entries.test.ts
-git commit -m "test(tracker): forward-port mapEntryToCanonical (RED)"
-```
-
----
-
-## Task 6 · Forward-port script — implementation
-
-**Files:**
-- Create: `scripts/tracker/forward-port-pon-tracker-entries.ts`
-- Modify: `package.json` — add `tracker:forward-port` npm script
-
-- [ ] **Step 1: Implement the script**
-
-Create `scripts/tracker/forward-port-pon-tracker-entries.ts`:
-
-```typescript
-#!/usr/bin/env tsx
-/**
- * One-shot forward-port: pon_tracker_entries → pon_stage_tracking + pon_manual_overrides
- *
- * Spec: docs/superpowers/specs/2026-05-08-project-tracker-workspace-design.md §4.2
- *
- * Idempotent — safe to re-run. Each value forward-ported writes a pon_change_log row
- * with source='migration' so any post-migration drift is auditable.
- *
- * Usage:
- *   npm run tracker:forward-port -- --dry-run
- *   npm run tracker:forward-port
- */
-
-import { Pool } from 'pg';
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Pure mapping (unit-tested). Keep DB-free so vitest can run it cheaply.
-// ──────────────────────────────────────────────────────────────────────────────
-
-export interface PonTrackerEntryRow {
-  id: string;
-  project_id: string;
-  zone_no: number | null;
-  hld_pon: number | null;
-  z_pon: number | null;
-  olt_port: string | null;
-  scope_poles: number | null;
-  scope_drops: number | null;
-  pole_permission: string | null;
-  poles_planted: number | null;
-  cwc_poles_date: string | null;
-  cwc_stringing_date: string | null;
-  ready_for_optical: string | null;
-  cwc_qa: boolean | null;
-  optical_splicing_date: string | null;
-  optical_submitted_date: string | null;
-  optical_activated_date: string | null;
-  atp_qa: boolean | null;
-  sign_ups: number | null;
-  homes_po: number | null;
-  homes_recon: number | null;
-  activated: number | null;
-  available: number | null;
-  blockage: string | null;
-  updated_by: string | null;
-}
-
-export interface MatchKey {
-  project_id: string;
-  zone_no: number;
-  pon_no: number;
-}
-
-export interface StagePatch {
-  project_id: string;
-  zone_no: number;
-  pon_no: number;            // ← entry.z_pon
-  hld_pon: number | null;
-  z_pon: number | null;
-  olt_port: string | null;
-  scope_string: number | null;
-  sign_ups: number | null;
-  homes_po: number | null;
-  homes_recon: number | null;
-  available: number | null;
-}
-
-export interface OverridesPatch {
-  blockage: string | null;
-  updated_by: string | null;
-}
-
-export interface ChangeLogEntry {
-  field: string;
-  new_value: string;
-  source: 'migration';
-  changed_by: string | null;
-}
-
-export interface CanonicalUpdate {
-  matchKey: MatchKey;
-  stage: StagePatch;
-  overrides: OverridesPatch | null;
-  changeLog: ChangeLogEntry[];
-}
-
-const STAGE_FIELDS: Array<keyof StagePatch> = [
-  'hld_pon', 'z_pon', 'olt_port', 'scope_string',
-  'sign_ups', 'homes_po', 'homes_recon', 'available',
-];
-
-const OVERRIDE_FIELDS: Array<keyof OverridesPatch> = ['blockage'];
-
-export function mapEntryToCanonical(entry: PonTrackerEntryRow): CanonicalUpdate {
-  if (entry.zone_no == null || entry.z_pon == null) {
-    throw new Error(`Entry ${entry.id} missing zone_no or z_pon — cannot match a canonical row`);
-  }
-
-  const matchKey: MatchKey = {
-    project_id: entry.project_id,
-    zone_no: entry.zone_no,
-    pon_no: entry.z_pon,
-  };
-
-  const stage: StagePatch = {
-    project_id: entry.project_id,
-    zone_no: entry.zone_no,
-    pon_no: entry.z_pon,
-    hld_pon: entry.hld_pon,
-    z_pon: entry.z_pon,
-    olt_port: entry.olt_port,
-    scope_string: null,                  // Not present in pon_tracker_entries; left null
-    sign_ups: entry.sign_ups,
-    homes_po: entry.homes_po,
-    homes_recon: entry.homes_recon,
-    available: entry.available,
-  };
-
-  const hasOverride = entry.blockage != null && entry.blockage !== '';
-  const overrides: OverridesPatch | null = hasOverride
-    ? { blockage: entry.blockage, updated_by: entry.updated_by }
-    : null;
-
-  const changeLog: ChangeLogEntry[] = [];
-  for (const field of STAGE_FIELDS) {
-    const value = stage[field];
-    if (value !== null && value !== undefined) {
-      changeLog.push({
-        field,
-        new_value: String(value),
-        source: 'migration',
-        changed_by: entry.updated_by,
-      });
-    }
-  }
-  for (const field of OVERRIDE_FIELDS) {
-    const value = overrides?.[field];
-    if (value !== null && value !== undefined) {
-      changeLog.push({
-        field,
-        new_value: String(value),
-        source: 'migration',
-        changed_by: entry.updated_by,
-      });
-    }
-  }
-
-  return { matchKey, stage, overrides, changeLog };
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// DB execution. Skipped during unit tests — only runs when invoked as a script.
-// ──────────────────────────────────────────────────────────────────────────────
-
-async function run(dryRun: boolean): Promise<void> {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error('DATABASE_URL is required');
-
-  const pool = new Pool({
-    connectionString: url,
-    ssl: url.includes('sslmode=require') ? { rejectUnauthorized: false } : false,
-  });
-
-  try {
-    const { rows } = await pool.query<PonTrackerEntryRow>(`
-      SELECT id, project_id, zone_no, hld_pon, z_pon, olt_port,
-             scope_poles, scope_drops,
-             pole_permission::text, poles_planted,
-             cwc_poles_date::text, cwc_stringing_date::text, ready_for_optical::text,
-             cwc_qa,
-             optical_splicing_date::text, optical_submitted_date::text, optical_activated_date::text,
-             atp_qa, sign_ups, homes_po, homes_recon, activated, available,
-             blockage, updated_by
-      FROM pon_tracker_entries
-      ORDER BY project_id, zone_no NULLS LAST, hld_pon NULLS LAST
-    `);
-
-    console.log(`[forward-port] ${rows.length} pon_tracker_entries rows to process${dryRun ? ' (dry-run)' : ''}`);
-
-    let portedStage = 0;
-    let portedOverrides = 0;
-    let logRows = 0;
-    let skipped = 0;
-
-    for (const entry of rows) {
-      let update: CanonicalUpdate;
-      try {
-        update = mapEntryToCanonical(entry);
-      } catch (err) {
-        console.warn(`[forward-port] skip entry ${entry.id}:`, (err as Error).message);
-        skipped += 1;
-        continue;
-      }
-
-      if (dryRun) {
-        console.log(`[forward-port] would write ${update.changeLog.length} field(s) for ${update.matchKey.project_id} z${update.matchKey.zone_no} pon${update.matchKey.pon_no}`);
-        continue;
-      }
-
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-
-        // Upsert pon_stage_tracking row keyed by (project_id, zone_no, pon_no).
-        // The unique constraint on (project_id, zone_no, pon_no) backs this ON CONFLICT.
-        const stageRes = await client.query<{ id: string }>(`
-          INSERT INTO pon_stage_tracking (project_id, zone_no, pon_no, hld_pon, z_pon, olt_port,
-                                          scope_string, sign_ups, homes_po, homes_recon, available)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-          ON CONFLICT (project_id, zone_no, pon_no) DO UPDATE SET
-            hld_pon      = COALESCE(pon_stage_tracking.hld_pon,      EXCLUDED.hld_pon),
-            z_pon        = COALESCE(pon_stage_tracking.z_pon,        EXCLUDED.z_pon),
-            olt_port     = COALESCE(pon_stage_tracking.olt_port,     EXCLUDED.olt_port),
-            scope_string = COALESCE(pon_stage_tracking.scope_string, EXCLUDED.scope_string),
-            sign_ups     = COALESCE(pon_stage_tracking.sign_ups,     EXCLUDED.sign_ups),
-            homes_po     = COALESCE(pon_stage_tracking.homes_po,     EXCLUDED.homes_po),
-            homes_recon  = COALESCE(pon_stage_tracking.homes_recon,  EXCLUDED.homes_recon),
-            available    = COALESCE(pon_stage_tracking.available,    EXCLUDED.available)
-          RETURNING id
-        `, [
-          update.stage.project_id, update.stage.zone_no, update.stage.pon_no,
-          update.stage.hld_pon, update.stage.z_pon, update.stage.olt_port,
-          update.stage.scope_string, update.stage.sign_ups,
-          update.stage.homes_po, update.stage.homes_recon, update.stage.available,
-        ]);
-
-        const ponStageId = stageRes.rows[0].id;
-        portedStage += 1;
-
-        if (update.overrides) {
-          await client.query(`
-            INSERT INTO pon_manual_overrides (pon_stage_id, blockage, updated_by)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (pon_stage_id) DO UPDATE SET
-              blockage   = COALESCE(EXCLUDED.blockage,   pon_manual_overrides.blockage),
-              updated_by = COALESCE(EXCLUDED.updated_by, pon_manual_overrides.updated_by),
-              updated_at = now()
-          `, [ponStageId, update.overrides.blockage, update.overrides.updated_by]);
-          portedOverrides += 1;
-        }
-
-        for (const c of update.changeLog) {
-          await client.query(`
-            INSERT INTO pon_change_log (pon_stage_id, field, new_value, source, changed_by)
-            VALUES ($1, $2, $3, $4, $5)
-          `, [ponStageId, c.field, c.new_value, c.source, c.changed_by]);
-          logRows += 1;
-        }
-
-        await client.query('COMMIT');
-      } catch (err) {
-        await client.query('ROLLBACK');
-        throw err;
-      } finally {
-        client.release();
-      }
-    }
-
-    console.log(`[forward-port] done. stage upserts=${portedStage}, override upserts=${portedOverrides}, change_log rows=${logRows}, skipped=${skipped}`);
-  } finally {
-    await pool.end();
-  }
-}
-
-// Only execute when run directly, not when imported by tests.
-const invokedDirectly = import.meta.url === `file://${process.argv[1]}`;
-if (invokedDirectly) {
-  const dryRun = process.argv.includes('--dry-run');
-  run(dryRun).catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
-}
-```
-
-- [ ] **Step 2: Wire the npm script**
-
-Open `package.json` and locate the `"scripts"` block. Add the following line **above** the existing `"db:migrate"` entry to keep tracker scripts grouped together:
-
-```json
-    "tracker:forward-port": "tsx scripts/tracker/forward-port-pon-tracker-entries.ts",
-```
-
-- [ ] **Step 3: Run the test — must now PASS**
-
-```bash
-cd /home/hein/Workspace/FF_Next.js-tracker-redesign
-npx vitest run tests/unit/tracker/forward-port-pon-tracker-entries.test.ts
-```
-
-Expected: all 6 tests pass.
-
-- [ ] **Step 4: Run the script in dry-run mode against the dev DB**
-
-```bash
-cd /home/hein/Workspace/FF_Next.js-tracker-redesign
-npm run tracker:forward-port -- --dry-run
-```
-
-Expected: prints "X pon_tracker_entries rows to process (dry-run)" and one "would write …" line per entry. **Do not proceed if the count is unexpectedly zero** — first verify with `psql "$DATABASE_URL" -c "SELECT COUNT(*) FROM pon_tracker_entries;"` that the source table actually has data on the dev DB.
-
-- [ ] **Step 5: Run the script for real**
-
-```bash
-cd /home/hein/Workspace/FF_Next.js-tracker-redesign
-npm run tracker:forward-port
-```
-
-Expected: `[forward-port] done. stage upserts=N, override upserts=M, change_log rows=K, skipped=0`. If `skipped > 0`, capture stderr and stop — investigate which entries are missing zone_no or z_pon before continuing.
-
-- [ ] **Step 6: Verify the forward-port landed**
-
-```bash
-psql "$DATABASE_URL" -c "SELECT COUNT(*) FROM pon_tracker_entries;"
-psql "$DATABASE_URL" -c "SELECT COUNT(*) FROM pon_stage_tracking WHERE olt_port IS NOT NULL;"
-psql "$DATABASE_URL" -c "SELECT COUNT(*) FROM pon_manual_overrides;"
-psql "$DATABASE_URL" -c "SELECT COUNT(*) FROM pon_change_log WHERE source = 'migration';"
-psql "$DATABASE_URL" -c "SELECT * FROM pon_change_log WHERE source = 'migration' ORDER BY changed_at DESC LIMIT 5;"
-```
-
-Expected: `pon_stage_tracking WHERE olt_port IS NOT NULL` count is ≥ stage upserts from step 5; `pon_change_log WHERE source = 'migration'` count is ≥ change_log rows from step 5; the 5-row sample shows realistic field/value pairs.
+Expected: empty diff.
 
 - [ ] **Step 7: Commit**
 
+If 338 was created:
+
 ```bash
-git add scripts/tracker/forward-port-pon-tracker-entries.ts \
-        package.json
-git commit -m "feat(tracker): forward-port pon_tracker_entries to canonical PON entity"
+git add scripts/migrations/sql/338_master_tracker_align.sql \
+        scripts/migrations/sql/rollback_338_master_tracker_align.sql
+git commit -m "feat(tracker): mig 338 align master_tracker columns with workspace spec"
 ```
 
-> **Note:** the legacy `pon_tracker_entries` table is **NOT dropped in this plan**. It stays in place during the parallel-cutover window so the old UI keeps working. Plan 1.0c retires it once the new workspace UI is the only writer.
+If 338 was **not** needed (existing schema matched), commit the audit artifact instead so the verification is captured in history:
 
----
+```bash
+git add tmp/tracker-foundation-snapshots/master_tracker-columns.txt
+# tmp/ is in .gitignore — force-add if needed; otherwise put the audit under docs/
+# Easiest: skip the commit and proceed. The plan file already documents the result.
+```
+
+(If `tmp/` is gitignored, no commit is needed for this task — the spec already documents that `master_tracker` matches.)
+
+## Task 5 · **REMOVED** — forward-port `pon_tracker_entries`
+
+> **Removed.** The §3.4 audit confirmed `pon_tracker_entries` does not exist on prod. The actually-deployed `pon_tracker` table holds 1 test row. Forward-port is not needed; `pon_tracker` is treated as dormant and will be retired with the legacy UI in plan 1.0c.
+
+## Task 6 · **REMOVED** — forward-port script implementation
+
+> **Removed.** See Task 5 above.
+
 
 ## Task 7 · Documentation
 
@@ -1072,35 +682,41 @@ project trackers (Lawley, Mohadin, Mamelodi, …).
 - `source` ∈ {`ui`, `1map`, `oes`, `nokia`, `sp_sync`, `import`, `migration`}.
 - Constraint enforces at least one of `pon_stage_id` / `drop_id` is set.
 
-### Master tracker view — `vw_master_tracker`
-- Mig 338. Read-only. Joins `drops × sow_poles × pon_stage_tracking ×
-  pon_manual_overrides × oes_activations × contractor_invoices`.
-- Edits dispatched per-field to the owning table by the workspace API
-  (plan 1.0b).
-- If query latency > 500ms p95, promote to a `MATERIALIZED VIEW` per spec
-  risk R3 — that work belongs to plan 1.0b.
+### Master tracker — existing `master_tracker` table
+- Already exists with the 73-column Excel shape (no view created).
+- Lawley snapshot importer (plan 1.0d) inserts rows; workspace UI reads/writes
+  rows directly (plan 1.0c).
+- Mig 338 only emitted if Task 4's audit found columns missing — most likely
+  the existing schema matches the spec exactly.
+- `master_tracker.project_id` is `text` (storing uuid strings) — application
+  code casts at the boundary.
+
+## Free wins (already on prod, reuse don't rebuild)
+- `v_pole_completion` + `v_pon_pole_progress` (1,713 rows) — per-pole and
+  per-PON completion aggregations. Use for the home dashboard (plan 1.0c).
+- `pon_boundaries` (1,617 rows) — PON polygon geometries. Use for the C-lens
+  map (plan 1.2).
 
 ## Legacy tables (parallel-cutover window)
 | Table | Status | Retirement |
 |-------|--------|-----------|
-| `pon_tracker_entries` | Read-only at app layer once 1.0c ships | Drop in 1.0c |
-| `sp_pon_tracker` | SharePoint cron continues writing; UI never reads | Archive in 1.2 |
+| `pon_tracker` | Dormant on prod (1 test row). Not referenced by new code. | Drop in 1.0c with the legacy UI. |
+| `sp_pon_tracker` | SharePoint cron continues writing; new workspace never reads | Archive in 1.2 |
 | `sp_project_summary` | Replaced by server-computed rollup of `pon_stage_tracking` | Drop in 1.2 |
 | `sp_tracker_config` | Retire with the SP cron | Drop in 1.2 |
-
-## One-shot scripts
-- `npm run tracker:forward-port` — copies `pon_tracker_entries` rows into
-  `pon_stage_tracking` + `pon_manual_overrides`, writing `pon_change_log`
-  rows with `source = 'migration'`. Idempotent.
+| `sharepoint_tracker_pole` | 4,965 rows of SP-synced pole data | Snapshot to `_archive_*` then drop in 1.2 |
+| `sharepoint_tracker_home` | 0 rows, dormant | Drop in 1.2 |
 
 ## Known invariants
-- `pon_stage_tracking.pon_no` = `pon_tracker_entries.z_pon` (zone-level PON).
+- `pon_stage_tracking.pon_no` is the zone-level PON number (= Excel `Z PON`).
 - `pon_stage_tracking.hld_pon` is project-level, not unique by itself.
 - Excel "PON STATUS" column maps to `pon_stage_tracking.overall_stage`
   (`activation` ≈ ACTIVE, anything else ≈ NOT ACTIVE).
 - Master Tracker pole columns are denormalised in Excel (blank on subsequent
-  drops sharing a pole). The view shows pole columns on every row; the
-  handover xlsx export (plan 1.0d) replicates Excel's blanking for parity.
+  drops sharing a pole). `master_tracker` rows mirror that exactly so the
+  handover xlsx export (plan 1.0d) is a faithful round-trip.
+- `master_tracker.project_id` and `pon_tracker.project_id` are `text`; all
+  other tables use `uuid`. Cast at boundaries.
 ```
 
 - [ ] **Step 2: Create the quick reference**
@@ -1123,7 +739,9 @@ Per-project unified tracker. Replaces Excel + the two legacy `tracker/` UI sets.
 - Canonical PON: `pon_stage_tracking` (mig 179/232/335)
 - Manual fields: `pon_manual_overrides` (mig 336, 1:1 with pon_stage_tracking)
 - Audit: `pon_change_log` (mig 337)
-- Master row view: `vw_master_tracker` (mig 338, read-only)
+- Master row storage: existing `master_tracker` table (no view, no new mig unless Task 4 audit found drift)
+- Free aggregations: `v_pole_completion`, `v_pon_pole_progress`
+- Free geometry: `pon_boundaries` (1,617 polygons, for the v1.2 map)
 
 ## Identifier gotcha
 `pon_no` is **zone-level** (= Excel `Z PON`). `hld_pon` is **project-level**.
@@ -1164,7 +782,7 @@ Expected: passes. If lint warnings increase, **revisit the SQL files / TS file**
 
 ```bash
 psql "$DATABASE_URL" -c "
-SELECT 'pon_stage_tracking columns' AS check, COUNT(*) AS value
+SELECT 'pon_stage_tracking new cols' AS check, COUNT(*) AS value
 FROM information_schema.columns
 WHERE table_name = 'pon_stage_tracking' AND column_name IN
   ('olt_port','hld_pon','z_pon','scope_string','sign_ups','homes_po','homes_recon','available','pct_original','pct_recon')
@@ -1173,15 +791,18 @@ SELECT 'pon_manual_overrides exists', COUNT(*) FROM information_schema.tables WH
 UNION ALL
 SELECT 'pon_change_log exists',       COUNT(*) FROM information_schema.tables WHERE table_name='pon_change_log'
 UNION ALL
-SELECT 'vw_master_tracker exists',    COUNT(*) FROM information_schema.views  WHERE table_name='vw_master_tracker';
+SELECT 'master_tracker exists',       COUNT(*) FROM information_schema.tables WHERE table_name='master_tracker'
+UNION ALL
+SELECT 'master_tracker col count',    COUNT(*) FROM information_schema.columns WHERE table_name='master_tracker';
 "
 ```
 
 Expected:
-- `pon_stage_tracking columns` = `10`
+- `pon_stage_tracking new cols` = `10`
 - `pon_manual_overrides exists` = `1`
 - `pon_change_log exists` = `1`
-- `vw_master_tracker exists` = `1`
+- `master_tracker exists` = `1`
+- `master_tracker col count` ≥ `73` (will be `73` if no align migration was needed; higher if Task 4 added columns)
 
 - [ ] **Step 3: Push the branch**
 
@@ -1195,9 +816,12 @@ git push -u origin spec/tracker-redesign
 gh pr create --title "feat(tracker): plan 1.0a schema foundation" --body "$(cat <<'EOF'
 ## Summary
 - Extends `pon_stage_tracking` to be the canonical PON entity (mig 335).
-- Adds `pon_manual_overrides`, `pon_change_log`, `vw_master_tracker` (migs 336–338).
-- Forward-ports `pon_tracker_entries` data with full audit trail.
+- Adds `pon_manual_overrides`, `pon_change_log` (migs 336–337).
+- Audits the existing `master_tracker` table; emits a small alignment migration only if columns were missing.
 - Documents the new module in `.claude/modules/tracker-workspace.md` and an auto-loaded quick reference.
+
+## Amended after live DB audit
+- The original plan included a `vw_master_tracker` view and a forward-port for `pon_tracker_entries`. The DB audit (spec §3.4) showed `master_tracker` already exists with the right shape and `pon_tracker_entries` was never deployed. Both are removed from this plan.
 
 Spec: `docs/superpowers/specs/2026-05-08-project-tracker-workspace-design.md`
 Plan: `docs/superpowers/plans/2026-05-08-tracker-workspace-1.0a-schema-foundation.md`
@@ -1205,10 +829,8 @@ Plan: `docs/superpowers/plans/2026-05-08-tracker-workspace-1.0a-schema-foundatio
 This is plan 1 of 4 for v1.0. No application code is touched.
 
 ## Test plan
-- [x] Each migration's verification query fails before, passes after.
-- [x] `npx vitest run tests/unit/tracker/forward-port-pon-tracker-entries.test.ts` passes.
-- [x] `npm run tracker:forward-port -- --dry-run` reports a non-zero candidate count.
-- [x] `npm run tracker:forward-port` reports `skipped=0` and writes `pon_change_log` rows with `source='migration'`.
+- [x] Each migration's verification query fails before, passes after (Tasks 1–3).
+- [x] `master_tracker` audit (Task 4) reports diff is empty, **or** a 338 alignment migration was emitted and re-run shows empty diff.
 - [x] Final verification SQL block in plan Task 8 returns the expected values.
 - [x] `npm run ci:quick` passes with no new lint regressions.
 
@@ -1230,7 +852,7 @@ Per CLAUDE.md "standing review-and-merge rule":
 ## Done
 
 When this plan completes:
-1. The DB has the canonical PON entity, audit log, manual-override table, and master tracker view.
-2. Legacy `pon_tracker_entries` data has been forward-ported and the legacy table still exists for reads.
+1. The DB has the canonical PON entity (`pon_stage_tracking` extended), the manual-override table, and the audit log.
+2. The existing `master_tracker` table is confirmed column-aligned with the spec; it stays empty until plan 1.0d's Lawley snapshot importer populates it.
 3. Plan 1.0b (API consolidation + RBAC) can begin against this foundation.
 4. No application code has been changed — the cutover risk is contained to "DB has new shape, app does not see it yet".
