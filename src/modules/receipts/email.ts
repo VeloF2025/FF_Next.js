@@ -65,14 +65,14 @@ async function loadReceiptContext(receipt: ReceiptRow): Promise<ReceiptContext> 
   };
 }
 
-function rands(cents: string | number | null | undefined, currency = 'ZAR'): string {
+export function rands(cents: string | number | null | undefined, currency = 'ZAR'): string {
   if (cents === null || cents === undefined) return '';
   const value = typeof cents === 'string' ? Number(cents) : cents;
   if (!Number.isFinite(value)) return '';
   return `${currency} ${(value / 100).toFixed(2)}`;
 }
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -81,7 +81,7 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-function fileExtensionFromMime(mime: string | null | undefined): string {
+export function fileExtensionFromMime(mime: string | null | undefined): string {
   if (!mime) return 'jpg';
   if (mime.includes('png')) return 'png';
   if (mime.includes('webp')) return 'webp';
@@ -147,7 +147,7 @@ const ALLOWED_ATTACHMENT_MIMES = new Set([
   'application/pdf',
 ]);
 
-function safeAttachmentMime(mime: string | null | undefined): string {
+export function safeAttachmentMime(mime: string | null | undefined): string {
   if (!mime) return 'application/octet-stream';
   const trimmed = mime.split(';')[0]?.trim().toLowerCase() ?? '';
   return ALLOWED_ATTACHMENT_MIMES.has(trimmed) ? trimmed : 'application/octet-stream';
@@ -156,7 +156,7 @@ function safeAttachmentMime(mime: string | null | undefined): string {
 // Strip CR/LF/NUL so user-submitted text (vendor, staff name) cannot inject
 // extra mail headers via the Subject line. Nodemailer sanitises this too,
 // but defence in depth: do it ourselves so the contract is explicit.
-function sanitizeHeaderValue(value: string): string {
+export function sanitizeHeaderValue(value: string): string {
   return value.replace(/[\r\n\0]+/g, ' ').trim();
 }
 
