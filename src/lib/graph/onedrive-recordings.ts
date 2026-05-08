@@ -55,10 +55,11 @@ interface MeetingStatusRow { processing_status: string }
  * Returns empty array if folder doesn't exist or access is denied.
  */
 export async function listUserRecordings(userId: string): Promise<DriveItem[]> {
+  // $orderby is not supported on /drive/root:/folder:/children — sort client-side instead
   const url =
     `${GRAPH_BASE}/users/${userId}/drive/root:/Recordings:/children` +
     `?$select=id,name,size,createdDateTime,lastModifiedDateTime,createdBy` +
-    `&$top=200&$orderby=createdDateTime desc`;
+    `&$top=200`;
 
   const response = await graphFetch(url);
 
@@ -75,10 +76,10 @@ export async function listUserRecordings(userId: string): Promise<DriveItem[]> {
   const data = await response.json();
   const items = (data.value || []) as DriveItem[];
 
-  // Only MP4 files (Teams recordings)
-  return items.filter(
-    (item) => item.name.toLowerCase().endsWith('.mp4') && item.size > 0
-  );
+  // Only MP4 files with content — size=0 means Teams hasn't finished processing yet
+  return items
+    .filter((item) => item.name.toLowerCase().endsWith('.mp4') && item.size > 0)
+    .sort((a, b) => b.createdDateTime.localeCompare(a.createdDateTime));
 }
 
 /**
