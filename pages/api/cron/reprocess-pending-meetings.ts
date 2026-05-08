@@ -2,11 +2,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
 import { processMeetingFromCallRecord } from '@/lib/graph/meeting-processor';
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 const LOGGER = 'ReprocessPendingCron';
+const BATCH_LIMIT = 20;
 
 /**
  * POST /api/cron/reprocess-pending-meetings
@@ -53,6 +54,7 @@ export default async function handler(
     WHERE processing_status = 'pending'
       AND teams_call_record_id IS NOT NULL
     ORDER BY meeting_date DESC
+    LIMIT ${BATCH_LIMIT}
   ` as { id: number; teams_call_record_id: string }[];
 
   log.info('Reprocess pending cron triggered', { count: pending.length }, LOGGER);
