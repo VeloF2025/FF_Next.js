@@ -29,6 +29,7 @@ import {
 } from './types';
 import { runMonthlyTotals } from './monthlyTotals';
 import { runGeoMismatch } from './geoMismatch';
+import { runGeofencePatterns } from './geofencePatterns';
 import { runOtTrend } from './otTrend';
 import { runDeptRollup } from './deptRollup';
 import { runWageCost } from './wageCost';
@@ -211,12 +212,13 @@ export async function parseAndScopeInput(
 }
 
 const DISPATCH: Record<ReportSlug, (input: ReportInput) => Promise<ReportRunResult>> = {
-  'monthly-totals': runMonthlyTotals,
-  'geo-mismatch':   runGeoMismatch,
-  'ot-trend':       runOtTrend,
-  'dept-rollup':    runDeptRollup,
-  'wage-cost':      runWageCost,
-  'bcea-premium':   runBceaPremium,
+  'monthly-totals':    runMonthlyTotals,
+  'geo-mismatch':      runGeoMismatch,
+  'geofence-patterns': runGeofencePatterns,
+  'ot-trend':          runOtTrend,
+  'dept-rollup':       runDeptRollup,
+  'wage-cost':         runWageCost,
+  'bcea-premium':      runBceaPremium,
 };
 
 /**

@@ -13,6 +13,7 @@ import type { ResolvedScope } from '../searchQueries';
 export type ReportSlug =
   | 'monthly-totals'
   | 'geo-mismatch'
+  | 'geofence-patterns'
   | 'ot-trend'
   | 'dept-rollup'
   | 'wage-cost'
@@ -21,6 +22,7 @@ export type ReportSlug =
 export const ALL_REPORT_SLUGS: ReadonlyArray<ReportSlug> = [
   'monthly-totals',
   'geo-mismatch',
+  'geofence-patterns',
   'ot-trend',
   'dept-rollup',
   'wage-cost',
@@ -69,6 +71,15 @@ export const REPORT_CATALOGUE: ReadonlyArray<ReportDef> = [
       { kind: 'date_range', defaultPreset: 'last_30d' },
       { kind: 'departments_text' },
       { kind: 'sites_text' },
+    ],
+  },
+  {
+    slug: 'geofence-patterns',
+    title: 'Geofence archetype patterns',
+    blurb: 'Per-staff clock-in patterns: project / mobile / office archetype + data gaps.',
+    inputs: [
+      { kind: 'date_range', defaultPreset: 'last_30d' },
+      { kind: 'departments_text' },
     ],
   },
   {

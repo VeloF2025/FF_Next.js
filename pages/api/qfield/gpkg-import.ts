@@ -13,7 +13,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { neon } from '@neondatabase/serverless';
+import { sql as dbPoolSql } from '@/lib/db-pool';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
@@ -35,7 +35,6 @@ export const config = {
 };
 
 const execAsync = promisify(exec);
-const getSql = () => neon(process.env.DATABASE_URL!);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -50,9 +49,8 @@ interface LayerResult {
   errors: string[];
 }
 
-/** Accept any neon sql tagged-template function */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type SqlFn = (strings: TemplateStringsArray, ...values: any[]) => Promise<any[]>;
+/** Tagged-template + .query method, both supplied by @/lib/db-pool. */
+type SqlFn = typeof dbPoolSql;
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -84,7 +82,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, 'mode must be "merge" or "replace"');
   }
 
-  const sql = getSql();
+  const sql = dbPoolSql;
   let jobId: string | null = null;
 
   try {
@@ -94,7 +92,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       VALUES (${projectId}, ${qfieldProjectId}, 'running', NOW())
       RETURNING id
     `;
-    jobId = jobRows[0]?.id ?? null;
+    jobId = (jobRows[0]?.id as string | undefined) ?? null;
     if (!jobId) {
       return apiResponse.internalError(res, new Error('Failed to create import job'), 'Failed to create import job record');
     }
