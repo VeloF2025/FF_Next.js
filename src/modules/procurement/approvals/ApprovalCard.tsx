@@ -5,7 +5,7 @@
 import { useRouter } from 'next/router';
 import {
   FileText, ShoppingCart, Package, ChevronRight,
-  Check, X, Clock, CheckCircle, XCircle, AlertTriangle,
+  Check, X, Clock, CheckCircle, XCircle, AlertTriangle, Pause, Play,
 } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import type { WorkflowType } from '@/types/procurement/approval.types';
@@ -25,6 +25,9 @@ export interface ApprovalItem {
   respondedAt: string | null;
   responseNotes: string | null;
   isOverdue: boolean;
+  parkedAt: string | null;
+  parkedByName: string | null;
+  parkReason: string | null;
   workflowName: string;
   levelName: string;
   approverRole: string | null;
@@ -48,6 +51,7 @@ const statusBadge: Record<string, { label: string; color: string; Icon: typeof C
   escalated: { label: 'Escalated', color: 'bg-orange-500/20 text-orange-400', Icon: AlertTriangle },
   skipped: { label: 'Skipped', color: 'bg-gray-500/20 text-gray-400', Icon: ChevronRight },
   cancelled: { label: 'Cancelled', color: 'bg-gray-500/20 text-gray-400', Icon: X },
+  on_hold: { label: 'Parked', color: 'bg-purple-500/20 text-purple-400', Icon: Pause },
 };
 
 function fmtZAR(n: number) {
@@ -71,15 +75,18 @@ interface Props {
   item: ApprovalItem;
   onApprove?: (id: string) => void;
   onReject?: (id: string) => void;
+  onPark?: (id: string) => void;
+  onResume?: (id: string) => void;
   actioningId: string | null;
 }
 
-export function ApprovalCard({ item, onApprove, onReject, actioningId }: Props) {
+export function ApprovalCard({ item, onApprove, onReject, onPark, onResume, actioningId }: Props) {
   const router = useRouter();
   const tc = typeConfig[item.documentType] || { label: item.documentType, color: 'bg-gray-500/20 text-gray-400', icon: FileText };
   const sb = (statusBadge[item.status] || statusBadge.pending)!;
   const TypeIcon = tc.icon;
   const isPending = item.status === 'pending';
+  const isParked = item.status === 'on_hold';
 
   return (
     <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:border-[var(--ff-border-light)] transition-colors">
@@ -120,15 +127,24 @@ export function ApprovalCard({ item, onApprove, onReject, actioningId }: Props) 
                 Assigned to <span className="text-amber-400">{item.assignedToName}</span>
               </div>
             )}
-            {!isPending && item.respondedByName && (
+            {!isPending && !isParked && item.respondedByName && (
               <div className="text-sm text-[var(--ff-text-tertiary)] mt-0.5">
                 {item.status === 'approved' ? 'Approved' : item.status === 'rejected' ? 'Rejected' : 'Actioned'} by{' '}
                 <span className="text-[var(--ff-text-secondary)]">{item.respondedByName}</span>
                 {item.respondedAt && <> on {fmtDate(item.respondedAt)}</>}
               </div>
             )}
+            {isParked && item.parkedByName && (
+              <div className="text-sm text-[var(--ff-text-tertiary)] mt-0.5">
+                Parked by <span className="text-[var(--ff-text-secondary)]">{item.parkedByName}</span>
+                {item.parkedAt && <> on {fmtDate(item.parkedAt)}</>}
+              </div>
+            )}
             {item.responseNotes && (
               <div className="text-sm text-[var(--ff-text-tertiary)] mt-1 italic">&ldquo;{item.responseNotes}&rdquo;</div>
+            )}
+            {isParked && item.parkReason && (
+              <div className="text-sm text-[var(--ff-text-tertiary)] mt-1 italic">&ldquo;{item.parkReason}&rdquo;</div>
             )}
           </div>
         </div>
@@ -160,6 +176,27 @@ export function ApprovalCard({ item, onApprove, onReject, actioningId }: Props) 
               >
                 <X className="h-4 w-4" />
                 Reject
+              </button>
+            )}
+            {isPending && onPark && (
+              <button
+                onClick={() => onPark(item.id)}
+                disabled={actioningId === item.id}
+                title="Put on hold; can be resumed later"
+                className="inline-flex items-center gap-1 px-3 py-1.5 border border-purple-500/40 text-purple-400 rounded-lg hover:bg-purple-500/10 transition-colors disabled:opacity-50 text-sm"
+              >
+                <Pause className="h-4 w-4" />
+                Park
+              </button>
+            )}
+            {isParked && onResume && (
+              <button
+                onClick={() => onResume(item.id)}
+                disabled={actioningId === item.id}
+                className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 text-sm"
+              >
+                {actioningId === item.id ? <InlineSpinner size="sm" /> : <Play className="h-4 w-4" />}
+                Resume
               </button>
             )}
             <button

@@ -33,6 +33,7 @@ export default withAuth(withErrorHandler(async (
           ar.status, ar.requested_by, ar.requested_by_name, ar.requested_at, ar.request_notes,
           ar.assigned_to, ar.assigned_to_name, ar.responded_by, ar.responded_by_name,
           ar.responded_at, ar.response_notes, ar.due_date, ar.is_overdue,
+          ar.parked_at, ar.parked_by, ar.parked_by_name, ar.park_reason,
           aw.name as workflow_name, al.name as level_name, al.level_number,
           al.approver_type, al.approver_user_id, al.approver_role,
           CASE
@@ -54,6 +55,7 @@ export default withAuth(withErrorHandler(async (
           ar.status, ar.requested_by, ar.requested_by_name, ar.requested_at, ar.request_notes,
           ar.assigned_to, ar.assigned_to_name, ar.responded_by, ar.responded_by_name,
           ar.responded_at, ar.response_notes, ar.due_date, ar.is_overdue,
+          ar.parked_at, ar.parked_by, ar.parked_by_name, ar.park_reason,
           aw.name as workflow_name, al.name as level_name, al.level_number,
           al.approver_type, al.approver_user_id, al.approver_role,
           CASE
@@ -76,6 +78,7 @@ export default withAuth(withErrorHandler(async (
           ar.status, ar.requested_by, ar.requested_by_name, ar.requested_at, ar.request_notes,
           ar.assigned_to, ar.assigned_to_name, ar.responded_by, ar.responded_by_name,
           ar.responded_at, ar.response_notes, ar.due_date, ar.is_overdue,
+          ar.parked_at, ar.parked_by, ar.parked_by_name, ar.park_reason,
           aw.name as workflow_name, al.name as level_name, al.level_number,
           al.approver_type, al.approver_user_id, al.approver_role,
           CASE
@@ -91,6 +94,29 @@ export default withAuth(withErrorHandler(async (
         ORDER BY ar.responded_at DESC
         LIMIT 200
       `;
+    } else if (statusFilter === 'on_hold') {
+      requests = await sql`
+        SELECT
+          ar.id, ar.document_type, ar.document_id, ar.document_number, ar.document_amount,
+          ar.status, ar.requested_by, ar.requested_by_name, ar.requested_at, ar.request_notes,
+          ar.assigned_to, ar.assigned_to_name, ar.responded_by, ar.responded_by_name,
+          ar.responded_at, ar.response_notes, ar.due_date, ar.is_overdue,
+          ar.parked_at, ar.parked_by, ar.parked_by_name, ar.park_reason,
+          aw.name as workflow_name, al.name as level_name, al.level_number,
+          al.approver_type, al.approver_user_id, al.approver_role,
+          CASE
+            WHEN al.approver_type = 'user' THEN COALESCE(approver_u.first_name || ' ' || approver_u.last_name, approver_u.email)
+            WHEN al.approver_type = 'role' AND al.approver_role IS NOT NULL THEN INITCAP(REPLACE(al.approver_role, '_', ' '))
+            ELSE NULL
+          END as approver_name
+        FROM approval_requests ar
+        JOIN approval_workflows aw ON ar.workflow_id = aw.id
+        JOIN approval_levels al ON ar.level_id = al.id
+        LEFT JOIN users approver_u ON al.approver_type = 'user' AND approver_u.id::text = al.approver_user_id::text
+        WHERE ar.status = 'on_hold'
+        ORDER BY ar.parked_at DESC NULLS LAST
+        LIMIT 200
+      `;
     } else {
       requests = await sql`
         SELECT
@@ -98,6 +124,7 @@ export default withAuth(withErrorHandler(async (
           ar.status, ar.requested_by, ar.requested_by_name, ar.requested_at, ar.request_notes,
           ar.assigned_to, ar.assigned_to_name, ar.responded_by, ar.responded_by_name,
           ar.responded_at, ar.response_notes, ar.due_date, ar.is_overdue,
+          ar.parked_at, ar.parked_by, ar.parked_by_name, ar.park_reason,
           aw.name as workflow_name, al.name as level_name, al.level_number,
           al.approver_type, al.approver_user_id, al.approver_role,
           CASE
@@ -146,6 +173,10 @@ export default withAuth(withErrorHandler(async (
       responseNotes: r.response_notes || null,
       dueDate: r.due_date || null,
       isOverdue: r.is_overdue || false,
+      parkedAt: r.parked_at || null,
+      parkedBy: r.parked_by || null,
+      parkedByName: r.parked_by_name || null,
+      parkReason: r.park_reason || null,
       workflowName: r.workflow_name,
       levelName: r.level_name,
       levelNumber: r.level_number,

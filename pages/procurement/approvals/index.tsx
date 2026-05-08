@@ -4,20 +4,21 @@ import { AppLayout } from '@/components/layout';
 import Link from 'next/link';
 import {
   ClipboardCheck, Search, AlertCircle, AlertTriangle,
-  Loader2, X, Settings, Clock, CheckCircle, XCircle,
+  Loader2, X, Settings, Clock, CheckCircle, XCircle, Pause,
 } from 'lucide-react';
 import { ApprovalCard } from '@/modules/procurement/approvals/ApprovalCard';
 import type { ApprovalItem } from '@/modules/procurement/approvals/ApprovalCard';
 import type { WorkflowType } from '@/types/procurement/approval.types';
 import { log } from '@/lib/logger';
 
-type StatusTab = 'all' | 'pending' | 'approved' | 'rejected';
+type StatusTab = 'all' | 'pending' | 'on_hold' | 'approved' | 'rejected';
 
-const statusTabs: { key: StatusTab; label: string; Icon: typeof Clock }[] = [
-  { key: 'all', label: 'All', Icon: ClipboardCheck },
-  { key: 'pending', label: 'Pending', Icon: Clock },
-  { key: 'approved', label: 'Approved', Icon: CheckCircle },
-  { key: 'rejected', label: 'Rejected', Icon: XCircle },
+const statusTabs: { key: StatusTab; label: string; Icon: typeof Clock; countKey: string }[] = [
+  { key: 'all', label: 'All', Icon: ClipboardCheck, countKey: 'total' },
+  { key: 'pending', label: 'Pending', Icon: Clock, countKey: 'pending' },
+  { key: 'on_hold', label: 'Parked', Icon: Pause, countKey: 'on_hold' },
+  { key: 'approved', label: 'Approved', Icon: CheckCircle, countKey: 'approved' },
+  { key: 'rejected', label: 'Rejected', Icon: XCircle, countKey: 'rejected' },
 ];
 
 export default function ApprovalsPage() {
@@ -31,6 +32,8 @@ export default function ApprovalsPage() {
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [showRejectModal, setShowRejectModal] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [showParkModal, setShowParkModal] = useState<string | null>(null);
+  const [parkReason, setParkReason] = useState('');
 
   const fetchApprovals = useCallback(async (status: StatusTab) => {
     try {
@@ -66,6 +69,52 @@ export default function ApprovalsPage() {
     } catch (err) {
       log.error('Failed to approve', { error: err });
       setError('Failed to approve');
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handlePark = async (taskId: string) => {
+    setActioningId(taskId);
+    try {
+      const res = await fetch(`/api/procurement/approvals/${taskId}/park`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: parkReason.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setItems((prev) => prev.filter((t) => t.id !== taskId));
+        setShowParkModal(null);
+        setParkReason('');
+        // Refresh counts so the Parked tab badge updates immediately.
+        fetchApprovals(activeTab);
+      } else {
+        setError(data.error?.message || 'Failed to park');
+      }
+    } catch (err) {
+      log.error('Failed to park', { error: err });
+      setError('Failed to park');
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handleResume = async (taskId: string) => {
+    setActioningId(taskId);
+    try {
+      const res = await fetch(`/api/procurement/approvals/${taskId}/resume`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setItems((prev) => prev.filter((t) => t.id !== taskId));
+        fetchApprovals(activeTab);
+      } else {
+        setError(data.error?.message || 'Failed to resume');
+      }
+    } catch (err) {
+      log.error('Failed to resume', { error: err });
+      setError('Failed to resume');
     } finally {
       setActioningId(null);
     }
@@ -141,7 +190,7 @@ export default function ApprovalsPage() {
           {/* Status Tabs */}
           <div className="mb-6 flex items-center gap-1 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-1 w-fit">
             {statusTabs.map((tab) => {
-              const count = tab.key === 'all' ? (counts.total || 0) : (counts[tab.key] || 0);
+              const count = counts[tab.countKey] || 0;
               const isActive = activeTab === tab.key;
               return (
                 <button
@@ -223,12 +272,54 @@ export default function ApprovalsPage() {
                   item={item}
                   onApprove={handleApprove}
                   onReject={(id) => setShowRejectModal(id)}
+                  onPark={(id) => setShowParkModal(id)}
+                  onResume={handleResume}
                   actioningId={actioningId}
                 />
               ))}
             </div>
           )}
         </div>
+
+        {/* Park Modal */}
+        {showParkModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-2">Park Approval Request</h3>
+              <p className="text-sm text-[var(--ff-text-tertiary)] mb-4">
+                Puts this request on hold without rejecting it. You can resume it from the Parked tab at any time.
+              </p>
+              <div className="mb-4">
+                <label className="block text-sm text-[var(--ff-text-secondary)] mb-2">
+                  Reason <span className="text-[var(--ff-text-tertiary)]">(optional)</span>
+                </label>
+                <textarea
+                  value={parkReason}
+                  onChange={(e) => setParkReason(e.target.value)}
+                  rows={3}
+                  placeholder="e.g. Waiting for budget confirmation"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => { setShowParkModal(null); setParkReason(''); }}
+                  className="px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handlePark(showParkModal)}
+                  disabled={actioningId === showParkModal}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                >
+                  {actioningId === showParkModal ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pause className="h-4 w-4" />}
+                  Park
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Reject Modal */}
         {showRejectModal && (
