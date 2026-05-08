@@ -195,6 +195,13 @@ function cleanGizzuSerial(serial: string | null): string | null {
   return s;
 }
 
+// Full Gizzu serial includes the per-row suffix (GU18W12V25-XXX-XXXXX ≈ 20 chars).
+// Readings shorter than this are just the shared prefix — not hallucinated, just partial.
+const GIZZU_FULL_SERIAL_MIN_LEN = 15;
+
+// PONs in this network are 100-200. Any VLM value outside that range (e.g. an address
+// like 14643 read from the wrong column) is silently discarded; the HLD fallback below
+// fills it in from the drops table instead.
 function validatePon(pon: string | null): string | null {
   if (!pon) return null;
   const num = parseInt(pon.replace(/[^0-9]/g, ''), 10);
@@ -207,7 +214,7 @@ async function enrichWithHldPon(entries: EodVlmEntry[]): Promise<EodVlmEntry[]> 
   const needsPon = entries.filter((e) => !e.pon_number && e.dr_number);
   if (needsPon.length === 0) return entries;
 
-  const drNumbers = needsPon.map((e) => e.dr_number!);
+  const drNumbers = Array.from(new Set(needsPon.map((e) => e.dr_number!)));
 
   try {
     const sql = neon();
@@ -219,7 +226,10 @@ async function enrichWithHldPon(entries: EodVlmEntry[]): Promise<EodVlmEntry[]> 
     `;
 
     const ponMap = new Map<string, string>();
-    for (const row of rows) ponMap.set(row.drop_number, row.pon_no.toString());
+    for (const row of rows) {
+      const validated = validatePon(row.pon_no.toString());
+      if (validated) ponMap.set(row.drop_number, validated);
+    }
 
     log.info('[EOD-HLD] PON lookup', { queried: drNumbers.length, found: ponMap.size });
 
@@ -230,7 +240,7 @@ async function enrichWithHldPon(entries: EodVlmEntry[]): Promise<EodVlmEntry[]> 
       return e;
     });
   } catch (err) {
-    log.warn('[EOD-HLD] PON lookup failed', { error: err });
+    log.warn('[EOD-HLD] PON lookup failed', { error: err instanceof Error ? err.message : String(err) });
     return entries;
   }
 }
@@ -448,7 +458,7 @@ export async function extractEodSheet(
         const singleGz = [...gzSet][0]!;
         // Only clear if it's a full-length serial (has unique suffix) — short prefix reads
         // like "GU18W12V" are legitimate partial reads when technicians abbreviate
-        const isFullSerial = singleGz.length >= 15 || HALLUCINATION_BLOCKLIST.has(singleGz);
+        const isFullSerial = singleGz.length >= GIZZU_FULL_SERIAL_MIN_LEN || HALLUCINATION_BLOCKLIST.has(singleGz);
         if (isFullSerial) {
           log.warn('[EOD] All Gizzu identical full serial — hallucination');
           parsed.entries = parsed.entries.map((e) => ({ ...e, gizzu_serial: null }));
