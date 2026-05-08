@@ -192,10 +192,10 @@ function cleanGizzuSerial(serial: string | null): string | null {
   const s = serial.toUpperCase().replace(/[\s]/g, '');
   if (HALLUCINATION_BLOCKLIST.has(s)) return null;
   if (s.startsWith('GU')) return s;
-  // Accept suffix-only values (e.g. "-0923246" or "0923246") — technicians often write
-  // the full serial only on row 1 and abbreviate subsequent rows with just the suffix.
-  // reconstructGizzuSerials will combine them with the row-1 prefix.
-  if (/^-?[0-9A-F-]{4,}$/i.test(s)) return s;
+  // Accept numeric suffix-only values (e.g. "-0923246" or "0923246") — technicians often
+  // write the full serial only on row 1 and abbreviate subsequent rows with the suffix.
+  // reconstructGizzuSerials will prepend the prefix; if no full serial is found it nulls them.
+  if (/^-?\d{4,}$/.test(s)) return s;
   return null;
 }
 
@@ -213,7 +213,14 @@ function reconstructGizzuSerials(entries: EodVlmEntry[]): EodVlmEntry[] {
     .map((e) => e.gizzu_serial)
     .find((s) => s && s.startsWith('GU') && s.length >= GIZZU_FULL_SERIAL_MIN_LEN);
 
-  if (!fullSerial) return entries;
+  if (!fullSerial) {
+    // No full serial → cannot reconstruct suffix-only values → null them to avoid corrupt serials
+    const nulled = entries.filter((e) => e.gizzu_serial && !e.gizzu_serial.startsWith('GU')).length;
+    if (nulled > 0) log.info('[EOD] Gizzu: no prefix found, nulling suffix-only values', { nulled });
+    return entries.map((e) =>
+      e.gizzu_serial && !e.gizzu_serial.startsWith('GU') ? { ...e, gizzu_serial: null } : e
+    );
+  }
 
   // Extract the prefix up to and including the separating dash: "GU18W12V25-"
   const prefixMatch = fullSerial.match(/^(GU[A-Z0-9]+-)/i);
@@ -221,9 +228,9 @@ function reconstructGizzuSerials(entries: EodVlmEntry[]): EodVlmEntry[] {
 
   const prefix = prefixMatch[1]!;
   let count = 0;
-
   const result = entries.map((e) => {
     if (!e.gizzu_serial || e.gizzu_serial.startsWith('GU')) return e;
+    // Strip optional leading dash — suffix is digits-only from cleanGizzuSerial
     const suffix = e.gizzu_serial.replace(/^-/, '');
     count++;
     return { ...e, gizzu_serial: `${prefix}${suffix}` };
