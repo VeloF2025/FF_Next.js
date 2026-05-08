@@ -442,6 +442,7 @@ Generated on demand from `/api/projects/[projectId]/tracker/export-handover`:
 | Q1 | Are Mohadin and Mamelodi structured identically to Lawley? Importer assumes yes; needs validation against a Mohadin export before v1.1. | PM input. |
 | Q2 | Who owns `pon_change_log` review? Ad-hoc or weekly digest? | PM team to decide before v1.1. |
 | Q3 | Should "Phase" become a first-class entity (campaigns / waves) or stay a column? Current data has only `phase = 1` for Lawley. | Defer to v2; column is sufficient for v1. |
+| Q4 | `pon_change_log` FKs are `ON DELETE CASCADE` (mig 337). For a true audit log, deleting a PON should not silently erase its history. Decide between `SET NULL` (preserve orphaned history) and `RESTRICT` (force explicit archive-then-delete) before any audit data accumulates. | Plan 1.0b. Audit log is currently empty so the policy can change with a small migration. |
 
 ## 12. Success criteria (measurable)
 
