@@ -39,6 +39,76 @@ type ImportMode = 'merge' | 'replace';
 /** Accept any neon sql tagged-template function */
 type SqlFn = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<Record<string, unknown>[]>;
 
+/** Tagged-template sql extended with a parameterised query method (db-pool compatible) */
+type SqlFnWithQuery = SqlFn & {
+  query<T extends Record<string, unknown> = Record<string, unknown>>(
+    text: string,
+    params?: unknown[]
+  ): Promise<T[]>;
+};
+
+// ---------------------------------------------------------------------------
+// Pure SQL builders — testable without a live DB
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds the INSERT SQL for zone_boundaries that writes both the geojson
+ * JSONB column and the derived PostGIS geom column.
+ *
+ * Parameters: $1::uuid[], $2::integer[], $3::jsonb[]
+ *   (project_ids, zone_nos, geojsons)
+ */
+export function buildZoneBoundariesInsertSql(mode: ImportMode): string {
+  const onConflict =
+    mode === 'merge'
+      ? `ON CONFLICT (project_id, zone_no) DO UPDATE SET
+           geojson = EXCLUDED.geojson,
+           geom    = EXCLUDED.geom`
+      : '';
+  return `
+    INSERT INTO zone_boundaries (project_id, zone_no, geojson, geom)
+    SELECT
+      project_id,
+      zone_no,
+      geojson,
+      ST_Multi(ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(geojson::text), 4326)))
+    FROM UNNEST($1::uuid[], $2::integer[], $3::jsonb[])
+      AS t(project_id, zone_no, geojson)
+    ${onConflict}
+  `;
+}
+
+/**
+ * Builds the INSERT SQL for pon_boundaries that writes both the geojson
+ * JSONB column and the derived PostGIS geom column.
+ *
+ * Parameters: $1::uuid[], $2::integer[], $3::integer[], $4::varchar[], $5::jsonb[]
+ *   (project_ids, pon_nos, zone_nos, pon_labels, geojsons)
+ */
+export function buildPonBoundariesInsertSql(mode: ImportMode): string {
+  const onConflict =
+    mode === 'merge'
+      ? `ON CONFLICT (project_id, pon_no) DO UPDATE SET
+           zone_no   = COALESCE(EXCLUDED.zone_no, pon_boundaries.zone_no),
+           pon_label = COALESCE(EXCLUDED.pon_label, pon_boundaries.pon_label),
+           geojson   = EXCLUDED.geojson,
+           geom      = EXCLUDED.geom`
+      : '';
+  return `
+    INSERT INTO pon_boundaries (project_id, pon_no, zone_no, pon_label, geojson, geom)
+    SELECT
+      project_id,
+      pon_no,
+      zone_no,
+      pon_label,
+      geojson,
+      ST_Multi(ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(geojson::text), 4326)))
+    FROM UNNEST($1::uuid[], $2::integer[], $3::integer[], $4::varchar[], $5::jsonb[])
+      AS t(project_id, pon_no, zone_no, pon_label, geojson)
+    ${onConflict}
+  `;
+}
+
 // ---------------------------------------------------------------------------
 // Cable Spans
 // ---------------------------------------------------------------------------
@@ -106,7 +176,7 @@ export async function importCableSpans(sql: SqlFn, features: GpkgFeature[], proj
 // ---------------------------------------------------------------------------
 // Zone Boundaries
 // ---------------------------------------------------------------------------
-export async function importZoneBoundaries(sql: SqlFn, features: GpkgFeature[], projectId: string, mode: ImportMode): Promise<LayerResult> {
+export async function importZoneBoundaries(sql: SqlFnWithQuery, features: GpkgFeature[], projectId: string, mode: ImportMode): Promise<LayerResult> {
   if (mode === 'replace') {
     await sql`DELETE FROM zone_boundaries WHERE project_id = ${projectId}::uuid`;
   }
@@ -125,21 +195,14 @@ export async function importZoneBoundaries(sql: SqlFn, features: GpkgFeature[], 
     const geojsons   = batch.map(f => JSON.stringify(f.geojson));
 
     if (mode === 'merge') {
-      const rows = await sql`
-        INSERT INTO zone_boundaries (project_id, zone_no, geojson)
-        SELECT * FROM UNNEST(${projectIds}::uuid[], ${zoneNos}::integer[], ${geojsons}::jsonb[])
-        ON CONFLICT (project_id, zone_no) DO UPDATE SET
-          geojson = EXCLUDED.geojson
-        RETURNING (xmax = 0) AS inserted
-      `;
+      const insertSql = buildZoneBoundariesInsertSql('merge') + '\n    RETURNING (xmax = 0) AS inserted';
+      const rows = await sql.query<{ inserted: boolean }>(insertSql, [projectIds, zoneNos, geojsons]);
       for (const r of rows) {
         if (r.inserted) created++; else updated++;
       }
     } else {
-      await sql`
-        INSERT INTO zone_boundaries (project_id, zone_no, geojson)
-        SELECT * FROM UNNEST(${projectIds}::uuid[], ${zoneNos}::integer[], ${geojsons}::jsonb[])
-      `;
+      const insertSql = buildZoneBoundariesInsertSql('replace');
+      await sql.query(insertSql, [projectIds, zoneNos, geojsons]);
       created += batch.length;
     }
   }
@@ -151,7 +214,7 @@ export async function importZoneBoundaries(sql: SqlFn, features: GpkgFeature[], 
 // ---------------------------------------------------------------------------
 // PON Boundaries
 // ---------------------------------------------------------------------------
-export async function importPonBoundaries(sql: SqlFn, features: GpkgFeature[], projectId: string, mode: ImportMode): Promise<LayerResult> {
+export async function importPonBoundaries(sql: SqlFnWithQuery, features: GpkgFeature[], projectId: string, mode: ImportMode): Promise<LayerResult> {
   if (mode === 'replace') {
     await sql`DELETE FROM pon_boundaries WHERE project_id = ${projectId}::uuid`;
   }
@@ -172,29 +235,14 @@ export async function importPonBoundaries(sql: SqlFn, features: GpkgFeature[], p
     const geojsons   = batch.map(f => JSON.stringify(f.geojson));
 
     if (mode === 'merge') {
-      const rows = await sql`
-        INSERT INTO pon_boundaries (project_id, pon_no, zone_no, pon_label, geojson)
-        SELECT * FROM UNNEST(
-          ${projectIds}::uuid[], ${ponNos}::integer[], ${zoneNos}::integer[],
-          ${ponLabels}::varchar[], ${geojsons}::jsonb[]
-        )
-        ON CONFLICT (project_id, pon_no) DO UPDATE SET
-          zone_no   = COALESCE(EXCLUDED.zone_no, pon_boundaries.zone_no),
-          pon_label = COALESCE(EXCLUDED.pon_label, pon_boundaries.pon_label),
-          geojson   = EXCLUDED.geojson
-        RETURNING (xmax = 0) AS inserted
-      `;
+      const insertSql = buildPonBoundariesInsertSql('merge') + '\n    RETURNING (xmax = 0) AS inserted';
+      const rows = await sql.query<{ inserted: boolean }>(insertSql, [projectIds, ponNos, zoneNos, ponLabels, geojsons]);
       for (const r of rows) {
         if (r.inserted) created++; else updated++;
       }
     } else {
-      await sql`
-        INSERT INTO pon_boundaries (project_id, pon_no, zone_no, pon_label, geojson)
-        SELECT * FROM UNNEST(
-          ${projectIds}::uuid[], ${ponNos}::integer[], ${zoneNos}::integer[],
-          ${ponLabels}::varchar[], ${geojsons}::jsonb[]
-        )
-      `;
+      const insertSql = buildPonBoundariesInsertSql('replace');
+      await sql.query(insertSql, [projectIds, ponNos, zoneNos, ponLabels, geojsons]);
       created += batch.length;
     }
   }
