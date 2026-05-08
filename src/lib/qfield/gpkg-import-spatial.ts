@@ -36,10 +36,15 @@ export interface LayerResult {
 
 type ImportMode = 'merge' | 'replace';
 
-/** Accept any neon sql tagged-template function */
+/** Tagged-template sql function (compatible with both db-pool and the legacy neon shim). */
 type SqlFn = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<Record<string, unknown>[]>;
 
-/** Tagged-template sql extended with a parameterised query method (db-pool compatible) */
+/**
+ * Tagged-template sql extended with a parameterised query method.
+ * Required by importers that build SQL strings dynamically (e.g. the
+ * `geom` backfill in zone/pon boundaries). `@/lib/db-pool`'s `sql`
+ * export satisfies this; the legacy neon serverless export does not.
+ */
 type SqlFnWithQuery = SqlFn & {
   query<T extends Record<string, unknown> = Record<string, unknown>>(
     text: string,
