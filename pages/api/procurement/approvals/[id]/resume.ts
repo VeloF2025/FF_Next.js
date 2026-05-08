@@ -82,6 +82,19 @@ export default withAuth(withErrorHandler(async (
       );
     }
 
+    // The audit trigger skips on_hold → pending transitions because the
+    // resumer isn't recorded on the row itself. Write the audit row here
+    // with proper attribution.
+    await sql`
+      INSERT INTO approval_history (
+        approval_request_id, action, performed_by, performed_by_name,
+        from_status, to_status, notes
+      ) VALUES (
+        ${id}, 'resumed', ${userId}, ${userName},
+        'on_hold', 'pending', NULL
+      )
+    `;
+
     log.info(
       `Approval resumed: ${request.document_type} ${request.document_id}`,
       { approvalRequestId: id, resumedBy: userId },

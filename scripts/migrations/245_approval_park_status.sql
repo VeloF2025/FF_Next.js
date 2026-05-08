@@ -57,7 +57,12 @@ BEGIN
             NEW.id, 'created', NEW.requested_by, NEW.requested_by_name,
             NEW.status, NEW.request_notes
         );
-    ELSIF TG_OP = 'UPDATE' AND OLD.status <> NEW.status THEN
+    -- Skip the on_hold → pending transition: the resumer isn't recorded on
+    -- the row itself, so the API writes this audit row directly with proper
+    -- attribution. Letting the trigger fire would attribute resume to a
+    -- COALESCE fall-through (typically the requester), which is wrong.
+    ELSIF TG_OP = 'UPDATE' AND OLD.status <> NEW.status
+          AND NOT (OLD.status = 'on_hold' AND NEW.status = 'pending') THEN
         INSERT INTO approval_history (
             approval_request_id, action, performed_by, performed_by_name,
             from_status, to_status, notes
@@ -70,7 +75,6 @@ BEGIN
                 WHEN NEW.status = 'skipped'   THEN 'skipped'
                 WHEN NEW.status = 'cancelled' THEN 'cancelled'
                 WHEN NEW.status = 'on_hold'   THEN 'parked'
-                WHEN OLD.status = 'on_hold' AND NEW.status = 'pending' THEN 'resumed'
                 ELSE 'assigned'
             END,
             CASE
