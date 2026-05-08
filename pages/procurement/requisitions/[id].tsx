@@ -130,7 +130,7 @@ export default function RequisitionDetailPage() {
   const [editMeta, setEditMeta] = useState({ projectId: '', department: '', requiredDate: '' });
   const [editMetaSaving, setEditMetaSaving] = useState(false);
   const [editMetaError, setEditMetaError] = useState<string | null>(null);
-  const [projects, setProjects] = useState<{ id: string; project_name: string; project_code?: string }[]>([]);
+  const [projects, setProjects] = useState<{ id: string; name: string; project_code?: string }[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
 
   // Convert to PO modal state
@@ -172,11 +172,11 @@ export default function RequisitionDetailPage() {
   const loadEditMetaOptions = async () => {
     try {
       if (projects.length === 0) {
-        const r = await fetch('/api/projects?status=all&pageSize=500');
+        const r = await fetch('/api/projects');
         const d = await r.json();
         if (d?.success && Array.isArray(d.data)) {
           const sorted = [...d.data].sort((a, b) =>
-            String(a.project_name || '').localeCompare(String(b.project_name || ''))
+            String(a.name || '').localeCompare(String(b.name || ''))
           );
           setProjects(sorted);
         }
@@ -1044,7 +1044,7 @@ export default function RequisitionDetailPage() {
                     <option value="">-- No project --</option>
                     {projects.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.project_name}{p.project_code ? ` (${p.project_code})` : ''}
+                        {p.name}{p.project_code ? ` (${p.project_code})` : ''}
                       </option>
                     ))}
                   </select>
