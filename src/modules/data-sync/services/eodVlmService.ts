@@ -191,13 +191,54 @@ function cleanGizzuSerial(serial: string | null): string | null {
   if (!serial) return null;
   const s = serial.toUpperCase().replace(/[\s]/g, '');
   if (HALLUCINATION_BLOCKLIST.has(s)) return null;
-  if (!s.startsWith('GU')) return null;
-  return s;
+  if (s.startsWith('GU')) return s;
+  // Accept numeric suffix-only values (e.g. "-0923246" or "0923246") — technicians often
+  // write the full serial only on row 1 and abbreviate subsequent rows with the suffix.
+  // reconstructGizzuSerials will prepend the prefix; if no full serial is found it nulls them.
+  if (/^-?\d{4,}$/.test(s)) return s;
+  return null;
 }
 
 // Full Gizzu serial includes the per-row suffix (GU18W12V25-XXX-XXXXX ≈ 20 chars).
 // Readings shorter than this are just the shared prefix — not hallucinated, just partial.
 const GIZZU_FULL_SERIAL_MIN_LEN = 15;
+
+/**
+ * Reconstruct abbreviated Gizzu serials using the prefix from the first full serial found.
+ * Technicians typically write the full serial on row 1 ("GU18W12V25-0923242") and only
+ * the suffix on subsequent rows ("-0923246", "-09023249", …).
+ */
+function reconstructGizzuSerials(entries: EodVlmEntry[]): EodVlmEntry[] {
+  const fullSerial = entries
+    .map((e) => e.gizzu_serial)
+    .find((s) => s && s.startsWith('GU') && s.length >= GIZZU_FULL_SERIAL_MIN_LEN);
+
+  if (!fullSerial) {
+    // No full serial → cannot reconstruct suffix-only values → null them to avoid corrupt serials
+    const nulled = entries.filter((e) => e.gizzu_serial && !e.gizzu_serial.startsWith('GU')).length;
+    if (nulled > 0) log.info('[EOD] Gizzu: no prefix found, nulling suffix-only values', { nulled });
+    return entries.map((e) =>
+      e.gizzu_serial && !e.gizzu_serial.startsWith('GU') ? { ...e, gizzu_serial: null } : e
+    );
+  }
+
+  // Extract the prefix up to and including the separating dash: "GU18W12V25-"
+  const prefixMatch = fullSerial.match(/^(GU[A-Z0-9]+-)/i);
+  if (!prefixMatch) return entries;
+
+  const prefix = prefixMatch[1]!;
+  let count = 0;
+  const result = entries.map((e) => {
+    if (!e.gizzu_serial || e.gizzu_serial.startsWith('GU')) return e;
+    // Strip optional leading dash — suffix is digits-only from cleanGizzuSerial
+    const suffix = e.gizzu_serial.replace(/^-/, '');
+    count++;
+    return { ...e, gizzu_serial: `${prefix}${suffix}` };
+  });
+
+  if (count > 0) log.info('[EOD] Gizzu reconstruction', { prefix, count });
+  return result;
+}
 
 // PONs in this network are 100-200. Any VLM value outside that range (e.g. an address
 // like 14643 read from the wrong column) is silently discarded; the HLD fallback below
@@ -443,6 +484,7 @@ export async function extractEodSheet(
 
     // Pass 3: Post-process
     parsed.entries = postProcessEntries(parsed.entries);
+    parsed.entries = reconstructGizzuSerials(parsed.entries);
 
     // Hallucination guards
     if (parsed.entries.length > 1) {
