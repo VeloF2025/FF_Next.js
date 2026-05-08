@@ -47,7 +47,7 @@ interface InputArgs {
   scopedStaffIds: string[] | null;
 }
 
-interface DbRow {
+interface DbRow extends Record<string, unknown> {
   staff_id: string;
   full_name: string;
   department: string | null;

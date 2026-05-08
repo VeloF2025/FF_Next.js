@@ -35,7 +35,7 @@ describe('geofencePatterns SQL shape', () => {
     });
     expect(params).toContain('2026-04-08');
     expect(params).toContain('2026-05-08');
-    expect(params.some((p) => Array.isArray(p) && (p as string[]).includes('Civil'))).toBe(true);
+    expect(params.some((p: unknown) => Array.isArray(p) && (p as string[]).includes('Civil'))).toBe(true);
     expect(text).toMatch(/s\.department\s*=\s*ANY\s*\(\s*\$\d+::text\[\]\s*\)/);
   });
 
