@@ -22,6 +22,7 @@ import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import { withPermission } from '@/lib/auth/middleware';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import { sendReceiptApprovedEmail } from '@/modules/receipts/email';
 import { findReceiptById } from '@/modules/receipts/queries';
 import {
   transitionReceiptStatus,
@@ -91,6 +92,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       action: body.action,
       newStatus: updated.status,
     });
+
+    if (body.action === 'approve') {
+      // Best-effort accounting notification. SMTP failures must not fail the API.
+      void sendReceiptApprovedEmail(updated);
+    }
 
     return apiResponse.success(res, {
       id: updated.id,
