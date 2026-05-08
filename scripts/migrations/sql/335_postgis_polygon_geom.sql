@@ -1,4 +1,4 @@
--- 245_postgis_polygon_geom.sql
+-- 335_postgis_polygon_geom.sql
 -- Add PostGIS-backed polygon geometry alongside existing GeoJSON.
 -- Phase 1 of geofence archetype matching (spec 2026-05-08).
 
