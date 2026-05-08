@@ -112,8 +112,8 @@ export function EodUploadTab() {
           <Button variant="secondary" size="sm" onClick={reset}>Upload More</Button>
         </div>
 
-        {savedSlots.map((slot, i) => (
-          <div key={i} className="border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
+        {savedSlots.map((slot) => (
+          <div key={slot.file.name} className="border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
             <div className="px-4 py-2 bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] flex items-center justify-between">
               <span className="text-sm font-medium text-[var(--ff-text-primary)]">
                 {slot.file.name}
