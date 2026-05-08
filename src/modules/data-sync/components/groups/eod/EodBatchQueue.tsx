@@ -66,17 +66,18 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
       .finally(() => { extractingRef.current = false; });
   }, [slots]);
 
-  // Auto-advance reviewIndex past duplicate/terminal slots — clamped to slots.length
+  // Auto-advance reviewIndex past duplicate/skipped — NOT past failed (user must retry or skip)
   useEffect(() => {
     const current = slots[reviewIndex];
-    if (current && TERMINAL.includes(current.status) && current.status !== 'saved') {
+    if (current && TERMINAL.includes(current.status) && current.status !== 'saved' && current.status !== 'failed') {
       const next = slots.findIndex((s, i) => i > reviewIndex && !TERMINAL.includes(s.status));
       setReviewIndex(Math.min(next === -1 ? reviewIndex + 1 : next, slots.length));
     }
   }, [slots, reviewIndex]);
 
+  // Only complete the batch when there are no remaining failed slots — failed requires user action
   useEffect(() => {
-    if (slots.length > 0 && slots.every((s) => TERMINAL.includes(s.status))) {
+    if (slots.length > 0 && slots.every((s) => TERMINAL.includes(s.status)) && !slots.some((s) => s.status === 'failed')) {
       onAllDoneRef.current(slots.filter((s) => s.status === 'saved'));
     }
   }, [slots]);
