@@ -7,7 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
-import { createSheet, listSheets, getSheetStats } from '@/modules/data-sync/services/eodSheetService';
+import { createSheet, listSheets, getSheetStats, findSheetByHash } from '@/modules/data-sync/services/eodSheetService';
 import { recordEodCorrections } from '@/modules/data-sync/services/eodLearningService';
 import { log } from '@/lib/logger';
 
@@ -48,6 +48,21 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
+    // Safety-net duplicate check (primary check is in /api/eod/extract before VLM call)
+    if (photoHash) {
+      const existing = await findSheetByHash(photoHash);
+      if (existing) {
+        log.warn('[EOD-Sheets] Duplicate save blocked by hash', { photoHash, existingId: existing.id });
+        return res.status(409).json({
+          success: false,
+          code: 'DUPLICATE',
+          message: `Already uploaded on ${existing.sheet_date}`,
+          existingSheetId: existing.id,
+          existingSheetDate: existing.sheet_date,
+        });
+      }
+    }
+
     // @ts-expect-error — req.user injected by withAuth
     const uploadedBy = req.user?.email || 'unknown';
     const sheet = await createSheet({

@@ -184,6 +184,14 @@ export async function getSheet(id: string): Promise<EodInstallSheet | null> {
   } as EodInstallSheet;
 }
 
+export async function findSheetByHash(photoHash: string): Promise<{ id: string; sheet_date: string } | null> {
+  const rows = await sql`
+    SELECT id, sheet_date::text FROM eod_install_sheets WHERE photo_hash = ${photoHash} LIMIT 1
+  `;
+  if (rows.length === 0) return null;
+  return rows[0] as { id: string; sheet_date: string };
+}
+
 export async function deleteSheet(id: string): Promise<boolean> {
   const result = await sql`
     DELETE FROM eod_install_sheets WHERE id = ${id} RETURNING id
