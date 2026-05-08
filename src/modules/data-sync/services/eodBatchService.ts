@@ -20,7 +20,14 @@ async function computeFileHash(file: File): Promise<string> {
 async function readAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve((reader.result as string).split(',')[1]!);
+    reader.onload = () => {
+      const parts = (reader.result as string).split(',');
+      if (parts.length < 2 || !parts[1]) {
+        reject(new Error('FileReader produced an unexpected data URL format'));
+        return;
+      }
+      resolve(parts[1]);
+    };
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
@@ -38,23 +45,29 @@ export async function extractSheetFile(file: File): Promise<ExtractResult> {
 
   const json = await res.json() as {
     success: boolean;
-    data: { duplicate: boolean; existingSheetId?: string; existingSheetDate?: string } & Partial<EodVlmExtraction>;
+    data?: {
+      duplicate: boolean;
+      existingSheetId?: string;
+      existingSheetDate?: string;
+    } & Partial<EodVlmExtraction>;
+    error?: { message: string };
     message?: string;
   };
 
-  if (!json.success) throw new Error(json.message ?? 'Extraction failed');
+  if (!json.success) throw new Error(json.error?.message ?? json.message ?? 'Extraction failed');
+  if (!json.data) throw new Error('Empty response from extract endpoint');
 
   if (json.data.duplicate) {
-    return {
-      duplicate: true,
-      existingSheetId: json.data.existingSheetId!,
-      existingSheetDate: json.data.existingSheetDate!,
-      photoHash,
-    };
+    const { existingSheetId, existingSheetDate } = json.data;
+    if (!existingSheetId || !existingSheetDate) {
+      throw new Error('Duplicate response missing sheet details');
+    }
+    return { duplicate: true, existingSheetId, existingSheetDate, photoHash };
   }
 
-  const { duplicate: _d, existingSheetId: _e, existingSheetDate: _ed, ...extraction } = json.data;
-  return { duplicate: false, extraction: extraction as EodVlmExtraction, photoHash };
+  const { duplicate: _d, existingSheetId: _e, existingSheetDate: _ed, ...rest } = json.data;
+  if (!Array.isArray(rest.entries)) throw new Error('Invalid extraction response: missing entries array');
+  return { duplicate: false, extraction: rest as EodVlmExtraction, photoHash };
 }
 
 export async function saveEodSheet(payload: EodSavePayload): Promise<{ matched_count: number }> {
@@ -77,7 +90,12 @@ export async function saveEodSheet(payload: EodSavePayload): Promise<{ matched_c
       })),
     }),
   });
-  const json = await res.json() as { success: boolean; data: { matched_count: number }; message?: string; code?: string };
-  if (!json.success) throw new Error(json.message ?? 'Save failed');
-  return json.data;
+  const json = await res.json() as {
+    success: boolean;
+    data?: { matched_count: number };
+    error?: { message: string };
+    message?: string;
+  };
+  if (!json.success) throw new Error(json.error?.message ?? json.message ?? 'Save failed');
+  return json.data ?? { matched_count: 0 };
 }

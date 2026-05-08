@@ -66,12 +66,12 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
       .finally(() => { extractingRef.current = false; });
   }, [slots]);
 
-  // Auto-advance reviewIndex past duplicate/terminal slots
+  // Auto-advance reviewIndex past duplicate/terminal slots — clamped to slots.length
   useEffect(() => {
     const current = slots[reviewIndex];
     if (current && TERMINAL.includes(current.status) && current.status !== 'saved') {
       const next = slots.findIndex((s, i) => i > reviewIndex && !TERMINAL.includes(s.status));
-      setReviewIndex(next === -1 ? reviewIndex + 1 : next);
+      setReviewIndex(Math.min(next === -1 ? reviewIndex + 1 : next, slots.length));
     }
   }, [slots, reviewIndex]);
 
@@ -114,7 +114,8 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
   const currentSlot = slots[reviewIndex];
   const savedCount = slots.filter((s) => s.status === 'saved').length;
   const dupCount = slots.filter((s) => s.status === 'duplicate').length;
-  const nonSkipped = slots.filter((s) => s.status !== 'skipped').length;
+  // Exclude skipped and duplicate from the denominator — "X of Y saved" should only count actionable sheets
+  const nonSkipped = slots.filter((s) => s.status !== 'skipped' && s.status !== 'duplicate').length;
 
   return (
     <div className="space-y-6">

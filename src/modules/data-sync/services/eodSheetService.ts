@@ -189,7 +189,8 @@ export async function findSheetByHash(photoHash: string): Promise<{ id: string; 
     SELECT id, sheet_date::text FROM eod_install_sheets WHERE photo_hash = ${photoHash} LIMIT 1
   `;
   if (rows.length === 0) return null;
-  return rows[0] as { id: string; sheet_date: string };
+  const row = rows[0] as Record<string, unknown>;
+  return { id: String(row.id), sheet_date: String(row.sheet_date) };
 }
 
 export async function deleteSheet(id: string): Promise<boolean> {

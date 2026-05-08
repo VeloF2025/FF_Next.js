@@ -49,17 +49,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     // Safety-net duplicate check (primary check is in /api/eod/extract before VLM call)
-    if (photoHash) {
+    if (photoHash && typeof photoHash === 'string') {
       const existing = await findSheetByHash(photoHash);
       if (existing) {
         log.warn('[EOD-Sheets] Duplicate save blocked by hash', { photoHash, existingId: existing.id });
-        return res.status(409).json({
-          success: false,
-          code: 'DUPLICATE',
-          message: `Already uploaded on ${existing.sheet_date}`,
-          existingSheetId: existing.id,
-          existingSheetDate: existing.sheet_date,
-        });
+        return apiResponse.conflict(res, `Already uploaded on ${existing.sheet_date}`);
       }
     }
 
