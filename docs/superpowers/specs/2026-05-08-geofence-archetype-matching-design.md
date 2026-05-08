@@ -129,7 +129,8 @@ This page is the gate for Phase 2: we use it to seed
    active assigned polygon for `mobile`).
 3. **`matchClockInLocation`** wraps the above with archetype switching:
    - `office` → `{ ok: true }` always. No exception. No project link.
-   - `project` → primary `staff_projects` polygon only. Match → `{ ok:true, projectId, zoneNo, isPrimary:true }`. Miss → `{ ok:false, distanceToNearestPolygonM, expectedProjectId }`.
+   - `project` → primary `staff_projects` polygon. If no `is_primary=true` row
+    exists for the staffer, fall back to any active assignment. Match → `{ ok:true, projectId, zoneNo, isPrimary }`. Miss → `{ ok:false, distanceToNearestPolygonM, expectedProjectId }`.
    - `mobile` → two-stage:
      1. any active assigned polygon → `{ ok:true, projectId, isPrimary, visiting: !isPrimary }`
      2. fallback to any office geofence → `{ ok:true, officeSiteId }`
@@ -302,12 +303,14 @@ historical entries don't shift.
 | Admin UI | `pages/staff/admin/department-archetypes.tsx` (new), staff edit page (extend) |
 | Tests | `__tests__` next to each new module; integration test for matcher across all three archetypes |
 
-## Open questions
+## Resolved decisions
 
-- **Default archetype seed values.** Listed above are proposals; the Phase 1
-  page is what finalises them. Do not run Migration B's seed until Phase 1 has
-  run for at least one full work week.
-- **`is_primary` enforcement.** Phase 1 will surface project-based staff with
-  no `is_primary=true` row on any active assignment. Decision after Phase 1:
-  add a `CHECK` requiring exactly one primary per `(staff_id, is_active=true)`,
-  or fall back to "any assignment" when no primary exists.
+- **Department-default seed timing.** Migration B creates the
+  `department_archetype_defaults` table empty. The seed is applied only after
+  Phase 1 has run for at least one full work week (5 working days of clock-in
+  data) so the proposed mapping is validated against observed behaviour first.
+- **`is_primary` handling.** No `CHECK` constraint enforcing exactly one
+  primary per active staff assignment. The matcher falls back to "any active
+  assignment" when no `is_primary=true` row exists for a `project`-archetype
+  staffer. Phase 1 still surfaces staff with no primary so admins can fix the
+  data, but the absence of a primary never blocks clock-in.
