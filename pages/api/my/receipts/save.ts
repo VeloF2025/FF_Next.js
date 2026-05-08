@@ -18,6 +18,7 @@ import {
   type ReceiptCategory,
 } from '@/modules/receipts/categories';
 import { sendReceiptSubmittedEmail } from '@/modules/receipts/email';
+import { resolveReceiptFetchUrl } from '@/modules/receipts/storage';
 import { insertReceipt, type PaymentMethod } from '@/modules/receipts/queries';
 
 export const config = {
@@ -67,6 +68,19 @@ export default withMySession(async (req, res, session) => {
   }
   if (typeof body.imageUrl !== 'string' || !body.imageUrl.trim()) {
     return apiResponse.badRequest(res, 'imageUrl is required');
+  }
+  // SSRF defense: imageUrl is fetched server-side later (proxy endpoints +
+  // accounting email). Reject anything that does not point into VF Storage
+  // before it ever reaches the DB.
+  try {
+    resolveReceiptFetchUrl(body.imageUrl);
+  } catch (err) {
+    log.warn('[my/receipts/save] rejected imageUrl outside VF Storage', {
+      err,
+      imageUrlPrefix: body.imageUrl.slice(0, 60),
+      staffId: session.staffId,
+    });
+    return apiResponse.badRequest(res, 'imageUrl must be a /storage/ path or a *.fibreflow.app/storage/ URL');
   }
   if (typeof body.imageMime !== 'string' || !body.imageMime.trim()) {
     return apiResponse.badRequest(res, 'imageMime is required');

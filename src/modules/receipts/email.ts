@@ -277,7 +277,13 @@ export async function sendReceiptSubmittedEmail(receipt: ReceiptRow): Promise<vo
     const image = await fetchReceiptImage(receipt);
     const reviewLink = `${APP_URL}/staff/receipts`;
 
-    const subject = `Receipt to approve — ${ctx.staffName}, ${rands(receipt.total_cents, receipt.currency) || receipt.vendor || receipt.receipt_date}`;
+    // Sanitise free-form vendor at the construction site — sendMail also runs
+    // sanitizeHeaderValue, but that only strips CRLF; vendor text can also
+    // contain other header-confusing characters worth dropping early.
+    const subjectTail = rands(receipt.total_cents, receipt.currency)
+      || sanitizeHeaderValue(receipt.vendor || '')
+      || receipt.receipt_date;
+    const subject = `Receipt to approve — ${sanitizeHeaderValue(ctx.staffName)}, ${subjectTail}`;
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:640px;color:#1a1a2e;">
         <h2 style="margin:0 0 12px 0;">New receipt awaiting approval</h2>
@@ -311,7 +317,10 @@ export async function sendReceiptApprovedEmail(receipt: ReceiptRow): Promise<voi
     const ctx = await loadReceiptContext(receipt);
     const image = await fetchReceiptImage(receipt);
 
-    const subject = `Receipt approved — ${ctx.staffName}, ${rands(receipt.total_cents, receipt.currency) || receipt.vendor || receipt.receipt_date}`;
+    const subjectTail = rands(receipt.total_cents, receipt.currency)
+      || sanitizeHeaderValue(receipt.vendor || '')
+      || receipt.receipt_date;
+    const subject = `Receipt approved — ${sanitizeHeaderValue(ctx.staffName)}, ${subjectTail}`;
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:640px;color:#1a1a2e;">
         <h2 style="margin:0 0 12px 0;">Approved receipt</h2>
