@@ -6,6 +6,7 @@
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import type { EodInstallSheet, EodInstallSheetEntry } from '../types';
+import { logSerialChange } from '@/modules/activate/services/activity-log/serialHistory';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -27,7 +28,72 @@ interface CreateSheetInput {
   }[];
 }
 
-export async function createSheet(input: CreateSheetInput): Promise<EodInstallSheet> {
+interface WriteBackResult {
+  matched_count: number;
+  logged_count: number;
+}
+
+async function writeBackDrSerials(
+  entries: CreateSheetInput['entries'],
+  sheetId: string,
+  uploadedBy: string
+): Promise<WriteBackResult> {
+  let matched_count = 0;
+  let logged_count = 0;
+
+  const candidates = entries.filter((e) => e.drNumber && e.ontSerial);
+
+  for (const entry of candidates) {
+    const drNumber = entry.drNumber!;
+    const eodOnt = entry.ontSerial!;
+
+    // Look up current serial in dr_photo_unified_reviews
+    const rows = await sql`
+      SELECT ont_serial_scanned
+      FROM dr_photo_unified_reviews
+      WHERE drop_number = ${drNumber}
+      LIMIT 1
+    `;
+
+    if (rows.length === 0) {
+      log.warn('[EOD-WriteBack] DR not found in dr_photo_unified_reviews', { drNumber });
+      continue;
+    }
+
+    const currentOnt = (rows[0] as { ont_serial_scanned: string | null }).ont_serial_scanned ?? null;
+
+    // Fill null serials only — never overwrite an existing serial
+    if (currentOnt === null) {
+      await sql`
+        UPDATE dr_photo_unified_reviews
+        SET ont_serial_scanned = ${eodOnt}
+        WHERE drop_number = ${drNumber}
+      `;
+      matched_count++;
+    }
+
+    // Log to serial_change_history + dr_activity_log regardless of whether we updated
+    try {
+      await logSerialChange(
+        drNumber,
+        'ont_serial',
+        currentOnt,
+        eodOnt,
+        'eod_sheet',
+        uploadedBy,
+        'technician_update',
+        { eod_sheet_id: sheetId, eod_entry_row: entry.rowNumber }
+      );
+      logged_count++;
+    } catch (err) {
+      log.warn('[EOD-WriteBack] logSerialChange failed', { drNumber, error: err });
+    }
+  }
+
+  return { matched_count, logged_count };
+}
+
+export async function createSheet(input: CreateSheetInput): Promise<EodInstallSheet & { matched_count: number; logged_count: number }> {
   // Insert sheet header
   const rows = await sql`
     INSERT INTO eod_install_sheets (
@@ -55,13 +121,17 @@ export async function createSheet(input: CreateSheetInput): Promise<EodInstallSh
     `;
   }
 
+  const writeBack = await writeBackDrSerials(input.entries, sheet.id as string, input.uploadedBy);
+
   log.info('[EOD] Sheet created', {
     id: sheet.id,
     date: input.sheetDate,
     entries: input.entries.length,
+    matched_count: writeBack.matched_count,
+    logged_count: writeBack.logged_count,
   });
 
-  return sheet as EodInstallSheet;
+  return { ...(sheet as EodInstallSheet), ...writeBack };
 }
 
 export async function listSheets(
