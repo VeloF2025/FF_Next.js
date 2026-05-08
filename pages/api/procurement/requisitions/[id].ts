@@ -25,7 +25,8 @@ export default withAuth(withErrorHandler(async (
       const [requisition] = await sql`
         SELECT
           pr.*,
-          p.project_name as project_name
+          p.project_name as project_name,
+          p.project_code as project_code
         FROM purchase_requisitions pr
         LEFT JOIN projects p ON pr.project_id = p.id
         WHERE pr.id = ${id}
@@ -60,6 +61,8 @@ export default withAuth(withErrorHandler(async (
         id: requisition.id,
         requisitionNumber: requisition.requisition_number,
         projectId: requisition.project_id,
+        projectName: requisition.project_name,
+        projectCode: requisition.project_code,
         department: requisition.department,
         requestedBy: requisition.requested_by,
         requestedByName: requisition.requested_by_name,
@@ -107,7 +110,10 @@ export default withAuth(withErrorHandler(async (
     try {
       const body = req.body;
 
-      // Check if requisition exists and is in draft status
+      // Check if requisition exists. Drafts allow full edits; submitted /
+      // pending_approval allow only the "missing details" fields (project,
+      // department, required date) so a requester can fill in what was left
+      // blank without having to recall the request.
       const [existing] = await sql`
         SELECT status FROM purchase_requisitions WHERE id = ${id}
       `;
@@ -116,18 +122,36 @@ export default withAuth(withErrorHandler(async (
         return apiResponse.notFound(res, 'Purchase Requisition', id);
       }
 
-      if (existing.status !== 'draft') {
-        return apiResponse.badRequest(res, 'Only draft requisitions can be edited');
+      const status = existing.status;
+      const isDraft = status === 'draft';
+      const isFillable = status === 'submitted' || status === 'pending_approval';
+
+      if (!isDraft && !isFillable) {
+        return apiResponse.badRequest(res, `Requisitions in status '${status}' cannot be edited`);
       }
 
-      // Update requisition
+      // Non-draft edits are restricted to project / department / required-date.
+      const editsRestrictedFields =
+        !isDraft &&
+        (body.urgency !== undefined || body.notes !== undefined);
+      if (editsRestrictedFields) {
+        return apiResponse.badRequest(
+          res,
+          'After submission, only project, department, and required date can be edited',
+        );
+      }
+
+      // Update requisition. COALESCE keeps existing values when the field is
+      // omitted; pass an explicit empty string ('') from the UI to clear a value.
       const [updated] = await sql`
         UPDATE purchase_requisitions
         SET
+          project_id = COALESCE(${body.projectId === '' ? null : body.projectId ?? null}::uuid, project_id),
+          department = COALESCE(${body.department || null}, department),
           required_date = COALESCE(${body.requiredDate || null}, required_date),
           urgency = COALESCE(${body.urgency || null}, urgency),
           notes = COALESCE(${body.notes || null}, notes),
-          department = COALESCE(${body.department || null}, department)
+          updated_at = NOW()
         WHERE id = ${id}
         RETURNING *
       `;
