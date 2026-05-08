@@ -25,8 +25,25 @@ ALTER TABLE approval_history ADD CONSTRAINT approval_history_action_check
     'parked', 'resumed'
   ));
 
--- 4. Update audit trigger to map on_hold transitions to parked/resumed actions,
---    and to attribute the action to the parker (parked_by) rather than the assignee.
+-- 4. Audit trail for mid-flight requisition edits (project / department /
+--    required_date) made after submission. Draft edits are not tracked here
+--    because they predate the approval workflow.
+CREATE TABLE IF NOT EXISTS requisition_edit_history (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  requisition_id  UUID NOT NULL REFERENCES purchase_requisitions(id) ON DELETE CASCADE,
+  edited_by       VARCHAR(255) NOT NULL,
+  edited_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  status_at_edit  VARCHAR(50) NOT NULL,
+  changed_fields  TEXT[] NOT NULL,
+  before_snapshot JSONB,
+  after_snapshot  JSONB
+);
+CREATE INDEX IF NOT EXISTS idx_req_edit_history_req
+  ON requisition_edit_history(requisition_id, edited_at DESC);
+
+-- 5. Update audit trigger to map on_hold transitions to parked/resumed actions,
+--    attribute the action to the parker (parked_by) rather than the assignee,
+--    and emit a sensible action for any genuinely-unknown future status.
 CREATE OR REPLACE FUNCTION public.log_approval_action()
  RETURNS trigger
  LANGUAGE plpgsql

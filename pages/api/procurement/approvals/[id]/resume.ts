@@ -10,7 +10,9 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { userHasPermission } from '@/lib/permissions';
 import { notify } from '@/modules/notifications/services';
+import { createApprovalActionItem } from '@/lib/action-items/procurementActions';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -33,7 +35,9 @@ export default withAuth(withErrorHandler(async (
 
   try {
     const existing = await sql`
-      SELECT id, status, assigned_to, document_type, document_id, document_number, requested_by
+      SELECT id, status, assigned_to, assigned_to_name, parked_by,
+             document_type, document_id, document_number, document_amount,
+             requested_by, requested_by_name
       FROM approval_requests
       WHERE id = ${id}
     `;
@@ -44,12 +48,19 @@ export default withAuth(withErrorHandler(async (
 
     const request = existing[0]!;
 
-    if (request.status !== 'on_hold') {
-      return apiResponse.validationError(res, {
-        status: `Cannot resume a request that is ${request.status}; only parked requests can be resumed`,
-      });
+    // Caller must be the assigned approver, the user who parked it, super_admin,
+    // or hold procurement.sourcing edit rights. Anyone else is forbidden.
+    const isAssignee = request.assigned_to && String(request.assigned_to) === String(userId);
+    const isParker = request.parked_by && String(request.parked_by) === String(userId);
+    const isSuperAdmin = authReq.user.role === 'super_admin';
+    const hasProcurementEdit = isSuperAdmin
+      ? true
+      : await userHasPermission(userId, 'procurement.sourcing', 'edit');
+    if (!isAssignee && !isParker && !hasProcurementEdit) {
+      return apiResponse.forbidden(res, 'You are not authorised to resume this approval request');
     }
 
+    // Atomic transition — guards against double-resume and resume↔approve races.
     const updated = await sql`
       UPDATE approval_requests
       SET
@@ -59,18 +70,42 @@ export default withAuth(withErrorHandler(async (
         parked_by_name = NULL,
         park_reason = NULL,
         updated_at = NOW()
-      WHERE id = ${id}
-      RETURNING *
+      WHERE id = ${id} AND status = 'on_hold'
+      RETURNING id, status, assigned_to, assigned_to_name,
+                document_type, document_id, document_number, requested_by
     `;
+
+    if (updated.length === 0) {
+      return apiResponse.conflict(
+        res,
+        `Cannot resume request — its status changed before the action completed (must be 'on_hold')`,
+      );
+    }
 
     log.info(
       `Approval resumed: ${request.document_type} ${request.document_id}`,
       { approvalRequestId: id, resumedBy: userId },
-      'procurement',
+      'procurement-resume',
     );
 
-    // Notify the current assignee that the request is back in their queue,
-    // and the requester that the hold has been lifted.
+    // Re-create the assignee's action-item (was completed when parked).
+    // The helper is idempotent: skips if a non-completed item already exists.
+    if (request.assigned_to) {
+      createApprovalActionItem({
+        approvalRequestId: String(id),
+        documentType: String(request.document_type || ''),
+        documentNumber: String(request.document_number || ''),
+        documentAmount: Number(request.document_amount || 0),
+        approverUserId: String(request.assigned_to),
+        approverName: String(request.assigned_to_name || ''),
+        requestedByName: String(request.requested_by_name || 'Unknown'),
+      }).catch((err) =>
+        log.error('Failed to re-create resume action item', { error: err }, 'procurement-resume'),
+      );
+    }
+
+    // Notify the current assignee (back in their queue) and the requester
+    // (hold lifted).
     const docLabel = (request.document_type || '').replace(/_/g, ' ');
     const recipients = new Set<string>();
     if (request.assigned_to) recipients.add(String(request.assigned_to));
@@ -92,7 +127,7 @@ export default withAuth(withErrorHandler(async (
 
     return apiResponse.success(res, updated[0], 'Request resumed');
   } catch (error) {
-    log.error('Failed to resume request', { error: { error } }, 'ResumeApi');
+    log.error('Failed to resume request', { error }, 'procurement-resume');
     return apiResponse.databaseError(res, error, 'Failed to resume request');
   }
 }));

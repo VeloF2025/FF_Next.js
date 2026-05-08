@@ -167,32 +167,38 @@ export default function RequisitionDetailPage() {
     }
   }, [id]);
 
-  // Fetch projects + departments for the inline-edit modal (alphabetical).
-  useEffect(() => {
-    fetch('/api/projects?status=all&pageSize=500')
-      .then((r) => r.json())
-      .then((d) => {
+  // Lazily load projects + departments — only when the edit modal is opened.
+  // Avoids pulling 500-row dropdowns for read-only viewers.
+  const loadEditMetaOptions = async () => {
+    try {
+      if (projects.length === 0) {
+        const r = await fetch('/api/projects?status=all&pageSize=500');
+        const d = await r.json();
         if (d?.success && Array.isArray(d.data)) {
           const sorted = [...d.data].sort((a, b) =>
             String(a.project_name || '').localeCompare(String(b.project_name || ''))
           );
           setProjects(sorted);
         }
-      })
-      .catch((err) => log.error('Failed to load projects', { error: err }));
-
-    fetch('/api/departments?isActive=true')
-      .then((r) => r.json())
-      .then((d) => {
+      }
+    } catch (err) {
+      log.error('Failed to load projects', { error: err });
+    }
+    try {
+      if (departments.length === 0) {
+        const r = await fetch('/api/departments?isActive=true');
+        const d = await r.json();
         if (d?.success && Array.isArray(d.data)) {
           const sorted = [...d.data].sort((a, b) =>
             String(a.name || '').localeCompare(String(b.name || ''))
           );
           setDepartments(sorted);
         }
-      })
-      .catch((err) => log.error('Failed to load departments', { error: err }));
-  }, []);
+      }
+    } catch (err) {
+      log.error('Failed to load departments', { error: err });
+    }
+  };
 
   // Fetch suppliers for conversion
   useEffect(() => {
@@ -324,6 +330,7 @@ export default function RequisitionDetailPage() {
     });
     setEditMetaError(null);
     setShowEditMetaModal(true);
+    loadEditMetaOptions();
   };
 
   const handleSaveMeta = async () => {
