@@ -231,7 +231,10 @@ function reconstructGizzuSerials(entries: EodVlmEntry[]): EodVlmEntry[] {
     return { ...e, gizzu_serial: `${prefix}${suffix}` };
   });
 
-  if (count > 0) log.info('[EOD] Gizzu reconstruction', { prefix, count, usedDefault: !prefixMatch });
+  if (count > 0) {
+    const usedDefault = !prefixMatch;
+    (usedDefault ? log.warn : log.info)('[EOD] Gizzu reconstruction', { prefix, count, usedDefault });
+  }
   return result;
 }
 
