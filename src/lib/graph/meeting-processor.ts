@@ -142,8 +142,7 @@ export async function processMeetingFromCallRecord(callRecordId: string): Promis
 
       if (meetingInfo?.id && resolvedUserId) {
         await fetchAndStoreTranscript(meetingId, resolvedUserId, meetingInfo.id);
-        await fetchAndStoreRecording(meetingId, resolvedUserId, meetingInfo.id);
-        hasRecording = true;
+        hasRecording = await fetchAndStoreRecording(meetingId, resolvedUserId, meetingInfo.id);
       }
     }
 
