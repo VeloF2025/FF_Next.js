@@ -4,6 +4,7 @@ import { log } from '@/lib/logger';
 import { fetchCallRecordById } from './call-records';
 import { resolveParticipants } from './speaker-resolver';
 import { processWithLLM } from '@/lib/llm/meeting-processor';
+import { transcribeWithWhisper } from '@/lib/llm/whisper-transcriber';
 import {
   resolveOnlineMeeting,
   fetchAndStoreTranscript,
@@ -17,6 +18,43 @@ const sql = neon(process.env.DATABASE_URL!);
 const MIN_DURATION_SECONDS = 60;
 
 const LOGGER = 'MeetingProcessor';
+const WHISPER_TEAMS_RECORDINGS = process.env.WHISPER_TEAMS_RECORDINGS === 'true';
+
+async function transcribeStoredRecordingWithWhisper(meetingId: number): Promise<void> {
+  const rows = await sql`
+    SELECT recording_path
+    FROM meetings
+    WHERE id = ${meetingId}
+      AND recording_path IS NOT NULL
+  `;
+  const recordingPath = rows[0]?.recording_path as string | undefined;
+  if (!recordingPath) return;
+
+  const result = await transcribeWithWhisper(recordingPath, meetingId);
+  if (!result.englishTranscript) return;
+
+  await sql`
+    UPDATE meetings
+    SET raw_transcript = ${result.englishTranscript},
+        transcript_source = 'whisper',
+        updated_at = NOW()
+    WHERE id = ${meetingId}
+  `;
+
+  if (result.afrikaansTranscript) {
+    await sql`DELETE FROM meeting_transcripts WHERE meeting_id = ${meetingId} AND format = 'whisper-af'`;
+    await sql`
+      INSERT INTO meeting_transcripts (meeting_id, format, content, created_at)
+      VALUES (${meetingId}, 'whisper-af', ${result.afrikaansTranscript}, NOW())
+    `;
+  }
+
+  log.info(
+    'Whisper Afrikaans transcription stored',
+    { meetingId, englishChars: result.englishTranscript.length, afrikaansChars: result.afrikaansTranscript.length },
+    LOGGER
+  );
+}
 
 /**
  * Processes a single Teams call record into a fully enriched meeting row.
@@ -155,8 +193,13 @@ export async function processMeetingFromCallRecord(callRecordId: string): Promis
         participants
       );
       if (found) {
+        hasRecording = true;
         log.info('Recording recovered via OneDrive fallback', { meetingId }, LOGGER);
       }
+    }
+
+    if (hasRecording && WHISPER_TEAMS_RECORDINGS) {
+      await transcribeStoredRecordingWithWhisper(meetingId);
     }
 
     // 6. LLM enrichment
