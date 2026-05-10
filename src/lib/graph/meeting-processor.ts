@@ -41,18 +41,31 @@ async function transcribeStoredRecordingWithWhisper(meetingId: number): Promise<
     WHERE id = ${meetingId}
   `;
 
-  if (result.afrikaansTranscript) {
+  const afrikaansStored = !!result.afrikaansTranscript;
+  if (afrikaansStored) {
     await sql`DELETE FROM meeting_transcripts WHERE meeting_id = ${meetingId} AND format = 'whisper-af'`;
     await sql`
       INSERT INTO meeting_transcripts (meeting_id, format, content, created_at)
       VALUES (${meetingId}, 'whisper-af', ${result.afrikaansTranscript}, NOW())
     `;
+  } else {
+    // Empty Afrikaans transcript usually means silence, all-English audio,
+    // or a Whisper miss on the af-language pass. English raw_transcript is
+    // still saved above, so meeting summarisation is unaffected — but we
+    // surface this so empty whisper-af rows are diagnosable.
+    log.warn(
+      'Whisper produced empty Afrikaans transcript; whisper-af row not stored',
+      { meetingId, englishChars: result.englishTranscript.length },
+      LOGGER,
+    );
   }
 
   log.info(
-    'Whisper Afrikaans transcription stored',
+    afrikaansStored
+      ? 'Whisper Afrikaans transcription stored'
+      : 'Whisper English transcription stored (no Afrikaans content)',
     { meetingId, englishChars: result.englishTranscript.length, afrikaansChars: result.afrikaansTranscript.length },
-    LOGGER
+    LOGGER,
   );
 }
 

@@ -182,13 +182,24 @@ function buildTranscriptText(segments: WhisperSegment[]): string {
  *
  * @param recordingPath - Absolute path to the MP4 recording
  * @param meetingId     - Database meeting ID (used for temp file naming)
- * @returns WhisperResult with English transcript
+ * @param options.withAfrikaans - When false, skip the Afrikaans transcription
+ *   pass and only run the translation pass. Halves OpenAI cost+latency for
+ *   callers that discard the Afrikaans transcript (e.g. the bot recorder).
+ *   Defaults to true for backwards compatibility with the Teams ingestion
+ *   path that needs both languages.
+ * @returns WhisperResult with English transcript (and Afrikaans if requested)
  */
+interface TranscribeOptions {
+  withAfrikaans?: boolean;
+}
+
 export async function transcribeWithWhisper(
   recordingPath: string,
   meetingId: number,
+  options: TranscribeOptions = {},
 ): Promise<WhisperResult> {
-  log.info('Starting Whisper transcription', { meetingId, recordingPath }, LOGGER);
+  const withAfrikaans = options.withAfrikaans !== false;
+  log.info('Starting Whisper transcription', { meetingId, recordingPath, withAfrikaans }, LOGGER);
 
   // 1. Extract audio
   const audioPath = extractAudio(recordingPath, meetingId);
@@ -209,15 +220,20 @@ export async function transcribeWithWhisper(
 
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i]!;
-    const afResult = await whisperTranscribeAfrikaans(chunk);
+    // Only run the Afrikaans pass when the caller asked for it. Both
+    // endpoints process the same audio chunk, so when both run they should
+    // return the same `duration`; we use whichever is available.
+    const afResult = withAfrikaans ? await whisperTranscribeAfrikaans(chunk) : null;
     const enResult = await whisperTranslate(chunk);
 
-    const afSegments = afResult.segments.map(s => ({
-      ...s,
-      start: s.start + timeOffset,
-      end: s.end + timeOffset,
-    }));
-    allAfrikaansSegments.push(...afSegments);
+    if (afResult) {
+      const afSegments = afResult.segments.map(s => ({
+        ...s,
+        start: s.start + timeOffset,
+        end: s.end + timeOffset,
+      }));
+      allAfrikaansSegments.push(...afSegments);
+    }
 
     const enSegments = enResult.segments.map(s => ({
       ...s,
@@ -226,8 +242,9 @@ export async function transcribeWithWhisper(
     }));
     allEnglishSegments.push(...enSegments);
 
-    timeOffset += afResult.duration;
-    totalDuration += afResult.duration;
+    const chunkDuration = afResult?.duration ?? enResult.duration;
+    timeOffset += chunkDuration;
+    totalDuration += chunkDuration;
   }
 
   // 4. Build transcript text
