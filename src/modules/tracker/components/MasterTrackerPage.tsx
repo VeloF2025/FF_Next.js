@@ -78,13 +78,18 @@ export function MasterTrackerPage({ projectId }: Props) {
     setError(null);
   }
 
+  const handleRowChange = useCallback((rowIndex: number, field: string, value: unknown) => {
+    setRows((prev) => {
+      const next = [...prev];
+      next[rowIndex] = { ...next[rowIndex], [field]: value } as MasterRow;
+      return next;
+    });
+    if (!editMode) setEditMode(true);
+  }, [editMode]);
+
   function handleAddRow() {
     if (!editMode) setEditMode(true);
     setRows((prev) => [...prev, emptyMasterRow(projectId)]);
-  }
-
-  function handleDeleteRow(idx: number) {
-    setRows((prev) => prev.filter((_, i) => i !== idx));
   }
 
   function exportCsv() {
@@ -105,13 +110,15 @@ export function MasterTrackerPage({ projectId }: Props) {
         const ws = wb.Sheets[wb.SheetNames[0] ?? ''];
         if (!ws) return;
         const rowData = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' });
-        const labelToKey: Record<string, keyof MasterRow> = {};
-        MASTER_COLS.forEach((c) => { labelToKey[c.label] = c.key; });
+        const labelToField: Record<string, string> = {};
+        MASTER_COLS.forEach((c) => {
+          if (c.headerName && c.field) labelToField[c.headerName] = c.field;
+        });
         const imported: MasterRow[] = rowData.map((r) => {
           const row = emptyMasterRow(projectId);
           for (const [header, val] of Object.entries(r)) {
-            const key = labelToKey[header];
-            if (key) (row as unknown as Record<string, unknown>)[key] = val === '' ? null : val;
+            const field = labelToField[header];
+            if (field) (row as unknown as Record<string, unknown>)[field] = val === '' ? null : val;
           }
           return row;
         });
@@ -170,10 +177,9 @@ export function MasterTrackerPage({ projectId }: Props) {
           rows={rows}
           editMode={editMode}
           selectLists={selectLists}
-          onChange={setRows}
-          onDeleteRow={handleDeleteRow}
           filters={filters}
-          onFiltersChange={setFilters}
+          onRowChange={handleRowChange}
+          onFilterChange={(field, values) => setFilters((prev) => ({ ...prev, [field]: values }))}
         />
       )}
     </div>
