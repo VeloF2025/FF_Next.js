@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import type { ColDef, CellValueChangedEvent } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
@@ -10,10 +10,7 @@ import type { MasterRow } from '../types/master-tracker.types';
 export interface MasterTrackerTableProps {
   rows: MasterRow[];
   editMode: boolean;
-  selectLists: Record<string, string[]>;
-  filters: Record<string, Set<string>>;
   onRowChange: (rowIndex: number, field: string, value: unknown) => void;
-  onFilterChange: (field: string, values: Set<string>) => void;
 }
 
 export const MASTER_COLS: ColDef<MasterRow>[] = [
@@ -63,6 +60,8 @@ export function MasterTrackerTable({
   editMode,
   onRowChange,
 }: MasterTrackerTableProps) {
+  const gridRef = useRef<AgGridReact<MasterRow>>(null);
+
   const defaultColDef = useMemo<ColDef>(() => ({
     editable: editMode,
     resizable: true,
@@ -70,9 +69,12 @@ export function MasterTrackerTable({
     sortable: true,
   }), [editMode]);
 
+  useEffect(() => {
+    gridRef.current?.api?.refreshCells({ force: true });
+  }, [editMode]);
+
   const onCellValueChanged = useCallback((e: CellValueChangedEvent<MasterRow>) => {
-    const rowIndex = e.rowIndex ?? 0;
-    onRowChange(rowIndex, e.colDef.field as string, e.newValue);
+    onRowChange(e.rowIndex ?? 0, e.colDef.field as string, e.newValue);
   }, [onRowChange]);
 
   return (
@@ -81,6 +83,7 @@ export function MasterTrackerTable({
       style={{ height: 'calc(100vh - 200px)' }}
     >
       <AgGridReact<MasterRow>
+        ref={gridRef}
         rowData={rows}
         columnDefs={MASTER_COLS}
         defaultColDef={defaultColDef}

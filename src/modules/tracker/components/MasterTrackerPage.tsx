@@ -20,8 +20,6 @@ export function MasterTrackerPage({ projectId }: Props) {
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectLists, setSelectLists] = useState<Record<string, string[]>>({});
-  const [filters, setFilters] = useState<Record<string, Set<string>>>({});
   const importRef = useRef<HTMLInputElement>(null);
 
   const fetchData = useCallback(async () => {
@@ -29,17 +27,10 @@ export function MasterTrackerPage({ projectId }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const [rowsRes, listsRes] = await Promise.all([
-        fetch(`/api/tracker/master/${projectId}`),
-        fetch('/api/tracker/selectlists'),
-      ]);
-      if (!rowsRes.ok) throw new Error('Failed to load');
-      const rowsJson = (await rowsRes.json()) as { data?: MasterRow[] };
-      const listsJson = listsRes.ok ? (await listsRes.json()) as { data?: Record<string, string[]> } : { data: {} };
-      // Add inline PoleScope values (not in DB selectlist)
-      const lists = { ...(listsJson.data ?? {}), PoleScope: ['PLANNED', 'WIP', 'Done'] };
-      setSelectLists(lists);
-      const data = rowsJson.data ?? [];
+      const res = await fetch(`/api/tracker/master/${projectId}`);
+      if (!res.ok) throw new Error('Failed to load');
+      const json = (await res.json()) as { data?: MasterRow[] };
+      const data = json.data ?? [];
       setRows(data);
       setSaved(data);
     } catch (err) {
@@ -161,11 +152,6 @@ export function MasterTrackerPage({ projectId }: Props) {
           Import Excel
         </Button>
         <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImport} />
-        {Object.values(filters).some((s) => s.size > 0) && (
-          <Button variant="secondary" size="sm" onClick={() => setFilters({})}>
-            Clear Filters
-          </Button>
-        )}
         {lastSaved && <span className="text-xs text-slate-500 ml-2">Saved {new Date(lastSaved).toLocaleTimeString()}</span>}
         {error && <span className="text-xs text-red-400 ml-2">{error}</span>}
       </div>
@@ -177,10 +163,7 @@ export function MasterTrackerPage({ projectId }: Props) {
         <MasterTrackerTable
           rows={rows}
           editMode={editMode}
-          selectLists={selectLists}
-          filters={filters}
           onRowChange={handleRowChange}
-          onFilterChange={(field, values) => setFilters((prev) => ({ ...prev, [field]: values }))}
         />
       )}
     </div>
