@@ -8,11 +8,16 @@ import { getAuth } from '@/lib/auth-mock';
 import { pool } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 
-const ALLOWED_FIELDS = new Set([
-  'blockage', 'civil_contractor', 'stringing_contractor',
-  'optical_contractor', 'optical_splitter', 'optical_type',
-  'atp_submitter_notes', 'override_notes',
-]);
+const OVERRIDE_COLS: Record<string, string> = {
+  blockage: 'blockage',
+  civil_contractor: 'civil_contractor',
+  stringing_contractor: 'stringing_contractor',
+  optical_contractor: 'optical_contractor',
+  optical_splitter: 'optical_splitter',
+  optical_type: 'optical_type',
+  atp_submitter_notes: 'atp_submitter_notes',
+  override_notes: 'override_notes',
+};
 
 interface Params { params: Promise<{ projectId: string }> }
 interface OverrideBody { pon_stage_id: string; field: string; value: unknown }
@@ -22,21 +27,33 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const auth = getAuth(req);
     if (!auth?.userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    await params;
+    const { projectId } = await params;
     const body = await req.json() as OverrideBody;
 
     if (!body.pon_stage_id || !body.field) {
       return NextResponse.json({ error: 'pon_stage_id and field required' }, { status: 400 });
     }
-    if (!ALLOWED_FIELDS.has(body.field)) {
+    const col = OVERRIDE_COLS[body.field];
+    if (!col) {
       return NextResponse.json({ error: `Field '${body.field}' is not PM-editable` }, { status: 400 });
+    }
+    if (body.value !== null && body.value !== undefined && typeof body.value !== 'string') {
+      return NextResponse.json({ error: 'value must be a string or null' }, { status: 400 });
+    }
+
+    const check = await pool.query(
+      `SELECT 1 FROM pon_stage_tracking WHERE id = $1 AND project_id = $2`,
+      [body.pon_stage_id, projectId]
+    );
+    if (!check.rowCount) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
     const { rows } = await pool.query(
-      `INSERT INTO pon_manual_overrides (pon_stage_id, ${body.field}, updated_by)
+      `INSERT INTO pon_manual_overrides (pon_stage_id, ${col}, updated_by)
        VALUES ($1, $2, $3)
        ON CONFLICT (pon_stage_id) DO UPDATE
-         SET ${body.field} = EXCLUDED.${body.field},
+         SET ${col} = EXCLUDED.${col},
              updated_by = EXCLUDED.updated_by,
              updated_at = NOW()
        RETURNING *`,
