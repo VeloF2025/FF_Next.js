@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
+import { log } from '@/lib/logger';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { TeamSelector } from '@/modules/noc/components/Assignment/TeamSelector';
 import { groupRecordsByProject, resolveTeamForProject } from '@/modules/activate/services/ticketBatchService';
@@ -27,6 +28,7 @@ interface CreateOltTicketsModalProps {
 const TICKET_TYPES = [
   { value: 'olt_investigation', label: 'ONT not found' },
   { value: 'serial_mismatch', label: 'Serial Mismatch' },
+  { value: 'home_installation_status', label: 'Home Sign-up Dispatch' },
   { value: 'fault_repair', label: 'Fault Repair' },
   { value: 'ont_swap', label: 'ONT Swap' },
 ];
@@ -54,7 +56,7 @@ export function CreateOltTicketsModal({ selectedRecords, onConfirm, onClose, loa
         );
         setAssignments(allAssignments);
       })
-      .catch(() => {});
+      .catch((err: unknown) => { log.error('CreateOltTicketsModal', 'Failed to load teams', err); });
   }, []);
 
   useEffect(() => {
