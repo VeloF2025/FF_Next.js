@@ -125,7 +125,8 @@ export function MasterTrackerPage({ projectId }: Props) {
         setRows((prev) => [...prev, ...imported]);
         if (!editMode) setEditMode(true);
       } catch (err) {
-        void err;
+        setError('Import failed — check file format');
+        log.error('MasterTrackerPage: import failed', { err }, 'tracker');
       }
     };
     reader.readAsArrayBuffer(file);
