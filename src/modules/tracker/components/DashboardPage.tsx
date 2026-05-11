@@ -34,16 +34,24 @@ function pct(n: number, d: number): string {
 export function DashboardPage() {
   const [projects, setProjects] = useState<ProjectKpi[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/tracker/dashboard')
-      .then((r) => r.json() as Promise<{ data?: ProjectKpi[] }>)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<{ data?: ProjectKpi[] }>;
+      })
       .then((j) => setProjects(j.data ?? []))
-      .catch((err: unknown) => log.error('DashboardPage: fetch failed', { err }, 'tracker'))
+      .catch((err: unknown) => {
+        log.error('DashboardPage: fetch failed', { err }, 'tracker');
+        setError('Failed to load dashboard data');
+      })
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <div className="py-16 text-center text-slate-500">Loading dashboard…</div>;
+  if (error) return <div className="py-16 text-center text-red-400">{error}</div>;
   if (projects.length === 0) return <div className="py-16 text-center text-slate-500">No active projects.</div>;
 
   return (

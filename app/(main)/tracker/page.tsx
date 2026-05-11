@@ -100,7 +100,7 @@ export default function TrackerPage() {
       <div className="flex-1 overflow-auto">
         {activeTab === 'dashboard' ? (
           <DashboardPage />
-        ) : loading ? (
+        ) : loading && activeTab !== 'settings' ? (
           <div className="py-16 text-center text-slate-500">Loading projects…</div>
         ) : activeTab === 'pon' ? (
           projects.length === 0 ? (
