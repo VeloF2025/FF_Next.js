@@ -70,10 +70,11 @@ export async function POST(req: NextRequest, { params }: Params) {
       for (const row of rows) {
         if (row.id) {
           const setClauses = writeCols.map((c, i) => `${c} = $${i + 2}`).join(', ');
-          const updateVals = [row.id, ...writeCols.map((c) => row[c] ?? null)];
+          const updateVals = [row.id, ...writeCols.map((c) => row[c] ?? null), projectId];
+          const projectIdPlaceholder = `$${updateVals.length}`;
           const { rows: updated } = await client.query(
             `UPDATE master_tracker SET ${setClauses}, updated_at = NOW()
-             WHERE id = $1 AND project_id = '${projectId}' RETURNING *`,
+             WHERE id = $1 AND project_id = ${projectIdPlaceholder} RETURNING *`,
             updateVals
           );
           if (updated[0]) results.push(updated[0]);
