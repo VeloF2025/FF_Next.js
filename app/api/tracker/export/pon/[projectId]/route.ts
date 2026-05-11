@@ -2,8 +2,9 @@
  * GET /api/tracker/export/pon/[projectId]
  * Styled ExcelJS export for Build Tracker (reads pon_stage_tracking)
  */
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
+import { getAuth } from '@/lib/auth-mock';
 import { pool } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 
@@ -35,7 +36,9 @@ const COLS = [
 
 interface Params { params: Promise<{ projectId: string }> }
 
-export async function GET(_req: Request, { params }: Params) {
+export async function GET(req: NextRequest, { params }: Params) {
+  const auth = getAuth(req);
+  if (!auth?.userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { projectId } = await params;
   try {
     const { rows } = await pool.query(
@@ -44,13 +47,13 @@ export async function GET(_req: Request, { params }: Params) {
          p.hld_pon,
          p.z_pon,
          p.olt_port,
-         p.permissions_approved::text         AS scope_poles,
+         p.permissions_total::text             AS scope_poles,
          NULL::text                           AS scope_drops,
          TO_CHAR(p.permissions_first_date, 'YYYY-MM-DD') AS pole_permission,
          p.poles_planted,
          TO_CHAR(p.cwc_first_date,  'YYYY-MM-DD') AS cwc_poles_date,
          TO_CHAR(p.cwc_last_date,   'YYYY-MM-DD') AS cwc_stringing_date,
-         TO_CHAR(p.optical_first_date, 'YYYY-MM-DD') AS ready_for_optical,
+         TO_CHAR(p.cwc_last_date, 'YYYY-MM-DD') AS ready_for_optical,
          CASE WHEN p.cwc_complete >= p.cwc_total AND p.cwc_total > 0 THEN true ELSE false END AS cwc_qa,
          TO_CHAR(p.optical_first_date,  'YYYY-MM-DD') AS optical_splicing_date,
          TO_CHAR(p.optical_last_date,   'YYYY-MM-DD') AS optical_submitted_date,

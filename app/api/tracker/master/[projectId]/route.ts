@@ -28,6 +28,8 @@ const DATA_COLS = [
   'pon_status', 'optical_rate', 'optical_invoice_date', 'optical_invoice_no',
 ] as const;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 interface Params {
   params: Promise<{ projectId: string }>;
 }
@@ -58,6 +60,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     const body = await req.json() as { rows?: Record<string, unknown>[] };
     const rows = body.rows ?? [];
 
+    if (rows.length > 2000) {
+      return NextResponse.json({ error: 'Batch too large — max 2000 rows per request' }, { status: 400 });
+    }
+
     if (rows.length === 0) {
       return NextResponse.json({ data: [] }, { status: 200 });
     }
@@ -69,6 +75,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       await client.query('BEGIN');
       for (const row of rows) {
         if (row.id) {
+          if (typeof row.id !== 'string' || !UUID_RE.test(row.id)) {
+            continue; // skip invalid id silently — INSERT path handles new rows
+          }
           const setClauses = writeCols.map((c, i) => `${c} = $${i + 2}`).join(', ');
           const updateVals = [row.id, ...writeCols.map((c) => row[c] ?? null), projectId];
           const projectIdPlaceholder = `$${updateVals.length}`;
@@ -92,7 +101,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       }
       await client.query('COMMIT');
     } catch (err) {
-      await client.query('ROLLBACK').catch(() => {});
+      await client.query('ROLLBACK').catch((rbErr: unknown) => {
+        log.error('[tracker/master POST] ROLLBACK failed', { err: String(rbErr) });
+      });
       throw err;
     } finally {
       client.release();
