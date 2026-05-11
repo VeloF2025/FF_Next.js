@@ -37,14 +37,14 @@ The session ended with a request to handoff before starting plan 1.0b.
 - `336_pon_manual_overrides.sql` — new 1:1 companion table, lazy insert, LEFT JOIN required
 - `337_pon_change_log.sql` — append-only audit log
 - `339_pon_change_log_audit_fk_fix.sql` — changed FKs from CASCADE to SET NULL after blind review (audit history survives PON deletion)
-- `340_pon_workspace_review_fixes.sql` — additional MEDIUM nits from a second review pass (added by Hein in commit `2b4c70774` post-handoff)
+- `340_pon_workspace_review_fixes.sql` — additional MEDIUM nits from a second review pass (commit `2b4c70774`, applied between blind-review APPROVED and merge)
 - Migration 338 number deliberately unused (Task 4 master_tracker audit found no drift)
 
 **Module docs:** `.claude/modules/tracker-workspace.md` (deep doc) + `src/modules/projects/tracker-workspace/.claude.md` (auto-loaded quick ref, 28 lines, under 50-line cap).
 
 **CI baseline bump:** `scripts/ci-local.sh` `MAX_LINT_WARNINGS` 180→183 with documented rationale (pre-existing master regressions from PRs #1554/#1556).
 
-**Blind review loop:** /review skill ran on the PR — REQUEST_CHANGES with 2 HIGH (GRANTs, FK CASCADE) + 3 MEDIUM + 3 LOW findings. All 8 fixed in commit `4865c1118`. Re-review APPROVED. Hein added one more polish commit `2b4c70774` ("MEDIUM nits") + migration 340 before merge.
+**Blind review loop:** /review skill ran on the PR — REQUEST_CHANGES with 2 HIGH (GRANTs, FK CASCADE) + 3 MEDIUM + 3 LOW findings. All 8 fixed in commit `4865c1118`. Re-review APPROVED. One more polish commit `2b4c70774` ("MEDIUM nits") + migration 340 landed before merge.
 
 ## What's next
 
@@ -122,20 +122,21 @@ Read this file. Then:
 
 ```bash
 # Create the 1.0b worktree
-git fetch origin master --quiet
-git worktree add /home/hein/Workspace/FF_Next.js-tracker-1.0b -b spec/tracker-1.0b origin/master
+git -C /home/hein/Workspace/FF_Next.js fetch origin master --quiet
+git -C /home/hein/Workspace/FF_Next.js worktree add /home/hein/Workspace/FF_Next.js-tracker-1.0b -b spec/tracker-1.0b origin/master
 ln -sf /home/hein/Workspace/FF_Next.js/node_modules /home/hein/Workspace/FF_Next.js-tracker-1.0b/node_modules
-cd /home/hein/Workspace/FF_Next.js-tracker-1.0b
 
-# Read the spec + 1.0a plan for context
-cat docs/superpowers/specs/2026-05-08-project-tracker-workspace-design.md
-cat docs/superpowers/plans/2026-05-08-tracker-workspace-1.0a-schema-foundation.md
+# Read the spec + 1.0a plan for context (use absolute paths; do not cd into the main worktree)
+cat /home/hein/Workspace/FF_Next.js-tracker-1.0b/docs/superpowers/specs/2026-05-08-project-tracker-workspace-design.md
+cat /home/hein/Workspace/FF_Next.js-tracker-1.0b/docs/superpowers/plans/2026-05-08-tracker-workspace-1.0a-schema-foundation.md
 
 # Read the auto-loaded quick ref (also auto-loads when working in tracker-workspace/)
-cat src/modules/projects/tracker-workspace/.claude.md
+cat /home/hein/Workspace/FF_Next.js-tracker-1.0b/src/modules/projects/tracker-workspace/.claude.md
 
 # Then invoke the brainstorming skill to scope plan 1.0b
 # (the user can then say "go" / "happy lets go" to advance through Q→spec→plan)
 ```
+
+All subsequent file edits in plan 1.0b must target paths under `/home/hein/Workspace/FF_Next.js-tracker-1.0b/` so the FF_Next.js worktree-guard hook does not block writes.
 
 Plan 1.0b's first concrete deliverable is the API endpoint table from spec §5.1, implemented as pages-router + `pg.Pool` routes with field-level RBAC enforcement matching §5.2.
