@@ -56,7 +56,7 @@ export function CreateOltTicketsModal({ selectedRecords, onConfirm, onClose, loa
         );
         setAssignments(allAssignments);
       })
-      .catch((err: unknown) => { log.error('CreateOltTicketsModal', 'Failed to load teams', err); });
+      .catch((err: unknown) => { log.error('Failed to load teams', { error: err }, 'CreateOltTicketsModal'); });
   }, []);
 
   useEffect(() => {

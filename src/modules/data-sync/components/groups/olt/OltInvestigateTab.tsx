@@ -26,6 +26,7 @@ import { OltResolveModal } from './OltResolveModal';
 import { OltEscalateModal } from './OltEscalateModal';
 import { CreateOltTicketsModal } from './CreateOltTicketsModal';
 import type { OltTicketBatch } from './CreateOltTicketsModal';
+import { log } from '@/lib/logger';
 
 interface OltInvestigateTabProps {
   records: OltRecord[];
@@ -76,6 +77,7 @@ export function OltInvestigateTab({
   const [swapLookups, setSwapLookups] = useState<Record<string, SwapLookupResult>>({});
   const [swapLoading, setSwapLoading] = useState<Set<string>>(new Set());
   const [swapErrors, setSwapErrors] = useState<Record<string, string>>({});
+  const [dispatchingSignup, setDispatchingSignup] = useState<Set<string>>(new Set());
 
   // Debounce search input
   useEffect(() => {
@@ -206,6 +208,8 @@ export function OltInvestigateTab({
 
   // Create a home sign-up dispatch ticket directly from the Cross-DR conflict panel
   const handleCreateHomeSignupTicket = async (record: OltRecord, drNumber: string) => {
+    if (dispatchingSignup.has(record.id)) return;
+    setDispatchingSignup(prev => new Set(prev).add(record.id));
     try {
       const res = await fetch('/api/system/olt-report/tickets', {
         method: 'POST',
@@ -228,7 +232,10 @@ export function OltInvestigateTab({
       );
       fetchStats();
     } catch (err: unknown) {
+      log.error('Failed to create home sign-up dispatch ticket', { error: err }, 'OltInvestigateTab');
       toast.error(err instanceof Error ? err.message : 'Failed to create ticket');
+    } finally {
+      setDispatchingSignup(prev => { const s = new Set(prev); s.delete(record.id); return s; });
     }
   };
 
@@ -459,9 +466,10 @@ export function OltInvestigateTab({
                             {swapErrors[record.id]?.toLowerCase().includes('home installation') && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleCreateHomeSignupTicket(record, lookup.drB.drNumber); }}
-                                className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700"
+                                disabled={isFixing || dispatchingSignup.has(record.id)}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 disabled:opacity-50"
                               >
-                                <ClipboardList className="w-3 h-3" />
+                                {dispatchingSignup.has(record.id) ? <InlineSpinner size="sm" /> : <ClipboardList className="w-3 h-3" />}
                                 Dispatch Home Sign-up
                               </button>
                             )}
