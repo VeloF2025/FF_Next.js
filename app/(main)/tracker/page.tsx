@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Table2, LayoutGrid, Settings } from 'lucide-react';
-import { PonTrackerPage } from '@/modules/tracker/components/PonTrackerPage';
+import { BuildTrackerPage } from '@/modules/tracker/components/BuildTrackerPage';
 import { MasterTrackerPage } from '@/modules/tracker/components/MasterTrackerPage';
 import { TrackerSelectListAdmin } from '@/modules/tracker/components/TrackerSelectListAdmin';
 import { log } from '@/lib/logger';
@@ -16,7 +16,7 @@ interface Project {
 }
 
 const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: 'pon', label: 'PON Tracker', icon: Table2 },
+  { id: 'pon', label: 'Build Tracker', icon: Table2 },
   { id: 'master', label: 'Master Tracker', icon: LayoutGrid },
   { id: 'settings', label: 'Tracker Settings', icon: Settings },
 ];
@@ -102,7 +102,7 @@ export default function TrackerPage() {
           projects.length === 0 ? (
             <div className="py-16 text-center text-slate-500">No active projects found.</div>
           ) : selectedId ? (
-            <PonTrackerPage key={selectedId} projectId={selectedId} />
+            <BuildTrackerPage key={selectedId} projectId={selectedId} />
           ) : null
         ) : activeTab === 'master' ? (
           projects.length === 0 ? (
