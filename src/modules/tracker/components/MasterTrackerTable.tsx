@@ -87,7 +87,6 @@ export function MasterTrackerTable({
         onCellValueChanged={onCellValueChanged}
         rowHeight={36}
         headerHeight={40}
-        suppressRowClickSelection
         enableCellTextSelection
         clipboardDelimiter="\t"
       />
