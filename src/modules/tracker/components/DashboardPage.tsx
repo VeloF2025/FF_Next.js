@@ -105,7 +105,7 @@ export function DashboardPage() {
                     {pct(p.activation_complete, p.activation_total)}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-right text-slate-400">{p.sign_ups || '—'}</td>
+                <td className="px-4 py-3 text-right text-slate-400">{p.sign_ups ?? '—'}</td>
                 <td className="px-4 py-3 text-xs text-slate-500">
                   {p.last_synced_at
                     ? new Date(p.last_synced_at).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: '2-digit' })
