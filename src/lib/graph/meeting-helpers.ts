@@ -156,15 +156,20 @@ export async function fetchAndStoreRecording(
 const RECORDINGS_BASE =
   process.env.MEETING_RECORDINGS_PATH || '/home/velo/meeting-recordings';
 
-// Teams recording filenames use the organizer's local timezone (SAST = UTC+2).
-// We parse them as UTC in parseRecordingFilename, introducing a 2h offset.
-// Using a 4h window covers that offset plus a reasonable scheduling buffer.
-const ONEDRIVE_MATCH_WINDOW_MS = 4 * 60 * 60 * 1000;
+// Match window: recording createdDateTime (UTC) vs meeting startDateTime (UTC).
+// Teams creates the OneDrive file when recording STARTS, not when it ends.
+// 2h covers the longest expected meeting; extra buffer for late webhook delivery.
+const ONEDRIVE_MATCH_WINDOW_MS = 2 * 60 * 60 * 1000;
 
 /**
- * Fallback: searches participants' OneDrive /Recordings/ folders for a recording
- * that matches the meeting date (±2 hours). Used when resolveOnlineMeeting fails
- * and the Graph onlineMeetings API can't find the meeting resource.
+ * Fallback: searches the organizer's OneDrive /Recordings/ folder for a recording
+ * that matches the meeting start time. Used when resolveOnlineMeeting fails and the
+ * Graph onlineMeetings API can't find the meeting resource.
+ *
+ * Only the organizer's OneDrive is searched — recordings from personal/ad-hoc meetings
+ * are always saved there. Searching all participants' OneDrive would cause recordings
+ * to be incorrectly claimed by meetings where the participant was the organizer of a
+ * different concurrent recording.
  *
  * @returns true if a recording was found and attached, false otherwise
  */
@@ -172,44 +177,38 @@ export async function findAndStoreOneDriveRecording(
   meetingId: number,
   meetingDate: string,
   organizerParticipant: ResolvedParticipant | null,
-  participants: ResolvedParticipant[]
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _participants: ResolvedParticipant[]
 ): Promise<boolean> {
   const meetingMs = new Date(meetingDate).getTime();
 
-  // Build candidate list: organizer first, then other internal participants
-  const candidateUserIds: string[] = [];
-  if (organizerParticipant?.graphUserId) {
-    candidateUserIds.push(organizerParticipant.graphUserId);
-  }
-  for (const p of participants) {
-    if (p.graphUserId && !candidateUserIds.includes(p.graphUserId)) {
-      const domain = p.email?.split('@')[1]?.toLowerCase();
-      if (domain && INTERNAL_DOMAINS.includes(domain)) {
-        candidateUserIds.push(p.graphUserId);
-      }
-    }
-  }
-
-  if (candidateUserIds.length === 0) {
-    log.info('No candidates for OneDrive fallback', { meetingId }, LOGGER);
+  // Only search the organizer's OneDrive. Searching all participants causes recordings
+  // to be incorrectly claimed by other meetings (the organizer is the only one whose
+  // OneDrive will contain a recording of THIS meeting).
+  if (!organizerParticipant?.graphUserId) {
+    log.info('No organizer for OneDrive fallback', { meetingId }, LOGGER);
     return false;
   }
 
+  const organizerUserId = organizerParticipant.graphUserId;
+
   log.info(
     'Attempting OneDrive recording fallback',
-    { meetingId, candidates: candidateUserIds.length },
+    { meetingId, organizerUserId: organizerUserId.substring(0, 8) },
     LOGGER
   );
 
-  for (const userId of candidateUserIds) {
-    try {
-      const recordings = await listUserRecordings(userId);
-      if (recordings.length === 0) continue;
+  try {
+      const recordings = await listUserRecordings(organizerUserId);
+      if (recordings.length === 0) {
+        log.info('No OneDrive recordings for organizer', { meetingId }, LOGGER);
+        return false;
+      }
 
       for (const item of recordings) {
-        const parsed = parseRecordingFilename(item.name);
-        const itemDate = parsed.date || new Date(item.createdDateTime);
-        const itemMs = itemDate.getTime();
+        // Use createdDateTime (UTC) for matching — filename timestamps are in the organizer's
+        // local timezone (SAST = UTC+2) and would introduce a 2h offset if parsed as UTC.
+        const itemMs = new Date(item.createdDateTime).getTime();
 
         if (Math.abs(itemMs - meetingMs) > ONEDRIVE_MATCH_WINDOW_MS) continue;
 
@@ -225,8 +224,10 @@ export async function findAndStoreOneDriveRecording(
         const month = String(recDate.getMonth() + 1).padStart(2, '0');
         const filePath = path.join(RECORDINGS_BASE, year, month, `${meetingId}.mp4`);
 
+        const parsed = parseRecordingFilename(item.name);
+
         if (!fs.existsSync(filePath)) {
-          const sizeBytes = await downloadDriveItem(userId, item.id, filePath);
+          const sizeBytes = await downloadDriveItem(organizerUserId, item.id, filePath);
           await sql`
             UPDATE meetings
             SET recording_path = ${filePath},
@@ -262,10 +263,9 @@ export async function findAndStoreOneDriveRecording(
 
         return true;
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      log.warn('OneDrive fallback failed for user', { userId: userId.substring(0, 8), error: msg }, LOGGER);
-    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log.warn('OneDrive fallback failed for organizer', { organizerUserId: organizerUserId.substring(0, 8), error: msg }, LOGGER);
   }
 
   log.info('No matching OneDrive recording found', { meetingId }, LOGGER);
