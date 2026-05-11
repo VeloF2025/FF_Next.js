@@ -52,7 +52,8 @@ export async function GET(req: NextRequest, { params }: Params) {
          TO_CHAR(p.permissions_first_date, 'YYYY-MM-DD') AS pole_permission,
          p.poles_planted,
          TO_CHAR(p.cwc_first_date,  'YYYY-MM-DD') AS cwc_poles_date,
-         TO_CHAR(p.cwc_last_date,   'YYYY-MM-DD') AS cwc_stringing_date,
+         TO_CHAR(p.cwc_last_date, 'YYYY-MM-DD') AS cwc_stringing_date,
+         -- cwc_last_date = CWC completion = when stringing finished = ready for optical
          TO_CHAR(p.cwc_last_date, 'YYYY-MM-DD') AS ready_for_optical,
          CASE WHEN p.cwc_complete >= p.cwc_total AND p.cwc_total > 0 THEN true ELSE false END AS cwc_qa,
          TO_CHAR(p.optical_first_date,  'YYYY-MM-DD') AS optical_splicing_date,

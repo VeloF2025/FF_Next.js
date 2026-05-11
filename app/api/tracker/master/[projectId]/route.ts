@@ -76,7 +76,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       for (const row of rows) {
         if (row.id) {
           if (typeof row.id !== 'string' || !UUID_RE.test(row.id)) {
-            continue; // skip invalid id silently — INSERT path handles new rows
+            log.warn('[tracker/master POST] skipping row with invalid id', { id: row.id });
+            continue;
           }
           const setClauses = writeCols.map((c, i) => `${c} = $${i + 2}`).join(', ');
           const updateVals = [row.id, ...writeCols.map((c) => row[c] ?? null), projectId];
