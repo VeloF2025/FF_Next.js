@@ -12,7 +12,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import * as XLSX from 'xlsx';
-import { withAuth } from '@/lib/auth';
+import { withAuth, withRole } from '@/lib/auth';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
@@ -170,10 +170,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     return res.status(200).send(excel);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : 'Unknown error';
-    log.error('Export failed', { message: msg }, 'OntSerialsExport');
-    return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, msg);
+    log.error('Export failed', { message: error instanceof Error ? error.message : String(error) }, 'OntSerialsExport');
+    return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Export failed');
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withRole('manager')(handler));

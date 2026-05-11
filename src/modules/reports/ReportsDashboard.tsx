@@ -3,6 +3,7 @@
 import { FileText, Download, Filter, PieChart, BarChart3, TrendingUp, Clock, Plus, RefreshCw, Wifi } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { useState, useCallback } from 'react';
+import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { StatsGrid } from '../../components/dashboard/EnhancedStatCard';
 import { DashboardHeader } from '../../components/dashboard/DashboardHeader';
@@ -42,16 +43,20 @@ export default function ReportsDashboard() {
       const response = await fetch('/api/reports/ont-serials-export');
       if (!response.ok) throw new Error('Export failed');
       const blob = await response.blob();
+      const disposition = response.headers.get('Content-Disposition') ?? '';
+      const match = disposition.match(/filename="([^"]+)"/);
+      const filename = match?.[1] ?? `ont-serials-${new Date().toISOString().slice(0, 10)}.xlsx`;
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `ont-serials-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    } catch {
-      alert('Failed to export ONT serials. Please try again.');
+      toast.success('ONT serials exported');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Export failed — please try again');
     } finally {
       setIsExportingOnt(false);
     }
