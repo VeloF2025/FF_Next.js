@@ -70,11 +70,15 @@ export function MasterTrackerTable({
   }), [editMode]);
 
   useEffect(() => {
-    gridRef.current?.api?.refreshCells({ force: true });
+    const api = gridRef.current?.api;
+    if (!api) return;
+    api.setGridOption('defaultColDef', { editable: editMode, resizable: true, filter: true, sortable: true });
+    api.refreshCells({ force: true });
   }, [editMode]);
 
   const onCellValueChanged = useCallback((e: CellValueChangedEvent<MasterRow>) => {
-    onRowChange(e.rowIndex ?? 0, e.colDef.field as string, e.newValue);
+    if (e.rowIndex == null || !e.colDef.field) return;
+    onRowChange(e.rowIndex, e.colDef.field, e.newValue);
   }, [onRowChange]);
 
   return (
