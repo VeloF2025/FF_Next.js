@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Table2, LayoutGrid, Settings } from 'lucide-react';
+import { Table2, LayoutGrid, Settings, BarChart3 } from 'lucide-react';
 import { BuildTrackerPage } from '@/modules/tracker/components/BuildTrackerPage';
 import { MasterTrackerPage } from '@/modules/tracker/components/MasterTrackerPage';
+import { DashboardPage } from '@/modules/tracker/components/DashboardPage';
 import { TrackerSelectListAdmin } from '@/modules/tracker/components/TrackerSelectListAdmin';
 import { log } from '@/lib/logger';
 
-type Tab = 'pon' | 'master' | 'settings';
+type Tab = 'dashboard' | 'pon' | 'master' | 'settings';
 
 interface Project {
   id: string;
@@ -16,6 +17,7 @@ interface Project {
 }
 
 const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
   { id: 'pon', label: 'Build Tracker', icon: Table2 },
   { id: 'master', label: 'Master Tracker', icon: LayoutGrid },
   { id: 'settings', label: 'Tracker Settings', icon: Settings },
@@ -26,7 +28,7 @@ export default function TrackerPage() {
   const searchParams = useSearchParams();
   // Handle null searchParams (Next.js can return null in some render scenarios)
   const tabParam = searchParams?.get('tab') as Tab | null;
-  const activeTab: Tab = tabParam && ['pon', 'master', 'settings'].includes(tabParam) ? tabParam : 'pon';
+  const activeTab: Tab = tabParam && ['dashboard', 'pon', 'master', 'settings'].includes(tabParam) ? tabParam : 'dashboard';
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
@@ -78,8 +80,8 @@ export default function TrackerPage() {
           </div>
         </div>
 
-        {/* Project selector — only for data tabs */}
-        {activeTab !== 'settings' && !loading && projects.length > 0 && (
+        {/* Project selector — only for per-project tabs */}
+        {activeTab !== 'dashboard' && activeTab !== 'settings' && !loading && projects.length > 0 && (
           <select
             value={selectedId}
             onChange={(e) => setSelectedId(e.target.value)}
@@ -96,7 +98,9 @@ export default function TrackerPage() {
 
       {/* Tab content */}
       <div className="flex-1 overflow-auto">
-        {loading && activeTab !== 'settings' ? (
+        {activeTab === 'dashboard' ? (
+          <DashboardPage />
+        ) : loading ? (
           <div className="py-16 text-center text-slate-500">Loading projects…</div>
         ) : activeTab === 'pon' ? (
           projects.length === 0 ? (
