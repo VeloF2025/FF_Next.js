@@ -36,6 +36,7 @@ const TICKET_CATEGORIES = [
   { value: 'modification', label: 'Modification' },
   { value: 'ont_swap', label: 'ONT Swap' },
   { value: 'new_installation', label: 'New Installation' },
+  { value: 'home_signup_not_done', label: 'Home Sign Up Not Done' },
 ];
 
 const PRIORITIES = [
