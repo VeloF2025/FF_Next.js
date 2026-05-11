@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Download } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { LoadingSpinner, InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import type { ReportPeriod, ReportData, DisplacedReport, OltRecord } from '../../../types';
@@ -22,6 +23,7 @@ export function OltReportingTab({ setError }: OltReportingTabProps) {
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingOnt, setExportingOnt] = useState(false);
   const [reportView, setReportView] = useState<'records' | 'imports' | 'displaced'>('records');
   const [displacedReport, setDisplacedReport] = useState<DisplacedReport | null>(null);
   const [displacedReportLoading, setDisplacedReportLoading] = useState(false);
@@ -101,6 +103,32 @@ export function OltReportingTab({ setError }: OltReportingTabProps) {
     }
   };
 
+  const handleOntSerialsExport = useCallback(async () => {
+    setExportingOnt(true);
+    try {
+      const res = await fetch('/api/reports/ont-serials-export');
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const disposition = res.headers.get('Content-Disposition') ?? '';
+      const match = disposition.match(/filename="([^"]+)"/);
+      const filename = match?.[1] ?? `ont-serials-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('ONT serials exported');
+    } catch (err) {
+      log.warn('OltReportingTab', { action: 'ontExportFailed', error: err });
+      toast.error('ONT serials export failed');
+    } finally {
+      setExportingOnt(false);
+    }
+  }, []);
+
   return (
     <div className="space-y-6">
       {/* Period Selector and Export */}
@@ -123,15 +151,26 @@ export function OltReportingTab({ setError }: OltReportingTabProps) {
             ))}
           </div>
         </div>
-        <button
-          onClick={handleExportCSV}
-          disabled={exporting || !reportData}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
-          title={`Export ${reportView === 'displaced' ? 'displaced ONTs' : reportView === 'imports' ? 'imports' : reportStatusFilter === 'all' ? 'all records' : reportStatusFilter.replace(/_/g, ' ')} to CSV`}
-        >
-          {exporting ? <InlineSpinner size="sm" /> : <Download className="w-4 h-4" />}
-          Export {reportView === 'displaced' ? 'Displaced' : reportView === 'imports' ? 'Imports' : reportStatusFilter === 'all' ? 'All' : reportStatusFilter.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} CSV
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            disabled={exporting || !reportData}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
+            title={`Export ${reportView === 'displaced' ? 'displaced ONTs' : reportView === 'imports' ? 'imports' : reportStatusFilter === 'all' ? 'all records' : reportStatusFilter.replace(/_/g, ' ')} to CSV`}
+          >
+            {exporting ? <InlineSpinner size="sm" /> : <Download className="w-4 h-4" />}
+            Export {reportView === 'displaced' ? 'Displaced' : reportView === 'imports' ? 'Imports' : reportStatusFilter === 'all' ? 'All' : reportStatusFilter.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} CSV
+          </button>
+          <button
+            onClick={handleOntSerialsExport}
+            disabled={exportingOnt}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            title="Export all ONT serials (OES + pre-provision + field scans) to Excel"
+          >
+            {exportingOnt ? <InlineSpinner size="sm" /> : <Download className="w-4 h-4" />}
+            ONT Serials Excel
+          </button>
+        </div>
       </div>
 
       {reportLoading ? (
