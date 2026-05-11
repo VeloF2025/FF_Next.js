@@ -51,3 +51,40 @@ export function emptyRow(): PonRow {
     blockage: '',
   };
 }
+
+export interface BuildRow {
+  id: string;
+  project_id: string;
+  zone_no: number;
+  pon_no: number;
+  hld_pon: number | null;
+  z_pon: number | null;
+  olt_port: string | null;
+  overall_stage: string;
+  permissions_total: number; permissions_approved: number;
+  poles_total: number; poles_planted: number;
+  cwc_total: number; cwc_complete: number;
+  cwc_target_date: string | null;
+  optical_total: number; optical_complete: number;
+  optical_target_date: string | null;
+  atp_total: number; atp_passed: number;
+  activation_total: number; activation_complete: number;
+  activation_target_date: string | null;
+  sign_ups: number | null;
+  homes_po: number | null;
+  homes_recon: number | null;
+  available: number | null;
+  scope_string: number | null;
+  pct_original: number | null;
+  pct_recon: number | null;
+  auto_blockage: string | null;
+  last_synced_at: string;
+  sync_source: string;
+  pm_blockage: string | null;
+  civil_contractor: string | null;
+  stringing_contractor: string | null;
+  optical_contractor: string | null;
+  override_notes: string | null;
+  override_updated_by: string | null;
+  override_updated_at: string | null;
+}
