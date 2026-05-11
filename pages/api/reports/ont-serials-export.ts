@@ -23,74 +23,68 @@ interface OntSerialRow {
   project: string | null;
   dr_number: string | null;
   zone_no: number | null;
-  zone_code: string | null;
   pon_no: number | null;
-  pon_code: string | null;
   date_registered: string | null;
   activation_date: string | null;
 }
 
+// drops table has zone_no and pon_no only (no zone_code / pon_code columns)
 const QUERY = `
-  SELECT
-    oa.serial_number,
-    'OES'::text                           AS source,
-    COALESCE(p.project_name, oa.team)     AS project,
-    oa.drop_number                        AS dr_number,
-    d.zone_no,
-    d.zone_code,
-    d.pon_no,
-    d.pon_code,
-    oa.activation_date::text              AS date_registered,
-    oa.activation_date::text              AS activation_date
-  FROM oes_activations oa
-  LEFT JOIN drops    d ON LOWER(TRIM(d.drop_number)) = LOWER(TRIM(oa.drop_number))
-  LEFT JOIN projects p ON p.id = d.project_id
+  SELECT * FROM (
+    SELECT
+      oa.serial_number,
+      'OES'::text                           AS source,
+      COALESCE(p.project_name, oa.team)     AS project,
+      oa.drop_number                        AS dr_number,
+      d.zone_no,
+      d.pon_no,
+      oa.activation_date::text              AS date_registered,
+      oa.activation_date::text              AS activation_date
+    FROM oes_activations oa
+    LEFT JOIN drops    d ON LOWER(TRIM(d.drop_number)) = LOWER(TRIM(oa.drop_number))
+    LEFT JOIN projects p ON p.id = d.project_id
 
-  UNION ALL
+    UNION ALL
 
-  SELECT
-    pp.serial_number,
-    'Pre-Provision'::text                 AS source,
-    pp.project,
-    pp.resolved_drop_number               AS dr_number,
-    d.zone_no,
-    d.zone_code,
-    d.pon_no,
-    d.pon_code,
-    pp.date_registered::text              AS date_registered,
-    NULL::text                            AS activation_date
-  FROM oes_pp_data pp
-  LEFT JOIN drops d ON LOWER(TRIM(d.drop_number)) = LOWER(TRIM(pp.resolved_drop_number))
-  WHERE NOT EXISTS (
-    SELECT 1 FROM oes_activations oa WHERE oa.serial_number = pp.serial_number
-  )
-
-  UNION ALL
-
-  SELECT
-    ur.ont_serial_scanned                 AS serial_number,
-    CASE
-      WHEN ur.photo_source ILIKE '%1map%' THEN '1Map Scan'
-      ELSE 'Field Scan'
-    END                                   AS source,
-    ur.project,
-    ur.drop_number                        AS dr_number,
-    d.zone_no,
-    d.zone_code,
-    d.pon_no,
-    d.pon_code,
-    ur.submitted_date::text               AS date_registered,
-    ur.oes_activated_at::date::text       AS activation_date
-  FROM dr_photo_unified_reviews ur
-  LEFT JOIN drops d ON LOWER(TRIM(d.drop_number)) = LOWER(TRIM(ur.drop_number))
-  WHERE ur.ont_serial_scanned IS NOT NULL
-    AND NOT EXISTS (
-      SELECT 1 FROM oes_activations oa WHERE oa.serial_number = ur.ont_serial_scanned
-    )
-    AND NOT EXISTS (
-      SELECT 1 FROM oes_pp_data pp WHERE pp.serial_number = ur.ont_serial_scanned
+    SELECT
+      pp.serial_number,
+      'Pre-Provision'::text                 AS source,
+      pp.project,
+      pp.resolved_drop_number               AS dr_number,
+      d.zone_no,
+      d.pon_no,
+      pp.date_registered::text              AS date_registered,
+      NULL::text                            AS activation_date
+    FROM oes_pp_data pp
+    LEFT JOIN drops d ON LOWER(TRIM(d.drop_number)) = LOWER(TRIM(pp.resolved_drop_number))
+    WHERE NOT EXISTS (
+      SELECT 1 FROM oes_activations oa WHERE oa.serial_number = pp.serial_number
     )
 
+    UNION ALL
+
+    SELECT
+      ur.ont_serial_scanned                 AS serial_number,
+      CASE
+        WHEN ur.photo_source ILIKE '%1map%' THEN '1Map Scan'
+        ELSE 'Field Scan'
+      END                                   AS source,
+      ur.project,
+      ur.drop_number                        AS dr_number,
+      d.zone_no,
+      d.pon_no,
+      ur.submitted_date::text               AS date_registered,
+      ur.oes_activated_at::date::text       AS activation_date
+    FROM dr_photo_unified_reviews ur
+    LEFT JOIN drops d ON LOWER(TRIM(d.drop_number)) = LOWER(TRIM(ur.drop_number))
+    WHERE ur.ont_serial_scanned IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM oes_activations oa WHERE oa.serial_number = ur.ont_serial_scanned
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM oes_pp_data pp WHERE pp.serial_number = ur.ont_serial_scanned
+      )
+  ) t
   ORDER BY
     CASE source
       WHEN 'OES'           THEN 1
@@ -107,9 +101,7 @@ function toExcel(rows: OntSerialRow[]): Buffer {
     'Project',
     'DR Number',
     'Zone No',
-    'Zone Code',
     'PON No',
-    'PON Code',
     'Date Registered',
     'Activation Date',
   ];
@@ -120,23 +112,19 @@ function toExcel(rows: OntSerialRow[]): Buffer {
     r.project ?? '',
     r.dr_number ?? '',
     r.zone_no ?? '',
-    r.zone_code ?? '',
     r.pon_no ?? '',
-    r.pon_code ?? '',
     r.date_registered ?? '',
     r.activation_date ?? '',
   ]);
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
   ws['!cols'] = [
-    { wch: 20 }, // Serial Number
+    { wch: 22 }, // Serial Number
     { wch: 14 }, // Source
-    { wch: 18 }, // Project
-    { wch: 14 }, // DR Number
-    { wch: 9 },  // Zone No
-    { wch: 12 }, // Zone Code
-    { wch: 8 },  // PON No
-    { wch: 12 }, // PON Code
+    { wch: 28 }, // Project
+    { wch: 16 }, // DR Number
+    { wch: 10 }, // Zone No
+    { wch: 10 }, // PON No
     { wch: 16 }, // Date Registered
     { wch: 16 }, // Activation Date
   ];
