@@ -1,8 +1,9 @@
 'use client';
 
-import { FileText, Download, Filter, PieChart, BarChart3, TrendingUp, Clock, Plus, RefreshCw } from 'lucide-react';
+import { FileText, Download, Filter, PieChart, BarChart3, TrendingUp, Clock, Plus, RefreshCw, Wifi } from 'lucide-react';
 import { useRouter } from 'next/router';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { StatsGrid } from '../../components/dashboard/EnhancedStatCard';
 import { DashboardHeader } from '../../components/dashboard/DashboardHeader';
@@ -33,6 +34,33 @@ export default function ReportsDashboard() {
     trends, 
     { formatNumber, formatCurrency, formatPercentage }
   );
+
+  const [isExportingOnt, setIsExportingOnt] = useState(false);
+
+  const handleOntSerialsExport = useCallback(async () => {
+    setIsExportingOnt(true);
+    try {
+      const response = await fetch('/api/reports/ont-serials-export');
+      if (!response.ok) throw new Error('Export failed');
+      const blob = await response.blob();
+      const disposition = response.headers.get('Content-Disposition') ?? '';
+      const match = disposition.match(/filename="([^"]+)"/);
+      const filename = match?.[1] ?? `ont-serials-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('ONT serials exported');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Export failed — please try again');
+    } finally {
+      setIsExportingOnt(false);
+    }
+  }, []);
 
   const tabs = [
     { id: 'all', label: 'All Reports' },
@@ -178,6 +206,37 @@ export default function ReportsDashboard() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Data Exports */}
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] mb-8">
+        <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
+          <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Data Exports</h2>
+          <p className="text-sm text-[var(--ff-text-secondary)] mt-1">Live exports — always reflects current database state</p>
+        </div>
+        <div className="p-6">
+          <div className="flex items-center justify-between p-3 hover:bg-[var(--ff-bg-hover)] rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="bg-green-600 p-2 rounded-lg">
+                <Wifi className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="font-medium text-[var(--ff-text-primary)]">ONT Serials Master List</p>
+                <p className="text-sm text-[var(--ff-text-secondary)]">
+                  All ONT serials — OES activations, pre-provisions, and field scans. Includes project, DR, zone, PON, and dates.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleOntSerialsExport}
+              disabled={isExportingOnt}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Download className={`h-4 w-4 ${isExportingOnt ? 'animate-bounce' : ''}`} />
+              {isExportingOnt ? 'Exporting...' : 'Download Excel'}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Recent Reports */}
