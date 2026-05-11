@@ -253,9 +253,9 @@ async function handleCreate(
         if (enrichment.zone) locationParts.push(`Zone ${enrichment.zone}`);
         if (enrichment.pon) locationParts.push(`PON ${enrichment.pon}`);
 
-        const title = dr
-          ? `PP ONT ${serial} at ${dr}`
-          : `PP ONT ${serial} — No DR (Project: ${project})`;
+        const title = ticket_category === 'home_signup_not_done'
+          ? (dr ? `Home Sign Up Not Done — DR ${dr}` : `Home Sign Up Not Done — No DR (Project: ${project})`)
+          : (dr ? `PP ONT ${serial} at ${dr}` : `PP ONT ${serial} — No DR (Project: ${project})`);
 
         // Build enriched description
         const descParts: string[] = [];
