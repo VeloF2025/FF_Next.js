@@ -4,6 +4,12 @@
 -- undo the schema changes those migrations actually applied to the DB.
 -- Only use this rollback to clean up a bad 341 apply; never to attempt
 -- un-applying 278-340 themselves.
+--
+-- After rollback, version 277 will be absent from the migrations table
+-- (the runner will attempt to re-execute 277_*.sql on next run, which
+-- will fail again unless the data issue is separately resolved).
+
+BEGIN;
 
 DELETE FROM migrations WHERE version IN (
   '278','279',
@@ -15,7 +21,11 @@ DELETE FROM migrations WHERE version IN (
   '336','337','339','340'
 );
 
+-- Restore 277 to its pre-341 failed state (success=false, error_message=NULL
+-- since we can't reliably reproduce the exact original error string).
 UPDATE migrations
 SET    success       = false,
-       error_message = 'check constraint "maintenance_tickets_ticket_category_check" of relation "maintenance_tickets" is violated by some row'
+       error_message = NULL
 WHERE  version = '277';
+
+COMMIT;
