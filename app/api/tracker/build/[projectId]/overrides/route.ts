@@ -45,7 +45,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       `SELECT 1 FROM pon_stage_tracking WHERE id = $1 AND project_id = $2`,
       [body.pon_stage_id, projectId]
     );
-    if (!check.rowCount) {
+    if ((check.rowCount ?? 0) < 1) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 

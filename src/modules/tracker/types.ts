@@ -78,12 +78,15 @@ export interface BuildRow {
   pct_original: number | null;
   pct_recon: number | null;
   auto_blockage: string | null;
-  last_synced_at: string;
+  last_synced_at: string | null;
   sync_source: string;
   pm_blockage: string | null;
   civil_contractor: string | null;
   stringing_contractor: string | null;
   optical_contractor: string | null;
+  optical_splitter: string | null;
+  optical_type: string | null;
+  atp_submitter_notes: string | null;
   override_notes: string | null;
   override_updated_by: string | null;
   override_updated_at: string | null;
