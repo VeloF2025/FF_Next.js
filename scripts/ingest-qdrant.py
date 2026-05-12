@@ -107,6 +107,8 @@ def load_env():
 # Only user-facing content — no .claude/ developer docs or module-context
 # .claude/ docs are for AI coding assistants; they pollute user-facing search
 SOURCE_GLOBS = [
+    # Module context docs — per-module gotchas, API tables, critical rules
+    ("src/modules/*/.claude.md",        "module-context"),
     # Primary: user manuals (how-to, feature guides)
     ("docs/user-manuals/source/*.md",   "user-manual"),
     # Feature docs (PRDs with user-facing feature descriptions)
