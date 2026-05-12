@@ -873,6 +873,110 @@ async function runWAPhotoVLMScan(): Promise<{
   return results;
 }
 
+/**
+ * Backfill GPS on resolved PP records and their linked tables.
+ * Priority: drops → oes_activations → onemap_drops
+ * Also propagates to dr_photo_unified_reviews and fills gaps in the drops table.
+ * All UPDATEs are idempotent (WHERE latitude IS NULL).
+ */
+async function backfillGpsCoordinates(): Promise<{ pp: number; unified: number; drops: number }> {
+  try {
+    let pp = 0, unified = 0, drops = 0;
+
+    // oes_pp_data: drops first
+    const r1 = await pool.query(`
+      UPDATE oes_pp_data pp
+      SET latitude = d.latitude, longitude = d.longitude, updated_at = NOW()
+      FROM drops d
+      WHERE d.drop_number = pp.resolved_drop_number
+        AND pp.resolved_drop_number IS NOT NULL
+        AND pp.latitude IS NULL
+        AND d.latitude IS NOT NULL
+    `);
+    pp += r1.rowCount ?? 0;
+
+    // oes_pp_data: oes_activations fallback
+    const r2 = await pool.query(`
+      UPDATE oes_pp_data pp
+      SET latitude = oa.latitude, longitude = oa.longitude, updated_at = NOW()
+      FROM oes_activations oa
+      WHERE oa.drop_number = pp.resolved_drop_number
+        AND pp.resolved_drop_number IS NOT NULL
+        AND pp.latitude IS NULL
+        AND oa.latitude IS NOT NULL
+    `);
+    pp += r2.rowCount ?? 0;
+
+    // oes_pp_data: onemap_drops second fallback
+    const r3 = await pool.query(`
+      UPDATE oes_pp_data pp
+      SET latitude = od.latitude::numeric, longitude = od.longitude::numeric, updated_at = NOW()
+      FROM onemap_drops od
+      WHERE od.drop_number = pp.resolved_drop_number
+        AND pp.resolved_drop_number IS NOT NULL
+        AND pp.latitude IS NULL
+        AND od.latitude IS NOT NULL
+    `);
+    pp += r3.rowCount ?? 0;
+
+    // dr_photo_unified_reviews: drops first (drop_number is NOT NULL constrained)
+    const r4 = await pool.query(`
+      UPDATE dr_photo_unified_reviews ur
+      SET latitude = d.latitude, longitude = d.longitude, updated_at = NOW()
+      FROM drops d
+      WHERE d.drop_number = ur.drop_number
+        AND ur.latitude IS NULL
+        AND d.latitude IS NOT NULL
+    `);
+    unified += r4.rowCount ?? 0;
+
+    // dr_photo_unified_reviews: oes_activations fallback
+    const r5 = await pool.query(`
+      UPDATE dr_photo_unified_reviews ur
+      SET latitude = oa.latitude, longitude = oa.longitude, updated_at = NOW()
+      FROM oes_activations oa
+      WHERE oa.drop_number = ur.drop_number
+        AND ur.latitude IS NULL
+        AND oa.latitude IS NOT NULL
+    `);
+    unified += r5.rowCount ?? 0;
+
+    // drops: fill planning GPS gaps from oes_activations
+    const r6 = await pool.query(`
+      UPDATE drops d
+      SET latitude = oa.latitude, longitude = oa.longitude, updated_at = NOW()
+      FROM oes_activations oa
+      WHERE oa.drop_number = d.drop_number
+        AND d.latitude IS NULL
+        AND oa.latitude IS NOT NULL
+    `);
+    drops += r6.rowCount ?? 0;
+
+    // drops: onemap_drops second fallback
+    const r7 = await pool.query(`
+      UPDATE drops d
+      SET latitude = od.latitude::numeric, longitude = od.longitude::numeric, updated_at = NOW()
+      FROM onemap_drops od
+      WHERE od.drop_number = d.drop_number
+        AND d.latitude IS NULL
+        AND od.latitude IS NOT NULL
+    `);
+    drops += r7.rowCount ?? 0;
+
+    if (pp + unified + drops > 0) {
+      logger.info('GPS backfill complete', { pp_updated: pp, unified_updated: unified, drops_updated: drops });
+    } else {
+      logger.debug('GPS backfill: nothing to update');
+    }
+    return { pp, unified, drops };
+  } catch (err) {
+    logger.warn('GPS backfill failed (non-blocking)', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return { pp: 0, unified: 0, drops: 0 };
+  }
+}
+
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
