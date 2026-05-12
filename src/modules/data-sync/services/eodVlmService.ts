@@ -166,15 +166,27 @@ you read from the form, or null if illegible. Do NOT echo the placeholder string
 // PASS 3: POST-PROCESSING
 // ============================================================================
 
+/** Coerce VLM output to string. VLMs sometimes return numbers for typed-string fields
+ * (e.g. pon_number: 121 instead of "121"), which used to throw `.replace is not a function`. */
+function toStringOrNull(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  return null;
+}
+
 function postProcessEntries(entries: EodVlmEntry[]): EodVlmEntry[] {
-  return entries.map((entry) => ({
-    ...entry,
-    dr_number: normalizeDrNumber(entry.dr_number),
-    ont_serial: cleanOntSerial(entry.ont_serial),
-    gizzu_serial: cleanGizzuSerial(entry.gizzu_serial),
-    pon_number: validatePon(entry.pon_number),
-    address: entry.address?.replace(/[^0-9]/g, '') || null,
-  }));
+  return entries.map((entry) => {
+    const addrStr = toStringOrNull(entry.address);
+    return {
+      ...entry,
+      dr_number: normalizeDrNumber(toStringOrNull(entry.dr_number)),
+      ont_serial: cleanOntSerial(toStringOrNull(entry.ont_serial)),
+      gizzu_serial: cleanGizzuSerial(toStringOrNull(entry.gizzu_serial)),
+      pon_number: validatePon(toStringOrNull(entry.pon_number)),
+      address: addrStr ? (addrStr.replace(/[^0-9]/g, '') || null) : null,
+    };
+  });
 }
 
 function normalizeDrNumber(dr: string | null): string | null {
