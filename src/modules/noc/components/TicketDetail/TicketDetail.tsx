@@ -514,7 +514,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
             currentUserId={ticket.assigned_to}
             currentUserName={ticket.assigned_user?.name}
             currentTeamId={ticket.assigned_team_id}
-            currentTeamName={ticket.assigned_team_name ?? ticket.assigned_team}
+            currentTeamName={ticket.assigned_team_name ?? null}
             onAssignmentSaved={handleActionComplete}
           />
 

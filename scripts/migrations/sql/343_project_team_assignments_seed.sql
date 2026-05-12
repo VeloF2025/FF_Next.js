@@ -1,8 +1,8 @@
 -- Migration 343: Seed project-team activations assignments for all live projects
 -- Fixes: modal auto-select was only working for Lawley; other projects showed
 -- "no team configured" and tickets were created without a team name.
--- See also: ticketService.ts patch that populates assigned_team (name) when
--- assigned_team_id is provided directly by callers.
+-- See also: ticketService.ts patch that mirrors assigned_team_id → assigned_team
+-- (both are UUID FK to teams) for callers that only set assigned_team_id.
 
 -- Mamelodi → Mamelodi Activations
 INSERT INTO project_team_assignments (project_id, team_id, role)

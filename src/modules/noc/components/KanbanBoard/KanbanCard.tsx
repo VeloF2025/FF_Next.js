@@ -207,7 +207,7 @@ export function KanbanCard({ ticket, isDragging, onQuickMove, canMoveForward, ca
                 </svg>
               </div>
               <span className="text-xs text-[var(--ff-text-secondary)] truncate max-w-[70px]">
-                {ticket.assigned_team_name || ticket.assigned_team || 'Team'}
+                {ticket.assigned_team_name || 'Team'}
               </span>
             </div>
           ) : (

@@ -202,7 +202,7 @@ export interface Ticket {
   // Assignment
   assigned_to: string | null; // UUID reference to users
   assigned_contractor_id: string | null; // UUID reference to contractors
-  assigned_team: string | null; // Legacy text field
+  assigned_team: string | null; // Legacy UUID FK to teams; mirrors assigned_team_id (both kept in sync)
   assigned_team_id: string | null; // UUID reference to teams table
 
   // Guarantee
