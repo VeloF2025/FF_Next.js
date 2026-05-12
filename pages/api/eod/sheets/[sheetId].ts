@@ -18,37 +18,38 @@ import { log } from '@/lib/logger';
 import type { EodVlmEntry } from '@/modules/data-sync/types';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { id } = req.query;
-  if (typeof id !== 'string') return apiResponse.badRequest(res, 'id required');
+  const { sheetId } = req.query;
+  if (typeof sheetId !== 'string') return apiResponse.badRequest(res, 'sheetId required');
 
-  if (req.method === 'GET') return handleGet(res, id);
-  if (req.method === 'PATCH') return handlePatch(req, res, id);
-  if (req.method === 'DELETE') return handleDelete(res, id);
+  if (req.method === 'GET') return handleGet(res, sheetId);
+  if (req.method === 'PATCH') return handlePatch(req, res, sheetId);
+  if (req.method === 'DELETE') return handleDelete(res, sheetId);
   return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET', 'PATCH', 'DELETE']);
 }
 
-async function handleGet(res: NextApiResponse, id: string) {
+async function handleGet(res: NextApiResponse, sheetId: string) {
   try {
-    const sheet = await getSheet(id);
-    if (!sheet) return apiResponse.notFound(res, 'Sheet', id);
+    const sheet = await getSheet(sheetId);
+    if (!sheet) return apiResponse.notFound(res, 'Sheet', sheetId);
     return apiResponse.success(res, sheet);
   } catch (err) {
-    log.error('[EOD-Sheet] Get error', { id, error: err });
+    log.error('[EOD-Sheet] Get error', { sheetId, error: err });
     return apiResponse.internalError(res, err, 'Failed to get sheet');
   }
 }
 
-async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string) {
+async function handlePatch(req: NextApiRequest, res: NextApiResponse, sheetId: string) {
   const { entries } = req.body as { entries?: unknown[] };
   if (!entries || !Array.isArray(entries) || entries.length === 0) {
     return apiResponse.badRequest(res, 'entries[] required');
   }
 
   try {
-    const sheet = await getSheet(id);
-    if (!sheet) return apiResponse.notFound(res, 'Sheet', id);
+    const sheet = await getSheet(sheetId);
+    if (!sheet) return apiResponse.notFound(res, 'Sheet', sheetId);
 
-    const updatedBy: string = (req as NextApiRequest & { user?: { email?: string } }).user?.email || 'unknown';
+    // @ts-expect-error — req.user injected by withAuth
+    const updatedBy: string = req.user?.email || 'unknown';
 
     const mappedEntries = (entries as Record<string, unknown>[]).map((e) => ({
       id: String(e.id),
@@ -60,7 +61,7 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
       address: (e.address as string | null) || null,
     }));
 
-    const result = await updateSheetEntries(id, mappedEntries, updatedBy);
+    const result = await updateSheetEntries(sheetId, mappedEntries, updatedBy);
 
     // Re-diff against original VLM extraction for learning — fire and forget
     const vlmRaw = sheet.vlm_raw_json as { entries?: EodVlmEntry[] } | null | undefined;
@@ -75,25 +76,25 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
           pon_number: (e.pon_number as string | null) || null,
           address: (e.address as string | null) || null,
         })),
-        id,
+        sheetId,
         sheet.photo_url
-      ).catch((err) => log.warn('[EOD-Learning] Re-diff failed', { id, error: err }));
+      ).catch((err) => log.warn('[EOD-Learning] Re-diff failed', { sheetId, error: err }));
     }
 
     return apiResponse.success(res, result);
   } catch (err) {
-    log.error('[EOD-Sheet] Patch error', { id, error: err });
+    log.error('[EOD-Sheet] Patch error', { sheetId, error: err });
     return apiResponse.internalError(res, err, 'Failed to update sheet entries');
   }
 }
 
-async function handleDelete(res: NextApiResponse, id: string) {
+async function handleDelete(res: NextApiResponse, sheetId: string) {
   try {
-    const deleted = await deleteSheet(id);
-    if (!deleted) return apiResponse.notFound(res, 'Sheet', id);
+    const deleted = await deleteSheet(sheetId);
+    if (!deleted) return apiResponse.notFound(res, 'Sheet', sheetId);
     return apiResponse.success(res, { deleted: true });
   } catch (err) {
-    log.error('[EOD-Sheet] Delete error', { id, error: err });
+    log.error('[EOD-Sheet] Delete error', { sheetId, error: err });
     return apiResponse.internalError(res, err, 'Failed to delete sheet');
   }
 }

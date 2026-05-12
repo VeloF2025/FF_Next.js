@@ -157,9 +157,8 @@ export async function updateSheetEntries(
   entries: UpdateEntryInput[],
   updatedBy: string
 ): Promise<UpdateSheetResult> {
-  let updated_count = 0;
-
-  await transaction(async (txn) => {
+  const updated_count = await transaction(async (txn) => {
+    let n = 0;
     for (const entry of entries) {
       const rows = await txn.query<{ id: string }>(
         `UPDATE eod_install_sheet_entries
@@ -168,8 +167,9 @@ export async function updateSheetEntries(
          RETURNING id`,
         [entry.ontSerial, entry.gizzuSerial, entry.drNumber, entry.ponNumber, entry.address, entry.id, sheetId]
       );
-      if (rows.length > 0) updated_count++;
+      if (rows.length > 0) n++;
     }
+    return n;
   });
 
   const writeBack = await writeBackDrSerials(
