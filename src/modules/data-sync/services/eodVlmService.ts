@@ -153,10 +153,13 @@ Designation section at the bottom of the form has TWO rows:
 - Row 2 label "Contractor" or "Technician" → technician_name + technician_id (contractor who did the work)
 Read both names and IDs in full. If a row is blank, use null.
 
-Each row is UNIQUE. Do NOT increment or copy values.
+Each row is UNIQUE. Do NOT increment or copy values. Do NOT copy the placeholder tokens
+below — they are SCHEMA hints (showing field names and types), not data. If you cannot
+read a value, use null. Inventing plausible-looking serials is forbidden.
 ${fewShotSection}${barcodeSection}
-JSON only:
-{"date":"2025-03-14","velocity_rep_name":"John Smith","velocity_rep_id":"VF042","technician_name":"Peter Dlamini","technician_id":"CT019","entries":[{"row_number":1,"ont_serial":"ALCLB4E5A300","gizzu_serial":"GU18W12V25-090-30991","dr_number":"DR1861234","pon_number":"128","address":"14643","confidence":0.9}],"overall_confidence":0.85}`;
+Return JSON matching this schema. Replace every <PLACEHOLDER> with the actual value
+you read from the form, or null if illegible. Do NOT echo the placeholder strings.
+{"date":"<YYYY-MM-DD>","velocity_rep_name":"<NAME_OR_NULL>","velocity_rep_id":"<ID_OR_NULL>","technician_name":"<NAME_OR_NULL>","technician_id":"<ID_OR_NULL>","entries":[{"row_number":<INT_FROM_1>,"ont_serial":"<ALCL_SERIAL_OR_NULL>","gizzu_serial":"<GU18W12V25_SERIAL_OR_NULL>","dr_number":"<DR186XXXX_OR_NULL>","pon_number":"<128_127_121_OR_NULL>","address":"<14XXX_OR_NULL>","confidence":<0_TO_1>}],"overall_confidence":<0_TO_1>}`;
 }
 
 // ============================================================================
@@ -524,10 +527,54 @@ export async function extractEodSheet(
 
       // Sequential pattern detection — if values increment by 1, it's hallucination
       const drNums = parsed.entries.map((e) => e.dr_number ? parseInt(e.dr_number.replace(/\D/g, '')) : NaN).filter((n) => !isNaN(n));
-      if (drNums.length >= 3 && isSequential(drNums)) {
+      const drsAreSequential = drNums.length >= 3 && isSequential(drNums);
+      if (drsAreSequential) {
         log.warn('[EOD] Sequential DRs detected — hallucination');
         parsed.entries = parsed.entries.map((e) => ({ ...e, dr_number: null, confidence: 0.3 }));
         parsed.overall_confidence = 0.3;
+      }
+
+      // ONT + Gizzu sequential guard: only fires when the DR column itself is unreliable.
+      // Real batch installs from a single carton have sequential Gizzu/ONT serials —
+      // those are legitimate. The prompt-echo signal is sequential serials COMBINED with
+      // a DR column the VLM couldn't read straight (sequential, all-duplicate, or absent).
+      //
+      // We read `parsed.entries` AFTER prior DR guards intentionally: if any earlier guard
+      // (sequential-DR, all-identical-DR) nulled the column, that IS the signal we want
+      // to act on — the VLM is in hallucination mode and the serial-column sequences are
+      // almost certainly echoed too. Real installs with varied, valid DRs pass through
+      // every prior guard untouched, so `drsColumnUnreliable` stays false and legitimate
+      // serial sequences are preserved.
+      const drsColumnUnreliable = parsed.entries.every((e) => !e.dr_number);
+
+      if (drsColumnUnreliable) {
+        // ONT serials: extract trailing digits (e.g. ALCLB4E5A300 → 300)
+        const ontNums = parsed.entries
+          .map((e) => {
+            if (!e.ont_serial) return NaN;
+            const m = e.ont_serial.match(/(\d+)$/);
+            return m ? parseInt(m[1]!) : NaN;
+          })
+          .filter((n) => !isNaN(n));
+        if (ontNums.length >= 3 && isSequential(ontNums)) {
+          log.warn('[EOD] Sequential ONT serials with bad DRs — prompt echo hallucination');
+          parsed.entries = parsed.entries.map((e) => ({ ...e, ont_serial: null, confidence: 0.3 }));
+          parsed.overall_confidence = 0.3;
+        }
+
+        // Gizzu serials: extract trailing digit run
+        const gzNums = parsed.entries
+          .map((e) => {
+            if (!e.gizzu_serial) return NaN;
+            const m = e.gizzu_serial.match(/(\d+)$/);
+            return m ? parseInt(m[1]!) : NaN;
+          })
+          .filter((n) => !isNaN(n));
+        if (gzNums.length >= 3 && isSequential(gzNums)) {
+          log.warn('[EOD] Sequential Gizzu serials with bad DRs — prompt echo hallucination');
+          parsed.entries = parsed.entries.map((e) => ({ ...e, gizzu_serial: null, confidence: 0.3 }));
+          parsed.overall_confidence = 0.3;
+        }
       }
 
       const addrs = parsed.entries.map((e) => e.address ? parseInt(e.address) : NaN).filter((n) => !isNaN(n));
