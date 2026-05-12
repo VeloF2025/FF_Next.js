@@ -133,33 +133,41 @@ async function buildPrompt(barcodeHints: string[]): Promise<string> {
   }
 
   return `/no_think
-Read this handwritten Velocity Fibre install form table.
+Read this handwritten Velocity Fibre install form table. Output ONLY what you can
+actually see written on the page. Do NOT invent values, do NOT default to common
+patterns, do NOT incrementally generate sequential numbers.
 
-HANDWRITING GUIDE for this writer:
-- "6" written as round "0" shape → when you see "0" in DR numbers or addresses, it's "6"
-- "8" written tall like "9" → in DR prefix, always "8" (DR186XXXX)
-- "4" can look like "1" or "9" → in addresses starting with "14", second digit is always "4"
+HANDWRITING TIPS (apply only when a digit is ambiguous, never as a default):
+- A round-shaped "0" inside a digit string is often a handwritten "6".
+- A tall "9"-shaped digit at the start of a DR number is often an "8".
+- A digit between "1" and the rest of a 5-digit address can be ambiguous — read it as written, do not assume.
 
-COLUMNS: Row# | ONT Serial (sticker "SN:ALCL...") | Gizzu (GU18W12V25-XXX-XXXXX) | DR (DR186XXXX) | PON | Address
+COLUMNS (left to right):
+1. Row # (printed)
+2. ONT Serial — sticker starting "SN:" then letters/digits like ALCLxxxxxxxx
+3. Gizzu Serial — starts with GU18W12V25, then a hyphenated suffix
+4. DR Number — handwritten alphanumeric, usually starts with "DR" then 6-7 digits
+5. PON — 2-3 digit handwritten number
+6. Address — handwritten 4-5 digit number (sometimes with slash, e.g. "19/694")
 
-DR Numbers: ALL start with DR186. The last 3-4 digits vary per row — read each carefully.
-Addresses: ALL start with "14" followed by 3 unique digits. Examples from this area: 14643, 14627, 14813, 14814, 14897, 14898, 14846, 14812, 14832, 14825.
-Gizzu suffixes: format is 3chars-5digits (like 090-30991 or 04C-31000). The suffix is different per row.
-PON: one of 128, 127, or 121 — read the actual handwritten digits.
+Read each cell EXACTLY as written. ONT serials, Gizzu serials, DR numbers,
+PON numbers and addresses all vary by row — never copy or increment values.
+If a cell is blank or unreadable, return null for that field.
 
 Date: top-right DD/MM/YYYY → YYYY-MM-DD.
 Designation section at the bottom of the form has TWO rows:
-- Row 1 label "Velocity Fibre" (or "VF") → velocity_rep_name + velocity_rep_id (VF supervisor)
-- Row 2 label "Contractor" or "Technician" → technician_name + technician_id (contractor who did the work)
+- Row 1 label "Velocity Fibre" (or "VF") → velocity_rep_name + velocity_rep_id
+- Row 2 label "Contractor" or "Technician" → technician_name + technician_id
 Read both names and IDs in full. If a row is blank, use null.
 
-Each row is UNIQUE. Do NOT increment or copy values. Do NOT copy the placeholder tokens
-below — they are SCHEMA hints (showing field names and types), not data. If you cannot
-read a value, use null. Inventing plausible-looking serials is forbidden.
+Inventing plausible-looking serials, DR numbers, PONs, or addresses is forbidden.
+If you cannot read a value, return null. Low confidence is better than fabrication.
 ${fewShotSection}${barcodeSection}
-Return JSON matching this schema. Replace every <PLACEHOLDER> with the actual value
-you read from the form, or null if illegible. Do NOT echo the placeholder strings.
-{"date":"<YYYY-MM-DD>","velocity_rep_name":"<NAME_OR_NULL>","velocity_rep_id":"<ID_OR_NULL>","technician_name":"<NAME_OR_NULL>","technician_id":"<ID_OR_NULL>","entries":[{"row_number":<INT_FROM_1>,"ont_serial":"<ALCL_SERIAL_OR_NULL>","gizzu_serial":"<GU18W12V25_SERIAL_OR_NULL>","dr_number":"<DR186XXXX_OR_NULL>","pon_number":"<128_127_121_OR_NULL>","address":"<14XXX_OR_NULL>","confidence":<0_TO_1>}],"overall_confidence":<0_TO_1>}`;
+Return JSON matching this schema. Replace every <PLACEHOLDER> token with the actual
+value you read from the form, or null if illegible. Do NOT echo the placeholder
+strings literally and do NOT use the field-name hints (e.g. "ALCL", "GU18W12V25",
+"DR") as fallback content — only as a clue to which cell you are reading.
+{"date":"<YYYY-MM-DD>","velocity_rep_name":"<NAME_OR_NULL>","velocity_rep_id":"<ID_OR_NULL>","technician_name":"<NAME_OR_NULL>","technician_id":"<ID_OR_NULL>","entries":[{"row_number":<INT_FROM_1>,"ont_serial":"<ONT_AS_READ_OR_NULL>","gizzu_serial":"<GIZZU_AS_READ_OR_NULL>","dr_number":"<DR_AS_READ_OR_NULL>","pon_number":"<PON_AS_READ_OR_NULL>","address":"<ADDRESS_AS_READ_OR_NULL>","confidence":<0_TO_1>}],"overall_confidence":<0_TO_1>}`;
 }
 
 // ============================================================================
