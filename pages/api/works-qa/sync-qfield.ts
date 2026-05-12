@@ -3,7 +3,9 @@ import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
-import { getSlotMeta } from '@/modules/works-qa/utils/slot-keys';
+import { SLOT_META, getSlotMeta } from '@/modules/works-qa/utils/slot-keys';
+
+const ALLOWED_PHOTO_COLUMNS = new Set(SLOT_META.map(s => s.dbColumn));
 
 interface SyncBody {
   project_id?: string;
@@ -105,6 +107,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       // Fetch current value of the slot column to check if it's already set
       const colName = slotMeta.dbColumn;
+      if (!ALLOWED_PHOTO_COLUMNS.has(colName)) { skipped++; continue; }
       const colCheckResult = await pool.query<{ col_val: string | null }>(
         `SELECT ${colName} AS col_val FROM pole_qa_photos WHERE project_id = $1::uuid AND pole_label = $2`,
         [project_id, poleLabel]
@@ -112,10 +115,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       if (colCheckResult.rows.length === 0) { skipped++; continue; }
 
-      const colRow = colCheckResult.rows[0];
-      if (!colRow) { skipped++; continue; }
-
-      if (colRow.col_val !== null) {
+      if (colCheckResult.rows[0].col_val !== null) {
         // Slot already populated — don't overwrite
         skipped++;
         continue;

@@ -50,7 +50,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (fetchResult.rows.length === 0) return apiResponse.notFound(res, 'Pole', pole_id);
 
     const poleRow = fetchResult.rows[0];
-    if (!poleRow) return apiResponse.notFound(res, 'Pole', pole_id);
     const existingVlm = poleRow.vlm_results ?? {};
     const existingSlot = existingVlm[slot] ?? {};
 
