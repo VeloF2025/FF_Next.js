@@ -187,4 +187,4 @@ ${notes ?? 'Please investigate why this device is offline. Possible causes: fibe
   }
 }
 
-export default withAuth(withRole('manager')(handler));
+export default withAuth(withRole('technician')(handler));
