@@ -17,6 +17,7 @@ import {
   CheckCircle,
   ArrowLeftRight,
   Ticket,
+  ClipboardList,
 } from 'lucide-react';
 import type { OltRecord, OltStats, InvestigationContext, SwapLookupResult } from '../../../types';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
@@ -25,6 +26,7 @@ import { OltResolveModal } from './OltResolveModal';
 import { OltEscalateModal } from './OltEscalateModal';
 import { CreateOltTicketsModal } from './CreateOltTicketsModal';
 import type { OltTicketBatch } from './CreateOltTicketsModal';
+import { log } from '@/lib/logger';
 
 interface OltInvestigateTabProps {
   records: OltRecord[];
@@ -75,6 +77,7 @@ export function OltInvestigateTab({
   const [swapLookups, setSwapLookups] = useState<Record<string, SwapLookupResult>>({});
   const [swapLoading, setSwapLoading] = useState<Set<string>>(new Set());
   const [swapErrors, setSwapErrors] = useState<Record<string, string>>({});
+  const [dispatchingSignup, setDispatchingSignup] = useState<Set<string>>(new Set());
 
   // Debounce search input
   useEffect(() => {
@@ -200,6 +203,39 @@ export function OltInvestigateTab({
       toast.error(err instanceof Error ? err.message : 'Failed to create tickets');
     } finally {
       setCreatingTickets(false);
+    }
+  };
+
+  // Create a home sign-up dispatch ticket directly from the Cross-DR conflict panel
+  const handleCreateHomeSignupTicket = async (record: OltRecord, drNumber: string) => {
+    if (dispatchingSignup.has(record.id)) return;
+    setDispatchingSignup(prev => new Set(prev).add(record.id));
+    try {
+      const res = await fetch('/api/system/olt-report/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          record_ids: [record.id],
+          ticket_type: 'home_installation_status',
+          priority: 'normal',
+          notes: `Home sign-up dispatch for ${drNumber} — required before serial swap can proceed.`,
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error?.message || result.error || 'Failed to create ticket');
+      toast.success(`Home sign-up dispatch ticket created for ${drNumber}`);
+      fetchRecords(
+        'needs_investigation',
+        investigateSubFilter !== 'all' ? investigateSubFilter : undefined,
+        debouncedSearch || undefined,
+        projectFilter !== 'all' ? projectFilter : undefined,
+      );
+      fetchStats();
+    } catch (err: unknown) {
+      log.error('Failed to create home sign-up dispatch ticket', { error: err }, 'OltInvestigateTab');
+      toast.error(err instanceof Error ? err.message : 'Failed to create ticket');
+    } finally {
+      setDispatchingSignup(prev => { const s = new Set(prev); s.delete(record.id); return s; });
     }
   };
 
@@ -427,6 +463,16 @@ export function OltInvestigateTab({
                           <span className={`text-xs font-medium ${sc.color}`}>Scenario: {sc.label}</span>
                           <div className="flex items-center gap-2">
                             {swapErrors[record.id] && <span className="text-[10px] text-red-400">{swapErrors[record.id]}</span>}
+                            {swapErrors[record.id]?.toLowerCase().includes('home installation') && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleCreateHomeSignupTicket(record, lookup.drB.drNumber); }}
+                                disabled={isFixing || dispatchingSignup.has(record.id)}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 disabled:opacity-50"
+                              >
+                                {dispatchingSignup.has(record.id) ? <InlineSpinner size="sm" /> : <ClipboardList className="w-3 h-3" />}
+                                Dispatch Home Sign-up
+                              </button>
+                            )}
                             {lookup.scenario === 'clean_swap' && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleSwapFix(record, lookup, true); }}
