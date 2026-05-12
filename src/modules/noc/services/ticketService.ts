@@ -405,6 +405,14 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
       }
     }
 
+    // Mirror assigned_team_id → assigned_team when the caller only sets the _id
+    // column. Both columns are UUID FKs to teams; assigned_team is the legacy
+    // field (now redundant) but AssignmentSection always writes both, so we keep
+    // them in sync here for callers (OLT/PP ticket APIs) that only set _id.
+    if (payload.assigned_team_id && !payload.assigned_team) {
+      payload.assigned_team = payload.assigned_team_id;
+    }
+
     const values = [
       ticketUID,
       payload.source,
