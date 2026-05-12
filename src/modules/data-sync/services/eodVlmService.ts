@@ -159,7 +159,7 @@ read a value, use null. Inventing plausible-looking serials is forbidden.
 ${fewShotSection}${barcodeSection}
 Return JSON matching this schema. Replace every <PLACEHOLDER> with the actual value
 you read from the form, or null if illegible. Do NOT echo the placeholder strings.
-{"date":"<YYYY-MM-DD>","velocity_rep_name":"<NAME_OR_NULL>","velocity_rep_id":"<ID_OR_NULL>","technician_name":"<NAME_OR_NULL>","technician_id":"<ID_OR_NULL>","entries":[{"row_number":1,"ont_serial":"<ALCL_SERIAL_OR_NULL>","gizzu_serial":"<GU18W12V25_SERIAL_OR_NULL>","dr_number":"<DR186XXXX_OR_NULL>","pon_number":"<128_127_121_OR_NULL>","address":"<14XXX_OR_NULL>","confidence":<0_TO_1>}],"overall_confidence":<0_TO_1>}`;
+{"date":"<YYYY-MM-DD>","velocity_rep_name":"<NAME_OR_NULL>","velocity_rep_id":"<ID_OR_NULL>","technician_name":"<NAME_OR_NULL>","technician_id":"<ID_OR_NULL>","entries":[{"row_number":<INT_FROM_1>,"ont_serial":"<ALCL_SERIAL_OR_NULL>","gizzu_serial":"<GU18W12V25_SERIAL_OR_NULL>","dr_number":"<DR186XXXX_OR_NULL>","pon_number":"<128_127_121_OR_NULL>","address":"<14XXX_OR_NULL>","confidence":<0_TO_1>}],"overall_confidence":<0_TO_1>}`;
 }
 
 // ============================================================================
@@ -534,14 +534,20 @@ export async function extractEodSheet(
         parsed.overall_confidence = 0.3;
       }
 
-      // ONT + Gizzu sequential guard: only fires when DRs are ALSO compromised
-      // (sequential or all-null after the DR guard). Real batch installs from a single
-      // carton have sequential Gizzu/ONT serials — those are legitimate. The prompt-echo
-      // signal is sequential serials COMBINED with broken/missing DR numbers.
-      const drsAllNull = parsed.entries.every((e) => !e.dr_number);
-      const promptEchoSignal = drsAreSequential || drsAllNull;
+      // ONT + Gizzu sequential guard: only fires when the DR column itself is unreliable.
+      // Real batch installs from a single carton have sequential Gizzu/ONT serials —
+      // those are legitimate. The prompt-echo signal is sequential serials COMBINED with
+      // a DR column the VLM couldn't read straight (sequential, all-duplicate, or absent).
+      //
+      // We read `parsed.entries` AFTER prior DR guards intentionally: if any earlier guard
+      // (sequential-DR, all-identical-DR) nulled the column, that IS the signal we want
+      // to act on — the VLM is in hallucination mode and the serial-column sequences are
+      // almost certainly echoed too. Real installs with varied, valid DRs pass through
+      // every prior guard untouched, so `drsColumnUnreliable` stays false and legitimate
+      // serial sequences are preserved.
+      const drsColumnUnreliable = parsed.entries.every((e) => !e.dr_number);
 
-      if (promptEchoSignal) {
+      if (drsColumnUnreliable) {
         // ONT serials: extract trailing digits (e.g. ALCLB4E5A300 → 300)
         const ontNums = parsed.entries
           .map((e) => {
