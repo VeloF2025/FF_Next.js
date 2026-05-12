@@ -904,7 +904,7 @@ async function backfillGpsCoordinates(): Promise<{ pp: number; unified: number; 
       WHERE d.drop_number = pp.resolved_drop_number
         AND pp.resolved_drop_number IS NOT NULL
         AND pp.latitude IS NULL
-        AND d.latitude IS NOT NULL
+        AND d.latitude IS NOT NULL AND d.longitude IS NOT NULL
     `);
     pp += r1.rowCount ?? 0;
 
@@ -916,7 +916,7 @@ async function backfillGpsCoordinates(): Promise<{ pp: number; unified: number; 
       WHERE oa.drop_number = pp.resolved_drop_number
         AND pp.resolved_drop_number IS NOT NULL
         AND pp.latitude IS NULL
-        AND oa.latitude IS NOT NULL
+        AND oa.latitude IS NOT NULL AND oa.longitude IS NOT NULL
     `);
     pp += r2.rowCount ?? 0;
 
@@ -928,7 +928,7 @@ async function backfillGpsCoordinates(): Promise<{ pp: number; unified: number; 
       WHERE od.drop_number = pp.resolved_drop_number
         AND pp.resolved_drop_number IS NOT NULL
         AND pp.latitude IS NULL
-        AND od.latitude IS NOT NULL
+        AND od.latitude IS NOT NULL AND od.longitude IS NOT NULL
     `);
     pp += r3.rowCount ?? 0;
 
@@ -939,7 +939,7 @@ async function backfillGpsCoordinates(): Promise<{ pp: number; unified: number; 
       FROM drops d
       WHERE d.drop_number = ur.drop_number
         AND ur.latitude IS NULL
-        AND d.latitude IS NOT NULL
+        AND d.latitude IS NOT NULL AND d.longitude IS NOT NULL
     `);
     unified += r4.rowCount ?? 0;
 
@@ -950,7 +950,7 @@ async function backfillGpsCoordinates(): Promise<{ pp: number; unified: number; 
       FROM oes_activations oa
       WHERE oa.drop_number = ur.drop_number
         AND ur.latitude IS NULL
-        AND oa.latitude IS NOT NULL
+        AND oa.latitude IS NOT NULL AND oa.longitude IS NOT NULL
     `);
     unified += r5.rowCount ?? 0;
 
@@ -961,7 +961,7 @@ async function backfillGpsCoordinates(): Promise<{ pp: number; unified: number; 
       FROM oes_activations oa
       WHERE oa.drop_number = d.drop_number
         AND d.latitude IS NULL
-        AND oa.latitude IS NOT NULL
+        AND oa.latitude IS NOT NULL AND oa.longitude IS NOT NULL
     `);
     drops += r6.rowCount ?? 0;
 
@@ -972,7 +972,7 @@ async function backfillGpsCoordinates(): Promise<{ pp: number; unified: number; 
       FROM onemap_drops od
       WHERE od.drop_number = d.drop_number
         AND d.latitude IS NULL
-        AND od.latitude IS NOT NULL
+        AND od.latitude IS NOT NULL AND od.longitude IS NOT NULL
     `);
     drops += r7.rowCount ?? 0;
 
