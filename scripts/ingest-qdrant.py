@@ -104,8 +104,8 @@ def load_env():
 # Source discovery
 # ---------------------------------------------------------------------------
 
-# Only user-facing content — no .claude/ developer docs or module-context
-# .claude/ docs are for AI coding assistants; they pollute user-facing search
+# Sources: module context docs (AI coding assistant orientation) + user-facing docs.
+# Module .claude.md files help Claude sessions orient to a module without re-reading source.
 SOURCE_GLOBS = [
     # Module context docs — per-module gotchas, API tables, critical rules
     ("src/modules/*/.claude.md",        "module-context"),
