@@ -46,6 +46,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   if (!sheetDate || !entries || !Array.isArray(entries) || entries.length === 0) {
     return apiResponse.badRequest(res, 'sheetDate and entries[] are required');
   }
+  if (velocityRepName !== undefined && typeof velocityRepName !== 'string') {
+    return apiResponse.badRequest(res, 'velocityRepName must be a string');
+  }
+  if (velocityRepId !== undefined && typeof velocityRepId !== 'string') {
+    return apiResponse.badRequest(res, 'velocityRepId must be a string');
+  }
 
   try {
     // Safety-net duplicate check (primary check is in /api/eod/extract before VLM call)
