@@ -12,9 +12,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { pole_id } = req.body as { pole_id?: string };
   if (!pole_id) return apiResponse.badRequest(res, 'pole_id required');
 
-  const userEmail = (req as AuthenticatedNextApiRequest).user.email;
-
   try {
+    const userEmail = (req as AuthenticatedNextApiRequest).user.email;
+
     const fetchResult = await pool.query(
       'SELECT * FROM pole_qa_photos WHERE id = $1::uuid',
       [pole_id]
