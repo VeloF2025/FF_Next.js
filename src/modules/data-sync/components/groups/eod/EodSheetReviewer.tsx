@@ -6,10 +6,12 @@
  */
 
 import { useState } from 'react';
-import { CheckCircle, XCircle, SkipForward } from 'lucide-react';
+import { CheckCircle, XCircle, SkipForward, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EodEntryTable } from './EodEntryTable';
 import type { EodVlmExtraction, EodVlmEntry, EodSavePayload } from '../../../types';
+
+const LOW_CONFIDENCE_THRESHOLD = 0.5;
 
 interface EodSheetReviewerProps {
   extraction: EodVlmExtraction;
@@ -57,14 +59,20 @@ export function EodSheetReviewer({
   const inputCls = 'w-full bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded px-3 py-2 text-sm text-[var(--ff-text-primary)] focus:outline-none focus:border-[var(--ff-accent)]';
   const labelCls = 'text-xs text-[var(--ff-text-secondary)] mb-1 block';
 
+  const drFilledCount = entries.filter((e) => e.dr_number && e.dr_number.trim().length > 0).length;
+  const allDrsBlank = entries.length > 0 && drFilledCount === 0;
+  const lowConfidence = extraction.overall_confidence < LOW_CONFIDENCE_THRESHOLD;
+  const blockSave = allDrsBlank || lowConfidence;
+  const confidencePct = Math.round(extraction.overall_confidence * 100);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
           Review Sheet {sheetIndex + 1} of {totalSheets}
         </h3>
-        <span className="text-xs text-[var(--ff-text-tertiary)]">
-          Confidence: {Math.round(extraction.overall_confidence * 100)}%
+        <span className={`text-xs ${lowConfidence ? 'text-red-400 font-medium' : 'text-[var(--ff-text-tertiary)]'}`}>
+          Confidence: {confidencePct}%
         </span>
       </div>
 
@@ -118,6 +126,24 @@ export function EodSheetReviewer({
 
       <EodEntryTable entries={entries} editable onChange={setEntries} />
 
+      {blockSave && (
+        <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+          <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-amber-300 space-y-1">
+            <p className="font-medium">VLM extraction unreliable — cannot save as-is.</p>
+            {allDrsBlank && (
+              <p>DR Number column is empty for all {entries.length} rows. Type the DR numbers from the photo before saving, or Skip this sheet.</p>
+            )}
+            {lowConfidence && !allDrsBlank && (
+              <p>Overall confidence is {confidencePct}% (threshold {Math.round(LOW_CONFIDENCE_THRESHOLD * 100)}%). Verify and correct each row against the photo before saving.</p>
+            )}
+            {lowConfidence && allDrsBlank && (
+              <p>Confidence is {confidencePct}%. Verify every column against the photo, not just DR Numbers.</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
           <XCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
@@ -129,7 +155,7 @@ export function EodSheetReviewer({
         <Button
           variant="primary"
           onClick={() => { void handleSave(); }}
-          disabled={saving || !sheetDate || entries.length === 0}
+          disabled={saving || !sheetDate || entries.length === 0 || blockSave}
           loading={saving}
           className="flex-1"
         >
