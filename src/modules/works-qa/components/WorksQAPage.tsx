@@ -11,6 +11,7 @@ import { WorksQANav } from './WorksQANav';
 import { PoleListTable } from './PoleListTable';
 import { PoleDetailPanel } from './PoleDetailPanel';
 import { usePoleList } from '../hooks/usePoleList';
+import { log } from '@/lib/logger';
 
 // 🟢 WORKING: page component — wraps table + detail panel with filter bar
 export function WorksQAPage() {
@@ -33,12 +34,21 @@ export function WorksQAPage() {
   /** Trigger a QField sync for the current project then refresh the list. */
   async function handleSync() {
     if (!projectId) return;
-    await fetch('/api/works-qa/sync-qfield', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: projectId }),
-    });
-    mutate();
+    try {
+      const res = await fetch('/api/works-qa/sync-qfield', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: projectId }),
+      });
+      if (!res.ok) {
+        log.error('works-qa: sync-qfield failed', { status: res.status });
+        return;
+      }
+    } catch (err) {
+      log.error('works-qa: sync-qfield network error', { error: err instanceof Error ? err.message : String(err) });
+      return;
+    }
+    void mutate();
   }
 
   const approvedCount = poles.filter(p => p.status === 'approved').length;
@@ -55,7 +65,8 @@ export function WorksQAPage() {
           <input
             type="text"
             placeholder="Project ID…"
-            defaultValue={projectId ?? ''}
+            key={projectId ?? ''}
+          defaultValue={projectId ?? ''}
             className="bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm text-zinc-200 w-72 focus:outline-none focus:border-teal-600"
             onBlur={e => {
               const val = e.target.value.trim();
@@ -65,7 +76,8 @@ export function WorksQAPage() {
           <input
             type="number"
             placeholder="PON No…"
-            defaultValue={ponNo ?? ''}
+            key={ponNo ?? ''}
+          defaultValue={ponNo ?? ''}
             className="bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm text-zinc-200 w-32 focus:outline-none focus:border-teal-600"
             onBlur={e => {
               const val = e.target.value.trim();
@@ -127,7 +139,7 @@ export function WorksQAPage() {
         poleId={selectedPoleId}
         onClose={() => {
           setSelectedPoleId(null);
-          mutate();
+          void mutate();
         }}
       />
     </div>
