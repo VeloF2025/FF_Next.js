@@ -177,7 +177,6 @@ export async function findAndStoreOneDriveRecording(
   meetingId: number,
   meetingDate: string,
   organizerParticipant: ResolvedParticipant | null,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _participants: ResolvedParticipant[]
 ): Promise<boolean> {
   const meetingMs = new Date(meetingDate).getTime();
