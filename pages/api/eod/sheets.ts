@@ -40,11 +40,17 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 }
 
 async function handlePost(req: NextApiRequest, res: NextApiResponse) {
-  const { sheetDate, technicianName, technicianId, photoUrl, photoHash, vlmRawJson, entries } =
+  const { sheetDate, velocityRepName, velocityRepId, technicianName, technicianId, photoUrl, photoHash, vlmRawJson, entries } =
     req.body;
 
   if (!sheetDate || !entries || !Array.isArray(entries) || entries.length === 0) {
     return apiResponse.badRequest(res, 'sheetDate and entries[] are required');
+  }
+  if (velocityRepName !== undefined && typeof velocityRepName !== 'string') {
+    return apiResponse.badRequest(res, 'velocityRepName must be a string');
+  }
+  if (velocityRepId !== undefined && typeof velocityRepId !== 'string') {
+    return apiResponse.badRequest(res, 'velocityRepId must be a string');
   }
 
   try {
@@ -61,6 +67,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     const uploadedBy = req.user?.email || 'unknown';
     const sheet = await createSheet({
       sheetDate,
+      velocityRepName: velocityRepName || null,
+      velocityRepId: velocityRepId || null,
       technicianName: technicianName || null,
       technicianId: technicianId || null,
       photoUrl: photoUrl || null,

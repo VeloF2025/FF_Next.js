@@ -409,6 +409,8 @@ export interface EodInstallSheet {
   sheet_date: string;
   technician_name: string | null;
   technician_id: string | null;
+  velocity_rep_name: string | null;
+  velocity_rep_id: string | null;
   photo_url: string | null;
   entry_count: number;
   uploaded_by: string | null;
@@ -444,6 +446,8 @@ export interface EodVlmExtraction {
   date: string | null;
   technician_name: string | null;
   technician_id: string | null;
+  velocity_rep_name: string | null;
+  velocity_rep_id: string | null;
   entries: EodVlmEntry[];
   overall_confidence: number;
 }
@@ -485,6 +489,8 @@ export interface EodSavePayload {
   sheetDate: string;
   technicianName: string | null;
   technicianId: string | null;
+  velocityRepName: string | null;
+  velocityRepId: string | null;
   entries: EodVlmEntry[];
   photoHash?: string | null;
   vlmExtraction?: EodVlmExtraction | null;

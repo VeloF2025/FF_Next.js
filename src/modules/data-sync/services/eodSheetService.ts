@@ -12,6 +12,8 @@ const sql = neon(process.env.DATABASE_URL!);
 
 interface CreateSheetInput {
   sheetDate: string;
+  velocityRepName: string | null;
+  velocityRepId: string | null;
   technicianName: string | null;
   technicianId: string | null;
   photoUrl: string | null;
@@ -97,10 +99,12 @@ export async function createSheet(input: CreateSheetInput): Promise<EodInstallSh
   // Insert sheet header
   const rows = await sql`
     INSERT INTO eod_install_sheets (
-      sheet_date, technician_name, technician_id,
+      sheet_date, velocity_rep_name, velocity_rep_id,
+      technician_name, technician_id,
       photo_url, photo_hash, entry_count, vlm_raw_json, uploaded_by
     ) VALUES (
-      ${input.sheetDate}, ${input.technicianName}, ${input.technicianId},
+      ${input.sheetDate}, ${input.velocityRepName}, ${input.velocityRepId},
+      ${input.technicianName}, ${input.technicianId},
       ${input.photoUrl}, ${input.photoHash}, ${input.entries.length},
       ${JSON.stringify(input.vlmRawJson)}::jsonb, ${input.uploadedBy}
     )

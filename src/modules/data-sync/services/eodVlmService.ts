@@ -147,12 +147,16 @@ Addresses: ALL start with "14" followed by 3 unique digits. Examples from this a
 Gizzu suffixes: format is 3chars-5digits (like 090-30991 or 04C-31000). The suffix is different per row.
 PON: one of 128, 127, or 121 — read the actual handwritten digits.
 
-Date: top-right DD/MM/YYYY → YYYY-MM-DD. Technician: bottom of form — read FULL name.
+Date: top-right DD/MM/YYYY → YYYY-MM-DD.
+Designation section at the bottom of the form has TWO rows:
+- Row 1 label "Velocity Fibre" (or "VF") → velocity_rep_name + velocity_rep_id (VF supervisor)
+- Row 2 label "Contractor" or "Technician" → technician_name + technician_id (contractor who did the work)
+Read both names and IDs in full. If a row is blank, use null.
 
 Each row is UNIQUE. Do NOT increment or copy values.
 ${fewShotSection}${barcodeSection}
 JSON only:
-{"date":"YYYY-MM-DD","technician_name":"string","technician_id":"string or null","entries":[{"row_number":1,"ont_serial":"string or null","gizzu_serial":"string or null","dr_number":"string","pon_number":"string","address":"string","confidence":0.8}],"overall_confidence":0.8}`;
+{"date":"2025-03-14","velocity_rep_name":"John Smith","velocity_rep_id":"VF042","technician_name":"Peter Dlamini","technician_id":"CT019","entries":[{"row_number":1,"ont_serial":"ALCLB4E5A300","gizzu_serial":"GU18W12V25-090-30991","dr_number":"DR1861234","pon_number":"128","address":"14643","confidence":0.9}],"overall_confidence":0.85}`;
 }
 
 // ============================================================================
