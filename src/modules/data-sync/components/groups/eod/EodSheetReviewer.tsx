@@ -46,6 +46,7 @@ export function EodSheetReviewer({
       technicianName: techName || null,
       technicianId: techId || null,
       entries,
+      vlmExtraction: extraction, // intentionally the original prop, not the user-edited entries
     });
   };
 
