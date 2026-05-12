@@ -13,8 +13,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const params: (string | number)[] = [project_id];
     let ponFilter = '';
-    if (pon_no) {
-      params.push(Number(pon_no));
+    if (pon_no && typeof pon_no === 'string') {
+      const ponNum = parseInt(pon_no, 10);
+      if (isNaN(ponNum)) return apiResponse.badRequest(res, 'pon_no must be a number');
+      params.push(ponNum);
       ponFilter = `AND pon_no = $${params.length}`;
     }
 
@@ -32,11 +34,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         (optical_joint_11_key IS NOT NULL)::int + (optical_joint_12_key IS NOT NULL)::int +
         (optical_joint_13_key IS NOT NULL)::int + (optical_joint_14_key IS NOT NULL)::int +
         (optical_joint_15_key IS NOT NULL)::int + (optical_joint_16_key IS NOT NULL)::int AS joint_filled,
-        array_length(optical_joint_tray_keys, 1) AS tray_count,
+        COALESCE(array_length(optical_joint_tray_keys, 1), 0) AS tray_count,
         (SELECT count(*) FROM jsonb_each(vlm_results) WHERE (value->>'valid')::boolean = false AND value->>'overridden_by' IS NULL) AS vlm_failures,
         CASE
           WHEN approved_at IS NOT NULL THEN 'approved'
-          WHEN civil_step_01_key IS NOT NULL OR optical_dome_01_key IS NOT NULL THEN
+          WHEN (
+            civil_step_01_key IS NOT NULL OR civil_step_02_key IS NOT NULL OR
+            civil_step_03_key IS NOT NULL OR civil_step_04_key IS NOT NULL OR
+            civil_step_05_key IS NOT NULL OR civil_step_06_key IS NOT NULL OR
+            civil_step_07_key IS NOT NULL OR
+            optical_dome_01_key IS NOT NULL OR optical_dome_02_key IS NOT NULL OR
+            optical_dome_03_key IS NOT NULL OR optical_dome_04_key IS NOT NULL OR
+            optical_dome_05_key IS NOT NULL OR optical_dome_06_key IS NOT NULL OR
+            optical_dome_07_key IS NOT NULL OR optical_dome_08_key IS NOT NULL OR
+            optical_joint_11_key IS NOT NULL OR optical_joint_12_key IS NOT NULL OR
+            optical_joint_13_key IS NOT NULL OR optical_joint_14_key IS NOT NULL OR
+            optical_joint_15_key IS NOT NULL OR optical_joint_16_key IS NOT NULL OR
+            array_length(optical_joint_tray_keys, 1) >= 1
+          ) THEN
             CASE WHEN (
               civil_step_01_key IS NOT NULL AND civil_step_02_key IS NOT NULL AND
               civil_step_03_key IS NOT NULL AND civil_step_04_key IS NOT NULL AND
@@ -62,7 +77,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.success(res, result.rows);
   } catch (err) {
     log.error('works-qa/poles', { error: err instanceof Error ? err.message : String(err) });
-    return apiResponse.internalError(res, err);
+    return apiResponse.internalError(res, 'Internal server error');
   }
 }
 
