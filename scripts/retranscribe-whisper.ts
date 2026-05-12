@@ -25,7 +25,7 @@
  *   --limit N        Max meetings to process (default: 10)
  */
 
-import { neon } from '@neondatabase/serverless';
+import { Pool } from 'pg';
 import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -37,7 +37,22 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 if (!DATABASE_URL) { console.error('DATABASE_URL not set'); process.exit(1); }
 if (!OPENAI_API_KEY) { console.error('OPENAI_API_KEY not set'); process.exit(1); }
 
-const sql = neon(DATABASE_URL);
+// Use pg.Pool directly — neon() HTTP client doesn't work for standalone scripts
+// against a self-hosted Postgres (it expects a Neon HTTP endpoint).
+const pool = new Pool({ connectionString: DATABASE_URL, ssl: false });
+const sql = async (strings: TemplateStringsArray, ...values: unknown[]): Promise<Record<string, unknown>[]> => {
+  let query = '';
+  const params: unknown[] = [];
+  strings.forEach((str, i) => {
+    query += str;
+    if (i < values.length) {
+      params.push(values[i]);
+      query += `$${params.length}`;
+    }
+  });
+  const result = await pool.query(query, params);
+  return result.rows;
+};
 const WHISPER_MAX_SIZE = 25 * 1024 * 1024; // 25MB Whisper API limit
 
 const args = process.argv.slice(2);
@@ -290,7 +305,7 @@ async function main() {
       FROM meetings
       WHERE id = ${meetingId}
         AND recording_path IS NOT NULL
-    `) as MeetingRow[];
+    `) as unknown as MeetingRow[];
   } else if (processAll) {
     meetings = (await sql`
       SELECT id, title, recording_path, recording_size_bytes
@@ -299,7 +314,7 @@ async function main() {
         AND source = 'teams'
       ORDER BY meeting_date DESC
       LIMIT ${limit}
-    `) as MeetingRow[];
+    `) as unknown as MeetingRow[];
   } else {
     // Default: only meetings that still have garbled VTT transcripts
     meetings = (await sql`
@@ -310,7 +325,7 @@ async function main() {
         AND (transcript_source IS NULL OR transcript_source = 'teams-vtt')
       ORDER BY meeting_date DESC
       LIMIT ${limit}
-    `) as MeetingRow[];
+    `) as unknown as MeetingRow[];
   }
 
   console.log(`Found ${meetings.length} meetings to re-transcribe\n`);
