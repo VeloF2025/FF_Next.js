@@ -115,7 +115,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       if (colCheckResult.rows.length === 0) { skipped++; continue; }
 
-      if (colCheckResult.rows[0].col_val !== null) {
+      if (colCheckResult.rows[0]!.col_val !== null) {
         // Slot already populated — don't overwrite
         skipped++;
         continue;
