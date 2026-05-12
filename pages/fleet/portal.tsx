@@ -880,16 +880,17 @@ export default function VehiclePortalPage() {
         </div>
 
         <div className="max-w-lg mx-auto px-4 py-6">
-          {/* Loading state - checking for existing session */}
-          {sessionLoading && step === 'capture' && (
+          {/* Loading state - checking for existing session on initial load only */}
+          {sessionLoading && !verifying && step === 'capture' && (
             <div className="flex flex-col items-center justify-center py-20">
               <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
               <p className="text-neutral-400">Checking session...</p>
             </div>
           )}
 
-          {/* Step 1: Capture Plate */}
-          {!sessionLoading && step === 'capture' && (
+          {/* Step 1: Capture Plate — verifying overrides sessionLoading so the
+               photo + "Verifying plate..." overlay stays visible during auth */}
+          {(!sessionLoading || verifying) && step === 'capture' && (
             <div className="space-y-6">
               <div className="text-center">
                 <div className="w-20 h-20 bg-blue-500/15 rounded-full flex items-center justify-center mx-auto mb-4">
