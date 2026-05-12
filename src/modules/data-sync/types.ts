@@ -412,7 +412,9 @@ export interface EodInstallSheet {
   velocity_rep_name: string | null;
   velocity_rep_id: string | null;
   photo_url: string | null;
+  photo_hash: string | null;
   entry_count: number;
+  vlm_raw_json?: unknown;
   uploaded_by: string | null;
   created_at: string;
   updated_at: string;

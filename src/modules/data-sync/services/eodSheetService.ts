@@ -3,12 +3,10 @@
  * CRUD operations for eod_install_sheets and eod_install_sheet_entries
  */
 
-import { neon } from '@/lib/db-neon';
+import { sql, transaction } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 import type { EodInstallSheet, EodInstallSheetEntry } from '../types';
 import { logSerialChange } from '@/modules/activate/services/activity-log/serialHistory';
-
-const sql = neon(process.env.DATABASE_URL!);
 
 interface CreateSheetInput {
   sheetDate: string;
@@ -31,6 +29,22 @@ interface CreateSheetInput {
 }
 
 interface WriteBackResult {
+  matched_count: number;
+  logged_count: number;
+}
+
+export interface UpdateEntryInput {
+  id: string;
+  rowNumber: number;
+  ontSerial: string | null;
+  gizzuSerial: string | null;
+  drNumber: string | null;
+  ponNumber: string | null;
+  address: string | null;
+}
+
+export interface UpdateSheetResult {
+  updated_count: number;
   matched_count: number;
   logged_count: number;
 }
@@ -135,7 +149,50 @@ export async function createSheet(input: CreateSheetInput): Promise<EodInstallSh
     logged_count: writeBack.logged_count,
   });
 
-  return { ...(sheet as EodInstallSheet), ...writeBack };
+  return { ...(sheet as unknown as EodInstallSheet), ...writeBack };
+}
+
+export async function updateSheetEntries(
+  sheetId: string,
+  entries: UpdateEntryInput[],
+  updatedBy: string
+): Promise<UpdateSheetResult> {
+  const updated_count = await transaction(async (txn) => {
+    let n = 0;
+    for (const entry of entries) {
+      const rows = await txn.query<{ id: string }>(
+        `UPDATE eod_install_sheet_entries
+         SET ont_serial = $1, gizzu_serial = $2, dr_number = $3, pon_number = $4, address = $5
+         WHERE id = $6 AND sheet_id = $7
+         RETURNING id`,
+        [entry.ontSerial, entry.gizzuSerial, entry.drNumber, entry.ponNumber, entry.address, entry.id, sheetId]
+      );
+      if (rows.length > 0) n++;
+    }
+    return n;
+  });
+
+  const writeBack = await writeBackDrSerials(
+    entries.map((e) => ({
+      rowNumber: e.rowNumber,
+      ontSerial: e.ontSerial,
+      gizzuSerial: e.gizzuSerial,
+      drNumber: e.drNumber,
+      ponNumber: e.ponNumber,
+      address: e.address,
+    })),
+    sheetId,
+    updatedBy
+  );
+
+  log.info('[EOD] Entries updated', {
+    sheetId,
+    updated_count,
+    matched_count: writeBack.matched_count,
+    logged_count: writeBack.logged_count,
+  });
+
+  return { updated_count, ...writeBack };
 }
 
 export async function listSheets(
@@ -156,7 +213,7 @@ export async function listSheets(
       SELECT COUNT(*)::int as count FROM eod_install_sheets
       WHERE sheet_date = ${dateFilter}
     `) as unknown as [{ count: number }];
-    return { sheets: sheets as EodInstallSheet[], total: count };
+    return { sheets: sheets as unknown as EodInstallSheet[], total: count };
   }
 
   const sheets = await sql`
@@ -167,7 +224,7 @@ export async function listSheets(
   const [{ count }] = (await sql`
     SELECT COUNT(*)::int as count FROM eod_install_sheets
   `) as unknown as [{ count: number }];
-  return { sheets: sheets as EodInstallSheet[], total: count };
+  return { sheets: sheets as unknown as EodInstallSheet[], total: count };
 }
 
 export async function getSheet(id: string): Promise<EodInstallSheet | null> {
@@ -184,8 +241,8 @@ export async function getSheet(id: string): Promise<EodInstallSheet | null> {
 
   return {
     ...sheet,
-    entries: entries as EodInstallSheetEntry[],
-  } as EodInstallSheet;
+    entries: entries as unknown as EodInstallSheetEntry[],
+  } as unknown as EodInstallSheet;
 }
 
 export async function findSheetByHash(photoHash: string): Promise<{ id: string; sheet_date: string } | null> {
@@ -216,7 +273,7 @@ export async function getSheetStats(): Promise<{
       (SELECT COUNT(*)::int FROM eod_install_sheet_entries WHERE match_status = 'pending') as pending_reconciliation
     FROM eod_install_sheets
   `;
-  const stats = statsRows[0]!;
+  const stats = statsRows[0] as unknown as { total_sheets: number; last_upload_date: string | null; pending_reconciliation: number };
   return {
     totalSheets: stats.total_sheets,
     lastUploadDate: stats.last_upload_date,
