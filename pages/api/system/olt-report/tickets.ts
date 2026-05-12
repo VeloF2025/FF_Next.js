@@ -93,7 +93,11 @@ async function handler(
       // Fetch eligible records: any non-fixable status, not yet ticketed.
       // Home-Installation-blocked rows are routed to needs_investigation by
       // process-lookup-queue / fix-1map, so they qualify automatically here.
+      // Exception: home_installation_status tickets may be created alongside an
+      // existing serial-mismatch ticket — the home sign-up dispatch is a separate
+      // action needed before the serial swap can proceed.
       const eligibleStatuses = ['needs_investigation', 'not_found', 'empty_serial', 'rejected'];
+      const allowExistingTicket = ticket_type === 'home_installation_status';
 
       const eligible = await pool.query(
         `SELECT id, drop_number, olt_serial, wrong_onemap_serial, fix_status,
@@ -101,7 +105,7 @@ async function handler(
          FROM olt_mismatch_records
          WHERE id = ANY($1::uuid[])
            AND fix_status = ANY($2)
-           AND maintenance_ticket_id IS NULL`,
+           ${allowExistingTicket ? '' : 'AND maintenance_ticket_id IS NULL'}`,
         [record_ids, eligibleStatuses]
       );
 

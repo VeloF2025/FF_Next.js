@@ -223,6 +223,11 @@ export function OltInvestigateTab({
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error?.message || result.error || 'Failed to create ticket');
+      const created = result.data?.created ?? result.created ?? 0;
+      if (created === 0) {
+        toast.error(`No ticket created for ${drNumber} — record may already have an open ticket`);
+        return;
+      }
       toast.success(`Home sign-up dispatch ticket created for ${drNumber}`);
       fetchRecords(
         'needs_investigation',
