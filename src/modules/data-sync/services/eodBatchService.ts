@@ -77,6 +77,8 @@ export async function saveEodSheet(payload: EodSavePayload): Promise<{ matched_c
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       sheetDate: payload.sheetDate,
+      velocityRepName: payload.velocityRepName,
+      velocityRepId: payload.velocityRepId,
       technicianName: payload.technicianName,
       technicianId: payload.technicianId,
       photoHash: payload.photoHash ?? null,

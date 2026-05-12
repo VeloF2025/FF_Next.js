@@ -37,18 +37,25 @@ export function EodSheetReviewer({
 }: EodSheetReviewerProps) {
   const [entries, setEntries] = useState<EodVlmEntry[]>(extraction.entries);
   const [sheetDate, setSheetDate] = useState(extraction.date ?? '');
+  const [vfRepName, setVfRepName] = useState(extraction.velocity_rep_name ?? '');
+  const [vfRepId, setVfRepId] = useState(extraction.velocity_rep_id ?? '');
   const [techName, setTechName] = useState(extraction.technician_name ?? '');
   const [techId, setTechId] = useState(extraction.technician_id ?? '');
 
   const handleSave = async () => {
     await onSave({
       sheetDate,
+      velocityRepName: vfRepName || null,
+      velocityRepId: vfRepId || null,
       technicianName: techName || null,
       technicianId: techId || null,
       entries,
       vlmExtraction: extraction, // intentionally the original prop, not the user-edited entries
     });
   };
+
+  const inputCls = 'w-full bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded px-3 py-2 text-sm text-[var(--ff-text-primary)] focus:outline-none focus:border-[var(--ff-accent)]';
+  const labelCls = 'text-xs text-[var(--ff-text-secondary)] mb-1 block';
 
   return (
     <div className="space-y-4">
@@ -61,30 +68,50 @@ export function EodSheetReviewer({
         </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div>
-          <label className="text-xs text-[var(--ff-text-secondary)] mb-1 block">Date</label>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        <div className="col-span-2 md:col-span-1">
+          <label className={labelCls}>Date</label>
           <input
             type="date"
             value={sheetDate}
             onChange={(e) => setSheetDate(e.target.value)}
-            className="w-full bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded px-3 py-2 text-sm text-[var(--ff-text-primary)] focus:outline-none focus:border-[var(--ff-accent)]"
+            className={inputCls}
+          />
+        </div>
+        <div className="col-span-2 md:col-span-1">
+          <label className={labelCls}>VF Representative</label>
+          <input
+            value={vfRepName}
+            onChange={(e) => setVfRepName(e.target.value)}
+            placeholder="VF rep name"
+            className={inputCls}
           />
         </div>
         <div>
-          <label className="text-xs text-[var(--ff-text-secondary)] mb-1 block">Technician Name</label>
+          <label className={labelCls}>VF Rep ID</label>
+          <input
+            value={vfRepId}
+            onChange={(e) => setVfRepId(e.target.value)}
+            placeholder="Emp ID"
+            className={inputCls}
+          />
+        </div>
+        <div className="col-span-2 md:col-span-1">
+          <label className={labelCls}>Contractor Technician</label>
           <input
             value={techName}
             onChange={(e) => setTechName(e.target.value)}
-            className="w-full bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded px-3 py-2 text-sm text-[var(--ff-text-primary)] focus:outline-none focus:border-[var(--ff-accent)]"
+            placeholder="Tech name"
+            className={inputCls}
           />
         </div>
         <div>
-          <label className="text-xs text-[var(--ff-text-secondary)] mb-1 block">Technician ID</label>
+          <label className={labelCls}>Tech ID</label>
           <input
             value={techId}
             onChange={(e) => setTechId(e.target.value)}
-            className="w-full bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded px-3 py-2 text-sm text-[var(--ff-text-primary)] focus:outline-none focus:border-[var(--ff-accent)]"
+            placeholder="Tech ID"
+            className={inputCls}
           />
         </div>
       </div>

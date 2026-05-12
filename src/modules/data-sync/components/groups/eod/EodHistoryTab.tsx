@@ -74,6 +74,7 @@ export function EodHistoryTab() {
             <tr className="border-b border-[var(--ff-border-light)]">
               <th className="w-8" />
               <th className="text-left px-3 py-2 text-[var(--ff-text-secondary)] font-medium">Date</th>
+              <th className="text-left px-3 py-2 text-[var(--ff-text-secondary)] font-medium">VF Rep</th>
               <th className="text-left px-3 py-2 text-[var(--ff-text-secondary)] font-medium">Technician</th>
               <th className="text-center px-3 py-2 text-[var(--ff-text-secondary)] font-medium">Entries</th>
               <th className="text-left px-3 py-2 text-[var(--ff-text-secondary)] font-medium">Uploaded By</th>
@@ -97,6 +98,9 @@ export function EodHistoryTab() {
                   </td>
                   <td className="px-3 py-2 text-[var(--ff-text-primary)] font-medium">
                     {sheet.sheet_date}
+                  </td>
+                  <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs">
+                    {sheet.velocity_rep_name || '—'}
                   </td>
                   <td className="px-3 py-2 text-[var(--ff-text-primary)]">
                     {sheet.technician_name || '—'}
@@ -126,9 +130,9 @@ export function EodHistoryTab() {
                 </tr>
                 {expandedId === sheet.id && expandedSheet && (
                   <tr>
-                    <td colSpan={7} className="bg-[var(--ff-bg-tertiary)] px-6 py-4">
+                    <td colSpan={8} className="bg-[var(--ff-bg-tertiary)] px-6 py-4">
                       <p className="text-xs text-[var(--ff-text-secondary)] mb-2">
-                        Tech ID: {sheet.technician_id || 'N/A'} | Sheet ID: {sheet.id}
+                        VF Rep ID: {sheet.velocity_rep_id || 'N/A'} | Tech ID: {sheet.technician_id || 'N/A'} | Sheet ID: {sheet.id}
                       </p>
                       <p className="text-sm text-[var(--ff-text-tertiary)]">
                         Expand detail view coming soon — check Reconciliation tab for match results.

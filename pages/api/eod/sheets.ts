@@ -40,7 +40,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 }
 
 async function handlePost(req: NextApiRequest, res: NextApiResponse) {
-  const { sheetDate, technicianName, technicianId, photoUrl, photoHash, vlmRawJson, entries } =
+  const { sheetDate, velocityRepName, velocityRepId, technicianName, technicianId, photoUrl, photoHash, vlmRawJson, entries } =
     req.body;
 
   if (!sheetDate || !entries || !Array.isArray(entries) || entries.length === 0) {
@@ -61,6 +61,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     const uploadedBy = req.user?.email || 'unknown';
     const sheet = await createSheet({
       sheetDate,
+      velocityRepName: velocityRepName || null,
+      velocityRepId: velocityRepId || null,
       technicianName: technicianName || null,
       technicianId: technicianId || null,
       photoUrl: photoUrl || null,
