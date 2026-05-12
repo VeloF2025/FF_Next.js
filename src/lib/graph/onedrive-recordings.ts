@@ -55,21 +55,38 @@ interface MeetingStatusRow { processing_status: string }
  * Returns empty array if folder doesn't exist or access is denied.
  */
 export async function listUserRecordings(userId: string): Promise<DriveItem[]> {
-  // $orderby is not supported on /drive/root:/folder:/children — sort client-side instead
+  // Step 1: Find the Recordings folder ID from root children.
+  // The path-based API (root:/Recordings:/children) returns 400 on this tenant —
+  // using the folder item ID directly is more reliable.
+  const rootUrl = `${GRAPH_BASE}/users/${userId}/drive/root/children?$select=id,name,folder&$top=200`;
+  const rootResp = await graphFetch(rootUrl);
+
+  if (rootResp.status === 403) {
+    log.warn('OneDrive access denied', { userId }, LOGGER);
+    return [];
+  }
+  if (!rootResp.ok) {
+    log.warn('OneDrive root listing failed', { userId, status: rootResp.status }, LOGGER);
+    return [];
+  }
+
+  const rootData = await rootResp.json();
+  const recordingsFolder = (rootData.value || []).find(
+    (item: { name: string; folder?: object }) => item.name === 'Recordings' && item.folder
+  ) as { id: string } | undefined;
+
+  if (!recordingsFolder) return []; // No Recordings folder
+
+  // Step 2: List the folder contents by item ID (avoids path-based 400 error).
   const url =
-    `${GRAPH_BASE}/users/${userId}/drive/root:/Recordings:/children` +
+    `${GRAPH_BASE}/users/${userId}/drive/items/${recordingsFolder.id}/children` +
     `?$select=id,name,size,createdDateTime,lastModifiedDateTime,createdBy` +
     `&$top=200`;
 
   const response = await graphFetch(url);
 
-  if (response.status === 404) return []; // No Recordings folder
-  if (response.status === 403) {
-    log.warn('OneDrive access denied', { userId }, LOGGER);
-    return [];
-  }
   if (!response.ok) {
-    log.warn('OneDrive listing failed', { userId, status: response.status }, LOGGER);
+    log.warn('OneDrive Recordings folder listing failed', { userId, status: response.status }, LOGGER);
     return [];
   }
 
