@@ -476,18 +476,29 @@ async function run1MapLookup(): Promise<{
         const serialUpper = serial.toUpperCase();
 
         if (recordStr.includes(serialUpper)) {
+          const drpNumber = (match.drp as string) || null;
+          const onemap1MapLat = match.latitude != null ? parseFloat(String(match.latitude)) : null;
+          const onemap1MapLon = match.longitude != null ? parseFloat(String(match.longitude)) : null;
           await pool.query(`
             UPDATE oes_pp_data
             SET resolution_status = 'located_1map',
                 resolved_drop_number = $1,
                 resolved_source = '1map_search',
                 resolved_details = $2,
+                latitude = COALESCE(
+                  (SELECT latitude FROM drops WHERE drop_number = $1 AND latitude IS NOT NULL LIMIT 1),
+                  $4::numeric
+                ),
+                longitude = COALESCE(
+                  (SELECT longitude FROM drops WHERE drop_number = $1 AND longitude IS NOT NULL LIMIT 1),
+                  $5::numeric
+                ),
                 resolved_at = NOW(),
                 updated_at = NOW()
             WHERE id = $3
               AND resolution_status = 'not_found'
           `, [
-            (match.drp as string) || null,
+            drpNumber,
             JSON.stringify({
               pole: match.pole as string,
               site: match.site as string,
@@ -496,6 +507,8 @@ async function run1MapLookup(): Promise<{
               search_results_count: searchResult.result!.length,
             }),
             ppId,
+            onemap1MapLat,
+            onemap1MapLon,
           ]);
           results.total_resolved++;
 
@@ -873,6 +886,110 @@ async function runWAPhotoVLMScan(): Promise<{
   return results;
 }
 
+/**
+ * Backfill GPS on resolved PP records and their linked tables.
+ * Priority: drops → oes_activations → onemap_drops
+ * Also propagates to dr_photo_unified_reviews and fills gaps in the drops table.
+ * All UPDATEs are idempotent (WHERE latitude IS NULL).
+ */
+async function backfillGpsCoordinates(): Promise<{ pp: number; unified: number; drops: number }> {
+  try {
+    let pp = 0, unified = 0, drops = 0;
+
+    // oes_pp_data: drops first
+    const r1 = await pool.query(`
+      UPDATE oes_pp_data pp
+      SET latitude = d.latitude, longitude = d.longitude, updated_at = NOW()
+      FROM drops d
+      WHERE d.drop_number = pp.resolved_drop_number
+        AND pp.resolved_drop_number IS NOT NULL
+        AND pp.latitude IS NULL
+        AND d.latitude IS NOT NULL AND d.longitude IS NOT NULL
+    `);
+    pp += r1.rowCount ?? 0;
+
+    // oes_pp_data: oes_activations fallback
+    const r2 = await pool.query(`
+      UPDATE oes_pp_data pp
+      SET latitude = oa.latitude, longitude = oa.longitude, updated_at = NOW()
+      FROM oes_activations oa
+      WHERE oa.drop_number = pp.resolved_drop_number
+        AND pp.resolved_drop_number IS NOT NULL
+        AND pp.latitude IS NULL
+        AND oa.latitude IS NOT NULL AND oa.longitude IS NOT NULL
+    `);
+    pp += r2.rowCount ?? 0;
+
+    // oes_pp_data: onemap_drops second fallback
+    const r3 = await pool.query(`
+      UPDATE oes_pp_data pp
+      SET latitude = od.latitude::numeric, longitude = od.longitude::numeric, updated_at = NOW()
+      FROM onemap_drops od
+      WHERE od.drop_number = pp.resolved_drop_number
+        AND pp.resolved_drop_number IS NOT NULL
+        AND pp.latitude IS NULL
+        AND od.latitude IS NOT NULL AND od.longitude IS NOT NULL
+    `);
+    pp += r3.rowCount ?? 0;
+
+    // dr_photo_unified_reviews: drops first (drop_number is NOT NULL constrained)
+    const r4 = await pool.query(`
+      UPDATE dr_photo_unified_reviews ur
+      SET latitude = d.latitude, longitude = d.longitude, updated_at = NOW()
+      FROM drops d
+      WHERE d.drop_number = ur.drop_number
+        AND ur.latitude IS NULL
+        AND d.latitude IS NOT NULL AND d.longitude IS NOT NULL
+    `);
+    unified += r4.rowCount ?? 0;
+
+    // dr_photo_unified_reviews: oes_activations fallback
+    const r5 = await pool.query(`
+      UPDATE dr_photo_unified_reviews ur
+      SET latitude = oa.latitude, longitude = oa.longitude, updated_at = NOW()
+      FROM oes_activations oa
+      WHERE oa.drop_number = ur.drop_number
+        AND ur.latitude IS NULL
+        AND oa.latitude IS NOT NULL AND oa.longitude IS NOT NULL
+    `);
+    unified += r5.rowCount ?? 0;
+
+    // drops: fill planning GPS gaps from oes_activations
+    const r6 = await pool.query(`
+      UPDATE drops d
+      SET latitude = oa.latitude, longitude = oa.longitude, updated_at = NOW()
+      FROM oes_activations oa
+      WHERE oa.drop_number = d.drop_number
+        AND d.latitude IS NULL
+        AND oa.latitude IS NOT NULL AND oa.longitude IS NOT NULL
+    `);
+    drops += r6.rowCount ?? 0;
+
+    // drops: onemap_drops second fallback
+    const r7 = await pool.query(`
+      UPDATE drops d
+      SET latitude = od.latitude::numeric, longitude = od.longitude::numeric, updated_at = NOW()
+      FROM onemap_drops od
+      WHERE od.drop_number = d.drop_number
+        AND d.latitude IS NULL
+        AND od.latitude IS NOT NULL AND od.longitude IS NOT NULL
+    `);
+    drops += r7.rowCount ?? 0;
+
+    if (pp + unified + drops > 0) {
+      logger.info('GPS backfill complete', { pp_updated: pp, unified_updated: unified, drops_updated: drops });
+    } else {
+      logger.debug('GPS backfill: nothing to update');
+    }
+    return { pp, unified, drops };
+  } catch (err) {
+    logger.warn('GPS backfill failed (non-blocking)', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return { pp: 0, unified: 0, drops: 0 };
+  }
+}
+
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -888,7 +1005,8 @@ async function handler(
       const cutoff = new Date();
       const result = await runLocalResolution();
       const ticketsUpdated = await syncTicketActivities(cutoff);
-      return res.status(200).json({ success: true, data: { ...result, tickets_updated: ticketsUpdated } });
+      const gps = await backfillGpsCoordinates();
+      return res.status(200).json({ success: true, data: { ...result, tickets_updated: ticketsUpdated, gps_updated: gps } });
     }
 
     if (action === '1map-lookup') {
@@ -913,6 +1031,7 @@ async function handler(
 
       // Sync ticket activities for all records resolved in steps 1-3
       const ticketsUpdated = await syncTicketActivities(cutoff);
+      const gps = await backfillGpsCoordinates();
 
       // Fire-and-forget 1Map lookup for remaining unresolved serials (has its own progress tracker)
       // 1Map lookup logs ticket activities per-serial inline
@@ -928,6 +1047,7 @@ async function handler(
           total_resolved: localResult.total_resolved + crossRefResult.total_resolved + vlmResult.total_pp_matched,
           onemap_started: true,
           tickets_updated: ticketsUpdated,
+          gps_updated: gps,
           steps: {
             local_scan: { resolved: localResult.total_resolved, sources: localResult.sources },
             wa_cross_ref: { resolved: crossRefResult.total_resolved, drs_checked: crossRefResult.total_drs_checked, backfilled: crossRefResult.total_backfilled },
