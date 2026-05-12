@@ -476,18 +476,29 @@ async function run1MapLookup(): Promise<{
         const serialUpper = serial.toUpperCase();
 
         if (recordStr.includes(serialUpper)) {
+          const drpNumber = (match.drp as string) || null;
+          const onemap1MapLat = match.latitude != null ? parseFloat(String(match.latitude)) : null;
+          const onemap1MapLon = match.longitude != null ? parseFloat(String(match.longitude)) : null;
           await pool.query(`
             UPDATE oes_pp_data
             SET resolution_status = 'located_1map',
                 resolved_drop_number = $1,
                 resolved_source = '1map_search',
                 resolved_details = $2,
+                latitude = COALESCE(
+                  (SELECT latitude FROM drops WHERE drop_number = $1 AND latitude IS NOT NULL LIMIT 1),
+                  $4::numeric
+                ),
+                longitude = COALESCE(
+                  (SELECT longitude FROM drops WHERE drop_number = $1 AND longitude IS NOT NULL LIMIT 1),
+                  $5::numeric
+                ),
                 resolved_at = NOW(),
                 updated_at = NOW()
             WHERE id = $3
               AND resolution_status = 'not_found'
           `, [
-            (match.drp as string) || null,
+            drpNumber,
             JSON.stringify({
               pole: match.pole as string,
               site: match.site as string,
@@ -496,6 +507,8 @@ async function run1MapLookup(): Promise<{
               search_results_count: searchResult.result!.length,
             }),
             ppId,
+            onemap1MapLat,
+            onemap1MapLon,
           ]);
           results.total_resolved++;
 
