@@ -43,6 +43,7 @@ export function EodSheetReviewer({
   const [vfRepId, setVfRepId] = useState(extraction.velocity_rep_id ?? '');
   const [techName, setTechName] = useState(extraction.technician_name ?? '');
   const [techId, setTechId] = useState(extraction.technician_id ?? '');
+  const [acknowledgeLowConfidence, setAcknowledgeLowConfidence] = useState(false);
 
   const handleSave = async () => {
     await onSave({
@@ -62,7 +63,9 @@ export function EodSheetReviewer({
   const drFilledCount = entries.filter((e) => e.dr_number && e.dr_number.trim().length > 0).length;
   const allDrsBlank = entries.length > 0 && drFilledCount === 0;
   const lowConfidence = extraction.overall_confidence < LOW_CONFIDENCE_THRESHOLD;
-  const blockSave = allDrsBlank || lowConfidence;
+  // allDrsBlank is a HARD block (cannot write back without DRs).
+  // lowConfidence is a SOFT block — user can override by ticking the acknowledgement.
+  const blockSave = allDrsBlank || (lowConfidence && !acknowledgeLowConfidence);
   const confidencePct = Math.round(extraction.overall_confidence * 100);
 
   return (
@@ -126,16 +129,27 @@ export function EodSheetReviewer({
 
       <EodEntryTable entries={entries} editable onChange={setEntries} />
 
-      {blockSave && (
+      {(allDrsBlank || lowConfidence) && (
         <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
           <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-amber-300 space-y-1">
-            <p className="font-medium">VLM extraction unreliable — cannot save as-is.</p>
+          <div className="text-sm text-amber-300 space-y-2 flex-1">
+            <p className="font-medium">VLM extraction unreliable — review carefully.</p>
             {allDrsBlank && (
               <p>DR Number column is empty for all {entries.length} rows. Type the DR numbers from the photo before saving, or Skip this sheet.</p>
             )}
             {lowConfidence && !allDrsBlank && (
-              <p>Overall confidence is {confidencePct}% (threshold {Math.round(LOW_CONFIDENCE_THRESHOLD * 100)}%). Verify and correct each row against the photo before saving.</p>
+              <>
+                <p>Overall confidence is {confidencePct}% (threshold {Math.round(LOW_CONFIDENCE_THRESHOLD * 100)}%). Verify and correct each row against the photo before saving.</p>
+                <label className="flex items-center gap-2 cursor-pointer select-none mt-1">
+                  <input
+                    type="checkbox"
+                    checked={acknowledgeLowConfidence}
+                    onChange={(e) => setAcknowledgeLowConfidence(e.target.checked)}
+                    className="w-4 h-4 accent-amber-500 cursor-pointer"
+                  />
+                  <span>I have verified all rows against the photo</span>
+                </label>
+              </>
             )}
             {lowConfidence && allDrsBlank && (
               <p>Confidence is {confidencePct}%. Verify every column against the photo, not just DR Numbers.</p>

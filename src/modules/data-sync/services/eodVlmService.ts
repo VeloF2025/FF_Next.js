@@ -527,38 +527,48 @@ export async function extractEodSheet(
 
       // Sequential pattern detection — if values increment by 1, it's hallucination
       const drNums = parsed.entries.map((e) => e.dr_number ? parseInt(e.dr_number.replace(/\D/g, '')) : NaN).filter((n) => !isNaN(n));
-      if (drNums.length >= 3 && isSequential(drNums)) {
+      const drsAreSequential = drNums.length >= 3 && isSequential(drNums);
+      if (drsAreSequential) {
         log.warn('[EOD] Sequential DRs detected — hallucination');
         parsed.entries = parsed.entries.map((e) => ({ ...e, dr_number: null, confidence: 0.3 }));
         parsed.overall_confidence = 0.3;
       }
 
-      // ONT serials: extract trailing digits (e.g. ALCLB4E5A300 → 300) and detect sequential
-      const ontNums = parsed.entries
-        .map((e) => {
-          if (!e.ont_serial) return NaN;
-          const m = e.ont_serial.match(/(\d+)$/);
-          return m ? parseInt(m[1]!) : NaN;
-        })
-        .filter((n) => !isNaN(n));
-      if (ontNums.length >= 3 && isSequential(ontNums)) {
-        log.warn('[EOD] Sequential ONT serials detected — hallucination (likely prompt echo)');
-        parsed.entries = parsed.entries.map((e) => ({ ...e, ont_serial: null, confidence: 0.3 }));
-        parsed.overall_confidence = 0.3;
-      }
+      // ONT + Gizzu sequential guard: only fires when DRs are ALSO compromised
+      // (sequential or all-null after the DR guard). Real batch installs from a single
+      // carton have sequential Gizzu/ONT serials — those are legitimate. The prompt-echo
+      // signal is sequential serials COMBINED with broken/missing DR numbers.
+      const drsAllNull = parsed.entries.every((e) => !e.dr_number);
+      const promptEchoSignal = drsAreSequential || drsAllNull;
 
-      // Gizzu serials: extract trailing digit run and detect sequential
-      const gzNums = parsed.entries
-        .map((e) => {
-          if (!e.gizzu_serial) return NaN;
-          const m = e.gizzu_serial.match(/(\d+)$/);
-          return m ? parseInt(m[1]!) : NaN;
-        })
-        .filter((n) => !isNaN(n));
-      if (gzNums.length >= 3 && isSequential(gzNums)) {
-        log.warn('[EOD] Sequential Gizzu serials detected — hallucination (likely prompt echo)');
-        parsed.entries = parsed.entries.map((e) => ({ ...e, gizzu_serial: null, confidence: 0.3 }));
-        parsed.overall_confidence = 0.3;
+      if (promptEchoSignal) {
+        // ONT serials: extract trailing digits (e.g. ALCLB4E5A300 → 300)
+        const ontNums = parsed.entries
+          .map((e) => {
+            if (!e.ont_serial) return NaN;
+            const m = e.ont_serial.match(/(\d+)$/);
+            return m ? parseInt(m[1]!) : NaN;
+          })
+          .filter((n) => !isNaN(n));
+        if (ontNums.length >= 3 && isSequential(ontNums)) {
+          log.warn('[EOD] Sequential ONT serials with bad DRs — prompt echo hallucination');
+          parsed.entries = parsed.entries.map((e) => ({ ...e, ont_serial: null, confidence: 0.3 }));
+          parsed.overall_confidence = 0.3;
+        }
+
+        // Gizzu serials: extract trailing digit run
+        const gzNums = parsed.entries
+          .map((e) => {
+            if (!e.gizzu_serial) return NaN;
+            const m = e.gizzu_serial.match(/(\d+)$/);
+            return m ? parseInt(m[1]!) : NaN;
+          })
+          .filter((n) => !isNaN(n));
+        if (gzNums.length >= 3 && isSequential(gzNums)) {
+          log.warn('[EOD] Sequential Gizzu serials with bad DRs — prompt echo hallucination');
+          parsed.entries = parsed.entries.map((e) => ({ ...e, gizzu_serial: null, confidence: 0.3 }));
+          parsed.overall_confidence = 0.3;
+        }
       }
 
       const addrs = parsed.entries.map((e) => e.address ? parseInt(e.address) : NaN).filter((n) => !isNaN(n));
