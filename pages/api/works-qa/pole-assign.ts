@@ -72,7 +72,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const poleId = firstString(fields.pole_id);
     const slot = firstString(fields.slot);
     // source is optional metadata — accepted but not persisted to a column
-    const _source = firstString(fields.source) ?? 'upload';
     const photoFile = firstFile(files.photo);
 
     // 2. Validate required fields
