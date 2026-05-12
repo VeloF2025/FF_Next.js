@@ -888,7 +888,8 @@ export default function VehiclePortalPage() {
             </div>
           )}
 
-          {/* Step 1: Capture Plate */}
+          {/* Step 1: Capture Plate — verifying overrides sessionLoading so the
+               photo + "Verifying plate..." overlay stays visible during auth */}
           {(!sessionLoading || verifying) && step === 'capture' && (
             <div className="space-y-6">
               <div className="text-center">
