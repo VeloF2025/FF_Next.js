@@ -6,6 +6,7 @@
 
 import { recordVlmCorrection } from '@/services/vlmLearningService';
 import { log } from '@/lib/logger';
+import type { VlmAnalysisType } from '@/types/vlm-learning';
 import type { EodVlmEntry } from '../types';
 
 /**
@@ -33,12 +34,7 @@ export async function recordEodCorrections(
     const vlm = vlmEntries.find((e) => e.row_number === corrected.row_number);
     if (!vlm) continue;
 
-    const pairs: Array<{
-      field: string;
-      analysisType: 'eod_sheet_dr' | 'eod_sheet_address' | 'eod_sheet_gizzu' | 'eod_sheet_pon' | 'eod_sheet_ont';
-      vlmValue: string | null;
-      correctedValue: string | null;
-    }> = [
+    const pairs: Array<{ field: string; analysisType: VlmAnalysisType; vlmValue: string | null; correctedValue: string | null }> = [
       { field: 'dr_number', analysisType: 'eod_sheet_dr', vlmValue: vlm.dr_number, correctedValue: corrected.dr_number },
       { field: 'address', analysisType: 'eod_sheet_address', vlmValue: vlm.address, correctedValue: corrected.address },
       { field: 'gizzu_serial', analysisType: 'eod_sheet_gizzu', vlmValue: vlm.gizzu_serial, correctedValue: corrected.gizzu_serial },
