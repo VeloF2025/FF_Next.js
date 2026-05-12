@@ -35,7 +35,7 @@ export async function recordEodCorrections(
 
     const pairs: Array<{
       field: string;
-      analysisType: 'eod_sheet_dr' | 'eod_sheet_address' | 'eod_sheet_gizzu' | 'eod_sheet_pon';
+      analysisType: 'eod_sheet_dr' | 'eod_sheet_address' | 'eod_sheet_gizzu' | 'eod_sheet_pon' | 'eod_sheet_ont';
       vlmValue: string | null;
       correctedValue: string | null;
     }> = [
@@ -43,6 +43,7 @@ export async function recordEodCorrections(
       { field: 'address', analysisType: 'eod_sheet_address', vlmValue: vlm.address, correctedValue: corrected.address },
       { field: 'gizzu_serial', analysisType: 'eod_sheet_gizzu', vlmValue: vlm.gizzu_serial, correctedValue: corrected.gizzu_serial },
       { field: 'pon_number', analysisType: 'eod_sheet_pon', vlmValue: vlm.pon_number, correctedValue: corrected.pon_number },
+      { field: 'ont_serial', analysisType: 'eod_sheet_ont', vlmValue: vlm.ont_serial, correctedValue: corrected.ont_serial },
     ];
 
     for (const pair of pairs) {

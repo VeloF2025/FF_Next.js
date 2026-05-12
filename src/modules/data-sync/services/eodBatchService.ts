@@ -80,6 +80,7 @@ export async function saveEodSheet(payload: EodSavePayload): Promise<{ matched_c
       technicianName: payload.technicianName,
       technicianId: payload.technicianId,
       photoHash: payload.photoHash ?? null,
+      vlmRawJson: payload.vlmExtraction ?? null,
       entries: payload.entries.map((e) => ({
         row_number: e.row_number,
         ont_serial: e.ont_serial,

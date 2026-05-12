@@ -487,6 +487,7 @@ export interface EodSavePayload {
   technicianId: string | null;
   entries: EodVlmEntry[];
   photoHash?: string | null;
+  vlmExtraction?: EodVlmExtraction | null;
 }
 
 export type EodSlotStatus = 'pending' | 'extracting' | 'ready' | 'saving' | 'saved' | 'failed' | 'skipped' | 'duplicate';
