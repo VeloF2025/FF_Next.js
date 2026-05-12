@@ -3,6 +3,7 @@ import { PhotoSlotCard } from './PhotoSlotCard';
 import { TrayBucket } from './TrayBucket';
 import { ApprovePoleButton } from './ApprovePoleButton';
 import { SLOT_META } from '../utils/slot-keys';
+import { log } from '@/lib/logger';
 
 interface PoleDetailPanelProps {
   poleId: string | null;
@@ -20,11 +21,12 @@ async function assignPhoto(poleId: string, slot: string, file: File) {
 }
 
 async function overrideSlot(poleId: string, slot: string, decision: 'pass' | 'fail', reason: string) {
-  await fetch('/api/works-qa/pole-override', {
+  const res = await fetch('/api/works-qa/pole-override', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pole_id: poleId, slot, decision, reason }),
   });
+  if (!res.ok) throw new Error(`Override failed: ${res.status}`);
 }
 
 async function uploadTrayPhotos(poleId: string, files: File[]) {
@@ -34,7 +36,10 @@ async function uploadTrayPhotos(poleId: string, files: File[]) {
     form.append('slot', 'tray');
     form.append('photo', file);
     form.append('source', 'upload');
-    await fetch('/api/works-qa/pole-assign', { method: 'POST', body: form });
+    const res = await fetch('/api/works-qa/pole-assign', { method: 'POST', body: form });
+    if (!res.ok) {
+      log.error('works-qa: tray upload failed', { status: res.status });
+    }
   }
 }
 
@@ -79,8 +84,8 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
                   label={slot.label}
                   photoKey={pole[slot.dbColumn as keyof typeof pole] as string | null}
                   vlm={pole.vlm_results[slot.key]}
-                  onUpload={file => assignPhoto(pole.id, slot.key, file).then(() => mutate())}
-                  onOverride={(d, r) => overrideSlot(pole.id, slot.key, d, r).then(() => mutate())}
+                  onUpload={file => assignPhoto(pole.id, slot.key, file).then(() => mutate()).catch((e: unknown) => log.error('works-qa: upload failed', { error: e instanceof Error ? e.message : String(e) }))}
+                  onOverride={(d, r) => overrideSlot(pole.id, slot.key, d, r).then(() => mutate()).catch((e: unknown) => log.error('works-qa: override failed', { error: e instanceof Error ? e.message : String(e) }))}
                   disabled={!!pole.approved_at}
                 />
               ))}
@@ -103,8 +108,8 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
                   label={slot.label}
                   photoKey={pole[slot.dbColumn as keyof typeof pole] as string | null}
                   vlm={pole.vlm_results[slot.key]}
-                  onUpload={file => assignPhoto(pole.id, slot.key, file).then(() => mutate())}
-                  onOverride={(d, r) => overrideSlot(pole.id, slot.key, d, r).then(() => mutate())}
+                  onUpload={file => assignPhoto(pole.id, slot.key, file).then(() => mutate()).catch((e: unknown) => log.error('works-qa: upload failed', { error: e instanceof Error ? e.message : String(e) }))}
+                  onOverride={(d, r) => overrideSlot(pole.id, slot.key, d, r).then(() => mutate()).catch((e: unknown) => log.error('works-qa: override failed', { error: e instanceof Error ? e.message : String(e) }))}
                   disabled={!!pole.approved_at}
                 />
               ))}
@@ -127,15 +132,15 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
                   label={slot.label}
                   photoKey={pole[slot.dbColumn as keyof typeof pole] as string | null}
                   vlm={pole.vlm_results[slot.key]}
-                  onUpload={file => assignPhoto(pole.id, slot.key, file).then(() => mutate())}
-                  onOverride={(d, r) => overrideSlot(pole.id, slot.key, d, r).then(() => mutate())}
+                  onUpload={file => assignPhoto(pole.id, slot.key, file).then(() => mutate()).catch((e: unknown) => log.error('works-qa: upload failed', { error: e instanceof Error ? e.message : String(e) }))}
+                  onOverride={(d, r) => overrideSlot(pole.id, slot.key, d, r).then(() => mutate()).catch((e: unknown) => log.error('works-qa: override failed', { error: e instanceof Error ? e.message : String(e) }))}
                   disabled={!!pole.approved_at}
                 />
               ))}
             </div>
             <TrayBucket
               trayKeys={pole.optical_joint_tray_keys}
-              onUpload={files => uploadTrayPhotos(pole.id, files).then(() => mutate())}
+              onUpload={files => uploadTrayPhotos(pole.id, files).then(() => mutate()).catch((e: unknown) => log.error('works-qa: tray upload error', { error: e instanceof Error ? e.message : String(e) }))}
               disabled={!!pole.approved_at}
             />
           </section>

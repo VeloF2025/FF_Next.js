@@ -65,7 +65,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               optical_joint_13_key IS NOT NULL AND optical_joint_14_key IS NOT NULL AND
               optical_joint_15_key IS NOT NULL AND optical_joint_16_key IS NOT NULL AND
               array_length(optical_joint_tray_keys, 1) >= 1
-            ) THEN 'ready' ELSE 'in_progress' END
+            ) AND (SELECT count(*) FROM jsonb_each(vlm_results) WHERE (value->>'valid')::boolean = false AND value->>'overridden_by' IS NULL) = 0
+            THEN 'ready' ELSE 'in_progress' END
           ELSE 'empty'
         END AS status,
         approved_at
@@ -77,7 +78,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.success(res, result.rows);
   } catch (err) {
     log.error('works-qa/poles', { error: err instanceof Error ? err.message : String(err) });
-    return apiResponse.internalError(res, 'Internal server error');
+    return apiResponse.internalError(res, err);
   }
 }
 

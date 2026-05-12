@@ -1,7 +1,7 @@
 import useSWR from 'swr';
 import type { PoleSummary } from '../types/works-qa.types';
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = (url: string) => fetch(url).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); });
 
 export function usePoleList(projectId: string | null, ponNo: number | null) {
   const params = new URLSearchParams();

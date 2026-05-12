@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth, withRole, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { getSlotMeta } from '@/modules/works-qa/utils/slot-keys';
 
@@ -58,13 +58,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // vlm_confidence, vlm_reasoning, correct_step, correct_category,
     // correction_reason, corrected_by
     const vlmPredictedStep = slotMeta.stepNumber;
-    const vlmPredictedCategory = slotMeta.discipline;
+    // Encode VLM's actual prediction: pass → discipline, fail → discipline_fail
+    const vlmPredictedValid = existingSlot.valid === true;
+    const vlmPredictedCategory = vlmPredictedValid ? slotMeta.discipline : `${slotMeta.discipline}_fail`;
+    const correctCategory = decision === 'pass' ? slotMeta.discipline : `${slotMeta.discipline}_fail`;
     const vlmConfidence = typeof existingSlot.confidence === 'number'
       ? existingSlot.confidence
       : 0;
     const vlmReasoning = existingSlot.feedback ?? '';
-    // If VLM said valid=true but user overrides to fail, correct_category = discipline+'_fail'
-    // Use the slot key as photo_filename reference (no actual file reference needed here)
     const photoFilename = `works_qa:${pole_id}:${slot}`;
 
     await pool.query(`
@@ -81,7 +82,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       vlmConfidence,
       vlmReasoning,
       vlmPredictedStep,
-      decision === 'pass' ? vlmPredictedCategory : `${vlmPredictedCategory}_fail`,
+      correctCategory,
       reason ?? '',
       userEmail,
     ]);
@@ -108,4 +109,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withRole('manager')(handler));

@@ -116,11 +116,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const fileBuffer = fs.readFileSync(photoFile.filepath);
     const uploadResult = await vfStorage.uploadFile(fileBuffer, storageType, storageCategory, filename);
 
-    // uploadResult.url is a relative /storage/... path.
-    // VLM needs an absolute URL reachable from the server.
+    // uploadResult.path is a bare storage path (no /storage/ prefix).
+    // Components render it as /storage/${photoKey}; pon-zip fetches as APP_BASE/storage/${photoKey}.
     const APP_BASE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.fibreflow.app';
-    const photoKey = uploadResult.url; // relative path stored in DB
-    const photoUrl = `${APP_BASE}${uploadResult.url}`; // absolute URL for VLM
+    const photoKey = uploadResult.path; // bare path stored in DB, no /storage/ prefix
+    const photoUrl = `${APP_BASE}/storage/${uploadResult.path}`; // absolute URL for VLM
 
     // 7. Run VLM validation
     const vlmLabel = isTray ? 'Optical Joint Tray' : slotMeta!.label;
@@ -148,7 +148,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // 8. Persist to DB
     if (isTray) {
       // Tray: append photo key to array, store VLM under timestamped key
-      const vlmKey = `tray_${Date.now()}`;
+      const vlmKey = `tray_${crypto.randomUUID()}`;
       await pool.query(
         `UPDATE pole_qa_photos
          SET optical_joint_tray_keys = array_append(optical_joint_tray_keys, $1),

@@ -22,7 +22,8 @@ async function fetchPhoto(url: string): Promise<Buffer | null> {
     const resp = await fetch(url);
     if (!resp.ok) return null;
     return Buffer.from(await resp.arrayBuffer());
-  } catch {
+  } catch (err) {
+    log.error('pon-zip: fetchPhoto failed', { url, error: err instanceof Error ? err.message : String(err) });
     return null;
   }
 }
