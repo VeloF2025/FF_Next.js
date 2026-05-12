@@ -26,6 +26,9 @@ import sharp from 'sharp';
 
 const EOD_MAX_TOKENS = 4096;
 const ONT_PATTERN = /^(SN:)?ALC[LB][A-Z0-9]{5,10}$/i;
+// Real ONT serials always start ALCLB then hex (e.g. ALCLB48DEC76, ALCLB4E5A300).
+// VLM commonly emits ALCL0xxxxx (misreading "B" as "0") — that's NOT a valid serial.
+const ONT_STRICT_PATTERN = /^ALCLB[0-9A-F]{5,8}$/i;
 
 // Known hallucination values the VLM tends to repeat
 const HALLUCINATION_BLOCKLIST = new Set([
@@ -211,6 +214,10 @@ function cleanOntSerial(serial: string | null): string | null {
   if (!serial) return null;
   const s = serial.toUpperCase().replace(/^SN:/, '').replace(/[\s-]/g, '');
   if (HALLUCINATION_BLOCKLIST.has(s)) return null;
+  // Reject misreads that don't have the ALCLB prefix. The main VLM pass at 1280x960
+  // commonly drops the "B" (emits ALCL0xxxxx). Nulling these triggers the focused
+  // full-resolution ONT pass below, which reads the actual sticker text.
+  if (!ONT_STRICT_PATTERN.test(s)) return null;
   return normalizeSerial(s);
 }
 
@@ -328,10 +335,18 @@ function isSequential(nums: number[]): boolean {
 
 const ONT_SERIAL_PROMPT = `/no_think
 This form has barcode stickers with small printed text "SN: ALCL..." below each barcode.
-Read the printed serial text from each sticker, row 1-10. Format: ALCLB4 or ALCLB48 followed by hex chars.
-Each is UNIQUE. Do NOT increment — if you can't read a sticker, output null for that row.
+Read the printed serial text from each sticker, row 1-10.
+
+EXACT FORMAT: starts with the 5 characters "ALCLB" (A-L-C-L-B, with capital B as the 5th
+character), then 6-8 hex characters (0-9, A-F). Examples: ALCLB48DEC76, ALCLB48DF68D,
+ALCLB48DFA13. The "B" in ALCLB is a letter B, NOT the digit 0 — never output "ALCL0..."
+because that is not a valid serial.
+
+Each sticker is UNIQUE. Do NOT increment, do NOT copy values, do NOT make up serials.
+If you cannot clearly read a sticker, output null for that row.
+
 JSON array only:
-[{"row":1,"serial":"ALCLB4E5A300"},{"row":2,"serial":"ALCLB48EEEE"},{"row":3,"serial":null}]`;
+[{"row":1,"serial":"<ALCLB_HEX_OR_NULL>"},{"row":2,"serial":"<ALCLB_HEX_OR_NULL>"}]`;
 
 const NAFNET_URL = process.env.NAFNET_URL || 'http://100.96.203.105:8101';
 
@@ -605,10 +620,13 @@ export async function extractEodSheet(
     }
 
     // Pass 2b: Focused ONT serial extraction at full resolution
-    // Only run if ONT serials are mostly null (main extraction failed to read stickers)
+    // Run whenever the main pass left ANY ONT null — cleanOntSerial now nulls reads that
+    // fail ONT_STRICT_PATTERN (no ALCLB prefix), so this fires whenever the main 1280x960
+    // pass misread the stickers. The focused pass re-extracts from the full-res image with
+    // a prompt narrowly scoped to the ONT column.
     const ontNulls = parsed.entries.filter((e) => !e.ont_serial).length;
-    if (ontNulls > parsed.entries.length * 0.5) {
-      log.info('[EOD] Most ONT serials null — running focused extraction at full res');
+    if (ontNulls > 0) {
+      log.info(`[EOD] ${ontNulls}/${parsed.entries.length} ONT serials null — running focused extraction at full res`);
       const ontMap = await extractOntSerials(fullResBase64, parsed.entries.length);
       if (ontMap.size > 0) {
         parsed.entries = parsed.entries.map((e) => {
