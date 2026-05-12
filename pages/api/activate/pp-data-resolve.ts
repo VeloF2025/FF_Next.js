@@ -1005,7 +1005,8 @@ async function handler(
       const cutoff = new Date();
       const result = await runLocalResolution();
       const ticketsUpdated = await syncTicketActivities(cutoff);
-      return res.status(200).json({ success: true, data: { ...result, tickets_updated: ticketsUpdated } });
+      const gps = await backfillGpsCoordinates();
+      return res.status(200).json({ success: true, data: { ...result, tickets_updated: ticketsUpdated, gps_updated: gps } });
     }
 
     if (action === '1map-lookup') {
@@ -1030,6 +1031,7 @@ async function handler(
 
       // Sync ticket activities for all records resolved in steps 1-3
       const ticketsUpdated = await syncTicketActivities(cutoff);
+      const gps = await backfillGpsCoordinates();
 
       // Fire-and-forget 1Map lookup for remaining unresolved serials (has its own progress tracker)
       // 1Map lookup logs ticket activities per-serial inline
@@ -1045,6 +1047,7 @@ async function handler(
           total_resolved: localResult.total_resolved + crossRefResult.total_resolved + vlmResult.total_pp_matched,
           onemap_started: true,
           tickets_updated: ticketsUpdated,
+          gps_updated: gps,
           steps: {
             local_scan: { resolved: localResult.total_resolved, sources: localResult.sources },
             wa_cross_ref: { resolved: crossRefResult.total_resolved, drs_checked: crossRefResult.total_drs_checked, backfilled: crossRefResult.total_backfilled },
