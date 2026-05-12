@@ -1,5 +1,3 @@
-import React from 'react';
-
 import { SearchableStaffSelect } from '@/components/forms/SearchableStaffSelect';
 
 import type { PreviewRow, StaffOption } from '@/modules/payslips/types';
