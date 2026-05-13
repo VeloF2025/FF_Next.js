@@ -130,54 +130,49 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   const pons        = rows.map(r => r.components.olt_pon);
   const onts        = rows.map(r => r.components.olt_ont_pos);
 
-  const result = await pool.query<{ serial_number: string }>(`
-    WITH updates AS (
-      SELECT
-        unnest($1::text[])     AS serial,
-        unnest($2::text[])     AS olt_port,
-        unnest($3::text[])     AS olt_address,
-        unnest($4::text[])     AS olt_name,
-        unnest($5::smallint[]) AS olt_lt,
-        unnest($6::smallint[]) AS olt_pon,
-        unnest($7::smallint[]) AS olt_ont_pos
-    )
-    UPDATE oes_pp_data pp
-    SET
-      olt_port    = u.olt_port,
-      olt_address = u.olt_address,
-      olt_name    = u.olt_name,
-      olt_lt      = u.olt_lt,
-      olt_pon     = u.olt_pon,
-      olt_ont_pos = u.olt_ont_pos,
-      updated_at  = NOW()
-    FROM updates u
-    WHERE pp.serial_number = u.serial
-    RETURNING pp.serial_number
-  `, [serials, ports, addresses, names, lts, pons, onts]);
+  const client = await pool.connect();
+  let updatedCount = 0;
+  try {
+    await client.query('BEGIN');
 
-  const updatedCount = result.rowCount ?? 0;
-  const notMatched = rows.length - updatedCount;
+    const result = await client.query<{ serial_number: string; maintenance_ticket_id: string | null }>(`
+      WITH updates AS (
+        SELECT
+          unnest($1::text[])     AS serial,
+          unnest($2::text[])     AS olt_port,
+          unnest($3::text[])     AS olt_address,
+          unnest($4::text[])     AS olt_name,
+          unnest($5::smallint[]) AS olt_lt,
+          unnest($6::smallint[]) AS olt_pon,
+          unnest($7::smallint[]) AS olt_ont_pos
+      )
+      UPDATE oes_pp_data pp
+      SET
+        olt_port    = u.olt_port,
+        olt_address = u.olt_address,
+        olt_name    = u.olt_name,
+        olt_lt      = u.olt_lt,
+        olt_pon     = u.olt_pon,
+        olt_ont_pos = u.olt_ont_pos,
+        updated_at  = NOW()
+      FROM updates u
+      WHERE pp.serial_number = u.serial
+      RETURNING pp.serial_number, pp.maintenance_ticket_id
+    `, [serials, ports, addresses, names, lts, pons, onts]);
 
-  // Insert a system note on every maintenance ticket linked to an updated serial
-  if (updatedCount > 0) {
-    const updatedSerials = result.rows.map(r => r.serial_number);
-    const oltMap = new Map(rows.map(r => [r.serial, r.components]));
+    updatedCount = result.rowCount ?? 0;
 
-    const linked = await pool.query<{ serial_number: string; maintenance_ticket_id: string }>(
-      `SELECT serial_number, maintenance_ticket_id
-       FROM oes_pp_data
-       WHERE serial_number = ANY($1::text[])
-         AND maintenance_ticket_id IS NOT NULL`,
-      [updatedSerials]
-    );
-
-    if ((linked.rowCount ?? 0) > 0) {
+    // For updated serials that have a linked maintenance ticket, insert a system note.
+    // NOT EXISTS guard prevents duplicate notes on re-import.
+    const toNote = result.rows.filter(r => r.maintenance_ticket_id !== null);
+    if (toNote.length > 0) {
+      const oltMap = new Map(rows.map(r => [r.serial, r.components]));
       const ticketIds: string[] = [];
       const contents: string[] = [];
 
-      for (const row of linked.rows) {
+      for (const row of toNote) {
         const c = oltMap.get(row.serial_number);
-        if (!c) continue;
+        if (!c || !row.maintenance_ticket_id) continue;
         ticketIds.push(row.maintenance_ticket_id);
         contents.push(
           `OLT port assigned via import:\nPort: ${c.olt_port}\nAddress: ${c.olt_address}\nPON: ${c.olt_pon}  LT: ${c.olt_lt}  ONT: ${c.olt_ont_pos}`
@@ -185,15 +180,31 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       }
 
       if (ticketIds.length > 0) {
-        await pool.query(
+        const noteResult = await client.query(
           `INSERT INTO maintenance_notes (ticket_id, content, note_type, visibility, is_resolution)
-           SELECT unnest($1::uuid[]), unnest($2::text[]), 'system', 'private', false`,
+           SELECT u.ticket_id, u.content, 'system', 'public', false
+           FROM unnest($1::uuid[], $2::text[]) AS u(ticket_id, content)
+           WHERE NOT EXISTS (
+             SELECT 1 FROM maintenance_notes mn
+             WHERE mn.ticket_id = u.ticket_id
+               AND mn.note_type = 'system'
+               AND mn.content LIKE 'OLT port assigned via import:%'
+           )`,
           [ticketIds, contents]
         );
-        logger.info('OLT import: inserted ticket notes', { count: ticketIds.length });
+        logger.info('OLT import: inserted ticket notes', { count: noteResult.rowCount ?? 0 });
       }
     }
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
+
+  const notMatched = rows.length - updatedCount;
 
   logger.info('OLT import complete', { total: rows.length, updated: updatedCount, notMatched });
 
