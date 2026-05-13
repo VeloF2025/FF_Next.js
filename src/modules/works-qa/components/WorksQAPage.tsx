@@ -1,54 +1,53 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
+import { ArrowLeft, RefreshCw, Download } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { log } from '@/lib/logger';
 import { PoleListTable } from './PoleListTable';
 import { PoleDetailPanel } from './PoleDetailPanel';
+import { WorksQAProjectCard } from './WorksQAProjectCard';
+import { WorksQAFiltersBar } from './WorksQAFiltersBar';
 import { usePoleList } from '../hooks/usePoleList';
-import { log } from '@/lib/logger';
+import type { WorksQAProjectStats, WorksQAZoneSummary } from '../types/works-qa.types';
 
-interface ProjectOption {
-  id: string;
-  name: string;
-  project_code?: string | null;
-  status?: string | null;
+interface ApiEnvelope<T> {
+  success?: boolean;
+  data?: T;
 }
 
-interface PonOption {
-  pon_no: number;
-  pole_count: number;
+async function fetcher<T>(url: string): Promise<T> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(String(res.status));
+  const body = (await res.json()) as ApiEnvelope<T> | T;
+  if (body && typeof body === 'object' && 'success' in body && (body as ApiEnvelope<T>).data !== undefined) {
+    return (body as ApiEnvelope<T>).data as T;
+  }
+  return body as T;
 }
-
-const fetcher = (url: string) => fetch(url).then((r) => {
-  if (!r.ok) throw new Error(String(r.status));
-  return r.json();
-});
 
 export function WorksQAPage() {
   const router = useRouter();
-  const { project_id, pon_no } = router.query;
-
+  const { project_id, zone_no, pon_no } = router.query;
   const projectId = typeof project_id === 'string' ? project_id : null;
+  const zoneNo = typeof zone_no === 'string' ? Number(zone_no) : null;
   const ponNo = typeof pon_no === 'string' ? Number(pon_no) : null;
 
-  const { data: projectsResp } = useSWR<{ data?: ProjectOption[]; success?: boolean } | ProjectOption[]>(
-    '/api/projects',
+  const { data: stats = [], isLoading: statsLoading } = useSWR<WorksQAProjectStats[]>(
+    !projectId ? '/api/works-qa/project-stats' : null,
     fetcher,
   );
-  const projects: ProjectOption[] = Array.isArray(projectsResp)
-    ? projectsResp
-    : (projectsResp?.data ?? []);
-  const sortedProjects = [...projects].sort((a, b) => a.name.localeCompare(b.name));
-  const selectedProject = sortedProjects.find(p => p.id === projectId) ?? null;
 
-  const { data: ponsResp } = useSWR<{ data?: PonOption[]; success?: boolean } | PonOption[]>(
-    projectId ? `/api/works-qa/pons?project_id=${encodeURIComponent(projectId)}` : null,
+  const { data: zones = [], isLoading: zonesLoading } = useSWR<WorksQAZoneSummary[]>(
+    projectId ? `/api/works-qa/zones?project_id=${encodeURIComponent(projectId)}` : null,
     fetcher,
   );
-  const pons: PonOption[] = Array.isArray(ponsResp) ? ponsResp : (ponsResp?.data ?? []);
 
-  const { poles, isLoading, mutate } = usePoleList(projectId, ponNo);
+  const { poles, isLoading: polesLoading, mutate: mutatePoles } = usePoleList(projectId, ponNo);
   const [selectedPoleId, setSelectedPoleId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+
+  const selectedProject = stats.find(s => s.project_id === projectId);
 
   function pushQuery(updates: Record<string, string | null>) {
     const next = { ...router.query };
@@ -59,122 +58,157 @@ export function WorksQAPage() {
     void router.push({ query: next }, undefined, { shallow: true });
   }
 
+  function selectProject(id: string) {
+    pushQuery({ project_id: id, zone_no: null, pon_no: null });
+  }
+
+  function backToDashboard() {
+    void router.push({ query: {} }, undefined, { shallow: true });
+    setSelectedPoleId(null);
+  }
+
   async function handleSync() {
     if (!projectId) return;
     setSyncing(true);
+    const body = JSON.stringify({ project_id: projectId });
+    const headers = { 'Content-Type': 'application/json' };
     try {
-      const res = await fetch('/api/works-qa/sync-qfield', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: projectId }),
-      });
-      if (!res.ok) {
-        log.error('works-qa: sync-qfield failed', { status: res.status });
-        return;
-      }
+      const [historicalRes, qfieldRes] = await Promise.all([
+        fetch('/api/works-qa/sync-historical', { method: 'POST', headers, body }),
+        fetch('/api/works-qa/sync-qfield',      { method: 'POST', headers, body }),
+      ]);
+      if (!historicalRes.ok) log.error('works-qa: sync-historical failed', { status: historicalRes.status });
+      if (!qfieldRes.ok)     log.error('works-qa: sync-qfield failed',     { status: qfieldRes.status });
     } catch (err) {
-      log.error('works-qa: sync-qfield network error', { error: err instanceof Error ? err.message : String(err) });
-      return;
+      log.error('works-qa: sync error', { error: err instanceof Error ? err.message : String(err) });
     } finally {
       setSyncing(false);
     }
-    void mutate();
+    void mutatePoles();
   }
 
+  // ─── Level 1: Project dashboard ───────────────────────────────────────
+  if (!projectId) {
+    return (
+      <div className="space-y-4">
+        {statsLoading ? (
+          <div className="flex items-center justify-center h-48">
+            <LoadingSpinner size="md" label="" />
+          </div>
+        ) : stats.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-48 text-zinc-500">
+            <p className="text-sm">No projects with pole photos yet.</p>
+            <p className="text-xs mt-1">Sync from QField to start populating Johan&apos;s sweep.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {stats.map(s => (
+              <WorksQAProjectCard
+                key={s.project_id}
+                stats={s}
+                onClick={() => selectProject(s.project_id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ─── Level 2: Project detail (zone+PON filters + pole table) ───────────
   const approvedCount = poles.filter(p => p.status === 'approved').length;
   const readyCount = poles.filter(p => p.status === 'ready').length;
   const inProgressCount = poles.filter(p => p.status === 'in_progress').length;
 
   return (
-    <div className="bg-zinc-950 text-zinc-100">
-      <div className="max-w-7xl mx-auto px-6 py-6">
-        {/* Filter bar — project + PON dropdowns */}
-        <div className="flex flex-wrap items-end gap-3 mb-6">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Project</label>
-            <select
-              value={projectId ?? ''}
-              onChange={e => pushQuery({ project_id: e.target.value || null, pon_no: null })}
-              className="bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm text-zinc-200 w-72 focus:outline-none focus:border-teal-600"
-            >
-              <option value="">Select a project…</option>
-              {sortedProjects.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.name}{p.project_code ? ` (${p.project_code})` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-zinc-500 uppercase tracking-wide">PON</label>
-            <select
-              value={ponNo ?? ''}
-              onChange={e => pushQuery({ pon_no: e.target.value || null })}
-              disabled={!projectId || pons.length === 0}
-              className="bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm text-zinc-200 w-44 focus:outline-none focus:border-teal-600 disabled:opacity-50"
-            >
-              <option value="">All PONs{pons.length > 0 ? ` (${pons.length})` : ''}</option>
-              {pons.map(p => (
-                <option key={p.pon_no} value={p.pon_no}>
-                  PON {p.pon_no} — {p.pole_count} pole{p.pole_count === 1 ? '' : 's'}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {projectId && (
-            <button
-              onClick={() => void handleSync()}
-              disabled={syncing}
-              className="px-3 py-1.5 text-sm bg-teal-700 hover:bg-teal-600 text-white rounded transition-colors disabled:opacity-50"
-            >
-              {syncing ? 'Syncing…' : 'Sync QField'}
-            </button>
-          )}
-          {projectId && ponNo != null && (
-            <a
-              href={`/api/works-qa/pon-zip?project_id=${encodeURIComponent(projectId)}&pon_no=${ponNo}`}
-              className="px-3 py-1.5 text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded transition-colors"
-            >
-              ↓ Download ZIP
-            </a>
+    <div className="space-y-4">
+      {/* Top bar: back, project name, filters, sync, zip */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            type="button"
+            onClick={backToDashboard}
+            className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-100 transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            All projects
+          </button>
+          <h2 className="text-sm font-semibold text-zinc-100">
+            {selectedProject?.project_name ?? 'Project'}
+          </h2>
+          {zonesLoading ? (
+            <span className="text-xs text-zinc-500">Loading zones…</span>
+          ) : (
+            <WorksQAFiltersBar
+              zones={zones}
+              zoneNo={zoneNo}
+              ponNo={ponNo}
+              onChange={updates => {
+                const next: Record<string, string | null> = {};
+                if ('zone_no' in updates) next.zone_no = updates.zone_no === null ? null : String(updates.zone_no);
+                if ('pon_no' in updates) next.pon_no = updates.pon_no === null ? null : String(updates.pon_no);
+                pushQuery(next);
+              }}
+            />
           )}
         </div>
 
-        {/* Summary bar */}
-        {!isLoading && poles.length > 0 && (
-          <div className="flex gap-5 mb-4 text-xs text-zinc-500">
-            <span><span className="font-medium text-zinc-300">{poles.length}</span> poles</span>
-            <span><span className="font-medium text-emerald-400">{approvedCount}</span> approved</span>
-            <span><span className="font-medium text-teal-400">{readyCount}</span> ready</span>
-            <span><span className="font-medium text-zinc-400">{inProgressCount}</span> in progress</span>
-          </div>
-        )}
-
-        {!projectId ? (
-          <div className="text-sm text-zinc-500 text-center py-16 border border-dashed border-zinc-800 rounded-lg">
-            Pick a project above to load Johan&apos;s QA sweep.
-          </div>
-        ) : pons.length === 0 && !isLoading ? (
-          <div className="text-sm text-zinc-500 text-center py-16 border border-dashed border-zinc-800 rounded-lg">
-            <div className="mb-2">No PONs yet for <span className="text-zinc-300">{selectedProject?.name ?? 'this project'}</span>.</div>
-            <div className="text-xs">Click <span className="text-teal-400">Sync QField</span> to pull pole photos from the field.</div>
-          </div>
-        ) : (
-          <PoleListTable
-            poles={poles}
-            selectedPoleId={selectedPoleId}
-            onSelect={setSelectedPoleId}
-          />
-        )}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleSync()}
+            disabled={syncing}
+            className="inline-flex items-center gap-1.5 bg-teal-700 hover:bg-teal-600 disabled:opacity-50 text-white text-xs px-3 py-2 rounded-md font-medium transition-colors"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing…' : 'Sync QField'}
+          </button>
+          {ponNo !== null && (
+            <a
+              href={`/api/works-qa/pon-zip?project_id=${encodeURIComponent(projectId)}&pon_no=${ponNo}`}
+              className="inline-flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs px-3 py-2 rounded-md font-medium transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" />
+              ZIP
+            </a>
+          )}
+        </div>
       </div>
+
+      {/* Summary counts */}
+      {!polesLoading && poles.length > 0 && (
+        <div className="flex gap-5 text-xs text-zinc-500">
+          <span><span className="font-medium text-zinc-300">{poles.length}</span> poles</span>
+          <span><span className="font-medium text-green-400">{approvedCount}</span> approved</span>
+          <span><span className="font-medium text-teal-400">{readyCount}</span> ready</span>
+          <span><span className="font-medium text-yellow-400">{inProgressCount}</span> in progress</span>
+        </div>
+      )}
+
+      {polesLoading ? (
+        <div className="flex items-center justify-center h-48">
+          <LoadingSpinner size="md" label="" />
+        </div>
+      ) : poles.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-48 text-zinc-500">
+          <p className="text-sm">No poles yet for this filter.</p>
+          <p className="text-xs mt-1">
+            Click <span className="text-teal-400">Sync QField</span> to pull pole photos from the field.
+          </p>
+        </div>
+      ) : (
+        <PoleListTable
+          poles={poles}
+          selectedPoleId={selectedPoleId}
+          onSelect={setSelectedPoleId}
+        />
+      )}
 
       <PoleDetailPanel
         poleId={selectedPoleId}
         onClose={() => {
           setSelectedPoleId(null);
-          void mutate();
+          void mutatePoles();
         }}
       />
     </div>

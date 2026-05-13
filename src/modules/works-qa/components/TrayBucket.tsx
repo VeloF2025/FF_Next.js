@@ -1,12 +1,14 @@
 import { useRef } from 'react';
+import { photoUrl } from '../utils/photo-url';
 
 interface TrayBucketProps {
   trayKeys: string[];
   onUpload: (files: File[]) => void;
+  onView?: (index: number) => void;
   disabled?: boolean;
 }
 
-export function TrayBucket({ trayKeys, onUpload, disabled }: TrayBucketProps) {
+export function TrayBucket({ trayKeys, onUpload, onView, disabled }: TrayBucketProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrop = (e: React.DragEvent) => {
@@ -40,12 +42,20 @@ export function TrayBucket({ trayKeys, onUpload, disabled }: TrayBucketProps) {
         ) : (
           <div className="grid grid-cols-3 gap-1">
             {trayKeys.map((key, i) => (
-              <img
+              <button
                 key={i}
-                src={`/storage/${key}`}
-                alt={`Tray ${i + 1}`}
-                className="w-full h-16 object-cover rounded"
-              />
+                type="button"
+                onClick={() => onView?.(i)}
+                disabled={!onView}
+                className="w-full h-16 rounded overflow-hidden focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:cursor-default"
+                aria-label={`Open tray photo ${i + 1}`}
+              >
+                <img
+                  src={photoUrl(key)}
+                  alt={`Tray ${i + 1}`}
+                  className="w-full h-full object-cover transition-transform hover:scale-[1.02]"
+                />
+              </button>
             ))}
           </div>
         )}

@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, withPermission } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { SLOT_META, getSlotMeta } from '@/modules/works-qa/utils/slot-keys';
 
@@ -77,12 +77,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       poleFilter = `AND feature_id = $${params.length}`;
     }
 
+    // project_id from the client is a FibreFlow project ID. qfield_photo_validations stores
+    // QField project IDs; translate via qfield_project_links so we pull every QField project
+    // mapped to this FibreFlow project.
     const qResult = await pool.query<QFieldRow>(`
-      SELECT feature_id, photo_key, checklist_step, work_type, vlm_confidence, vlm_feedback
-      FROM qfield_photo_validations
-      WHERE project_id = $1::uuid
-        AND feature_type = 'pole'
-        ${poleFilter}
+      SELECT q.feature_id, q.photo_key, q.checklist_step, q.work_type, q.vlm_confidence, q.vlm_feedback
+      FROM qfield_photo_validations q
+      INNER JOIN qfield_project_links l ON l.qfield_project_id = q.project_id
+      WHERE l.fibreflow_project_id = $1::uuid
+        AND q.feature_type = 'pole'
+        ${poleFilter ? poleFilter.replace('feature_id', 'q.feature_id') : ''}
     `, params);
 
     let synced = 0;
@@ -98,11 +102,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const slotMeta = getSlotMeta(slotKey);
       if (!slotMeta) { skipped++; continue; }
 
-      // Upsert the pole row — ignore if already exists
+      // Upsert the pole row; copy zone/PON from sow_poles by pole_number match so the
+      // pole list and PON filter have something to group on.
       await pool.query(`
-        INSERT INTO pole_qa_photos (project_id, pole_label)
-        VALUES ($1::uuid, $2)
-        ON CONFLICT (project_id, pole_label) DO NOTHING
+        INSERT INTO pole_qa_photos (project_id, pole_label, zone_no, pon_no)
+        SELECT $1::uuid, $2, sp.zone_no, sp.pon_no
+        FROM (SELECT 1) one
+        LEFT JOIN sow_poles sp
+          ON sp.project_id = $1::uuid
+         AND sp.pole_number = $2
+        ON CONFLICT (project_id, pole_label) DO UPDATE
+        SET zone_no = COALESCE(pole_qa_photos.zone_no, EXCLUDED.zone_no),
+            pon_no  = COALESCE(pole_qa_photos.pon_no,  EXCLUDED.pon_no)
       `, [project_id, poleLabel]);
 
       // Fetch current value of the slot column to check if it's already set
@@ -149,4 +160,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withPermission('construction-qa.works-qa.sync', 'create')(handler));

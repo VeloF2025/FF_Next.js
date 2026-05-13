@@ -234,14 +234,6 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
       };
     }
 
-    // Works QA (must precede generic field-ops catch-all)
-    if (path.includes('works-qa')) {
-      return {
-        title: 'Works QA',
-        breadcrumbs: ['Home', 'Field Operations', 'Works QA'],
-      };
-    }
-
     // Field App
     if (path.includes('field')) {
       return {

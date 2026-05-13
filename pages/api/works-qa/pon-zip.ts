@@ -2,25 +2,37 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import JSZip from 'jszip';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, withPermission } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { SLOT_META } from '@/modules/works-qa/utils/slot-keys';
 import type { PoleQaPhoto } from '@/modules/works-qa/types/works-qa.types';
 
-const STORAGE_BASE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.fibreflow.app';
+// Loopback so the server-to-server call lands on the local Next.js process and the
+// photo-proxy's localhost-bypass (`?vlm=true`) accepts it without a session cookie.
+// Falls back to the user's cookie for non-loopback paths if PORT is unknown.
+const LOOPBACK_PORT = process.env.PORT ?? '3000';
+const LOOPBACK_BASE = `http://127.0.0.1:${LOOPBACK_PORT}`;
 
 function photoUrl(key: string): string {
-  return `${STORAGE_BASE}/storage/${key}`;
+  // See src/modules/works-qa/utils/photo-url.ts for the dispatch rationale.
+  if (key.startsWith('works-qa/')) return `${LOOPBACK_BASE}/storage/${key}`;
+  const source = key.startsWith('projects/')   ? 'qfield'
+              : key.startsWith('sharepoint:') ? 'sharepoint'
+              :                                 'local';
+  return `${LOOPBACK_BASE}/api/construction-qa/photo-proxy?key=${encodeURIComponent(key)}&source=${source}&vlm=true`;
 }
 
 function slotFilename(stepNumber: number, label: string): string {
   return `${String(stepNumber).padStart(2, '0')}_${label.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.jpg`;
 }
 
-async function fetchPhoto(url: string): Promise<Buffer | null> {
+async function fetchPhoto(url: string, cookie: string): Promise<Buffer | null> {
   try {
-    const resp = await fetch(url);
-    if (!resp.ok) return null;
+    const resp = await fetch(url, { headers: cookie ? { cookie } : {} });
+    if (!resp.ok) {
+      log.warn('pon-zip: fetchPhoto non-OK', { url, status: resp.status });
+      return null;
+    }
     return Buffer.from(await resp.arrayBuffer());
   } catch (err) {
     log.error('pon-zip: fetchPhoto failed', { url, error: err instanceof Error ? err.message : String(err) });
@@ -63,6 +75,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const ponLabel = ponNum !== undefined ? `PON_${ponNum}` : 'works-qa';
     const zip = new JSZip();
+    // Forward the caller's cookie so the loopback fetch authenticates as the same
+    // user when localhost-bypass doesn't apply (e.g. cookie-auth photo proxies).
+    const cookie = req.headers.cookie ?? '';
 
     const civilSlots = SLOT_META.filter(s => s.discipline === 'civil');
     const opticalSlots = SLOT_META.filter(s => s.discipline === 'dome' || s.discipline === 'joint');
@@ -77,7 +92,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const civilPromises = civilSlots.map(async slot => {
         const key = pole[slot.dbColumn as keyof PoleQaPhoto] as string | null;
         if (!key) return;
-        const buf = await fetchPhoto(photoUrl(key));
+        const buf = await fetchPhoto(photoUrl(key), cookie);
         if (buf) civilFolder.file(slotFilename(slot.stepNumber, slot.label), buf);
       });
 
@@ -85,7 +100,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const opticalPromises = opticalSlots.map(async slot => {
         const key = pole[slot.dbColumn as keyof PoleQaPhoto] as string | null;
         if (!key) return;
-        const buf = await fetchPhoto(photoUrl(key));
+        const buf = await fetchPhoto(photoUrl(key), cookie);
         if (buf) opticalFolder.file(slotFilename(slot.stepNumber, slot.label), buf);
       });
 
@@ -94,7 +109,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ? pole.optical_joint_tray_keys
         : [];
       const trayPromises = trayKeys.map(async (trayKey, i) => {
-        const buf = await fetchPhoto(photoUrl(trayKey));
+        const buf = await fetchPhoto(photoUrl(trayKey), cookie);
         if (buf) opticalFolder.file(`tray_${String(i + 1).padStart(2, '0')}.jpg`, buf);
       });
 
@@ -117,4 +132,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withPermission('construction-qa.works-qa.export', 'view')(handler));

@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import type { VlmSlotResult } from '../types/works-qa.types';
+import { photoUrl } from '../utils/photo-url';
 
 interface PhotoSlotCardProps {
   slotKey: string;
@@ -8,10 +9,11 @@ interface PhotoSlotCardProps {
   vlm: VlmSlotResult | undefined;
   onUpload: (file: File) => void;
   onOverride: (decision: 'pass' | 'fail', reason: string) => void;
+  onView?: () => void;
   disabled?: boolean;
 }
 
-export function PhotoSlotCard({ slotKey, label, photoKey, vlm, onUpload, onOverride, disabled }: PhotoSlotCardProps) {
+export function PhotoSlotCard({ slotKey: _slotKey, label, photoKey, vlm, onUpload, onOverride, onView, disabled }: PhotoSlotCardProps) {
   const [showOverride, setShowOverride] = useState(false);
   const [overrideReason, setOverrideReason] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -45,11 +47,19 @@ export function PhotoSlotCard({ slotKey, label, photoKey, vlm, onUpload, onOverr
       </div>
 
       {photoKey ? (
-        <img
-          src={`/storage/${photoKey}`}
-          alt={label}
-          className="w-full h-28 object-cover rounded"
-        />
+        <button
+          type="button"
+          onClick={onView}
+          disabled={!onView}
+          className="w-full h-28 rounded overflow-hidden focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:cursor-default"
+          aria-label={`Open ${label}`}
+        >
+          <img
+            src={photoUrl(photoKey)}
+            alt={label}
+            className="w-full h-full object-cover transition-transform hover:scale-[1.02]"
+          />
+        </button>
       ) : (
         <button
           onClick={() => fileInputRef.current?.click()}

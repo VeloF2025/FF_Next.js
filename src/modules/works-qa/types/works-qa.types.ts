@@ -66,6 +66,26 @@ export interface PoleSummary {
   approved_at: string | null;
 }
 
+export interface WorksQAProjectStats {
+  project_id: string;
+  project_name: string;
+  project_code: string | null;
+  total: number;
+  approved: number;
+  ready: number;
+  in_progress: number;
+  empty: number;
+  pending_vlm: number;
+}
+
+export interface WorksQAZoneSummary {
+  zone_no: number | null;
+  pon_count: number;
+  pole_count: number;
+  approved_count: number;
+  pons: { pon_no: number; pole_count: number; approved_count: number }[];
+}
+
 export type SlotKey =
   | 'civil_01' | 'civil_02' | 'civil_03' | 'civil_04' | 'civil_05' | 'civil_06' | 'civil_07'
   | 'dome_01' | 'dome_02' | 'dome_03' | 'dome_04' | 'dome_05' | 'dome_06' | 'dome_07' | 'dome_08'
