@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePoleDetail } from '../hooks/usePoleDetail';
 import { PhotoSlotCard } from './PhotoSlotCard';
 import { TrayBucket } from './TrayBucket';
@@ -75,6 +75,10 @@ function buildLightboxPhotos(pole: PoleQaPhoto): { photos: LightboxPhoto[]; slot
 export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
   const { pole, isLoading, mutate } = usePoleDetail(poleId);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  // Reset the lightbox whenever the selected pole changes — otherwise a stale
+  // index can point past the new pole's photo array (or render the wrong photo).
+  useEffect(() => { setLightboxIndex(null); }, [poleId]);
 
   if (!poleId) return null;
 

@@ -83,7 +83,7 @@ export interface WorksQAZoneSummary {
   pon_count: number;
   pole_count: number;
   approved_count: number;
-  pons: { pon_no: number; pole_count: number; approved_count: number; ready_count: number }[];
+  pons: { pon_no: number; pole_count: number; approved_count: number }[];
 }
 
 export type SlotKey =

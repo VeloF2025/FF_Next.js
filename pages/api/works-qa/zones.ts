@@ -16,7 +16,7 @@ interface ZoneOut {
   pon_count: number;
   pole_count: number;
   approved_count: number;
-  pons: { pon_no: number; pole_count: number; approved_count: number; ready_count: number }[];
+  pons: { pon_no: number; pole_count: number; approved_count: number }[];
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -74,7 +74,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         pon_no: row.pon_no,
         pole_count: row.pole_count,
         approved_count: row.approved_count,
-        ready_count: 0,
       });
       zone.pon_count += 1;
       zone.pole_count += row.pole_count;

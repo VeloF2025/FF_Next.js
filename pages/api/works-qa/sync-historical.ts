@@ -95,7 +95,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `, [project_id]);
 
     let slotsPopulated = 0;
-    let polesUpserted = new Set<string>();
+    const polesUpserted = new Set<string>();
 
     for (const row of photoResult.rows) {
       const slot = resolveSlot(row.discipline, row.checklist_step);
@@ -134,28 +134,45 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       polesUpserted.add(row.pole_label);
     }
 
-    // 2. Carry approvals forward from construction_qa_reviews
-    const approvalUpdate = await pool.query<{ feature_id: string; discipline: string }>(`
+    // 2. Carry approvals forward, one discipline at a time. Running both disciplines
+    //    in a single `UPDATE...FROM` is non-deterministic when a pole has both civil
+    //    and optical approvals — PostgreSQL picks one join row arbitrarily and the
+    //    other discipline's flag silently doesn't update.
+    const civilApprovals = await pool.query(`
       UPDATE pole_qa_photos qa
-      SET civil_approved = CASE WHEN r.discipline = 'civil' THEN TRUE ELSE qa.civil_approved END,
-          dome_approved  = CASE WHEN r.discipline = 'optical' THEN TRUE ELSE qa.dome_approved END,
-          joint_approved = CASE WHEN r.discipline = 'optical' THEN TRUE ELSE qa.joint_approved END,
+      SET civil_approved = TRUE,
           approved_at    = COALESCE(qa.approved_at, r.qa_decision_at, r.updated_at),
           approved_by    = COALESCE(qa.approved_by, r.qa_decision_by, 'construction-qa-historical'),
           updated_at     = NOW()
       FROM construction_qa_reviews r
       WHERE r.project_id = $1::uuid
         AND r.feature_type = 'pole'
+        AND r.discipline = 'civil'
         AND r.workflow_status = 'approved'
         AND qa.project_id = r.project_id
         AND qa.pole_label = r.feature_id
-      RETURNING r.feature_id, r.discipline
+    `, [project_id]);
+
+    const opticalApprovals = await pool.query(`
+      UPDATE pole_qa_photos qa
+      SET dome_approved  = TRUE,
+          joint_approved = TRUE,
+          approved_at    = COALESCE(qa.approved_at, r.qa_decision_at, r.updated_at),
+          approved_by    = COALESCE(qa.approved_by, r.qa_decision_by, 'construction-qa-historical'),
+          updated_at     = NOW()
+      FROM construction_qa_reviews r
+      WHERE r.project_id = $1::uuid
+        AND r.feature_type = 'pole'
+        AND r.discipline = 'optical'
+        AND r.workflow_status = 'approved'
+        AND qa.project_id = r.project_id
+        AND qa.pole_label = r.feature_id
     `, [project_id]);
 
     return apiResponse.success(res, {
       poles_touched: polesUpserted.size,
       slots_populated: slotsPopulated,
-      approvals_carried_forward: approvalUpdate.rowCount ?? 0,
+      approvals_carried_forward: (civilApprovals.rowCount ?? 0) + (opticalApprovals.rowCount ?? 0),
     });
   } catch (err) {
     log.error('works-qa/sync-historical', { error: err instanceof Error ? err.message : String(err) });
