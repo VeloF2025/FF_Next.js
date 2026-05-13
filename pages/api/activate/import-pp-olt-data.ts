@@ -130,7 +130,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   const pons        = rows.map(r => r.components.olt_pon);
   const onts        = rows.map(r => r.components.olt_ont_pos);
 
-  const result = await pool.query<{ updated_count: string }>(`
+  const result = await pool.query<{ serial_number: string }>(`
     WITH updates AS (
       SELECT
         unnest($1::text[])     AS serial,
@@ -157,6 +157,43 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   const updatedCount = result.rowCount ?? 0;
   const notMatched = rows.length - updatedCount;
+
+  // Insert a system note on every maintenance ticket linked to an updated serial
+  if (updatedCount > 0) {
+    const updatedSerials = result.rows.map(r => r.serial_number);
+    const oltMap = new Map(rows.map(r => [r.serial, r.components]));
+
+    const linked = await pool.query<{ serial_number: string; maintenance_ticket_id: string }>(
+      `SELECT serial_number, maintenance_ticket_id
+       FROM oes_pp_data
+       WHERE serial_number = ANY($1::text[])
+         AND maintenance_ticket_id IS NOT NULL`,
+      [updatedSerials]
+    );
+
+    if ((linked.rowCount ?? 0) > 0) {
+      const ticketIds: string[] = [];
+      const contents: string[] = [];
+
+      for (const row of linked.rows) {
+        const c = oltMap.get(row.serial_number);
+        if (!c) continue;
+        ticketIds.push(row.maintenance_ticket_id);
+        contents.push(
+          `OLT port assigned via import:\nPort: ${c.olt_port}\nAddress: ${c.olt_address}\nPON: ${c.olt_pon}  LT: ${c.olt_lt}  ONT: ${c.olt_ont_pos}`
+        );
+      }
+
+      if (ticketIds.length > 0) {
+        await pool.query(
+          `INSERT INTO maintenance_notes (ticket_id, content, note_type, visibility, is_resolution)
+           SELECT unnest($1::uuid[]), unnest($2::text[]), 'system', 'private', false`,
+          [ticketIds, contents]
+        );
+        logger.info('OLT import: inserted ticket notes', { count: ticketIds.length });
+      }
+    }
+  }
 
   logger.info('OLT import complete', { total: rows.length, updated: updatedCount, notMatched });
 
