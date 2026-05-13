@@ -70,6 +70,37 @@ export async function extractSheetFile(file: File): Promise<ExtractResult> {
   return { duplicate: false, extraction: rest as EodVlmExtraction, photoHash };
 }
 
+/** Convert a PDF File into one synthetic JPEG File per page. */
+export async function expandPdfToFiles(file: File): Promise<File[]> {
+  const base64 = await readAsBase64(file);
+  const res = await fetch('/api/eod/pdf-pages', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pdf: base64 }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`PDF conversion failed (${res.status}): ${text}`);
+  }
+  const json = await res.json() as {
+    success: boolean;
+    data?: { pages: Array<{ pageNumber: number; base64: string }> };
+    error?: { message: string };
+    message?: string;
+  };
+  if (!json.success) throw new Error(json.error?.message ?? json.message ?? 'PDF conversion failed');
+  if (!json.data?.pages?.length) throw new Error('PDF produced no pages');
+
+  const stem = file.name.replace(/\.pdf$/i, '');
+  const total = json.data.pages.length;
+  return json.data.pages.map(({ pageNumber, base64: imgB64 }) => {
+    const bytes = Uint8Array.from(atob(imgB64), (c) => c.charCodeAt(0));
+    const name = total === 1 ? `${stem}.jpg` : `${stem}_p${pageNumber}.jpg`;
+    return new File([bytes], name, { type: 'image/jpeg' });
+  });
+}
+
 export async function saveEodSheet(payload: EodSavePayload): Promise<{ matched_count: number }> {
   const res = await fetch('/api/eod/sheets', {
     method: 'POST',

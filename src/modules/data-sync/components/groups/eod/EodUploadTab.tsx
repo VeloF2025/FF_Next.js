@@ -7,10 +7,15 @@ import { Button } from '@/components/ui/button';
 import { log } from '@/lib/logger';
 import { EodBatchQueue } from './EodBatchQueue';
 import { EodEntryTable } from './EodEntryTable';
+import { expandPdfToFiles } from '../../../services/eodBatchService';
 import type { EodSheetSlot } from '../../../types';
 
 function isImageFile(file: File): boolean {
   return file.type.startsWith('image/') || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name);
+}
+
+function isPdfFile(file: File): boolean {
+  return file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
 }
 
 async function readDirectoryFiles(entry: FileSystemDirectoryEntry): Promise<File[]> {
@@ -27,7 +32,7 @@ async function readDirectoryFiles(entry: FileSystemDirectoryEntry): Promise<File
         for (const e of entries) {
           if (e.isFile) {
             const file = await new Promise<File>((res, rej) => (e as FileSystemFileEntry).file(res, rej));
-            if (isImageFile(file)) collected.push(file);
+            if (isImageFile(file) || isPdfFile(file)) collected.push(file);
           } else if (e.isDirectory) {
             const sub = await readDirectoryFiles(e as FileSystemDirectoryEntry);
             collected.push(...sub);
@@ -48,17 +53,41 @@ function deduplicateFiles(existing: File[], incoming: File[]): File[] {
 export function EodUploadTab() {
   const [files, setFiles] = useState<File[]>([]);
   const [savedSlots, setSavedSlots] = useState<EodSheetSlot[]>([]);
+  const [expanding, setExpanding] = useState(false);
+  const [expandError, setExpandError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement | null>(null);
 
-  const addFiles = useCallback((incoming: File[]) => {
+  const addFiles = useCallback(async (incoming: File[]) => {
     const images = incoming.filter(isImageFile);
-    if (images.length === 0) return;
-    setFiles((prev) => deduplicateFiles(prev, images));
+    const pdfs = incoming.filter(isPdfFile);
+
+    if (images.length === 0 && pdfs.length === 0) return;
+
+    let allImages = images;
+
+    if (pdfs.length > 0) {
+      setExpanding(true);
+      setExpandError(null);
+      try {
+        const expanded = await Promise.all(pdfs.map(expandPdfToFiles));
+        allImages = [...images, ...expanded.flat()];
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'PDF conversion failed';
+        log.warn('[EOD] PDF expansion failed', { error: err });
+        setExpandError(msg);
+      } finally {
+        setExpanding(false);
+      }
+    }
+
+    if (allImages.length > 0) {
+      setFiles((prev) => deduplicateFiles(prev, allImages));
+    }
   }, []);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) addFiles(Array.from(e.target.files));
+    if (e.target.files) void addFiles(Array.from(e.target.files));
     e.target.value = '';
   };
 
@@ -75,7 +104,7 @@ export function EodUploadTab() {
       try {
         if (entry.isFile) {
           const file = await new Promise<File>((res, rej) => (entry as FileSystemFileEntry).file(res, rej));
-          if (isImageFile(file)) collected.push(file);
+          if (isImageFile(file) || isPdfFile(file)) collected.push(file);
         } else if (entry.isDirectory) {
           const sub = await readDirectoryFiles(entry as FileSystemDirectoryEntry);
           collected.push(...sub);
@@ -85,7 +114,7 @@ export function EodUploadTab() {
       }
     }
 
-    addFiles(collected);
+    void addFiles(collected);
   };
 
   const reset = () => {
@@ -173,7 +202,7 @@ export function EodUploadTab() {
           Drag & drop EOD sheets or a folder here
         </p>
         <p className="text-xs text-[var(--ff-text-tertiary)] mb-6">
-          JPG, PNG — VLM extracts all fields automatically
+          JPG, PNG, PDF — VLM extracts all fields automatically
         </p>
 
         <div className="flex justify-center gap-3">
@@ -181,7 +210,7 @@ export function EodUploadTab() {
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
+            accept="image/*,.pdf"
             multiple
             className="hidden"
             onChange={handleFileInput}
@@ -197,7 +226,7 @@ export function EodUploadTab() {
           {/* Folder pick — webkitdirectory is not in React types, set via ref callback */}
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,.pdf"
             multiple
             className="hidden"
             onChange={handleFileInput}
@@ -215,6 +244,15 @@ export function EodUploadTab() {
           </button>
         </div>
       </div>
+
+      {expanding && (
+        <p className="text-sm text-center text-[var(--ff-text-secondary)] animate-pulse">
+          Converting PDF pages…
+        </p>
+      )}
+      {expandError && (
+        <p className="text-sm text-center text-red-400">{expandError}</p>
+      )}
     </div>
   );
 }
