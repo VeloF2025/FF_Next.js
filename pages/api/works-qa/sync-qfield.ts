@@ -102,11 +102,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const slotMeta = getSlotMeta(slotKey);
       if (!slotMeta) { skipped++; continue; }
 
-      // Upsert the pole row — ignore if already exists
+      // Upsert the pole row; copy zone/PON from sow_poles by pole_number match so the
+      // pole list and PON filter have something to group on.
       await pool.query(`
-        INSERT INTO pole_qa_photos (project_id, pole_label)
-        VALUES ($1::uuid, $2)
-        ON CONFLICT (project_id, pole_label) DO NOTHING
+        INSERT INTO pole_qa_photos (project_id, pole_label, zone_no, pon_no)
+        SELECT $1::uuid, $2, sp.zone_no, sp.pon_no
+        FROM (SELECT 1) one
+        LEFT JOIN sow_poles sp
+          ON sp.project_id = $1::uuid
+         AND sp.pole_number = $2
+        ON CONFLICT (project_id, pole_label) DO UPDATE
+        SET zone_no = COALESCE(pole_qa_photos.zone_no, EXCLUDED.zone_no),
+            pon_no  = COALESCE(pole_qa_photos.pon_no,  EXCLUDED.pon_no)
       `, [project_id, poleLabel]);
 
       // Fetch current value of the slot column to check if it's already set

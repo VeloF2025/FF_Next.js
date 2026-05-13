@@ -9,7 +9,6 @@ interface PonRow {
   pon_no: number;
   pole_count: number;
   approved_count: number;
-  ready_count: number;
 }
 
 interface ZoneOut {
@@ -29,16 +28,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
+    // Source of zone/PON metadata is sow_poles (FibreFlow IDs).
+    // pole_qa_photos may carry zone/PON copied at sync time too — merge in case sync ran
+    // and added rows that aren't in the SoW (manual additions).
     const result = await pool.query<PonRow>(`
       WITH pole_pool AS (
-        SELECT DISTINCT q.zone_no, q.pon_no, q.feature_id AS pole_label, NULL::timestamptz AS approved_at
-        FROM qfield_photo_validations q
-        INNER JOIN qfield_project_links l ON l.qfield_project_id = q.project_id
-        WHERE l.fibreflow_project_id = $1::uuid
-          AND q.feature_type = 'pole'
-          AND q.pon_no IS NOT NULL
+        SELECT zone_no, pon_no, pole_number AS pole_label, NULL::timestamptz AS approved_at
+        FROM sow_poles
+        WHERE project_id = $1::uuid
+          AND pon_no IS NOT NULL
         UNION
-        SELECT DISTINCT zone_no, pon_no, pole_label, approved_at
+        SELECT zone_no, pon_no, pole_label, approved_at
         FROM pole_qa_photos
         WHERE project_id = $1::uuid
           AND pon_no IS NOT NULL
@@ -56,8 +56,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         zone_no,
         pon_no,
         COUNT(DISTINCT pole_label)::int                                AS pole_count,
-        COUNT(DISTINCT pole_label) FILTER (WHERE approved_at IS NOT NULL)::int AS approved_count,
-        0::int                                                          AS ready_count
+        COUNT(DISTINCT pole_label) FILTER (WHERE approved_at IS NOT NULL)::int AS approved_count
       FROM pole_dedup
       GROUP BY zone_no, pon_no
       ORDER BY zone_no NULLS LAST, pon_no ASC
@@ -75,7 +74,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         pon_no: row.pon_no,
         pole_count: row.pole_count,
         approved_count: row.approved_count,
-        ready_count: row.ready_count,
+        ready_count: 0,
       });
       zone.pon_count += 1;
       zone.pole_count += row.pole_count;
