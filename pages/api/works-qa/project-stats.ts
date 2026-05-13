@@ -20,11 +20,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
 
   try {
+    // qfield_photo_validations.project_id uses QField IDs; pole_qa_photos.project_id uses
+    // FibreFlow IDs. qfield_project_links translates between the two so we can build the
+    // pole universe in the FibreFlow ID space throughout.
     const result = await pool.query<ProjectStatsRow>(`
       WITH pole_universe AS (
-        SELECT DISTINCT project_id, feature_id AS pole_label
-        FROM qfield_photo_validations
-        WHERE feature_type = 'pole'
+        SELECT DISTINCT l.fibreflow_project_id AS project_id, q.feature_id AS pole_label
+        FROM qfield_photo_validations q
+        INNER JOIN qfield_project_links l ON l.qfield_project_id = q.project_id
+        WHERE q.feature_type = 'pole'
         UNION
         SELECT DISTINCT project_id, pole_label
         FROM pole_qa_photos
@@ -89,10 +93,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         COUNT(*) FILTER (WHERE s.status = 'in_progress')::int                 AS in_progress,
         COUNT(*) FILTER (WHERE s.status = 'empty')::int                       AS empty,
         COALESCE(SUM(s.pending_vlm_failures), 0)::int                         AS pending_vlm
-      FROM pole_status s
-      INNER JOIN projects p ON p.id = s.project_id
+      FROM projects p
+      LEFT JOIN pole_status s ON s.project_id = p.id
+      WHERE p.status != 'archived'
       GROUP BY p.id, p.project_name, p.project_code
-      ORDER BY p.project_name ASC
+      ORDER BY (COUNT(s.pole_label) > 0) DESC, p.project_name ASC
     `);
 
     return apiResponse.success(res, result.rows);

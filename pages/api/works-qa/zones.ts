@@ -31,11 +31,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const result = await pool.query<PonRow>(`
       WITH pole_pool AS (
-        SELECT DISTINCT zone_no, pon_no, feature_id AS pole_label, NULL::timestamptz AS approved_at
-        FROM qfield_photo_validations
-        WHERE project_id = $1::uuid
-          AND feature_type = 'pole'
-          AND pon_no IS NOT NULL
+        SELECT DISTINCT q.zone_no, q.pon_no, q.feature_id AS pole_label, NULL::timestamptz AS approved_at
+        FROM qfield_photo_validations q
+        INNER JOIN qfield_project_links l ON l.qfield_project_id = q.project_id
+        WHERE l.fibreflow_project_id = $1::uuid
+          AND q.feature_type = 'pole'
+          AND q.pon_no IS NOT NULL
         UNION
         SELECT DISTINCT zone_no, pon_no, pole_label, approved_at
         FROM pole_qa_photos

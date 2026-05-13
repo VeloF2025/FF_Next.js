@@ -77,12 +77,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       poleFilter = `AND feature_id = $${params.length}`;
     }
 
+    // project_id from the client is a FibreFlow project ID. qfield_photo_validations stores
+    // QField project IDs; translate via qfield_project_links so we pull every QField project
+    // mapped to this FibreFlow project.
     const qResult = await pool.query<QFieldRow>(`
-      SELECT feature_id, photo_key, checklist_step, work_type, vlm_confidence, vlm_feedback
-      FROM qfield_photo_validations
-      WHERE project_id = $1::uuid
-        AND feature_type = 'pole'
-        ${poleFilter}
+      SELECT q.feature_id, q.photo_key, q.checklist_step, q.work_type, q.vlm_confidence, q.vlm_feedback
+      FROM qfield_photo_validations q
+      INNER JOIN qfield_project_links l ON l.qfield_project_id = q.project_id
+      WHERE l.fibreflow_project_id = $1::uuid
+        AND q.feature_type = 'pole'
+        ${poleFilter ? poleFilter.replace('feature_id', 'q.feature_id') : ''}
     `, params);
 
     let synced = 0;
