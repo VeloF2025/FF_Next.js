@@ -169,9 +169,62 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         AND qa.pole_label = r.feature_id
     `, [project_id]);
 
+    // 3. Pull historical step-0 photos (Uncategorized / Unrelated) that are
+    //    linked to a pole but never got classified — surface them in the
+    //    unassigned bucket so Johan can drag them to the right slot.
+    //
+    // Guardrails:
+    //   - COALESCE the existing array to '{}' so a NULL column (pre-migration
+    //     state) can't wipe the row in the `||` concatenation.
+    //   - Exclude keys already used in a slot column or already in the bucket
+    //     so a backfill never demotes a photo that's correctly assigned.
+    const unassignedBackfill = await pool.query(`
+      WITH step0_photos AS (
+        SELECT r.feature_id AS pole_label, p.storage_key
+        FROM construction_qa_reviews r
+        INNER JOIN construction_qa_photos p ON p.review_id = r.id
+        WHERE r.project_id = $1::uuid
+          AND r.feature_type = 'pole'
+          AND r.feature_id IS NOT NULL
+          AND (p.checklist_step IS NULL OR p.checklist_step = 0)
+          AND p.storage_key IS NOT NULL
+          AND p.upload_status = 'available'
+        GROUP BY r.feature_id, p.storage_key
+      )
+      UPDATE pole_qa_photos qa
+      SET unassigned_photo_keys = (
+            SELECT ARRAY(
+              SELECT DISTINCT k FROM unnest(
+                COALESCE(qa.unassigned_photo_keys, '{}'::text[]) || ARRAY(
+                  SELECT s.storage_key
+                  FROM step0_photos s
+                  WHERE s.pole_label = qa.pole_label
+                    AND s.storage_key NOT IN (
+                      qa.civil_step_01_key, qa.civil_step_02_key, qa.civil_step_03_key,
+                      qa.civil_step_04_key, qa.civil_step_05_key, qa.civil_step_06_key,
+                      qa.civil_step_07_key,
+                      qa.optical_dome_01_key, qa.optical_dome_02_key, qa.optical_dome_03_key,
+                      qa.optical_dome_04_key, qa.optical_dome_05_key, qa.optical_dome_06_key,
+                      qa.optical_dome_07_key, qa.optical_dome_08_key,
+                      qa.main_joint_11_key, qa.main_joint_12_key, qa.main_joint_13_key,
+                      qa.main_joint_14_key, qa.main_joint_15_key, qa.main_joint_16_key
+                    )
+                    AND NOT (s.storage_key = ANY(COALESCE(qa.main_joint_tray_keys, '{}'::text[])))
+                )
+              ) AS k
+              WHERE k IS NOT NULL
+            )
+          ),
+          updated_at = NOW()
+      FROM (SELECT DISTINCT pole_label FROM step0_photos) src
+      WHERE qa.project_id = $1::uuid
+        AND qa.pole_label = src.pole_label
+    `, [project_id]);
+
     return apiResponse.success(res, {
       poles_touched: polesUpserted.size,
       slots_populated: slotsPopulated,
+      poles_unassigned_populated: unassignedBackfill.rowCount ?? 0,
       approvals_carried_forward: (civilApprovals.rowCount ?? 0) + (opticalApprovals.rowCount ?? 0),
     });
   } catch (err) {

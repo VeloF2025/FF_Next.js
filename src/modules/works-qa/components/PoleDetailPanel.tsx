@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
 import { usePoleDetail } from '../hooks/usePoleDetail';
 import { PhotoSlotCard } from './PhotoSlotCard';
 import { TrayBucket } from './TrayBucket';
 import { ApproveDisciplineButton } from './ApprovePoleButton';
 import { DisciplineComments } from './DisciplineComments';
+import { UnassignedBucket } from './UnassignedBucket';
 import { SLOT_META } from '../utils/slot-keys';
 import { photoUrl } from '../utils/photo-url';
 import type { Discipline } from '../utils/approval-gates';
@@ -35,6 +37,18 @@ async function overrideSlot(poleId: string, slot: string, decision: 'pass' | 'fa
   if (!res.ok) throw new Error(`Override failed: ${res.status}`);
 }
 
+async function movePhoto(poleId: string, photoKey: string, from: string, to: string) {
+  const res = await fetch('/api/works-qa/move-photo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pole_id: poleId, photo_key: photoKey, from, to }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string };
+    throw new Error(body.error ?? `Move failed: ${res.status}`);
+  }
+}
+
 async function uploadTrayPhotos(poleId: string, files: File[]) {
   for (const file of files) {
     const form = new FormData();
@@ -63,7 +77,7 @@ interface PoleWithComments extends PoleQaPhoto {
   comments: PoleQaComment[];
 }
 
-function buildLightboxPhotos(pole: PoleQaPhoto): { photos: LightboxPhoto[]; slotIndex: Record<string, number>; trayIndex: number[] } {
+function buildLightboxPhotos(pole: PoleQaPhoto): { photos: LightboxPhoto[]; slotIndex: Record<string, number>; trayIndex: number[]; unassignedIndex: number[] } {
   const photos: LightboxPhoto[] = [];
   const slotIndex: Record<string, number> = {};
   for (const slot of SLOT_META) {
@@ -81,23 +95,71 @@ function buildLightboxPhotos(pole: PoleQaPhoto): { photos: LightboxPhoto[]; slot
     trayIndex.push(photos.length);
     photos.push({ url: photoUrl(key), label: `Tray ${i + 1} — ${pole.pole_label}` });
   });
-  return { photos, slotIndex, trayIndex };
+  const unassignedIndex: number[] = [];
+  (pole.unassigned_photo_keys ?? []).forEach((key, i) => {
+    unassignedIndex.push(photos.length);
+    photos.push({ url: photoUrl(key), label: `Unassigned ${i + 1} — ${pole.pole_label}` });
+  });
+  return { photos, slotIndex, trayIndex, unassignedIndex };
+}
+
+/**
+ * Parse a draggableId minted by either UnassignedBucket (`unassigned:${key}`) or
+ * PhotoSlotCard (`slot:${slotKey}:${photoKey}`).
+ */
+function parseDraggable(id: string): { from: string; photoKey: string } | null {
+  if (id.startsWith('unassigned:')) {
+    return { from: 'unassigned', photoKey: id.slice('unassigned:'.length) };
+  }
+  if (id.startsWith('slot:')) {
+    const rest = id.slice('slot:'.length);
+    const colon = rest.indexOf(':');
+    if (colon === -1) return null;
+    return { from: rest.slice(0, colon), photoKey: rest.slice(colon + 1) };
+  }
+  return null;
+}
+
+/** Parse a droppableId: 'unassigned' or 'slot:${slotKey}'. */
+function parseDroppable(id: string): string | null {
+  if (id === 'unassigned') return 'unassigned';
+  if (id.startsWith('slot:')) return id.slice('slot:'.length);
+  return null;
 }
 
 export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
   const { pole: poleRaw, isLoading, mutate } = usePoleDetail(poleId);
   const pole = poleRaw as PoleWithComments | null;
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
 
-  useEffect(() => { setLightboxIndex(null); }, [poleId]);
+  useEffect(() => { setLightboxIndex(null); setMoveError(null); }, [poleId]);
 
   if (!poleId) return null;
 
-  const { photos, slotIndex, trayIndex } = pole
+  const { photos, slotIndex, trayIndex, unassignedIndex } = pole
     ? buildLightboxPhotos(pole)
-    : { photos: [], slotIndex: {}, trayIndex: [] };
+    : { photos: [], slotIndex: {}, trayIndex: [], unassignedIndex: [] };
 
   const comments = pole?.comments ?? [];
+
+  async function handleDragEnd(result: DropResult) {
+    if (!pole) return;
+    setMoveError(null);
+    const { destination, draggableId } = result;
+    if (!destination) return;
+    const parsedDrag = parseDraggable(draggableId);
+    const to = parseDroppable(destination.droppableId);
+    if (!parsedDrag || !to || parsedDrag.from === to) return;
+    try {
+      await movePhoto(pole.id, parsedDrag.photoKey, parsedDrag.from, to);
+      await mutate();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      log.error('works-qa: move-photo failed', { error: msg });
+      setMoveError(msg);
+    }
+  }
 
   function renderSection(label: string, discipline: Discipline, slots: typeof CIVIL_SLOTS, extra?: React.ReactNode) {
     if (!pole) return null;
@@ -121,6 +183,11 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
               onUpload={file => assignPhoto(pole.id, slot.key, file).then(() => mutate()).catch((e: unknown) => log.error('works-qa: upload failed', { error: e instanceof Error ? e.message : String(e) }))}
               onOverride={(d, r) => overrideSlot(pole.id, slot.key, d, r).then(() => mutate()).catch((e: unknown) => log.error('works-qa: override failed', { error: e instanceof Error ? e.message : String(e) }))}
               onView={slotIndex[slot.key] !== undefined ? () => setLightboxIndex(slotIndex[slot.key]!) : undefined}
+              onUnassign={() => {
+                const k = pole[slot.dbColumn as keyof PoleQaPhoto] as string | null;
+                if (!k) return;
+                movePhoto(pole.id, k, slot.key, 'unassigned').then(() => mutate()).catch((e: unknown) => setMoveError(e instanceof Error ? e.message : String(e)));
+              }}
               disabled={disciplineApproved}
             />
           ))}
@@ -155,6 +222,9 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
               ✓ All approved — {new Date(pole.approved_at).toLocaleString('en-ZA', { dateStyle: 'short', timeStyle: 'short' })}
             </span>
           )}
+          {moveError && (
+            <span className="text-xs text-red-400">Move failed: {moveError}</span>
+          )}
         </div>
         <button onClick={onClose} className="text-zinc-500 hover:text-zinc-200 text-lg leading-none">×</button>
       </div>
@@ -164,18 +234,26 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
       )}
 
       {pole && (
-        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
-          {renderSection('Civil', 'civil', CIVIL_SLOTS)}
-          {renderSection('Optical Dome', 'dome', DOME_SLOTS)}
-          {renderSection('Main Joint', 'main_joint', MAIN_JOINT_SLOTS,
-            <TrayBucket
-              trayKeys={pole.main_joint_tray_keys}
-              onUpload={files => uploadTrayPhotos(pole.id, files).then(() => mutate()).catch((e: unknown) => log.error('works-qa: tray upload error', { error: e instanceof Error ? e.message : String(e) }))}
-              onView={i => { const idx = trayIndex[i]; if (idx !== undefined) setLightboxIndex(idx); }}
-              disabled={pole[APPROVED_FLAG.main_joint] === true}
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
+            {renderSection('Civil', 'civil', CIVIL_SLOTS)}
+            {renderSection('Optical Dome', 'dome', DOME_SLOTS)}
+            {renderSection('Main Joint', 'main_joint', MAIN_JOINT_SLOTS,
+              <TrayBucket
+                trayKeys={pole.main_joint_tray_keys}
+                onUpload={files => uploadTrayPhotos(pole.id, files).then(() => mutate()).catch((e: unknown) => log.error('works-qa: tray upload error', { error: e instanceof Error ? e.message : String(e) }))}
+                onView={i => { const idx = trayIndex[i]; if (idx !== undefined) setLightboxIndex(idx); }}
+                disabled={pole[APPROVED_FLAG.main_joint] === true}
+              />
+            )}
+
+            <UnassignedBucket
+              photoKeys={pole.unassigned_photo_keys ?? []}
+              onView={i => { const idx = unassignedIndex[i]; if (idx !== undefined) setLightboxIndex(idx); }}
+              disabled={!!pole.approved_at}
             />
-          )}
-        </div>
+          </div>
+        </DragDropContext>
       )}
 
       {lightboxIndex !== null && photos.length > 0 && (
