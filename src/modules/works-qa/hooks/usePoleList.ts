@@ -1,7 +1,18 @@
 import useSWR from 'swr';
 import type { PoleSummary } from '../types/works-qa.types';
 
-const fetcher = (url: string) => fetch(url).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); });
+interface ApiEnvelope<T> {
+  success?: boolean;
+  data?: T;
+}
+
+const fetcher = async (url: string): Promise<PoleSummary[]> => {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(String(res.status));
+  const body = (await res.json()) as ApiEnvelope<PoleSummary[]> | PoleSummary[];
+  if (Array.isArray(body)) return body;
+  return body.data ?? [];
+};
 
 export function usePoleList(projectId: string | null, ponNo: number | null) {
   const params = new URLSearchParams();
