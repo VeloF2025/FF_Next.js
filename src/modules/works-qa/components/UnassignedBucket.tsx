@@ -1,4 +1,5 @@
 import { Droppable, Draggable } from '@hello-pangea/dnd';
+import { GripVertical } from 'lucide-react';
 import { photoUrl } from '../utils/photo-url';
 
 interface UnassignedBucketProps {
@@ -46,11 +47,22 @@ export function UnassignedBucket({ photoKeys, onView, disabled }: UnassignedBuck
                       <div
                         ref={dragProvided.innerRef}
                         {...dragProvided.draggableProps}
-                        {...dragProvided.dragHandleProps}
-                        className={`relative rounded overflow-hidden ${
-                          dragSnap.isDragging ? 'ring-2 ring-teal-400 shadow-lg' : ''
+                        className={`relative rounded overflow-hidden group ${
+                          dragSnap.isDragging ? 'ring-2 ring-teal-400 shadow-lg shadow-teal-500/30 z-50' : ''
                         }`}
                       >
+                        {/* Drag handle — small grip icon, dragHandleProps lives
+                            here so the photo button below remains clickable. */}
+                        {!disabled && (
+                          <div
+                            {...dragProvided.dragHandleProps}
+                            aria-label="Drag to slot"
+                            className="absolute top-1 left-1 z-10 p-0.5 rounded bg-black/60 text-zinc-200 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+                          >
+                            <GripVertical className="w-3 h-3" aria-hidden="true" />
+                          </div>
+                        )}
+
                         <button
                           type="button"
                           onClick={() => onView?.(i)}
@@ -62,6 +74,7 @@ export function UnassignedBucket({ photoKeys, onView, disabled }: UnassignedBuck
                             src={photoUrl(key)}
                             alt={`Unassigned ${i + 1}`}
                             className="w-full h-full object-cover"
+                            draggable={false}
                           />
                         </button>
                       </div>
