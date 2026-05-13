@@ -133,8 +133,10 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
   const pole = poleRaw as PoleWithComments | null;
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
-  // Accordion state: which discipline is expanded. Defaults to 'civil' on each new pole.
-  const [expanded, setExpanded] = useState<Discipline | null>('civil');
+  // Accordion state: SET of expanded disciplines. Multi-open so user can keep
+  // the drag source visible while the drop target is also expanded. Defaults
+  // to civil only on each new pole.
+  const [expanded, setExpanded] = useState<Set<Discipline>>(() => new Set(['civil']));
   // While the user is dragging a photo, force-expand all sections so any slot
   // can receive the drop (mirrors the construction-qa wizard pattern).
   const [isDragging, setIsDragging] = useState(false);
@@ -142,8 +144,17 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
   useEffect(() => {
     setLightboxIndex(null);
     setMoveError(null);
-    setExpanded('civil');
+    setExpanded(new Set(['civil']));
   }, [poleId]);
+
+  function toggleSection(d: Discipline) {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(d)) next.delete(d);
+      else next.add(d);
+      return next;
+    });
+  }
 
   // Hooks must run unconditionally on every render — keep this BEFORE the
   // poleId early return so React's hook-order check stays stable.
@@ -173,7 +184,7 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
       // user sees where the photo landed.
       if (to !== 'unassigned') {
         const meta = SLOT_META.find(s => s.key === to);
-        if (meta) setExpanded(meta.discipline);
+        if (meta) setExpanded(prev => new Set(prev).add(meta.discipline));
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -186,14 +197,14 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
     if (!pole) return null;
     const filled = slots.filter(s => pole[s.dbColumn as keyof PoleQaPhoto]).length;
     const disciplineApproved = pole[APPROVED_FLAG[discipline]] === true;
-    const isOpen = isDragging || expanded === discipline;
+    const isOpen = isDragging || expanded.has(discipline);
     const commentCount = comments.filter(c => c.discipline === discipline).length;
 
     return (
       <section className="border border-zinc-800 rounded-lg overflow-hidden">
         <button
           type="button"
-          onClick={() => setExpanded(prev => (prev === discipline ? null : discipline))}
+          onClick={() => toggleSection(discipline)}
           aria-expanded={isOpen}
           className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-zinc-900/50 transition-colors"
         >
@@ -272,7 +283,20 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
             <span className="text-xs text-red-400">Move failed: {moveError}</span>
           )}
         </div>
-        <button onClick={onClose} className="text-zinc-500 hover:text-zinc-200 text-lg leading-none">×</button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              const allOpen = expanded.size === 3;
+              setExpanded(allOpen ? new Set() : new Set(['civil', 'dome', 'main_joint']));
+            }}
+            className="text-[10px] uppercase tracking-wider text-zinc-500 hover:text-zinc-200 transition-colors px-2 py-1 rounded border border-zinc-800 hover:border-zinc-600"
+            title="Expand or collapse all sections — useful before dragging photos"
+          >
+            {expanded.size === 3 ? 'Collapse all' : 'Expand all'}
+          </button>
+          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-200 text-lg leading-none">×</button>
+        </div>
       </div>
 
       {isLoading && (
