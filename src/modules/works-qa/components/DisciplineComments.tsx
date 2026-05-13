@@ -11,8 +11,12 @@ interface DisciplineCommentsProps {
   onAdded: () => void;
 }
 
-function relativeTime(iso: string): string {
-  return new Date(iso).toLocaleString('en-ZA', { dateStyle: 'short', timeStyle: 'short' });
+function formatStamp(iso: string): string {
+  return new Date(iso).toLocaleString('en-ZA', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+    hour12: false,
+  });
 }
 
 export function DisciplineComments({ poleId, discipline, comments, disabled, onAdded }: DisciplineCommentsProps) {
@@ -20,6 +24,8 @@ export function DisciplineComments({ poleId, discipline, comments, disabled, onA
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // pole_qa_comments returns rows ordered by created_at ASC, so the array
+  // index is also the comment number per discipline thread.
   const thread = comments.filter(c => c.discipline === discipline);
 
   async function handleSubmit() {
@@ -51,12 +57,13 @@ export function DisciplineComments({ poleId, discipline, comments, disabled, onA
   return (
     <div className="flex flex-col gap-2">
       {thread.length > 0 && (
-        <ul className="flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1">
-          {thread.map(c => (
+        <ul className="flex flex-col gap-1.5 max-h-44 overflow-y-auto pr-1">
+          {thread.map((c, idx) => (
             <li key={c.id} className="text-xs bg-zinc-900 border border-zinc-800 rounded px-2 py-1.5">
-              <div className="flex items-center justify-between text-[10px] text-zinc-500 mb-0.5">
-                <span>{c.created_by}</span>
-                <span>{relativeTime(c.created_at)}</span>
+              <div className="flex items-baseline justify-between gap-2 text-[10px] mb-1">
+                <span className="font-mono text-teal-400 shrink-0">#{idx + 1}</span>
+                <span className="text-zinc-400 truncate flex-1">{c.created_by}</span>
+                <span className="text-zinc-500 shrink-0 font-mono">{formatStamp(c.created_at)}</span>
               </div>
               <p className="text-zinc-200 whitespace-pre-wrap leading-snug">{c.comment}</p>
             </li>
