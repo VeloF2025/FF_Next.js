@@ -30,6 +30,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       width: 1280,
       preserveAspectRatio: true,
     });
+    // Velocity server has ImageMagick, not GraphicsMagick (pdf2pic default)
+    convert.setGMClass(true);
 
     // -1 converts all pages
     const results = await convert.bulk(-1, { responseType: 'base64' });
