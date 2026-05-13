@@ -1,34 +1,127 @@
 #!/bin/bash
+set -euo pipefail
 # =============================================================================
 # fibreflow-prestart.sh — ExecStartPre guard for fibreflow systemd services
 # =============================================================================
-# Checks that .next/BUILD_ID exists before starting the service.
-# If missing, attempts a rebuild. If rebuild fails, restores from backup.
-# This prevents infinite crash-loops when .next is deleted or corrupted.
+# Install at /usr/local/bin/fibreflow-prestart (sudoers entry runs it as root).
+#
+# Guarantees before fibreflow-{dev,production}.service starts:
+#   1. node_modules/.bin/next is executable (atomic-swap recovery on failure).
+#   2. All critical .next files exist; otherwise restore from backup or rebuild.
+#
+# Both recoveries are atomic: if npm ci / rebuild fails, the previous good
+# state is restored before the script exits. The service NEVER starts with
+# an empty node_modules or a half-written .next.
 #
 # Usage (in systemd unit):
-#   ExecStartPre=/usr/local/bin/fibreflow-prestart /home/velo/fibreflow-dev
+#   ExecStartPre=+/usr/local/bin/fibreflow-prestart /home/velo/fibreflow-dev
 # =============================================================================
-
-set -euo pipefail
 
 APP_DIR="${1:?Usage: fibreflow-prestart <app-dir>}"
 LOG_FILE="/var/log/fibreflow-prestart.log"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') [prestart] $*" >> "$LOG_FILE"; echo "[prestart] $*"; }
 
-# --- Check if BUILD_ID exists ---
-if [ -f "$APP_DIR/.next/BUILD_ID" ]; then
-    exit 0  # All good, let the service start
+# --- Serialize prestart per APP_DIR ----------------------------------------
+# Two ExecStartPre invocations (rapid systemctl restart, or systemd retrying a
+# crashed unit) can race on the node_modules mv. Use flock so the second one
+# waits for the first to finish instead of trampling its backup.
+LOCK_FILE="/var/lock/fibreflow-prestart-$(basename "$APP_DIR").lock"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    log "Another prestart for $APP_DIR is in progress — waiting (max 300s)..."
+    flock -w 300 9 || { log "ERROR: flock timed out waiting for sibling prestart"; exit 1; }
 fi
 
-log "WARNING: $APP_DIR/.next/BUILD_ID is missing!"
+# --- Sweep stale prestart backups (>24h) from prior failed runs --------------
+# Backup dirs are async-cleaned on success but a SIGKILL or sudo permission
+# failure can leave .prestart-bak.<PID> dirs around. Clean them up at the
+# start of every prestart so they don't accumulate on disk.
+su - velo -c "find '$APP_DIR' -maxdepth 1 -name 'node_modules.prestart-bak.*' -mtime +0 -exec rm -rf {} + 2>/dev/null || true" 2>/dev/null || true
 
-# --- Try to restore from backup first (fastest recovery) ---
-LATEST_BACKUP=$(ls -dt "$APP_DIR"/.next-backup-* "$APP_DIR"/.next-healthcheck-backup 2>/dev/null | head -1)
-if [ -n "$LATEST_BACKUP" ] && [ -f "$LATEST_BACKUP/BUILD_ID" ]; then
+# --- Guard 1: ensure node_modules/.bin/next is usable -------------------------
+# Historical context: previous recovery did `rm -rf node_modules && npm ci`,
+# but if npm ci failed (OOM, network blip, parallel deploy contention) the dir
+# stayed empty and the service started serving 500s on every cookie-touching
+# request because next/dist/compiled/cookie was missing. The `|| true` on the
+# npm ci call swallowed the failure silently.
+#
+# Atomic recovery: mv the broken node_modules aside, run npm ci into a fresh
+# dir, swap on success. On failure, restore the backup so the service still
+# has whatever node_modules it had before — we don't make it worse. If
+# nothing works, exit non-zero so systemd doesn't start the service into a
+# 500-storm.
+if ! su - velo -c "test -x '$APP_DIR/node_modules/.bin/next'" 2>/dev/null; then
+    log "WARNING: node_modules/.bin/next not accessible — atomic npm ci recovery..."
+    BACKUP_PATH=""
+    if su - velo -c "test -e '$APP_DIR/node_modules'" 2>/dev/null; then
+        BACKUP_PATH="$APP_DIR/node_modules.prestart-bak.$$"
+        su - velo -c "mv '$APP_DIR/node_modules' '$BACKUP_PATH'"
+        log "Existing node_modules moved aside to $BACKUP_PATH"
+    fi
+
+    NPM_CI_RC=0
+    su - velo -c "cd $APP_DIR && npm ci --legacy-peer-deps" >> "$LOG_FILE" 2>&1 || NPM_CI_RC=$?
+
+    if [ "$NPM_CI_RC" -eq 0 ] && su - velo -c "test -x '$APP_DIR/node_modules/.bin/next'" 2>/dev/null; then
+        log "node_modules restored OK via npm ci."
+        if [ -n "$BACKUP_PATH" ] && [ -d "$BACKUP_PATH" ]; then
+            # Close fd 9 (flock) in the subshell so a slow rm doesn't extend the lock
+            ( 9>&-; su - velo -c "rm -rf '$BACKUP_PATH'" ) &
+        fi
+    else
+        log "ERROR: npm ci failed (exit $NPM_CI_RC) — attempting rollback"
+        su - velo -c "rm -rf '$APP_DIR/node_modules'" 2>/dev/null || true
+        RESTORED=false
+        if [ -n "$BACKUP_PATH" ] && [ -d "$BACKUP_PATH" ]; then
+            if su - velo -c "mv '$BACKUP_PATH' '$APP_DIR/node_modules'"; then
+                RESTORED=true
+                log "Restored previous node_modules from $BACKUP_PATH"
+            else
+                log "WARNING: Failed to restore backup from $BACKUP_PATH — node_modules now MISSING"
+            fi
+        fi
+        if [ "$RESTORED" = true ]; then
+            log "ERROR: npm ci failed. Previous node_modules restored (may also be broken). Manual intervention needed."
+        else
+            log "ERROR: npm ci failed. No backup to restore — node_modules is MISSING. Run npm ci manually."
+        fi
+        exit 1
+    fi
+fi
+
+# --- Guard 2: ensure .next build is complete ----------------------------------
+CRITICAL_FILES=(
+    "$APP_DIR/.next/BUILD_ID"
+    "$APP_DIR/.next/prerender-manifest.json"
+    "$APP_DIR/.next/routes-manifest.json"
+    "$APP_DIR/.next/build-manifest.json"
+    "$APP_DIR/.next/required-server-files.json"
+)
+
+build_complete() {
+    for cf in "${CRITICAL_FILES[@]}"; do
+        [ -f "$cf" ] || return 1
+    done
+    [ -d "$APP_DIR/.next/server" ] || return 1
+    return 0
+}
+
+if build_complete; then
+    exit 0
+fi
+
+MISSING=""
+for cf in "${CRITICAL_FILES[@]}"; do
+    [ -f "$cf" ] || MISSING="$MISSING $(basename "$cf")"
+done
+[ -d "$APP_DIR/.next/server" ] || MISSING="$MISSING server/"
+log "WARNING: Incomplete .next build — missing:$MISSING"
+
+# --- Try to restore from backup first (fastest recovery) ---------------------
+LATEST_BACKUP=$(ls -dt "$APP_DIR"/.next-backup-* "$APP_DIR"/.next-healthcheck-backup 2>/dev/null | head -1 || true)
+if [ -n "$LATEST_BACKUP" ] && [ -f "$LATEST_BACKUP/BUILD_ID" ] && [ -f "$LATEST_BACKUP/prerender-manifest.json" ]; then
     log "Restoring from backup: $LATEST_BACKUP"
-    # Remove the partial .next first — mv won't replace a directory, it'll nest inside it
     rm -rf "$APP_DIR/.next"
     mv "$LATEST_BACKUP" "$APP_DIR/.next"
     chown -R velo:velo "$APP_DIR/.next"
@@ -36,20 +129,18 @@ if [ -n "$LATEST_BACKUP" ] && [ -f "$LATEST_BACKUP/BUILD_ID" ]; then
     exit 0
 fi
 
-# --- No valid backup — must rebuild ---
+# --- No valid backup — wait for in-flight deploy or rebuild --------------------
 log "No valid backup found. Rebuilding .next..."
 
-# Check deploy lock to avoid racing
 for LOCK in /tmp/fibreflow-deploy-*.lock; do
     if [ -f "$LOCK" ]; then
         LOCK_AGE=$(( $(date +%s) - $(stat -c %Y "$LOCK" 2>/dev/null || echo 0) ))
         if [ "$LOCK_AGE" -lt 600 ]; then
             log "Deploy in progress (lock: $LOCK, age: ${LOCK_AGE}s). Waiting for deploy to finish."
-            # Wait up to 5 minutes for the deploy to finish
             for i in $(seq 1 60); do
                 sleep 5
-                if [ -f "$APP_DIR/.next/BUILD_ID" ]; then
-                    log "BUILD_ID appeared (deploy completed). Service can start."
+                if build_complete; then
+                    log "All critical files present (deploy completed). Service can start."
                     exit 0
                 fi
                 if [ ! -f "$LOCK" ]; then
@@ -60,11 +151,10 @@ for LOCK in /tmp/fibreflow-deploy-*.lock; do
     fi
 done
 
-# Build as velo user
 su - velo -c "cd $APP_DIR && NODE_OPTIONS='--max-old-space-size=4096' npm run build" >> "$LOG_FILE" 2>&1
 BUILD_EXIT=$?
 
-if [ $BUILD_EXIT -eq 0 ] && [ -f "$APP_DIR/.next/BUILD_ID" ]; then
+if [ $BUILD_EXIT -eq 0 ] && build_complete; then
     log "Rebuild successful (BUILD_ID: $(cat "$APP_DIR/.next/BUILD_ID"))"
     exit 0
 fi

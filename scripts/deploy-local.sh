@@ -157,22 +157,72 @@ export SENTRY_RELEASE="$GIT_SHA"
 export NEXT_PUBLIC_GIT_SHA="$GIT_SHA"
 log "Release SHA: $GIT_SHA"
 
-# --- Step 3: Install deps if needed ---
+# --- Step 3 helper: atomic npm ci with rollback on failure ---
+# `npm ci` deletes node_modules before installing. If the install fails (OOM,
+# network blip, parallel-deploy contention) the dir is left empty, breaking
+# the service at runtime because next/dist/compiled/cookie and friends are
+# missing — every cookie-touching request 500s.
+#
+# Strategy: move the current node_modules aside, run npm ci, swap on success.
+# On failure, restore the backup so node_modules is at least no WORSE than
+# before. The build step that follows will fail loudly if recovery doesn't
+# produce a usable .bin/next.
+atomic_npm_ci() {
+  local reason="$1"
+  local backup=""
+  if sudo -u velo bash -c "test -e '$DIR/node_modules'"; then
+    backup="$DIR/node_modules.deploy-bak.$$"
+    sudo -u velo bash -c "mv '$DIR/node_modules' '$backup'"
+    log "node_modules moved aside to $(basename "$backup") (reason: $reason)"
+  fi
+
+  local rc=0
+  sudo -u velo bash -c "cd $DIR && npm ci --legacy-peer-deps" || rc=$?
+
+  if [[ "$rc" -eq 0 ]] && sudo -u velo bash -c "test -x '$DIR/node_modules/.bin/next'"; then
+    log "npm ci succeeded ($reason) — node_modules ready."
+    if [[ -n "$backup" ]] && sudo -u velo bash -c "test -d '$backup'"; then
+      (sudo -u velo bash -c "rm -rf '$backup'" &) # async cleanup
+    fi
+    return 0
+  fi
+
+  warn "npm ci failed (exit $rc) — attempting rollback"
+  sudo -u velo bash -c "rm -rf '$DIR/node_modules'" 2>/dev/null || true
+  local restored=false
+  if [[ -n "$backup" ]] && sudo -u velo bash -c "test -d '$backup'"; then
+    if sudo -u velo bash -c "mv '$backup' '$DIR/node_modules'"; then
+      restored=true
+      log "Restored previous node_modules from $(basename "$backup")"
+    else
+      warn "Failed to restore backup from $(basename "$backup") — node_modules now MISSING"
+    fi
+  fi
+  if [[ "$restored" == true ]]; then
+    error "npm ci failed ($reason). Previous node_modules restored (may also be broken). Investigate and redeploy."
+  else
+    error "npm ci failed ($reason). No backup to restore — node_modules is MISSING. Run npm ci manually before next deploy."
+  fi
+}
+
+# --- Sweep stale npm-ci backups (>24h old) from prior failed deploys ---
+# atomic_npm_ci async-cleans backups on success but a SIGKILL or sudo
+# permission failure can leave .deploy-bak.<PID> dirs around. Clean them
+# up at the start of every deploy so they don't accumulate on disk.
+sudo -u velo bash -c "find '$DIR' -maxdepth 1 -name 'node_modules.deploy-bak.*' -mtime +0 -exec rm -rf {} + 2>/dev/null || true"
+
+# --- Step 3: Install deps if package.json changed in the pull ---
 if sudo -u velo bash -c "cd $DIR && git diff --name-only $CURRENT_COMMIT HEAD 2>/dev/null" | grep -q 'package.json'; then
-  log "package.json changed, running npm ci..."
-  # npm ci installs exactly what's in the lock file — never rewrites package-lock.json
-  sudo -u velo bash -c "cd $DIR && npm ci --legacy-peer-deps"
+  log "package.json changed, running atomic npm ci..."
+  atomic_npm_ci "package.json changed"
 fi
 
 # --- Step 3 (guard): Validate node_modules is usable (catches dangling symlink) ---
 # node_modules may be a symlink to the workspace; if that target was wiped the build silently
 # fails with "next: not found" (exit 127). Detect this before touching .next.
 if ! sudo -u velo bash -c "test -x '$DIR/node_modules/.bin/next'"; then
-  log "WARNING: node_modules/.bin/next not accessible — replacing with local install..."
-  sudo -u velo bash -c "rm -rf '$DIR/node_modules' && cd '$DIR' && npm ci --legacy-peer-deps"
-  if ! sudo -u velo bash -c "test -x '$DIR/node_modules/.bin/next'"; then
-    error "npm ci failed — node_modules still unusable. Cannot build."
-  fi
+  log "WARNING: node_modules/.bin/next not accessible — atomic npm ci recovery..."
+  atomic_npm_ci "node_modules/.bin/next missing"
   log "node_modules restored OK."
 fi
 
