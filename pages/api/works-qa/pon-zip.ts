@@ -10,11 +10,13 @@ import type { PoleQaPhoto } from '@/modules/works-qa/types/works-qa.types';
 const STORAGE_BASE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.fibreflow.app';
 
 function photoUrl(key: string): string {
-  // QField photos go through the MinIO photo-proxy; manual uploads sit in VF Storage.
-  if (key.startsWith('projects/')) {
-    return `${STORAGE_BASE}/api/qfield/photo-proxy?key=${encodeURIComponent(key)}`;
-  }
-  return `${STORAGE_BASE}/storage/${key}`;
+  // See src/modules/works-qa/utils/photo-url.ts for the dispatch rationale; mirrored
+  // here because the ZIP builder runs server-side and needs absolute URLs.
+  if (key.startsWith('works-qa/')) return `${STORAGE_BASE}/storage/${key}`;
+  const source = key.startsWith('projects/')   ? 'qfield'
+              : key.startsWith('sharepoint:') ? 'sharepoint'
+              :                                 'local';
+  return `${STORAGE_BASE}/api/construction-qa/photo-proxy?key=${encodeURIComponent(key)}&source=${source}`;
 }
 
 function slotFilename(stepNumber: number, label: string): string {

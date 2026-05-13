@@ -1,21 +1,25 @@
 /**
  * Resolve a stored photo_key into a browser-loadable URL.
  *
- * Routes through the construction-qa photo proxy because it already knows
- * how to fetch all three sources (QField MinIO, SharePoint Graph, local
- * filesystem) and Works QA inherits the same key formats:
- *   - projects/...                  → QField MinIO
- *   - sharepoint:...                → SharePoint Graph API
- *   - everything else (e.g. "lawley/LAW.P.E410/...") → local VF Storage
+ * pole_qa_photos collects photos from three different storage backends. The
+ * key prefix distinguishes them:
+ *
+ *   works-qa/{project_id}/...     → Works QA upload via VF Storage (/storage/)
+ *   projects/{qfield_id}/...      → QField MinIO  (construction-qa photo-proxy, source=qfield)
+ *   sharepoint:...                → SharePoint Graph (construction-qa photo-proxy, source=sharepoint)
+ *   anything else (e.g. lawley/...) → Historical construction-qa photos under
+ *                                    /home/velo/storage/qa-photos/ (source=local)
  */
 export function photoUrl(key: string): string {
   if (!key) return '';
-  const source = detectSource(key);
-  return `/api/construction-qa/photo-proxy?key=${encodeURIComponent(key)}&source=${source}`;
-}
 
-function detectSource(key: string): 'qfield' | 'sharepoint' | 'upload' {
-  if (key.startsWith('projects/')) return 'qfield';
-  if (key.startsWith('sharepoint:')) return 'sharepoint';
-  return 'upload';
+  // Newly uploaded works-qa photos live in VF Storage — serve via the nginx /storage/ proxy
+  if (key.startsWith('works-qa/')) return `/storage/${key}`;
+
+  // Everything else is reachable via the construction-qa photo-proxy. Map the prefix
+  // to the source param the proxy expects.
+  const source = key.startsWith('projects/')   ? 'qfield'
+              : key.startsWith('sharepoint:') ? 'sharepoint'
+              :                                 'local';
+  return `/api/construction-qa/photo-proxy?key=${encodeURIComponent(key)}&source=${source}`;
 }
