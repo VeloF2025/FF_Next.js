@@ -1,68 +1,78 @@
 import { useState } from 'react';
-import { allGatesPass } from '../utils/approval-gates';
+import { disciplineGatesPass, type Discipline } from '../utils/approval-gates';
 import type { PoleQaPhoto } from '../types/works-qa.types';
 
-interface ApprovePoleButtonProps {
+interface ApproveDisciplineButtonProps {
   pole: PoleQaPhoto;
+  discipline: Discipline;
   onApproved: () => void;
 }
 
-export function ApprovePoleButton({ pole, onApproved }: ApprovePoleButtonProps) {
+const APPROVED_FLAG: Record<Discipline, keyof PoleQaPhoto> = {
+  civil: 'civil_approved',
+  dome: 'dome_approved',
+  main_joint: 'joint_approved',  // legacy DB column name
+};
+
+const DISCIPLINE_LABEL: Record<Discipline, string> = {
+  civil: 'Civil',
+  dome: 'Optical Dome',
+  main_joint: 'Main Joint',
+};
+
+export function ApproveDisciplineButton({ pole, discipline, onApproved }: ApproveDisciplineButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { pass, blocking } = allGatesPass(pole);
+  const alreadyApproved = pole[APPROVED_FLAG[discipline]] === true;
+  const { pass, blocking } = disciplineGatesPass(pole, discipline);
+  const label = DISCIPLINE_LABEL[discipline];
 
-  const handleApprove = async () => {
+  if (alreadyApproved) {
+    return (
+      <div className="flex items-center gap-2 text-green-400 text-xs font-medium">
+        <span>✓ {label} approved</span>
+      </div>
+    );
+  }
+
+  async function handleApprove() {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch('/api/works-qa/pole-approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pole_id: pole.id }),
+        body: JSON.stringify({ pole_id: pole.id, discipline }),
       });
       const data = await res.json() as { success?: boolean; error?: string; blocking?: string[] };
       if (!res.ok) {
         setError(data.error ?? 'Approval failed');
-      } else {
-        onApproved();
+        return;
       }
+      onApproved();
     } catch {
       setError('Network error');
     } finally {
       setLoading(false);
     }
-  };
-
-  if (pole.approved_at) {
-    return (
-      <div className="flex items-center gap-2 text-green-400 text-sm font-medium">
-        <span>✓ Approved</span>
-        <span className="text-zinc-500 text-xs">
-          by {pole.approved_by} at {new Date(pole.approved_at).toLocaleString()}
-        </span>
-      </div>
-    );
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1">
       <button
-        onClick={handleApprove}
+        onClick={() => void handleApprove()}
         disabled={!pass || loading}
-        className="px-4 py-2 rounded bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        className="px-3 py-1.5 rounded bg-teal-600 hover:bg-teal-500 text-white text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors self-start"
       >
-        {loading ? 'Approving…' : 'Approve Pole'}
+        {loading ? 'Approving…' : `Approve ${label}`}
       </button>
-
       {!pass && (
-        <div className="text-xs text-zinc-500">
+        <div className="text-[10px] text-zinc-500">
           Blocked: {blocking.slice(0, 3).join(', ')}{blocking.length > 3 ? ` +${blocking.length - 3} more` : ''}
         </div>
       )}
-
-      {error && <div className="text-xs text-red-400">{error}</div>}
+      {error && <div className="text-[10px] text-red-400">{error}</div>}
     </div>
   );
 }

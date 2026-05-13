@@ -15,7 +15,7 @@
  * Discipline + step → slot mapping follows the slot-keys utility:
  *   civil + 1-7    → civil_step_0{step}_key       / civil_approved
  *   optical + 1-8  → optical_dome_0{step}_key     / dome_approved
- *   optical + 11-16 → optical_joint_{step}_key    / joint_approved
+ *   optical + 11-16 → main_joint_{step}_key    / joint_approved
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -54,7 +54,7 @@ function resolveSlot(discipline: string, step: number): { dbColumn: string; slot
     return { dbColumn: `optical_dome_${s}_key`, slotKey: `dome_${s}`, approveColumn: 'dome_approved' };
   }
   if (discipline === 'optical' && step >= 11 && step <= 16) {
-    return { dbColumn: `optical_joint_${step}_key`, slotKey: `joint_${step}`, approveColumn: 'joint_approved' };
+    return { dbColumn: `main_joint_${step}_key`, slotKey: `main_joint_${step}`, approveColumn: 'joint_approved' };
   }
   return null;
 }

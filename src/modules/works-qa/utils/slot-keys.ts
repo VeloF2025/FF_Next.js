@@ -2,7 +2,7 @@ export interface SlotMeta {
   key: string;
   dbColumn: string;
   label: string;
-  discipline: 'civil' | 'dome' | 'joint';
+  discipline: 'civil' | 'dome' | 'main_joint';
   stepNumber: number;
   vlmCheck: string;
 }
@@ -25,13 +25,13 @@ export const SLOT_META: SlotMeta[] = [
   { key: 'dome_06', dbColumn: 'optical_dome_06_key', label: 'Strength Members',   discipline: 'dome', stepNumber: 6, vlmCheck: 'Strength members (aramid/steel) secured inside dome.' },
   { key: 'dome_07', dbColumn: 'optical_dome_07_key', label: 'Seals & Dust Caps',  discipline: 'dome', stepNumber: 7, vlmCheck: 'Dome seals tightened, dust caps on unused ports.' },
   { key: 'dome_08', dbColumn: 'optical_dome_08_key', label: 'Pole ID',            discipline: 'dome', stepNumber: 8, vlmCheck: 'Pole ID label/tag attached to pole near dome.' },
-  // Joint
-  { key: 'joint_11', dbColumn: 'optical_joint_11_key', label: 'Cable Entries',     discipline: 'joint', stepNumber: 11, vlmCheck: 'Labelled cable entries into main joint closure.' },
-  { key: 'joint_12', dbColumn: 'optical_joint_12_key', label: 'Strength Members',  discipline: 'joint', stepNumber: 12, vlmCheck: 'Strength members properly secured within closure.' },
-  { key: 'joint_13', dbColumn: 'optical_joint_13_key', label: 'Tube Routing',      discipline: 'joint', stepNumber: 13, vlmCheck: 'Fibre tubes routed neatly from entry to splice tray.' },
-  { key: 'joint_14', dbColumn: 'optical_joint_14_key', label: 'Tray Entries',      discipline: 'joint', stepNumber: 14, vlmCheck: 'Fibre entering splice trays in organised manner.' },
-  { key: 'joint_15', dbColumn: 'optical_joint_15_key', label: 'Coiling & Protectors', discipline: 'joint', stepNumber: 15, vlmCheck: 'Fibre coiling loops and visible splice protectors.' },
-  { key: 'joint_16', dbColumn: 'optical_joint_16_key', label: 'Readable Labels',   discipline: 'joint', stepNumber: 16, vlmCheck: 'Clear readable labels on cables, tubes, or closure.' },
+  // Main Joint
+  { key: 'main_joint_11', dbColumn: 'main_joint_11_key', label: 'Cable Entries',     discipline: 'main_joint', stepNumber: 11, vlmCheck: 'Labelled cable entries into main joint closure.' },
+  { key: 'main_joint_12', dbColumn: 'main_joint_12_key', label: 'Strength Members',  discipline: 'main_joint', stepNumber: 12, vlmCheck: 'Strength members properly secured within closure.' },
+  { key: 'main_joint_13', dbColumn: 'main_joint_13_key', label: 'Tube Routing',      discipline: 'main_joint', stepNumber: 13, vlmCheck: 'Fibre tubes routed neatly from entry to splice tray.' },
+  { key: 'main_joint_14', dbColumn: 'main_joint_14_key', label: 'Tray Entries',      discipline: 'main_joint', stepNumber: 14, vlmCheck: 'Fibre entering splice trays in organised manner.' },
+  { key: 'main_joint_15', dbColumn: 'main_joint_15_key', label: 'Coiling & Protectors', discipline: 'main_joint', stepNumber: 15, vlmCheck: 'Fibre coiling loops and visible splice protectors.' },
+  { key: 'main_joint_16', dbColumn: 'main_joint_16_key', label: 'Readable Labels',   discipline: 'main_joint', stepNumber: 16, vlmCheck: 'Clear readable labels on cables, tubes, or closure.' },
 ];
 
 export const SLOT_KEYS = SLOT_META.map(s => s.key);

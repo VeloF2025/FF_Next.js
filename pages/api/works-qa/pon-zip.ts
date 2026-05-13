@@ -80,7 +80,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const cookie = req.headers.cookie ?? '';
 
     const civilSlots = SLOT_META.filter(s => s.discipline === 'civil');
-    const opticalSlots = SLOT_META.filter(s => s.discipline === 'dome' || s.discipline === 'joint');
+    const opticalSlots = SLOT_META.filter(s => s.discipline === 'dome' || s.discipline === 'main_joint');
 
     for (const pole of result.rows) {
       const civilFolder = zip.folder(`${ponLabel}/${pole.pole_label}/civil`);
@@ -105,8 +105,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
 
       // Tray photos — must await before generateAsync
-      const trayKeys: string[] = Array.isArray(pole.optical_joint_tray_keys)
-        ? pole.optical_joint_tray_keys
+      const trayKeys: string[] = Array.isArray(pole.main_joint_tray_keys)
+        ? pole.main_joint_tray_keys
         : [];
       const trayPromises = trayKeys.map(async (trayKey, i) => {
         const buf = await fetchPhoto(photoUrl(trayKey), cookie);

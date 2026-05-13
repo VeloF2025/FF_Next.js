@@ -32,24 +32,34 @@ export interface PoleQaPhoto {
   optical_dome_07_key: string | null;
   optical_dome_08_key: string | null;
 
-  // Optical Joint
-  optical_joint_11_key: string | null;
-  optical_joint_12_key: string | null;
-  optical_joint_13_key: string | null;
-  optical_joint_14_key: string | null;
-  optical_joint_15_key: string | null;
-  optical_joint_16_key: string | null;
+  // Main Joint (renamed from Optical Joint)
+  main_joint_11_key: string | null;
+  main_joint_12_key: string | null;
+  main_joint_13_key: string | null;
+  main_joint_14_key: string | null;
+  main_joint_15_key: string | null;
+  main_joint_16_key: string | null;
 
-  optical_joint_tray_keys: string[];
+  main_joint_tray_keys: string[];
   vlm_results: Record<string, VlmSlotResult>;
 
   civil_approved: boolean;
   dome_approved: boolean;
-  joint_approved: boolean;
+  joint_approved: boolean;          // DB column kept as-is, represents 'main_joint' discipline
   approved_by: string | null;
   approved_at: string | null;
   created_at: string;
   updated_at: string;
+
+  comments?: PoleQaComment[];
+}
+
+export interface PoleQaComment {
+  id: string;
+  discipline: 'civil' | 'dome' | 'main_joint';
+  comment: string;
+  created_by: string;
+  created_at: string;
 }
 
 export interface PoleSummary {
@@ -89,5 +99,5 @@ export interface WorksQAZoneSummary {
 export type SlotKey =
   | 'civil_01' | 'civil_02' | 'civil_03' | 'civil_04' | 'civil_05' | 'civil_06' | 'civil_07'
   | 'dome_01' | 'dome_02' | 'dome_03' | 'dome_04' | 'dome_05' | 'dome_06' | 'dome_07' | 'dome_08'
-  | 'joint_11' | 'joint_12' | 'joint_13' | 'joint_14' | 'joint_15' | 'joint_16'
+  | 'main_joint_11' | 'main_joint_12' | 'main_joint_13' | 'main_joint_14' | 'main_joint_15' | 'main_joint_16'
   | 'tray_photos';

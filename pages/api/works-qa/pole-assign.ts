@@ -151,7 +151,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const vlmKey = `tray_${crypto.randomUUID()}`;
       await pool.query(
         `UPDATE pole_qa_photos
-         SET optical_joint_tray_keys = array_append(optical_joint_tray_keys, $1),
+         SET main_joint_tray_keys = array_append(main_joint_tray_keys, $1),
              vlm_results = vlm_results || jsonb_build_object($2, $3::jsonb),
              updated_at = NOW()
          WHERE id = $4::uuid`,
