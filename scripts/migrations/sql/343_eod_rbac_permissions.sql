@@ -19,7 +19,7 @@ ON CONFLICT (key) DO NOTHING;
 
 -- ── 2. role_permissions ──────────────────────────────────────────────────────
 -- Pattern mirrors system.data-sync.activate and system.data-sync.billing:
---   super_admin → full, admin/manager → view+create+edit, contractor/storeman → all false
+--   super_admin → full, admin/manager → view+create+edit, all others → all false
 
 INSERT INTO role_permissions (role, permission_key, actions)
 VALUES
@@ -27,24 +27,32 @@ VALUES
   ('super_admin', 'system.data-sync.eod',               '{"view":true,"create":true,"edit":true,"delete":true}'),
   ('admin',       'system.data-sync.eod',               '{"view":true,"create":true,"edit":true,"delete":false}'),
   ('manager',     'system.data-sync.eod',               '{"view":true,"create":true,"edit":true,"delete":false}'),
+  ('technician',  'system.data-sync.eod',               '{"view":false,"create":false,"edit":false,"delete":false}'),
+  ('viewer',      'system.data-sync.eod',               '{"view":false,"create":false,"edit":false,"delete":false}'),
   ('contractor',  'system.data-sync.eod',               '{"view":false,"create":false,"edit":false,"delete":false}'),
   ('storeman',    'system.data-sync.eod',               '{"view":false,"create":false,"edit":false,"delete":false}'),
   -- Upload tab
   ('super_admin', 'system.data-sync.eod.upload',        '{"view":true,"create":true,"edit":true,"delete":true}'),
   ('admin',       'system.data-sync.eod.upload',        '{"view":true,"create":true,"edit":true,"delete":false}'),
   ('manager',     'system.data-sync.eod.upload',        '{"view":true,"create":true,"edit":true,"delete":false}'),
+  ('technician',  'system.data-sync.eod.upload',        '{"view":false,"create":false,"edit":false,"delete":false}'),
+  ('viewer',      'system.data-sync.eod.upload',        '{"view":false,"create":false,"edit":false,"delete":false}'),
   ('contractor',  'system.data-sync.eod.upload',        '{"view":false,"create":false,"edit":false,"delete":false}'),
   ('storeman',    'system.data-sync.eod.upload',        '{"view":false,"create":false,"edit":false,"delete":false}'),
   -- Reconciliation tab
   ('super_admin', 'system.data-sync.eod.reconciliation','{"view":true,"create":true,"edit":true,"delete":true}'),
   ('admin',       'system.data-sync.eod.reconciliation','{"view":true,"create":true,"edit":true,"delete":false}'),
   ('manager',     'system.data-sync.eod.reconciliation','{"view":true,"create":true,"edit":true,"delete":false}'),
+  ('technician',  'system.data-sync.eod.reconciliation','{"view":false,"create":false,"edit":false,"delete":false}'),
+  ('viewer',      'system.data-sync.eod.reconciliation','{"view":false,"create":false,"edit":false,"delete":false}'),
   ('contractor',  'system.data-sync.eod.reconciliation','{"view":false,"create":false,"edit":false,"delete":false}'),
   ('storeman',    'system.data-sync.eod.reconciliation','{"view":false,"create":false,"edit":false,"delete":false}'),
   -- History tab
   ('super_admin', 'system.data-sync.eod.history',       '{"view":true,"create":true,"edit":true,"delete":true}'),
   ('admin',       'system.data-sync.eod.history',       '{"view":true,"create":true,"edit":true,"delete":false}'),
   ('manager',     'system.data-sync.eod.history',       '{"view":true,"create":true,"edit":true,"delete":false}'),
+  ('technician',  'system.data-sync.eod.history',       '{"view":false,"create":false,"edit":false,"delete":false}'),
+  ('viewer',      'system.data-sync.eod.history',       '{"view":false,"create":false,"edit":false,"delete":false}'),
   ('contractor',  'system.data-sync.eod.history',       '{"view":false,"create":false,"edit":false,"delete":false}'),
   ('storeman',    'system.data-sync.eod.history',       '{"view":false,"create":false,"edit":false,"delete":false}')
 ON CONFLICT (role, permission_key) DO NOTHING;
