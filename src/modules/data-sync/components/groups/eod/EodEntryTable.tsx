@@ -71,7 +71,7 @@ export function EodEntryTable({ entries, editable = false, onChange }: EodEntryT
                 </td>
                 <td className="px-2 py-1.5">
                   {editable ? (
-                    <input className={cellClass} value={entry.pon_number || ''} onChange={(e) => updateEntry(i, 'pon_number', e.target.value)} placeholder="128" />
+                    <input className={cellClass} value={entry.pon_number || ''} onChange={(e) => updateEntry(i, 'pon_number', e.target.value)} />
                   ) : (
                     <span className={cellClass}>{entry.pon_number || '\u2014'}</span>
                   )}
