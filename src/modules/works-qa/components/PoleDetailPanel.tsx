@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
+import { ChevronDown } from 'lucide-react';
 import { usePoleDetail } from '../hooks/usePoleDetail';
 import { PhotoSlotCard } from './PhotoSlotCard';
 import { TrayBucket } from './TrayBucket';
@@ -132,8 +133,17 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
   const pole = poleRaw as PoleWithComments | null;
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
+  // Accordion state: which discipline is expanded. Defaults to 'civil' on each new pole.
+  const [expanded, setExpanded] = useState<Discipline | null>('civil');
+  // While the user is dragging a photo, force-expand all sections so any slot
+  // can receive the drop (mirrors the construction-qa wizard pattern).
+  const [isDragging, setIsDragging] = useState(false);
 
-  useEffect(() => { setLightboxIndex(null); setMoveError(null); }, [poleId]);
+  useEffect(() => {
+    setLightboxIndex(null);
+    setMoveError(null);
+    setExpanded('civil');
+  }, [poleId]);
 
   if (!poleId) return null;
 
@@ -143,7 +153,10 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
 
   const comments = pole?.comments ?? [];
 
+  const handleDragStart = useCallback(() => { setIsDragging(true); }, []);
+
   async function handleDragEnd(result: DropResult) {
+    setIsDragging(false);
     if (!pole) return;
     setMoveError(null);
     const { destination, draggableId } = result;
@@ -154,6 +167,12 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
     try {
       await movePhoto(pole.id, parsedDrag.photoKey, parsedDrag.from, to);
       await mutate();
+      // After a successful move, expand the destination's discipline so the
+      // user sees where the photo landed.
+      if (to !== 'unassigned') {
+        const meta = SLOT_META.find(s => s.key === to);
+        if (meta) setExpanded(meta.discipline);
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       log.error('works-qa: move-photo failed', { error: msg });
@@ -165,47 +184,72 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
     if (!pole) return null;
     const filled = slots.filter(s => pole[s.dbColumn as keyof PoleQaPhoto]).length;
     const disciplineApproved = pole[APPROVED_FLAG[discipline]] === true;
+    const isOpen = isDragging || expanded === discipline;
+    const commentCount = comments.filter(c => c.discipline === discipline).length;
+
     return (
-      <section className="border border-zinc-800 rounded-lg p-3 flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">{label}</h3>
-          <span className="text-xs text-zinc-500">{filled}/{slots.length}</span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          {slots.map(slot => (
-            <PhotoSlotCard
-              key={slot.key}
-              slotKey={slot.key}
-              label={slot.label}
-              photoKey={pole[slot.dbColumn as keyof PoleQaPhoto] as string | null}
-              vlm={pole.vlm_results[slot.key]}
-              onUpload={file => assignPhoto(pole.id, slot.key, file).then(() => mutate()).catch((e: unknown) => log.error('works-qa: upload failed', { error: e instanceof Error ? e.message : String(e) }))}
-              onOverride={(d, r) => overrideSlot(pole.id, slot.key, d, r).then(() => mutate()).catch((e: unknown) => log.error('works-qa: override failed', { error: e instanceof Error ? e.message : String(e) }))}
-              onView={slotIndex[slot.key] !== undefined ? () => setLightboxIndex(slotIndex[slot.key]!) : undefined}
-              onUnassign={() => {
-                const k = pole[slot.dbColumn as keyof PoleQaPhoto] as string | null;
-                if (!k) return;
-                movePhoto(pole.id, k, slot.key, 'unassigned').then(() => mutate()).catch((e: unknown) => setMoveError(e instanceof Error ? e.message : String(e)));
-              }}
-              disabled={disciplineApproved}
+      <section className="border border-zinc-800 rounded-lg overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setExpanded(prev => (prev === discipline ? null : discipline))}
+          aria-expanded={isOpen}
+          className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-zinc-900/50 transition-colors"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <ChevronDown
+              className={`w-4 h-4 text-zinc-500 transition-transform shrink-0 ${isOpen ? '' : '-rotate-90'}`}
             />
-          ))}
-        </div>
+            <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider truncate">{label}</h3>
+            {disciplineApproved && (
+              <span className="text-[10px] text-green-400 shrink-0">✓ approved</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0 text-xs text-zinc-500">
+            <span>{filled}/{slots.length}</span>
+            {commentCount > 0 && (
+              <span className="text-zinc-600">· {commentCount} comment{commentCount === 1 ? '' : 's'}</span>
+            )}
+          </div>
+        </button>
 
-        {extra}
+        {isOpen && (
+          <div className="px-3 pb-3 flex flex-col gap-3 border-t border-zinc-800">
+            <div className="grid grid-cols-2 gap-2 pt-3">
+              {slots.map(slot => (
+                <PhotoSlotCard
+                  key={slot.key}
+                  slotKey={slot.key}
+                  label={slot.label}
+                  photoKey={pole[slot.dbColumn as keyof PoleQaPhoto] as string | null}
+                  vlm={pole.vlm_results[slot.key]}
+                  onUpload={file => assignPhoto(pole.id, slot.key, file).then(() => mutate()).catch((e: unknown) => log.error('works-qa: upload failed', { error: e instanceof Error ? e.message : String(e) }))}
+                  onOverride={(d, r) => overrideSlot(pole.id, slot.key, d, r).then(() => mutate()).catch((e: unknown) => log.error('works-qa: override failed', { error: e instanceof Error ? e.message : String(e) }))}
+                  onView={slotIndex[slot.key] !== undefined ? () => setLightboxIndex(slotIndex[slot.key]!) : undefined}
+                  onUnassign={() => {
+                    const k = pole[slot.dbColumn as keyof PoleQaPhoto] as string | null;
+                    if (!k) return;
+                    movePhoto(pole.id, k, slot.key, 'unassigned').then(() => mutate()).catch((e: unknown) => setMoveError(e instanceof Error ? e.message : String(e)));
+                  }}
+                  disabled={disciplineApproved}
+                />
+              ))}
+            </div>
 
-        <div className="flex items-center justify-between border-t border-zinc-800 pt-2 mt-1">
-          <ApproveDisciplineButton pole={pole} discipline={discipline} onApproved={() => mutate()} />
-        </div>
+            {extra}
 
-        <DisciplineComments
-          poleId={pole.id}
-          discipline={discipline}
-          comments={comments}
-          disabled={disciplineApproved}
-          onAdded={() => mutate()}
-        />
+            <div className="flex items-center justify-between border-t border-zinc-800 pt-2">
+              <ApproveDisciplineButton pole={pole} discipline={discipline} onApproved={() => mutate()} />
+            </div>
+
+            <DisciplineComments
+              poleId={pole.id}
+              discipline={discipline}
+              comments={comments}
+              disabled={disciplineApproved}
+              onAdded={() => mutate()}
+            />
+          </div>
+        )}
       </section>
     );
   }
@@ -234,7 +278,7 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
       )}
 
       {pole && (
-        <DragDropContext onDragEnd={handleDragEnd}>
+        <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
             {renderSection('Civil', 'civil', CIVIL_SLOTS)}
             {renderSection('Optical Dome', 'dome', DOME_SLOTS)}
