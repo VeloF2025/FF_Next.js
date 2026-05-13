@@ -22,6 +22,23 @@ LOG_FILE="/var/log/fibreflow-prestart.log"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') [prestart] $*" >> "$LOG_FILE"; echo "[prestart] $*"; }
 
+# --- Serialize prestart per APP_DIR ----------------------------------------
+# Two ExecStartPre invocations (rapid systemctl restart, or systemd retrying a
+# crashed unit) can race on the node_modules mv. Use flock so the second one
+# waits for the first to finish instead of trampling its backup.
+LOCK_FILE="/var/lock/fibreflow-prestart-$(basename "$APP_DIR").lock"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    log "Another prestart for $APP_DIR is in progress — waiting (max 300s)..."
+    flock -w 300 9 || { log "ERROR: flock timed out waiting for sibling prestart"; exit 1; }
+fi
+
+# --- Sweep stale prestart backups (>24h) from prior failed runs --------------
+# Backup dirs are async-cleaned on success but a SIGKILL or sudo permission
+# failure can leave .prestart-bak.<PID> dirs around. Clean them up at the
+# start of every prestart so they don't accumulate on disk.
+su - velo -c "find '$APP_DIR' -maxdepth 1 -name 'node_modules.prestart-bak.*' -mtime +0 -exec rm -rf {} + 2>/dev/null || true" 2>/dev/null || true
+
 # --- Guard 1: ensure node_modules/.bin/next is usable -------------------------
 # Historical context: previous recovery did `rm -rf node_modules && npm ci`,
 # but if npm ci failed (OOM, network blip, parallel deploy contention) the dir
@@ -52,13 +69,22 @@ if ! su - velo -c "test -x '$APP_DIR/node_modules/.bin/next'" 2>/dev/null; then
             (su - velo -c "rm -rf '$BACKUP_PATH'" &) # async cleanup of old node_modules
         fi
     else
-        log "ERROR: npm ci failed (exit $NPM_CI_RC) — restoring previous node_modules"
+        log "ERROR: npm ci failed (exit $NPM_CI_RC) — attempting rollback"
         su - velo -c "rm -rf '$APP_DIR/node_modules'" 2>/dev/null || true
+        RESTORED=false
         if [ -n "$BACKUP_PATH" ] && [ -d "$BACKUP_PATH" ]; then
-            su - velo -c "mv '$BACKUP_PATH' '$APP_DIR/node_modules'"
-            log "Restored previous node_modules from $BACKUP_PATH"
+            if su - velo -c "mv '$BACKUP_PATH' '$APP_DIR/node_modules'"; then
+                RESTORED=true
+                log "Restored previous node_modules from $BACKUP_PATH"
+            else
+                log "WARNING: Failed to restore backup from $BACKUP_PATH — node_modules now MISSING"
+            fi
         fi
-        log "ERROR: Recovery failed — service will fail to start. Manual intervention needed."
+        if [ "$RESTORED" = true ]; then
+            log "ERROR: npm ci failed. Previous node_modules restored (may also be broken). Manual intervention needed."
+        else
+            log "ERROR: npm ci failed. No backup to restore — node_modules is MISSING. Run npm ci manually."
+        fi
         exit 1
     fi
 fi

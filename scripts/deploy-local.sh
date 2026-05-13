@@ -187,14 +187,29 @@ atomic_npm_ci() {
     return 0
   fi
 
-  warn "npm ci failed (exit $rc) — restoring previous node_modules"
+  warn "npm ci failed (exit $rc) — attempting rollback"
   sudo -u velo bash -c "rm -rf '$DIR/node_modules'" 2>/dev/null || true
+  local restored=false
   if [[ -n "$backup" ]] && sudo -u velo bash -c "test -d '$backup'"; then
-    sudo -u velo bash -c "mv '$backup' '$DIR/node_modules'"
-    log "Restored previous node_modules from $(basename "$backup")"
+    if sudo -u velo bash -c "mv '$backup' '$DIR/node_modules'"; then
+      restored=true
+      log "Restored previous node_modules from $(basename "$backup")"
+    else
+      warn "Failed to restore backup from $(basename "$backup") — node_modules now MISSING"
+    fi
   fi
-  error "npm ci failed ($reason). Previous node_modules restored (may also be broken). Investigate and redeploy."
+  if [[ "$restored" == true ]]; then
+    error "npm ci failed ($reason). Previous node_modules restored (may also be broken). Investigate and redeploy."
+  else
+    error "npm ci failed ($reason). No backup to restore — node_modules is MISSING. Run npm ci manually before next deploy."
+  fi
 }
+
+# --- Sweep stale npm-ci backups (>24h old) from prior failed deploys ---
+# atomic_npm_ci async-cleans backups on success but a SIGKILL or sudo
+# permission failure can leave .deploy-bak.<PID> dirs around. Clean them
+# up at the start of every deploy so they don't accumulate on disk.
+sudo -u velo bash -c "find '$DIR' -maxdepth 1 -name 'node_modules.deploy-bak.*' -mtime +0 -exec rm -rf {} + 2>/dev/null || true"
 
 # --- Step 3: Install deps if package.json changed in the pull ---
 if sudo -u velo bash -c "cd $DIR && git diff --name-only $CURRENT_COMMIT HEAD 2>/dev/null" | grep -q 'package.json'; then
