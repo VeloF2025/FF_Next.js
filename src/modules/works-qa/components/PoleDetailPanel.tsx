@@ -145,6 +145,10 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
     setExpanded('civil');
   }, [poleId]);
 
+  // Hooks must run unconditionally on every render — keep this BEFORE the
+  // poleId early return so React's hook-order check stays stable.
+  const handleDragStart = useCallback(() => { setIsDragging(true); }, []);
+
   if (!poleId) return null;
 
   const { photos, slotIndex, trayIndex, unassignedIndex } = pole
@@ -152,8 +156,6 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
     : { photos: [], slotIndex: {}, trayIndex: [], unassignedIndex: [] };
 
   const comments = pole?.comments ?? [];
-
-  const handleDragStart = useCallback(() => { setIsDragging(true); }, []);
 
   async function handleDragEnd(result: DropResult) {
     setIsDragging(false);
