@@ -211,7 +211,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     await client.query('COMMIT');
     return apiResponse.success(res, { moved: true, from, to });
   } catch (err) {
-    await client.query('ROLLBACK').catch(() => undefined);
+    await client.query('ROLLBACK').catch(rbErr => {
+      log.warn('works-qa/move-photo: rollback failed', { error: rbErr instanceof Error ? rbErr.message : String(rbErr) });
+    });
     log.error('works-qa/move-photo', { error: err instanceof Error ? err.message : String(err) });
     return apiResponse.internalError(res, err);
   } finally {

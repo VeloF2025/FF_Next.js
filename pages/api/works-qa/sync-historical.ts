@@ -172,6 +172,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // 3. Pull historical step-0 photos (Uncategorized / Unrelated) that are
     //    linked to a pole but never got classified — surface them in the
     //    unassigned bucket so Johan can drag them to the right slot.
+    //
+    // Guardrails:
+    //   - COALESCE the existing array to '{}' so a NULL column (pre-migration
+    //     state) can't wipe the row in the `||` concatenation.
+    //   - Exclude keys already used in a slot column or already in the bucket
+    //     so a backfill never demotes a photo that's correctly assigned.
     const unassignedBackfill = await pool.query(`
       WITH step0_photos AS (
         SELECT r.feature_id AS pole_label, p.storage_key
@@ -188,9 +194,25 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       UPDATE pole_qa_photos qa
       SET unassigned_photo_keys = (
             SELECT ARRAY(
-              SELECT DISTINCT unnest(qa.unassigned_photo_keys || ARRAY(
-                SELECT storage_key FROM step0_photos s WHERE s.pole_label = qa.pole_label
-              ))
+              SELECT DISTINCT k FROM unnest(
+                COALESCE(qa.unassigned_photo_keys, '{}'::text[]) || ARRAY(
+                  SELECT s.storage_key
+                  FROM step0_photos s
+                  WHERE s.pole_label = qa.pole_label
+                    AND s.storage_key NOT IN (
+                      qa.civil_step_01_key, qa.civil_step_02_key, qa.civil_step_03_key,
+                      qa.civil_step_04_key, qa.civil_step_05_key, qa.civil_step_06_key,
+                      qa.civil_step_07_key,
+                      qa.optical_dome_01_key, qa.optical_dome_02_key, qa.optical_dome_03_key,
+                      qa.optical_dome_04_key, qa.optical_dome_05_key, qa.optical_dome_06_key,
+                      qa.optical_dome_07_key, qa.optical_dome_08_key,
+                      qa.main_joint_11_key, qa.main_joint_12_key, qa.main_joint_13_key,
+                      qa.main_joint_14_key, qa.main_joint_15_key, qa.main_joint_16_key
+                    )
+                    AND NOT (s.storage_key = ANY(COALESCE(qa.main_joint_tray_keys, '{}'::text[])))
+                )
+              ) AS k
+              WHERE k IS NOT NULL
             )
           ),
           updated_at = NOW()
