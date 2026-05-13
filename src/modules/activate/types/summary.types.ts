@@ -47,6 +47,10 @@ export interface DRSummary {
   equipment: {
     ontSerial: string | null;
     upsSerial: string | null;
+    oltAddress: string | null;
+    oltPort: string | null;
+    oltPon: number | null;
+    oltLt: number | null;
   };
 
   photoPreview: Array<{

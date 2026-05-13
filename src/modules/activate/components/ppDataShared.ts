@@ -22,6 +22,12 @@ export interface PPRecord {
   wa_team: string | null;
   zone_no: number | null;
   pon_no: number | null;
+  olt_port: string | null;
+  olt_address: string | null;
+  olt_name: string | null;
+  olt_lt: number | null;
+  olt_pon: number | null;
+  olt_ont_pos: number | null;
 }
 
 export type PPCardCategory = 'total' | 'activated' | 'located' | 'not_found' | 'ticketed';

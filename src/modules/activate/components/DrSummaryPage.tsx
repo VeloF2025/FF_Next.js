@@ -273,6 +273,31 @@ export function DrSummaryPage({
             </div>
           </div>
 
+          {/* OLT Port Info */}
+          {summary.equipment.oltAddress && (
+            <div className="bg-background rounded p-2 border border-border">
+              <span className="text-xs text-muted-foreground block mb-1">OLT Port</span>
+              <div className="flex items-center gap-3 flex-wrap">
+                <span
+                  className="text-sm font-mono text-foreground"
+                  title={summary.equipment.oltPort ?? undefined}
+                >
+                  {summary.equipment.oltAddress}
+                </span>
+                {summary.equipment.oltPon !== null && (
+                  <span className="px-1.5 py-0.5 rounded border border-indigo-600 bg-indigo-900/20 text-indigo-300 text-xs font-mono">
+                    PON {summary.equipment.oltPon}
+                  </span>
+                )}
+                {summary.equipment.oltLt !== null && (
+                  <span className="text-xs text-muted-foreground font-mono">
+                    LT {summary.equipment.oltLt}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* ONT Swap Banner */}
           {summary.ontSwap && (
             <OntSwapBanner swap={summary.ontSwap} />
