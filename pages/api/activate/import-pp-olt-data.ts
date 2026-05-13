@@ -170,9 +170,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       const ticketIds: string[] = [];
       const contents: string[] = [];
 
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       for (const row of toNote) {
         const c = oltMap.get(row.serial_number);
         if (!c || !row.maintenance_ticket_id) continue;
+        if (!uuidPattern.test(row.maintenance_ticket_id)) {
+          logger.warn('OLT import: skipping note — invalid ticket UUID', {
+            serial: row.serial_number,
+            ticketId: row.maintenance_ticket_id,
+          });
+          continue;
+        }
         ticketIds.push(row.maintenance_ticket_id);
         contents.push(
           `OLT port assigned via import:\nPort: ${c.olt_port}\nAddress: ${c.olt_address}\nPON: ${c.olt_pon}  LT: ${c.olt_lt}  ONT: ${c.olt_ont_pos}`
@@ -181,18 +189,28 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
       if (ticketIds.length > 0) {
         const noteResult = await client.query(
+          // 'src' alias is distinct from the subquery to avoid self-reference ambiguity.
+          // Exact content match (not LIKE prefix) so re-import with changed OLT data creates a new note.
           `INSERT INTO maintenance_notes (ticket_id, content, note_type, visibility, is_resolution)
-           SELECT u.ticket_id, u.content, 'system', 'public', false
-           FROM unnest($1::uuid[], $2::text[]) AS u(ticket_id, content)
+           SELECT src.ticket_id, src.content, 'system', 'public', false
+           FROM unnest($1::uuid[], $2::text[]) AS src(ticket_id, content)
            WHERE NOT EXISTS (
              SELECT 1 FROM maintenance_notes mn
-             WHERE mn.ticket_id = u.ticket_id
+             WHERE mn.ticket_id = src.ticket_id
                AND mn.note_type = 'system'
-               AND mn.content LIKE 'OLT port assigned via import:%'
+               AND mn.content = src.content
            )`,
           [ticketIds, contents]
         );
-        logger.info('OLT import: inserted ticket notes', { count: noteResult.rowCount ?? 0 });
+        const inserted = noteResult.rowCount ?? 0;
+        if (inserted < ticketIds.length) {
+          logger.warn('OLT import: some ticket notes suppressed (already exist)', {
+            attempted: ticketIds.length,
+            inserted,
+          });
+        } else {
+          logger.info('OLT import: inserted ticket notes', { count: inserted });
+        }
       }
     }
 
