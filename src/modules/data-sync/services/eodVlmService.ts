@@ -396,7 +396,7 @@ async function extractOntSerials(fullResBase64: string, rowCount: number): Promi
 
     const data = await response.json();
     let content = data.choices?.[0]?.message?.content || '';
-    log.info('[EOD-ONT] VLM raw response', { length: content.length, preview: content.slice(0, 200) });
+    log.info('[EOD-ONT] VLM responded', { bytes: content.length });
 
     const block = content.match(/```(?:json)?\n([\s\S]*?)\n```/);
     if (block) content = block[1];
@@ -409,6 +409,34 @@ async function extractOntSerials(fullResBase64: string, rowCount: number): Promi
     for (const s of parsed) {
       const cleaned = cleanOntSerial(s.serial!);
       if (cleaned) result.set(s.row, cleaned);
+    }
+
+    // Guard: only remove a serial if it appears on ≥50% of rows — mass copy-paste hallucination.
+    // A threshold of 1 would remove legitimate accidental re-reads; ≥50% is clearly a prompt echo.
+    const hallucThreshold = Math.max(2, Math.ceil(rowCount * 0.5));
+    const counts = new Map<string, number>();
+    for (const [, val] of result) counts.set(val, (counts.get(val) || 0) + 1);
+    for (const [serial, count] of counts) {
+      if (count >= hallucThreshold) {
+        log.warn('[EOD-ONT] Mass duplicate serial — removing', { serial, count, threshold: hallucThreshold });
+        for (const [row, val] of result) if (val === serial) result.delete(row);
+      }
+    }
+
+    // Guard: all-sequential run across ALL candidates = prompt-echo hallucination.
+    // Partial sequential runs (adjacent rows from same carton) are legitimate.
+    const candidates = Array.from(result.entries()).sort((a, b) => a[0] - b[0]);
+    if (candidates.length >= 3) {
+      const allSeq = candidates.every((c, i) => {
+        if (i === 0) return true;
+        const prev = parseInt(candidates[i - 1]![1].slice(-3), 16);
+        const curr = parseInt(c[1].slice(-3), 16);
+        return !isNaN(prev) && !isNaN(curr) && curr === prev + 1;
+      });
+      if (allSeq) {
+        log.warn('[EOD-ONT] All serials fully sequential — prompt echo hallucination, clearing');
+        result.clear();
+      }
     }
 
     log.info('[EOD-ONT] Focused extraction done', { kept: result.size });
