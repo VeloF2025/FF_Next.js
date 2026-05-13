@@ -1,6 +1,7 @@
 'use client';
 
-import { Search, XCircle, Download } from 'lucide-react';
+import { useRef, type ChangeEvent } from 'react';
+import { Search, XCircle, Download, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface PPDataFiltersProps {
@@ -19,8 +20,14 @@ interface PPDataFiltersProps {
   onDateFromChange: (val: string) => void;
   filterDateTo: string;
   onDateToChange: (val: string) => void;
+  filterPon: string;
+  onPonChange: (val: string) => void;
   onExport: () => void;
+  onImportOlt: (file: File) => void;
+  isImportingOlt: boolean;
 }
+
+const PON_OPTIONS = Array.from({ length: 16 }, (_, i) => i + 1);
 
 export function PPDataFilters({
   projects,
@@ -31,8 +38,22 @@ export function PPDataFilters({
   filterAging, onAgingChange,
   filterDateFrom, onDateFromChange,
   filterDateTo, onDateToChange,
+  filterPon, onPonChange,
   onExport,
+  onImportOlt,
+  isImportingOlt,
 }: PPDataFiltersProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      onImportOlt(file);
+      // Reset so same file can be re-imported
+      e.target.value = '';
+    }
+  }
+
   return (
     <div className="bg-[var(--ff-bg-primary)] px-4 py-3 border-b border-[var(--ff-border-light)] flex flex-wrap gap-3 items-center">
       <div className="relative">
@@ -83,6 +104,20 @@ export function PPDataFilters({
         <option value="located_1map">Found (1Map)</option>
         <option value="located_local">Found (Local)</option>
         <option value="activated">Activated</option>
+      </select>
+      <select
+        value={filterPon}
+        onChange={(e) => onPonChange(e.target.value)}
+        className={`px-3 py-1.5 rounded border text-sm ${
+          filterPon
+            ? 'bg-indigo-900/20 border-indigo-600 text-indigo-300'
+            : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-primary)]'
+        }`}
+      >
+        <option value="">All PONs</option>
+        {PON_OPTIONS.map(n => (
+          <option key={n} value={String(n)}>PON {n}</option>
+        ))}
       </select>
       <select
         value={filterPriority}
@@ -136,7 +171,24 @@ export function PPDataFilters({
           </Button>
         )}
       </div>
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-2">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xlsx,.xls"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isImportingOlt}
+          title="Import Velocity PPs Excel to populate OLT port data"
+        >
+          <Upload className="w-3.5 h-3.5" />
+          {isImportingOlt ? 'Importing...' : 'Import OLT Data'}
+        </Button>
         <Button variant="secondary" size="sm" onClick={onExport}>
           <Download className="w-3.5 h-3.5" /> Export Excel
         </Button>

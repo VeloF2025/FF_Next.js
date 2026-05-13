@@ -80,6 +80,7 @@ async function handler(
     const search = (req.query.search as string || '').trim();
     const priority = req.query.priority as string;
     const aging = req.query.aging as string;
+    const pon = req.query.pon as string;
 
     let whereClause = '';
     const params: (string | number)[] = [];
@@ -157,6 +158,10 @@ async function handler(
       whereClause += ` AND (pp.serial_number ILIKE $${paramIndex} OR pp.resolved_drop_number ILIKE $${paramIndex} OR mt.ticket_uid ILIKE $${paramIndex})`;
       params.push(`%${search}%`);
       paramIndex++;
+    }
+    if (pon) {
+      whereClause += ` AND pp.olt_pon = $${paramIndex++}`;
+      params.push(parseInt(pon, 10));
     }
 
     const countResult = await pool.query(
@@ -244,6 +249,7 @@ async function handler(
     const dataResult = await pool.query(
       `SELECT pp.serial_number, pp.project, pp.date_registered, pp.resolution_status,
               pp.resolved_drop_number, pp.resolved_source, pp.resolved_at,
+              pp.olt_address, pp.olt_port, pp.olt_pon, pp.olt_lt, pp.olt_ont_pos,
               mt.priority AS ticket_priority,
               COALESCE(oa.team, d.installed_by_name) AS oes_team,
               oa.activation_date,
@@ -289,6 +295,11 @@ async function handler(
       'WA Phone': r.wa_phone || '',
       'WA Team': r.wa_team || '',
       'Priority': r.ticket_priority ? (r.ticket_priority === 'high' ? 'High' : 'Normal') : '',
+      'OLT Address': r.olt_address || '',
+      'OLT Port': r.olt_port || '',
+      'OLT PON': r.olt_pon ?? '',
+      'OLT LT': r.olt_lt ?? '',
+      'OLT ONT Pos': r.olt_ont_pos ?? '',
     }));
 
     const wb = XLSX.utils.book_new();

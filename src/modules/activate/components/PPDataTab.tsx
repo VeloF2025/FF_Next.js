@@ -25,6 +25,8 @@ export function PPDataTab() {
   const [filterDateTo, setFilterDateTo] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
   const [filterAging, setFilterAging] = useState('');
+  const [filterPon, setFilterPon] = useState('');
+  const [isImportingOlt, setIsImportingOlt] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [lookupStatus, setLookupStatus] = useState<LookupStatus | null>(null);
@@ -48,7 +50,7 @@ export function PPDataTab() {
       .catch(err => log.error('Failed to fetch projects', { err }, 'PPDataTab'));
   }, []);
 
-  useEffect(() => { setSelectedIds([]); }, [page, filterProject, filterStatus, filterPriority, filterAging, filterDateFrom, filterDateTo, debouncedSearch]);
+  useEffect(() => { setSelectedIds([]); }, [page, filterProject, filterStatus, filterPriority, filterAging, filterDateFrom, filterDateTo, debouncedSearch, filterPon]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -70,13 +72,14 @@ export function PPDataTab() {
       if (filterDateFrom) params.set('dateFrom', filterDateFrom);
       if (filterDateTo) params.set('dateTo', filterDateTo);
       if (debouncedSearch) params.set('search', debouncedSearch);
+      if (filterPon) params.set('pon', filterPon);
       const res = await fetch(`/api/activate/import-pp-data?${params}`);
       const data = await res.json();
       if (data.success) { setRecords(data.data); setTotalPages(data.pagination.totalPages); }
     } catch (err) {
       log.error('Failed to fetch records', { err }, 'PPDataTab');
     }
-  }, [page, filterProject, filterStatus, filterPriority, filterAging, filterDateFrom, filterDateTo, debouncedSearch]);
+  }, [page, filterProject, filterStatus, filterPriority, filterAging, filterDateFrom, filterDateTo, debouncedSearch, filterPon]);
 
   const fetchLookupStatus = useCallback(async () => {
     try {
@@ -230,6 +233,23 @@ export function PPDataTab() {
     window.open(`/api/activate/import-pp-data?${params}`, '_blank');
   };
 
+  const handleImportOlt = async (file: File) => {
+    setIsImportingOlt(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/activate/import-pp-olt-data', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error?.message || 'Import failed');
+      toast.success(`OLT data imported: ${data.data.updated} records updated, ${data.data.notMatched} not matched`);
+      fetchRecords();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'OLT import failed');
+    } finally {
+      setIsImportingOlt(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-blue-900/20 border border-blue-800 rounded-lg p-4 flex items-start gap-3">
@@ -323,7 +343,10 @@ export function PPDataTab() {
             filterAging={filterAging} onAgingChange={handleFilterChange(setFilterAging)}
             filterDateFrom={filterDateFrom} onDateFromChange={handleFilterChange(setFilterDateFrom)}
             filterDateTo={filterDateTo} onDateToChange={handleFilterChange(setFilterDateTo)}
+            filterPon={filterPon} onPonChange={handleFilterChange(setFilterPon)}
             onExport={handleExport}
+            onImportOlt={handleImportOlt}
+            isImportingOlt={isImportingOlt}
           />
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -333,7 +356,7 @@ export function PPDataTab() {
                   <PPDataRow key={record.id} record={record} isSelected={selectedIds.includes(record.id)} onToggleSelect={toggleSelect} />
                 ))}
                 {records.length === 0 && (
-                  <tr><td colSpan={12} className="px-3 py-8 text-center text-[var(--ff-text-tertiary)]">No records found</td></tr>
+                  <tr><td colSpan={15} className="px-3 py-8 text-center text-[var(--ff-text-tertiary)]">No records found</td></tr>
                 )}
               </tbody>
             </table>
