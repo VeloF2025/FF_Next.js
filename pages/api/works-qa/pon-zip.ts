@@ -10,6 +10,10 @@ import type { PoleQaPhoto } from '@/modules/works-qa/types/works-qa.types';
 const STORAGE_BASE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.fibreflow.app';
 
 function photoUrl(key: string): string {
+  // QField photos go through the MinIO photo-proxy; manual uploads sit in VF Storage.
+  if (key.startsWith('projects/')) {
+    return `${STORAGE_BASE}/api/qfield/photo-proxy?key=${encodeURIComponent(key)}`;
+  }
   return `${STORAGE_BASE}/storage/${key}`;
 }
 

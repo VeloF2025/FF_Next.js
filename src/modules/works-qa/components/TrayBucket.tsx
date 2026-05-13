@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { photoUrl } from '../utils/photo-url';
 
 interface TrayBucketProps {
   trayKeys: string[];
@@ -42,7 +43,7 @@ export function TrayBucket({ trayKeys, onUpload, disabled }: TrayBucketProps) {
             {trayKeys.map((key, i) => (
               <img
                 key={i}
-                src={`/storage/${key}`}
+                src={photoUrl(key)}
                 alt={`Tray ${i + 1}`}
                 className="w-full h-16 object-cover rounded"
               />

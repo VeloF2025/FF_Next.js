@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import type { VlmSlotResult } from '../types/works-qa.types';
+import { photoUrl } from '../utils/photo-url';
 
 interface PhotoSlotCardProps {
   slotKey: string;
@@ -46,7 +47,7 @@ export function PhotoSlotCard({ slotKey, label, photoKey, vlm, onUpload, onOverr
 
       {photoKey ? (
         <img
-          src={`/storage/${photoKey}`}
+          src={photoUrl(photoKey)}
           alt={label}
           className="w-full h-28 object-cover rounded"
         />
