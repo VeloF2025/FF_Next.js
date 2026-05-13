@@ -16,7 +16,7 @@ import formidable from 'formidable';
 import fs from 'fs';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, withPermission } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { vfStorage } from '@/services/vfStorageAdapter';
 import { getSlotMeta } from '@/modules/works-qa/utils/slot-keys';
@@ -191,4 +191,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withPermission('construction-qa.works-qa', 'create')(handler));

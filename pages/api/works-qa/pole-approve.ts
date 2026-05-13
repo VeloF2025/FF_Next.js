@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth, withRole, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth, withPermission, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { allGatesPass } from '@/modules/works-qa/utils/approval-gates';
 import type { PoleQaPhoto } from '@/modules/works-qa/types/works-qa.types';
@@ -42,4 +42,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(withRole('manager')(handler));
+export default withAuth(withPermission('construction-qa.works-qa.approve', 'edit')(handler));
