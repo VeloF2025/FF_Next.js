@@ -66,7 +66,8 @@ if ! su - velo -c "test -x '$APP_DIR/node_modules/.bin/next'" 2>/dev/null; then
     if [ "$NPM_CI_RC" -eq 0 ] && su - velo -c "test -x '$APP_DIR/node_modules/.bin/next'" 2>/dev/null; then
         log "node_modules restored OK via npm ci."
         if [ -n "$BACKUP_PATH" ] && [ -d "$BACKUP_PATH" ]; then
-            (su - velo -c "rm -rf '$BACKUP_PATH'" &) # async cleanup of old node_modules
+            # Close fd 9 (flock) in the subshell so a slow rm doesn't extend the lock
+            ( 9>&-; su - velo -c "rm -rf '$BACKUP_PATH'" ) &
         fi
     else
         log "ERROR: npm ci failed (exit $NPM_CI_RC) — attempting rollback"
