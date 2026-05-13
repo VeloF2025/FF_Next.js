@@ -79,6 +79,10 @@ export async function expandPdfToFiles(file: File): Promise<File[]> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pdf: base64 }),
   });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`PDF conversion failed (${res.status}): ${text}`);
+  }
   const json = await res.json() as {
     success: boolean;
     data?: { pages: Array<{ pageNumber: number; base64: string }> };
@@ -89,11 +93,10 @@ export async function expandPdfToFiles(file: File): Promise<File[]> {
   if (!json.data?.pages?.length) throw new Error('PDF produced no pages');
 
   const stem = file.name.replace(/\.pdf$/i, '');
+  const total = json.data.pages.length;
   return json.data.pages.map(({ pageNumber, base64: imgB64 }) => {
-    const byteChars = atob(imgB64);
-    const bytes = new Uint8Array(byteChars.length);
-    for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
-    const name = json.data!.pages.length === 1 ? `${stem}.jpg` : `${stem}_p${pageNumber}.jpg`;
+    const bytes = Uint8Array.from(atob(imgB64), (c) => c.charCodeAt(0));
+    const name = total === 1 ? `${stem}.jpg` : `${stem}_p${pageNumber}.jpg`;
     return new File([bytes], name, { type: 'image/jpeg' });
   });
 }

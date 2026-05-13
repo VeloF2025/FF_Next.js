@@ -20,8 +20,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, 'Missing pdf (base64 string)');
   }
 
+  // Strip data-URL prefix if the client accidentally included it
+  const rawBase64 = pdf.includes(',') ? pdf.split(',')[1]! : pdf;
+
   try {
-    const convert = fromBase64(pdf, {
+    const convert = fromBase64(rawBase64, {
       density: 150,
       format: 'jpeg',
       width: 1280,
@@ -31,9 +34,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // -1 converts all pages
     const results = await convert.bulk(-1, { responseType: 'base64' });
 
+    if (results.length > 50) {
+      return apiResponse.badRequest(res, `PDF has ${results.length} pages; maximum is 50`);
+    }
+
     const pages = results
       .filter((r) => r.base64)
-      .map((r) => ({ pageNumber: r.page ?? 1, base64: r.base64! }));
+      .map((r, idx) => ({ pageNumber: r.page ?? idx + 1, base64: r.base64! }));
 
     if (pages.length === 0) {
       return apiResponse.internalError(res, new Error('PDF rendered 0 pages'), 'PDF conversion failed');
