@@ -15,7 +15,7 @@ import {
   VLM_MAX_TOKENS_OCR,
   stripThinkTags,
 } from '@/lib/vlm';
-import { neon } from '@/lib/db-neon';
+import { pool } from '@/lib/db';
 import { optimizeForVlm } from '@/modules/activate/services/imagePreprocessService';
 import { scanAllBarcodes } from '@/modules/activate/services/enhancedBarcodeService';
 import { normalizeSerial } from '@/modules/activate/services/serialExtractor';
@@ -297,13 +297,11 @@ async function enrichWithHldPon(entries: EodVlmEntry[]): Promise<EodVlmEntry[]> 
   const drNumbers = Array.from(new Set(needsPon.map((e) => e.dr_number!)));
 
   try {
-    const sql = neon();
-    const rows = await sql<Array<{ drop_number: string; pon_no: number }>>`
-      SELECT drop_number, pon_no
-      FROM drops
-      WHERE drop_number = ANY(${drNumbers})
-        AND pon_no IS NOT NULL
-    `;
+    const result = await pool.query<{ drop_number: string; pon_no: number }>(
+      'SELECT drop_number, pon_no FROM drops WHERE drop_number = ANY($1) AND pon_no IS NOT NULL',
+      [drNumbers],
+    );
+    const rows = result.rows;
 
     const ponMap = new Map<string, string>();
     for (const row of rows) {
