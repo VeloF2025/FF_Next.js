@@ -199,16 +199,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                   SELECT s.storage_key
                   FROM step0_photos s
                   WHERE s.pole_label = qa.pole_label
-                    AND s.storage_key NOT IN (
-                      qa.civil_step_01_key, qa.civil_step_02_key, qa.civil_step_03_key,
-                      qa.civil_step_04_key, qa.civil_step_05_key, qa.civil_step_06_key,
-                      qa.civil_step_07_key,
-                      qa.optical_dome_01_key, qa.optical_dome_02_key, qa.optical_dome_03_key,
-                      qa.optical_dome_04_key, qa.optical_dome_05_key, qa.optical_dome_06_key,
-                      qa.optical_dome_07_key, qa.optical_dome_08_key,
-                      qa.main_joint_11_key, qa.main_joint_12_key, qa.main_joint_13_key,
-                      qa.main_joint_14_key, qa.main_joint_15_key, qa.main_joint_16_key
-                    )
+                    -- Exclude keys already in any slot column. NOT IN (...) returns NULL when
+                    -- any operand is NULL and silently excludes everything, so build the list
+                    -- via VALUES and filter out NULLs first.
+                    AND NOT (s.storage_key = ANY(ARRAY(
+                      SELECT v FROM (VALUES
+                        (qa.civil_step_01_key), (qa.civil_step_02_key), (qa.civil_step_03_key),
+                        (qa.civil_step_04_key), (qa.civil_step_05_key), (qa.civil_step_06_key),
+                        (qa.civil_step_07_key),
+                        (qa.optical_dome_01_key), (qa.optical_dome_02_key), (qa.optical_dome_03_key),
+                        (qa.optical_dome_04_key), (qa.optical_dome_05_key), (qa.optical_dome_06_key),
+                        (qa.optical_dome_07_key), (qa.optical_dome_08_key),
+                        (qa.main_joint_11_key), (qa.main_joint_12_key), (qa.main_joint_13_key),
+                        (qa.main_joint_14_key), (qa.main_joint_15_key), (qa.main_joint_16_key)
+                      ) AS slot(v)
+                      WHERE v IS NOT NULL
+                    )))
                     AND NOT (s.storage_key = ANY(COALESCE(qa.main_joint_tray_keys, '{}'::text[])))
                 )
               ) AS k
