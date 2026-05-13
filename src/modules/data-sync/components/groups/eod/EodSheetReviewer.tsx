@@ -127,6 +127,23 @@ export function EodSheetReviewer({
         </div>
       </div>
 
+      {extraction.low_resolution_warning && (
+        <div className="flex items-start gap-2 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+          <AlertTriangle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-blue-300 space-y-1 flex-1">
+            <p className="font-medium">Photo resolution too low to decode barcodes.</p>
+            <p>
+              This photo is {extraction.source_width ?? '?'}×{extraction.source_height ?? '?'}px.
+              The 10 ONT stickers on a single sheet are too small at this resolution for the
+              barcode scanner — only handwriting OCR can run, and OCR misreads small printed
+              text. For exact reads, re-upload via the app&apos;s file picker, or send the
+              photo through WhatsApp as a <strong>Document</strong> (not Image) so it
+              isn&apos;t compressed.
+            </p>
+          </div>
+        </div>
+      )}
+
       <EodEntryTable entries={entries} editable onChange={setEntries} />
 
       {(allDrsBlank || lowConfidence) && (

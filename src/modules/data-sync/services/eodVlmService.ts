@@ -26,6 +26,13 @@ import sharp from 'sharp';
 
 const EOD_MAX_TOKENS = 4096;
 const ONT_PATTERN = /^(SN:)?ALC[LB][A-Z0-9]{5,10}$/i;
+
+// Below this image width, Code-128 barcodes on a 10-row EOD sheet collapse to
+// ~1px/bar and zxing cannot decode them. Diagnostic threshold to surface a
+// "re-upload at higher resolution" hint when the OCR also failed.
+// WhatsApp downsamples to 720x1280; 1200px-wide is a reasonable floor for
+// reliable per-barcode bar resolution at the typical 10-row layout.
+const EOD_MIN_WIDTH_FOR_BARCODES_PX = 1200;
 // Real ONT serials always start ALCLB then hex (e.g. ALCLB48DEC76, ALCLB4E5A300).
 // VLM commonly emits ALCL0xxxxx (misreading "B" as "0") — that's NOT a valid serial.
 const ONT_STRICT_PATTERN = /^ALCLB[0-9A-F]{5,8}$/i;
@@ -472,6 +479,8 @@ export async function extractEodSheet(
   let vlmBase64 = base64Image;
   let fullResBase64 = base64Image;
   let barcodeHints: string[] = [];
+  let sourceWidth: number | undefined;
+  let sourceHeight: number | undefined;
 
   // Pass 0 + 1: Preprocess + Barcode scan
   try {
@@ -479,11 +488,15 @@ export async function extractEodSheet(
     vlmBase64 = processed;
     // Keep full-res version for ONT serial focused extraction
     const raw = Buffer.from(base64Image, 'base64');
-    const rotated = await sharp(raw).rotate().normalise().jpeg({ quality: 92 }).toBuffer();
+    const rotatedSharp = sharp(raw).rotate();
+    const rotatedMeta = await rotatedSharp.metadata();
+    sourceWidth = rotatedMeta.width;
+    sourceHeight = rotatedMeta.height;
+    const rotated = await rotatedSharp.normalise().jpeg({ quality: 92 }).toBuffer();
     fullResBase64 = rotated.toString('base64');
 
     barcodeHints = await findAllBarcodes(barcodeVariants);
-    log.info('[EOD] Pass 0+1', { barcodes: barcodeHints.length, serials: barcodeHints, ms: Date.now() - startTime });
+    log.info('[EOD] Pass 0+1', { barcodes: barcodeHints.length, serials: barcodeHints, source: `${sourceWidth}x${sourceHeight}`, ms: Date.now() - startTime });
   } catch (err) {
     log.warn('[EOD] Preprocess failed', { error: err });
   }
@@ -641,9 +654,24 @@ export async function extractEodSheet(
     // Pass 4: HLD PON enrichment — fill missing PON from drops table
     parsed.entries = await enrichWithHldPon(parsed.entries);
 
+    // Diagnostic: flag low-resolution photos where barcodes couldn't decode AND
+    // the OCR fallback also had to guess ONT serials. Surfaces an actionable
+    // "re-upload at higher resolution" hint to the user.
+    parsed.source_width = sourceWidth;
+    parsed.source_height = sourceHeight;
+    const ontStillMissing = parsed.entries.filter((e) => !e.ont_serial).length;
+    parsed.low_resolution_warning =
+      sourceWidth !== undefined &&
+      sourceWidth < EOD_MIN_WIDTH_FOR_BARCODES_PX &&
+      barcodeHints.length === 0 &&
+      (ontStillMissing > 0 || parsed.entries.length >= 5);
+
     log.info('[EOD] Done', {
       entries: parsed.entries.length, barcodes: barcodeHints.length,
-      confidence: parsed.overall_confidence, ms: Date.now() - startTime,
+      confidence: parsed.overall_confidence,
+      source: sourceWidth && sourceHeight ? `${sourceWidth}x${sourceHeight}` : 'unknown',
+      lowResWarning: parsed.low_resolution_warning,
+      ms: Date.now() - startTime,
     });
 
     return { success: true, data: parsed };

@@ -452,6 +452,13 @@ export interface EodVlmExtraction {
   velocity_rep_id: string | null;
   entries: EodVlmEntry[];
   overall_confidence: number;
+  /** Set when the source photo is too low-res for reliable barcode decoding.
+   *  When true the reviewer surfaces a banner asking the user to re-upload at
+   *  higher resolution (WhatsApp Document mode or the app's file picker). */
+  low_resolution_warning?: boolean;
+  /** Source image width × height in pixels (post EXIF rotate). Diagnostic. */
+  source_width?: number;
+  source_height?: number;
 }
 
 export interface EodVlmEntry {
