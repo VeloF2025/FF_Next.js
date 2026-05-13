@@ -23,7 +23,7 @@ import type { EodVlmExtraction, EodVlmEntry } from '../types';
 import { log } from '@/lib/logger';
 import sharp from 'sharp';
 
-const EOD_MAX_TOKENS = 4096;
+const EOD_MAX_TOKENS = 8192;
 const ONT_PATTERN = /^(SN:)?ALC[LB][A-Z0-9]{5,10}$/i;
 
 // Below this image width, Code-128 barcodes on a 10-row EOD sheet collapse to
@@ -145,6 +145,10 @@ async function buildPrompt(barcodeHints: string[]): Promise<string> {
 Read this handwritten Velocity Fibre install form table. Output ONLY what you can
 actually see written on the page. Do NOT invent values, do NOT default to common
 patterns, do NOT incrementally generate sequential numbers.
+
+OUTPUT FORMAT: return COMPACT minified JSON only — no leading whitespace, no
+indentation, no trailing newlines, no markdown fences. The entire response must
+fit on as few tokens as possible.
 
 HANDWRITING TIPS (apply only when a digit is ambiguous, never as a default):
 - A round-shaped "0" inside a digit string is often a handwritten "6".
