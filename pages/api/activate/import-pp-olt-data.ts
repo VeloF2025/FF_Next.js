@@ -163,7 +163,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     updatedCount = result.rowCount ?? 0;
 
     // For updated serials that have a linked maintenance ticket, insert a system note.
-    // NOT EXISTS guard prevents duplicate notes on re-import.
+    // NOT EXISTS reduces duplicate notes on sequential re-imports; concurrent imports can still
+    // produce duplicates (no unique DB constraint on ticket_id+content — acceptable for this
+    // manager-only endpoint where concurrent imports are extremely unlikely).
     const toNote = result.rows.filter(r => r.maintenance_ticket_id !== null);
     if (toNote.length > 0) {
       const oltMap = new Map(rows.map(r => [r.serial, r.components]));
@@ -216,7 +218,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
     await client.query('COMMIT');
   } catch (err) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch((rbErr: unknown) =>
+      logger.warn('OLT import: ROLLBACK failed', { rbErr })
+    );
     throw err;
   } finally {
     client.release();
