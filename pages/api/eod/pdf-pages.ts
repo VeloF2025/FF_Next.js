@@ -1,14 +1,69 @@
 /**
  * EOD PDF-to-Images API
  * POST: Convert a PDF (base64) into per-page JPEG images (base64).
- *       Ghostscript must be available on the server (it is on Velocity).
+ *       Uses Ghostscript directly — avoids pdf2pic's GraphicsMagick/ImageMagick
+ *       %p page-numbering incompatibility. gs is installed on Velocity.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { fromBase64 } from 'pdf2pic';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import { writeFile, readFile, readdir, mkdtemp, rm } from 'fs/promises';
+import { join } from 'path';
+import { tmpdir } from 'os';
 import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+
+const MAX_PAGES = 50;
+
+const execFileAsync = promisify(execFile);
+
+async function pdfToJpegPages(
+  pdfBase64: string,
+): Promise<Array<{ pageNumber: number; base64: string }>> {
+  const tmpDir = await mkdtemp(join(tmpdir(), 'eod-pdf-'));
+  const pdfPath = join(tmpDir, 'input.pdf');
+
+  try {
+    await writeFile(pdfPath, Buffer.from(pdfBase64, 'base64'));
+
+    await execFileAsync(
+      'gs',
+      [
+        '-sDEVICE=jpeg',
+        '-r150',
+        '-dBATCH',
+        '-dNOPAUSE',
+        '-q',
+        `-dLastPage=${MAX_PAGES}`,
+        `-sOutputFile=${join(tmpDir, 'page-%d.jpg')}`,
+        pdfPath,
+      ],
+      { timeout: 60000 },
+    );
+
+    const files: string[] = await readdir(tmpDir);
+    const pageFiles = files
+      .filter((f: string) => /^page-\d+\.jpg$/.test(f))
+      .sort((a: string, b: string) => {
+        const na = parseInt(/(\d+)/.exec(a)?.[1] ?? '0', 10);
+        const nb = parseInt(/(\d+)/.exec(b)?.[1] ?? '0', 10);
+        return na - nb;
+      });
+
+    return Promise.all(
+      pageFiles.map(async (f, idx) => {
+        const data = await readFile(join(tmpDir, f));
+        return { pageNumber: idx + 1, base64: data.toString('base64') };
+      }),
+    );
+  } finally {
+    await rm(tmpDir, { recursive: true, force: true }).catch((e: unknown) =>
+      log.warn('[EOD-PDF] Failed to clean up tmpDir', { tmpDir, err: e }),
+    );
+  }
+}
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -20,32 +75,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.badRequest(res, 'Missing pdf (base64 string)');
   }
 
-  // Strip data-URL prefix if the client accidentally included it
   const rawBase64 = pdf.includes(',') ? pdf.split(',')[1]! : pdf;
 
   try {
-    const convert = fromBase64(rawBase64, {
-      density: 150,
-      format: 'jpeg',
-      width: 1280,
-      preserveAspectRatio: true,
-    });
-    // Velocity server has ImageMagick, not GraphicsMagick (pdf2pic default)
-    convert.setGMClass(true);
-
-    // -1 converts all pages
-    const results = await convert.bulk(-1, { responseType: 'base64' });
-
-    if (results.length > 50) {
-      return apiResponse.badRequest(res, `PDF has ${results.length} pages; maximum is 50`);
-    }
-
-    const pages = results
-      .filter((r) => r.base64)
-      .map((r, idx) => ({ pageNumber: r.page ?? idx + 1, base64: r.base64! }));
+    const pages = await pdfToJpegPages(rawBase64);
 
     if (pages.length === 0) {
-      return apiResponse.internalError(res, new Error('PDF rendered 0 pages'), 'PDF conversion failed');
+      return apiResponse.internalError(
+        res,
+        new Error('PDF rendered 0 pages'),
+        'PDF conversion failed',
+      );
     }
 
     log.info('[EOD-PDF] Converted PDF to images', { pages: pages.length });
