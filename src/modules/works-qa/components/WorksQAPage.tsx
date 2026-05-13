@@ -70,19 +70,17 @@ export function WorksQAPage() {
   async function handleSync() {
     if (!projectId) return;
     setSyncing(true);
+    const body = JSON.stringify({ project_id: projectId });
+    const headers = { 'Content-Type': 'application/json' };
     try {
-      const res = await fetch('/api/works-qa/sync-qfield', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: projectId }),
-      });
-      if (!res.ok) {
-        log.error('works-qa: sync-qfield failed', { status: res.status });
-        return;
-      }
+      const [historicalRes, qfieldRes] = await Promise.all([
+        fetch('/api/works-qa/sync-historical', { method: 'POST', headers, body }),
+        fetch('/api/works-qa/sync-qfield',      { method: 'POST', headers, body }),
+      ]);
+      if (!historicalRes.ok) log.error('works-qa: sync-historical failed', { status: historicalRes.status });
+      if (!qfieldRes.ok)     log.error('works-qa: sync-qfield failed',     { status: qfieldRes.status });
     } catch (err) {
-      log.error('works-qa: sync-qfield error', { error: err instanceof Error ? err.message : String(err) });
-      return;
+      log.error('works-qa: sync error', { error: err instanceof Error ? err.message : String(err) });
     } finally {
       setSyncing(false);
     }

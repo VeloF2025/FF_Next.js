@@ -1,15 +1,21 @@
 /**
  * Resolve a stored photo_key into a browser-loadable URL.
  *
- * - QField paths (start with `projects/`) come from QFieldCloud's MinIO bucket
- *   and must go through the photo-proxy endpoint.
- * - VF Storage paths (everything else, e.g. `works-qa/{project_id}/...`) are
- *   served by the nginx /storage/ proxy.
+ * Routes through the construction-qa photo proxy because it already knows
+ * how to fetch all three sources (QField MinIO, SharePoint Graph, local
+ * filesystem) and Works QA inherits the same key formats:
+ *   - projects/...                  → QField MinIO
+ *   - sharepoint:...                → SharePoint Graph API
+ *   - everything else (e.g. "lawley/LAW.P.E410/...") → local VF Storage
  */
 export function photoUrl(key: string): string {
   if (!key) return '';
-  if (key.startsWith('projects/')) {
-    return `/api/qfield/photo-proxy?key=${encodeURIComponent(key)}`;
-  }
-  return `/storage/${key}`;
+  const source = detectSource(key);
+  return `/api/construction-qa/photo-proxy?key=${encodeURIComponent(key)}&source=${source}`;
+}
+
+function detectSource(key: string): 'qfield' | 'sharepoint' | 'upload' {
+  if (key.startsWith('projects/')) return 'qfield';
+  if (key.startsWith('sharepoint:')) return 'sharepoint';
+  return 'upload';
 }
