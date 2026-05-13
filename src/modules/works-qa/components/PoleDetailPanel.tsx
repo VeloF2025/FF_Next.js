@@ -201,7 +201,7 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
     const commentCount = comments.filter(c => c.discipline === discipline).length;
 
     return (
-      <section className="border border-zinc-800 rounded-lg overflow-hidden">
+      <section className="border border-zinc-800 rounded-lg">
         <button
           type="button"
           onClick={() => toggleSection(discipline)}
