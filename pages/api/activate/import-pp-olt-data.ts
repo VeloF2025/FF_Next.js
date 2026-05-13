@@ -108,8 +108,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     return apiResponse.error(res, 'MISSING_FILE' as never, 'No file uploaded');
   }
 
-  const rows = parseExcel(uploaded.filepath);
-  fs.unlinkSync(uploaded.filepath);
+  let rows: OltRow[];
+  try {
+    rows = parseExcel(uploaded.filepath);
+  } finally {
+    fs.unlinkSync(uploaded.filepath);
+  }
 
   if (rows.length === 0) {
     return apiResponse.error(res, 'NO_DATA' as never, 'No valid OLT rows found in file');

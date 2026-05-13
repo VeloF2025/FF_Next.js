@@ -160,8 +160,11 @@ async function handler(
       paramIndex++;
     }
     if (pon) {
-      whereClause += ` AND pp.olt_pon = $${paramIndex++}`;
-      params.push(parseInt(pon, 10));
+      const ponNum = parseInt(pon, 10);
+      if (!isNaN(ponNum)) {
+        whereClause += ` AND pp.olt_pon = $${paramIndex++}`;
+        params.push(ponNum);
+      }
     }
 
     const countResult = await pool.query(
