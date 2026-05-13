@@ -141,7 +141,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           dome_approved  = CASE WHEN r.discipline = 'optical' THEN TRUE ELSE qa.dome_approved END,
           joint_approved = CASE WHEN r.discipline = 'optical' THEN TRUE ELSE qa.joint_approved END,
           approved_at    = COALESCE(qa.approved_at, r.qa_decision_at, r.updated_at),
-          approved_by    = COALESCE(qa.approved_by, r.manual_reviewed_by, 'construction-qa-historical'),
+          approved_by    = COALESCE(qa.approved_by, r.qa_decision_by, 'construction-qa-historical'),
           updated_at     = NOW()
       FROM construction_qa_reviews r
       WHERE r.project_id = $1::uuid
