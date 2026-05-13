@@ -23,13 +23,13 @@ const FULL_POLE: PoleQaPhoto = {
   optical_dome_06_key: 'works-qa/proj/A673/optical/dome_06.jpg',
   optical_dome_07_key: 'works-qa/proj/A673/optical/dome_07.jpg',
   optical_dome_08_key: 'works-qa/proj/A673/optical/dome_08.jpg',
-  optical_joint_11_key: 'works-qa/proj/A673/optical/joint_11.jpg',
-  optical_joint_12_key: 'works-qa/proj/A673/optical/joint_12.jpg',
-  optical_joint_13_key: 'works-qa/proj/A673/optical/joint_13.jpg',
-  optical_joint_14_key: 'works-qa/proj/A673/optical/joint_14.jpg',
-  optical_joint_15_key: 'works-qa/proj/A673/optical/joint_15.jpg',
-  optical_joint_16_key: 'works-qa/proj/A673/optical/joint_16.jpg',
-  optical_joint_tray_keys: ['works-qa/proj/A673/optical/tray_01.jpg'],
+  main_joint_11_key: 'works-qa/proj/A673/optical/joint_11.jpg',
+  main_joint_12_key: 'works-qa/proj/A673/optical/joint_12.jpg',
+  main_joint_13_key: 'works-qa/proj/A673/optical/joint_13.jpg',
+  main_joint_14_key: 'works-qa/proj/A673/optical/joint_14.jpg',
+  main_joint_15_key: 'works-qa/proj/A673/optical/joint_15.jpg',
+  main_joint_16_key: 'works-qa/proj/A673/optical/joint_16.jpg',
+  main_joint_tray_keys: ['works-qa/proj/A673/optical/tray_01.jpg'],
   vlm_results: {
     civil_01: { valid: true, confidence: 0.92, feedback: 'OK' },
     civil_02: { valid: true, confidence: 0.88, feedback: 'OK' },
@@ -46,12 +46,12 @@ const FULL_POLE: PoleQaPhoto = {
     dome_06: { valid: true, confidence: 0.92, feedback: 'OK' },
     dome_07: { valid: true, confidence: 0.86, feedback: 'OK' },
     dome_08: { valid: true, confidence: 0.94, feedback: 'OK' },
-    joint_11: { valid: true, confidence: 0.88, feedback: 'OK' },
-    joint_12: { valid: true, confidence: 0.89, feedback: 'OK' },
-    joint_13: { valid: true, confidence: 0.91, feedback: 'OK' },
-    joint_14: { valid: true, confidence: 0.87, feedback: 'OK' },
-    joint_15: { valid: true, confidence: 0.90, feedback: 'OK' },
-    joint_16: { valid: true, confidence: 0.88, feedback: 'OK' },
+    main_joint_11: { valid: true, confidence: 0.88, feedback: 'OK' },
+    main_joint_12: { valid: true, confidence: 0.89, feedback: 'OK' },
+    main_joint_13: { valid: true, confidence: 0.91, feedback: 'OK' },
+    main_joint_14: { valid: true, confidence: 0.87, feedback: 'OK' },
+    main_joint_15: { valid: true, confidence: 0.90, feedback: 'OK' },
+    main_joint_16: { valid: true, confidence: 0.88, feedback: 'OK' },
   },
   civil_approved: false,
   dome_approved: false,
@@ -102,7 +102,7 @@ describe('allGatesPass', () => {
   });
 
   it('blocks when no tray photos', () => {
-    const pole = { ...FULL_POLE, optical_joint_tray_keys: [] };
+    const pole = { ...FULL_POLE, main_joint_tray_keys: [] };
     const result = allGatesPass(pole);
     expect(result.pass).toBe(false);
     expect(result.blocking).toContain('tray_photos');

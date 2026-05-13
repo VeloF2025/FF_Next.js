@@ -3,7 +3,7 @@
  *
  * Accepts a multipart upload with:
  *   - pole_id  — UUID of the pole_qa_photos record
- *   - slot     — slot key (civil_01 … joint_16, or 'tray')
+ *   - slot     — slot key (civil_01 … civil_07, dome_01 … dome_08, main_joint_11 … main_joint_16, or 'tray')
  *   - source   — optional, defaults to 'upload'
  *   - photo    — image file
  *
@@ -151,7 +151,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const vlmKey = `tray_${crypto.randomUUID()}`;
       await pool.query(
         `UPDATE pole_qa_photos
-         SET optical_joint_tray_keys = array_append(optical_joint_tray_keys, $1),
+         SET main_joint_tray_keys = array_append(main_joint_tray_keys, $1),
              vlm_results = vlm_results || jsonb_build_object($2, $3::jsonb),
              updated_at = NOW()
          WHERE id = $4::uuid`,

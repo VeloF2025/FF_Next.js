@@ -49,10 +49,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               qa.optical_dome_03_key IS NOT NULL AND qa.optical_dome_04_key IS NOT NULL AND
               qa.optical_dome_05_key IS NOT NULL AND qa.optical_dome_06_key IS NOT NULL AND
               qa.optical_dome_07_key IS NOT NULL AND qa.optical_dome_08_key IS NOT NULL AND
-              qa.optical_joint_11_key IS NOT NULL AND qa.optical_joint_12_key IS NOT NULL AND
-              qa.optical_joint_13_key IS NOT NULL AND qa.optical_joint_14_key IS NOT NULL AND
-              qa.optical_joint_15_key IS NOT NULL AND qa.optical_joint_16_key IS NOT NULL AND
-              array_length(qa.optical_joint_tray_keys, 1) >= 1 AND
+              qa.main_joint_11_key IS NOT NULL AND qa.main_joint_12_key IS NOT NULL AND
+              qa.main_joint_13_key IS NOT NULL AND qa.main_joint_14_key IS NOT NULL AND
+              qa.main_joint_15_key IS NOT NULL AND qa.main_joint_16_key IS NOT NULL AND
+              array_length(qa.main_joint_tray_keys, 1) >= 1 AND
               (SELECT COUNT(*) FROM jsonb_each(qa.vlm_results)
                  WHERE (value->>'valid')::boolean = false
                    AND value->>'overridden_by' IS NULL) = 0
@@ -66,10 +66,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               qa.optical_dome_03_key IS NOT NULL OR qa.optical_dome_04_key IS NOT NULL OR
               qa.optical_dome_05_key IS NOT NULL OR qa.optical_dome_06_key IS NOT NULL OR
               qa.optical_dome_07_key IS NOT NULL OR qa.optical_dome_08_key IS NOT NULL OR
-              qa.optical_joint_11_key IS NOT NULL OR qa.optical_joint_12_key IS NOT NULL OR
-              qa.optical_joint_13_key IS NOT NULL OR qa.optical_joint_14_key IS NOT NULL OR
-              qa.optical_joint_15_key IS NOT NULL OR qa.optical_joint_16_key IS NOT NULL OR
-              array_length(qa.optical_joint_tray_keys, 1) >= 1
+              qa.main_joint_11_key IS NOT NULL OR qa.main_joint_12_key IS NOT NULL OR
+              qa.main_joint_13_key IS NOT NULL OR qa.main_joint_14_key IS NOT NULL OR
+              qa.main_joint_15_key IS NOT NULL OR qa.main_joint_16_key IS NOT NULL OR
+              array_length(qa.main_joint_tray_keys, 1) >= 1
             ) THEN 'in_progress'
             ELSE 'empty'
           END AS status,

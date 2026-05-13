@@ -56,7 +56,7 @@ export function PoleListTable({ poles, selectedPoleId, onSelect }: PoleListTable
             <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3 w-24">Pole</th>
             <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3">Civil</th>
             <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3">Dome</th>
-            <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3">Joint + Trays</th>
+            <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3">Main Joint + Trays</th>
             <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3 w-28">Status</th>
           </tr>
         </thead>

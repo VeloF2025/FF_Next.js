@@ -33,12 +33,12 @@ const OPTICAL_STEP_MAP: Record<number, string> = {
   6: 'dome_06',
   7: 'dome_07',
   8: 'dome_08',
-  11: 'joint_11',
-  12: 'joint_12',
-  13: 'joint_13',
-  14: 'joint_14',
-  15: 'joint_15',
-  16: 'joint_16',
+  11: 'main_joint_11',
+  12: 'main_joint_12',
+  13: 'main_joint_13',
+  14: 'main_joint_14',
+  15: 'main_joint_15',
+  16: 'main_joint_16',
 };
 
 // Optical work types — anything dome/joint/optical/activation-related

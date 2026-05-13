@@ -31,10 +31,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         (optical_dome_03_key IS NOT NULL)::int + (optical_dome_04_key IS NOT NULL)::int +
         (optical_dome_05_key IS NOT NULL)::int + (optical_dome_06_key IS NOT NULL)::int +
         (optical_dome_07_key IS NOT NULL)::int + (optical_dome_08_key IS NOT NULL)::int AS dome_filled,
-        (optical_joint_11_key IS NOT NULL)::int + (optical_joint_12_key IS NOT NULL)::int +
-        (optical_joint_13_key IS NOT NULL)::int + (optical_joint_14_key IS NOT NULL)::int +
-        (optical_joint_15_key IS NOT NULL)::int + (optical_joint_16_key IS NOT NULL)::int AS joint_filled,
-        COALESCE(array_length(optical_joint_tray_keys, 1), 0) AS tray_count,
+        (main_joint_11_key IS NOT NULL)::int + (main_joint_12_key IS NOT NULL)::int +
+        (main_joint_13_key IS NOT NULL)::int + (main_joint_14_key IS NOT NULL)::int +
+        (main_joint_15_key IS NOT NULL)::int + (main_joint_16_key IS NOT NULL)::int AS joint_filled,
+        COALESCE(array_length(main_joint_tray_keys, 1), 0) AS tray_count,
         (SELECT count(*) FROM jsonb_each(vlm_results) WHERE (value->>'valid')::boolean = false AND value->>'overridden_by' IS NULL) AS vlm_failures,
         CASE
           WHEN approved_at IS NOT NULL THEN 'approved'
@@ -47,10 +47,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             optical_dome_03_key IS NOT NULL OR optical_dome_04_key IS NOT NULL OR
             optical_dome_05_key IS NOT NULL OR optical_dome_06_key IS NOT NULL OR
             optical_dome_07_key IS NOT NULL OR optical_dome_08_key IS NOT NULL OR
-            optical_joint_11_key IS NOT NULL OR optical_joint_12_key IS NOT NULL OR
-            optical_joint_13_key IS NOT NULL OR optical_joint_14_key IS NOT NULL OR
-            optical_joint_15_key IS NOT NULL OR optical_joint_16_key IS NOT NULL OR
-            array_length(optical_joint_tray_keys, 1) >= 1
+            main_joint_11_key IS NOT NULL OR main_joint_12_key IS NOT NULL OR
+            main_joint_13_key IS NOT NULL OR main_joint_14_key IS NOT NULL OR
+            main_joint_15_key IS NOT NULL OR main_joint_16_key IS NOT NULL OR
+            array_length(main_joint_tray_keys, 1) >= 1
           ) THEN
             CASE WHEN (
               civil_step_01_key IS NOT NULL AND civil_step_02_key IS NOT NULL AND
@@ -61,10 +61,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               optical_dome_03_key IS NOT NULL AND optical_dome_04_key IS NOT NULL AND
               optical_dome_05_key IS NOT NULL AND optical_dome_06_key IS NOT NULL AND
               optical_dome_07_key IS NOT NULL AND optical_dome_08_key IS NOT NULL AND
-              optical_joint_11_key IS NOT NULL AND optical_joint_12_key IS NOT NULL AND
-              optical_joint_13_key IS NOT NULL AND optical_joint_14_key IS NOT NULL AND
-              optical_joint_15_key IS NOT NULL AND optical_joint_16_key IS NOT NULL AND
-              array_length(optical_joint_tray_keys, 1) >= 1
+              main_joint_11_key IS NOT NULL AND main_joint_12_key IS NOT NULL AND
+              main_joint_13_key IS NOT NULL AND main_joint_14_key IS NOT NULL AND
+              main_joint_15_key IS NOT NULL AND main_joint_16_key IS NOT NULL AND
+              array_length(main_joint_tray_keys, 1) >= 1
             ) AND (SELECT count(*) FROM jsonb_each(vlm_results) WHERE (value->>'valid')::boolean = false AND value->>'overridden_by' IS NULL) = 0
             THEN 'ready' ELSE 'in_progress' END
           ELSE 'empty'
