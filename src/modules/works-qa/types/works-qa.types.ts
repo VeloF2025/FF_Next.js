@@ -41,6 +41,7 @@ export interface PoleQaPhoto {
   main_joint_16_key: string | null;
 
   main_joint_tray_keys: string[];
+  unassigned_photo_keys: string[];
   vlm_results: Record<string, VlmSlotResult>;
 
   civil_approved: boolean;

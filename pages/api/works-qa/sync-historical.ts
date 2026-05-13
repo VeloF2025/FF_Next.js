@@ -169,9 +169,40 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         AND qa.pole_label = r.feature_id
     `, [project_id]);
 
+    // 3. Pull historical step-0 photos (Uncategorized / Unrelated) that are
+    //    linked to a pole but never got classified — surface them in the
+    //    unassigned bucket so Johan can drag them to the right slot.
+    const unassignedBackfill = await pool.query(`
+      WITH step0_photos AS (
+        SELECT r.feature_id AS pole_label, p.storage_key
+        FROM construction_qa_reviews r
+        INNER JOIN construction_qa_photos p ON p.review_id = r.id
+        WHERE r.project_id = $1::uuid
+          AND r.feature_type = 'pole'
+          AND r.feature_id IS NOT NULL
+          AND (p.checklist_step IS NULL OR p.checklist_step = 0)
+          AND p.storage_key IS NOT NULL
+          AND p.upload_status = 'available'
+        GROUP BY r.feature_id, p.storage_key
+      )
+      UPDATE pole_qa_photos qa
+      SET unassigned_photo_keys = (
+            SELECT ARRAY(
+              SELECT DISTINCT unnest(qa.unassigned_photo_keys || ARRAY(
+                SELECT storage_key FROM step0_photos s WHERE s.pole_label = qa.pole_label
+              ))
+            )
+          ),
+          updated_at = NOW()
+      FROM (SELECT DISTINCT pole_label FROM step0_photos) src
+      WHERE qa.project_id = $1::uuid
+        AND qa.pole_label = src.pole_label
+    `, [project_id]);
+
     return apiResponse.success(res, {
       poles_touched: polesUpserted.size,
       slots_populated: slotsPopulated,
+      poles_unassigned_populated: unassignedBackfill.rowCount ?? 0,
       approvals_carried_forward: (civilApprovals.rowCount ?? 0) + (opticalApprovals.rowCount ?? 0),
     });
   } catch (err) {
