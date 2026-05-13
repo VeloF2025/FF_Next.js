@@ -12,7 +12,6 @@ import {
   VLM_CHAT_ENDPOINT as VLM_API_ENDPOINT,
   VLM_EXTRACTION_MODEL as VLM_MODEL,
   VLM_TIMEOUT_DEFAULT as VLM_TIMEOUT_MS,
-  VLM_MAX_TOKENS_OCR,
   stripThinkTags,
 } from '@/lib/vlm';
 import { pool } from '@/lib/db';
@@ -353,33 +352,9 @@ If you cannot clearly read a sticker, output null for that row.
 JSON array only:
 [{"row":1,"serial":"<ALCLB_HEX_OR_NULL>"},{"row":2,"serial":"<ALCLB_HEX_OR_NULL>"}]`;
 
-const NAFNET_URL = process.env.NAFNET_URL || 'http://100.96.203.105:8101';
-
-/** Deblur image using NAFNet, then upscale 2x for better VLM text reading */
+/** Upscale image 2x for better VLM text reading of small barcode stickers */
 async function enhanceForOntReading(base64: string): Promise<string> {
-  let enhanced = base64;
-
-  // NAFNet deblur (non-blocking — fall back to original if unavailable)
-  try {
-    const res = await fetch(`${NAFNET_URL}/deblur`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: base64 }),
-      signal: AbortSignal.timeout(30000),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.image) {
-        enhanced = data.image;
-        log.info('[EOD-ONT] NAFNet deblur applied');
-      }
-    }
-  } catch {
-    log.warn('[EOD-ONT] NAFNet unavailable, using original');
-  }
-
-  // Upscale 2x + sharpen for small text readability
-  const buf = Buffer.from(enhanced, 'base64');
+  const buf = Buffer.from(base64, 'base64');
   const meta = await sharp(buf).metadata();
   const upscaled = await sharp(buf)
     .resize((meta.width || 1280) * 2, (meta.height || 720) * 2, { kernel: 'lanczos3' })
@@ -387,7 +362,6 @@ async function enhanceForOntReading(base64: string): Promise<string> {
     .sharpen({ sigma: 1.5 })
     .jpeg({ quality: 95 })
     .toBuffer();
-
   return upscaled.toString('base64');
 }
 
@@ -395,7 +369,6 @@ async function extractOntSerials(fullResBase64: string, rowCount: number): Promi
   const result = new Map<number, string>();
 
   try {
-    // Enhance image: NAFNet deblur + 2x upscale for small sticker text
     const enhancedBase64 = await enhanceForOntReading(fullResBase64);
 
     const response = await fetch(VLM_API_ENDPOINT, {
@@ -410,54 +383,63 @@ async function extractOntSerials(fullResBase64: string, rowCount: number): Promi
             { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${enhancedBase64}` } },
           ],
         }],
-        max_tokens: VLM_MAX_TOKENS_OCR,
+        max_tokens: EOD_MAX_TOKENS,
         temperature: 0,
       }),
-      signal: AbortSignal.timeout(VLM_TIMEOUT_MS),
+      signal: AbortSignal.timeout(VLM_TIMEOUT_MS * 2),
     });
 
-    if (!response.ok) return result;
+    if (!response.ok) {
+      log.warn('[EOD-ONT] VLM request failed', { status: response.status });
+      return result;
+    }
 
     const data = await response.json();
     let content = data.choices?.[0]?.message?.content || '';
+    log.info('[EOD-ONT] VLM responded', { bytes: content.length });
 
-    // Parse
     const block = content.match(/```(?:json)?\n([\s\S]*?)\n```/);
     if (block) content = block[1];
     content = stripThinkTags(content);
 
-    const serials: Array<{ row: number; serial: string }> = JSON.parse(content);
+    const serials: Array<{ row: number; serial: string | null }> = JSON.parse(content);
+    const parsed = serials.filter((s) => s.serial && s.row >= 1 && s.row <= rowCount);
+    log.info('[EOD-ONT] VLM parsed', { total: parsed.length, values: parsed.map((s) => `${s.row}:${s.serial}`) });
 
-    for (const s of serials) {
-      if (s.serial && s.row >= 1 && s.row <= rowCount) {
-        const cleaned = cleanOntSerial(s.serial);
-        if (cleaned) result.set(s.row, cleaned);
-      }
+    for (const s of parsed) {
+      const cleaned = cleanOntSerial(s.serial!);
+      if (cleaned) result.set(s.row, cleaned);
     }
 
-    // Detect sequential hex suffix — keep only before the run starts
-    const candidates = Array.from(result.entries()).sort((a, b) => a[0] - b[0]);
-    let seqStart = candidates.length;
-    for (let i = 1; i < candidates.length; i++) {
-      const prevSuffix = parseInt(candidates[i - 1]![1].slice(-3), 16);
-      const currSuffix = parseInt(candidates[i]![1].slice(-3), 16);
-      if (!isNaN(prevSuffix) && !isNaN(currSuffix) && currSuffix === prevSuffix + 1) {
-        if (i < seqStart) seqStart = i;
-      }
-    }
-    if (seqStart < candidates.length) {
-      log.warn('[EOD-ONT] Sequential at index ' + seqStart + ' — trimming');
-      for (let i = seqStart; i < candidates.length; i++) result.delete(candidates[i]![0]);
-    }
-
-    // Also reject duplicates
+    // Guard: only remove a serial if it appears on ≥50% of rows — mass copy-paste hallucination.
+    // A threshold of 1 would remove legitimate accidental re-reads; ≥50% is clearly a prompt echo.
+    const hallucThreshold = Math.max(2, Math.ceil(rowCount * 0.5));
     const counts = new Map<string, number>();
     for (const [, val] of result) counts.set(val, (counts.get(val) || 0) + 1);
     for (const [serial, count] of counts) {
-      if (count > 1) { for (const [row, val] of result) if (val === serial) result.delete(row); }
+      if (count >= hallucThreshold) {
+        log.warn('[EOD-ONT] Mass duplicate serial — removing', { serial, count, threshold: hallucThreshold });
+        for (const [row, val] of result) if (val === serial) result.delete(row);
+      }
     }
 
-    log.info('[EOD-ONT] Focused extraction', { total: candidates.length, kept: result.size, seqStart });
+    // Guard: all-sequential run across ALL candidates = prompt-echo hallucination.
+    // Partial sequential runs (adjacent rows from same carton) are legitimate.
+    const candidates = Array.from(result.entries()).sort((a, b) => a[0] - b[0]);
+    if (candidates.length >= 3) {
+      const allSeq = candidates.every((c, i) => {
+        if (i === 0) return true;
+        const prev = parseInt(candidates[i - 1]![1].slice(-3), 16);
+        const curr = parseInt(c[1].slice(-3), 16);
+        return !isNaN(prev) && !isNaN(curr) && curr === prev + 1;
+      });
+      if (allSeq) {
+        log.warn('[EOD-ONT] All serials fully sequential — prompt echo hallucination, clearing');
+        result.clear();
+      }
+    }
+
+    log.info('[EOD-ONT] Focused extraction done', { kept: result.size });
   } catch (err) {
     log.warn('[EOD-ONT] Focused extraction failed', { error: err });
   }
