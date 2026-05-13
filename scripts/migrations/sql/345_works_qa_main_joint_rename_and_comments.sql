@@ -13,28 +13,50 @@
 
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='pole_qa_photos' AND column_name='optical_joint_11_key') THEN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='pole_qa_photos' AND column_name='optical_joint_11_key') THEN
     ALTER TABLE pole_qa_photos RENAME COLUMN optical_joint_11_key TO main_joint_11_key;
   END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='pole_qa_photos' AND column_name='optical_joint_12_key') THEN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='pole_qa_photos' AND column_name='optical_joint_12_key') THEN
     ALTER TABLE pole_qa_photos RENAME COLUMN optical_joint_12_key TO main_joint_12_key;
   END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='pole_qa_photos' AND column_name='optical_joint_13_key') THEN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='pole_qa_photos' AND column_name='optical_joint_13_key') THEN
     ALTER TABLE pole_qa_photos RENAME COLUMN optical_joint_13_key TO main_joint_13_key;
   END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='pole_qa_photos' AND column_name='optical_joint_14_key') THEN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='pole_qa_photos' AND column_name='optical_joint_14_key') THEN
     ALTER TABLE pole_qa_photos RENAME COLUMN optical_joint_14_key TO main_joint_14_key;
   END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='pole_qa_photos' AND column_name='optical_joint_15_key') THEN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='pole_qa_photos' AND column_name='optical_joint_15_key') THEN
     ALTER TABLE pole_qa_photos RENAME COLUMN optical_joint_15_key TO main_joint_15_key;
   END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='pole_qa_photos' AND column_name='optical_joint_16_key') THEN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='pole_qa_photos' AND column_name='optical_joint_16_key') THEN
     ALTER TABLE pole_qa_photos RENAME COLUMN optical_joint_16_key TO main_joint_16_key;
   END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='pole_qa_photos' AND column_name='optical_joint_tray_keys') THEN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='pole_qa_photos' AND column_name='optical_joint_tray_keys') THEN
     ALTER TABLE pole_qa_photos RENAME COLUMN optical_joint_tray_keys TO main_joint_tray_keys;
   END IF;
 END $$;
+
+-- ============================================================
+-- SECTION 1b: Rename vlm_results JSONB keys
+--
+-- vlm_results stores per-slot results keyed by slot.key (e.g. {"joint_11": {...}}).
+-- After the slot-key rename joint_NN → main_joint_NN, the gate lookup
+-- vlm_results[slot.key] would miss every existing row. Rewrite the keys in
+-- place so historical VLM results stay attached to the renamed slots.
+-- ============================================================
+
+UPDATE pole_qa_photos
+SET vlm_results = (
+  SELECT COALESCE(jsonb_object_agg(
+    CASE
+      WHEN k LIKE 'joint_%' THEN 'main_' || k
+      ELSE k
+    END,
+    v
+  ), '{}'::jsonb)
+  FROM jsonb_each(vlm_results) AS e(k, v)
+)
+WHERE vlm_results::text LIKE '%"joint_1%';
 
 -- ============================================================
 -- SECTION 2: pole_qa_comments — audit trail per discipline

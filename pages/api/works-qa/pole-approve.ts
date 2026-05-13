@@ -50,15 +50,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const approvedColumn = APPROVE_COLUMN[d];
 
-    // Set this discipline's flag + approved_by; only set approved_at once ALL three are approved.
+    // PostgreSQL evaluates UPDATE SET expressions against the pre-update row, so
+    // a naive `CASE WHEN civil_approved AND dome_approved AND joint_approved`
+    // would miss the discipline being approved right now. Substitute TRUE for
+    // the column we're flipping so the final-approval check works on the very
+    // call that sets the third flag.
+    const civilExpr      = approvedColumn === APPROVE_COLUMN.civil      ? 'TRUE' : APPROVE_COLUMN.civil;
+    const domeExpr       = approvedColumn === APPROVE_COLUMN.dome       ? 'TRUE' : APPROVE_COLUMN.dome;
+    const mainJointExpr  = approvedColumn === APPROVE_COLUMN.main_joint ? 'TRUE' : APPROVE_COLUMN.main_joint;
+
     await pool.query(
       `UPDATE pole_qa_photos
        SET ${approvedColumn} = TRUE,
            approved_by = $1,
            approved_at = CASE
-             WHEN ${APPROVE_COLUMN.civil} = TRUE
-              AND ${APPROVE_COLUMN.dome}  = TRUE
-              AND ${APPROVE_COLUMN.main_joint} = TRUE
+             WHEN ${civilExpr} = TRUE AND ${domeExpr} = TRUE AND ${mainJointExpr} = TRUE
              THEN COALESCE(approved_at, NOW())
              ELSE approved_at
            END,
