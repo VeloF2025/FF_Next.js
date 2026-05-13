@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Droppable, Draggable } from '@hello-pangea/dnd';
-import { X } from 'lucide-react';
+import { X, GripVertical } from 'lucide-react';
 import type { VlmSlotResult } from '../types/works-qa.types';
 import { photoUrl } from '../utils/photo-url';
 
@@ -76,9 +76,20 @@ export function PhotoSlotCard({ slotKey, label, photoKey, vlm, onUpload, onOverr
                 <div
                   ref={dragProvided.innerRef}
                   {...dragProvided.draggableProps}
-                  {...dragProvided.dragHandleProps}
-                  className={`w-full h-28 rounded overflow-hidden ${dragSnap.isDragging ? 'ring-2 ring-teal-400' : ''}`}
+                  className={`relative w-full h-28 rounded overflow-hidden group ${dragSnap.isDragging ? 'ring-2 ring-teal-400 shadow-lg shadow-teal-500/30 z-50' : ''}`}
                 >
+                  {/* Drag handle — small grip icon, dragHandleProps lives here so
+                      the photo button below remains clickable for the lightbox. */}
+                  {!disabled && (
+                    <div
+                      {...dragProvided.dragHandleProps}
+                      aria-label="Drag to reassign photo"
+                      className="absolute top-1 left-1 z-10 p-1 rounded bg-black/60 text-zinc-200 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+                    >
+                      <GripVertical className="w-3 h-3" aria-hidden="true" />
+                    </div>
+                  )}
+
                   <button
                     type="button"
                     onClick={onView}
@@ -89,7 +100,8 @@ export function PhotoSlotCard({ slotKey, label, photoKey, vlm, onUpload, onOverr
                     <img
                       src={photoUrl(photoKey)}
                       alt={label}
-                      className="w-full h-full object-cover transition-transform hover:scale-[1.02]"
+                      className="w-full h-full object-cover transition-transform group-hover:scale-[1.02]"
+                      draggable={false}
                     />
                   </button>
                 </div>
