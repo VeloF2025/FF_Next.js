@@ -566,4 +566,4 @@ async function sendTeamNotification(
   });
 }
 
-export default withAuth(withRole('manager')(handler));
+export default withAuth(withRole('technician')(handler));
