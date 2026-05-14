@@ -82,12 +82,22 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
     }
   }, [slots, reviewIndex]);
 
-  // Only complete the batch when there are no remaining failed slots — failed requires user action
+  // Only complete the batch when every slot is fully resolved.
+  // `duplicate` is held open: the user must explicitly Re-extract or Dismiss
+  // so the dup banner stays visible. `failed` is held open for the same reason
+  // (retry vs skip is a user decision).
   useEffect(() => {
-    if (slots.length > 0 && slots.every((s) => TERMINAL.includes(s.status)) && !slots.some((s) => s.status === 'failed')) {
+    if (slots.length > 0
+      && slots.every((s) => TERMINAL.includes(s.status))
+      && !slots.some((s) => s.status === 'failed' || s.status === 'duplicate')) {
       onAllDoneRef.current(slots.filter((s) => s.status === 'saved'));
     }
   }, [slots]);
+
+  /** Bulk-dismiss all remaining duplicate slots so the batch can finalize. */
+  const handleDismissDuplicates = useCallback(() => {
+    setSlots((prev) => prev.map((s) => (s.status === 'duplicate' ? { ...s, status: 'skipped' } : s)));
+  }, []);
 
   const advanceReview = useCallback(() => {
     const next = slots.findIndex((s, i) => i > reviewIndex && !TERMINAL.includes(s.status));
@@ -183,7 +193,11 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
         ))}
       </div>
 
-      <EodDuplicateBanner slots={slots} onForceReExtract={handleForceReExtract} />
+      <EodDuplicateBanner
+        slots={slots}
+        onForceReExtract={handleForceReExtract}
+        onDismissAll={handleDismissDuplicates}
+      />
 
       {matchedTotal > 0 && (
         <div className="px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-lg text-sm text-green-400">
