@@ -161,7 +161,9 @@ COLUMNS (left to right):
 3. Gizzu Serial — starts with GU18W12V25, then a hyphenated suffix
 4. DR Number — handwritten alphanumeric, usually starts with "DR" then 6-7 digits
 5. PON — 2-3 digit handwritten number
-6. Address — handwritten 4-5 digit number (sometimes with slash, e.g. "19/694")
+6. Address — handwritten 4-5 digit number, occasionally with a slash for unit/erf
+   format (the slash itself is the only signal — never copy any digit string from
+   this instruction). Read each row independently from the form.
 
 Read each cell EXACTLY as written. ONT serials, Gizzu serials, DR numbers,
 PON numbers and addresses all vary by row — never copy or increment values.
@@ -282,13 +284,13 @@ function reconstructGizzuSerials(entries: EodVlmEntry[]): EodVlmEntry[] {
   return result;
 }
 
-// PONs in this network are 100-200. Any VLM value outside that range (e.g. an address
-// like 14643 read from the wrong column) is silently discarded; the HLD fallback below
-// fills it in from the drops table instead.
+// PONs in this network are <= 900 (current data: 1-852, 852 distinct values).
+// Anything outside that range (e.g. an address like 14643 read from the wrong column)
+// is silently discarded; the HLD fallback below fills it in from the drops table.
 function validatePon(pon: string | null): string | null {
   if (!pon) return null;
   const num = parseInt(pon.replace(/[^0-9]/g, ''), 10);
-  if (num >= 100 && num <= 200) return num.toString();
+  if (Number.isFinite(num) && num >= 1 && num <= 900) return num.toString();
   return null;
 }
 
@@ -612,6 +614,17 @@ export async function extractEodSheet(
       const addrs = parsed.entries.map((e) => e.address ? parseInt(e.address) : NaN).filter((n) => !isNaN(n));
       if (addrs.length >= 3 && isSequential(addrs)) {
         log.warn('[EOD] Sequential addresses detected — hallucination');
+        parsed.entries = parsed.entries.map((e) => ({ ...e, address: null }));
+      }
+      // All-identical address across 5+ rows = prompt-echo hallucination (the model
+      // copies a single value into every row instead of reading each independently).
+      // Threshold of 5 protects small multi-unit complexes (3-4 flats sharing an erf
+      // are legitimate; 5+ identical numeric addresses on one daily install sheet are
+      // not). Mirrors the existing sequential-address guard above.
+      const nonNullAddrs = parsed.entries.map((e) => e.address).filter((a): a is string => Boolean(a));
+      const addrSet = new Set(nonNullAddrs);
+      if (addrSet.size === 1 && nonNullAddrs.length >= 5) {
+        log.warn('[EOD] All addresses identical across 5+ rows — hallucination, clearing');
         parsed.entries = parsed.entries.map((e) => ({ ...e, address: null }));
       }
     }
