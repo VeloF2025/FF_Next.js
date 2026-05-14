@@ -94,6 +94,26 @@ export enum TicketCategory {
 
 
 /**
+ * Resolution Path — how a ticket should be worked on the public resolve link.
+ *
+ * Drives per-path verification step templates, Context Panel variant, and
+ * dispatch routing. Set at ticket creation by classifyResolutionPath().
+ * 'triage_required' surfaces a single classification step on first link open.
+ */
+export enum ResolutionPath {
+  INSTALL = 'install',
+  MAINTENANCE = 'maintenance',
+  SNAG = 'snag',
+  INVESTIGATE_DATA_GAP = 'investigate_data_gap',
+  DISPATCH_SIGNUP = 'dispatch_signup',
+  DISPATCH_INSTALL = 'dispatch_install',
+  FIX_SERIAL = 'fix_serial',
+  FIX_PROJECT_TAG = 'fix_project_tag',
+  TRIAGE_REQUIRED = 'triage_required',
+  NOT_APPLICABLE = 'not_applicable',
+}
+
+/**
  * Ticket Priority Levels
  */
 export enum TicketPriority {
@@ -177,6 +197,11 @@ export interface Ticket {
    * has a `category` column for QContact's category hierarchy.
    */
   ticket_category: TicketCategory | null;
+  /**
+   * Resolution path — drives the resolve-page step template + Context Panel
+   * variant. Added by migration 2026-05-14; classifier sets this at creation.
+   */
+  resolution_path: ResolutionPath | null;
   priority: TicketPriority;
   status: TicketStatus;
 
@@ -293,6 +318,13 @@ export interface CreateTicketPayload {
   ticket_category?: TicketCategory | string;
   /** Fault cause attribution (optional at creation, typically set during investigation) */
   fault_cause?: FaultCause;
+  /**
+   * Resolution path — drives the resolve-page step template + Context Panel.
+   * Callers must call classifyResolutionPath() and pass the result here; if
+   * not provided, the column is stored as NULL and downstream UI falls back
+   * to the legacy template.
+   */
+  resolution_path?: ResolutionPath;
 }
 
 /**
