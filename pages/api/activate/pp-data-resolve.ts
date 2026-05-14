@@ -887,6 +887,276 @@ async function runWAPhotoVLMScan(): Promise<{
 }
 
 /**
+ * Layer 5a: Backfill `dr_photo_unified_reviews` for DRs that are resolved on
+ * `oes_pp_data` but have no `sender_phone`. Uses `wa_photos` first (more reliable
+ * because it's tied to a specific DR), then falls back to `wa_message_logs` for
+ * the same drop_number. The display query joins `dur.sender_phone` → `wa_contacts`
+ * to populate the WA Technician column, so this is the missing link for "Found
+ * (1Map)" rows that have no oes_activations match.
+ */
+async function runWAGroupBackfill(): Promise<{
+  drs_scanned: number;
+  drs_backfilled: number;
+  rows_inserted: number;
+  rows_updated: number;
+}> {
+  const results = { drs_scanned: 0, drs_backfilled: 0, rows_inserted: 0, rows_updated: 0 };
+
+  // A DR is "missing" WA submitter info if either no dur row exists for it,
+  // or a dur row exists but sender_phone IS NULL.
+  const candidatesResult = await pool.query(`
+    SELECT DISTINCT pp.resolved_drop_number AS drop_number, pp.project
+    FROM oes_pp_data pp
+    LEFT JOIN dr_photo_unified_reviews dur
+      ON dur.drop_number = pp.resolved_drop_number
+     AND dur.sender_phone IS NOT NULL
+    WHERE pp.resolved_drop_number IS NOT NULL
+      AND dur.drop_number IS NULL
+  `);
+
+  if (candidatesResult.rows.length === 0) {
+    logger.info('WA group backfill: no DRs need sender_phone backfill');
+    return results;
+  }
+
+  results.drs_scanned = candidatesResult.rows.length;
+  logger.info('WA group backfill: scanning DRs for WA sender info', { count: results.drs_scanned });
+
+  for (const row of candidatesResult.rows) {
+    const dropNumber = row.drop_number as string;
+    const project = (row.project as string | null) || null;
+
+    // wa_photos first (DR-tagged, most reliable)
+    let waResult = await pool.query(`
+      SELECT sender_jid, wa_group_jid, message_timestamp
+      FROM wa_photos
+      WHERE drop_number = $1
+        AND sender_jid IS NOT NULL
+      ORDER BY message_timestamp ASC
+      LIMIT 1
+    `, [dropNumber]);
+
+    if (waResult.rows.length === 0) {
+      waResult = await pool.query(`
+        SELECT sender_jid, group_jid AS wa_group_jid, created_at AS message_timestamp
+        FROM wa_message_logs
+        WHERE drop_number = $1
+          AND direction = 'inbound'
+          AND sender_jid IS NOT NULL
+        ORDER BY created_at ASC
+        LIMIT 1
+      `, [dropNumber]);
+    }
+
+    if (waResult.rows.length === 0) continue;
+
+    const senderJid = waResult.rows[0].sender_jid as string;
+    const groupJid = (waResult.rows[0].wa_group_jid as string | null) || null;
+    const receivedAt = waResult.rows[0].message_timestamp as Date;
+    // Strip ':n@suffix' or '@suffix' to get bare phone digits used in wa_contacts.sender_phone
+    const senderPhone = senderJid.replace(/[:@].*$/, '');
+
+    const updateResult = await pool.query(`
+      UPDATE dr_photo_unified_reviews
+      SET sender_phone = $1,
+          wa_sender_jid = COALESCE(wa_sender_jid, $2),
+          wa_group_jid = COALESCE(wa_group_jid, $3),
+          wa_received_at = COALESCE(wa_received_at, $4),
+          updated_at = NOW()
+      WHERE drop_number = $5
+        AND sender_phone IS NULL
+    `, [senderPhone, senderJid, groupJid, receivedAt, dropNumber]);
+
+    if ((updateResult.rowCount || 0) > 0) {
+      results.rows_updated++;
+      results.drs_backfilled++;
+      continue;
+    }
+
+    try {
+      await pool.query(`
+        INSERT INTO dr_photo_unified_reviews
+          (drop_number, project, photo_source, sender_phone, wa_sender_jid, wa_group_jid, wa_received_at, created_at, updated_at)
+        VALUES ($1, $2, 'wa_backfill', $3, $4, $5, $6, NOW(), NOW())
+        ON CONFLICT (drop_number) DO NOTHING
+      `, [dropNumber, project, senderPhone, senderJid, groupJid, receivedAt]);
+      results.rows_inserted++;
+      results.drs_backfilled++;
+    } catch (err) {
+      logger.warn('WA group backfill: dur insert failed', {
+        dropNumber,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  logger.info('WA group backfill complete', results);
+  return results;
+}
+
+/**
+ * Layer 5b: Scan `wa_message_logs.message_content` for unresolved PP serials.
+ *
+ * For each unresolved serial, search inbound message text. If the matching message
+ * has a `drop_number` on the same row, link directly. Otherwise look for the SAME
+ * sender's nearest message with a drop_number within ±60 minutes.
+ */
+async function runWAMessageSerialScan(): Promise<{
+  serials_scanned: number;
+  serials_matched: number;
+  matched_via_same_message: number;
+  matched_via_thread: number;
+  errors: number;
+}> {
+  const results = {
+    serials_scanned: 0,
+    serials_matched: 0,
+    matched_via_same_message: 0,
+    matched_via_thread: 0,
+    errors: 0,
+  };
+
+  const unresolvedResult = await pool.query(`
+    SELECT id, serial_number, project, maintenance_ticket_id
+    FROM oes_pp_data
+    WHERE resolution_status = 'not_found'
+    ORDER BY date_registered DESC NULLS LAST
+  `);
+
+  if (unresolvedResult.rows.length === 0) {
+    logger.info('WA message scan: no unresolved PPs');
+    return results;
+  }
+
+  results.serials_scanned = unresolvedResult.rows.length;
+  logger.info('WA message scan: searching wa_message_logs', { count: results.serials_scanned });
+
+  for (const pp of unresolvedResult.rows) {
+    const serial = pp.serial_number as string;
+    const ppId = pp.id as number;
+    const ticketId = pp.maintenance_ticket_id as string | null;
+
+    try {
+      const directMatch = await pool.query(`
+        SELECT drop_number, sender_jid, group_jid, created_at
+        FROM wa_message_logs
+        WHERE message_content ILIKE $1
+          AND drop_number IS NOT NULL
+          AND direction = 'inbound'
+        ORDER BY created_at ASC
+        LIMIT 1
+      `, [`%${serial}%`]);
+
+      let dropNumber: string | null = null;
+      let senderJid: string | null = null;
+      let groupJid: string | null = null;
+      let receivedAt: Date | null = null;
+      let matchType: 'same_message' | 'thread' | null = null;
+
+      if (directMatch.rows.length > 0) {
+        dropNumber = directMatch.rows[0].drop_number as string;
+        senderJid = directMatch.rows[0].sender_jid as string | null;
+        groupJid = directMatch.rows[0].group_jid as string | null;
+        receivedAt = directMatch.rows[0].created_at as Date;
+        matchType = 'same_message';
+      } else {
+        const threadMatch = await pool.query(`
+          WITH serial_msg AS (
+            SELECT sender_jid, group_jid, created_at
+            FROM wa_message_logs
+            WHERE message_content ILIKE $1
+              AND direction = 'inbound'
+              AND sender_jid IS NOT NULL
+            ORDER BY created_at ASC
+            LIMIT 1
+          )
+          SELECT wml.drop_number, wml.sender_jid, wml.group_jid, wml.created_at
+          FROM wa_message_logs wml, serial_msg sm
+          WHERE wml.sender_jid = sm.sender_jid
+            AND wml.drop_number IS NOT NULL
+            AND wml.created_at BETWEEN sm.created_at - INTERVAL '60 minutes'
+                                  AND sm.created_at + INTERVAL '60 minutes'
+          ORDER BY ABS(EXTRACT(EPOCH FROM (wml.created_at - sm.created_at))) ASC
+          LIMIT 1
+        `, [`%${serial}%`]);
+
+        if (threadMatch.rows.length > 0) {
+          dropNumber = threadMatch.rows[0].drop_number as string;
+          senderJid = threadMatch.rows[0].sender_jid as string | null;
+          groupJid = threadMatch.rows[0].group_jid as string | null;
+          receivedAt = threadMatch.rows[0].created_at as Date;
+          matchType = 'thread';
+        }
+      }
+
+      if (!dropNumber) continue;
+
+      const senderPhone = senderJid ? senderJid.replace(/[:@].*$/, '') : null;
+
+      await pool.query(`
+        UPDATE oes_pp_data
+        SET resolution_status = 'located_local',
+            resolved_drop_number = $1,
+            resolved_source = 'wa_message_logs',
+            resolved_details = jsonb_build_object(
+              'method', $2,
+              'sender_jid', $3::text,
+              'group_jid', $4::text,
+              'received_at', $5::text
+            ),
+            resolved_at = NOW(),
+            updated_at = NOW()
+        WHERE id = $6
+          AND resolution_status = 'not_found'
+      `, [dropNumber, matchType, senderJid, groupJid, receivedAt?.toISOString() || null, ppId]);
+
+      if (senderPhone && receivedAt) {
+        const updateResult = await pool.query(`
+          UPDATE dr_photo_unified_reviews
+          SET sender_phone = COALESCE(sender_phone, $1),
+              wa_sender_jid = COALESCE(wa_sender_jid, $2),
+              wa_group_jid = COALESCE(wa_group_jid, $3),
+              wa_received_at = COALESCE(wa_received_at, $4),
+              updated_at = NOW()
+          WHERE drop_number = $5
+        `, [senderPhone, senderJid, groupJid, receivedAt, dropNumber]);
+
+        if ((updateResult.rowCount || 0) === 0) {
+          await pool.query(`
+            INSERT INTO dr_photo_unified_reviews
+              (drop_number, project, photo_source, sender_phone, wa_sender_jid, wa_group_jid, wa_received_at, created_at, updated_at)
+            VALUES ($1, $2, 'wa_backfill', $3, $4, $5, $6, NOW(), NOW())
+            ON CONFLICT (drop_number) DO NOTHING
+          `, [dropNumber, pp.project, senderPhone, senderJid, groupJid, receivedAt]);
+        }
+      }
+
+      results.serials_matched++;
+      if (matchType === 'same_message') results.matched_via_same_message++;
+      else results.matched_via_thread++;
+
+      if (ticketId) {
+        try {
+          await logPPStatusChangeToTicket(ticketId, serial, 'located_local', 'wa_message_logs', dropNumber);
+        } catch (actErr) {
+          logger.warn('WA msg scan: ticket activity log failed', {
+            ticketId, serial, error: actErr instanceof Error ? actErr.message : String(actErr),
+          });
+        }
+      }
+    } catch (err) {
+      results.errors++;
+      logger.warn('WA message scan: serial lookup failed', {
+        serial, error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  logger.info('WA message scan complete', results);
+  return results;
+}
+
+/**
  * Backfill GPS on resolved PP records and their linked tables.
  * Priority: drops → oes_activations → onemap_drops
  * Also propagates to dr_photo_unified_reviews and fills gaps in the drops table.
@@ -1022,14 +1292,28 @@ async function handler(
       });
     }
 
+    if (action === 'wa-backfill') {
+      // Standalone: backfill WA technician/team for already-resolved DRs
+      const backfillResult = await runWAGroupBackfill();
+      return res.status(200).json({ success: true, data: backfillResult });
+    }
+
+    if (action === 'wa-message-scan') {
+      // Standalone: scan wa_message_logs text for unresolved serials
+      const scanResult = await runWAMessageSerialScan();
+      return res.status(200).json({ success: true, data: scanResult });
+    }
+
     if (action === 'resolve-all') {
-      // Pipeline: local-scan → WA cross-ref → WA photo VLM → 1Map (background)
+      // Pipeline: local-scan → WA cross-ref → WA photo VLM → WA message scan → WA group backfill → 1Map (background)
       const cutoff = new Date();
       const localResult = await runLocalResolution();
       const crossRefResult = await runWACrossReference();
       const vlmResult = await runWAPhotoVLMScan();
+      const msgScanResult = await runWAMessageSerialScan();
+      const waBackfillResult = await runWAGroupBackfill();
 
-      // Sync ticket activities for all records resolved in steps 1-3
+      // Sync ticket activities for all records resolved in steps 1-4
       const ticketsUpdated = await syncTicketActivities(cutoff);
       const gps = await backfillGpsCoordinates();
 
@@ -1044,7 +1328,11 @@ async function handler(
       return res.status(200).json({
         success: true,
         data: {
-          total_resolved: localResult.total_resolved + crossRefResult.total_resolved + vlmResult.total_pp_matched,
+          total_resolved:
+            localResult.total_resolved +
+            crossRefResult.total_resolved +
+            vlmResult.total_pp_matched +
+            msgScanResult.serials_matched,
           onemap_started: true,
           tickets_updated: ticketsUpdated,
           gps_updated: gps,
@@ -1052,12 +1340,14 @@ async function handler(
             local_scan: { resolved: localResult.total_resolved, sources: localResult.sources },
             wa_cross_ref: { resolved: crossRefResult.total_resolved, drs_checked: crossRefResult.total_drs_checked, backfilled: crossRefResult.total_backfilled },
             wa_photo_vlm: { resolved: vlmResult.total_pp_matched, photos_processed: vlmResult.total_vlm_processed, drs_scanned: vlmResult.drs_scanned },
+            wa_message_scan: msgScanResult,
+            wa_group_backfill: waBackfillResult,
           },
         },
       });
     }
 
-    return res.status(400).json({ error: 'Invalid action. Use "local-scan", "1map-lookup", or "resolve-all".' });
+    return res.status(400).json({ error: 'Invalid action. Use "local-scan", "1map-lookup", "wa-backfill", "wa-message-scan", or "resolve-all".' });
   } catch (error) {
     logger.error('Resolution failed', {
       error: error instanceof Error ? error.message : String(error),

@@ -168,8 +168,8 @@ async function handler(
 
     const dataResult = await pool.query(
       `SELECT pp.*, mt.ticket_uid, mt.priority AS ticket_priority, mt.created_at AS ticket_created_at,
-              COALESCE(oa.team, d.installed_by_name) AS oes_team,
-              oa.activation_date,
+              COALESCE(oa.team, d.installed_by_name, wc.team) AS oes_team,
+              COALESCE(oa.activation_date, dur.wa_received_at::date) AS activation_date,
               dur.sender_phone AS wa_phone,
               COALESCE(wc.formal_name, wc.wa_display_name) AS wa_name,
               wc.team AS wa_team,
@@ -245,8 +245,8 @@ async function handler(
       `SELECT pp.serial_number, pp.project, pp.date_registered, pp.resolution_status,
               pp.resolved_drop_number, pp.resolved_source, pp.resolved_at,
               mt.priority AS ticket_priority,
-              COALESCE(oa.team, d.installed_by_name) AS oes_team,
-              oa.activation_date,
+              COALESCE(oa.team, d.installed_by_name, wc.team) AS oes_team,
+              COALESCE(oa.activation_date, dur.wa_received_at::date) AS activation_date,
               dur.sender_phone AS wa_phone,
               COALESCE(wc.formal_name, wc.wa_display_name) AS wa_name,
               wc.team AS wa_team,
