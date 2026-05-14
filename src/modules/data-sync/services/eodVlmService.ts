@@ -358,17 +358,31 @@ If you cannot clearly read a sticker, output null for that row.
 JSON array only:
 [{"row":1,"serial":"<ALCLB_HEX_OR_NULL>"},{"row":2,"serial":"<ALCLB_HEX_OR_NULL>"}]`;
 
-/** Upscale image 2x for better VLM text reading of small barcode stickers */
+/**
+ * Resize to a fixed target width for the focused ONT pass. We want the
+ * stickers to occupy enough pixels for the VLM to read individual characters
+ * but not so many that the model truncates or rejects the input.
+ *
+ * 2560px wide ≈ 256px per row on a 10-row form ≈ ~80px tall per sticker —
+ * comfortable resolution for handwritten/printed serial reads.
+ */
+const ONT_PASS_TARGET_WIDTH = 2560;
+
 async function enhanceForOntReading(base64: string): Promise<string> {
   const buf = Buffer.from(base64, 'base64');
   const meta = await sharp(buf).metadata();
-  const upscaled = await sharp(buf)
-    .resize((meta.width || 1280) * 2, (meta.height || 720) * 2, { kernel: 'lanczos3' })
+  const srcWidth = meta.width || 1280;
+  // If source is smaller than target, upscale (clean sticker images
+  // benefit from interpolation); if larger, downscale to keep VLM happy.
+  const ratio = ONT_PASS_TARGET_WIDTH / srcWidth;
+  const targetHeight = Math.round((meta.height || 720) * ratio);
+  const resized = await sharp(buf)
+    .resize(ONT_PASS_TARGET_WIDTH, targetHeight, { kernel: 'lanczos3' })
     .normalise()
     .sharpen({ sigma: 1.5 })
     .jpeg({ quality: 95 })
     .toBuffer();
-  return upscaled.toString('base64');
+  return resized.toString('base64');
 }
 
 async function extractOntSerials(fullResBase64: string, rowCount: number): Promise<Map<number, string>> {

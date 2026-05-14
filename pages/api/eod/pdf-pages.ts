@@ -28,15 +28,16 @@ async function pdfToJpegPages(
   try {
     await writeFile(pdfPath, Buffer.from(pdfBase64, 'base64'));
 
-    // 300 DPI is the minimum where Code-128 stickers on a 10-row EOD form
-    // produce ~2px per bar — the practical floor for zxing to decode. Lower
-    // (150 DPI) gives ~1px bars and the scanner returns zero hits, forcing
-    // the pipeline onto OCR fallback which mis-reads the printed serials.
+    // 600 DPI gives ~4px per bar on Code-128 stickers — comfortable headroom
+    // for zxing on the full-res image and for VLM OCR on handwritten DR /
+    // Gizzu serial digits. The downstream optimizeForVlm step still
+    // downsamples to 1280x960 for the main pass, so the cost is contained to
+    // PDF rasterisation + barcode-variant generation.
     await execFileAsync(
       'gs',
       [
         '-sDEVICE=jpeg',
-        '-r300',
+        '-r600',
         '-dBATCH',
         '-dNOPAUSE',
         '-q',
@@ -44,7 +45,7 @@ async function pdfToJpegPages(
         `-sOutputFile=${join(tmpDir, 'page-%d.jpg')}`,
         pdfPath,
       ],
-      { timeout: 120000 },
+      { timeout: 180000 },
     );
 
     const files: string[] = await readdir(tmpDir);
