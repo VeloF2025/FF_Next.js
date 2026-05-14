@@ -57,5 +57,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 export default withAuth(handler);
 
 export const config = {
-  api: { bodyParser: { sizeLimit: '10mb' } },
+  // 25mb to accommodate 300-DPI rasterised PDF pages — a single A4 sheet
+  // produces a ~1.5-2.5MB JPEG at quality 90 (vs ~500kB at 150 DPI).
+  api: { bodyParser: { sizeLimit: '25mb' } },
 };
