@@ -157,7 +157,7 @@ COLUMNS (left to right):
 3. Gizzu Serial — starts with GU18W12V25, then a hyphenated suffix
 4. DR Number — handwritten alphanumeric, usually starts with "DR" then 6-7 digits
 5. PON — 2-3 digit handwritten number
-6. Address — handwritten 4-5 digit number (sometimes with slash, e.g. "19/694")
+6. Address — handwritten 4-5 digit number. Read each row independently; addresses vary per row. Do not copy any value from this prompt — only read what is on the form.
 
 Read each cell EXACTLY as written. ONT serials, Gizzu serials, DR numbers,
 PON numbers and addresses all vary by row — never copy or increment values.
@@ -278,13 +278,13 @@ function reconstructGizzuSerials(entries: EodVlmEntry[]): EodVlmEntry[] {
   return result;
 }
 
-// PONs in this network are 100-200. Any VLM value outside that range (e.g. an address
-// like 14643 read from the wrong column) is silently discarded; the HLD fallback below
-// fills it in from the drops table instead.
+// PONs in this network range from 1-999 (current data: 1-852). Anything outside
+// that range (e.g. an address like 14643 read from the wrong column) is silently
+// discarded; the HLD fallback below fills it in from the drops table instead.
 function validatePon(pon: string | null): string | null {
   if (!pon) return null;
   const num = parseInt(pon.replace(/[^0-9]/g, ''), 10);
-  if (num >= 100 && num <= 200) return num.toString();
+  if (Number.isFinite(num) && num >= 1 && num <= 999) return num.toString();
   return null;
 }
 
@@ -608,6 +608,13 @@ export async function extractEodSheet(
       const addrs = parsed.entries.map((e) => e.address ? parseInt(e.address) : NaN).filter((n) => !isNaN(n));
       if (addrs.length >= 3 && isSequential(addrs)) {
         log.warn('[EOD] Sequential addresses detected — hallucination');
+        parsed.entries = parsed.entries.map((e) => ({ ...e, address: null }));
+      }
+      // All-identical address across 3+ rows = prompt-echo hallucination (the model
+      // copies a single value into every row instead of reading each independently).
+      const addrSet = new Set(parsed.entries.map((e) => e.address).filter(Boolean));
+      if (addrSet.size === 1 && parsed.entries.filter((e) => e.address).length >= 3) {
+        log.warn('[EOD] All addresses identical — hallucination, clearing');
         parsed.entries = parsed.entries.map((e) => ({ ...e, address: null }));
       }
     }
