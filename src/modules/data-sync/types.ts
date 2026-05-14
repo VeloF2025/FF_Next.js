@@ -427,7 +427,10 @@ export interface EodInstallSheetEntry {
   row_number: number;
   ont_serial: string | null;
   gizzu_serial: string | null;
+  /** DR where the ONT was installed (form column 2). */
   dr_number: string | null;
+  /** DR where the Gizzu was installed (form column 4). May differ from dr_number. */
+  gizzu_dr_number: string | null;
   pon_number: string | null;
   address: string | null;
   match_status: EodMatchStatus;
@@ -465,7 +468,14 @@ export interface EodVlmEntry {
   row_number: number;
   ont_serial: string | null;
   gizzu_serial: string | null;
+  /** DR where the ONT was installed (form column 2). Primary match key. */
   dr_number: string | null;
+  /**
+   * DR where the Gizzu was installed (form column 4). May differ from
+   * `dr_number` — technicians do not pair ONT and Gizzu installs by drop.
+   * Find-it-later field; no downstream join consumes it today.
+   */
+  gizzu_dr_number: string | null;
   pon_number: string | null;
   address: string | null;
   confidence: number;

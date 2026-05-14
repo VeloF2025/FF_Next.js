@@ -209,6 +209,10 @@ function postProcessEntries(entries: EodVlmEntry[]): EodVlmEntry[] {
     return {
       ...entry,
       dr_number: normalizeDrNumber(toStringOrNull(entry.dr_number)),
+      // Main VLM pass doesn't extract column 4 — start null. The per-cell
+      // pass `extractGizzuDrNumbers` below populates this field for entries
+      // where the col-4 crop produces a valid DR.
+      gizzu_dr_number: null,
       ont_serial: cleanOntSerial(toStringOrNull(entry.ont_serial)),
       gizzu_serial: cleanGizzuSerial(toStringOrNull(entry.gizzu_serial)),
       pon_number: validatePon(toStringOrNull(entry.pon_number)),
@@ -722,6 +726,26 @@ function extractDrNumbers(fullResBase64: string, rowCount: number): Promise<Map<
   );
 }
 
+/**
+ * Per-cell extraction for the SECOND handwritten DR column (col 4 on the form).
+ * This is the DR where the Gizzu in that row was installed — typically a
+ * different drop than the ONT-DR on the same row, since technicians don't pair
+ * ONT and Gizzu installs by drop.
+ */
+function extractGizzuDrNumbers(fullResBase64: string, rowCount: number): Promise<Map<number, string>> {
+  return extractColumnPerCell(
+    fullResBase64,
+    rowCount,
+    'dr2',
+    DR_CELL_PROMPT,
+    (raw) => {
+      const cleaned = normalizeDrNumber(raw);
+      return cleaned && DR_STRICT_PATTERN.test(cleaned) ? cleaned : null;
+    },
+    'EOD-GZ-DR',
+  );
+}
+
 // ============================================================================
 // HLD DR FUZZY MATCH (Pass 2d)
 // ============================================================================
@@ -1223,6 +1247,29 @@ export async function extractEodSheet(
         } else {
           log.info(`[EOD] Gizzu focused pass overrode ${overridden} rows; eviction skipped (partial map: ${gzMap.size}/${cropRowCount})`);
         }
+      }
+    }
+
+    // Pass 2f: Per-cell extraction of the Gizzu-DR column (form column 4).
+    // This is the DR where the Gizzu was installed, which generally differs
+    // from the row's `dr_number` (ONT-DR, column 2). Find-it-later metadata —
+    // no downstream consumer joins on this today, so we just populate the
+    // field with no override-evict gymnastics (the field starts null from the
+    // main pass anyway since the main pass prompt doesn't extract column 4).
+    if (parsed.entries.length > 0) {
+      const cropRowCount = Math.min(parsed.entries.length, PHYSICAL_FORM_ROWS);
+      const gzDrMap = await extractGizzuDrNumbers(fullResBase64, cropRowCount);
+      if (gzDrMap.size > 0) {
+        let filled = 0;
+        parsed.entries = parsed.entries.map((e) => {
+          const focused = gzDrMap.get(e.row_number);
+          if (focused && focused !== e.gizzu_dr_number) {
+            filled++;
+            return { ...e, gizzu_dr_number: focused };
+          }
+          return e;
+        });
+        log.info(`[EOD] Gizzu-DR per-cell pass filled ${filled} rows (of ${gzDrMap.size} returned)`);
       }
     }
 

@@ -115,6 +115,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
         ontSerial: (e.ont_serial as string) || null,
         gizzuSerial: (e.gizzu_serial as string) || null,
         drNumber: (e.dr_number as string) || null,
+        gizzuDrNumber: (e.gizzu_dr_number as string) || null,
         ponNumber: (e.pon_number as string) || null,
         address: (e.address as string) || null,
       })),
@@ -124,7 +125,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     if (vlmRawJson?.entries) {
       recordEodCorrections(
         vlmRawJson.entries,
-        entries as Array<{ row_number: number; dr_number: string | null; ont_serial: string | null; gizzu_serial: string | null; pon_number: string | null; address: string | null }>,
+        entries as Array<{ row_number: number; dr_number: string | null; gizzu_dr_number: string | null; ont_serial: string | null; gizzu_serial: string | null; pon_number: string | null; address: string | null }>,
         sheet.id,
         photoUrl || null
       ).catch((err) => log.warn('[EOD-Learning] Background recording failed', { error: err }));

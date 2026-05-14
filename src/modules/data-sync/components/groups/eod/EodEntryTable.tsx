@@ -32,9 +32,10 @@ export function EodEntryTable({ entries, editable = false, onChange }: EodEntryT
         <thead>
           <tr className="border-b border-[var(--ff-border-light)]">
             <th className="text-left px-2 py-2 text-[var(--ff-text-secondary)] font-medium w-10">#</th>
-            <th className="text-left px-2 py-2 text-[var(--ff-text-secondary)] font-medium">DR Number</th>
+            <th className="text-left px-2 py-2 text-[var(--ff-text-secondary)] font-medium" title="DR where the ONT was installed (form column 2)">DR Number</th>
             <th className="text-left px-2 py-2 text-[var(--ff-text-secondary)] font-medium">ONT Serial</th>
             <th className="text-left px-2 py-2 text-[var(--ff-text-secondary)] font-medium">Gizzu Serial</th>
+            <th className="text-left px-2 py-2 text-[var(--ff-text-secondary)] font-medium" title="DR where the Gizzu was installed (form column 4). May differ from DR Number.">Gizzu DR</th>
             <th className="text-left px-2 py-2 text-[var(--ff-text-secondary)] font-medium w-20">PON</th>
             <th className="text-left px-2 py-2 text-[var(--ff-text-secondary)] font-medium">Address</th>
             {!editable && (
@@ -67,6 +68,13 @@ export function EodEntryTable({ entries, editable = false, onChange }: EodEntryT
                     <input className={cellClass} value={entry.gizzu_serial || ''} onChange={(e) => updateEntry(i, 'gizzu_serial', e.target.value)} placeholder="GU..." />
                   ) : (
                     <span className={`${cellClass} font-mono text-xs`}>{entry.gizzu_serial || '\u2014'}</span>
+                  )}
+                </td>
+                <td className="px-2 py-1.5">
+                  {editable ? (
+                    <input className={cellClass} value={entry.gizzu_dr_number || ''} onChange={(e) => updateEntry(i, 'gizzu_dr_number', e.target.value)} placeholder="DR..." />
+                  ) : (
+                    <span className={cellClass}>{entry.gizzu_dr_number || '\u2014'}</span>
                   )}
                 </td>
                 <td className="px-2 py-1.5">

@@ -19,6 +19,7 @@ export async function recordEodCorrections(
   correctedEntries: {
     row_number: number;
     dr_number: string | null;
+    gizzu_dr_number: string | null;
     ont_serial: string | null;
     gizzu_serial: string | null;
     pon_number: string | null;
@@ -36,6 +37,9 @@ export async function recordEodCorrections(
 
     const pairs: Array<{ field: string; analysisType: VlmAnalysisType; vlmValue: string | null; correctedValue: string | null }> = [
       { field: 'dr_number', analysisType: 'eod_sheet_dr', vlmValue: vlm.dr_number, correctedValue: corrected.dr_number },
+      // Old vlm_raw_json rows (pre-Gizzu-DR support) won't have this field — coerce undefined → null
+      // so it's a clean "no VLM value to compare" rather than poisoning the correction record.
+      { field: 'gizzu_dr_number', analysisType: 'eod_sheet_gizzu_dr', vlmValue: vlm.gizzu_dr_number ?? null, correctedValue: corrected.gizzu_dr_number },
       { field: 'address', analysisType: 'eod_sheet_address', vlmValue: vlm.address, correctedValue: corrected.address },
       { field: 'gizzu_serial', analysisType: 'eod_sheet_gizzu', vlmValue: vlm.gizzu_serial, correctedValue: corrected.gizzu_serial },
       { field: 'pon_number', analysisType: 'eod_sheet_pon', vlmValue: vlm.pon_number, correctedValue: corrected.pon_number },

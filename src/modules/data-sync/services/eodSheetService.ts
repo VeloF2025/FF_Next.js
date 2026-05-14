@@ -23,6 +23,7 @@ interface CreateSheetInput {
     ontSerial: string | null;
     gizzuSerial: string | null;
     drNumber: string | null;
+    gizzuDrNumber: string | null;
     ponNumber: string | null;
     address: string | null;
   }[];
@@ -39,6 +40,7 @@ export interface UpdateEntryInput {
   ontSerial: string | null;
   gizzuSerial: string | null;
   drNumber: string | null;
+  gizzuDrNumber: string | null;
   ponNumber: string | null;
   address: string | null;
 }
@@ -131,10 +133,10 @@ export async function createSheet(input: CreateSheetInput): Promise<EodInstallSh
     await sql`
       INSERT INTO eod_install_sheet_entries (
         sheet_id, row_number, ont_serial, gizzu_serial,
-        dr_number, pon_number, address
+        dr_number, gizzu_dr_number, pon_number, address
       ) VALUES (
         ${sheet.id}, ${entry.rowNumber}, ${entry.ontSerial}, ${entry.gizzuSerial},
-        ${entry.drNumber}, ${entry.ponNumber}, ${entry.address}
+        ${entry.drNumber}, ${entry.gizzuDrNumber ?? null}, ${entry.ponNumber}, ${entry.address}
       )
     `;
   }
@@ -162,10 +164,10 @@ export async function updateSheetEntries(
     for (const entry of entries) {
       const rows = await txn.query<{ id: string }>(
         `UPDATE eod_install_sheet_entries
-         SET ont_serial = $1, gizzu_serial = $2, dr_number = $3, pon_number = $4, address = $5
-         WHERE id = $6 AND sheet_id = $7
+         SET ont_serial = $1, gizzu_serial = $2, dr_number = $3, gizzu_dr_number = $4, pon_number = $5, address = $6
+         WHERE id = $7 AND sheet_id = $8
          RETURNING id`,
-        [entry.ontSerial, entry.gizzuSerial, entry.drNumber, entry.ponNumber, entry.address, entry.id, sheetId]
+        [entry.ontSerial, entry.gizzuSerial, entry.drNumber, entry.gizzuDrNumber ?? null, entry.ponNumber, entry.address, entry.id, sheetId]
       );
       if (rows.length > 0) n++;
     }
@@ -178,6 +180,7 @@ export async function updateSheetEntries(
       ontSerial: e.ontSerial,
       gizzuSerial: e.gizzuSerial,
       drNumber: e.drNumber,
+      gizzuDrNumber: e.gizzuDrNumber,
       ponNumber: e.ponNumber,
       address: e.address,
     })),

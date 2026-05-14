@@ -147,6 +147,7 @@ export async function saveEodSheet(
         ont_serial: e.ont_serial,
         gizzu_serial: e.gizzu_serial,
         dr_number: e.dr_number,
+        gizzu_dr_number: e.gizzu_dr_number ?? null,
         pon_number: e.pon_number,
         address: e.address,
       })),

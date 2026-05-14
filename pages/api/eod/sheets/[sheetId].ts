@@ -57,6 +57,7 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, sheetId: s
       ontSerial: (e.ont_serial as string | null) || null,
       gizzuSerial: (e.gizzu_serial as string | null) || null,
       drNumber: (e.dr_number as string | null) || null,
+      gizzuDrNumber: (e.gizzu_dr_number as string | null) || null,
       ponNumber: (e.pon_number as string | null) || null,
       address: (e.address as string | null) || null,
     }));
@@ -71,6 +72,7 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, sheetId: s
         (entries as Record<string, unknown>[]).map((e) => ({
           row_number: Number(e.row_number) || 0,
           dr_number: (e.dr_number as string | null) || null,
+          gizzu_dr_number: (e.gizzu_dr_number as string | null) || null,
           ont_serial: (e.ont_serial as string | null) || null,
           gizzu_serial: (e.gizzu_serial as string | null) || null,
           pon_number: (e.pon_number as string | null) || null,

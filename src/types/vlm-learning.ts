@@ -54,6 +54,7 @@ export type VlmAnalysisType =
   | 'construction_photo_qa'
   // Data Sync module (EOD sheets)
   | 'eod_sheet_dr'
+  | 'eod_sheet_gizzu_dr'
   | 'eod_sheet_address'
   | 'eod_sheet_gizzu'
   | 'eod_sheet_pon'
@@ -80,7 +81,7 @@ export const ANALYSIS_TYPES_BY_MODULE: Record<VlmModule, VlmAnalysisType[]> = {
   staff: ['id_extraction', 'photo_match'],
   qfield: ['qfield_photo_qa'],
   construction_qa: ['construction_photo_qa'],
-  'data-sync': ['eod_sheet_dr', 'eod_sheet_address', 'eod_sheet_gizzu', 'eod_sheet_pon', 'eod_sheet_ont'],
+  'data-sync': ['eod_sheet_dr', 'eod_sheet_gizzu_dr', 'eod_sheet_address', 'eod_sheet_gizzu', 'eod_sheet_pon', 'eod_sheet_ont'],
 };
 
 // ============================================================================
