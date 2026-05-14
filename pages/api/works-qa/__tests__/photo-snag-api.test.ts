@@ -150,11 +150,28 @@ describe('POST /api/works-qa/photo-snag', () => {
     expect(res._getStatusCode()).toBe(200);
     const payload = JSON.parse(res._getData());
     expect(payload.data.status).toBe('amended');
+    expect(payload.data.note_appended).toBe(true);
     expect(logActivityMock).toHaveBeenCalledTimes(1);
     expect(logActivityMock.mock.calls[0]![0]).toMatchObject({
       ticketId: 'tkt-existing', activityType: 'note',
     });
     expect(logActivityMock.mock.calls[0]![0].description).toContain('also pole is leaning');
+  });
+
+  it('amend mode with no linked ticket: note_appended=false (no silent success)', async () => {
+    poolMock.query.mockResolvedValueOnce({ rows: [{ project_id: 'proj-1' }] }).mockResolvedValueOnce({ rows: [] });
+    serviceMocks.createPhotoSnag.mockResolvedValue({
+      status: 'duplicate',
+      snag: { id: 'snag-orphan', noc_ticket_id: null },
+      slotApprovals: {},
+    });
+    const { req, res } = createMocks({ method: 'POST', body: body({ pole_qa_photo_id: 'p1', slot_key: 'civil_03', comment: 'amend orphan', amend: true }) });
+    await snagHandler(withUser(req as unknown as NextApiRequest), res as unknown as NextApiResponse);
+    expect(res._getStatusCode()).toBe(200);
+    const payload = JSON.parse(res._getData());
+    expect(payload.data.status).toBe('amended');
+    expect(payload.data.note_appended).toBe(false);
+    expect(logActivityMock).not.toHaveBeenCalled();
   });
 });
 
@@ -220,20 +237,22 @@ describe('GET /api/works-qa/assignable-users', () => {
     await assignablesHandler(withUser(req as unknown as NextApiRequest), res as unknown as NextApiResponse);
     expect(res._getStatusCode()).toBe(422);
   });
-  it('filters to assignable roles and resolves staff.user_id → users.id', async () => {
+  it('resolves staff.user_id → users.id and filters roles in SQL', async () => {
+    // Service returns whatever the SQL already filtered — the handler trusts the DB.
     poolMock.query.mockResolvedValueOnce({ rows: [
-      { user_id: 'u-1', name: 'Jane Site',    email: 'jane@x',  role: 'Site Manager' },
-      { user_id: 'u-2', name: 'Bob Driver',   email: 'bob@x',   role: 'Driver' },          // not assignable
-      { user_id: 'u-3', name: 'Mary QA',      email: 'mary@x',  role: 'QA Manager' },
+      { user_id: 'u-1', name: 'Jane Site', email: 'jane@x', role: 'Site Manager' },
+      { user_id: 'u-3', name: 'Mary QA',   email: 'mary@x', role: 'QA Manager' },
     ] });
     const { req, res } = createMocks({ method: 'GET', query: { project_id: 'proj-1' } });
     await assignablesHandler(withUser(req as unknown as NextApiRequest), res as unknown as NextApiResponse);
     expect(res._getStatusCode()).toBe(200);
     const payload = JSON.parse(res._getData());
     const ids = payload.data.users.map((u: { user_id: string }) => u.user_id);
-    expect(ids).toEqual(['u-1', 'u-3']);                    // Driver filtered out
-    const sql = poolMock.query.mock.calls[0]![0] as string;
+    expect(ids).toEqual(['u-1', 'u-3']);
+    const [sql, params] = poolMock.query.mock.calls[0]! as [string, unknown[]];
     expect(sql).toMatch(/JOIN staff s ON s\.id::text = vpt\.person_id/);  // FK bridge present
     expect(sql).toMatch(/s\.user_id IS NOT NULL/);
+    expect(sql).toMatch(/LOWER\(vpt\.role\) = ANY\(\$2/);                 // filter moved to SQL
+    expect(params[1]).toEqual(expect.arrayContaining(['site manager', 'project manager', 'qa manager']));
   });
 });

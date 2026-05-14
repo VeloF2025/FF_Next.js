@@ -3,9 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock the pg pool before importing the service. vi.mock is hoisted above
 // imports, but factories capture outer-scope variables — so the spies must
 // also be hoisted via vi.hoisted to be defined at the time the factories run.
-const { queryMock, createTicketMock } = vi.hoisted(() => ({
+const { queryMock, createTicketMock, updateTicketMock } = vi.hoisted(() => ({
   queryMock: vi.fn(),
   createTicketMock: vi.fn(),
+  updateTicketMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -15,6 +16,7 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/modules/noc/services/ticketService', () => ({
   createTicket: createTicketMock,
+  updateTicket: updateTicketMock,
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -285,7 +287,7 @@ describe('photoSnagService.resolvePhotoSnag', () => {
     expect(result.ticketResolved).toBe(false);
   });
 
-  it('auto-resolves linked NOC ticket when closeTicket=true', async () => {
+  it('auto-resolves linked NOC ticket via updateTicket (not direct SQL UPDATE)', async () => {
     setupQueryQueue([
       { match: /UPDATE snags/i, rows: [{
         ...SNAG_INSERT_ROW,
@@ -293,14 +295,20 @@ describe('photoSnagService.resolvePhotoSnag', () => {
         noc_ticket_id: 'ticket-uuid-1',
       }] },
       { match: /UPDATE pole_qa_photos/i, rows: [] },
-      { match: /UPDATE maintenance_tickets[\s\S]+resolved/i, rows: [] },
     ]);
+    updateTicketMock.mockReset();
+    updateTicketMock.mockResolvedValue({ id: 'ticket-uuid-1', status: 'resolved' });
     const result = await resolvePhotoSnag({
       snagId: 'snag-uuid-1',
       resolvedBy: 'user-2',
       closeTicket: true,
     });
     expect(result.ticketResolved).toBe(true);
+    // Critical: must go through the ticket service so activity log + notifications fire.
+    expect(updateTicketMock).toHaveBeenCalledWith('ticket-uuid-1', { status: 'resolved' });
+    // And NOT via a direct SQL UPDATE on maintenance_tickets.
+    const sqlCalls = queryMock.mock.calls.map(c => c[0] as string);
+    expect(sqlCalls.some(s => /UPDATE maintenance_tickets/i.test(s))).toBe(false);
   });
 
   it('throws when snag id is missing or not a works-qa snag', async () => {

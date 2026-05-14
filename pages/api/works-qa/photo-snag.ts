@@ -100,6 +100,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         );
       }
       // Amend mode: append the new comment to the linked ticket's activity log.
+      // If the snag has no linked ticket (data-corrupted edge case), surface
+      // that via `note_appended: false` rather than succeeding silently — the
+      // UI then knows it needs to fall back to a different code path.
+      let noteAppended = false;
       if (result.snag.noc_ticket_id) {
         await logTicketActivity({
           ticketId: result.snag.noc_ticket_id,
@@ -109,11 +113,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           userName: user.name,
           userEmail: user.email,
         });
+        noteAppended = true;
+      } else {
+        log.warn('works-qa/photo-snag amend without ticket', { snag_id: result.snag.id });
       }
       return apiResponse.success(res, {
         status: 'amended',
         snag: result.snag,
         slot_approvals: result.slotApprovals,
+        note_appended: noteAppended,
       });
     }
 

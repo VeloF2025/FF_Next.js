@@ -3,7 +3,7 @@
 
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
-import { createTicket } from '@/modules/noc/services/ticketService';
+import { createTicket, updateTicket } from '@/modules/noc/services/ticketService';
 import { TicketSource, TicketCategory, TicketStatus, type CreateTicketPayload } from '@/modules/noc/types/ticket';
 import { SLOT_META } from '../utils/slot-keys';
 import {
@@ -181,12 +181,11 @@ export async function resolvePhotoSnag(input: ResolvePhotoSnagInput): Promise<{ 
 
   let ticketResolved = false;
   if (input.closeTicket && snag.noc_ticket_id) {
-    await pool.query(
-      `UPDATE maintenance_tickets
-          SET status = 'resolved', updated_at = NOW(), resolved_at = NOW()
-        WHERE id = $1`,
-      [snag.noc_ticket_id]
-    );
+    // Use updateTicket() rather than a direct SQL UPDATE so the ticket
+    // service's normal lifecycle runs: previous_status capture, activity-log
+    // entry, downstream notifications. Bypassing it would leave the audit
+    // trail empty about who resolved the ticket and when.
+    await updateTicket(snag.noc_ticket_id, { status: TicketStatus.RESOLVED });
     ticketResolved = true;
   }
 
@@ -214,13 +213,14 @@ export async function approvePhoto(input: { poleQaPhotoId: string; slotKey: stri
 }
 
 /**
- * List snags for one pole. Joins to maintenance_tickets for the human-readable
- * ticket UID and to users for the assignee's display name.
+ * List snags for one pole. Joins maintenance_tickets for the ticket UID and
+ * users for the assignee's display name.
  *
- * NOTE: snags.assigned_to references users(id); the `users` table has a `name`
- * column (set up by Clerk integration). We deliberately do NOT join `staff`
- * here because (a) `staff` has no `user_id` column and (b) `staff.id` is not
- * a valid value for snags.assigned_to in the first place.
+ * NOTE: snags.assigned_to references users(id). We join users directly and use
+ * first_name/last_name (the `users` table has no single `name` column). The
+ * staff↔user bridge (staff.user_id → users.id) is handled at write-time by the
+ * /api/works-qa/photo-snag and /assignable-users routes — by the time a row
+ * is in `snags.assigned_to`, it is already a users.id.
  */
 export async function listPhotoSnags(poleQaPhotoId: string): Promise<PhotoSnagListItem[]> {
   const { rows } = await pool.query<PhotoSnagListItem>(

@@ -4,15 +4,17 @@ import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth, withPermission } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
-// Roles eligible to receive works-qa snag assignments. Mirrors the project-team
-// roles likely to fix on-site issues; site managers, project managers, QA leads.
-const ASSIGNABLE_ROLES = new Set([
+// Roles eligible to receive works-qa snag assignments. Stored lowercase so the
+// SQL filter is case-insensitive against whatever convention v_project_team.role
+// actually uses (Title Case in some seeds, lowercase in others — see
+// pages/api/snags/create-ticket.ts:138 for the same LOWER() pattern).
+const ASSIGNABLE_ROLES = [
   'site manager',
   'project manager',
   'qa manager',
   'civils lead',
   'optical lead',
-]);
+];
 
 interface AssignableUser {
   user_id: string;
@@ -29,12 +31,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     // v_project_team.person_id = staff.id; staff.user_id = users.id.
     // Bridge so the snag-assign FK (snags.assigned_to → users.id) gets a valid value.
-    const { rows } = await pool.query<{
-      user_id: string;
-      name: string;
-      email: string | null;
-      role: string;
-    }>(
+    // Role filter runs in SQL (LOWER + ANY) so the result set is already filtered
+    // before the round trip; avoids any in-process case-convention drift.
+    const { rows } = await pool.query<AssignableUser>(
       `SELECT DISTINCT s.user_id, vpt.name, vpt.email, vpt.role
          FROM v_project_team vpt
          JOIN staff s ON s.id::text = vpt.person_id
@@ -42,11 +41,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           AND vpt.person_type = 'staff'
           AND vpt.is_active = true
           AND s.user_id IS NOT NULL
+          AND LOWER(vpt.role) = ANY($2::text[])
         ORDER BY vpt.name`,
-      [projectId]
+      [projectId, ASSIGNABLE_ROLES]
     );
-    const users: AssignableUser[] = rows.filter(r => ASSIGNABLE_ROLES.has(r.role.toLowerCase()));
-    return apiResponse.success(res, { users });
+    return apiResponse.success(res, { users: rows });
   } catch (err) {
     log.error('works-qa/assignable-users', { error: err instanceof Error ? err.message : String(err), projectId });
     return apiResponse.internalError(res, err);
