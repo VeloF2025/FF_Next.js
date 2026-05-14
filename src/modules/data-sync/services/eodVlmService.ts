@@ -622,10 +622,18 @@ export async function extractEodSheet(
       // are legitimate; 5+ identical numeric addresses on one daily install sheet are
       // not). Mirrors the existing sequential-address guard above.
       const nonNullAddrs = parsed.entries.map((e) => e.address).filter((a): a is string => Boolean(a));
-      const addrSet = new Set(nonNullAddrs);
-      if (addrSet.size === 1 && nonNullAddrs.length >= 5) {
+      if (nonNullAddrs.length >= 5 && new Set(nonNullAddrs).size === 1) {
         log.warn('[EOD] All addresses identical across 5+ rows — hallucination, clearing');
         parsed.entries = parsed.entries.map((e) => ({ ...e, address: null }));
+      }
+
+      // All-identical PON across 5+ rows = the model filled one value into every row
+      // (technicians' handwritten PON is often a small/ambiguous digit so the VLM falls
+      // back to the same guess). Null them so enrichWithHldPon below fills from drops.
+      const nonNullPons = parsed.entries.map((e) => e.pon_number).filter((p): p is string => Boolean(p));
+      if (nonNullPons.length >= 5 && new Set(nonNullPons).size === 1) {
+        log.warn('[EOD] All PONs identical across 5+ rows — likely misread, clearing for HLD lookup');
+        parsed.entries = parsed.entries.map((e) => ({ ...e, pon_number: null }));
       }
     }
 
