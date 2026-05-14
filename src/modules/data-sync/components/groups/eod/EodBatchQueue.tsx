@@ -50,24 +50,25 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
     if (nextPending === -1) return;
     extractingRef.current = true;
     setSlots((prev) => prev.map((s, i) => (i === nextPending ? { ...s, status: 'extracting' } : s)));
-    extractSheetFile(slots[nextPending]!.file)
+    const slot = slots[nextPending]!;
+    extractSheetFile(slot.file, { skipHashCheck: slot.forceReExtract === true })
       .then((result) => {
         if (result.duplicate) {
           // Auto-skip — mark as duplicate and advance review index past this slot
           setSlots((prev) => prev.map((s, i) =>
             i === nextPending
-              ? { ...s, status: 'duplicate', photoHash: result.photoHash, error: `Already uploaded on ${result.existingSheetDate}` }
+              ? { ...s, status: 'duplicate', photoHash: result.photoHash, error: `Already uploaded on ${result.existingSheetDate}`, forceReExtract: false }
               : s
           ));
         } else {
           setSlots((prev) => prev.map((s, i) =>
-            i === nextPending ? { ...s, status: 'ready', extraction: result.extraction, photoHash: result.photoHash } : s
+            i === nextPending ? { ...s, status: 'ready', extraction: result.extraction, photoHash: result.photoHash, forceReExtract: false } : s
           ));
         }
       })
       .catch((err: unknown) => {
         setSlots((prev) => prev.map((s, i) =>
-          i === nextPending ? { ...s, status: 'failed', error: err instanceof Error ? err.message : 'Extraction failed' } : s
+          i === nextPending ? { ...s, status: 'failed', error: err instanceof Error ? err.message : 'Extraction failed', forceReExtract: false } : s
         ));
       })
       .finally(() => { extractingRef.current = false; });
@@ -145,12 +146,13 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
   }, []);
 
   /**
-   * Re-extract a slot that was flagged as a duplicate image.
-   * Bypasses the hash dedup by clearing photoHash, so the API runs VLM fresh.
+   * Re-extract a slot that was flagged as a duplicate image. Sets
+   * forceReExtract=true so the next extract call omits photoHash from the
+   * request, bypassing the API's image-hash dedup so the VLM runs fresh.
    */
   const handleForceReExtract = useCallback((index: number) => {
     setSlots((prev) => prev.map((s, i) =>
-      i === index ? { ...s, status: 'pending', error: null, photoHash: null } : s
+      i === index ? { ...s, status: 'pending', error: null, photoHash: null, forceReExtract: true } : s
     ));
     setReviewIndex((idx) => Math.min(idx, index));
   }, []);
