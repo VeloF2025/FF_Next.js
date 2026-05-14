@@ -86,6 +86,7 @@ export interface PoleSummary {
   vlm_failures: number;
   status: 'empty' | 'in_progress' | 'ready' | 'approved';
   approved_at: string | null;
+  outstanding_snag_count: number;
 }
 
 export interface WorksQAProjectStats {
@@ -105,7 +106,8 @@ export interface WorksQAZoneSummary {
   pon_count: number;
   pole_count: number;
   approved_count: number;
-  pons: { pon_no: number; pole_count: number; approved_count: number }[];
+  outstanding_snag_count: number;
+  pons: { pon_no: number; pole_count: number; approved_count: number; outstanding_snag_count: number }[];
 }
 
 export type SlotKey =

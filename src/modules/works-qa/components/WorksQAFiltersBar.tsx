@@ -57,6 +57,9 @@ export function WorksQAFiltersBar({ zones, zoneNo, ponNo, onChange }: WorksQAFil
           {sortedPons.map(p => (
             <SelectItem key={p.pon_no} value={String(p.pon_no)} className="text-zinc-100">
               PON {p.pon_no} — {p.pole_count} pole{p.pole_count === 1 ? '' : 's'}
+              {p.outstanding_snag_count > 0 && (
+                <span className="text-red-400"> · {p.outstanding_snag_count} snag{p.outstanding_snag_count === 1 ? '' : 's'}</span>
+              )}
             </SelectItem>
           ))}
         </SelectContent>
