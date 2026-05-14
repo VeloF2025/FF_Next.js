@@ -35,14 +35,23 @@ async function readAsBase64(file: File): Promise<string> {
   });
 }
 
-export async function extractSheetFile(file: File): Promise<ExtractResult> {
+export async function extractSheetFile(
+  file: File,
+  options: { skipHashCheck?: boolean } = {},
+): Promise<ExtractResult> {
   const [base64, photoHash] = await Promise.all([readAsBase64(file), computeFileHash(file)]);
 
+  // When the caller has explicitly chosen to re-extract a duplicate, omit
+  // photoHash from the request so the API bypasses its hash dedup. We still
+  // compute the hash locally because it's needed later for the save-time
+  // safety net (which can be force-overridden in turn via the overlap modal).
   const res = await fetch('/api/eod/extract', {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image: base64, photoHash }),
+    body: JSON.stringify(options.skipHashCheck
+      ? { image: base64 }
+      : { image: base64, photoHash }),
   });
 
   const json = await res.json() as {

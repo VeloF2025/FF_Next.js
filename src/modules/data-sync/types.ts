@@ -513,6 +513,10 @@ export interface EodSheetSlot {
   extraction: EodVlmExtraction | null;
   photoHash: string | null;
   error: string | null;
+  /** Set true when the user clicks "Re-extract anyway" on a duplicate — instructs
+   * the next extract call to bypass the API's image-hash dedup so the VLM runs
+   * fresh and the result lands as a new sheet. */
+  forceReExtract?: boolean;
 }
 
 /**
