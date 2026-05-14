@@ -4,8 +4,14 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { CheckCircle, AlertCircle, RefreshCw, Copy } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { EodSheetReviewer } from './EodSheetReviewer';
-import { extractSheetFile, saveEodSheet } from '../../../services/eodBatchService';
-import type { EodVlmExtraction, EodSavePayload, EodSlotStatus, EodSheetSlot } from '../../../types';
+import { EodOverlapModal } from './EodOverlapModal';
+import {
+  extractSheetFile,
+  saveEodSheet,
+  EodOverlapError,
+  type OverlapMatch,
+} from '../../../services/eodBatchService';
+import type { EodSavePayload, EodSlotStatus, EodSheetSlot } from '../../../types';
 
 interface EodBatchQueueProps {
   files: File[];
@@ -33,6 +39,7 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [matchedTotal, setMatchedTotal] = useState(0);
+  const [overlap, setOverlap] = useState<{ matches: OverlapMatch[]; payload: EodSavePayload; index: number } | null>(null);
   const extractingRef = useRef(false);
   const onAllDoneRef = useRef(onAllDone);
   useEffect(() => { onAllDoneRef.current = onAllDone; });
@@ -88,21 +95,34 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
     setSaveError(null);
   }, [slots, reviewIndex]);
 
-  const handleSave = useCallback(async (payload: EodSavePayload) => {
-    setSavingIndex(reviewIndex);
+  const performSave = useCallback(async (
+    payload: EodSavePayload,
+    index: number,
+    options: { forceOverlap?: boolean } = {},
+  ) => {
+    setSavingIndex(index);
     setSaveError(null);
-    const slot = slots[reviewIndex];
     try {
-      const result = await saveEodSheet({ ...payload, photoHash: slot?.photoHash ?? null });
+      const result = await saveEodSheet(payload, options);
       setMatchedTotal((t) => t + (result.matched_count ?? 0));
-      setSlots((prev) => prev.map((s, i) => (i === reviewIndex ? { ...s, status: 'saved' } : s)));
+      setSlots((prev) => prev.map((s, i) => (i === index ? { ...s, status: 'saved' } : s)));
+      setOverlap(null);
       advanceReview();
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Save failed');
+      if (err instanceof EodOverlapError) {
+        setOverlap({ matches: err.overlaps, payload, index });
+      } else {
+        setSaveError(err instanceof Error ? err.message : 'Save failed');
+      }
     } finally {
       setSavingIndex(null);
     }
-  }, [reviewIndex, advanceReview, slots]);
+  }, [advanceReview]);
+
+  const handleSave = useCallback(async (payload: EodSavePayload) => {
+    const slot = slots[reviewIndex];
+    await performSave({ ...payload, photoHash: slot?.photoHash ?? null }, reviewIndex);
+  }, [reviewIndex, performSave, slots]);
 
   const handleSkip = useCallback(() => {
     setSlots((prev) => prev.map((s, i) => (i === reviewIndex ? { ...s, status: 'skipped' } : s)));
@@ -113,6 +133,26 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
   const handleRetry = useCallback((index: number) => {
     setSlots((prev) => prev.map((s, i) => (i === index ? { ...s, status: 'pending', error: null, photoHash: null } : s)));
   }, []);
+
+  /**
+   * Re-extract a slot that was flagged as a duplicate image.
+   * Bypasses the hash dedup by clearing photoHash, so the API runs VLM fresh.
+   */
+  const handleForceReExtract = useCallback((index: number) => {
+    setSlots((prev) => prev.map((s, i) =>
+      i === index ? { ...s, status: 'pending', error: null, photoHash: null } : s
+    ));
+    setReviewIndex((idx) => Math.min(idx, index));
+  }, []);
+
+  const handleOverlapCancel = useCallback(() => {
+    setOverlap(null);
+  }, []);
+
+  const handleOverlapConfirm = useCallback(() => {
+    if (!overlap) return;
+    void performSave(overlap.payload, overlap.index, { forceOverlap: true });
+  }, [overlap, performSave]);
 
   const currentSlot = slots[reviewIndex];
   const savedCount = slots.filter((s) => s.status === 'saved').length;
@@ -144,8 +184,22 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
       </div>
 
       {dupCount > 0 && (
-        <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-sm text-amber-400">
-          {dupCount} sheet{dupCount !== 1 ? 's' : ''} already uploaded — skipped automatically.
+        <div className="px-4 py-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-sm text-amber-400 space-y-2">
+          <div>{dupCount} sheet{dupCount !== 1 ? 's' : ''} already uploaded — skipped automatically.</div>
+          <ul className="space-y-1 text-xs text-amber-300/90">
+            {slots.map((slot, i) => slot.status === 'duplicate' ? (
+              <li key={i} className="flex items-center justify-between gap-2">
+                <span className="truncate">{slot.file.name}{slot.error ? ` — ${slot.error}` : ''}</span>
+                <button
+                  onClick={() => handleForceReExtract(i)}
+                  className="flex-shrink-0 text-amber-200 underline hover:no-underline"
+                  title="Re-extract this sheet as a new entry (bypasses the image-hash check)"
+                >
+                  Re-extract anyway
+                </button>
+              </li>
+            ) : null)}
+          </ul>
         </div>
       )}
 
@@ -194,6 +248,15 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
           {dupCount > 0 && ` ${dupCount} duplicate${dupCount !== 1 ? 's' : ''} skipped.`}
           <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">Check the Reconciliation tab to compare with WA DRs and OES activations.</p>
         </div>
+      )}
+
+      {overlap && (
+        <EodOverlapModal
+          matches={overlap.matches}
+          saving={savingIndex !== null}
+          onCancel={handleOverlapCancel}
+          onConfirm={handleOverlapConfirm}
+        />
       )}
     </div>
   );

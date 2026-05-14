@@ -254,6 +254,57 @@ export async function findSheetByHash(photoHash: string): Promise<{ id: string; 
   return { id: String(row.id), sheet_date: String(row.sheet_date) };
 }
 
+export interface OverlapMatch {
+  sheet_id: string;
+  sheet_date: string;
+  uploaded_by: string | null;
+  technician_name: string | null;
+  overlapping_drs: string[];
+  overlapping_onts: string[];
+}
+
+/**
+ * Find existing sheets that share any DR number or ONT serial with the new sheet.
+ * DR and ONT serial are physical device identifiers — if they reappear, it's almost
+ * certainly the same install being recorded twice (regardless of tech or date).
+ */
+export async function findOverlappingSheets(
+  drNumbers: string[],
+  ontSerials: string[],
+): Promise<OverlapMatch[]> {
+  const drs = drNumbers.filter(Boolean);
+  const onts = ontSerials.filter(Boolean);
+  if (drs.length === 0 && onts.length === 0) return [];
+
+  const rows = await sql`
+    SELECT
+      s.id::text AS sheet_id,
+      s.sheet_date::text AS sheet_date,
+      s.uploaded_by,
+      s.technician_name,
+      ARRAY_AGG(DISTINCT e.dr_number) FILTER (WHERE e.dr_number = ANY(${drs}::text[])) AS overlapping_drs,
+      ARRAY_AGG(DISTINCT e.ont_serial) FILTER (WHERE e.ont_serial = ANY(${onts}::text[])) AS overlapping_onts
+    FROM eod_install_sheets s
+    JOIN eod_install_sheet_entries e ON e.sheet_id = s.id
+    WHERE e.dr_number = ANY(${drs}::text[]) OR e.ont_serial = ANY(${onts}::text[])
+    GROUP BY s.id, s.sheet_date, s.uploaded_by, s.technician_name
+    ORDER BY s.sheet_date DESC
+    LIMIT 10
+  `;
+
+  return rows.map((r) => {
+    const row = r as Record<string, unknown>;
+    return {
+      sheet_id: String(row.sheet_id),
+      sheet_date: String(row.sheet_date),
+      uploaded_by: row.uploaded_by ? String(row.uploaded_by) : null,
+      technician_name: row.technician_name ? String(row.technician_name) : null,
+      overlapping_drs: ((row.overlapping_drs as string[] | null) ?? []).filter(Boolean),
+      overlapping_onts: ((row.overlapping_onts as string[] | null) ?? []).filter(Boolean),
+    };
+  });
+}
+
 export async function deleteSheet(id: string): Promise<boolean> {
   const result = await sql`
     DELETE FROM eod_install_sheets WHERE id = ${id} RETURNING id

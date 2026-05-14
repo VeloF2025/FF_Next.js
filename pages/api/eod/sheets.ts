@@ -7,8 +7,15 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
-import { createSheet, listSheets, getSheetStats, findSheetByHash } from '@/modules/data-sync/services/eodSheetService';
+import {
+  createSheet,
+  listSheets,
+  getSheetStats,
+  findSheetByHash,
+  findOverlappingSheets,
+} from '@/modules/data-sync/services/eodSheetService';
 import { recordEodCorrections } from '@/modules/data-sync/services/eodLearningService';
+import { ApiResponseHelper, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -40,8 +47,10 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 }
 
 async function handlePost(req: NextApiRequest, res: NextApiResponse) {
-  const { sheetDate, velocityRepName, velocityRepId, technicianName, technicianId, photoUrl, photoHash, vlmRawJson, entries } =
-    req.body;
+  const {
+    sheetDate, velocityRepName, velocityRepId, technicianName, technicianId,
+    photoUrl, photoHash, vlmRawJson, entries, forceOverlap,
+  } = req.body;
 
   if (!sheetDate || !entries || !Array.isArray(entries) || entries.length === 0) {
     return apiResponse.badRequest(res, 'sheetDate and entries[] are required');
@@ -60,6 +69,32 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       if (existing) {
         log.warn('[EOD-Sheets] Duplicate save blocked by hash', { photoHash, existingId: existing.id });
         return apiResponse.conflict(res, `Already uploaded on ${existing.sheet_date}`);
+      }
+    }
+
+    // Content-overlap check: any prior sheet containing the same DR or ONT serial.
+    // Bypassed when the client explicitly opts in via forceOverlap=true (user picked
+    // "Save anyway" after reviewing the overlap details).
+    if (!forceOverlap) {
+      const drs = entries
+        .map((e: Record<string, unknown>) => (e.dr_number as string) || '')
+        .filter(Boolean);
+      const onts = entries
+        .map((e: Record<string, unknown>) => (e.ont_serial as string) || '')
+        .filter(Boolean);
+
+      const overlaps = await findOverlappingSheets(drs, onts);
+      if (overlaps.length > 0) {
+        log.warn('[EOD-Sheets] Content overlap detected', {
+          overlapCount: overlaps.length,
+          firstSheet: overlaps[0]?.sheet_id,
+        });
+        return ApiResponseHelper.error(
+          res,
+          ErrorCode.CONFLICT,
+          'This sheet contains DR numbers or ONT serials that already exist in previous sheets.',
+          { overlaps },
+        );
       }
     }
 
