@@ -175,7 +175,7 @@ async function runLocalResolution(): Promise<{
           'status', oa.status,
           'team', oa.team
         ),
-        resolved_at = NOW(), updated_at = NOW()
+        resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM oes_activations oa
     WHERE pp.serial_number = oa.serial_number
       AND pp.resolution_status = 'not_found'
@@ -194,7 +194,7 @@ async function runLocalResolution(): Promise<{
           END,
           'project', ur.project
         ),
-        resolved_at = NOW(), updated_at = NOW()
+        resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM dr_photo_unified_reviews ur
     WHERE (ur.oes_serial = pp.serial_number OR ur.ont_serial_scanned = pp.serial_number)
       AND pp.resolution_status = 'not_found'
@@ -207,7 +207,7 @@ async function runLocalResolution(): Promise<{
         resolved_drop_number = op.drop_number,
         resolved_source = 'onemap_properties',
         resolved_details = jsonb_build_object('site', op.site, 'pole', op.pole),
-        resolved_at = NOW(), updated_at = NOW()
+        resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM onemap_properties op
     WHERE op.ont_barcode = pp.serial_number
       AND pp.resolution_status = 'not_found'
@@ -225,7 +225,7 @@ async function runLocalResolution(): Promise<{
           'project_id', d.project_id::text,
           'status', d.status
         ),
-        resolved_at = NOW(), updated_at = NOW()
+        resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM drops d
     WHERE d.ont_serial = pp.serial_number
       AND pp.resolution_status = 'not_found'
@@ -241,7 +241,7 @@ async function runLocalResolution(): Promise<{
           'status', ss.status,
           'installed_date', ss.installed_date::text
         ),
-        resolved_at = NOW(), updated_at = NOW()
+        resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM stock_serials ss
     WHERE ss.serial_number = pp.serial_number
       AND ss.installed_at_drop_number IS NOT NULL
@@ -260,7 +260,7 @@ async function runLocalResolution(): Promise<{
             ELSE 'vlm_ont_serial_step9'
           END
         ),
-        resolved_at = NOW(), updated_at = NOW()
+        resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM foto_ai_reviews fr
     WHERE (fr.vlm_ont_serial_step6 = pp.serial_number OR fr.vlm_ont_serial_step9 = pp.serial_number)
       AND pp.resolution_status = 'not_found'
@@ -276,7 +276,7 @@ async function runLocalResolution(): Promise<{
           'vlm_confidence', wp.vlm_confidence::text,
           'purpose', wp.purpose
         ),
-        resolved_at = NOW(), updated_at = NOW()
+        resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM wa_photos wp
     WHERE wp.vlm_ont_serial = pp.serial_number
       AND wp.drop_number IS NOT NULL
@@ -297,7 +297,7 @@ async function runLocalResolution(): Promise<{
           'change_type', sch.change_type,
           'change_source', sch.change_source
         ),
-        resolved_at = NOW(), updated_at = NOW()
+        resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM serial_change_history sch
     WHERE (sch.new_value = pp.serial_number OR sch.old_value = pp.serial_number)
       AND sch.change_type = 'ont_serial'
@@ -318,7 +318,7 @@ async function runLocalResolution(): Promise<{
           END,
           'serial_mismatch', od.serial_mismatch
         ),
-        resolved_at = NOW(), updated_at = NOW()
+        resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM offline_devices od
     WHERE (od.serial_number = pp.serial_number
         OR od.expected_serial = pp.serial_number
@@ -340,7 +340,7 @@ async function runLocalResolution(): Promise<{
           END,
           'fix_status', om.fix_status
         ),
-        resolved_at = NOW(), updated_at = NOW()
+        resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM olt_mismatch_records om
     WHERE (om.olt_serial = pp.serial_number OR om.wrong_onemap_serial = pp.serial_number)
       AND pp.resolution_status = 'not_found'
@@ -356,7 +356,7 @@ async function runLocalResolution(): Promise<{
           'oes_status', aod.oes_status,
           'last_down_reason', aod.last_down_reason
         ),
-        resolved_at = NOW(), updated_at = NOW()
+        resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM arch_offline_devices aod
     WHERE aod.serial_number = pp.serial_number
       AND aod.drop_number IS NOT NULL
@@ -370,7 +370,7 @@ async function runLocalResolution(): Promise<{
         resolved_drop_number = op.drop_number,
         resolved_source = 'onemap_installations',
         resolved_details = jsonb_build_object('property_id', oi.property_id::text),
-        resolved_at = NOW(), updated_at = NOW()
+        resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM onemap_installations oi
     JOIN onemap_properties op ON op.id = oi.property_id
     WHERE oi.ont_barcode = pp.serial_number
@@ -508,6 +508,7 @@ async function run1MapLookup(): Promise<{
                   $5::numeric
                 ),
                 resolved_at = NOW(),
+                first_resolved_at = COALESCE(first_resolved_at, NOW()),
                 updated_at = NOW()
             WHERE id = $3
               AND resolution_status = 'not_found'
@@ -711,7 +712,7 @@ async function runWACrossReference(): Promise<{
                   'project', $2,
                   'ont_serial', $3
                 ),
-                resolved_at = NOW(), updated_at = NOW()
+                resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
             WHERE id = $4
               AND resolution_status = 'not_found'
           `, [dropNumber, dr.project || pp.project, ontSerial, pp.id]);
@@ -819,7 +820,7 @@ async function runWAPhotoVLMScan(): Promise<{
             'vlm_confidence', wp.vlm_confidence::text,
             'method', 'case_insensitive_rescan'
           ),
-          resolved_at = NOW(), updated_at = NOW()
+          resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
       FROM wa_photos wp
       WHERE UPPER(wp.vlm_ont_serial) = UPPER(pp.serial_number)
         AND wp.drop_number IS NOT NULL
@@ -872,7 +873,7 @@ async function runWAPhotoVLMScan(): Promise<{
                     'vlm_confidence', $3::text,
                     'project', $4
                   ),
-                  resolved_at = NOW(), updated_at = NOW()
+                  resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
               WHERE id = $5
                 AND resolution_status = 'not_found'
             `, [dropNumber, extraction.bestOnt.serial, extraction.bestOnt.confidence, pp.project, pp.id]);
@@ -1134,6 +1135,7 @@ async function runWAMessageSerialScan(): Promise<{
                 'received_at', $5::text
               ),
               resolved_at = NOW(),
+              first_resolved_at = COALESCE(first_resolved_at, NOW()),
               updated_at = NOW()
           WHERE id = $6
             AND resolution_status = 'not_found'
@@ -1272,7 +1274,9 @@ async function runEODSheetScan(): Promise<{
             'velocity_rep_name', e.velocity_rep_name,
             'gizzu_serial', e.gizzu_serial
           ),
-          resolved_at = NOW(), updated_at = NOW()
+          resolved_at = NOW(),
+          first_resolved_at = COALESCE(first_resolved_at, NOW()),
+          updated_at = NOW()
       FROM eod_by_serial e
       WHERE UPPER(pp.serial_number) = UPPER(e.ont_serial)
         AND pp.resolution_status = 'not_found'

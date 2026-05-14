@@ -50,25 +50,14 @@ export const PPDataRow = React.memo(function PPDataRow({
           <span title={record.olt_port ?? undefined}>{record.olt_address}</span>
         ) : '-'}
       </td>
-      <td className="px-3 py-2 text-[var(--ff-text-secondary)]">
+      <td className="px-3 py-2 text-[var(--ff-text-secondary)]" title="Date the serial first appeared on the OES PP sheet">
         {record.date_registered ? formatDisplayDate(record.date_registered) : '-'}
       </td>
-      <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs">
-        {record.activation_date ? (
-          <span>
-            {formatDisplayDate(record.activation_date)}
-            {record.activation_source === 'wa' && (
-              <span className="ml-1 text-[10px] text-[var(--ff-text-tertiary)]" title="WA submission date — no OES activation record">
-                (WA)
-              </span>
-            )}
-            {record.activation_source === 'eod' && (
-              <span className="ml-1 text-[10px] text-[var(--ff-text-tertiary)]" title="EOD sheet date — no OES activation or WA submission">
-                (EOD)
-              </span>
-            )}
-          </span>
-        ) : '-'}
+      <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs" title="Date the resolve process first linked this serial to a DR">
+        {record.first_resolved_at ? formatDisplayDate(record.first_resolved_at) : '-'}
+      </td>
+      <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs" title="OES activation date — blank until the install shows on the OES activated report">
+        {record.activation_date ? formatDisplayDate(record.activation_date) : '-'}
       </td>
       <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs">
         {record.oes_team || '-'}
@@ -132,8 +121,8 @@ export const PPDataRow = React.memo(function PPDataRow({
 });
 
 export const TABLE_HEADERS = [
-  'Serial', 'Project', 'Status', 'DR', 'Zone', 'PON', 'OLT Address', 'Registered',
-  'Activation', 'Install Team', 'WA Technician', 'Source', 'Ticket', 'Priority',
+  'Serial', 'Project', 'Status', 'DR', 'Zone', 'PON', 'OLT Address', 'PP',
+  'Located', 'Activation', 'Install Team', 'WA Technician', 'Source', 'Ticket', 'Priority',
 ] as const;
 
 export function PPDataTableHead({

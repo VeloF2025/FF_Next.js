@@ -188,13 +188,10 @@ async function handler(
        )
        SELECT pp.*, mt.ticket_uid, mt.priority AS ticket_priority, mt.created_at AS ticket_created_at,
               COALESCE(oa.team, d.installed_by_name, wc.team, em.eod_velocity_rep_name) AS oes_team,
-              COALESCE(oa.activation_date, dur.wa_received_at::date, em.eod_sheet_date) AS activation_date,
-              CASE
-                WHEN oa.activation_date IS NOT NULL THEN 'oes'
-                WHEN dur.wa_received_at IS NOT NULL THEN 'wa'
-                WHEN em.eod_sheet_date IS NOT NULL THEN 'eod'
-                ELSE NULL
-              END AS activation_source,
+              -- Activation: strict OES activation date. Blank until OES has logged the
+              -- activation. WA/EOD submission dates are NOT used as fallback — those are
+              -- "located" signals, not real activations.
+              oa.activation_date AS activation_date,
               dur.sender_phone AS wa_phone,
               COALESCE(wc.formal_name, wc.wa_display_name, em.eod_technician_name) AS wa_name,
               CASE
@@ -285,17 +282,12 @@ async function handler(
          ORDER BY e.dr_number, s.sheet_date DESC NULLS LAST, e.id DESC
        )
        SELECT pp.serial_number, pp.project, pp.date_registered, pp.resolution_status,
-              pp.resolved_drop_number, pp.resolved_source, pp.resolved_at,
+              pp.resolved_drop_number, pp.resolved_source, pp.resolved_at, pp.first_resolved_at,
               pp.olt_address, pp.olt_port, pp.olt_pon, pp.olt_lt, pp.olt_ont_pos,
               mt.priority AS ticket_priority,
               COALESCE(oa.team, d.installed_by_name, wc.team, em.eod_velocity_rep_name) AS oes_team,
-              COALESCE(oa.activation_date, dur.wa_received_at::date, em.eod_sheet_date) AS activation_date,
-              CASE
-                WHEN oa.activation_date IS NOT NULL THEN 'oes'
-                WHEN dur.wa_received_at IS NOT NULL THEN 'wa'
-                WHEN em.eod_sheet_date IS NOT NULL THEN 'eod'
-                ELSE NULL
-              END AS activation_source,
+              -- Strict OES activation only — see comment in list query above.
+              oa.activation_date AS activation_date,
               dur.sender_phone AS wa_phone,
               COALESCE(wc.formal_name, wc.wa_display_name, em.eod_technician_name) AS wa_name,
               CASE
@@ -331,21 +323,16 @@ async function handler(
     const rows = dataResult.rows.map(r => ({
       'Serial Number': r.serial_number,
       'Project': r.project,
-      'Date Registered': r.date_registered ? new Date(r.date_registered).toLocaleDateString() : '',
+      'PP Date': r.date_registered ? new Date(r.date_registered).toLocaleDateString() : '',
       'Status': STATUS_LABELS[r.resolution_status] || r.resolution_status,
       'Resolved DR': r.resolved_drop_number || '',
       'Zone': r.zone_no ?? '',
       'PON': r.pon_no ?? '',
       'Source': r.resolved_source || '',
+      'Located Date': r.first_resolved_at ? new Date(r.first_resolved_at).toLocaleDateString() : '',
       'Resolved At': r.resolved_at ? new Date(r.resolved_at).toLocaleString() : '',
       'Install Team': r.oes_team || '',
-      'Activation Date': r.activation_date
-        ? `${new Date(r.activation_date).toLocaleDateString()}${
-            r.activation_source === 'wa' ? ' (WA)' :
-            r.activation_source === 'eod' ? ' (EOD)' : ''
-          }`
-        : '',
-      'Activation Source': r.activation_source || '',
+      'Activation Date': r.activation_date ? new Date(r.activation_date).toLocaleDateString() : '',
       'WA Technician': r.wa_name
         ? `${r.wa_name}${r.technician_source === 'eod' ? ' (EOD)' : ''}`
         : '',
