@@ -28,16 +28,15 @@ async function pdfToJpegPages(
   try {
     await writeFile(pdfPath, Buffer.from(pdfBase64, 'base64'));
 
-    // 600 DPI gives ~4px per bar on Code-128 stickers — comfortable headroom
-    // for zxing on the full-res image and for VLM OCR on handwritten DR /
-    // Gizzu serial digits. The downstream optimizeForVlm step still
-    // downsamples to 1280x960 for the main pass, so the cost is contained to
-    // PDF rasterisation + barcode-variant generation.
+    // 300 DPI is the sweet spot: Code-128 bars are ~2px wide (clean zxing
+    // decode) without the cost or VLM side-effects of 600 DPI. Empirically
+    // 600 DPI made the VLM more confident, which caused it to duplicate row
+    // 4 into row 6 and shift everything down — net worse despite better OCR.
     await execFileAsync(
       'gs',
       [
         '-sDEVICE=jpeg',
-        '-r600',
+        '-r300',
         '-dBATCH',
         '-dNOPAUSE',
         '-q',
@@ -45,7 +44,7 @@ async function pdfToJpegPages(
         `-sOutputFile=${join(tmpDir, 'page-%d.jpg')}`,
         pdfPath,
       ],
-      { timeout: 180000 },
+      { timeout: 120000 },
     );
 
     const files: string[] = await readdir(tmpDir);
