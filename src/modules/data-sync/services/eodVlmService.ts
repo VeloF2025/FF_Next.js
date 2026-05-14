@@ -169,6 +169,11 @@ Read each cell EXACTLY as written. ONT serials, Gizzu serials, DR numbers,
 PON numbers and addresses all vary by row — never copy or increment values.
 If a cell is blank or unreadable, return null for that field.
 
+UNIQUENESS: Within a single sheet, each ONT serial, Gizzu serial and DR
+number appears at most ONCE — they are physical device IDs. If you cannot
+read a row clearly, return null for that field instead of copying the
+value from a neighbouring row. Duplicates in the output are forbidden.
+
 Date: top-right DD/MM/YYYY → YYYY-MM-DD.
 Designation section at the bottom of the form has TWO rows:
 - Row 1 label "Velocity Fibre" (or "VF") → velocity_rep_name + velocity_rep_id
@@ -651,6 +656,30 @@ export async function extractEodSheet(
       }
     }
 
+    // Within-sheet uniqueness guard: ONT serial, Gizzu serial and DR number are
+    // physical device / drop identifiers and must each appear at most once on a
+    // single sheet. When the same value reappears across rows it's a copy-paste
+    // hallucination (the VLM duplicated a previous row instead of reading the
+    // current cell). Null every duplicate after the first occurrence — the
+    // focused-ONT pass and HLD PON enrichment below will re-fill correct values
+    // for the nulled cells where possible.
+    if (parsed.entries.length > 1) {
+      for (const field of ['ont_serial', 'gizzu_serial', 'dr_number'] as const) {
+        const seen = new Set<string>();
+        let cleared = 0;
+        parsed.entries = parsed.entries.map((e) => {
+          const v = e[field];
+          if (typeof v !== 'string' || !v) return e;
+          if (seen.has(v)) { cleared++; return { ...e, [field]: null }; }
+          seen.add(v);
+          return e;
+        });
+        if (cleared > 0) {
+          log.warn(`[EOD] Cleared ${cleared} duplicate ${field} entries — hallucination`);
+        }
+      }
+    }
+
     // Pass 2b: Focused ONT serial extraction at full resolution
     // Run whenever the main pass left ANY ONT null — cleanOntSerial now nulls reads that
     // fail ONT_STRICT_PATTERN (no ALCLB prefix), so this fires whenever the main 1280x960
@@ -661,12 +690,22 @@ export async function extractEodSheet(
       log.info(`[EOD] ${ontNulls}/${parsed.entries.length} ONT serials null — running focused extraction at full res`);
       const ontMap = await extractOntSerials(fullResBase64, parsed.entries.length);
       if (ontMap.size > 0) {
+        // Track serials already set on the entries so the focused-pass fill
+        // can't re-introduce a duplicate that the uniqueness guard cleared.
+        const alreadySet = new Set(
+          parsed.entries.map((e) => e.ont_serial).filter((s): s is string => !!s),
+        );
+        let filled = 0;
         parsed.entries = parsed.entries.map((e) => {
           const focused = ontMap.get(e.row_number);
-          if (focused && !e.ont_serial) return { ...e, ont_serial: focused };
+          if (focused && !e.ont_serial && !alreadySet.has(focused)) {
+            alreadySet.add(focused);
+            filled++;
+            return { ...e, ont_serial: focused };
+          }
           return e;
         });
-        log.info(`[EOD] ONT focused pass filled ${ontMap.size} serials`);
+        log.info(`[EOD] ONT focused pass filled ${filled} serials (of ${ontMap.size} returned)`);
       }
     }
 
