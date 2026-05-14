@@ -17,6 +17,7 @@ export interface PPRecord {
   ticket_created_at: string | null;
   oes_team: string | null;
   activation_date: string | null;
+  activation_source: 'oes' | 'wa' | null;
   wa_phone: string | null;
   wa_name: string | null;
   wa_team: string | null;

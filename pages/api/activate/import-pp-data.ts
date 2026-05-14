@@ -176,8 +176,13 @@ async function handler(
 
     const dataResult = await pool.query(
       `SELECT pp.*, mt.ticket_uid, mt.priority AS ticket_priority, mt.created_at AS ticket_created_at,
-              COALESCE(oa.team, d.installed_by_name) AS oes_team,
-              oa.activation_date,
+              COALESCE(oa.team, d.installed_by_name, wc.team) AS oes_team,
+              COALESCE(oa.activation_date, dur.wa_received_at::date) AS activation_date,
+              CASE
+                WHEN oa.activation_date IS NOT NULL THEN 'oes'
+                WHEN dur.wa_received_at IS NOT NULL THEN 'wa'
+                ELSE NULL
+              END AS activation_source,
               dur.sender_phone AS wa_phone,
               COALESCE(wc.formal_name, wc.wa_display_name) AS wa_name,
               wc.team AS wa_team,
@@ -254,8 +259,13 @@ async function handler(
               pp.resolved_drop_number, pp.resolved_source, pp.resolved_at,
               pp.olt_address, pp.olt_port, pp.olt_pon, pp.olt_lt, pp.olt_ont_pos,
               mt.priority AS ticket_priority,
-              COALESCE(oa.team, d.installed_by_name) AS oes_team,
-              oa.activation_date,
+              COALESCE(oa.team, d.installed_by_name, wc.team) AS oes_team,
+              COALESCE(oa.activation_date, dur.wa_received_at::date) AS activation_date,
+              CASE
+                WHEN oa.activation_date IS NOT NULL THEN 'oes'
+                WHEN dur.wa_received_at IS NOT NULL THEN 'wa'
+                ELSE NULL
+              END AS activation_source,
               dur.sender_phone AS wa_phone,
               COALESCE(wc.formal_name, wc.wa_display_name) AS wa_name,
               wc.team AS wa_team,
@@ -293,7 +303,10 @@ async function handler(
       'Source': r.resolved_source || '',
       'Resolved At': r.resolved_at ? new Date(r.resolved_at).toLocaleString() : '',
       'Install Team': r.oes_team || '',
-      'Activation Date': r.activation_date ? new Date(r.activation_date).toLocaleDateString() : '',
+      'Activation Date': r.activation_date
+        ? `${new Date(r.activation_date).toLocaleDateString()}${r.activation_source === 'wa' ? ' (WA)' : ''}`
+        : '',
+      'Activation Source': r.activation_source || '',
       'WA Technician': r.wa_name || '',
       'WA Phone': r.wa_phone || '',
       'WA Team': r.wa_team || '',
