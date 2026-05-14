@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
 import { ChevronDown } from 'lucide-react';
 import { usePoleDetail } from '../hooks/usePoleDetail';
@@ -248,7 +249,18 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
       )}
 
       {pole && (
-        <DragDropContext onDragEnd={handleDragEnd}>
+        <DragDropContext
+          onBeforeCapture={() => {
+            // hello-pangea/dnd snapshots Droppable geometry once at drag start.
+            // If the user collapsed a section before grabbing a photo, that
+            // section's slots have a zero-area bbox (`display: none`) and rfd
+            // silently rejects drops onto them. Force-expand every section
+            // synchronously here so geometry is measurable before the snapshot.
+            // flushSync guarantees the DOM mutation lands before rfd reads bboxes.
+            flushSync(() => setExpanded(new Set(['civil', 'dome', 'main_joint'])));
+          }}
+          onDragEnd={handleDragEnd}
+        >
           <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
             {renderSection('Civil', 'civil', CIVIL_SLOTS)}
             {renderSection('Optical Dome', 'dome', DOME_SLOTS)}
