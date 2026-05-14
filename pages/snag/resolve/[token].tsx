@@ -63,22 +63,30 @@ interface SessionActor {
 const ACTOR_STORAGE_KEY = 'ff-resolve-actor';
 const FINGERPRINT_STORAGE_KEY = 'ff-resolve-fingerprint';
 
+/**
+ * Browser fingerprint is intentionally **device-scoped, not token-scoped** —
+ * the same browser produces the same fingerprint across all share links it
+ * opens. That keeps the (token_hash, fingerprint) dedup key stable for a
+ * single technician working through multiple tickets on one device.
+ */
 function getOrCreateFingerprint(): string {
   if (typeof window === 'undefined') return '';
   const existing = window.localStorage.getItem(FINGERPRINT_STORAGE_KEY);
   if (existing) return existing;
-  const fresh = (crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const fresh = crypto.randomUUID();
   window.localStorage.setItem(FINGERPRINT_STORAGE_KEY, fresh);
   return fresh;
 }
 
 function loadStoredActor(token: string): SessionActor | null {
   if (typeof window === 'undefined') return null;
+  const raw = window.localStorage.getItem(`${ACTOR_STORAGE_KEY}:${token}`);
+  if (!raw) return null;
   try {
-    const raw = window.localStorage.getItem(`${ACTOR_STORAGE_KEY}:${token}`);
-    if (!raw) return null;
     return JSON.parse(raw) as SessionActor;
   } catch {
+    // Tampered or stale storage — drop it and force re-identify on next action.
+    window.localStorage.removeItem(`${ACTOR_STORAGE_KEY}:${token}`);
     return null;
   }
 }
@@ -172,6 +180,10 @@ export default function SnagResolvePage() {
 
   const handlePhotoUpload = async (stepId: string, file: File) => {
     if (!token || !data) return;
+    if (!actor) {
+      setShowIdentityModal(true);
+      return;
+    }
     setUploadingStep(stepId);
     try {
       const formData = new FormData();
@@ -444,7 +456,10 @@ export default function SnagResolvePage() {
                         ) : (
                           <button
                             type="button"
-                            onClick={() => { void performAction('complete_step', { stepId: step.id }); }}
+                            onClick={() => {
+                              if (!actor) { setShowIdentityModal(true); return; }
+                              void performAction('complete_step', { stepId: step.id });
+                            }}
                             disabled={actionLoading}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-200 text-xs font-medium rounded transition-colors"
                           >
@@ -472,7 +487,10 @@ export default function SnagResolvePage() {
       {/* Identity capture modal */}
       {showIdentityModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-md rounded-lg bg-zinc-900 border border-zinc-700 p-5">
+          <form
+            className="w-full max-w-md rounded-lg bg-zinc-900 border border-zinc-700 p-5"
+            onSubmit={(e) => { e.preventDefault(); void handleIdentitySubmit(); }}
+          >
             <h3 className="text-base font-semibold text-zinc-100 mb-1">Who are you?</h3>
             <p className="text-xs text-zinc-400 mb-4">
               We need your details before you can start work. Stamped on every photo and step you complete.
@@ -521,15 +539,14 @@ export default function SnagResolvePage() {
                 Cancel
               </button>
               <button
-                type="button"
-                onClick={() => { void handleIdentitySubmit(); }}
+                type="submit"
                 disabled={actionLoading || !identityForm.name.trim() || !identityForm.phone.trim()}
                 className="flex-1 px-4 py-2 bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white font-medium text-sm rounded"
               >
                 {actionLoading ? 'Saving…' : 'Save & Start Work'}
               </button>
             </div>
-          </div>
+          </form>
         </div>
       )}
 

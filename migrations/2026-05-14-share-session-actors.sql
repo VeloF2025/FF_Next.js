@@ -5,31 +5,32 @@
 -- + (optional) company per browser session and reference the resulting
 -- actor_id on every step completion, photo upload, and (future) comment.
 --
--- The browser_fingerprint is the dedup key — same browser + same token
--- returns the same actor_id on subsequent interactions, so a re-opened tab
--- on the same device doesn't re-prompt.
+-- Security notes:
+--   - token_hash stores SHA256(raw_token), never the raw token. The actors
+--     table is the obvious target for an audit-view query; without hashing
+--     a leaked actors row would replay as a live share link.
+--   - browser_fingerprint is the dedup key — same browser + same token
+--     returns the same actor_id on subsequent interactions.
+--   - char_length CHECK constraints bound the storage footprint of an
+--     unauthenticated public-write endpoint.
 
 CREATE TABLE IF NOT EXISTS share_session_actors (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  token               text NOT NULL,
-  browser_fingerprint text NOT NULL,
-  name                text NOT NULL,
-  phone               text NOT NULL,
-  company             text,
+  token_hash          text NOT NULL CHECK (char_length(token_hash) = 64),
+  browser_fingerprint text NOT NULL CHECK (char_length(browser_fingerprint) BETWEEN 1 AND 128),
+  name                text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 200),
+  phone               text NOT NULL CHECK (char_length(phone) BETWEEN 1 AND 50),
+  company             text          CHECK (company IS NULL OR char_length(company) <= 200),
   first_seen_at       timestamptz NOT NULL DEFAULT now(),
   last_seen_at        timestamptz NOT NULL DEFAULT now()
 );
 
--- One actor per (token, fingerprint). UPSERT on register_actor uses this.
+-- One actor per (token_hash, fingerprint). UPSERT on register_actor uses this.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_share_session_actors_token_fp
-  ON share_session_actors (token, browser_fingerprint);
+  ON share_session_actors (token_hash, browser_fingerprint);
 
-CREATE INDEX IF NOT EXISTS idx_share_session_actors_token
-  ON share_session_actors (token);
-
--- Foreign-key style guard via trigger would be circular (snag_share_tokens
--- ownership is not in this PR's scope). Application code validates the
--- token exists before inserting.
+CREATE INDEX IF NOT EXISTS idx_share_session_actors_token_hash
+  ON share_session_actors (token_hash);
 
 -- Stamp every step completion with the actor who completed it.
 ALTER TABLE maintenance_verification_steps
