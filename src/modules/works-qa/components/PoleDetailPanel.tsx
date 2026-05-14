@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import { flushSync } from 'react-dom';
+import { mutate as globalMutate } from 'swr';
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
 import { ChevronDown } from 'lucide-react';
 import { usePoleDetail } from '../hooks/usePoleDetail';
+import { useAssignableUsers } from '../hooks/useAssignableUsers';
 import { PhotoSlotCard } from './PhotoSlotCard';
 import { TrayBucket } from './TrayBucket';
 import { ApproveDisciplineButton } from './ApprovePoleButton';
 import { DisciplineComments } from './DisciplineComments';
 import { UnassignedBucket } from './UnassignedBucket';
+import { PoleSnagsTab } from './PoleSnagsTab';
 import { SLOT_META } from '../utils/slot-keys';
 import {
   APPROVED_FLAG,
@@ -19,6 +22,10 @@ import {
   parseDroppable,
   type PoleWithComments,
 } from '../utils/pole-detail-helpers';
+import {
+  assignPhoto, overrideSlot, movePhoto, uploadTrayPhotos,
+  approvePhotoApi, snagPhotoApi,
+} from '../utils/pole-detail-api';
 import type { Discipline } from '../utils/approval-gates';
 import { log } from '@/lib/logger';
 import { PhotoLightbox } from '@/components/PhotoLightbox';
@@ -29,74 +36,24 @@ interface PoleDetailPanelProps {
   onClose: () => void;
 }
 
-async function assignPhoto(poleId: string, slot: string, file: File) {
-  const form = new FormData();
-  form.append('pole_id', poleId);
-  form.append('slot', slot);
-  form.append('photo', file);
-  form.append('source', 'upload');
-  const res = await fetch('/api/works-qa/pole-assign', { method: 'POST', body: form });
-  if (!res.ok) throw new Error('Upload failed');
-}
-
-async function overrideSlot(poleId: string, slot: string, decision: 'pass' | 'fail', reason: string) {
-  const res = await fetch('/api/works-qa/pole-override', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pole_id: poleId, slot, decision, reason }),
-  });
-  if (!res.ok) throw new Error(`Override failed: ${res.status}`);
-}
-
-async function movePhoto(poleId: string, photoKey: string, from: string, to: string) {
-  const res = await fetch('/api/works-qa/move-photo', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pole_id: poleId, photo_key: photoKey, from, to }),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({})) as { error?: string };
-    throw new Error(body.error ?? `Move failed: ${res.status}`);
-  }
-}
-
-async function uploadTrayPhotos(poleId: string, files: File[]) {
-  for (const file of files) {
-    const form = new FormData();
-    form.append('pole_id', poleId);
-    form.append('slot', 'tray');
-    form.append('photo', file);
-    form.append('source', 'upload');
-    const res = await fetch('/api/works-qa/pole-assign', { method: 'POST', body: form });
-    if (!res.ok) {
-      log.error('works-qa: tray upload failed', { status: res.status });
-    }
-  }
-}
-
 export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
   const { pole: poleRaw, isLoading, mutate } = usePoleDetail(poleId);
   const pole = poleRaw as PoleWithComments | null;
+  const { users: assignableUsers, isLoading: loadingUsers } = useAssignableUsers(pole?.project_id ?? null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
-  // Accordion state: SET of expanded disciplines. Multi-open.
-  //
-  // Defaults to ALL THREE expanded so every Droppable has measurable
-  // geometry at drag start — hello-pangea/dnd captures a getBoundingClientRect
-  // snapshot in onBeforeCapture; a `display: none` (collapsed) section returns
-  // a zero-area bbox and silently rejects drops onto its slots. Users can
-  // collapse via the header chevrons or the "Collapse all" button.
-  //
-  // NOTE: section content is ALWAYS mounted (visibility toggled by CSS). This
-  // keeps every Droppable registered with hello-pangea/dnd for the lifetime of
-  // the panel — mutating the droppable tree mid-drag silently breaks the drop
-  // event and leaves the drag clone stuck mid-air.
+  const [tab, setTab] = useState<'photos' | 'snags'>('photos');
+  // Accordion state: multi-open SET of expanded disciplines. Defaults to all
+  // three so every Droppable has measurable geometry at drag start (rfd
+  // snapshots `display:none` slots as zero-area bboxes and silently rejects
+  // drops). Section content is always mounted; only visibility toggles.
   const [expanded, setExpanded] = useState<Set<Discipline>>(() => new Set(['civil', 'dome', 'main_joint']));
 
   useEffect(() => {
     setLightboxIndex(null);
     setMoveError(null);
     setExpanded(new Set(['civil', 'dome', 'main_joint']));
+    setTab('photos');
   }, [poleId]);
 
   function toggleSection(d: Discipline) {
@@ -181,8 +138,21 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
                   label={slot.label}
                   photoKey={pole[slot.dbColumn as keyof PoleQaPhoto] as string | null}
                   vlm={pole.vlm_results[slot.key]}
+                  slotApproval={pole.slot_approvals?.[slot.key]}
+                  assignableUsers={assignableUsers}
+                  loadingUsers={loadingUsers}
                   onUpload={file => assignPhoto(pole.id, slot.key, file).then(() => mutate()).catch((e: unknown) => log.error('works-qa: upload failed', { error: e instanceof Error ? e.message : String(e) }))}
                   onOverride={(d, r) => overrideSlot(pole.id, slot.key, d, r).then(() => mutate()).catch((e: unknown) => log.error('works-qa: override failed', { error: e instanceof Error ? e.message : String(e) }))}
+                  onApprove={async () => { await approvePhotoApi(pole.id, slot.key); await mutate(); }}
+                  onSnag={async input => {
+                    const result = await snagPhotoApi(pole.id, slot.key, input);
+                    // Invalidate both pole detail (slot_approvals badge) and the
+                    // per-pole snags-list SWR cache so the Snags tab stays in sync.
+                    if (result.status === 'created' || result.status === 'amended') {
+                      await Promise.all([mutate(), globalMutate(`/api/works-qa/photo-snags?pole_id=${pole.id}`)]);
+                    }
+                    return result;
+                  }}
                   onView={slotIndex[slot.key] !== undefined ? () => setLightboxIndex(slotIndex[slot.key]!) : undefined}
                   onUnassign={() => {
                     const k = pole[slot.dbColumn as keyof PoleQaPhoto] as string | null;
@@ -249,37 +219,67 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
       )}
 
       {pole && (
-        <DragDropContext
-          onBeforeCapture={() => {
-            // hello-pangea/dnd snapshots Droppable geometry once at drag start.
-            // If the user collapsed a section before grabbing a photo, that
-            // section's slots have a zero-area bbox (`display: none`) and rfd
-            // silently rejects drops onto them. Force-expand every section
-            // synchronously here so geometry is measurable before the snapshot.
-            // flushSync guarantees the DOM mutation lands before rfd reads bboxes.
-            flushSync(() => setExpanded(new Set(['civil', 'dome', 'main_joint'])));
-          }}
-          onDragEnd={handleDragEnd}
-        >
-          <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
-            {renderSection('Civil', 'civil', CIVIL_SLOTS)}
-            {renderSection('Optical Dome', 'dome', DOME_SLOTS)}
-            {renderSection('Main Joint', 'main_joint', MAIN_JOINT_SLOTS,
-              <TrayBucket
-                trayKeys={pole.main_joint_tray_keys}
-                onUpload={files => uploadTrayPhotos(pole.id, files).then(() => mutate()).catch((e: unknown) => log.error('works-qa: tray upload error', { error: e instanceof Error ? e.message : String(e) }))}
-                onView={i => { const idx = trayIndex[i]; if (idx !== undefined) setLightboxIndex(idx); }}
-                disabled={pole[APPROVED_FLAG.main_joint] === true}
-              />
-            )}
-
-            <UnassignedBucket
-              photoKeys={pole.unassigned_photo_keys ?? []}
-              onView={i => { const idx = unassignedIndex[i]; if (idx !== undefined) setLightboxIndex(idx); }}
-              disabled={!!pole.approved_at}
-            />
+        <>
+          <div className="flex items-stretch border-b border-zinc-800 bg-zinc-950">
+            <button
+              type="button"
+              onClick={() => setTab('photos')}
+              className={`flex-1 text-xs uppercase tracking-wider py-2 transition-colors ${
+                tab === 'photos'
+                  ? 'text-teal-400 border-b-2 border-teal-400'
+                  : 'text-zinc-500 hover:text-zinc-300 border-b-2 border-transparent'
+              }`}
+            >
+              Photos
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('snags')}
+              className={`flex-1 text-xs uppercase tracking-wider py-2 transition-colors ${
+                tab === 'snags'
+                  ? 'text-red-400 border-b-2 border-red-400'
+                  : 'text-zinc-500 hover:text-zinc-300 border-b-2 border-transparent'
+              }`}
+            >
+              Snags
+            </button>
           </div>
-        </DragDropContext>
+
+          {tab === 'photos' ? (
+            <DragDropContext
+              onBeforeCapture={() => {
+                // Force-expand all sections BEFORE rfd captures Droppable
+                // geometry; display:none yields zero bbox and silently rejects
+                // drops. flushSync ensures the DOM lands before the snapshot.
+                flushSync(() => setExpanded(new Set(['civil', 'dome', 'main_joint'])));
+              }}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
+                {renderSection('Civil', 'civil', CIVIL_SLOTS)}
+                {renderSection('Optical Dome', 'dome', DOME_SLOTS)}
+                {renderSection('Main Joint', 'main_joint', MAIN_JOINT_SLOTS,
+                  <TrayBucket
+                    trayKeys={pole.main_joint_tray_keys}
+                    onUpload={files => uploadTrayPhotos(pole.id, files).then(() => mutate()).catch((e: unknown) => log.error('works-qa: tray upload error', { error: e instanceof Error ? e.message : String(e) }))}
+                    onView={i => { const idx = trayIndex[i]; if (idx !== undefined) setLightboxIndex(idx); }}
+                    disabled={pole[APPROVED_FLAG.main_joint] === true}
+                  />
+                )}
+
+                <UnassignedBucket
+                  photoKeys={pole.unassigned_photo_keys ?? []}
+                  onView={i => { const idx = unassignedIndex[i]; if (idx !== undefined) setLightboxIndex(idx); }}
+                  disabled={!!pole.approved_at}
+                />
+              </div>
+            </DragDropContext>
+          ) : (
+            <div className="flex-1 overflow-y-auto">
+              <PoleSnagsTab poleId={pole.id} onChanged={() => { void mutate(); }} />
+            </div>
+          )}
+        </>
       )}
 
       {lightboxIndex !== null && photos.length > 0 && (
