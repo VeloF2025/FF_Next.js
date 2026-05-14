@@ -1,10 +1,11 @@
 'use client';
 
+import { useEffect } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
-import type { OverlapMatch } from '../../../services/eodBatchService';
+import type { EodOverlapMatch } from '../../../types';
 
 interface EodOverlapModalProps {
-  matches: OverlapMatch[];
+  matches: EodOverlapMatch[];
   saving: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -14,13 +15,26 @@ export function EodOverlapModal({ matches, saving, onCancel, onConfirm }: EodOve
   const totalDrs = matches.reduce((sum, m) => sum + m.overlapping_drs.length, 0);
   const totalOnts = matches.reduce((sum, m) => sum + m.overlapping_onts.length, 0);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !saving) onCancel();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel, saving]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="eod-overlap-modal-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+    >
       <div className="w-full max-w-2xl bg-[var(--ff-bg-secondary)] border border-amber-500/30 rounded-xl shadow-2xl overflow-hidden">
         <header className="flex items-center justify-between px-5 py-3 border-b border-[var(--ff-border-light)] bg-amber-500/10">
           <div className="flex items-center gap-2 text-amber-400">
             <AlertTriangle className="w-5 h-5" />
-            <h2 className="text-sm font-semibold">Possible duplicate sheet</h2>
+            <h2 id="eod-overlap-modal-title" className="text-sm font-semibold">Possible duplicate sheet</h2>
           </div>
           <button onClick={onCancel} className="text-[var(--ff-text-secondary)] hover:text-white" aria-label="Close">
             <X className="w-4 h-4" />

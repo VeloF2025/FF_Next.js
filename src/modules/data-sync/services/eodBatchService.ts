@@ -3,7 +3,9 @@
  * These run in the browser — fetch() only, no SQL.
  */
 
-import type { EodVlmExtraction, EodSavePayload } from '../types';
+import type { EodVlmExtraction, EodSavePayload, EodOverlapMatch } from '../types';
+
+export type OverlapMatch = EodOverlapMatch;
 
 export type ExtractResult =
   | { duplicate: true; existingSheetId: string; existingSheetDate: string; photoHash: string }
@@ -101,22 +103,13 @@ export async function expandPdfToFiles(file: File): Promise<File[]> {
   });
 }
 
-export interface OverlapMatch {
-  sheet_id: string;
-  sheet_date: string;
-  uploaded_by: string | null;
-  technician_name: string | null;
-  overlapping_drs: string[];
-  overlapping_onts: string[];
-}
-
 /**
  * Raised when the new sheet's DRs or ONT serials overlap an existing sheet.
  * Caller decides: cancel, or retry with forceOverlap=true.
  */
 export class EodOverlapError extends Error {
-  readonly overlaps: OverlapMatch[];
-  constructor(overlaps: OverlapMatch[], message: string) {
+  readonly overlaps: EodOverlapMatch[];
+  constructor(overlaps: EodOverlapMatch[], message: string) {
     super(message);
     this.name = 'EodOverlapError';
     this.overlaps = overlaps;
@@ -153,7 +146,7 @@ export async function saveEodSheet(
   const json = await res.json() as {
     success: boolean;
     data?: { matched_count: number };
-    error?: { code?: string; message: string; details?: { overlaps?: OverlapMatch[] } };
+    error?: { code?: string; message: string; details?: { overlaps?: EodOverlapMatch[] } };
     message?: string;
   };
   if (!json.success) {

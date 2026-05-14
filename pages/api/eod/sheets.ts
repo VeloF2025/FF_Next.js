@@ -12,8 +12,8 @@ import {
   listSheets,
   getSheetStats,
   findSheetByHash,
-  findOverlappingSheets,
 } from '@/modules/data-sync/services/eodSheetService';
+import { findOverlappingSheets } from '@/modules/data-sync/services/eodOverlapService';
 import { recordEodCorrections } from '@/modules/data-sync/services/eodLearningService';
 import { ApiResponseHelper, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';

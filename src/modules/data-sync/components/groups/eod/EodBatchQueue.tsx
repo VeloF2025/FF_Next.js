@@ -5,13 +5,13 @@ import { CheckCircle, AlertCircle, RefreshCw, Copy } from 'lucide-react';
 import { InlineSpinner } from '@/components/ui/LoadingSpinner';
 import { EodSheetReviewer } from './EodSheetReviewer';
 import { EodOverlapModal } from './EodOverlapModal';
+import { EodDuplicateBanner } from './EodDuplicateBanner';
 import {
   extractSheetFile,
   saveEodSheet,
   EodOverlapError,
-  type OverlapMatch,
 } from '../../../services/eodBatchService';
-import type { EodSavePayload, EodSlotStatus, EodSheetSlot } from '../../../types';
+import type { EodSavePayload, EodSlotStatus, EodSheetSlot, EodOverlapMatch } from '../../../types';
 
 interface EodBatchQueueProps {
   files: File[];
@@ -39,7 +39,7 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [matchedTotal, setMatchedTotal] = useState(0);
-  const [overlap, setOverlap] = useState<{ matches: OverlapMatch[]; payload: EodSavePayload; index: number } | null>(null);
+  const [overlap, setOverlap] = useState<{ matches: EodOverlapMatch[]; payload: EodSavePayload; index: number } | null>(null);
   const extractingRef = useRef(false);
   const onAllDoneRef = useRef(onAllDone);
   useEffect(() => { onAllDoneRef.current = onAllDone; });
@@ -183,25 +183,7 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
         ))}
       </div>
 
-      {dupCount > 0 && (
-        <div className="px-4 py-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-sm text-amber-400 space-y-2">
-          <div>{dupCount} sheet{dupCount !== 1 ? 's' : ''} already uploaded — skipped automatically.</div>
-          <ul className="space-y-1 text-xs text-amber-300/90">
-            {slots.map((slot, i) => slot.status === 'duplicate' ? (
-              <li key={i} className="flex items-center justify-between gap-2">
-                <span className="truncate">{slot.file.name}{slot.error ? ` — ${slot.error}` : ''}</span>
-                <button
-                  onClick={() => handleForceReExtract(i)}
-                  className="flex-shrink-0 text-amber-200 underline hover:no-underline"
-                  title="Re-extract this sheet as a new entry (bypasses the image-hash check)"
-                >
-                  Re-extract anyway
-                </button>
-              </li>
-            ) : null)}
-          </ul>
-        </div>
-      )}
+      <EodDuplicateBanner slots={slots} onForceReExtract={handleForceReExtract} />
 
       {matchedTotal > 0 && (
         <div className="px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-lg text-sm text-green-400">
