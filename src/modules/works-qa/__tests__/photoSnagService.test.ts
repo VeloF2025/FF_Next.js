@@ -26,6 +26,7 @@ import {
   resolvePhotoSnag,
   approvePhoto,
   getPoleSnagReport,
+  listPhotoSnags,
   buildTicketTitle,
   buildTicketDescription,
 } from '../services/photoSnagService';
@@ -142,14 +143,12 @@ describe('photoSnagService.createPhotoSnag', () => {
     expect(createTicketMock).not.toHaveBeenCalled();
   });
 
-  it('creates snag + ticket, auto-assigns to site manager when no assignee passed', async () => {
+  it('creates snag + ticket with assignee, status=assigned, tags include works_qa', async () => {
     setupQueryQueue([
       // findOpenSnagForSlot → none
       { match: /FROM snags/i, rows: [] },
       // loadPoleAndPhoto
       { match: /SELECT id, project_id, pole_label[\s\S]+FROM pole_qa_photos/i, rows: [POLE_ROW] },
-      // site manager lookup
-      { match: /FROM v_project_team/i, rows: [{ person_id: 'staff-uuid-9' }] },
       // findOrCreateWorksQaReport: select existing
       { match: /SELECT id FROM snag_reports[\s\S]+works_qa/i, rows: [] },
       // findOrCreateWorksQaReport: insert
@@ -171,6 +170,7 @@ describe('photoSnagService.createPhotoSnag', () => {
       poleQaPhotoId: 'pole-uuid-1',
       slotKey: 'civil_03',
       comment: 'Depth not reaching 600mm',
+      assignedToUserId: 'user-uuid-9',
       createdBy: 'user-1',
     });
 
@@ -182,21 +182,53 @@ describe('photoSnagService.createPhotoSnag', () => {
     expect(payload.ticket_category).toBe('snag');
     expect(payload.ticket_type).toBe('civils');
     expect(payload.priority).toBe('normal');                 // default severity='major' → priority='normal'
-    expect(payload.assigned_to).toBe('staff-uuid-9');        // auto from v_project_team
+    expect(payload.assigned_to).toBe('user-uuid-9');         // passed through, not resolved here
     expect(payload.status).toBe('assigned');
     expect(payload.uid_prefix).toBe('WQA');
-    expect(payload.external_id).toContain('snag-uuid-1');
+    const parsed = JSON.parse(payload.external_id);
+    expect(parsed.snag_id).toBe('snag-uuid-1');
+    expect(parsed.tags).toEqual(expect.arrayContaining(['snag', 'works_qa', 'civil']));
     expect(result.slotApprovals.civil_03?.decision).toBe('snagged');
   });
 
+  it('treats empty-string assigneeId as null (no FK ::uuid cast errors)', async () => {
+    setupQueryQueue([
+      { match: /FROM snags/i, rows: [] },
+      { match: /FROM pole_qa_photos/i, rows: [POLE_ROW] },
+      { match: /SELECT id FROM snag_reports/i, rows: [{ id: 'report-uuid-1' }] },
+      { match: /COALESCE\(MAX\(snag_number\)/i, rows: [{ next: 1 }] },
+      { match: /INSERT INTO snags/i, rows: [SNAG_INSERT_ROW] },
+      { match: /INSERT INTO snag_photos/i, rows: [] },
+      { match: /UPDATE snags SET noc_ticket_id/i, rows: [] },
+      { match: /UPDATE pole_qa_photos/i, rows: [{ slot_approvals: {} }] },
+    ]);
+    createTicketMock.mockResolvedValue({ id: 'ticket-x', uid: 'WQA-x' });
+
+    await createPhotoSnag({
+      poleQaPhotoId: 'pole-uuid-1',
+      slotKey: 'civil_03',
+      comment: 'x',
+      assignedToUserId: '',                                  // empty string from form input
+      createdBy: 'user-1',
+    });
+
+    // The INSERT params must have `null` for assigned_to, not ''.
+    const insertCall = queryMock.mock.calls.find((c: [string, unknown[]]) => /INSERT INTO snags/.test(c[0]));
+    expect(insertCall).toBeDefined();
+    const params = insertCall![1];
+    expect(params[10]).toBeNull();                            // assigned_to (11th param, index 10)
+    // No assigned_to or status in the ticket payload either.
+    const payload = createTicketMock.mock.calls[0]![0];
+    expect(payload.assigned_to).toBeUndefined();
+    expect(payload.status).toBeUndefined();
+  });
+
   it('maps severity correctly: minor → low, critical → high', async () => {
-    // Run twice with different severities; assert priority mapping each time.
     for (const [severity, expectedPriority] of [['minor', 'low'], ['critical', 'high']] as const) {
       setupQueryQueue([
         { match: /FROM snags/i, rows: [] },
         { match: /FROM pole_qa_photos/i, rows: [POLE_ROW] },
-        { match: /FROM v_project_team/i, rows: [] },        // no manager
-        { match: /SELECT id FROM snag_reports/i, rows: [{ id: 'report-uuid-1' }] }, // existing report
+        { match: /SELECT id FROM snag_reports/i, rows: [{ id: 'report-uuid-1' }] },
         { match: /COALESCE\(MAX\(snag_number\)/i, rows: [{ next: 2 }] },
         { match: /INSERT INTO snags/i, rows: [{ ...SNAG_INSERT_ROW, severity }] },
         { match: /INSERT INTO snag_photos/i, rows: [] },
@@ -306,6 +338,29 @@ describe('photoSnagService.approvePhoto', () => {
       slotKey: 'made_up_slot',
       approvedBy: 'user-1',
     })).rejects.toThrow(/Unknown slot key/);
+  });
+});
+
+describe('photoSnagService.listPhotoSnags', () => {
+  beforeEach(() => { queryMock.mockReset(); });
+
+  it('joins maintenance_tickets.ticket_uid and users.name (not staff.user_id)', async () => {
+    setupQueryQueue([
+      { match: /FROM snags s[\s\S]+JOIN pole_qa_photos[\s\S]+LEFT JOIN maintenance_tickets[\s\S]+LEFT JOIN users/i, rows: [
+        { id: 'snag-1', pole_qa_photo_id: 'pole-1', slot_key: 'civil_03', ticket_uid: 'WQA-20260514-001', assignee_name: 'Jane Doe', pole_label: 'MAM.P.A033' },
+      ] },
+    ]);
+    const result = await listPhotoSnags('pole-1');
+    expect(result[0]!.ticket_uid).toBe('WQA-20260514-001');
+    expect(result[0]!.assignee_name).toBe('Jane Doe');
+    // Guardrail: ensure the SQL did NOT reference staff.user_id or t.uid
+    // (regressions of the bugs the blind reviewer flagged on PR #1633).
+    const callSql = queryMock.mock.calls[0]![0] as string;
+    expect(callSql).not.toMatch(/staff\.user_id/);
+    expect(callSql).not.toMatch(/staff\.name/);
+    expect(callSql).not.toMatch(/\bt\.uid\b/);
+    expect(callSql).toMatch(/t\.ticket_uid/);
+    expect(callSql).toMatch(/u\.name/);
   });
 });
 
