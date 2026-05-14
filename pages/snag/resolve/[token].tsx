@@ -459,7 +459,10 @@ export default function SnagResolvePage() {
                         {step.photo_slots.map((slot) => {
                           const slotUploadKey = `${step.id}:${slot.slot_key}`;
                           const isUploading = uploadingStep === slotUploadKey;
-                          const canUpload = canInteract && ticket.status === 'in_progress';
+                          // Once a step is complete its evidence is treated as
+                          // immutable on this public endpoint — matches the
+                          // server-side lock in shared/[token].ts.
+                          const canUpload = canInteract && ticket.status === 'in_progress' && !step.is_complete;
                           // Camera mode forces live capture (no gallery picker).
                           // Gallery mode (e.g. 1Map sign-up screenshot) leaves
                           // capture unset so the user picks from photos.

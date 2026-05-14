@@ -139,17 +139,19 @@ export async function initializeVerificationSteps(
         // by the template. Each row starts with photo_url = NULL so the
         // resolve page can render slot tiles immediately (label/source_mode
         // come from the seed row, not from upload). Upload UPSERTs by
-        // (step_id, slot_key).
+        // (step_id, slot_key). ON CONFLICT DO NOTHING keeps this idempotent
+        // for safety; RETURNING gives us a real insert count for logging.
         if (template.photo_slots && template.photo_slots.length > 0) {
           for (const slot of template.photo_slots) {
-            await txn.query(
+            const inserted = await txn.query<{ id: string }>(
               `INSERT INTO maintenance_step_photos (
                 step_id, slot_key, slot_label, source_mode, is_required, photo_url
               ) VALUES ($1, $2, $3, $4, $5, NULL)
-              ON CONFLICT (step_id, slot_key) DO NOTHING`,
+              ON CONFLICT (step_id, slot_key) DO NOTHING
+              RETURNING id`,
               [result.id, slot.key, slot.label, slot.source_mode, slot.is_required]
             );
-            slotRowsCreated += 1;
+            slotRowsCreated += inserted.length;
           }
         }
       }

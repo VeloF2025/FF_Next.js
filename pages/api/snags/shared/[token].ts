@@ -88,17 +88,18 @@ async function actorBelongsToToken(actorId: string, token: string): Promise<bool
 /**
  * Fetch a verification step and confirm it belongs to the given ticket.
  * Prevents an actor on Ticket A from injecting maintenance_step_photos
- * rows for a step on Ticket B.
+ * rows for a step on Ticket B. Returns is_complete so callers can block
+ * post-completion replacement (evidence-tampering guard on this public endpoint).
  */
 async function getStepForTicket(
   stepId: string,
   ticketId: string,
-): Promise<{ step_number: number } | null> {
+): Promise<{ step_number: number; is_complete: boolean } | null> {
   const rows = await sql`
-    SELECT step_number FROM maintenance_verification_steps
+    SELECT step_number, is_complete FROM maintenance_verification_steps
     WHERE id = ${stepId} AND ticket_id = ${ticketId}
     LIMIT 1
-  ` as Array<{ step_number: number }>;
+  ` as Array<{ step_number: number; is_complete: boolean }>;
   return rows[0] ?? null;
 }
 
@@ -300,6 +301,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           if (!step) {
             return apiResponse.error(res, ErrorCode.FORBIDDEN, 'step does not belong to this ticket');
           }
+          // Block uploads to a step that's already been marked complete (by
+          // a prior all-required-slots-filled gate firing or by the legacy
+          // single-photo path). Allows QA to treat completed-step evidence
+          // as immutable on this public endpoint.
+          if (step.is_complete) {
+            return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'step is already complete — uploads are locked');
+          }
           stepNumber = step.step_number;
         }
 
@@ -357,31 +365,34 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                           uploaded_at = NOW(),
                           updated_at = NOW()
           `;
-          // Completion gate: a slot-aware step is complete only when every
-          // is_required slot row has a non-null photo_url. Stamps the actor
-          // who finished the step (the uploader of the last required slot).
-          const gateRows = await sql`
-            SELECT COUNT(*) FILTER (WHERE is_required = true) AS required_total,
-                   COUNT(*) FILTER (WHERE is_required = true AND photo_url IS NOT NULL) AS required_filled
-            FROM maintenance_step_photos
-            WHERE step_id = ${stepIdField}
-          ` as Array<{ required_total: string | number; required_filled: string | number }>;
-          const gate = gateRows[0];
-          if (gate) {
-            const total = Number(gate.required_total);
-            const filled = Number(gate.required_filled);
-            if (total > 0 && filled === total) {
-              await sql`
-                UPDATE maintenance_verification_steps
-                SET is_complete = true,
-                    completed_at = NOW(),
-                    completed_by_actor_id = ${actorIdField},
-                    photo_verified = true,
-                    updated_at = NOW()
-                WHERE id = ${stepIdField} AND ticket_id = ${ticketId} AND is_complete = false
-              `;
-            }
-          }
+          // Completion gate (atomic): a slot-aware step is complete only
+          // when every is_required slot row has a non-null photo_url AND at
+          // least one such slot exists. We fold the gate check into a single
+          // conditional UPDATE so concurrent uploads can't both miss the
+          // gate. Postgres takes a row lock on the target step and
+          // re-evaluates the WHERE clause after lock acquisition — only the
+          // first concurrent UPDATE that sees the row not-yet-complete fires;
+          // subsequent ones match zero rows. Optional slots (is_required=false)
+          // are deliberately excluded from the gate.
+          await sql`
+            UPDATE maintenance_verification_steps mvs
+            SET is_complete = true,
+                completed_at = NOW(),
+                completed_by_actor_id = ${actorIdField},
+                photo_verified = true,
+                updated_at = NOW()
+            WHERE mvs.id = ${stepIdField}
+              AND mvs.ticket_id = ${ticketId}
+              AND mvs.is_complete = false
+              AND EXISTS (
+                SELECT 1 FROM maintenance_step_photos
+                WHERE step_id = ${stepIdField} AND is_required = true
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM maintenance_step_photos
+                WHERE step_id = ${stepIdField} AND is_required = true AND photo_url IS NULL
+              )
+          `;
         } else if (stepIdField) {
           // Legacy single-photo path — unchanged from PR2.
           await sql`UPDATE maintenance_verification_steps SET photo_url = ${fileUrl}, photo_verified = true, is_complete = true, completed_at = NOW(), completed_by_actor_id = ${actorIdField} WHERE id = ${stepIdField} AND ticket_id = ${ticketId}`;
