@@ -191,7 +191,7 @@ describe('photoSnagService.createPhotoSnag', () => {
     expect(result.slotApprovals.civil_03?.decision).toBe('snagged');
   });
 
-  it('treats empty-string assigneeId as null (no FK ::uuid cast errors)', async () => {
+  it('treats whitespace-only assigneeId as null (no FK ::uuid cast errors)', async () => {
     setupQueryQueue([
       { match: /FROM snags/i, rows: [] },
       { match: /FROM pole_qa_photos/i, rows: [POLE_ROW] },
@@ -208,7 +208,7 @@ describe('photoSnagService.createPhotoSnag', () => {
       poleQaPhotoId: 'pole-uuid-1',
       slotKey: 'civil_03',
       comment: 'x',
-      assignedToUserId: '',                                  // empty string from form input
+      assignedToUserId: '   ',                                // whitespace-only from form input
       createdBy: 'user-1',
     });
 
@@ -359,8 +359,11 @@ describe('photoSnagService.listPhotoSnags', () => {
     expect(callSql).not.toMatch(/staff\.user_id/);
     expect(callSql).not.toMatch(/staff\.name/);
     expect(callSql).not.toMatch(/\bt\.uid\b/);
+    // users.name does not exist; users has first_name/last_name only.
+    expect(callSql).not.toMatch(/\bu\.name\b/);
     expect(callSql).toMatch(/t\.ticket_uid/);
-    expect(callSql).toMatch(/u\.name/);
+    expect(callSql).toMatch(/u\.first_name/);
+    expect(callSql).toMatch(/u\.last_name/);
   });
 });
 

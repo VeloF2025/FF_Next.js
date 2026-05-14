@@ -31,10 +31,10 @@ export { buildTicketTitle, buildTicketDescription } from './photoSnagHelpers';
  */
 export async function createPhotoSnag(input: CreatePhotoSnagInput): Promise<CreatePhotoSnagResult> {
   const severity = input.severity ?? 'major';
-  // Normalise to null so we never pass empty strings through to ::uuid casts.
-  const assigneeId = input.assignedToUserId && input.assignedToUserId.length > 0
-    ? input.assignedToUserId
-    : null;
+  // Normalise to null so we never pass empty/whitespace strings through to
+  // a ::uuid context (Postgres would throw `invalid input syntax for type uuid`).
+  const trimmed = input.assignedToUserId?.trim();
+  const assigneeId = trimmed && trimmed.length > 0 ? trimmed : null;
 
   const existing = await findOpenSnagForSlot(input.poleQaPhotoId, input.slotKey);
   if (existing) {
@@ -227,7 +227,7 @@ export async function listPhotoSnags(poleQaPhotoId: string): Promise<PhotoSnagLi
     `SELECT s.id, s.pole_qa_photo_id, s.slot_key, s.slot_photo_key, s.discipline,
             s.description, s.severity, s.status, s.noc_ticket_id, s.assigned_to, s.created_at,
             t.ticket_uid AS ticket_uid,
-            u.name AS assignee_name,
+            NULLIF(CONCAT_WS(' ', u.first_name, u.last_name), '') AS assignee_name,
             pq.pole_label
        FROM snags s
        JOIN pole_qa_photos pq ON pq.id = s.pole_qa_photo_id
