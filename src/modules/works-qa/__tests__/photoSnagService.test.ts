@@ -307,8 +307,8 @@ describe('photoSnagService.resolvePhotoSnag', () => {
     // Critical: must go through the ticket service so activity log + notifications fire.
     expect(updateTicketMock).toHaveBeenCalledWith('ticket-uuid-1', { status: 'resolved' });
     // And NOT via a direct SQL UPDATE on maintenance_tickets.
-    const sqlCalls = queryMock.mock.calls.map(c => c[0] as string);
-    expect(sqlCalls.some(s => /UPDATE maintenance_tickets/i.test(s))).toBe(false);
+    const sqlCalls = queryMock.mock.calls.map((c: [string, unknown[]]) => c[0]);
+    expect(sqlCalls.some((s: string) => /UPDATE maintenance_tickets/i.test(s))).toBe(false);
   });
 
   it('throws when snag id is missing or not a works-qa snag', async () => {
