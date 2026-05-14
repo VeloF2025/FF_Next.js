@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
 import { ChevronDown } from 'lucide-react';
 import { usePoleDetail } from '../hooks/usePoleDetail';
@@ -8,11 +9,20 @@ import { ApproveDisciplineButton } from './ApprovePoleButton';
 import { DisciplineComments } from './DisciplineComments';
 import { UnassignedBucket } from './UnassignedBucket';
 import { SLOT_META } from '../utils/slot-keys';
-import { photoUrl } from '../utils/photo-url';
+import {
+  APPROVED_FLAG,
+  CIVIL_SLOTS,
+  DOME_SLOTS,
+  MAIN_JOINT_SLOTS,
+  buildLightboxPhotos,
+  parseDraggable,
+  parseDroppable,
+  type PoleWithComments,
+} from '../utils/pole-detail-helpers';
 import type { Discipline } from '../utils/approval-gates';
 import { log } from '@/lib/logger';
-import { PhotoLightbox, type LightboxPhoto } from '@/components/PhotoLightbox';
-import type { PoleQaPhoto, PoleQaComment } from '../types/works-qa.types';
+import { PhotoLightbox } from '@/components/PhotoLightbox';
+import type { PoleQaPhoto } from '../types/works-qa.types';
 
 interface PoleDetailPanelProps {
   poleId: string | null;
@@ -64,87 +74,29 @@ async function uploadTrayPhotos(poleId: string, files: File[]) {
   }
 }
 
-const CIVIL_SLOTS = SLOT_META.filter(s => s.discipline === 'civil');
-const DOME_SLOTS = SLOT_META.filter(s => s.discipline === 'dome');
-const MAIN_JOINT_SLOTS = SLOT_META.filter(s => s.discipline === 'main_joint');
-
-const APPROVED_FLAG: Record<Discipline, keyof PoleQaPhoto> = {
-  civil: 'civil_approved',
-  dome: 'dome_approved',
-  main_joint: 'joint_approved',
-};
-
-interface PoleWithComments extends PoleQaPhoto {
-  comments: PoleQaComment[];
-}
-
-function buildLightboxPhotos(pole: PoleQaPhoto): { photos: LightboxPhoto[]; slotIndex: Record<string, number>; trayIndex: number[]; unassignedIndex: number[] } {
-  const photos: LightboxPhoto[] = [];
-  const slotIndex: Record<string, number> = {};
-  for (const slot of SLOT_META) {
-    const key = pole[slot.dbColumn as keyof PoleQaPhoto] as string | null;
-    if (!key) continue;
-    slotIndex[slot.key] = photos.length;
-    const vlm = pole.vlm_results[slot.key];
-    const metadata = vlm?.overridden_by
-      ? `Overridden by ${vlm.overridden_by}${vlm.override_reason ? ` — ${vlm.override_reason}` : ''}`
-      : vlm?.feedback || undefined;
-    photos.push({ url: photoUrl(key), label: `${slot.label} — ${pole.pole_label}`, metadata });
-  }
-  const trayIndex: number[] = [];
-  pole.main_joint_tray_keys.forEach((key, i) => {
-    trayIndex.push(photos.length);
-    photos.push({ url: photoUrl(key), label: `Tray ${i + 1} — ${pole.pole_label}` });
-  });
-  const unassignedIndex: number[] = [];
-  (pole.unassigned_photo_keys ?? []).forEach((key, i) => {
-    unassignedIndex.push(photos.length);
-    photos.push({ url: photoUrl(key), label: `Unassigned ${i + 1} — ${pole.pole_label}` });
-  });
-  return { photos, slotIndex, trayIndex, unassignedIndex };
-}
-
-/**
- * Parse a draggableId minted by either UnassignedBucket (`unassigned:${key}`) or
- * PhotoSlotCard (`slot:${slotKey}:${photoKey}`).
- */
-function parseDraggable(id: string): { from: string; photoKey: string } | null {
-  if (id.startsWith('unassigned:')) {
-    return { from: 'unassigned', photoKey: id.slice('unassigned:'.length) };
-  }
-  if (id.startsWith('slot:')) {
-    const rest = id.slice('slot:'.length);
-    const colon = rest.indexOf(':');
-    if (colon === -1) return null;
-    return { from: rest.slice(0, colon), photoKey: rest.slice(colon + 1) };
-  }
-  return null;
-}
-
-/** Parse a droppableId: 'unassigned' or 'slot:${slotKey}'. */
-function parseDroppable(id: string): string | null {
-  if (id === 'unassigned') return 'unassigned';
-  if (id.startsWith('slot:')) return id.slice('slot:'.length);
-  return null;
-}
-
 export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
   const { pole: poleRaw, isLoading, mutate } = usePoleDetail(poleId);
   const pole = poleRaw as PoleWithComments | null;
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
-  // Accordion state: SET of expanded disciplines. Multi-open so user can keep
-  // the drag source visible while the drop target is also expanded. Defaults
-  // to civil only on each new pole.
-  const [expanded, setExpanded] = useState<Set<Discipline>>(() => new Set(['civil']));
-  // While the user is dragging a photo, force-expand all sections so any slot
-  // can receive the drop (mirrors the construction-qa wizard pattern).
-  const [isDragging, setIsDragging] = useState(false);
+  // Accordion state: SET of expanded disciplines. Multi-open.
+  //
+  // Defaults to ALL THREE expanded so every Droppable has measurable
+  // geometry at drag start — hello-pangea/dnd captures a getBoundingClientRect
+  // snapshot in onBeforeCapture; a `display: none` (collapsed) section returns
+  // a zero-area bbox and silently rejects drops onto its slots. Users can
+  // collapse via the header chevrons or the "Collapse all" button.
+  //
+  // NOTE: section content is ALWAYS mounted (visibility toggled by CSS). This
+  // keeps every Droppable registered with hello-pangea/dnd for the lifetime of
+  // the panel — mutating the droppable tree mid-drag silently breaks the drop
+  // event and leaves the drag clone stuck mid-air.
+  const [expanded, setExpanded] = useState<Set<Discipline>>(() => new Set(['civil', 'dome', 'main_joint']));
 
   useEffect(() => {
     setLightboxIndex(null);
     setMoveError(null);
-    setExpanded(new Set(['civil']));
+    setExpanded(new Set(['civil', 'dome', 'main_joint']));
   }, [poleId]);
 
   function toggleSection(d: Discipline) {
@@ -156,10 +108,6 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
     });
   }
 
-  // Hooks must run unconditionally on every render — keep this BEFORE the
-  // poleId early return so React's hook-order check stays stable.
-  const handleDragStart = useCallback(() => { setIsDragging(true); }, []);
-
   if (!poleId) return null;
 
   const { photos, slotIndex, trayIndex, unassignedIndex } = pole
@@ -169,7 +117,6 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
   const comments = pole?.comments ?? [];
 
   async function handleDragEnd(result: DropResult) {
-    setIsDragging(false);
     if (!pole) return;
     setMoveError(null);
     const { destination, draggableId } = result;
@@ -197,7 +144,7 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
     if (!pole) return null;
     const filled = slots.filter(s => pole[s.dbColumn as keyof PoleQaPhoto]).length;
     const disciplineApproved = pole[APPROVED_FLAG[discipline]] === true;
-    const isOpen = isDragging || expanded.has(discipline);
+    const isOpen = expanded.has(discipline);
     const commentCount = comments.filter(c => c.discipline === discipline).length;
 
     return (
@@ -225,8 +172,7 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
           </div>
         </button>
 
-        {isOpen && (
-          <div className="px-3 pb-3 flex flex-col gap-3 border-t border-zinc-800">
+        <div className={`px-3 pb-3 flex-col gap-3 border-t border-zinc-800 ${isOpen ? 'flex' : 'hidden'}`}>
             <div className="grid grid-cols-2 gap-2 pt-3">
               {slots.map(slot => (
                 <PhotoSlotCard
@@ -261,8 +207,7 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
               disabled={disciplineApproved}
               onAdded={() => mutate()}
             />
-          </div>
-        )}
+        </div>
       </section>
     );
   }
@@ -304,7 +249,18 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
       )}
 
       {pole && (
-        <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <DragDropContext
+          onBeforeCapture={() => {
+            // hello-pangea/dnd snapshots Droppable geometry once at drag start.
+            // If the user collapsed a section before grabbing a photo, that
+            // section's slots have a zero-area bbox (`display: none`) and rfd
+            // silently rejects drops onto them. Force-expand every section
+            // synchronously here so geometry is measurable before the snapshot.
+            // flushSync guarantees the DOM mutation lands before rfd reads bboxes.
+            flushSync(() => setExpanded(new Set(['civil', 'dome', 'main_joint'])));
+          }}
+          onDragEnd={handleDragEnd}
+        >
           <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
             {renderSection('Civil', 'civil', CIVIL_SLOTS)}
             {renderSection('Optical Dome', 'dome', DOME_SLOTS)}
