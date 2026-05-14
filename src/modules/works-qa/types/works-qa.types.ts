@@ -43,6 +43,8 @@ export interface PoleQaPhoto {
   main_joint_tray_keys: string[];
   unassigned_photo_keys: string[];
   vlm_results: Record<string, VlmSlotResult>;
+  // Per-slot Approve / Snag decisions (migration 247). Keyed by SLOT_META.key.
+  slot_approvals: Record<string, SlotApproval>;
 
   civil_approved: boolean;
   dome_approved: boolean;
@@ -53,6 +55,13 @@ export interface PoleQaPhoto {
   updated_at: string;
 
   comments?: PoleQaComment[];
+}
+
+export interface SlotApproval {
+  decision: 'approved' | 'snagged';
+  by: string;
+  at: string;
+  snag_id?: string;
 }
 
 export interface PoleQaComment {

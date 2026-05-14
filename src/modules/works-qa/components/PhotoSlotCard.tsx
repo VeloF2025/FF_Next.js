@@ -1,24 +1,38 @@
 import { useState, useRef } from 'react';
 import { Droppable, Draggable } from '@hello-pangea/dnd';
 import { X, GripVertical } from 'lucide-react';
-import type { VlmSlotResult } from '../types/works-qa.types';
+import type { VlmSlotResult, SlotApproval } from '../types/works-qa.types';
 import { photoUrl } from '../utils/photo-url';
+import { SnagInlineForm, type SnagSubmitInput, type SnagSubmitResult } from './SnagInlineForm';
+import type { AssignableUser } from '../hooks/useAssignableUsers';
 
 interface PhotoSlotCardProps {
   slotKey: string;
   label: string;
   photoKey: string | null;
   vlm: VlmSlotResult | undefined;
+  slotApproval?: SlotApproval | undefined;
+  assignableUsers?: AssignableUser[];
+  loadingUsers?: boolean;
   onUpload: (file: File) => void;
   onOverride: (decision: 'pass' | 'fail', reason: string) => void;
+  onApprove?: () => Promise<void>;
+  onSnag?: (input: SnagSubmitInput) => Promise<SnagSubmitResult>;
   onView?: () => void;
   onUnassign?: () => void;
   disabled?: boolean;
 }
 
-export function PhotoSlotCard({ slotKey, label, photoKey, vlm, onUpload, onOverride, onView, onUnassign, disabled }: PhotoSlotCardProps) {
+export function PhotoSlotCard({
+  slotKey, label, photoKey, vlm, slotApproval,
+  assignableUsers = [], loadingUsers,
+  onUpload, onOverride, onApprove, onSnag,
+  onView, onUnassign, disabled,
+}: PhotoSlotCardProps) {
   const [showOverride, setShowOverride] = useState(false);
   const [overrideReason, setOverrideReason] = useState('');
+  const [showSnagForm, setShowSnagForm] = useState(false);
+  const [approving, setApproving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const status: 'empty' | 'pass' | 'fail' | 'overridden' =
@@ -127,6 +141,45 @@ export function PhotoSlotCard({ slotKey, label, photoKey, vlm, onUpload, onOverr
 
           {vlm?.feedback && (
             <p className="text-xs text-zinc-500 leading-tight">{vlm.feedback}</p>
+          )}
+
+          {/* Per-photo Approve / Snag — orthogonal to discipline approval (Hein 2026-05-14).
+              Only render when a photo is present; an empty slot has nothing to judge. */}
+          {photoKey && slotApproval?.decision === 'approved' && (
+            <p className="text-xs text-green-400">✓ Approved</p>
+          )}
+          {photoKey && slotApproval?.decision === 'snagged' && (
+            <p className="text-xs text-red-400">⚠ Snagged</p>
+          )}
+          {photoKey && !slotApproval && !showSnagForm && !disabled && onApprove && onSnag && (
+            <div className="flex gap-1">
+              <button
+                type="button"
+                disabled={approving}
+                onClick={async () => {
+                  setApproving(true);
+                  try { await onApprove(); } finally { setApproving(false); }
+                }}
+                className="text-xs px-2 py-1 rounded bg-green-600/80 hover:bg-green-500 text-white disabled:opacity-50"
+              >
+                {approving ? '…' : 'Approve'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSnagForm(true)}
+                className="text-xs px-2 py-1 rounded bg-red-600/80 hover:bg-red-500 text-white"
+              >
+                Snag
+              </button>
+            </div>
+          )}
+          {showSnagForm && onSnag && (
+            <SnagInlineForm
+              assignableUsers={assignableUsers}
+              loadingUsers={loadingUsers}
+              onSubmit={onSnag}
+              onCancel={() => setShowSnagForm(false)}
+            />
           )}
 
           {status === 'fail' && !showOverride && (
