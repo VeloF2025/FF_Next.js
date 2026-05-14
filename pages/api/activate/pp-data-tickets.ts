@@ -273,6 +273,13 @@ async function handleCreate(
 
         const description = notes || descParts.join('\n');
 
+        // PARTIAL: only the category-heuristic signals are passed here. The
+        // PP-data ingest can also resolve inOes/inOneMap/serialMismatch per
+        // record — wiring those into the detection object would let the
+        // classifier produce FIX_SERIAL / FIX_PROJECT_TAG / INVESTIGATE_DATA_GAP
+        // at creation instead of after technician triage. Tracked as a
+        // follow-up; for now ambiguous cases land on TRIAGE_REQUIRED, which
+        // is safe.
         const resolution_path = classifyResolutionPath({
           ticket_category,
           ticket_type: ticket_type as TicketType,

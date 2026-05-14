@@ -197,6 +197,11 @@ export interface Ticket {
    * has a `category` column for QContact's category hierarchy.
    */
   ticket_category: TicketCategory | null;
+  /**
+   * Resolution path — drives the resolve-page step template + Context Panel
+   * variant. Added by migration 2026-05-14; classifier sets this at creation.
+   */
+  resolution_path: ResolutionPath | null;
   priority: TicketPriority;
   status: TicketStatus;
 
@@ -315,7 +320,9 @@ export interface CreateTicketPayload {
   fault_cause?: FaultCause;
   /**
    * Resolution path — drives the resolve-page step template + Context Panel.
-   * If omitted, ticket creators should call classifyResolutionPath() to set it.
+   * Callers must call classifyResolutionPath() and pass the result here; if
+   * not provided, the column is stored as NULL and downstream UI falls back
+   * to the legacy template.
    */
   resolution_path?: ResolutionPath;
 }

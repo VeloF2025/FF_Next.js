@@ -43,6 +43,10 @@ export interface ClassifierInput {
     serialMismatch?: boolean;
     /** Project tag in source data conflicts with assigned project */
     projectMismatch?: boolean;
+    /** 1Map shows Home Sign-up record present for this address. */
+    signupDone?: boolean;
+    /** Install recorded in any source (drops, qa_photo_reviews, OLT). */
+    installDone?: boolean;
   };
 }
 
@@ -73,6 +77,16 @@ export function classifyResolutionPath(input: ClassifierInput): ResolutionPath {
   if (detection) {
     if (detection.serialMismatch) return ResolutionPath.FIX_SERIAL;
     if (detection.projectMismatch) return ResolutionPath.FIX_PROJECT_TAG;
+
+    // Sign-up done but install never happened = dispatch the install team.
+    if (detection.signupDone === true && detection.installDone === false) {
+      return ResolutionPath.DISPATCH_INSTALL;
+    }
+
+    // No sign-up = dispatch the sign-up team (regardless of source presence).
+    if (detection.signupDone === false) {
+      return ResolutionPath.DISPATCH_SIGNUP;
+    }
 
     // DR present somewhere but not everywhere = data gap (no field work).
     const sourcesPresent = [detection.inOes, detection.inOneMap, detection.inOlt].filter(Boolean).length;

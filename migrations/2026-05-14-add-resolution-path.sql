@@ -50,6 +50,11 @@ CREATE INDEX IF NOT EXISTS idx_maintenance_tickets_resolution_path
 -- Backfill existing rows from (ticket_category, type, dr_number).
 -- Best-effort mapping; anything ambiguous falls to 'triage_required' so the
 -- technician (or an office user) classifies on next interaction.
+--
+-- Branch order matters: the 'not_applicable' WHEN must remain first so that
+-- HSE / dev_ops / sales_lead tickets short-circuit before category-based
+-- branches (e.g. a dev_ops ticket with ticket_category='pre_provision' must
+-- land on 'not_applicable', not 'investigate_data_gap').
 UPDATE maintenance_tickets
 SET resolution_path = CASE
     WHEN ticket_category IN ('hse_incident', 'hse_near_miss', 'sales_lead', 'dev_ops')

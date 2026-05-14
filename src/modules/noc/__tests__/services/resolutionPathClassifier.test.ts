@@ -78,6 +78,26 @@ describe('classifyResolutionPath', () => {
         }),
       ).toBe(ResolutionPath.DISPATCH_SIGNUP);
     });
+
+    it('returns DISPATCH_INSTALL when sign-up done but install not done', () => {
+      expect(
+        classifyResolutionPath({
+          ticket_category: 'pre_provision',
+          hasDrNumber: false,
+          detection: { signupDone: true, installDone: false },
+        }),
+      ).toBe(ResolutionPath.DISPATCH_INSTALL);
+    });
+
+    it('returns DISPATCH_SIGNUP when signupDone is explicitly false', () => {
+      expect(
+        classifyResolutionPath({
+          ticket_category: 'pre_provision',
+          hasDrNumber: false,
+          detection: { signupDone: false },
+        }),
+      ).toBe(ResolutionPath.DISPATCH_SIGNUP);
+    });
   });
 
   describe('category heuristic', () => {
