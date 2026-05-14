@@ -92,6 +92,7 @@ export async function initializeVerificationSteps(
   // WORKING: Initialize all steps in a transaction
   const steps = await transaction(async (txn) => {
     const createdSteps: VerificationStep[] = [];
+    let slotRowsCreated = 0;
 
     for (const template of templates) {
       const insertQuery = `
@@ -133,6 +134,24 @@ export async function initializeVerificationSteps(
 
       if (result) {
         createdSteps.push(result);
+
+        // Pre-seed maintenance_step_photos rows for any photo_slots declared
+        // by the template. Each row starts with photo_url = NULL so the
+        // resolve page can render slot tiles immediately (label/source_mode
+        // come from the seed row, not from upload). Upload UPSERTs by
+        // (step_id, slot_key).
+        if (template.photo_slots && template.photo_slots.length > 0) {
+          for (const slot of template.photo_slots) {
+            await txn.query(
+              `INSERT INTO maintenance_step_photos (
+                step_id, slot_key, slot_label, source_mode, is_required, photo_url
+              ) VALUES ($1, $2, $3, $4, $5, NULL)
+              ON CONFLICT (step_id, slot_key) DO NOTHING`,
+              [result.id, slot.key, slot.label, slot.source_mode, slot.is_required]
+            );
+            slotRowsCreated += 1;
+          }
+        }
       }
     }
 
@@ -140,6 +159,7 @@ export async function initializeVerificationSteps(
       ticketId,
       ticketType,
       stepCount: createdSteps.length,
+      slotRowsCreated,
     });
 
     return createdSteps;

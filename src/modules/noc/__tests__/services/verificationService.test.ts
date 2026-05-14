@@ -59,12 +59,18 @@ describe('VerificationService - TDD', () => {
   }
 
   describe('initializeVerificationSteps', () => {
-    it('should initialize exactly 12 verification steps for a ticket', async () => {
+    // PR4: the default install template was consolidated from 12 steps to 6
+    // with named photo_slots. These tests assert the new contract for
+    // activations/new_installation. Other ticket types (fault_repair, etc.)
+    // still have their own non-slot step counts.
+    const INSTALL_STEP_COUNT = 6;
+
+    it(`should initialize exactly ${INSTALL_STEP_COUNT} verification steps for the default install template`, async () => {
       // Arrange
       vi.mocked(db.queryOne).mockResolvedValueOnce({ id: mockTicketId }); // ticket exists
       vi.mocked(db.query).mockResolvedValueOnce([]); // no existing steps
 
-      const mockSteps = Array.from({ length: 12 }, (_, i) =>
+      const mockSteps = Array.from({ length: INSTALL_STEP_COUNT }, (_, i) =>
         createMockStep((i + 1) as VerificationStepNumber)
       );
 
@@ -82,16 +88,15 @@ describe('VerificationService - TDD', () => {
       const steps = await verificationService.initializeVerificationSteps(mockTicketId);
 
       // Assert
-      expect(steps).toHaveLength(TOTAL_VERIFICATION_STEPS);
-      expect(steps).toHaveLength(12);
+      expect(steps).toHaveLength(INSTALL_STEP_COUNT);
     });
 
-    it('should create steps with correct step numbers 1-12', async () => {
+    it(`should create steps with correct step numbers 1-${INSTALL_STEP_COUNT}`, async () => {
       // Arrange
       vi.mocked(db.queryOne).mockResolvedValueOnce({ id: mockTicketId });
       vi.mocked(db.query).mockResolvedValueOnce([]);
 
-      const mockSteps = Array.from({ length: 12 }, (_, i) =>
+      const mockSteps = Array.from({ length: INSTALL_STEP_COUNT }, (_, i) =>
         createMockStep((i + 1) as VerificationStepNumber)
       );
 
@@ -102,7 +107,7 @@ describe('VerificationService - TDD', () => {
 
       // Assert
       const stepNumbers = steps.map(s => s.step_number).sort((a, b) => a - b);
-      expect(stepNumbers).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+      expect(stepNumbers).toEqual(Array.from({ length: INSTALL_STEP_COUNT }, (_, i) => i + 1));
     });
 
     it('should initialize all steps as incomplete', async () => {
@@ -110,7 +115,7 @@ describe('VerificationService - TDD', () => {
       vi.mocked(db.queryOne).mockResolvedValueOnce({ id: mockTicketId });
       vi.mocked(db.query).mockResolvedValueOnce([]);
 
-      const mockSteps = Array.from({ length: 12 }, (_, i) =>
+      const mockSteps = Array.from({ length: INSTALL_STEP_COUNT }, (_, i) =>
         createMockStep((i + 1) as VerificationStepNumber)
       );
 
@@ -127,12 +132,12 @@ describe('VerificationService - TDD', () => {
       });
     });
 
-    it('should set correct photo requirements for each step', async () => {
+    it('should set photo_required = true on every install step (slot-aware)', async () => {
       // Arrange
       vi.mocked(db.queryOne).mockResolvedValueOnce({ id: mockTicketId });
       vi.mocked(db.query).mockResolvedValueOnce([]);
 
-      const mockSteps = Array.from({ length: 12 }, (_, i) =>
+      const mockSteps = Array.from({ length: INSTALL_STEP_COUNT }, (_, i) =>
         createMockStep((i + 1) as VerificationStepNumber)
       );
 
@@ -141,12 +146,11 @@ describe('VerificationService - TDD', () => {
       // Act
       const steps = await verificationService.initializeVerificationSteps(mockTicketId);
 
-      // Assert
-      const step9 = steps.find(s => s.step_number === 9);
-      expect(step9?.photo_required).toBe(false);
-
-      const step1 = steps.find(s => s.step_number === 1);
-      expect(step1?.photo_required).toBe(true);
+      // Assert — the 6-step install template marks every step photo_required.
+      // Slot-level required flags are tested separately at the template level.
+      steps.forEach(step => {
+        expect(step.photo_required).toBe(true);
+      });
     });
 
     it('should throw error if ticket does not exist', async () => {

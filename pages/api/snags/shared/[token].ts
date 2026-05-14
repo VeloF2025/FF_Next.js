@@ -341,10 +341,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         // Slot-aware path: when slotKey is provided AND template declares it.
         if (stepIdField && slotKeyField && resolvedSlot) {
-          // Slot metadata (label, source_mode, is_required) comes from the
-          // template, not the client. Future schema cleanup could pre-seed
-          // these rows when a step is initialized and let upload only update
-          // photo_url; for now we UPSERT with the resolved values.
+          // Slot metadata (label, source_mode, is_required) is authoritative
+          // from the template. UPSERT covers both the pre-seeded NULL row
+          // (created at step init) and the legacy case where a slot row
+          // never got pre-seeded.
           await sql`
             INSERT INTO maintenance_step_photos (step_id, slot_key, slot_label, source_mode, is_required, photo_url, uploaded_by_actor_id, uploaded_at)
             VALUES (${stepIdField}, ${slotKeyField}, ${resolvedSlot.label}, ${resolvedSlot.source_mode}, ${resolvedSlot.is_required}, ${fileUrl}, ${actorIdField}, NOW())
@@ -357,16 +357,31 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                           uploaded_at = NOW(),
                           updated_at = NOW()
           `;
-          // PARTIAL: legacy photo_url mirror — each slot upload overwrites the
-          // single legacy column with the most recent slot's URL. This is the
-          // last-write-wins fallback for QA report generators that still read
-          // maintenance_verification_steps.photo_url; PR4 will switch those
-          // readers to maintenance_step_photos and this mirror can be removed.
-          await sql`UPDATE maintenance_verification_steps SET photo_url = ${fileUrl}, photo_verified = true, completed_by_actor_id = ${actorIdField}, updated_at = NOW() WHERE id = ${stepIdField} AND ticket_id = ${ticketId}`;
-          // TODO(PR4): set is_complete = true only when all required slots
-          // for this step have a non-null photo_url. PR3 ships the storage
-          // primitive; PR4 introduces slot templates AND the matching
-          // completion gate. Until then, slot-aware steps stay incomplete.
+          // Completion gate: a slot-aware step is complete only when every
+          // is_required slot row has a non-null photo_url. Stamps the actor
+          // who finished the step (the uploader of the last required slot).
+          const gateRows = await sql`
+            SELECT COUNT(*) FILTER (WHERE is_required = true) AS required_total,
+                   COUNT(*) FILTER (WHERE is_required = true AND photo_url IS NOT NULL) AS required_filled
+            FROM maintenance_step_photos
+            WHERE step_id = ${stepIdField}
+          ` as Array<{ required_total: string | number; required_filled: string | number }>;
+          const gate = gateRows[0];
+          if (gate) {
+            const total = Number(gate.required_total);
+            const filled = Number(gate.required_filled);
+            if (total > 0 && filled === total) {
+              await sql`
+                UPDATE maintenance_verification_steps
+                SET is_complete = true,
+                    completed_at = NOW(),
+                    completed_by_actor_id = ${actorIdField},
+                    photo_verified = true,
+                    updated_at = NOW()
+                WHERE id = ${stepIdField} AND ticket_id = ${ticketId} AND is_complete = false
+              `;
+            }
+          }
         } else if (stepIdField) {
           // Legacy single-photo path — unchanged from PR2.
           await sql`UPDATE maintenance_verification_steps SET photo_url = ${fileUrl}, photo_verified = true, is_complete = true, completed_at = NOW(), completed_by_actor_id = ${actorIdField} WHERE id = ${stepIdField} AND ticket_id = ${ticketId}`;

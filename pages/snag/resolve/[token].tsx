@@ -31,6 +31,18 @@ interface SharedTicket {
   project_name: string | null;
 }
 
+interface SlotPhoto {
+  id: string;
+  step_id: string;
+  slot_key: string;
+  slot_label: string;
+  source_mode: 'camera' | 'gallery' | 'either';
+  is_required: boolean;
+  photo_url: string | null;
+  uploaded_by_actor_id: string | null;
+  uploaded_at: string | null;
+}
+
 interface VerificationStep {
   id: string;
   step_number: number;
@@ -41,6 +53,8 @@ interface VerificationStep {
   photo_required: boolean;
   photo_url: string | null;
   notes: string | null;
+  /** Slot rows from maintenance_step_photos (empty array for legacy single-photo steps). */
+  photo_slots: SlotPhoto[];
 }
 
 interface SharedData {
@@ -178,18 +192,23 @@ export default function SnagResolvePage() {
     }
   };
 
-  const handlePhotoUpload = async (stepId: string, file: File) => {
+  const handlePhotoUpload = async (stepId: string, file: File, slotKey?: string) => {
     if (!token || !data) return;
     if (!actor) {
       setShowIdentityModal(true);
       return;
     }
-    setUploadingStep(stepId);
+    // Slot-aware uploads use a stepId+slotKey compound key so concurrent
+    // tile uploads on different slots can run in parallel without clobbering
+    // each other's spinners. Legacy single-photo steps key on stepId only.
+    const uploadKey = slotKey ? `${stepId}:${slotKey}` : stepId;
+    setUploadingStep(uploadKey);
     try {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('action', 'upload_photo');
       formData.append('stepId', stepId);
+      if (slotKey) formData.append('slotKey', slotKey);
       if (actor?.id) formData.append('actorId', actor.id);
 
       const res = await fetch(`/api/snags/shared/${token}`, {
@@ -434,8 +453,80 @@ export default function SnagResolvePage() {
                     </div>
                     <p className="text-xs text-zinc-400 mb-2">{step.step_description}</p>
 
-                    {/* Action area — only when in_progress */}
-                    {canInteract && ticket.status === 'in_progress' && !step.is_complete && (
+                    {/* Slot-aware step: render one tile per declared slot */}
+                    {step.photo_slots.length > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
+                        {step.photo_slots.map((slot) => {
+                          const slotUploadKey = `${step.id}:${slot.slot_key}`;
+                          const isUploading = uploadingStep === slotUploadKey;
+                          const canUpload = canInteract && ticket.status === 'in_progress';
+                          // Camera mode forces live capture (no gallery picker).
+                          // Gallery mode (e.g. 1Map sign-up screenshot) leaves
+                          // capture unset so the user picks from photos.
+                          const captureAttr = slot.source_mode === 'camera' ? 'environment' : undefined;
+                          return (
+                            <div
+                              key={slot.slot_key}
+                              className={`rounded border p-2 text-[11px] ${
+                                slot.photo_url
+                                  ? 'bg-green-900/10 border-green-700/30'
+                                  : slot.is_required
+                                  ? 'bg-zinc-900/40 border-zinc-700'
+                                  : 'bg-zinc-900/20 border-zinc-800'
+                              }`}
+                            >
+                              <div className="flex items-center gap-1 mb-1">
+                                <span className="font-medium text-zinc-200 truncate">{slot.slot_label}</span>
+                                {slot.is_required && !slot.photo_url && (
+                                  <span className="text-[9px] px-1 py-0.5 rounded bg-orange-900/40 text-orange-300">
+                                    Required
+                                  </span>
+                                )}
+                              </div>
+                              {slot.photo_url ? (
+                                <a href={slot.photo_url} target="_blank" rel="noopener noreferrer" className="block">
+                                  <img
+                                    src={slot.photo_url}
+                                    alt={slot.slot_label}
+                                    className="w-full h-20 object-cover rounded"
+                                  />
+                                </a>
+                              ) : (
+                                <div className="w-full h-20 rounded bg-zinc-800/60 flex items-center justify-center text-zinc-500">
+                                  <Camera className="w-4 h-4" />
+                                </div>
+                              )}
+                              {canUpload && (
+                                <label className="inline-flex items-center gap-1 mt-1.5 px-2 py-1 bg-blue-700 hover:bg-blue-600 text-white text-[10px] font-medium rounded cursor-pointer transition-colors w-full justify-center">
+                                  <Upload className="w-3 h-3" />
+                                  {isUploading
+                                    ? 'Uploading...'
+                                    : slot.photo_url
+                                    ? 'Replace'
+                                    : slot.source_mode === 'gallery'
+                                    ? 'Upload'
+                                    : 'Take photo'}
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    {...(captureAttr ? { capture: captureAttr } : {})}
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) void handlePhotoUpload(step.id, file, slot.slot_key);
+                                    }}
+                                    disabled={isUploading}
+                                  />
+                                </label>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Legacy single-photo / mark-complete UI — only when the step has no slots */}
+                    {step.photo_slots.length === 0 && canInteract && ticket.status === 'in_progress' && !step.is_complete && (
                       <div className="flex items-center gap-2 mt-2">
                         {step.photo_required ? (
                           <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-600 text-white text-xs font-medium rounded cursor-pointer transition-colors">

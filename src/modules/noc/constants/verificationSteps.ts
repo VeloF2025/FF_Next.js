@@ -711,6 +711,93 @@ const OPTICAL_STEPS: VerificationStepTemplate[] = [
 ];
 
 /**
+ * Install (activations / new_installation) — 6-step consolidated flow with
+ * named photo slots. Replaces the legacy 12-step VERIFICATION_STEPS for
+ * subcontractor-facing flows (resolve page, snag share links).
+ *
+ * Slot count per step is fixed at template time. The resolve page renders one
+ * tile per slot; the upload API rejects any slotKey not declared here. Step
+ * completion is gated on all `is_required: true` slots having a photo.
+ *
+ * The 1Map sign-up slot uses `source_mode: 'gallery'` — sign-up happens in a
+ * separate app, so the technician uploads a screenshot rather than a live
+ * camera capture.
+ */
+const INSTALL_STEPS_WITH_SLOTS: VerificationStepTemplate[] = [
+  {
+    step_number: 1,
+    step_name: 'Site Assessment',
+    step_description: 'Verify site conditions, access, and DR location. Confirm pole, PON, and zone details.',
+    photo_required: true,
+    required_for_qa: true,
+    category: 'preparation',
+    photo_slots: [
+      { key: 'site_overview', label: 'Site overview', source_mode: 'camera', is_required: true, hint: 'Wide shot showing house and drop point.' },
+    ],
+  },
+  {
+    step_number: 2,
+    step_name: 'Material Verification',
+    step_description: 'Verify all required materials are on site (fiber, ONT, Gizzu, cables, connectors).',
+    photo_required: true,
+    required_for_qa: true,
+    category: 'preparation',
+    photo_slots: [
+      { key: 'materials_laid_out', label: 'Materials laid out', source_mode: 'camera', is_required: true, hint: 'All install items visible in one frame.' },
+    ],
+  },
+  {
+    step_number: 3,
+    step_name: 'Fiber Install + Splice + Termination',
+    step_description: 'Install drop from PON to premises, splice at PON, terminate at ONT. Photograph each milestone.',
+    photo_required: true,
+    required_for_qa: true,
+    category: 'installation',
+    photo_slots: [
+      { key: 'fiber_route', label: 'Fiber route', source_mode: 'camera', is_required: true, hint: 'Drop cable routing from PON to wall.' },
+      { key: 'splice_closure', label: 'Splice at PON', source_mode: 'camera', is_required: true, hint: 'Closed splice closure with drop entering.' },
+      { key: 'termination_at_ont', label: 'Termination at ONT', source_mode: 'camera', is_required: true, hint: 'Clean termination with strain relief.' },
+    ],
+  },
+  {
+    step_number: 4,
+    step_name: 'ONT Install',
+    step_description: 'Mount ONT, connect power and fiber. Capture serial and full context.',
+    photo_required: true,
+    required_for_qa: true,
+    category: 'installation',
+    photo_slots: [
+      { key: 'ont_closeup', label: 'ONT closeup (serial visible)', source_mode: 'camera', is_required: true, hint: 'Sticker readable — no glare.' },
+      { key: 'ont_wide', label: 'ONT in context', source_mode: 'camera', is_required: true, hint: 'ONT mounted on wall with cables.' },
+    ],
+  },
+  {
+    step_number: 5,
+    step_name: 'Activation + Signal + Connectivity',
+    step_description: 'Power on ONT, verify activation, record RX power, test customer connectivity.',
+    photo_required: true,
+    required_for_qa: true,
+    category: 'testing',
+    photo_slots: [
+      { key: 'signal_meter', label: 'Signal meter reading', source_mode: 'camera', is_required: true, hint: 'RX power level visible (-28 dBm to -8 dBm).' },
+      { key: 'speedtest_screen', label: 'Speed test on customer device', source_mode: 'camera', is_required: true, hint: 'Result screen with download/upload speeds.' },
+    ],
+  },
+  {
+    step_number: 6,
+    step_name: 'Handover + 1Map Sign-up',
+    step_description: 'Customer sign-off and complete 1Map sign-up. Upload sign-up confirmation screenshot.',
+    photo_required: true,
+    required_for_qa: true,
+    category: 'documentation',
+    photo_slots: [
+      { key: 'customer_signoff', label: 'Customer sign-off', source_mode: 'camera', is_required: true, hint: 'Signed handover sheet or customer with completed install.' },
+      { key: 'onemap_signup_screenshot', label: '1Map sign-up confirmation', source_mode: 'gallery', is_required: true, hint: 'Screenshot from the 1Map sign-up flow showing the property is signed up.' },
+    ],
+  },
+];
+
+/**
  * Map of ticket types to their verification step arrays.
  *
  * Primary keys are the 6 discipline values from the April-11 taxonomy
@@ -765,7 +852,7 @@ export const VERIFICATION_STEPS_BY_TICKET_TYPE: Record<string, VerificationStepT
     },
   ],
   optical: OPTICAL_STEPS,
-  activations: VERIFICATION_STEPS,
+  activations: INSTALL_STEPS_WITH_SLOTS,
   maintenance: FAULT_REPAIR_STEPS,
   dev_ops: DEV_OPS_STEPS,
 
@@ -773,7 +860,7 @@ export const VERIFICATION_STEPS_BY_TICKET_TYPE: Record<string, VerificationStepT
   // Kept so that any rows that were not caught by migration 279 still get
   // correct steps (defence-in-depth). New tickets will always carry a
   // discipline value and hit the primary keys above.
-  new_installation: VERIFICATION_STEPS,
+  new_installation: INSTALL_STEPS_WITH_SLOTS,
   fault_repair: FAULT_REPAIR_STEPS,
   ont_swap: ONT_SWAP_STEPS,
   modification: MODIFICATION_STEPS,
