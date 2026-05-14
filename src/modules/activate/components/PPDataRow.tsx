@@ -49,7 +49,16 @@ export const PPDataRow = React.memo(function PPDataRow({
         {record.date_registered ? formatDisplayDate(record.date_registered) : '-'}
       </td>
       <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs">
-        {record.activation_date ? formatDisplayDate(record.activation_date) : '-'}
+        {record.activation_date ? (
+          <span>
+            {formatDisplayDate(record.activation_date)}
+            {record.activation_source === 'wa' && (
+              <span className="ml-1 text-[10px] text-[var(--ff-text-tertiary)]" title="WA submission date — no OES activation record">
+                (WA)
+              </span>
+            )}
+          </span>
+        ) : '-'}
       </td>
       <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs">
         {record.oes_team || '-'}

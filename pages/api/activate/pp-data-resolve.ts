@@ -25,6 +25,20 @@ export const config = {
   maxDuration: 300, // 5 minutes for 1Map serial lookups
 };
 
+// Caps for WA-derived scans (HIGH: prevent N+1 timeouts on large datasets)
+const WA_MESSAGE_SCAN_SERIAL_CAP = 200;
+const WA_MESSAGE_SCAN_DAYS_BACK = 30;
+const WA_BACKFILL_DR_CAP = 500;
+
+/**
+ * Extract bare phone digits from a WhatsApp JID so it can be matched against
+ * `wa_contacts.sender_phone` (which stores digits only, no '+' or '@').
+ * Handles: `27831234567@s.whatsapp.net`, `155228775178345:37@lid`, `+27831234567@s.whatsapp.net`.
+ */
+function jidToPhone(jid: string): string {
+  return jid.replace(/[:@].*$/, '').replace(/^\+/, '');
+}
+
 /** Status label map for human-readable activity descriptions */
 const STATUS_LABELS: Record<string, string> = {
   located_oes: 'Found (OES)',
@@ -902,17 +916,16 @@ async function runWAGroupBackfill(): Promise<{
 }> {
   const results = { drs_scanned: 0, drs_backfilled: 0, rows_inserted: 0, rows_updated: 0 };
 
-  // A DR is "missing" WA submitter info if either no dur row exists for it,
+  // A DR needs WA submitter info if either no dur row exists for it,
   // or a dur row exists but sender_phone IS NULL.
   const candidatesResult = await pool.query(`
     SELECT DISTINCT pp.resolved_drop_number AS drop_number, pp.project
     FROM oes_pp_data pp
-    LEFT JOIN dr_photo_unified_reviews dur
-      ON dur.drop_number = pp.resolved_drop_number
-     AND dur.sender_phone IS NOT NULL
+    LEFT JOIN dr_photo_unified_reviews dur ON dur.drop_number = pp.resolved_drop_number
     WHERE pp.resolved_drop_number IS NOT NULL
-      AND dur.drop_number IS NULL
-  `);
+      AND (dur.drop_number IS NULL OR dur.sender_phone IS NULL)
+    LIMIT $1
+  `, [WA_BACKFILL_DR_CAP]);
 
   if (candidatesResult.rows.length === 0) {
     logger.info('WA group backfill: no DRs need sender_phone backfill');
@@ -953,8 +966,7 @@ async function runWAGroupBackfill(): Promise<{
     const senderJid = waResult.rows[0].sender_jid as string;
     const groupJid = (waResult.rows[0].wa_group_jid as string | null) || null;
     const receivedAt = waResult.rows[0].message_timestamp as Date;
-    // Strip ':n@suffix' or '@suffix' to get bare phone digits used in wa_contacts.sender_phone
-    const senderPhone = senderJid.replace(/[:@].*$/, '');
+    const senderPhone = jidToPhone(senderJid);
 
     const updateResult = await pool.query(`
       UPDATE dr_photo_unified_reviews
@@ -974,14 +986,16 @@ async function runWAGroupBackfill(): Promise<{
     }
 
     try {
-      await pool.query(`
+      const insertResult = await pool.query(`
         INSERT INTO dr_photo_unified_reviews
           (drop_number, project, photo_source, sender_phone, wa_sender_jid, wa_group_jid, wa_received_at, created_at, updated_at)
         VALUES ($1, $2, 'wa_backfill', $3, $4, $5, $6, NOW(), NOW())
         ON CONFLICT (drop_number) DO NOTHING
       `, [dropNumber, project, senderPhone, senderJid, groupJid, receivedAt]);
-      results.rows_inserted++;
-      results.drs_backfilled++;
+      if ((insertResult.rowCount || 0) > 0) {
+        results.rows_inserted++;
+        results.drs_backfilled++;
+      }
     } catch (err) {
       logger.warn('WA group backfill: dur insert failed', {
         dropNumber,
@@ -1016,12 +1030,16 @@ async function runWAMessageSerialScan(): Promise<{
     errors: 0,
   };
 
+  // Cap per run to bound wall-clock time. wa_message_logs.message_content has no trigram
+  // index (see migration 094); each ILIKE is a sequential scan, so we restrict to recent
+  // messages via INTERVAL filter in the SQL below.
   const unresolvedResult = await pool.query(`
     SELECT id, serial_number, project, maintenance_ticket_id
     FROM oes_pp_data
     WHERE resolution_status = 'not_found'
     ORDER BY date_registered DESC NULLS LAST
-  `);
+    LIMIT $1
+  `, [WA_MESSAGE_SCAN_SERIAL_CAP]);
 
   if (unresolvedResult.rows.length === 0) {
     logger.info('WA message scan: no unresolved PPs');
@@ -1029,7 +1047,10 @@ async function runWAMessageSerialScan(): Promise<{
   }
 
   results.serials_scanned = unresolvedResult.rows.length;
-  logger.info('WA message scan: searching wa_message_logs', { count: results.serials_scanned });
+  logger.info('WA message scan: searching wa_message_logs', {
+    count: results.serials_scanned,
+    days_back: WA_MESSAGE_SCAN_DAYS_BACK,
+  });
 
   for (const pp of unresolvedResult.rows) {
     const serial = pp.serial_number as string;
@@ -1040,12 +1061,13 @@ async function runWAMessageSerialScan(): Promise<{
       const directMatch = await pool.query(`
         SELECT drop_number, sender_jid, group_jid, created_at
         FROM wa_message_logs
-        WHERE message_content ILIKE $1
+        WHERE direction = 'inbound'
           AND drop_number IS NOT NULL
-          AND direction = 'inbound'
+          AND created_at >= NOW() - ($2 || ' days')::interval
+          AND message_content ILIKE $1
         ORDER BY created_at ASC
         LIMIT 1
-      `, [`%${serial}%`]);
+      `, [`%${serial}%`, String(WA_MESSAGE_SCAN_DAYS_BACK)]);
 
       let dropNumber: string | null = null;
       let senderJid: string | null = null;
@@ -1064,9 +1086,10 @@ async function runWAMessageSerialScan(): Promise<{
           WITH serial_msg AS (
             SELECT sender_jid, group_jid, created_at
             FROM wa_message_logs
-            WHERE message_content ILIKE $1
-              AND direction = 'inbound'
+            WHERE direction = 'inbound'
               AND sender_jid IS NOT NULL
+              AND created_at >= NOW() - ($2 || ' days')::interval
+              AND message_content ILIKE $1
             ORDER BY created_at ASC
             LIMIT 1
           )
@@ -1078,7 +1101,7 @@ async function runWAMessageSerialScan(): Promise<{
                                   AND sm.created_at + INTERVAL '60 minutes'
           ORDER BY ABS(EXTRACT(EPOCH FROM (wml.created_at - sm.created_at))) ASC
           LIMIT 1
-        `, [`%${serial}%`]);
+        `, [`%${serial}%`, String(WA_MESSAGE_SCAN_DAYS_BACK)]);
 
         if (threadMatch.rows.length > 0) {
           dropNumber = threadMatch.rows[0].drop_number as string;
@@ -1091,44 +1114,70 @@ async function runWAMessageSerialScan(): Promise<{
 
       if (!dropNumber) continue;
 
-      const senderPhone = senderJid ? senderJid.replace(/[:@].*$/, '') : null;
+      const senderPhone = senderJid ? jidToPhone(senderJid) : null;
 
-      await pool.query(`
-        UPDATE oes_pp_data
-        SET resolution_status = 'located_local',
-            resolved_drop_number = $1,
-            resolved_source = 'wa_message_logs',
-            resolved_details = jsonb_build_object(
-              'method', $2,
-              'sender_jid', $3::text,
-              'group_jid', $4::text,
-              'received_at', $5::text
-            ),
-            resolved_at = NOW(),
-            updated_at = NOW()
-        WHERE id = $6
-          AND resolution_status = 'not_found'
-      `, [dropNumber, matchType, senderJid, groupJid, receivedAt?.toISOString() || null, ppId]);
+      // Transactional: PP update and dur upsert must succeed together so a linked PP
+      // always has a corresponding WA contact row (or both fail and we retry next run).
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
 
-      if (senderPhone && receivedAt) {
-        const updateResult = await pool.query(`
-          UPDATE dr_photo_unified_reviews
-          SET sender_phone = COALESCE(sender_phone, $1),
-              wa_sender_jid = COALESCE(wa_sender_jid, $2),
-              wa_group_jid = COALESCE(wa_group_jid, $3),
-              wa_received_at = COALESCE(wa_received_at, $4),
+        const ppUpdate = await client.query(`
+          UPDATE oes_pp_data
+          SET resolution_status = 'located_local',
+              resolved_drop_number = $1,
+              resolved_source = 'wa_message_logs',
+              resolved_details = jsonb_build_object(
+                'method', $2,
+                'sender_jid', $3::text,
+                'group_jid', $4::text,
+                'received_at', $5::text
+              ),
+              resolved_at = NOW(),
               updated_at = NOW()
-          WHERE drop_number = $5
-        `, [senderPhone, senderJid, groupJid, receivedAt, dropNumber]);
+          WHERE id = $6
+            AND resolution_status = 'not_found'
+        `, [dropNumber, matchType, senderJid, groupJid, receivedAt, ppId]);
 
-        if ((updateResult.rowCount || 0) === 0) {
-          await pool.query(`
-            INSERT INTO dr_photo_unified_reviews
-              (drop_number, project, photo_source, sender_phone, wa_sender_jid, wa_group_jid, wa_received_at, created_at, updated_at)
-            VALUES ($1, $2, 'wa_backfill', $3, $4, $5, $6, NOW(), NOW())
-            ON CONFLICT (drop_number) DO NOTHING
-          `, [dropNumber, pp.project, senderPhone, senderJid, groupJid, receivedAt]);
+        if ((ppUpdate.rowCount || 0) === 0) {
+          // Row was resolved by another process between SELECT and UPDATE — skip cleanly.
+          await client.query('ROLLBACK');
+          continue;
         }
+
+        if (senderPhone && receivedAt) {
+          const updateResult = await client.query(`
+            UPDATE dr_photo_unified_reviews
+            SET sender_phone = COALESCE(sender_phone, $1),
+                wa_sender_jid = COALESCE(wa_sender_jid, $2),
+                wa_group_jid = COALESCE(wa_group_jid, $3),
+                wa_received_at = COALESCE(wa_received_at, $4),
+                updated_at = NOW()
+            WHERE drop_number = $5
+          `, [senderPhone, senderJid, groupJid, receivedAt, dropNumber]);
+
+          if ((updateResult.rowCount || 0) === 0) {
+            await client.query(`
+              INSERT INTO dr_photo_unified_reviews
+                (drop_number, project, photo_source, sender_phone, wa_sender_jid, wa_group_jid, wa_received_at, created_at, updated_at)
+              VALUES ($1, $2, 'wa_backfill', $3, $4, $5, $6, NOW(), NOW())
+              ON CONFLICT (drop_number) DO NOTHING
+            `, [dropNumber, pp.project, senderPhone, senderJid, groupJid, receivedAt]);
+          }
+        }
+
+        await client.query('COMMIT');
+      } catch (txErr) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackErr) {
+          logger.warn('WA msg scan: rollback failed (non-fatal — original error rethrown)', {
+            rollbackError: rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr),
+          });
+        }
+        throw txErr;
+      } finally {
+        client.release();
       }
 
       results.serials_matched++;
