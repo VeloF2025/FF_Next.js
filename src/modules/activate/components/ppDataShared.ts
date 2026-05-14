@@ -11,13 +11,13 @@ export interface PPRecord {
   resolved_drop_number: string | null;
   resolved_source: string | null;
   resolved_at: string | null;
+  first_resolved_at: string | null;
   maintenance_ticket_id: string | null;
   ticket_uid: string | null;
   ticket_priority: string | null;
   ticket_created_at: string | null;
   oes_team: string | null;
   activation_date: string | null;
-  activation_source: 'oes' | 'wa' | 'eod' | null;
   wa_phone: string | null;
   wa_name: string | null;
   wa_team: string | null;
