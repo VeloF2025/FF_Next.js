@@ -173,7 +173,7 @@ export function PhotoSlotCard({
               </button>
             </div>
           )}
-          {showSnagForm && onSnag && (
+          {showSnagForm && onSnag && !disabled && (
             <SnagInlineForm
               assignableUsers={assignableUsers}
               loadingUsers={loadingUsers}

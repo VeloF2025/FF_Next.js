@@ -44,7 +44,9 @@ export interface PoleQaPhoto {
   unassigned_photo_keys: string[];
   vlm_results: Record<string, VlmSlotResult>;
   // Per-slot Approve / Snag decisions (migration 247). Keyed by SLOT_META.key.
-  slot_approvals: Record<string, SlotApproval>;
+  // Optional because pre-migration rows lack the column and the API may return
+  // null/undefined; callers MUST use optional chaining.
+  slot_approvals?: Record<string, SlotApproval>;
 
   civil_approved: boolean;
   dome_approved: boolean;

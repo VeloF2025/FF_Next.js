@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { flushSync } from 'react-dom';
+import { mutate as globalMutate } from 'swr';
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
 import { ChevronDown } from 'lucide-react';
 import { usePoleDetail } from '../hooks/usePoleDetail';
@@ -42,18 +43,10 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
   const [tab, setTab] = useState<'photos' | 'snags'>('photos');
-  // Accordion state: SET of expanded disciplines. Multi-open.
-  //
-  // Defaults to ALL THREE expanded so every Droppable has measurable
-  // geometry at drag start — hello-pangea/dnd captures a getBoundingClientRect
-  // snapshot in onBeforeCapture; a `display: none` (collapsed) section returns
-  // a zero-area bbox and silently rejects drops onto its slots. Users can
-  // collapse via the header chevrons or the "Collapse all" button.
-  //
-  // NOTE: section content is ALWAYS mounted (visibility toggled by CSS). This
-  // keeps every Droppable registered with hello-pangea/dnd for the lifetime of
-  // the panel — mutating the droppable tree mid-drag silently breaks the drop
-  // event and leaves the drag clone stuck mid-air.
+  // Accordion state: multi-open SET of expanded disciplines. Defaults to all
+  // three so every Droppable has measurable geometry at drag start (rfd
+  // snapshots `display:none` slots as zero-area bboxes and silently rejects
+  // drops). Section content is always mounted; only visibility toggles.
   const [expanded, setExpanded] = useState<Set<Discipline>>(() => new Set(['civil', 'dome', 'main_joint']));
 
   useEffect(() => {
@@ -153,7 +146,11 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
                   onApprove={async () => { await approvePhotoApi(pole.id, slot.key); await mutate(); }}
                   onSnag={async input => {
                     const result = await snagPhotoApi(pole.id, slot.key, input);
-                    if (result.status === 'created' || result.status === 'amended') await mutate();
+                    // Invalidate both pole detail (slot_approvals badge) and the
+                    // per-pole snags-list SWR cache so the Snags tab stays in sync.
+                    if (result.status === 'created' || result.status === 'amended') {
+                      await Promise.all([mutate(), globalMutate(`/api/works-qa/photo-snags?pole_id=${pole.id}`)]);
+                    }
                     return result;
                   }}
                   onView={slotIndex[slot.key] !== undefined ? () => setLightboxIndex(slotIndex[slot.key]!) : undefined}
