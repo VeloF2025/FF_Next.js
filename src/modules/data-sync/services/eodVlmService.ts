@@ -390,6 +390,117 @@ async function enhanceForOntReading(base64: string): Promise<string> {
   return resized.toString('base64');
 }
 
+const ONT_CELL_PROMPT = `/no_think
+This image is a single cell from a form, containing one ONT barcode sticker.
+The sticker has a barcode with a printed serial line "S/N: ALCL..." BELOW it.
+
+The image may also show the tail end of the previous row's "S/N:" line at the
+TOP, and/or the start of the next row's barcode at the BOTTOM. The serial
+for THIS cell is the one DIRECTLY BELOW THE BARCODE in the middle of the
+image — that is, the LAST "S/N:" line readable in the image.
+
+Output ONLY that serial value (without the "S/N:" prefix), nothing else.
+Format: starts with the 5 characters "ALCLB" (A-L-C-L, then capital letter B),
+then 6-8 hex characters (0-9, A-F). Examples: ALCLB480E666, ALCLB484F549,
+ALCLB484F5EA, ALCLB48DEC76.
+
+The "B" in ALCLB is the letter B, NEVER the digit 0. Do not output "ALCL0...".
+
+If you cannot read the printed text confidently, output "null".`;
+
+/**
+ * Generic per-cell column extraction. Crops one row's cell from the specified
+ * column, sends the tiny image to the VLM with a single-cell prompt, validates
+ * the read against `validate`, and applies within-sheet uniqueness.
+ *
+ * Used by the ONT, DR, and Gizzu passes — same orchestration shape, only the
+ * column / prompt / validation differ.
+ */
+async function extractColumnPerCell(
+  fullResBase64: string,
+  rowCount: number,
+  col: keyof typeof COL_X_FRAC,
+  prompt: string,
+  validate: (raw: string) => string | null,
+  tag: string,
+): Promise<Map<number, string>> {
+  const result = new Map<number, string>();
+  try {
+    const raw = Buffer.from(fullResBase64, 'base64');
+    const rotated = await sharp(raw).rotate().toBuffer();
+    const meta = await sharp(rotated).metadata();
+    const W = meta.width || 0;
+    const H = meta.height || 0;
+    if (W < 100 || H < 100) {
+      log.warn(`[${tag}] Image too small for per-cell extraction`, { W, H });
+      return result;
+    }
+
+    // Layout sanity check — per-cell crop fractions are calibrated for the
+    // A4 portrait Velocity install form. Reject geometries that clearly are
+    // not portrait-A4 (e.g. landscape phone photo, square crop). Crops on
+    // mis-shaped images would target wrong locations and read garbage.
+    const aspect = H / W;
+    if (aspect < EXPECTED_ASPECT_MIN || aspect > EXPECTED_ASPECT_MAX) {
+      log.warn(`[${tag}] Image aspect ratio outside A4 portrait range — skipping per-cell extraction`, {
+        W, H, aspect: aspect.toFixed(3),
+        expected: `${EXPECTED_ASPECT_MIN}-${EXPECTED_ASPECT_MAX}`,
+      });
+      return result;
+    }
+
+    const reads = await Promise.all(
+      Array.from({ length: rowCount }, async (_, idx) => {
+        try {
+          const cell = await cropCell(rotated, W, H, idx, rowCount, col);
+          const rawRead = await readCellWithVlm(cell, prompt);
+          return { row: idx + 1, value: rawRead ? validate(rawRead) : null };
+        } catch (cellErr) {
+          log.warn(`[${tag}] Cell read failed`, { row: idx + 1, error: cellErr instanceof Error ? cellErr.message : String(cellErr) });
+          return { row: idx + 1, value: null };
+        }
+      })
+    );
+
+    log.info(`[${tag}] Per-cell reads`, {
+      total: reads.length,
+      hits: reads.filter((r) => r.value).length,
+      values: reads.map((r) => `${r.row}:${r.value || '—'}`),
+    });
+
+    for (const r of reads) if (r.value) result.set(r.row, r.value);
+
+    // Within-sheet uniqueness — each cell value (ONT/DR/Gizzu) is a unique
+    // physical identifier. If two cells read the same value, null both —
+    // we cannot tell which is correct.
+    const counts = new Map<string, number>();
+    for (const v of result.values()) counts.set(v, (counts.get(v) || 0) + 1);
+    for (const [v, c] of counts) {
+      if (c >= 2) {
+        log.warn(`[${tag}] Duplicate value across cells — nulling all instances`, { value: v, count: c });
+        for (const [row, val] of result) if (val === v) result.delete(row);
+      }
+    }
+
+    log.info(`[${tag}] Per-cell extraction done`, { kept: result.size });
+  } catch (err) {
+    log.warn(`[${tag}] Per-cell extraction failed`, { error: err instanceof Error ? err.message : String(err) });
+  }
+  return result;
+}
+
+/** Per-cell ONT extraction. Validates ALCLB-prefixed serial format. */
+function extractOntSerialsPerCell(fullResBase64: string, rowCount: number): Promise<Map<number, string>> {
+  return extractColumnPerCell(
+    fullResBase64,
+    rowCount,
+    'ont',
+    ONT_CELL_PROMPT,
+    (raw) => cleanOntSerial(raw),
+    'EOD-ONT-PC',
+  );
+}
+
 async function extractOntSerials(fullResBase64: string, rowCount: number): Promise<Map<number, string>> {
   const result = new Map<number, string>();
 
@@ -470,6 +581,288 @@ async function extractOntSerials(fullResBase64: string, rowCount: number): Promi
   }
 
   return result;
+}
+
+// ============================================================================
+// PER-CELL FOCUSED EXTRACTION (Pass 2c / 2e)
+//
+// The full-image focused pass works for ONT serial because the ONT sticker
+// has a printed serial below the barcode — the VLM can locate it by feature.
+// Handwritten DR / Gizzu cells have no such printed anchor, and on a multi-row
+// form the main pass commonly shuffles which value belongs to which row.
+//
+// The fix is to crop each (row, column) cell out of the full-resolution image
+// individually and send a tiny single-cell image to the VLM. Row alignment is
+// then guaranteed by construction — the VLM has no way to confuse rows when
+// it's only looking at one cell at a time.
+// ============================================================================
+
+const DR_STRICT_PATTERN = /^DR\d{7}$/;
+const GIZZU_STRICT_PATTERN = /^GU18W12V25-\d{6}$/;
+
+// The Velocity install form always has exactly 10 data rows.
+// Per-cell crops use this constant rather than `entries.length`, because the
+// main VLM pass occasionally hallucinates an extra row — slicing the table
+// band into the wrong number of cells would misalign every crop.
+const PHYSICAL_FORM_ROWS = 10;
+
+// Empirical column boundaries for the standard Velocity install form
+// (A4 portrait, 4 data columns + ONT sticker column on left).
+// Values are fractions of total image width.
+const COL_X_FRAC: Record<'ont' | 'dr' | 'gizzu' | 'dr2', [number, number]> = {
+  ont:   [0.00, 0.26],
+  dr:    [0.26, 0.44],
+  gizzu: [0.44, 0.74],
+  dr2:   [0.74, 1.00],
+};
+
+// Vertical fractions of the data-row band (first row top to last row bottom).
+const TABLE_TOP_FRAC = 0.290;
+const TABLE_BOTTOM_FRAC = 0.532;
+// Padding added to each row crop so that minor calibration drift doesn't clip text.
+const ROW_PAD_FRAC = 0.005;
+
+// Target upscaled width for each cell crop — large enough for the VLM to read
+// individual handwritten digits clearly.
+const CELL_CROP_TARGET_WIDTH = 800;
+
+// Expected aspect ratio (height/width) for the A4 portrait Velocity form.
+// Real A4 is √2 ≈ 1.414. We allow ±15% to accommodate camera-angle scans.
+// Crops calibrated for this geometry; landscape or square images would
+// produce cells in the wrong location.
+const EXPECTED_ASPECT_MIN = 1.2;
+const EXPECTED_ASPECT_MAX = 1.65;
+
+async function cropCell(
+  rotatedJpegBuffer: Buffer,
+  imgWidth: number,
+  imgHeight: number,
+  rowIdx: number,
+  rowCount: number,
+  colName: keyof typeof COL_X_FRAC,
+): Promise<string> {
+  const [xLeftFrac, xRightFrac] = COL_X_FRAC[colName];
+  const rowHeightFrac = (TABLE_BOTTOM_FRAC - TABLE_TOP_FRAC) / rowCount;
+  const xLeft = Math.max(0, Math.floor(imgWidth * xLeftFrac));
+  const xRight = Math.min(imgWidth, Math.floor(imgWidth * xRightFrac));
+  const yTop = Math.max(0, Math.floor(imgHeight * (TABLE_TOP_FRAC + rowIdx * rowHeightFrac - ROW_PAD_FRAC)));
+  const yBot = Math.min(imgHeight, Math.floor(imgHeight * (TABLE_TOP_FRAC + (rowIdx + 1) * rowHeightFrac + ROW_PAD_FRAC)));
+  const width = xRight - xLeft;
+  const height = yBot - yTop;
+
+  const cropped = await sharp(rotatedJpegBuffer)
+    .extract({ left: xLeft, top: yTop, width, height })
+    .resize({ width: CELL_CROP_TARGET_WIDTH, kernel: 'lanczos3', fit: 'inside' })
+    .normalise()
+    .sharpen({ sigma: 1.5 })
+    .jpeg({ quality: 95 })
+    .toBuffer();
+  return cropped.toString('base64');
+}
+
+async function readCellWithVlm(cellBase64: string, prompt: string): Promise<string | null> {
+  try {
+    const response = await fetch(VLM_API_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: VLM_MODEL,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${cellBase64}` } },
+          ],
+        }],
+        max_tokens: 64,
+        temperature: 0,
+      }),
+      signal: AbortSignal.timeout(VLM_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      log.warn('[EOD-cell-vlm] non-OK response', { status: response.status });
+      return null;
+    }
+    const data = await response.json();
+    let content: string = data.choices?.[0]?.message?.content || '';
+    content = stripThinkTags(content).trim();
+    // Strip code fences, quotes, leading "DR:" / "Serial:" labels
+    content = content.replace(/^```[a-z]*\n?|\n?```$/g, '');
+    content = content.replace(/^["'`]+|["'`]+$/g, '');
+    if (!content || /^null$/i.test(content)) return null;
+    return content.trim();
+  } catch (err) {
+    log.warn('[EOD-cell-vlm] VLM call failed', { error: err instanceof Error ? err.message : String(err) });
+    return null;
+  }
+}
+
+const DR_CELL_PROMPT = `/no_think
+This image is a single cell from a handwritten install form, containing one
+handwritten DR number.
+
+Output ONLY the DR number, nothing else. Format: the letters "DR" followed by
+exactly 7 digits, e.g. "DR1858020", "DR1858106", "DR1858123".
+
+If the digits are unclear or you cannot read them confidently, output "null".
+Do not invent values, do not pad, do not extrapolate.`;
+
+/** Per-cell DR extraction. Validates "DR" + 7-digit format. */
+function extractDrNumbers(fullResBase64: string, rowCount: number): Promise<Map<number, string>> {
+  return extractColumnPerCell(
+    fullResBase64,
+    rowCount,
+    'dr',
+    DR_CELL_PROMPT,
+    (raw) => {
+      const cleaned = normalizeDrNumber(raw);
+      return cleaned && DR_STRICT_PATTERN.test(cleaned) ? cleaned : null;
+    },
+    'EOD-DR',
+  );
+}
+
+// ============================================================================
+// HLD DR FUZZY MATCH (Pass 2d)
+// ============================================================================
+
+function levenshteinDistance(a: string, b: string): number {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  let prev: number[] = Array.from({ length: b.length + 1 }, (_, i) => i);
+  let curr: number[] = new Array(b.length + 1).fill(0);
+  for (let i = 1; i <= a.length; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      curr[j] = a[i - 1] === b[j - 1]
+        ? prev[j - 1]!
+        : 1 + Math.min(prev[j]!, curr[j - 1]!, prev[j - 1]!);
+    }
+    [prev, curr] = [curr, prev];
+  }
+  return prev[b.length]!;
+}
+
+/**
+ * Find the longest prefix shared by at least `minQuorum` fraction of strings.
+ * Tolerates outliers — a single misread (e.g. "DR2..." among nine "DR1858..."
+ * reads) would not collapse the prefix to "DR" if quorum is 0.7+.
+ */
+function majorityPrefix(strs: string[], minQuorum = 0.7): string {
+  if (strs.length === 0) return '';
+  const threshold = Math.ceil(strs.length * minQuorum);
+  // Find longest L where ≥threshold strings share their first L characters.
+  // Start from longest possible and shrink.
+  const maxLen = Math.max(...strs.map((s) => s.length));
+  for (let len = maxLen; len > 0; len--) {
+    const counts = new Map<string, number>();
+    for (const s of strs) {
+      if (s.length < len) continue;
+      const pre = s.slice(0, len);
+      counts.set(pre, (counts.get(pre) || 0) + 1);
+    }
+    for (const [pre, c] of counts) {
+      if (c >= threshold) return pre;
+    }
+  }
+  return '';
+}
+
+/**
+ * Cross-validate VLM-read DRs against the HLD `drops` table.
+ * If a DR doesn't exist in the table but a unique near-neighbor does
+ * (Levenshtein ≤ 2), replace the VLM value with the legit DR.
+ * Single-digit handwriting misreads (0↔6, 3↔8, etc.) get corrected here.
+ */
+async function correctDrFromHld(entries: EodVlmEntry[]): Promise<EodVlmEntry[]> {
+  const readDrs = entries.map((e) => e.dr_number).filter((d): d is string => !!d && DR_STRICT_PATTERN.test(d));
+  if (readDrs.length === 0) return entries;
+
+  // Scope the lookup by the prefix shared by at least 70% of valid reads.
+  // (e.g. "DR1858" for the test sheet narrows ~3000 candidates to ~500.)
+  // Using majority — not strict common — tolerates a single VLM misread that
+  // would otherwise collapse the prefix to "DR" and silently skip correction.
+  const prefix = majorityPrefix(readDrs, 0.7);
+  if (prefix.length < 4 || !prefix.startsWith('DR')) {
+    log.warn('[EOD-DR-HLD] No usable majority prefix — skipping fuzzy match', { prefix, readDrs });
+    return entries;
+  }
+
+  try {
+    const { rows } = await pool.query<{ drop_number: string }>(
+      'SELECT drop_number FROM drops WHERE drop_number LIKE $1',
+      [`${prefix}%`],
+    );
+    const legit = new Set(rows.map((r) => r.drop_number));
+    log.info('[EOD-DR-HLD] HLD lookup', { prefix, candidates: legit.size });
+    if (legit.size === 0) return entries;
+
+    // Reserve already-used legit DRs so we don't fuzzy-match two reads to the same target
+    const reserved = new Set<string>();
+    for (const e of entries) {
+      if (e.dr_number && legit.has(e.dr_number)) reserved.add(e.dr_number);
+    }
+
+    let corrected = 0;
+    const result = entries.map((e) => {
+      if (!e.dr_number || legit.has(e.dr_number)) return e;
+      let best: { dr: string; dist: number } | null = null;
+      let tieCount = 0;
+      for (const legitDr of legit) {
+        if (reserved.has(legitDr)) continue;
+        const d = levenshteinDistance(e.dr_number, legitDr);
+        if (d > 2) continue;
+        if (!best || d < best.dist) { best = { dr: legitDr, dist: d }; tieCount = 1; }
+        else if (d === best.dist) tieCount++;
+      }
+      if (best && tieCount === 1) {
+        log.info('[EOD-DR-HLD] DR corrected', { from: e.dr_number, to: best.dr, dist: best.dist });
+        reserved.add(best.dr);
+        corrected++;
+        return { ...e, dr_number: best.dr };
+      }
+      return e;
+    });
+    if (corrected > 0) log.info('[EOD-DR-HLD] DR corrections applied', { corrected });
+    return result;
+  } catch (err) {
+    log.warn('[EOD-DR-HLD] HLD fuzzy match failed', { error: err instanceof Error ? err.message : String(err) });
+    return entries;
+  }
+}
+
+// ============================================================================
+// GIZZU SERIAL PER-CELL EXTRACTION (Pass 2e)
+// Note: Gizzu serials on this form are HANDWRITTEN, not barcode stickers.
+// ============================================================================
+
+const GIZZU_CELL_PROMPT = `/no_think
+This image is a single cell from a handwritten install form, containing one
+handwritten Gizzu UPS serial.
+
+Output ONLY the serial, nothing else. Format: "GU18W12V25-" followed by
+exactly 6 digits, e.g. "GU18W12V25-176688", "GU18W12V25-176581".
+
+Note: the handwritten "1" can look like "I" and "V" can look like "U" — the
+canonical prefix is always GU18W12V25- (digit-1, digit-8, W, digit-1, digit-2,
+letter-V, digit-2, digit-5, hyphen). Normalise the prefix to that form.
+
+If the suffix digits are unclear, output "null". Do not invent or pad.`;
+
+/** Per-cell Gizzu extraction. Validates GU18W12V25-XXXXXX format + blocklist. */
+function extractGizzuSerials(fullResBase64: string, rowCount: number): Promise<Map<number, string>> {
+  return extractColumnPerCell(
+    fullResBase64,
+    rowCount,
+    'gizzu',
+    GIZZU_CELL_PROMPT,
+    (raw) => {
+      const cleaned = raw.toUpperCase().replace(/\s/g, '');
+      if (HALLUCINATION_BLOCKLIST.has(cleaned)) return null;
+      return GIZZU_STRICT_PATTERN.test(cleaned) ? cleaned : null;
+    },
+    'EOD-GZ',
+  );
 }
 
 // ============================================================================
@@ -680,18 +1073,55 @@ export async function extractEodSheet(
       }
     }
 
-    // Pass 2b: Focused ONT serial extraction at full resolution
-    // Run whenever the main pass left ANY ONT null — cleanOntSerial now nulls reads that
-    // fail ONT_STRICT_PATTERN (no ALCLB prefix), so this fires whenever the main 1280x960
-    // pass misread the stickers. The focused pass re-extracts from the full-res image with
-    // a prompt narrowly scoped to the ONT column.
+    // Pass 2b: Per-cell ONT extraction.
+    // Each ONT cell is cropped from the full-resolution image and read in
+    // isolation. Row alignment is guaranteed by construction — the previous
+    // full-image focused ONT pass occasionally shuffled rows when the main
+    // pass also shuffled them. Trust focused values and evict stale main-pass
+    // duplicates, same pattern as the DR/Gizzu passes.
+    if (parsed.entries.length > 0) {
+      const cropRowCount = Math.min(parsed.entries.length, PHYSICAL_FORM_ROWS);
+      const ontMap = await extractOntSerialsPerCell(fullResBase64, cropRowCount);
+      if (ontMap.size > 0) {
+        let overridden = 0;
+        parsed.entries = parsed.entries.map((e) => {
+          const focused = ontMap.get(e.row_number);
+          if (focused && focused !== e.ont_serial) {
+            overridden++;
+            return { ...e, ont_serial: focused };
+          }
+          return e;
+        });
+
+        // Only evict main-pass duplicates when the per-cell pass produced a
+        // COMPLETE map (every row covered). On a partial map we cannot
+        // distinguish "main pass duplicated" from "per-cell didn't read this
+        // row", so we leave main-pass values alone for non-focused rows.
+        if (ontMap.size === cropRowCount) {
+          const focusedValues = new Set(ontMap.values());
+          let evicted = 0;
+          parsed.entries = parsed.entries.map((e) => {
+            if (e.ont_serial && !ontMap.has(e.row_number) && focusedValues.has(e.ont_serial)) {
+              evicted++;
+              return { ...e, ont_serial: null };
+            }
+            return e;
+          });
+          log.info(`[EOD] ONT per-cell pass overrode ${overridden} rows; evicted ${evicted} stale main-pass duplicates`);
+        } else {
+          log.info(`[EOD] ONT per-cell pass overrode ${overridden} rows; eviction skipped (partial map: ${ontMap.size}/${cropRowCount})`);
+        }
+      }
+    }
+
+    // Pass 2b-fallback: if the per-cell pass left any ONT null, fall back to
+    // the full-image focused pass which reads the printed serials across all
+    // rows in one call. Lower row-alignment confidence but can fill nulls.
     const ontNulls = parsed.entries.filter((e) => !e.ont_serial).length;
     if (ontNulls > 0) {
-      log.info(`[EOD] ${ontNulls}/${parsed.entries.length} ONT serials null — running focused extraction at full res`);
+      log.info(`[EOD] ${ontNulls}/${parsed.entries.length} ONT serials still null after per-cell — running full-image fallback`);
       const ontMap = await extractOntSerials(fullResBase64, parsed.entries.length);
       if (ontMap.size > 0) {
-        // Track serials already set on the entries so the focused-pass fill
-        // can't re-introduce a duplicate that the uniqueness guard cleared.
         const alreadySet = new Set(
           parsed.entries.map((e) => e.ont_serial).filter((s): s is string => !!s),
         );
@@ -705,7 +1135,94 @@ export async function extractEodSheet(
           }
           return e;
         });
-        log.info(`[EOD] ONT focused pass filled ${filled} serials (of ${ontMap.size} returned)`);
+        log.info(`[EOD] ONT full-image fallback filled ${filled} serials (of ${ontMap.size} returned)`);
+      }
+    }
+
+    // Pass 2c: Per-cell DR extraction.
+    // Each DR cell is cropped from the full-resolution image and read in
+    // isolation by the VLM. Row alignment is guaranteed by construction —
+    // far more reliable than the multi-field 1280x960 main pass for
+    // handwritten digits. Trust focused values unconditionally and evict
+    // any main-pass duplicates on other rows.
+    //
+    // Row count is capped at PHYSICAL_FORM_ROWS (10). The Velocity install
+    // form is always 10 rows; if the main pass hallucinated extras, those
+    // extra entries simply won't get focused overrides.
+    if (parsed.entries.length > 0) {
+      const cropRowCount = Math.min(parsed.entries.length, PHYSICAL_FORM_ROWS);
+      const drMap = await extractDrNumbers(fullResBase64, cropRowCount);
+      if (drMap.size > 0) {
+        let overridden = 0;
+        parsed.entries = parsed.entries.map((e) => {
+          const focused = drMap.get(e.row_number);
+          if (focused && focused !== e.dr_number) {
+            overridden++;
+            return { ...e, dr_number: focused };
+          }
+          return e;
+        });
+
+        // Per-cell extraction's own uniqueness guard already ensured focused
+        // values are unique across rows. On a COMPLETE map, any non-focused
+        // entry whose main-pass value collides with a focused value is a
+        // stale duplicate (main pass put the same value on two rows). Null
+        // those. On a PARTIAL map we can't distinguish duplicate-from-main
+        // from row-not-read-by-per-cell, so leave non-focused rows alone.
+        if (drMap.size === cropRowCount) {
+          const focusedValues = new Set(drMap.values());
+          let evicted = 0;
+          parsed.entries = parsed.entries.map((e) => {
+            if (e.dr_number && !drMap.has(e.row_number) && focusedValues.has(e.dr_number)) {
+              evicted++;
+              return { ...e, dr_number: null };
+            }
+            return e;
+          });
+          log.info(`[EOD] DR focused pass overrode ${overridden} rows; evicted ${evicted} stale main-pass duplicates`);
+        } else {
+          log.info(`[EOD] DR focused pass overrode ${overridden} rows; eviction skipped (partial map: ${drMap.size}/${cropRowCount})`);
+        }
+      }
+    }
+
+    // Pass 2d: HLD fuzzy-match — correct misread DRs against the drops table.
+    // Single-digit handwriting misreads (0↔6, 3↔8 etc.) that survive the focused
+    // pass get corrected here. Every legit DR for an install must exist in `drops`.
+    parsed.entries = await correctDrFromHld(parsed.entries);
+
+    // Pass 2e: Per-cell Gizzu extraction.
+    // Mirror of the DR pass — Gizzu serials are HANDWRITTEN on this form,
+    // and the main 1280x960 pass commonly misreads suffix digits (e.g.
+    // 176688 → 176587). Per-cell crops + isolated reads fix this.
+    if (parsed.entries.length > 0) {
+      const cropRowCount = Math.min(parsed.entries.length, PHYSICAL_FORM_ROWS);
+      const gzMap = await extractGizzuSerials(fullResBase64, cropRowCount);
+      if (gzMap.size > 0) {
+        let overridden = 0;
+        parsed.entries = parsed.entries.map((e) => {
+          const focused = gzMap.get(e.row_number);
+          if (focused && focused !== e.gizzu_serial) {
+            overridden++;
+            return { ...e, gizzu_serial: focused };
+          }
+          return e;
+        });
+
+        if (gzMap.size === cropRowCount) {
+          const focusedValues = new Set(gzMap.values());
+          let evicted = 0;
+          parsed.entries = parsed.entries.map((e) => {
+            if (e.gizzu_serial && !gzMap.has(e.row_number) && focusedValues.has(e.gizzu_serial)) {
+              evicted++;
+              return { ...e, gizzu_serial: null };
+            }
+            return e;
+          });
+          log.info(`[EOD] Gizzu focused pass overrode ${overridden} rows; evicted ${evicted} stale main-pass duplicates`);
+        } else {
+          log.info(`[EOD] Gizzu focused pass overrode ${overridden} rows; eviction skipped (partial map: ${gzMap.size}/${cropRowCount})`);
+        }
       }
     }
 
