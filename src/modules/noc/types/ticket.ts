@@ -359,6 +359,12 @@ export interface UpdateTicketPayload {
   sla_due_at?: Date;
   sla_first_response_at?: Date;
   sla_breached?: boolean;
+  /**
+   * Set when a caller transitions status to 'resolved' so downstream reports
+   * (e.g. snag closeout) can filter on resolution timestamp. updateTicket()
+   * does NOT auto-stamp this on its own — callers must pass it explicitly.
+   */
+  resolved_at?: Date | string;
 }
 
 /** Meta-status groups used by Active/Completed sub-tabs */

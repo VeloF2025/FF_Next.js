@@ -663,7 +663,8 @@ export async function updateTicket(
       qa_ready: 'qa_ready',
       sla_due_at: 'sla_due_at',
       sla_first_response_at: 'sla_first_response_at',
-      sla_breached: 'sla_breached'
+      sla_breached: 'sla_breached',
+      resolved_at: 'resolved_at',
     };
 
     // Build SET clause dynamically
