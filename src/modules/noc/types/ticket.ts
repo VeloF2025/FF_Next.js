@@ -94,6 +94,26 @@ export enum TicketCategory {
 
 
 /**
+ * Resolution Path — how a ticket should be worked on the public resolve link.
+ *
+ * Drives per-path verification step templates, Context Panel variant, and
+ * dispatch routing. Set at ticket creation by classifyResolutionPath().
+ * 'triage_required' surfaces a single classification step on first link open.
+ */
+export enum ResolutionPath {
+  INSTALL = 'install',
+  MAINTENANCE = 'maintenance',
+  SNAG = 'snag',
+  INVESTIGATE_DATA_GAP = 'investigate_data_gap',
+  DISPATCH_SIGNUP = 'dispatch_signup',
+  DISPATCH_INSTALL = 'dispatch_install',
+  FIX_SERIAL = 'fix_serial',
+  FIX_PROJECT_TAG = 'fix_project_tag',
+  TRIAGE_REQUIRED = 'triage_required',
+  NOT_APPLICABLE = 'not_applicable',
+}
+
+/**
  * Ticket Priority Levels
  */
 export enum TicketPriority {
@@ -293,6 +313,11 @@ export interface CreateTicketPayload {
   ticket_category?: TicketCategory | string;
   /** Fault cause attribution (optional at creation, typically set during investigation) */
   fault_cause?: FaultCause;
+  /**
+   * Resolution path — drives the resolve-page step template + Context Panel.
+   * If omitted, ticket creators should call classifyResolutionPath() to set it.
+   */
+  resolution_path?: ResolutionPath;
 }
 
 /**

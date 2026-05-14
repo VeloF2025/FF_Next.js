@@ -17,6 +17,7 @@ import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
 import { normalizePPTicketBatches } from '@/modules/activate/services/ticketBatchService';
 import { createTicket } from '@/modules/noc/services/ticketService';
+import { classifyResolutionPath } from '@/modules/noc/services/resolutionPathClassifier';
 import { TicketSource, TicketType, TicketPriority, TicketStatus } from '@/modules/noc/types/ticket';
 import { PP_OLT_SUBTYPES } from '@/modules/noc/constants/ticketCategories';
 import { createLogger } from '@/lib/logger';
@@ -272,11 +273,18 @@ async function handleCreate(
 
         const description = notes || descParts.join('\n');
 
+        const resolution_path = classifyResolutionPath({
+          ticket_category,
+          ticket_type: ticket_type as TicketType,
+          hasDrNumber: Boolean(dr),
+        });
+
         const ticket = await createTicket({
           source: TicketSource.PP_DATA,
           title,
           ticket_type: ticket_type as TicketType,
           ticket_category,
+          resolution_path,
           priority: ticketPriority,
           description,
           dr_number: dr || undefined,
