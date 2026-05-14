@@ -514,3 +514,17 @@ export interface EodSheetSlot {
   photoHash: string | null;
   error: string | null;
 }
+
+/**
+ * Returned by /api/eod/sheets when the new sheet shares DR numbers or
+ * ONT serials with existing sheets. Identical shape on server (created by
+ * eodOverlapService) and client (consumed by EodOverlapModal).
+ */
+export interface EodOverlapMatch {
+  sheet_id: string;
+  sheet_date: string;
+  uploaded_by: string | null;
+  technician_name: string | null;
+  overlapping_drs: string[];
+  overlapping_onts: string[];
+}

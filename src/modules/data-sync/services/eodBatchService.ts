@@ -3,7 +3,9 @@
  * These run in the browser — fetch() only, no SQL.
  */
 
-import type { EodVlmExtraction, EodSavePayload } from '../types';
+import type { EodVlmExtraction, EodSavePayload, EodOverlapMatch } from '../types';
+
+export type OverlapMatch = EodOverlapMatch;
 
 export type ExtractResult =
   | { duplicate: true; existingSheetId: string; existingSheetDate: string; photoHash: string }
@@ -101,7 +103,23 @@ export async function expandPdfToFiles(file: File): Promise<File[]> {
   });
 }
 
-export async function saveEodSheet(payload: EodSavePayload): Promise<{ matched_count: number }> {
+/**
+ * Raised when the new sheet's DRs or ONT serials overlap an existing sheet.
+ * Caller decides: cancel, or retry with forceOverlap=true.
+ */
+export class EodOverlapError extends Error {
+  readonly overlaps: EodOverlapMatch[];
+  constructor(overlaps: EodOverlapMatch[], message: string) {
+    super(message);
+    this.name = 'EodOverlapError';
+    this.overlaps = overlaps;
+  }
+}
+
+export async function saveEodSheet(
+  payload: EodSavePayload,
+  options: { forceOverlap?: boolean } = {},
+): Promise<{ matched_count: number }> {
   const res = await fetch('/api/eod/sheets', {
     method: 'POST',
     credentials: 'include',
@@ -114,6 +132,7 @@ export async function saveEodSheet(payload: EodSavePayload): Promise<{ matched_c
       technicianId: payload.technicianId,
       photoHash: payload.photoHash ?? null,
       vlmRawJson: payload.vlmExtraction ?? null,
+      forceOverlap: options.forceOverlap === true,
       entries: payload.entries.map((e) => ({
         row_number: e.row_number,
         ont_serial: e.ont_serial,
@@ -127,9 +146,15 @@ export async function saveEodSheet(payload: EodSavePayload): Promise<{ matched_c
   const json = await res.json() as {
     success: boolean;
     data?: { matched_count: number };
-    error?: { message: string };
+    error?: { code?: string; message: string; details?: { overlaps?: EodOverlapMatch[] } };
     message?: string;
   };
-  if (!json.success) throw new Error(json.error?.message ?? json.message ?? 'Save failed');
+  if (!json.success) {
+    const overlaps = json.error?.details?.overlaps;
+    if (json.error?.code === 'CONFLICT' && Array.isArray(overlaps) && overlaps.length > 0) {
+      throw new EodOverlapError(overlaps, json.error.message);
+    }
+    throw new Error(json.error?.message ?? json.message ?? 'Save failed');
+  }
   return json.data ?? { matched_count: 0 };
 }
