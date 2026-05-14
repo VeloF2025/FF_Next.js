@@ -155,6 +155,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         const [fields, files] = await form.parse(req);
         const file = files.file?.[0];
         const stepIdField = fields.stepId?.[0];
+        const actorIdField = fields.actorId?.[0] ?? null;
         if (!file) return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'file is required');
 
         // Upload to VF Storage
@@ -169,20 +170,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         const storagePath = uploadResult.path ?? `noc/tickets/${uploadResult.filename ?? filename}`;
         const fileUrl = `/api/uploads/${storagePath}`;
 
-        // Insert attachment
+        // Insert attachment, stamping the actor who uploaded it (NULL if no
+        // actor session was established yet — backwards compat).
         await sql`
-          INSERT INTO maintenance_attachments (ticket_id, filename, file_url, file_type, file_size, uploaded_by, description, mime_type, storage_url, is_evidence)
-          VALUES (${ticketId}, ${filename}, ${fileUrl}, 'photo', ${file.size}, ${ticketId}, 'Uploaded by field technician', ${file.mimetype ?? 'image/jpeg'}, ${fileUrl}, true)
+          INSERT INTO maintenance_attachments (ticket_id, filename, file_url, file_type, file_size, uploaded_by, description, mime_type, storage_url, is_evidence, uploaded_by_actor_id)
+          VALUES (${ticketId}, ${filename}, ${fileUrl}, 'photo', ${file.size}, ${ticketId}, 'Uploaded by field technician', ${file.mimetype ?? 'image/jpeg'}, ${fileUrl}, true, ${actorIdField})
         `;
         await sql`UPDATE maintenance_tickets SET attachments_count = attachments_count + 1, updated_at = NOW() WHERE id = ${ticketId}`;
 
-        // Link to verification step and mark complete
+        // Link to verification step and mark complete (stamping the actor).
         if (stepIdField) {
-          await sql`UPDATE maintenance_verification_steps SET photo_url = ${fileUrl}, photo_verified = true, is_complete = true, completed_at = NOW() WHERE id = ${stepIdField} AND ticket_id = ${ticketId}`;
+          await sql`UPDATE maintenance_verification_steps SET photo_url = ${fileUrl}, photo_verified = true, is_complete = true, completed_at = NOW(), completed_by_actor_id = COALESCE(${actorIdField}, completed_by_actor_id) WHERE id = ${stepIdField} AND ticket_id = ${ticketId}`;
         }
 
         fs.unlinkSync(file.filepath);
-        log.info('Shared ticket: photo uploaded', { ticketId, filename, stepId: stepIdField });
+        log.info('Shared ticket: photo uploaded', { ticketId, filename, stepId: stepIdField, actorId: actorIdField });
         return apiResponse.success(res, { uploaded: true, url: fileUrl });
       } catch (err) {
         log.error('Shared ticket: photo upload failed', { ticketId, error: err instanceof Error ? err.message : 'Unknown' });
@@ -199,10 +201,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     } catch {
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Invalid JSON body');
     }
-    const { action, stepId, notes } = body as {
-      action: 'start_work' | 'submit_for_qa' | 'complete_step';
+    const { action, stepId, notes, actorId, name, phone, company, browserFingerprint } = body as {
+      action: 'start_work' | 'submit_for_qa' | 'complete_step' | 'register_actor';
       stepId?: string;
       notes?: string;
+      actorId?: string;
+      // register_actor fields
+      name?: string;
+      phone?: string;
+      company?: string;
+      browserFingerprint?: string;
     };
 
     if (!action) {
@@ -210,6 +218,28 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     try {
+      if (action === 'register_actor') {
+        const trimmedName = (name ?? '').trim();
+        const trimmedPhone = (phone ?? '').trim();
+        const fingerprint = (browserFingerprint ?? '').trim();
+        if (!trimmedName) return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'name is required');
+        if (!trimmedPhone) return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'phone is required');
+        if (!fingerprint) return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'browserFingerprint is required');
+
+        const rows = await sql`
+          INSERT INTO share_session_actors (token, browser_fingerprint, name, phone, company)
+          VALUES (${token}, ${fingerprint}, ${trimmedName}, ${trimmedPhone}, ${company?.trim() || null})
+          ON CONFLICT (token, browser_fingerprint)
+          DO UPDATE SET name = EXCLUDED.name, phone = EXCLUDED.phone, company = EXCLUDED.company, last_seen_at = NOW()
+          RETURNING id, name, phone, company
+        ` as Array<{ id: string; name: string; phone: string; company: string | null }>;
+
+        const actor = rows[0];
+        if (!actor) return apiResponse.internalError(res, new Error('Failed to register actor'));
+        log.info('Shared ticket: actor registered', { ticketId, actorId: actor.id, token: token.substring(0, 8) });
+        return apiResponse.success(res, { actor });
+      }
+
       if (action === 'start_work') {
         if (status !== 'assigned') {
           return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Ticket must be in Assigned status to start work');
@@ -217,7 +247,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         await sql`UPDATE maintenance_tickets SET status = 'in_progress', updated_at = NOW() WHERE id = ${ticketId}`;
         // Mirror status on linked snag row (civils tickets). No-op for other discipline types.
         await sql`UPDATE snags SET status = 'in_progress', updated_at = NOW() WHERE noc_ticket_id = ${ticketId}`;
-        log.info('Shared ticket: start work', { ticketId, token: token.substring(0, 8) });
+        log.info('Shared ticket: start work', { ticketId, actorId: actorId ?? null, token: token.substring(0, 8) });
         return apiResponse.success(res, { newStatus: 'in_progress' });
       }
 
@@ -241,10 +271,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
         await sql`
           UPDATE maintenance_verification_steps
-          SET is_complete = true, completed_at = NOW(), notes = COALESCE(${notes ?? null}, notes)
+          SET is_complete = true,
+              completed_at = NOW(),
+              notes = COALESCE(${notes ?? null}, notes),
+              completed_by_actor_id = COALESCE(${actorId ?? null}, completed_by_actor_id)
           WHERE id = ${stepId} AND ticket_id = ${ticketId}
         `;
-        log.info('Shared ticket: step completed', { ticketId, stepId, token: token.substring(0, 8) });
+        log.info('Shared ticket: step completed', { ticketId, stepId, actorId: actorId ?? null, token: token.substring(0, 8) });
         return apiResponse.success(res, { completed: true });
       }
 

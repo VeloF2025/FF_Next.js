@@ -15,7 +15,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import {
   AlertTriangle, CheckCircle, Circle, Camera, ArrowRight,
-  Lock, Clock, Upload,
+  Lock, Clock, Upload, User,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -53,6 +53,41 @@ interface SharedData {
   attachments: Array<{ id: string; filename: string; storage_url: string }>;
 }
 
+interface SessionActor {
+  id: string;
+  name: string;
+  phone: string;
+  company: string | null;
+}
+
+const ACTOR_STORAGE_KEY = 'ff-resolve-actor';
+const FINGERPRINT_STORAGE_KEY = 'ff-resolve-fingerprint';
+
+function getOrCreateFingerprint(): string {
+  if (typeof window === 'undefined') return '';
+  const existing = window.localStorage.getItem(FINGERPRINT_STORAGE_KEY);
+  if (existing) return existing;
+  const fresh = (crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  window.localStorage.setItem(FINGERPRINT_STORAGE_KEY, fresh);
+  return fresh;
+}
+
+function loadStoredActor(token: string): SessionActor | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(`${ACTOR_STORAGE_KEY}:${token}`);
+    if (!raw) return null;
+    return JSON.parse(raw) as SessionActor;
+  } catch {
+    return null;
+  }
+}
+
+function persistActor(token: string, actor: SessionActor): void {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(`${ACTOR_STORAGE_KEY}:${token}`, JSON.stringify(actor));
+}
+
 // ─── Status helpers ──────────────────────────────────────────────────────────
 
 const STATUS_LABELS: Record<string, string> = {
@@ -81,6 +116,18 @@ export default function SnagResolvePage() {
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [uploadingStep, setUploadingStep] = useState<string | null>(null);
+  const [actor, setActor] = useState<SessionActor | null>(null);
+  const [showIdentityModal, setShowIdentityModal] = useState(false);
+  const [identityForm, setIdentityForm] = useState({ name: '', phone: '', company: '' });
+
+  const tokenStr = typeof token === 'string' ? token : null;
+
+  // Hydrate stored actor on mount (per token).
+  useEffect(() => {
+    if (!tokenStr) return;
+    const stored = loadStoredActor(tokenStr);
+    if (stored) setActor(stored);
+  }, [tokenStr]);
 
   const fetchData = useCallback(async () => {
     if (!token || typeof token !== 'string') return;
@@ -109,7 +156,7 @@ export default function SnagResolvePage() {
       const res = await fetch(`/api/snags/shared/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, ...extra }),
+        body: JSON.stringify({ action, actorId: actor?.id, ...extra }),
       });
       if (!res.ok) {
         const json = await res.json().catch(() => null);
@@ -131,6 +178,7 @@ export default function SnagResolvePage() {
       formData.append('file', file);
       formData.append('action', 'upload_photo');
       formData.append('stepId', stepId);
+      if (actor?.id) formData.append('actorId', actor.id);
 
       const res = await fetch(`/api/snags/shared/${token}`, {
         method: 'POST',
@@ -143,6 +191,63 @@ export default function SnagResolvePage() {
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setUploadingStep(null);
+    }
+  };
+
+  const registerActor = async (): Promise<SessionActor | null> => {
+    if (!tokenStr) return null;
+    const trimmedName = identityForm.name.trim();
+    const trimmedPhone = identityForm.phone.trim();
+    if (!trimmedName || !trimmedPhone) {
+      setError('Name and WhatsApp number are required.');
+      return null;
+    }
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/snags/shared/${tokenStr}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'register_actor',
+          name: trimmedName,
+          phone: trimmedPhone,
+          company: identityForm.company.trim() || undefined,
+          browserFingerprint: getOrCreateFingerprint(),
+        }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error?.message ?? 'Register failed');
+      }
+      const json = await res.json();
+      const registered = json.data?.actor as SessionActor | undefined;
+      if (!registered) throw new Error('Register failed');
+      setActor(registered);
+      persistActor(tokenStr, registered);
+      setError(null);
+      return registered;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Register failed');
+      return null;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleStartWork = async () => {
+    if (!actor) {
+      setShowIdentityModal(true);
+      return;
+    }
+    void performAction('start_work');
+  };
+
+  const handleIdentitySubmit = async () => {
+    const registered = await registerActor();
+    if (!registered) return;
+    setShowIdentityModal(false);
+    if (data?.canStartWork) {
+      void performAction('start_work');
     }
   };
 
@@ -194,6 +299,12 @@ export default function SnagResolvePage() {
         {ticket.project_name && (
           <p className="text-xs text-zinc-500">Project: {ticket.project_name}</p>
         )}
+        {actor && (
+          <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-zinc-400 bg-zinc-800/60 border border-zinc-700 rounded px-2 py-1">
+            <User className="w-3 h-3" />
+            <span>Logged in as <span className="text-zinc-200">{actor.name}</span>{actor.company ? ` · ${actor.company}` : ''}</span>
+          </div>
+        )}
       </div>
 
       {/* Error banner */}
@@ -232,7 +343,7 @@ export default function SnagResolvePage() {
           </p>
           <button
             type="button"
-            onClick={() => { void performAction('start_work'); }}
+            onClick={() => { void handleStartWork(); }}
             disabled={actionLoading}
             className="inline-flex items-center gap-2 px-6 py-2.5 bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
           >
@@ -354,6 +465,70 @@ export default function SnagResolvePage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Identity capture modal */}
+      {showIdentityModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-md rounded-lg bg-zinc-900 border border-zinc-700 p-5">
+            <h3 className="text-base font-semibold text-zinc-100 mb-1">Who are you?</h3>
+            <p className="text-xs text-zinc-400 mb-4">
+              We need your details before you can start work. Stamped on every photo and step you complete.
+            </p>
+            <div className="space-y-3">
+              <label className="block">
+                <span className="text-xs text-zinc-300">Your name *</span>
+                <input
+                  type="text"
+                  value={identityForm.name}
+                  onChange={(e) => setIdentityForm((f) => ({ ...f, name: e.target.value }))}
+                  className="mt-1 w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-sm text-zinc-100 placeholder:text-zinc-500"
+                  placeholder="e.g. Sipho Nkosi"
+                  autoFocus
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs text-zinc-300">WhatsApp number *</span>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  value={identityForm.phone}
+                  onChange={(e) => setIdentityForm((f) => ({ ...f, phone: e.target.value }))}
+                  className="mt-1 w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-sm text-zinc-100 placeholder:text-zinc-500"
+                  placeholder="e.g. 082 123 4567"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs text-zinc-300">Company (optional)</span>
+                <input
+                  type="text"
+                  value={identityForm.company}
+                  onChange={(e) => setIdentityForm((f) => ({ ...f, company: e.target.value }))}
+                  className="mt-1 w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-sm text-zinc-100 placeholder:text-zinc-500"
+                  placeholder="e.g. JK Civils"
+                />
+              </label>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button
+                type="button"
+                onClick={() => setShowIdentityModal(false)}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-300 text-sm rounded"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { void handleIdentitySubmit(); }}
+                disabled={actionLoading || !identityForm.name.trim() || !identityForm.phone.trim()}
+                className="flex-1 px-4 py-2 bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white font-medium text-sm rounded"
+              >
+                {actionLoading ? 'Saving…' : 'Save & Start Work'}
+              </button>
+            </div>
           </div>
         </div>
       )}
