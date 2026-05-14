@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Droppable, Draggable } from '@hello-pangea/dnd';
 import { X, GripVertical } from 'lucide-react';
 import type { VlmSlotResult, SlotApproval } from '../types/works-qa.types';
@@ -34,6 +34,11 @@ export function PhotoSlotCard({
   const [showSnagForm, setShowSnagForm] = useState(false);
   const [approving, setApproving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Close the snag form if the discipline becomes approved while it is open.
+  // Without this, an un-approval (discipline re-opened) would silently restore
+  // the previously-open form because `showSnagForm` would still be true.
+  useEffect(() => { if (disabled) setShowSnagForm(false); }, [disabled]);
 
   const status: 'empty' | 'pass' | 'fail' | 'overridden' =
     !photoKey ? 'empty'
