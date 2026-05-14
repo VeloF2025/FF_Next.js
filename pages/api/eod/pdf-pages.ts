@@ -28,11 +28,15 @@ async function pdfToJpegPages(
   try {
     await writeFile(pdfPath, Buffer.from(pdfBase64, 'base64'));
 
+    // 300 DPI is the minimum where Code-128 stickers on a 10-row EOD form
+    // produce ~2px per bar — the practical floor for zxing to decode. Lower
+    // (150 DPI) gives ~1px bars and the scanner returns zero hits, forcing
+    // the pipeline onto OCR fallback which mis-reads the printed serials.
     await execFileAsync(
       'gs',
       [
         '-sDEVICE=jpeg',
-        '-r150',
+        '-r300',
         '-dBATCH',
         '-dNOPAUSE',
         '-q',
@@ -40,7 +44,7 @@ async function pdfToJpegPages(
         `-sOutputFile=${join(tmpDir, 'page-%d.jpg')}`,
         pdfPath,
       ],
-      { timeout: 60000 },
+      { timeout: 120000 },
     );
 
     const files: string[] = await readdir(tmpDir);
