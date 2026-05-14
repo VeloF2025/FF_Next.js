@@ -62,6 +62,11 @@ export const PPDataRow = React.memo(function PPDataRow({
                 (WA)
               </span>
             )}
+            {record.activation_source === 'eod' && (
+              <span className="ml-1 text-[10px] text-[var(--ff-text-tertiary)]" title="EOD sheet date — no OES activation or WA submission">
+                (EOD)
+              </span>
+            )}
           </span>
         ) : '-'}
       </td>
@@ -72,6 +77,11 @@ export const PPDataRow = React.memo(function PPDataRow({
         {record.wa_name ? (
           <div>
             <span className="text-[var(--ff-text-primary)]">{record.wa_name}</span>
+            {record.technician_source === 'eod' && (
+              <span className="ml-1 text-[10px] text-[var(--ff-text-tertiary)]" title="From EOD install sheet — not a WhatsApp submission">
+                (EOD)
+              </span>
+            )}
             {record.wa_phone && (
               <span className="block text-[var(--ff-text-tertiary)] font-mono text-[10px]">{record.wa_phone}</span>
             )}

@@ -1206,6 +1206,122 @@ async function runWAMessageSerialScan(): Promise<{
 }
 
 /**
+ * Layer 6: Resolve PP serials via EOD install-sheet entries.
+ *
+ * EOD sheets are technician-uploaded Excel summaries of a day's installs.
+ * Each entry pairs an ONT serial with a DR number, plus the gizzu (UPS)
+ * serial and the parent sheet's technician + date. This is the most reliable
+ * field-data signal we have apart from the OES export.
+ *
+ * For each unresolved PP, match `serial_number` against `ont_serial` (ONT only —
+ * the gizzu_serial is a UPS, semantically distinct from the PP ONT serial). If a
+ * match exists, mark the PP `located_local` with `resolved_source='eod_sheet'`
+ * and link to the EOD entry's DR. Also propagate EOD knowledge to `drops` and
+ * `dr_photo_unified_reviews` so the UI display columns populate.
+ */
+async function runEODSheetScan(): Promise<{
+  pp_matched: number;
+  drops_backfilled: number;
+  dur_backfilled: number;
+  errors: number;
+}> {
+  const results = { pp_matched: 0, drops_backfilled: 0, dur_backfilled: 0, errors: 0 };
+
+  // Match unresolved PPs against EOD ONT serials.
+  const matchResult = await pool.query(`
+    UPDATE oes_pp_data pp
+    SET resolution_status = 'located_local',
+        resolved_drop_number = e.dr_number,
+        resolved_source = 'eod_sheet',
+        resolved_details = jsonb_build_object(
+          'eod_entry_id', e.id::text,
+          'sheet_date', s.sheet_date::text,
+          'technician_name', s.technician_name,
+          'velocity_rep_name', s.velocity_rep_name,
+          'gizzu_serial', e.gizzu_serial
+        ),
+        resolved_at = NOW(), updated_at = NOW()
+    FROM eod_install_sheet_entries e
+    JOIN eod_install_sheets s ON s.id = e.sheet_id
+    WHERE UPPER(pp.serial_number) = UPPER(e.ont_serial)
+      AND e.dr_number IS NOT NULL
+      AND pp.resolution_status = 'not_found'
+    RETURNING pp.resolved_drop_number, pp.serial_number
+  `);
+  results.pp_matched = matchResult.rowCount || 0;
+
+  // Propagate EOD ONT + gizzu serials to drops (idempotent: only fill nulls).
+  // This is independent of PP matching — any EOD entry whose DR exists in drops
+  // and has no serial recorded yet should learn from EOD.
+  const dropsOntResult = await pool.query(`
+    UPDATE drops d
+    SET ont_serial = e.ont_serial, updated_at = NOW()
+    FROM eod_install_sheet_entries e
+    WHERE e.dr_number = d.drop_number
+      AND e.ont_serial IS NOT NULL
+      AND d.ont_serial IS NULL
+  `);
+  const dropsUpsResult = await pool.query(`
+    UPDATE drops d
+    SET mini_ups_serial = e.gizzu_serial, updated_at = NOW()
+    FROM eod_install_sheet_entries e
+    WHERE e.dr_number = d.drop_number
+      AND e.gizzu_serial IS NOT NULL
+      AND d.mini_ups_serial IS NULL
+  `);
+  results.drops_backfilled = (dropsOntResult.rowCount || 0) + (dropsUpsResult.rowCount || 0);
+
+  // Propagate to dr_photo_unified_reviews (ONT + UPS serials + installer_name).
+  const durOntResult = await pool.query(`
+    UPDATE dr_photo_unified_reviews dur
+    SET ont_serial_scanned = e.ont_serial, updated_at = NOW()
+    FROM eod_install_sheet_entries e
+    WHERE e.dr_number = dur.drop_number
+      AND e.ont_serial IS NOT NULL
+      AND dur.ont_serial_scanned IS NULL
+  `);
+  const durUpsResult = await pool.query(`
+    UPDATE dr_photo_unified_reviews dur
+    SET ups_serial_scanned = e.gizzu_serial, updated_at = NOW()
+    FROM eod_install_sheet_entries e
+    WHERE e.dr_number = dur.drop_number
+      AND e.gizzu_serial IS NOT NULL
+      AND dur.ups_serial_scanned IS NULL
+  `);
+  const durInstallerResult = await pool.query(`
+    UPDATE dr_photo_unified_reviews dur
+    SET installer_name = s.technician_name, updated_at = NOW()
+    FROM eod_install_sheet_entries e
+    JOIN eod_install_sheets s ON s.id = e.sheet_id
+    WHERE e.dr_number = dur.drop_number
+      AND s.technician_name IS NOT NULL
+      AND dur.installer_name IS NULL
+  `);
+  results.dur_backfilled =
+    (durOntResult.rowCount || 0) +
+    (durUpsResult.rowCount || 0) +
+    (durInstallerResult.rowCount || 0);
+
+  // Where the EOD technician matches a wa_contacts entry by formal_name, backfill
+  // sender_phone on dur so the WA Technician column populates via the existing
+  // wa_contacts join. Idempotent: only set when sender_phone is null.
+  const durSenderPhoneResult = await pool.query(`
+    UPDATE dr_photo_unified_reviews dur
+    SET sender_phone = wc.sender_phone, updated_at = NOW()
+    FROM eod_install_sheet_entries e
+    JOIN eod_install_sheets s ON s.id = e.sheet_id
+    JOIN wa_contacts wc ON LOWER(wc.formal_name) = LOWER(s.technician_name)
+    WHERE e.dr_number = dur.drop_number
+      AND dur.sender_phone IS NULL
+      AND s.technician_name IS NOT NULL
+  `);
+  results.dur_backfilled += durSenderPhoneResult.rowCount || 0;
+
+  logger.info('EOD sheet scan complete', results);
+  return results;
+}
+
+/**
  * Backfill GPS on resolved PP records and their linked tables.
  * Priority: drops → oes_activations → onemap_drops
  * Also propagates to dr_photo_unified_reviews and fills gaps in the drops table.
@@ -1353,16 +1469,25 @@ async function handler(
       return res.status(200).json({ success: true, data: scanResult });
     }
 
+    if (action === 'eod-scan') {
+      // Standalone: resolve via EOD install-sheet entries + propagate to drops/dur
+      const eodResult = await runEODSheetScan();
+      return res.status(200).json({ success: true, data: eodResult });
+    }
+
     if (action === 'resolve-all') {
-      // Pipeline: local-scan → WA cross-ref → WA photo VLM → WA message scan → WA group backfill → 1Map (background)
+      // Pipeline: EOD → local-scan → WA cross-ref → WA photo VLM → WA message scan → WA group backfill → 1Map (background)
+      // EOD runs first so its high-quality DR/serial pairs are visible to downstream scans
+      // (e.g. local-scan will then find them via drops.ont_serial / dur.ont_serial_scanned).
       const cutoff = new Date();
+      const eodResult = await runEODSheetScan();
       const localResult = await runLocalResolution();
       const crossRefResult = await runWACrossReference();
       const vlmResult = await runWAPhotoVLMScan();
       const msgScanResult = await runWAMessageSerialScan();
       const waBackfillResult = await runWAGroupBackfill();
 
-      // Sync ticket activities for all records resolved in steps 1-4
+      // Sync ticket activities for all records resolved in steps 1-5
       const ticketsUpdated = await syncTicketActivities(cutoff);
       const gps = await backfillGpsCoordinates();
 
@@ -1378,6 +1503,7 @@ async function handler(
         success: true,
         data: {
           total_resolved:
+            eodResult.pp_matched +
             localResult.total_resolved +
             crossRefResult.total_resolved +
             vlmResult.total_pp_matched +
@@ -1386,6 +1512,7 @@ async function handler(
           tickets_updated: ticketsUpdated,
           gps_updated: gps,
           steps: {
+            eod_scan: eodResult,
             local_scan: { resolved: localResult.total_resolved, sources: localResult.sources },
             wa_cross_ref: { resolved: crossRefResult.total_resolved, drs_checked: crossRefResult.total_drs_checked, backfilled: crossRefResult.total_backfilled },
             wa_photo_vlm: { resolved: vlmResult.total_pp_matched, photos_processed: vlmResult.total_vlm_processed, drs_scanned: vlmResult.drs_scanned },
@@ -1396,7 +1523,7 @@ async function handler(
       });
     }
 
-    return res.status(400).json({ error: 'Invalid action. Use "local-scan", "1map-lookup", "wa-backfill", "wa-message-scan", or "resolve-all".' });
+    return res.status(400).json({ error: 'Invalid action. Use "local-scan", "1map-lookup", "wa-backfill", "wa-message-scan", "eod-scan", or "resolve-all".' });
   } catch (error) {
     logger.error('Resolution failed', {
       error: error instanceof Error ? error.message : String(error),

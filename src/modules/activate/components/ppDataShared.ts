@@ -17,10 +17,11 @@ export interface PPRecord {
   ticket_created_at: string | null;
   oes_team: string | null;
   activation_date: string | null;
-  activation_source: 'oes' | 'wa' | null;
+  activation_source: 'oes' | 'wa' | 'eod' | null;
   wa_phone: string | null;
   wa_name: string | null;
   wa_team: string | null;
+  technician_source: 'wa' | 'eod' | null;
   zone_no: number | null;
   pon_no: number | null;
   olt_port: string | null;
