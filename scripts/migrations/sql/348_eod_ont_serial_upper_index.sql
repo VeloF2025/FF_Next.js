@@ -6,8 +6,11 @@
 -- the resolve runs.
 --
 -- Idempotent: CREATE INDEX IF NOT EXISTS.
--- Concurrent build so it can run on production without locking writes.
+-- Plain (non-CONCURRENT) because scripts/run-pending-migrations.sh wraps every
+-- migration in `psql -1` (single transaction). CONCURRENTLY can't run inside a
+-- transaction. The table is small (~50 rows), so the brief AccessExclusiveLock
+-- during index build is negligible.
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_eod_entries_upper_ont_serial
+CREATE INDEX IF NOT EXISTS idx_eod_entries_upper_ont_serial
   ON eod_install_sheet_entries (UPPER(ont_serial))
   WHERE ont_serial IS NOT NULL;

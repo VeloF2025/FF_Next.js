@@ -1227,15 +1227,10 @@ async function runEODSheetScan(): Promise<{
 }> {
   const results = { pp_matched: 0, drops_backfilled: 0, dur_backfilled: 0, errors: 0 };
 
-  // Source CTE used by every write below: the newest EOD entry per ONT serial AND
-  // per DR. The double DISTINCT ON guarantees deterministic results regardless of
-  // re-uploads or duplicate sheets, with sheet_date (then id) as tiebreaker.
-  // eod_by_serial — newest entry for each ont_serial (used to resolve PPs)
-  // eod_by_dr     — newest entry for each dr_number (used to propagate to drops/dur)
-  //
-  // wa_contacts.formal_name is not unique, so the contact lookup also de-dupes via
-  // DISTINCT ON, preferring active contacts.
-  const eodSourceCTE = `
+  // Source CTEs. Split so only the PP match recomputes eod_by_serial (used once),
+  // while the propagation writes share eod_by_dr (newest entry per dr_number).
+  // DISTINCT ON tiebreaker: sheet_date DESC, id DESC for deterministic picks.
+  const eodBySerialCTE = `
     WITH eod_by_serial AS (
       SELECT DISTINCT ON (e.ont_serial)
              e.id AS entry_id, e.ont_serial, e.dr_number, e.gizzu_serial,
@@ -1244,8 +1239,10 @@ async function runEODSheetScan(): Promise<{
       JOIN eod_install_sheets s ON s.id = e.sheet_id
       WHERE e.ont_serial IS NOT NULL AND e.dr_number IS NOT NULL
       ORDER BY e.ont_serial, s.sheet_date DESC NULLS LAST, e.id DESC
-    ),
-    eod_by_dr AS (
+    )
+  `;
+  const eodByDrCTE = `
+    WITH eod_by_dr AS (
       SELECT DISTINCT ON (e.dr_number)
              e.id AS entry_id, e.dr_number, e.ont_serial, e.gizzu_serial,
              s.sheet_date, s.technician_name, s.velocity_rep_name
@@ -1262,10 +1259,8 @@ async function runEODSheetScan(): Promise<{
   try {
     await client.query('BEGIN');
 
-    // PP match — RETURNING gives row count via rows.length (rowCount is also valid
-    // for UPDATE...RETURNING but rows.length is unambiguous).
     const matchResult = await client.query(`
-      ${eodSourceCTE}
+      ${eodBySerialCTE}
       UPDATE oes_pp_data pp
       SET resolution_status = 'located_local',
           resolved_drop_number = e.dr_number,
@@ -1281,11 +1276,14 @@ async function runEODSheetScan(): Promise<{
       FROM eod_by_serial e
       WHERE UPPER(pp.serial_number) = UPPER(e.ont_serial)
         AND pp.resolution_status = 'not_found'
-        AND EXISTS (
+        -- Cross-project guard: only block when drops HAS a row for this DR but in
+        -- a different project than pp.project. If drops has no row yet (SOW not
+        -- imported), allow the match — the EOD signal is still authoritative.
+        AND NOT EXISTS (
           SELECT 1 FROM drops d
           JOIN projects p ON p.id = d.project_id
           WHERE d.drop_number = e.dr_number
-            AND p.project_name = pp.project
+            AND p.project_name IS DISTINCT FROM pp.project
         )
       RETURNING pp.id
     `);
@@ -1294,40 +1292,30 @@ async function runEODSheetScan(): Promise<{
     // Drops backfill: drops is UNIQUE(project_id, drop_number) — drop_number can
     // appear in multiple projects. Only write where there is exactly ONE drops row
     // for the DR, otherwise we'd silently corrupt an unrelated project's serial.
-    const dropsOntResult = await client.query(`
-      ${eodSourceCTE},
+    // Single UPDATE writes both ont_serial and mini_ups_serial (each gated by its
+    // own IS NULL + IS NOT NULL guard), halving the scan cost vs two passes.
+    const dropsResult = await client.query(`
+      ${eodByDrCTE},
       unique_drops AS (
         SELECT drop_number FROM drops
         GROUP BY drop_number HAVING COUNT(*) = 1
       )
       UPDATE drops d
-      SET ont_serial = e.ont_serial, updated_at = NOW()
+      SET ont_serial = COALESCE(d.ont_serial, e.ont_serial),
+          mini_ups_serial = COALESCE(d.mini_ups_serial, e.gizzu_serial),
+          updated_at = NOW()
       FROM eod_by_dr e
       JOIN unique_drops u ON u.drop_number = e.dr_number
       WHERE e.dr_number = d.drop_number
-        AND e.ont_serial IS NOT NULL
-        AND d.ont_serial IS NULL
+        AND ((d.ont_serial IS NULL AND e.ont_serial IS NOT NULL)
+          OR (d.mini_ups_serial IS NULL AND e.gizzu_serial IS NOT NULL))
     `);
-    const dropsUpsResult = await client.query(`
-      ${eodSourceCTE},
-      unique_drops AS (
-        SELECT drop_number FROM drops
-        GROUP BY drop_number HAVING COUNT(*) = 1
-      )
-      UPDATE drops d
-      SET mini_ups_serial = e.gizzu_serial, updated_at = NOW()
-      FROM eod_by_dr e
-      JOIN unique_drops u ON u.drop_number = e.dr_number
-      WHERE e.dr_number = d.drop_number
-        AND e.gizzu_serial IS NOT NULL
-        AND d.mini_ups_serial IS NULL
-    `);
-    results.drops_backfilled = (dropsOntResult.rowCount || 0) + (dropsUpsResult.rowCount || 0);
+    results.drops_backfilled = dropsResult.rowCount || 0;
 
     // dr_photo_unified_reviews.drop_number IS unique globally — no project scoping
     // needed. Three idempotent backfills (only updates where target IS NULL).
     const durOntResult = await client.query(`
-      ${eodSourceCTE}
+      ${eodByDrCTE}
       UPDATE dr_photo_unified_reviews dur
       SET ont_serial_scanned = e.ont_serial, updated_at = NOW()
       FROM eod_by_dr e
@@ -1336,7 +1324,7 @@ async function runEODSheetScan(): Promise<{
         AND dur.ont_serial_scanned IS NULL
     `);
     const durUpsResult = await client.query(`
-      ${eodSourceCTE}
+      ${eodByDrCTE}
       UPDATE dr_photo_unified_reviews dur
       SET ups_serial_scanned = e.gizzu_serial, updated_at = NOW()
       FROM eod_by_dr e
@@ -1345,7 +1333,7 @@ async function runEODSheetScan(): Promise<{
         AND dur.ups_serial_scanned IS NULL
     `);
     const durInstallerResult = await client.query(`
-      ${eodSourceCTE}
+      ${eodByDrCTE}
       UPDATE dr_photo_unified_reviews dur
       SET installer_name = e.technician_name, updated_at = NOW()
       FROM eod_by_dr e
@@ -1363,7 +1351,7 @@ async function runEODSheetScan(): Promise<{
     // then newest by updated_at). Skips technicians whose name maps to >1 active
     // contact to avoid attributing the install to the wrong person.
     const durSenderPhoneResult = await client.query(`
-      ${eodSourceCTE},
+      ${eodByDrCTE},
       unique_contacts AS (
         SELECT DISTINCT ON (LOWER(formal_name))
                formal_name, sender_phone
