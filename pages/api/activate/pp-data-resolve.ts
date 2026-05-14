@@ -1227,95 +1227,183 @@ async function runEODSheetScan(): Promise<{
 }> {
   const results = { pp_matched: 0, drops_backfilled: 0, dur_backfilled: 0, errors: 0 };
 
-  // Match unresolved PPs against EOD ONT serials.
-  const matchResult = await pool.query(`
-    UPDATE oes_pp_data pp
-    SET resolution_status = 'located_local',
-        resolved_drop_number = e.dr_number,
-        resolved_source = 'eod_sheet',
-        resolved_details = jsonb_build_object(
-          'eod_entry_id', e.id::text,
-          'sheet_date', s.sheet_date::text,
-          'technician_name', s.technician_name,
-          'velocity_rep_name', s.velocity_rep_name,
-          'gizzu_serial', e.gizzu_serial
-        ),
-        resolved_at = NOW(), updated_at = NOW()
-    FROM eod_install_sheet_entries e
-    JOIN eod_install_sheets s ON s.id = e.sheet_id
-    WHERE UPPER(pp.serial_number) = UPPER(e.ont_serial)
-      AND e.dr_number IS NOT NULL
-      AND pp.resolution_status = 'not_found'
-    RETURNING pp.resolved_drop_number, pp.serial_number
-  `);
-  results.pp_matched = matchResult.rowCount || 0;
+  // Source CTE used by every write below: the newest EOD entry per ONT serial AND
+  // per DR. The double DISTINCT ON guarantees deterministic results regardless of
+  // re-uploads or duplicate sheets, with sheet_date (then id) as tiebreaker.
+  // eod_by_serial — newest entry for each ont_serial (used to resolve PPs)
+  // eod_by_dr     — newest entry for each dr_number (used to propagate to drops/dur)
+  //
+  // wa_contacts.formal_name is not unique, so the contact lookup also de-dupes via
+  // DISTINCT ON, preferring active contacts.
+  const eodSourceCTE = `
+    WITH eod_by_serial AS (
+      SELECT DISTINCT ON (e.ont_serial)
+             e.id AS entry_id, e.ont_serial, e.dr_number, e.gizzu_serial,
+             s.sheet_date, s.technician_name, s.velocity_rep_name
+      FROM eod_install_sheet_entries e
+      JOIN eod_install_sheets s ON s.id = e.sheet_id
+      WHERE e.ont_serial IS NOT NULL AND e.dr_number IS NOT NULL
+      ORDER BY e.ont_serial, s.sheet_date DESC NULLS LAST, e.id DESC
+    ),
+    eod_by_dr AS (
+      SELECT DISTINCT ON (e.dr_number)
+             e.id AS entry_id, e.dr_number, e.ont_serial, e.gizzu_serial,
+             s.sheet_date, s.technician_name, s.velocity_rep_name
+      FROM eod_install_sheet_entries e
+      JOIN eod_install_sheets s ON s.id = e.sheet_id
+      WHERE e.dr_number IS NOT NULL
+      ORDER BY e.dr_number, s.sheet_date DESC NULLS LAST, e.id DESC
+    )
+  `;
 
-  // Propagate EOD ONT + gizzu serials to drops (idempotent: only fill nulls).
-  // This is independent of PP matching — any EOD entry whose DR exists in drops
-  // and has no serial recorded yet should learn from EOD.
-  const dropsOntResult = await pool.query(`
-    UPDATE drops d
-    SET ont_serial = e.ont_serial, updated_at = NOW()
-    FROM eod_install_sheet_entries e
-    WHERE e.dr_number = d.drop_number
-      AND e.ont_serial IS NOT NULL
-      AND d.ont_serial IS NULL
-  `);
-  const dropsUpsResult = await pool.query(`
-    UPDATE drops d
-    SET mini_ups_serial = e.gizzu_serial, updated_at = NOW()
-    FROM eod_install_sheet_entries e
-    WHERE e.dr_number = d.drop_number
-      AND e.gizzu_serial IS NOT NULL
-      AND d.mini_ups_serial IS NULL
-  `);
-  results.drops_backfilled = (dropsOntResult.rowCount || 0) + (dropsUpsResult.rowCount || 0);
+  // Transaction wrapper: all writes succeed together or roll back. Without this,
+  // a mid-pass failure leaves drops half-populated and the counters out of sync.
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-  // Propagate to dr_photo_unified_reviews (ONT + UPS serials + installer_name).
-  const durOntResult = await pool.query(`
-    UPDATE dr_photo_unified_reviews dur
-    SET ont_serial_scanned = e.ont_serial, updated_at = NOW()
-    FROM eod_install_sheet_entries e
-    WHERE e.dr_number = dur.drop_number
-      AND e.ont_serial IS NOT NULL
-      AND dur.ont_serial_scanned IS NULL
-  `);
-  const durUpsResult = await pool.query(`
-    UPDATE dr_photo_unified_reviews dur
-    SET ups_serial_scanned = e.gizzu_serial, updated_at = NOW()
-    FROM eod_install_sheet_entries e
-    WHERE e.dr_number = dur.drop_number
-      AND e.gizzu_serial IS NOT NULL
-      AND dur.ups_serial_scanned IS NULL
-  `);
-  const durInstallerResult = await pool.query(`
-    UPDATE dr_photo_unified_reviews dur
-    SET installer_name = s.technician_name, updated_at = NOW()
-    FROM eod_install_sheet_entries e
-    JOIN eod_install_sheets s ON s.id = e.sheet_id
-    WHERE e.dr_number = dur.drop_number
-      AND s.technician_name IS NOT NULL
-      AND dur.installer_name IS NULL
-  `);
-  results.dur_backfilled =
-    (durOntResult.rowCount || 0) +
-    (durUpsResult.rowCount || 0) +
-    (durInstallerResult.rowCount || 0);
+    // PP match — RETURNING gives row count via rows.length (rowCount is also valid
+    // for UPDATE...RETURNING but rows.length is unambiguous).
+    const matchResult = await client.query(`
+      ${eodSourceCTE}
+      UPDATE oes_pp_data pp
+      SET resolution_status = 'located_local',
+          resolved_drop_number = e.dr_number,
+          resolved_source = 'eod_sheet',
+          resolved_details = jsonb_build_object(
+            'eod_entry_id', e.entry_id::text,
+            'sheet_date', e.sheet_date::text,
+            'technician_name', e.technician_name,
+            'velocity_rep_name', e.velocity_rep_name,
+            'gizzu_serial', e.gizzu_serial
+          ),
+          resolved_at = NOW(), updated_at = NOW()
+      FROM eod_by_serial e
+      WHERE UPPER(pp.serial_number) = UPPER(e.ont_serial)
+        AND pp.resolution_status = 'not_found'
+        AND EXISTS (
+          SELECT 1 FROM drops d
+          JOIN projects p ON p.id = d.project_id
+          WHERE d.drop_number = e.dr_number
+            AND p.project_name = pp.project
+        )
+      RETURNING pp.id
+    `);
+    results.pp_matched = matchResult.rows.length;
 
-  // Where the EOD technician matches a wa_contacts entry by formal_name, backfill
-  // sender_phone on dur so the WA Technician column populates via the existing
-  // wa_contacts join. Idempotent: only set when sender_phone is null.
-  const durSenderPhoneResult = await pool.query(`
-    UPDATE dr_photo_unified_reviews dur
-    SET sender_phone = wc.sender_phone, updated_at = NOW()
-    FROM eod_install_sheet_entries e
-    JOIN eod_install_sheets s ON s.id = e.sheet_id
-    JOIN wa_contacts wc ON LOWER(wc.formal_name) = LOWER(s.technician_name)
-    WHERE e.dr_number = dur.drop_number
-      AND dur.sender_phone IS NULL
-      AND s.technician_name IS NOT NULL
-  `);
-  results.dur_backfilled += durSenderPhoneResult.rowCount || 0;
+    // Drops backfill: drops is UNIQUE(project_id, drop_number) — drop_number can
+    // appear in multiple projects. Only write where there is exactly ONE drops row
+    // for the DR, otherwise we'd silently corrupt an unrelated project's serial.
+    const dropsOntResult = await client.query(`
+      ${eodSourceCTE},
+      unique_drops AS (
+        SELECT drop_number FROM drops
+        GROUP BY drop_number HAVING COUNT(*) = 1
+      )
+      UPDATE drops d
+      SET ont_serial = e.ont_serial, updated_at = NOW()
+      FROM eod_by_dr e
+      JOIN unique_drops u ON u.drop_number = e.dr_number
+      WHERE e.dr_number = d.drop_number
+        AND e.ont_serial IS NOT NULL
+        AND d.ont_serial IS NULL
+    `);
+    const dropsUpsResult = await client.query(`
+      ${eodSourceCTE},
+      unique_drops AS (
+        SELECT drop_number FROM drops
+        GROUP BY drop_number HAVING COUNT(*) = 1
+      )
+      UPDATE drops d
+      SET mini_ups_serial = e.gizzu_serial, updated_at = NOW()
+      FROM eod_by_dr e
+      JOIN unique_drops u ON u.drop_number = e.dr_number
+      WHERE e.dr_number = d.drop_number
+        AND e.gizzu_serial IS NOT NULL
+        AND d.mini_ups_serial IS NULL
+    `);
+    results.drops_backfilled = (dropsOntResult.rowCount || 0) + (dropsUpsResult.rowCount || 0);
+
+    // dr_photo_unified_reviews.drop_number IS unique globally — no project scoping
+    // needed. Three idempotent backfills (only updates where target IS NULL).
+    const durOntResult = await client.query(`
+      ${eodSourceCTE}
+      UPDATE dr_photo_unified_reviews dur
+      SET ont_serial_scanned = e.ont_serial, updated_at = NOW()
+      FROM eod_by_dr e
+      WHERE e.dr_number = dur.drop_number
+        AND e.ont_serial IS NOT NULL
+        AND dur.ont_serial_scanned IS NULL
+    `);
+    const durUpsResult = await client.query(`
+      ${eodSourceCTE}
+      UPDATE dr_photo_unified_reviews dur
+      SET ups_serial_scanned = e.gizzu_serial, updated_at = NOW()
+      FROM eod_by_dr e
+      WHERE e.dr_number = dur.drop_number
+        AND e.gizzu_serial IS NOT NULL
+        AND dur.ups_serial_scanned IS NULL
+    `);
+    const durInstallerResult = await client.query(`
+      ${eodSourceCTE}
+      UPDATE dr_photo_unified_reviews dur
+      SET installer_name = e.technician_name, updated_at = NOW()
+      FROM eod_by_dr e
+      WHERE e.dr_number = dur.drop_number
+        AND e.technician_name IS NOT NULL
+        AND dur.installer_name IS NULL
+    `);
+    results.dur_backfilled =
+      (durOntResult.rowCount || 0) +
+      (durUpsResult.rowCount || 0) +
+      (durInstallerResult.rowCount || 0);
+
+    // sender_phone backfill: wa_contacts.formal_name is NOT unique. Use a deduped
+    // CTE that picks ONE contact per lowercase formal_name (preferring active,
+    // then newest by updated_at). Skips technicians whose name maps to >1 active
+    // contact to avoid attributing the install to the wrong person.
+    const durSenderPhoneResult = await client.query(`
+      ${eodSourceCTE},
+      unique_contacts AS (
+        SELECT DISTINCT ON (LOWER(formal_name))
+               formal_name, sender_phone
+        FROM wa_contacts
+        WHERE formal_name IS NOT NULL
+          AND sender_phone IS NOT NULL
+          AND is_active = true
+        ORDER BY LOWER(formal_name), updated_at DESC NULLS LAST, id DESC
+      ),
+      ambiguous_names AS (
+        SELECT LOWER(formal_name) AS fname
+        FROM wa_contacts
+        WHERE formal_name IS NOT NULL AND sender_phone IS NOT NULL AND is_active = true
+        GROUP BY LOWER(formal_name) HAVING COUNT(*) > 1
+      )
+      UPDATE dr_photo_unified_reviews dur
+      SET sender_phone = uc.sender_phone, updated_at = NOW()
+      FROM eod_by_dr e
+      JOIN unique_contacts uc ON LOWER(uc.formal_name) = LOWER(e.technician_name)
+      WHERE e.dr_number = dur.drop_number
+        AND dur.sender_phone IS NULL
+        AND e.technician_name IS NOT NULL
+        AND LOWER(e.technician_name) NOT IN (SELECT fname FROM ambiguous_names)
+    `);
+    results.dur_backfilled += durSenderPhoneResult.rowCount || 0;
+
+    await client.query('COMMIT');
+  } catch (txErr) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackErr) {
+      logger.warn('EOD scan: rollback failed (non-fatal — original error rethrown)', {
+        rollbackError: rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr),
+      });
+    }
+    results.errors++;
+    throw txErr;
+  } finally {
+    client.release();
+  }
 
   logger.info('EOD sheet scan complete', results);
   return results;

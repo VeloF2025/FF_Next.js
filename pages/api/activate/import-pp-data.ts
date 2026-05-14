@@ -184,7 +184,7 @@ async function handler(
          FROM eod_install_sheet_entries e
          JOIN eod_install_sheets s ON s.id = e.sheet_id
          WHERE e.dr_number IS NOT NULL
-         ORDER BY e.dr_number, s.sheet_date DESC NULLS LAST
+         ORDER BY e.dr_number, s.sheet_date DESC NULLS LAST, e.id DESC
        )
        SELECT pp.*, mt.ticket_uid, mt.priority AS ticket_priority, mt.created_at AS ticket_created_at,
               COALESCE(oa.team, d.installed_by_name, wc.team, em.eod_velocity_rep_name) AS oes_team,
@@ -282,7 +282,7 @@ async function handler(
          FROM eod_install_sheet_entries e
          JOIN eod_install_sheets s ON s.id = e.sheet_id
          WHERE e.dr_number IS NOT NULL
-         ORDER BY e.dr_number, s.sheet_date DESC NULLS LAST
+         ORDER BY e.dr_number, s.sheet_date DESC NULLS LAST, e.id DESC
        )
        SELECT pp.serial_number, pp.project, pp.date_registered, pp.resolution_status,
               pp.resolved_drop_number, pp.resolved_source, pp.resolved_at,
