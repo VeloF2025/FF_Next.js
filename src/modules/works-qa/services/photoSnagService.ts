@@ -183,9 +183,13 @@ export async function resolvePhotoSnag(input: ResolvePhotoSnagInput): Promise<{ 
   if (input.closeTicket && snag.noc_ticket_id) {
     // Use updateTicket() rather than a direct SQL UPDATE so the ticket
     // service's normal lifecycle runs: previous_status capture, activity-log
-    // entry, downstream notifications. Bypassing it would leave the audit
-    // trail empty about who resolved the ticket and when.
-    await updateTicket(snag.noc_ticket_id, { status: TicketStatus.RESOLVED });
+    // entry, downstream notifications. updateTicket() does NOT auto-stamp
+    // resolved_at on status transitions, so we pass it explicitly here —
+    // /api/snags/closeout-report and other dashboards filter on resolved_at.
+    await updateTicket(snag.noc_ticket_id, {
+      status: TicketStatus.RESOLVED,
+      resolved_at: new Date(),
+    });
     ticketResolved = true;
   }
 

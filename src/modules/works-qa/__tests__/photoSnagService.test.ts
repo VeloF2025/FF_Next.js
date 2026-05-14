@@ -305,7 +305,13 @@ describe('photoSnagService.resolvePhotoSnag', () => {
     });
     expect(result.ticketResolved).toBe(true);
     // Critical: must go through the ticket service so activity log + notifications fire.
-    expect(updateTicketMock).toHaveBeenCalledWith('ticket-uuid-1', { status: 'resolved' });
+    expect(updateTicketMock).toHaveBeenCalledTimes(1);
+    const [ticketId, payload] = updateTicketMock.mock.calls[0]!;
+    expect(ticketId).toBe('ticket-uuid-1');
+    expect(payload.status).toBe('resolved');
+    // resolved_at must be stamped — closeout reports filter on this column,
+    // and updateTicket() does not auto-set it on status transitions.
+    expect(payload.resolved_at).toBeInstanceOf(Date);
     // And NOT via a direct SQL UPDATE on maintenance_tickets.
     const sqlCalls = queryMock.mock.calls.map((c: [string, unknown[]]) => c[0]);
     expect(sqlCalls.some((s: string) => /UPDATE maintenance_tickets/i.test(s))).toBe(false);
