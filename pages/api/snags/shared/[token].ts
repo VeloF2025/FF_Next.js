@@ -18,6 +18,10 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import rateLimiter from '@/lib/rateLimiter';
+import {
+  getStepsForCategoryAndDiscipline,
+  type PhotoSlot,
+} from '@/modules/noc/constants/verificationSteps';
 
 export const config = {
   api: { bodyParser: false },
@@ -81,11 +85,44 @@ async function actorBelongsToToken(actorId: string, token: string): Promise<bool
   return rows.length > 0;
 }
 
+/**
+ * Fetch a verification step and confirm it belongs to the given ticket.
+ * Prevents an actor on Ticket A from injecting maintenance_step_photos
+ * rows for a step on Ticket B.
+ */
+async function getStepForTicket(
+  stepId: string,
+  ticketId: string,
+): Promise<{ step_number: number } | null> {
+  const rows = await sql`
+    SELECT step_number FROM maintenance_verification_steps
+    WHERE id = ${stepId} AND ticket_id = ${ticketId}
+    LIMIT 1
+  ` as Array<{ step_number: number }>;
+  return rows[0] ?? null;
+}
+
+/**
+ * Resolve a slot definition from the ticket's step template. Returns null if
+ * the slot key isn't declared in the template — which means the upload should
+ * be rejected, not written with guessed metadata.
+ */
+function resolveSlotFromTemplate(
+  ticketCategory: string | null,
+  ticketDiscipline: string,
+  stepNumber: number,
+  slotKey: string,
+): PhotoSlot | null {
+  const template = getStepsForCategoryAndDiscipline(ticketCategory, ticketDiscipline);
+  const step = template.find((s) => s.step_number === stepNumber);
+  return step?.photo_slots?.find((slot) => slot.key === slotKey) ?? null;
+}
+
 async function resolveToken(token: string) {
   const rows = await sql`
     SELECT st.ticket_id, st.is_active, st.created_at as shared_at,
            mt.id, mt.ticket_uid, mt.status, mt.title, mt.description, mt.priority,
-           mt.type, mt.source,
+           mt.type, mt.source, mt.ticket_category,
            (u.first_name || ' ' || u.last_name) AS assigned_to_name,
            p.project_name
     FROM snag_share_tokens st
@@ -238,7 +275,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         const [fields, files] = await form.parse(req);
         const file = files.file?.[0];
         const stepIdField = fields.stepId?.[0];
-        const slotKeyField = fields.slotKey?.[0] ?? null;
+        const slotKeyRaw = fields.slotKey?.[0] ?? null;
+        const slotKeyField = slotKeyRaw?.trim() || null;
         const actorIdField = fields.actorId?.[0] ?? null;
         if (!file) return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'file is required');
         if (!actorIdField) {
@@ -248,9 +286,37 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         if (!(await actorBelongsToToken(actorIdField, token))) {
           return apiResponse.error(res, ErrorCode.FORBIDDEN, 'actor session does not match this share link');
         }
-        // Slot keys must be short and well-formed to fit the table CHECK.
-        if (slotKeyField && (slotKeyField.length === 0 || slotKeyField.length > 64)) {
+        // Slot keys must match the table's regex (lowercase alphanumeric + underscore, ≤64).
+        if (slotKeyField && !/^[a-z0-9_]{1,64}$/.test(slotKeyField)) {
           return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'slotKey is malformed');
+        }
+
+        // Verify the step belongs to THIS ticket before any write — prevents
+        // an attacker from injecting maintenance_step_photos rows for a step
+        // on a different ticket.
+        let stepNumber: number | null = null;
+        if (stepIdField) {
+          const step = await getStepForTicket(stepIdField, ticketId);
+          if (!step) {
+            return apiResponse.error(res, ErrorCode.FORBIDDEN, 'step does not belong to this ticket');
+          }
+          stepNumber = step.step_number;
+        }
+
+        // Slot uploads must reference a slot declared by the step's template.
+        // Resolves slot_label / source_mode / is_required from the template so
+        // we never trust client-supplied or guessed metadata.
+        let resolvedSlot: PhotoSlot | null = null;
+        if (slotKeyField) {
+          if (!stepIdField || stepNumber === null) {
+            return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'slotKey requires stepId');
+          }
+          const ticketCategory = (ticketData.ticket_category as string | null) ?? null;
+          const ticketDiscipline = (ticketData.type as string | null) ?? 'unspecified';
+          resolvedSlot = resolveSlotFromTemplate(ticketCategory, ticketDiscipline, stepNumber, slotKeyField);
+          if (!resolvedSlot) {
+            return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'slotKey is not defined on this step template');
+          }
         }
 
         // Upload to VF Storage
@@ -273,25 +339,36 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         await sql`UPDATE maintenance_tickets SET attachments_count = attachments_count + 1, updated_at = NOW() WHERE id = ${ticketId}`;
 
-        // Slot-aware path: when slotKey is provided, write to the per-slot
-        // table. The step is marked complete only when all required slots
-        // for that step have a photo_url (deferred — UI computes today).
-        if (stepIdField && slotKeyField) {
+        // Slot-aware path: when slotKey is provided AND template declares it.
+        if (stepIdField && slotKeyField && resolvedSlot) {
+          // Slot metadata (label, source_mode, is_required) comes from the
+          // template, not the client. Future schema cleanup could pre-seed
+          // these rows when a step is initialized and let upload only update
+          // photo_url; for now we UPSERT with the resolved values.
           await sql`
             INSERT INTO maintenance_step_photos (step_id, slot_key, slot_label, source_mode, is_required, photo_url, uploaded_by_actor_id, uploaded_at)
-            VALUES (${stepIdField}, ${slotKeyField}, ${slotKeyField}, 'either', true, ${fileUrl}, ${actorIdField}, NOW())
+            VALUES (${stepIdField}, ${slotKeyField}, ${resolvedSlot.label}, ${resolvedSlot.source_mode}, ${resolvedSlot.is_required}, ${fileUrl}, ${actorIdField}, NOW())
             ON CONFLICT (step_id, slot_key)
             DO UPDATE SET photo_url = EXCLUDED.photo_url,
+                          slot_label = EXCLUDED.slot_label,
+                          source_mode = EXCLUDED.source_mode,
+                          is_required = EXCLUDED.is_required,
                           uploaded_by_actor_id = EXCLUDED.uploaded_by_actor_id,
                           uploaded_at = NOW(),
                           updated_at = NOW()
           `;
-          // Keep legacy photo_url + completion flag updated so QA report
-          // generation (which still reads the legacy column) sees a value.
-          // Step completion gating moves to the slot-aware check in PR4.
+          // PARTIAL: legacy photo_url mirror — each slot upload overwrites the
+          // single legacy column with the most recent slot's URL. This is the
+          // last-write-wins fallback for QA report generators that still read
+          // maintenance_verification_steps.photo_url; PR4 will switch those
+          // readers to maintenance_step_photos and this mirror can be removed.
           await sql`UPDATE maintenance_verification_steps SET photo_url = ${fileUrl}, photo_verified = true, completed_by_actor_id = ${actorIdField}, updated_at = NOW() WHERE id = ${stepIdField} AND ticket_id = ${ticketId}`;
+          // TODO(PR4): set is_complete = true only when all required slots
+          // for this step have a non-null photo_url. PR3 ships the storage
+          // primitive; PR4 introduces slot templates AND the matching
+          // completion gate. Until then, slot-aware steps stay incomplete.
         } else if (stepIdField) {
-          // Legacy single-photo path.
+          // Legacy single-photo path — unchanged from PR2.
           await sql`UPDATE maintenance_verification_steps SET photo_url = ${fileUrl}, photo_verified = true, is_complete = true, completed_at = NOW(), completed_by_actor_id = ${actorIdField} WHERE id = ${stepIdField} AND ticket_id = ${ticketId}`;
         }
 

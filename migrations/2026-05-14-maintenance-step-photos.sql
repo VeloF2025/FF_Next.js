@@ -14,7 +14,7 @@
 CREATE TABLE IF NOT EXISTS maintenance_step_photos (
   id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   step_id               uuid NOT NULL REFERENCES maintenance_verification_steps(id) ON DELETE CASCADE,
-  slot_key              text NOT NULL CHECK (char_length(slot_key) BETWEEN 1 AND 64),
+  slot_key              text NOT NULL CHECK (slot_key ~ '^[a-z0-9_]{1,64}$'),
   slot_label            text NOT NULL CHECK (char_length(slot_label) BETWEEN 1 AND 200),
   source_mode           text NOT NULL CHECK (source_mode IN ('camera', 'gallery', 'either')),
   is_required           boolean NOT NULL DEFAULT true,
