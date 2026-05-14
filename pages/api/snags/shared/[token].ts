@@ -145,6 +145,34 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     }
 
+    // Fetch per-step photo slots (slot-aware steps only). Returned alongside
+    // each step so the resolve page can render slot tiles. Steps with no
+    // photo_slots in their template have no rows here and fall back to the
+    // legacy single-photo flow.
+    const stepIds = steps.map((s) => s.id).filter((id): id is string => typeof id === 'string');
+    const stepPhotos = stepIds.length > 0
+      ? (await sql`
+          SELECT id, step_id, slot_key, slot_label, source_mode, is_required,
+                 photo_url, uploaded_by_actor_id, uploaded_at
+          FROM maintenance_step_photos
+          WHERE step_id = ANY(${stepIds}::uuid[])
+          ORDER BY step_id, slot_key
+        `) as Array<Record<string, unknown>>
+      : [];
+
+    // Group photos by step_id for the response shape.
+    const photosByStep = new Map<string, Array<Record<string, unknown>>>();
+    for (const photo of stepPhotos) {
+      const sid = photo.step_id as string;
+      const list = photosByStep.get(sid) ?? [];
+      list.push(photo);
+      photosByStep.set(sid, list);
+    }
+    const stepsWithPhotos = steps.map((s) => ({
+      ...s,
+      photo_slots: photosByStep.get(s.id as string) ?? [],
+    }));
+
     // Fetch before photos — check snag_photos (for snags) AND maintenance_attachments (for all types)
     const snagPhotos = await sql`
       SELECT sp.photo_url, sp.thumbnail_url, sp.phase
@@ -189,7 +217,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       canInteract,
       canStartWork: status === 'assigned',
       canSubmit: status === 'in_progress',
-      steps,
+      steps: stepsWithPhotos,
       beforePhotos,
       attachments,
     });
@@ -210,6 +238,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         const [fields, files] = await form.parse(req);
         const file = files.file?.[0];
         const stepIdField = fields.stepId?.[0];
+        const slotKeyField = fields.slotKey?.[0] ?? null;
         const actorIdField = fields.actorId?.[0] ?? null;
         if (!file) return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'file is required');
         if (!actorIdField) {
@@ -218,6 +247,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         // Verify the actor belongs to THIS token.
         if (!(await actorBelongsToToken(actorIdField, token))) {
           return apiResponse.error(res, ErrorCode.FORBIDDEN, 'actor session does not match this share link');
+        }
+        // Slot keys must be short and well-formed to fit the table CHECK.
+        if (slotKeyField && (slotKeyField.length === 0 || slotKeyField.length > 64)) {
+          return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'slotKey is malformed');
         }
 
         // Upload to VF Storage
@@ -240,14 +273,31 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         await sql`UPDATE maintenance_tickets SET attachments_count = attachments_count + 1, updated_at = NOW() WHERE id = ${ticketId}`;
 
-        // Link to verification step and mark complete (stamping the actor).
-        if (stepIdField) {
+        // Slot-aware path: when slotKey is provided, write to the per-slot
+        // table. The step is marked complete only when all required slots
+        // for that step have a photo_url (deferred — UI computes today).
+        if (stepIdField && slotKeyField) {
+          await sql`
+            INSERT INTO maintenance_step_photos (step_id, slot_key, slot_label, source_mode, is_required, photo_url, uploaded_by_actor_id, uploaded_at)
+            VALUES (${stepIdField}, ${slotKeyField}, ${slotKeyField}, 'either', true, ${fileUrl}, ${actorIdField}, NOW())
+            ON CONFLICT (step_id, slot_key)
+            DO UPDATE SET photo_url = EXCLUDED.photo_url,
+                          uploaded_by_actor_id = EXCLUDED.uploaded_by_actor_id,
+                          uploaded_at = NOW(),
+                          updated_at = NOW()
+          `;
+          // Keep legacy photo_url + completion flag updated so QA report
+          // generation (which still reads the legacy column) sees a value.
+          // Step completion gating moves to the slot-aware check in PR4.
+          await sql`UPDATE maintenance_verification_steps SET photo_url = ${fileUrl}, photo_verified = true, completed_by_actor_id = ${actorIdField}, updated_at = NOW() WHERE id = ${stepIdField} AND ticket_id = ${ticketId}`;
+        } else if (stepIdField) {
+          // Legacy single-photo path.
           await sql`UPDATE maintenance_verification_steps SET photo_url = ${fileUrl}, photo_verified = true, is_complete = true, completed_at = NOW(), completed_by_actor_id = ${actorIdField} WHERE id = ${stepIdField} AND ticket_id = ${ticketId}`;
         }
 
         fs.unlinkSync(file.filepath);
-        log.info('Shared ticket: photo uploaded', { ticketId, filename, stepId: stepIdField, actorId: actorIdField });
-        return apiResponse.success(res, { uploaded: true, url: fileUrl });
+        log.info('Shared ticket: photo uploaded', { ticketId, filename, stepId: stepIdField, slotKey: slotKeyField, actorId: actorIdField });
+        return apiResponse.success(res, { uploaded: true, url: fileUrl, slotKey: slotKeyField });
       } catch (err) {
         log.error('Shared ticket: photo upload failed', { ticketId, error: err instanceof Error ? err.message : 'Unknown' });
         return apiResponse.internalError(res, new Error('Photo upload failed'));

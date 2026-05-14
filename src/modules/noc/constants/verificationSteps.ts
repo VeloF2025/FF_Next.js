@@ -9,7 +9,31 @@
 import { VerificationStepNumber } from '../types/verification';
 
 /**
+ * A named photo slot inside a step. A step may declare 1+ slots; the technician
+ * uploads to each by key. Used by the slot-aware resolve-page flow.
+ *
+ * source_mode:
+ *   'camera'  → forces `capture="environment"` (live camera, no gallery picker)
+ *   'gallery' → no capture attribute (file picker — used for screenshots)
+ *   'either'  → no capture, allow user to choose
+ */
+export interface PhotoSlot {
+  key: string;
+  label: string;
+  source_mode: 'camera' | 'gallery' | 'either';
+  is_required: boolean;
+  hint?: string;
+}
+
+/**
  * Verification step template
+ *
+ * Legacy mode: photo_required=true means "one photo per step", stored on
+ * maintenance_verification_steps.photo_url.
+ *
+ * Slot mode: photo_slots defined → multiple named photos per step, stored
+ * on maintenance_step_photos. The legacy photo_url is unused. Step completion
+ * requires all `is_required: true` slots to have a photo_url.
  */
 export interface VerificationStepTemplate {
   step_number: VerificationStepNumber;
@@ -18,6 +42,8 @@ export interface VerificationStepTemplate {
   photo_required: boolean;
   required_for_qa: boolean;
   category: 'preparation' | 'installation' | 'testing' | 'documentation' | 'investigation';
+  /** Optional multi-photo slot definitions. When present, supersedes photo_required. */
+  photo_slots?: PhotoSlot[];
 }
 
 /**
