@@ -15,6 +15,18 @@
  * is filled (so the snag service has a row to attach to). If no fixture is
  * available, the test skips gracefully rather than producing a false
  * failure.
+ *
+ * Limitations:
+ * - Uses the super_admin storage state (auth.setup.ts). withPermission
+ *   short-circuits for super_admin, so this test does NOT cover the RBAC
+ *   gate on .snags.create / .snags.verify — that requires a qa_manager
+ *   fixture user we don't have yet.
+ * - On the duplicate-snag idempotency branch (line 99), the create-side
+ *   count assertion is skipped — the test then only proves the resolve
+ *   path drops the count. Re-running this test against the same pole+slot
+ *   without DB cleanup will always hit this branch.
+ * - No teardown: resolved snags persist with status='verified'. Acceptable
+ *   on dev (data is freely mutable); revisit if we ever point E2E at prod.
  */
 
 import { test, expect } from '@playwright/test';

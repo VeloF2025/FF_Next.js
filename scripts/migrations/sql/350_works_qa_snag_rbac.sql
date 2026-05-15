@@ -5,10 +5,18 @@
 -- temporary mapping; this migration introduces the dedicated permissions
 -- and the role grants. The route swaps happen in the same PR.
 --
--- Locked decisions (from the snag feature plan):
+-- Locked decisions (Hein 2026-05-14, broader than plan §5 draft):
 --   create:  super_admin, admin, manager, project_manager, qa_manager,
 --            site_supervisor, contractor, technician
+--            (field roles raise snags directly — they're at the photo)
 --   verify:  super_admin, admin, qa_manager, project_manager
+--            (manager intentionally excluded from verify)
+--
+-- Note: parent_key is 'construction-qa' (matching the flat convention
+-- established by migration 343 for all construction-qa.works-qa.*
+-- siblings). A user-level override at the intermediate
+-- 'construction-qa.works-qa' node will NOT cascade-block these — that
+-- gap exists across the whole sibling set and is out of scope here.
 --
 -- Mirrors the pattern in migration 343_works_qa_rbac.sql. Idempotent.
 
