@@ -1,4 +1,10 @@
--- Add resolution_path column to maintenance_tickets
+-- Migration 352: Add resolution_path column to maintenance_tickets
+--
+-- Originally authored as migrations/2026-05-14-add-resolution-path.sql in PR
+-- #1629 but committed to /migrations/ instead of scripts/migrations/sql/ —
+-- the runner only scans the sql/ subdir, so it never applied. Renumbered to
+-- 352 and relocated. Same pattern as migration 351 (the works-qa snag schema
+-- migration). All statements remain idempotent (IF NOT EXISTS, DO-blocks).
 --
 -- Drives the per-path verification step template, the Context Panel variant,
 -- and the resolve-page flow. Set at ticket creation by the classifier
