@@ -85,7 +85,9 @@ export interface SnagReport {
 /** Maps to snags table */
 export interface Snag {
   id: string;
-  report_id: string;
+  report_id: string | null;
+  pole_qa_photo_id: string | null;   // Works QA pole row link (verification snags + ad-hoc Works QA snags)
+  source: string | null;             // 'works_qa' for Works QA-originated snags, NULL for PDF-imported
   project_id: string;
   snag_number: number;
 

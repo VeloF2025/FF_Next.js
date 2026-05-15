@@ -23,9 +23,8 @@ describe('POST /api/snags', () => {
   });
 
   it('creates a verification snag without report_id, auto-generates snag_number, skips snag_reports UPDATE', async () => {
-    // First call: SELECT next_num; second call: INSERT RETURNING
+    // Single atomic INSERT...SELECT — no separate SELECT next_num call
     mockSql
-      .mockResolvedValueOnce([{ next_num: 42 }])
       .mockResolvedValueOnce([{ id: 'snag-uuid', snag_number: 42, category: 'verification', status: 'open' }]);
 
     const req = {
@@ -44,8 +43,20 @@ describe('POST /api/snags', () => {
     await handler(req, res);
 
     expect(res.statusCode).toBe(201);
-    // Exactly 2 SQL calls: SELECT next_num + INSERT. No UPDATE snag_reports.
-    expect(mockSql).toHaveBeenCalledTimes(2);
+    // Exactly 1 SQL call: the atomic INSERT...SELECT. No UPDATE snag_reports.
+    expect(mockSql).toHaveBeenCalledTimes(1);
+
+    // The single atomic INSERT...SELECT must carry source='works_qa', category='verification',
+    // and pole_qa_photo_id='pole-uuid'. In neon's tagged-template call the first arg is the
+    // TemplateStringsArray and the remaining args are the interpolated values.
+    const insertCallArgs = mockSql.mock.calls[0];
+    // 'works_qa' is a SQL literal hardcoded in the template string (not an interpolated param)
+    const sqlString = insertCallArgs[0].join('');
+    expect(sqlString).toContain("'works_qa'");
+    // Interpolated values are args 1..N
+    const interpolatedValues = insertCallArgs.slice(1).flat();
+    expect(interpolatedValues).toContain('verification');
+    expect(interpolatedValues).toContain('pole-uuid');
   });
 
   it('rejects a non-verification snag with no report_id with 400', async () => {
@@ -64,5 +75,21 @@ describe('POST /api/snags', () => {
 
     expect(res.statusCode).toBe(400);
     expect(mockSql).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-verification snags missing snag_number', async () => {
+    const req = {
+      method: 'POST',
+      body: {
+        project_id: 'proj-uuid',
+        report_id: 'report-uuid',
+        category: 'quality',
+        description: 'Bad weld',
+        pole_references: ['MOA.P.D134'],
+      },
+    } as unknown as NextApiRequest;
+    const res = makeRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(400);
   });
 });

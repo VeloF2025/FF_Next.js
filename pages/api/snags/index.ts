@@ -166,37 +166,54 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     }
   }
 
-  let snagNumber = body.snag_number;
+  let rows: Snag[];
   if (isVerification) {
-    const numRows = await sql`
-      SELECT COALESCE(MAX(snag_number), 0) + 1 AS next_num
+    rows = await sql`
+      INSERT INTO snags (
+        report_id, project_id, snag_number,
+        category, severity, description,
+        pole_references, pole_qa_photo_id, source,
+        status, verification_notes
+      )
+      SELECT
+        NULL,
+        ${body.project_id},
+        COALESCE(MAX(snag_number), 0) + 1,
+        ${body.category},
+        ${body.severity ?? 'minor'},
+        ${body.description.trim()},
+        ${body.pole_references ?? null},
+        ${body.pole_qa_photo_id ?? null},
+        'works_qa',
+        'open',
+        ${body.verification_notes ?? null}
       FROM snags
       WHERE project_id = ${body.project_id} AND report_id IS NULL
-    ` as Array<{ next_num: number }>;
-    snagNumber = numRows[0]?.next_num ?? 1;
+      RETURNING *
+    ` as Snag[];
+  } else {
+    rows = await sql`
+      INSERT INTO snags (
+        report_id, project_id, snag_number,
+        category, severity, description,
+        pole_references, pole_qa_photo_id, source,
+        status, verification_notes
+      ) VALUES (
+        ${body.report_id},
+        ${body.project_id},
+        ${body.snag_number},
+        ${body.category},
+        ${body.severity ?? 'major'},
+        ${body.description.trim()},
+        ${body.pole_references ?? null},
+        ${body.pole_qa_photo_id ?? null},
+        NULL,
+        'open',
+        ${body.verification_notes ?? null}
+      )
+      RETURNING *
+    ` as Snag[];
   }
-
-  const rows = await sql`
-    INSERT INTO snags (
-      report_id, project_id, snag_number,
-      category, severity, description,
-      pole_references, pole_qa_photo_id, source,
-      status, verification_notes
-    ) VALUES (
-      ${body.report_id ?? null},
-      ${body.project_id},
-      ${snagNumber},
-      ${body.category},
-      ${body.severity ?? (isVerification ? 'minor' : 'major')},
-      ${body.description.trim()},
-      ${body.pole_references ?? null},
-      ${body.pole_qa_photo_id ?? null},
-      ${isVerification ? 'works_qa' : null},
-      'open',
-      ${body.verification_notes ?? null}
-    )
-    RETURNING *
-  ` as Snag[];
 
   if (!rows[0]) {
     return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Failed to create snag');
