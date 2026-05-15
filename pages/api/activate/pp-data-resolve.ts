@@ -17,6 +17,7 @@ import pool from '@/lib/db';
 import { createOneMapClient } from '@/services/onemap';
 import { extractWaPhotoSerials } from '@/modules/activate/services/serialVerificationService';
 import { logTicketActivity } from '@/modules/noc/services/ticketService';
+import { cascadePpResolution } from '@/modules/activate/services/cascadePpResolution';
 import { apiResponse } from '@/lib/apiResponse';
 
 const logger = createLogger('PPDataResolve');
@@ -266,7 +267,7 @@ async function runLocalResolution(): Promise<{
       AND pp.resolution_status = 'not_found'
   `);
 
-  // 7. wa_photos — WhatsApp photo VLM-extracted ONT serials
+  // 7. wa_photos — WhatsApp photo VLM-extracted ONT serials (EXACT)
   matchedLocal += await matchSource('wa_photos', 'located_local', `
     UPDATE oes_pp_data pp
     SET resolution_status = 'located_local',
@@ -274,12 +275,78 @@ async function runLocalResolution(): Promise<{
         resolved_source = 'wa_photos',
         resolved_details = jsonb_build_object(
           'vlm_confidence', wp.vlm_confidence::text,
-          'purpose', wp.purpose
+          'purpose', wp.purpose,
+          'photo_serial', wp.vlm_ont_serial,
+          'photo_date', wp.message_timestamp::date::text,
+          'technician_lid', wp.sender_name
         ),
         resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
     FROM wa_photos wp
     WHERE wp.vlm_ont_serial = pp.serial_number
       AND wp.drop_number IS NOT NULL
+      AND pp.resolution_status = 'not_found'
+  `);
+
+  // 7b. wa_photos_fuzzy — dist-1 match where exactly ONE candidate photo serial
+  //     and ONE drop are within edit-distance 1 of the PP serial in the same
+  //     project. Guards: drops.ont_serial must not conflict (different ONT on
+  //     that DR). HIGH-confidence only — multi-candidate ambiguity is left for
+  //     manual review.
+  matchedLocal += await matchSource('wa_photos_fuzzy', 'located_unified', `
+    WITH candidates AS (
+      SELECT pp.id AS pp_id,
+             pp.serial_number AS pp_serial,
+             wp.vlm_ont_serial AS photo_serial,
+             wp.drop_number,
+             wp.message_timestamp::date AS photo_date,
+             wp.vlm_confidence,
+             wp.sender_name,
+             levenshtein(pp.serial_number, wp.vlm_ont_serial) AS dist
+      FROM oes_pp_data pp
+      JOIN wa_photos wp
+        ON wp.vlm_ont_serial IS NOT NULL
+       AND length(wp.vlm_ont_serial) = 12
+       AND levenshtein(pp.serial_number, wp.vlm_ont_serial) = 1
+       AND wp.project = pp.project
+       AND wp.drop_number IS NOT NULL
+      WHERE pp.resolution_status = 'not_found'
+    ),
+    unambiguous AS (
+      SELECT pp_id, pp_serial
+      FROM candidates
+      GROUP BY pp_id, pp_serial
+      HAVING COUNT(DISTINCT photo_serial) = 1 AND COUNT(DISTINCT drop_number) = 1
+    ),
+    best_pick AS (
+      SELECT DISTINCT ON (c.pp_id)
+        c.pp_id, c.pp_serial, c.photo_serial, c.drop_number, c.photo_date, c.vlm_confidence, c.sender_name, c.dist
+      FROM candidates c
+      JOIN unambiguous u ON u.pp_id = c.pp_id
+      ORDER BY c.pp_id, c.vlm_confidence DESC NULLS LAST, c.photo_date DESC
+    ),
+    safe_pick AS (
+      SELECT bp.* FROM best_pick bp
+      LEFT JOIN drops d ON d.drop_number = bp.drop_number
+      WHERE d.ont_serial IS NULL
+         OR d.ont_serial = bp.photo_serial
+         OR d.ont_serial = bp.pp_serial
+    )
+    UPDATE oes_pp_data pp
+    SET resolution_status = 'located_unified',
+        resolved_drop_number = sp.drop_number,
+        resolved_source = 'wa_photos_fuzzy',
+        resolved_details = jsonb_build_object(
+          'pp_serial', sp.pp_serial,
+          'photo_serial', sp.photo_serial,
+          'edit_distance', sp.dist,
+          'photo_date', sp.photo_date::text,
+          'vlm_confidence', sp.vlm_confidence,
+          'technician_lid', sp.sender_name,
+          'method', 'wa_photo_fuzzy_dist1_unambiguous_v1'
+        ),
+        resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
+    FROM safe_pick sp
+    WHERE pp.id = sp.pp_id
       AND pp.resolution_status = 'not_found'
   `);
 
@@ -404,6 +471,7 @@ async function run1MapLookup(): Promise<{
   total_errors: number;
 }> {
   const startTime = Date.now();
+  const cutoff = new Date();
   const results = { total_resolved: 0, total_searched: 0, total_not_found: 0, total_errors: 0 };
 
   // Get all unresolved serials (include ticket link for activity logging)
@@ -591,6 +659,19 @@ async function run1MapLookup(): Promise<{
   }
 
   logger.info('1Map per-serial lookup complete', { ...results, elapsed_seconds: elapsed });
+
+  // Cascade newly-resolved PPs (from this 1Map run) into tickets/drops/stock_serials.
+  // Best-effort: a cascade failure should not bubble up since run1MapLookup is
+  // fire-and-forget background work.
+  try {
+    const cascade = await cascadePpResolution(cutoff);
+    logger.info('1Map post-cascade', { ...cascade });
+  } catch (err) {
+    logger.error('1Map post-cascade failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   return results;
 }
 
@@ -1520,8 +1601,9 @@ async function handler(
       const cutoff = new Date();
       const result = await runLocalResolution();
       const ticketsUpdated = await syncTicketActivities(cutoff);
+      const cascade = await cascadePpResolution(cutoff);
       const gps = await backfillGpsCoordinates();
-      return res.status(200).json({ success: true, data: { ...result, tickets_updated: ticketsUpdated, gps_updated: gps } });
+      return res.status(200).json({ success: true, data: { ...result, tickets_updated: ticketsUpdated, cascade, gps_updated: gps } });
     }
 
     if (action === '1map-lookup') {
@@ -1569,6 +1651,7 @@ async function handler(
 
       // Sync ticket activities for all records resolved in steps 1-5
       const ticketsUpdated = await syncTicketActivities(cutoff);
+      const cascade = await cascadePpResolution(cutoff);
       const gps = await backfillGpsCoordinates();
 
       // Fire-and-forget 1Map lookup for remaining unresolved serials (has its own progress tracker)
@@ -1590,6 +1673,7 @@ async function handler(
             msgScanResult.serials_matched,
           onemap_started: true,
           tickets_updated: ticketsUpdated,
+          cascade,
           gps_updated: gps,
           steps: {
             eod_scan: eodResult,
@@ -1614,4 +1698,23 @@ async function handler(
   }
 }
 
-export default withAuth(withRole('manager')(handler));
+/**
+ * Allow POST with x-cron-secret header to bypass session auth.
+ * Used by the hourly cron and the post-VLM batch hook.
+ */
+function hasCronSecret(req: NextApiRequest): boolean {
+  const cronSecret = req.headers['x-cron-secret'];
+  const expectedSecret = process.env.CRON_SECRET;
+  if (!expectedSecret) return false;
+  return cronSecret === expectedSecret;
+}
+
+async function authGate(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method === 'POST' && hasCronSecret(req)) {
+    logger.info('pp-data-resolve triggered via cron secret');
+    return handler(req, res);
+  }
+  return withAuth(withRole('manager')(handler))(req, res);
+}
+
+export default authGate;
