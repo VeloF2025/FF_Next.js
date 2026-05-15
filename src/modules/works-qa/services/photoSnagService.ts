@@ -66,7 +66,7 @@ export async function createPhotoSnag(input: CreatePhotoSnagInput): Promise<Crea
         $1, $2, $3,
         'works_qa', $4, $5, $6, $7,
         'Workmanship', $8, $9,
-        $10, $11, CASE WHEN $11 IS NOT NULL THEN NOW() ELSE NULL END
+        $10, $11::uuid, CASE WHEN $11::uuid IS NOT NULL THEN NOW() ELSE NULL END
      )
      RETURNING id, pole_qa_photo_id, slot_key, slot_photo_key, discipline,
                description, severity, status, noc_ticket_id, assigned_to, created_at`,
