@@ -209,8 +209,9 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
         setLoadingProjects(prev => new Set(prev).add(project));
         try {
           const params = new URLSearchParams();
-          params.set('dateFrom', filters.dateFrom || getTodaySAST());
-          params.set('dateTo', filters.dateTo || getTodaySAST());
+          // Match parent project-stats defaults: empty filters (All tab) = all-time, not today
+          params.set('dateFrom', filters.dateFrom || '1900-01-01');
+          params.set('dateTo', filters.dateTo || '2100-01-01');
           params.set('project', project);
 
           const response = await fetch(`/api/activate/reporting/daily-counts?${params.toString()}`);
