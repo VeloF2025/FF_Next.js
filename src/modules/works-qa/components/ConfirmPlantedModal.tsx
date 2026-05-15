@@ -13,7 +13,7 @@ interface ConfirmPlantedModalProps {
 }
 
 export function ConfirmPlantedModal({ open, projectId, poleQaPhotoId, poleLabel, onClose, onChanged }: ConfirmPlantedModalProps) {
-  const { snag, isLoading, mutate } = useVerificationSnag(open ? projectId : null, open ? poleLabel : null);
+  const { snag, isLoading, mutate } = useVerificationSnag(open ? projectId : null, open ? poleQaPhotoId : null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

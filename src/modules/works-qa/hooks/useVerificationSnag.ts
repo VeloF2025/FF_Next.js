@@ -16,11 +16,12 @@ async function fetcher(url: string): Promise<Snag | null> {
 
 /**
  * Returns the most relevant verification snag for the given pole, if any.
- * `null` while loading or when none exists.
+ * Filters server-side on `pole_qa_photo_id` so multi-pole projects can't show
+ * a sibling pole's snag by accident. `null` while loading or when none exists.
  */
-export function useVerificationSnag(projectId: string | null, poleLabel: string | null) {
-  const key = projectId && poleLabel
-    ? `/api/snags?projectId=${encodeURIComponent(projectId)}&category=verification&search=${encodeURIComponent(poleLabel)}`
+export function useVerificationSnag(projectId: string | null, poleQaPhotoId: string | null) {
+  const key = projectId && poleQaPhotoId
+    ? `/api/snags?projectId=${encodeURIComponent(projectId)}&category=verification&pole_qa_photo_id=${encodeURIComponent(poleQaPhotoId)}`
     : null;
   const { data, isLoading, mutate } = useSWR<Snag | null>(key, fetcher);
   return { snag: data ?? null, isLoading, mutate };

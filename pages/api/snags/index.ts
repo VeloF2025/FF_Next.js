@@ -103,6 +103,26 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     );
   }
 
+  // Direct pole_qa_photo_id lookup (used by Works QA ConfirmPlantedModal to find
+  // the verification snag for a specific pole). Filters by exact UUID match plus
+  // optional projectId/category narrowing.
+  const poleQaPhotoId = req.query.pole_qa_photo_id;
+  if (typeof poleQaPhotoId === 'string' && poleQaPhotoId) {
+    const projectIdFilter = (typeof projectId === 'string' && projectId) ? projectId : null;
+    const categoryFilter = categoryArr[0] ?? null;
+    const rows = await sql`
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name
+      FROM snags s
+      LEFT JOIN users u ON u.id = s.assigned_to
+      WHERE s.pole_qa_photo_id = ${poleQaPhotoId}::uuid
+        AND (${projectIdFilter}::uuid IS NULL OR s.project_id = ${projectIdFilter}::uuid)
+        AND (${categoryFilter}::text IS NULL OR s.category = ${categoryFilter}::text)
+      ORDER BY s.created_at DESC
+      LIMIT 100
+    ` as Snag[];
+    return apiResponse.success(res, rows);
+  }
+
   if (projectId && typeof projectId === 'string') {
     // When zone_no/pon_no are present, use the hierarchy-aware query
     if (zoneArr.length > 0 || ponArr.length > 0) {
@@ -192,11 +212,14 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       RETURNING *
     ` as Snag[];
   } else {
+    // Non-verification (PDF-import) path: omit `source` from the column list so
+    // Postgres uses the column default ('tqr'::text). Passing NULL would violate
+    // the NOT NULL constraint on snags.source.
     rows = await sql`
       INSERT INTO snags (
         report_id, project_id, snag_number,
         category, severity, description,
-        pole_references, pole_qa_photo_id, source,
+        pole_references, pole_qa_photo_id,
         status, verification_notes
       ) VALUES (
         ${body.report_id},
@@ -207,7 +230,6 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
         ${body.description.trim()},
         ${body.pole_references ?? null},
         ${body.pole_qa_photo_id ?? null},
-        NULL,
         'open',
         ${body.verification_notes ?? null}
       )
