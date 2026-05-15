@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Droppable, Draggable } from '@hello-pangea/dnd';
 import { X, GripVertical } from 'lucide-react';
+import { log } from '@/lib/logger';
 import type { VlmSlotResult, SlotApproval } from '../types/works-qa.types';
 import { photoUrl } from '../utils/photo-url';
 import { SnagInlineForm, type SnagSubmitInput, type SnagSubmitResult } from './SnagInlineForm';
@@ -33,7 +34,7 @@ export function PhotoSlotCard({
   const [overrideReason, setOverrideReason] = useState('');
   const [showSnagForm, setShowSnagForm] = useState(false);
   const [approving, setApproving] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Close the snag form if the discipline becomes approved while it is open.
   // Without this, an un-approval (discipline re-opened) would silently restore
@@ -65,9 +66,24 @@ export function PhotoSlotCard({
         <div
           ref={dropProvided.innerRef}
           {...dropProvided.droppableProps}
-          className={`rounded-lg border ${borderColor} ${bgColor} p-3 flex flex-col gap-2 ${
+          className={`rounded-lg border ${borderColor} ${bgColor} p-3 flex flex-col gap-2 transition-colors ${
             dropSnap.isDraggingOver ? 'ring-2 ring-teal-400/60' : ''
-          }`}
+          } ${isDragOver ? 'ring-2 ring-teal-500/60 bg-teal-500/5' : ''}`}
+          onDragOver={e => {
+            if (disabled || photoKey) return;
+            e.preventDefault();
+            if (!isDragOver) setIsDragOver(true);
+          }}
+          onDragLeave={() => setIsDragOver(false)}
+          onDrop={e => {
+            if (disabled || photoKey) return;
+            e.preventDefault();
+            setIsDragOver(false);
+            const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+            if (files.length === 0) return;
+            if (files[0]) onUpload(files[0]);
+            log.debug('works-qa: slot drop', { slotKey, droppedCount: files.length });
+          }}
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-zinc-300">{label}</span>
@@ -127,22 +143,30 @@ export function PhotoSlotCard({
               )}
             </Draggable>
           ) : (
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={disabled}
-              className="w-full h-28 flex items-center justify-center text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 rounded transition-colors disabled:opacity-50"
+            <label
+              className={`w-full h-28 flex items-center justify-center text-xs rounded transition-colors ${
+                disabled
+                  ? 'opacity-50 cursor-not-allowed text-zinc-600'
+                  : isDragOver
+                    ? 'bg-teal-500/10 border border-teal-500 border-solid text-teal-300 cursor-copy'
+                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 cursor-pointer'
+              }`}
             >
               + Upload
-            </button>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={disabled}
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  log.debug('works-qa: slot file picked', { hasFile: Boolean(f) });
+                  if (f) onUpload(f);
+                  e.target.value = '';
+                }}
+              />
+            </label>
           )}
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(f); }}
-          />
 
           {vlm?.feedback && (
             <p className="text-xs text-zinc-500 leading-tight">{vlm.feedback}</p>

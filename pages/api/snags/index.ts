@@ -103,6 +103,26 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     );
   }
 
+  // Direct pole_qa_photo_id lookup (used by Works QA ConfirmPlantedModal to find
+  // the verification snag for a specific pole). Filters by exact UUID match plus
+  // optional projectId/category narrowing.
+  const poleQaPhotoId = req.query.pole_qa_photo_id;
+  if (typeof poleQaPhotoId === 'string' && poleQaPhotoId) {
+    const projectIdFilter = (typeof projectId === 'string' && projectId) ? projectId : null;
+    const categoryFilter = categoryArr[0] ?? null;
+    const rows = await sql`
+      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name
+      FROM snags s
+      LEFT JOIN users u ON u.id = s.assigned_to
+      WHERE s.pole_qa_photo_id = ${poleQaPhotoId}::uuid
+        AND (${projectIdFilter}::uuid IS NULL OR s.project_id = ${projectIdFilter}::uuid)
+        AND (${categoryFilter}::text IS NULL OR s.category = ${categoryFilter}::text)
+      ORDER BY s.created_at DESC
+      LIMIT 100
+    ` as Snag[];
+    return apiResponse.success(res, rows);
+  }
+
   if (projectId && typeof projectId === 'string') {
     // When zone_no/pon_no are present, use the hierarchy-aware query
     if (zoneArr.length > 0 || ponArr.length > 0) {
@@ -145,14 +165,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   const body = req.body as CreateSnagRequest;
 
-  if (!body.report_id) {
-    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'report_id is required');
-  }
   if (!body.project_id) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'project_id is required');
-  }
-  if (!body.snag_number) {
-    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'snag_number is required');
   }
   if (!body.category) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'category is required');
@@ -161,39 +175,85 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'description is required');
   }
 
-  const rows = await sql`
-    INSERT INTO snags (
-      report_id, project_id, snag_number,
-      category, severity, description,
-      pole_references, status
-    ) VALUES (
-      ${body.report_id},
-      ${body.project_id},
-      ${body.snag_number},
-      ${body.category},
-      ${body.severity ?? 'major'},
-      ${body.description.trim()},
-      ${body.pole_references ?? null},
-      'open'
-    )
-    RETURNING *
-  ` as Snag[];
+  const isVerification = body.category === 'verification';
+
+  if (!isVerification) {
+    if (!body.report_id) {
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'report_id is required');
+    }
+    if (!body.snag_number) {
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'snag_number is required');
+    }
+  }
+
+  let rows: Snag[];
+  if (isVerification) {
+    rows = await sql`
+      INSERT INTO snags (
+        report_id, project_id, snag_number,
+        category, severity, description,
+        pole_references, pole_qa_photo_id, source,
+        status, verification_notes
+      )
+      SELECT
+        NULL,
+        ${body.project_id},
+        COALESCE(MAX(snag_number), 0) + 1,
+        ${body.category},
+        ${body.severity ?? 'minor'},
+        ${body.description.trim()},
+        ${body.pole_references ?? null},
+        ${body.pole_qa_photo_id ?? null},
+        'works_qa',
+        'open',
+        ${body.verification_notes ?? null}
+      FROM snags
+      WHERE project_id = ${body.project_id} AND report_id IS NULL
+      RETURNING *
+    ` as Snag[];
+  } else {
+    // Non-verification (PDF-import) path: omit `source` from the column list so
+    // Postgres uses the column default ('tqr'::text). Passing NULL would violate
+    // the NOT NULL constraint on snags.source.
+    rows = await sql`
+      INSERT INTO snags (
+        report_id, project_id, snag_number,
+        category, severity, description,
+        pole_references, pole_qa_photo_id,
+        status, verification_notes
+      ) VALUES (
+        ${body.report_id},
+        ${body.project_id},
+        ${body.snag_number},
+        ${body.category},
+        ${body.severity ?? 'major'},
+        ${body.description.trim()},
+        ${body.pole_references ?? null},
+        ${body.pole_qa_photo_id ?? null},
+        'open',
+        ${body.verification_notes ?? null}
+      )
+      RETURNING *
+    ` as Snag[];
+  }
 
   if (!rows[0]) {
     return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Failed to create snag');
   }
 
-  // Update total_findings count on report
-  await sql`
-    UPDATE snag_reports
-    SET total_findings = (
-      SELECT COUNT(*) FROM snags WHERE report_id = ${body.report_id}
-    ),
-    updated_at = NOW()
-    WHERE id = ${body.report_id}
-  `;
+  // Only update total_findings when snag belongs to a report
+  if (body.report_id) {
+    await sql`
+      UPDATE snag_reports
+      SET total_findings = (
+        SELECT COUNT(*) FROM snags WHERE report_id = ${body.report_id}
+      ),
+      updated_at = NOW()
+      WHERE id = ${body.report_id}
+    `;
+  }
 
-  log.info('Snag created', { snagId: rows[0].id, reportId: body.report_id });
+  log.info('Snag created', { snagId: rows[0].id, reportId: body.report_id ?? null, category: body.category });
   return apiResponse.created(res, rows[0]);
 }
 

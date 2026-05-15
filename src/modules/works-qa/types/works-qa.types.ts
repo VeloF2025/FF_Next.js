@@ -87,6 +87,8 @@ export interface PoleSummary {
   status: 'empty' | 'in_progress' | 'ready' | 'approved';
   approved_at: string | null;
   outstanding_snag_count: number;
+  has_open_verification_snag: boolean;
+  has_verified_planted: boolean;
 }
 
 export interface WorksQAProjectStats {

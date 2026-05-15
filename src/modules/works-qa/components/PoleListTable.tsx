@@ -4,6 +4,7 @@ interface PoleListTableProps {
   poles: PoleSummary[];
   selectedPoleId: string | null;
   onSelect: (id: string) => void;
+  onSnagPole: (pole: PoleSummary) => void;
 }
 
 function PixelStrip({ filled, total, hasFailures }: { filled: number; total: number; hasFailures: boolean }) {
@@ -39,7 +40,26 @@ const STATUS_LABEL: Record<PoleSummary['status'], string> = {
   approved:    '✓ Approved',
 };
 
-export function PoleListTable({ poles, selectedPoleId, onSelect }: PoleListTableProps) {
+function VerifyFlag({ pole, onClick }: { pole: PoleSummary; onClick: (e: React.MouseEvent) => void }) {
+  let icon = '🚩';
+  let cls = 'text-zinc-500 hover:text-zinc-300';
+  let title = 'Confirm pole planted';
+  if (pole.has_open_verification_snag) { icon = '⚠'; cls = 'text-red-400 hover:text-red-300'; title = 'Reported NOT planted — click to revisit'; }
+  else if (pole.has_verified_planted) { icon = '✓'; cls = 'text-green-400 hover:text-green-300'; title = 'Confirmed planted — click to revisit'; }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`text-base ${cls} px-1`}
+      title={title}
+      aria-label={title}
+    >
+      {icon}
+    </button>
+  );
+}
+
+export function PoleListTable({ poles, selectedPoleId, onSelect, onSnagPole }: PoleListTableProps) {
   if (poles.length === 0) {
     return (
       <div className="text-sm text-zinc-500 text-center py-12">
@@ -59,6 +79,7 @@ export function PoleListTable({ poles, selectedPoleId, onSelect }: PoleListTable
             <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3">Main Joint + Trays</th>
             <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3 w-20">Snags</th>
             <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3 w-28">Status</th>
+            <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3 w-12">Verify</th>
           </tr>
         </thead>
         <tbody>
@@ -68,7 +89,7 @@ export function PoleListTable({ poles, selectedPoleId, onSelect }: PoleListTable
               onClick={() => onSelect(pole.id)}
               className={`border-b border-zinc-900 cursor-pointer transition-colors hover:bg-zinc-800/50 ${
                 selectedPoleId === pole.id ? 'bg-zinc-800/70' : ''
-              } ${pole.status === 'approved' ? 'bg-green-500/5' : ''}`}
+              } ${pole.status === 'approved' ? 'bg-green-500/5' : ''} ${pole.has_open_verification_snag ? 'ring-1 ring-red-500/30' : ''}`}
             >
               <td className="py-2 px-3 font-semibold text-zinc-100">{pole.pole_label}</td>
               <td className="py-2 px-3">
@@ -98,6 +119,9 @@ export function PoleListTable({ poles, selectedPoleId, onSelect }: PoleListTable
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[pole.status]}`}>
                   {STATUS_LABEL[pole.status]}
                 </span>
+              </td>
+              <td className="py-2 px-3">
+                <VerifyFlag pole={pole} onClick={(e) => { e.stopPropagation(); onSnagPole(pole); }} />
               </td>
             </tr>
           ))}

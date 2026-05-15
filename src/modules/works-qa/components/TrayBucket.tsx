@@ -1,4 +1,5 @@
-import { useRef } from 'react';
+import { useState } from 'react';
+import { log } from '@/lib/logger';
 import { photoUrl } from '../utils/photo-url';
 
 interface TrayBucketProps {
@@ -9,13 +10,7 @@ interface TrayBucketProps {
 }
 
 export function TrayBucket({ trayKeys, onUpload, onView, disabled }: TrayBucketProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-    if (files.length > 0) onUpload(files);
-  };
+  const [isDragOver, setIsDragOver] = useState(false);
 
   return (
     <div className="flex flex-col gap-2">
@@ -23,19 +18,50 @@ export function TrayBucket({ trayKeys, onUpload, onView, disabled }: TrayBucketP
         <span className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
           Tray Photos ({trayKeys.length})
         </span>
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={disabled}
-          className="text-xs text-teal-400 hover:text-teal-300 disabled:opacity-50"
+        <label
+          className={`text-xs ${
+            disabled
+              ? 'opacity-50 cursor-not-allowed text-zinc-600'
+              : 'text-teal-400 hover:text-teal-300 cursor-pointer'
+          }`}
         >
           + Add
-        </button>
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            disabled={disabled}
+            onChange={e => {
+              const files = Array.from(e.target.files ?? []);
+              if (files.length > 0) onUpload(files);
+              e.target.value = '';
+              log.debug('works-qa: tray files picked', { count: files.length });
+            }}
+          />
+        </label>
       </div>
 
       <div
-        onDrop={handleDrop}
-        onDragOver={e => e.preventDefault()}
-        className="border border-dashed border-zinc-700 rounded-lg p-3 min-h-16"
+        onDragOver={e => {
+          if (disabled) return;
+          e.preventDefault();
+          if (!isDragOver) setIsDragOver(true);
+        }}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={e => {
+          if (disabled) return;
+          e.preventDefault();
+          setIsDragOver(false);
+          const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+          if (files.length > 0) onUpload(files);
+          log.debug('works-qa: tray drop', { droppedCount: files.length });
+        }}
+        className={`rounded-lg p-3 min-h-16 border transition-colors ${
+          isDragOver
+            ? 'border-teal-500 border-solid bg-teal-500/10'
+            : 'border-dashed border-zinc-700'
+        }`}
       >
         {trayKeys.length === 0 ? (
           <p className="text-xs text-zinc-600 text-center pt-2">Drop tray photos here or click Add</p>
@@ -60,18 +86,6 @@ export function TrayBucket({ trayKeys, onUpload, onView, disabled }: TrayBucketP
           </div>
         )}
       </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        className="hidden"
-        onChange={e => {
-          const files = Array.from(e.target.files ?? []);
-          if (files.length > 0) onUpload(files);
-        }}
-      />
     </div>
   );
 }
