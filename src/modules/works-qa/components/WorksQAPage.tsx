@@ -8,6 +8,7 @@ import { PoleListTable } from './PoleListTable';
 import { PoleDetailPanel } from './PoleDetailPanel';
 import { WorksQAProjectCard } from './WorksQAProjectCard';
 import { WorksQAFiltersBar } from './WorksQAFiltersBar';
+import { ConfirmPlantedModal } from './ConfirmPlantedModal';
 import { usePoleList } from '../hooks/usePoleList';
 import type { WorksQAProjectStats, WorksQAZoneSummary } from '../types/works-qa.types';
 
@@ -46,6 +47,7 @@ export function WorksQAPage() {
   const { poles, isLoading: polesLoading, mutate: mutatePoles } = usePoleList(projectId, ponNo);
   const [selectedPoleId, setSelectedPoleId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [snagPole, setSnagPole] = useState<{ id: string; pole_label: string } | null>(null);
 
   const selectedProject = stats.find(s => s.project_id === projectId);
 
@@ -201,6 +203,7 @@ export function WorksQAPage() {
           poles={poles}
           selectedPoleId={selectedPoleId}
           onSelect={setSelectedPoleId}
+          onSnagPole={(p) => setSnagPole({ id: p.id, pole_label: p.pole_label })}
         />
       )}
 
@@ -211,6 +214,17 @@ export function WorksQAPage() {
           void mutatePoles();
         }}
       />
+
+      {projectId && snagPole && (
+        <ConfirmPlantedModal
+          open
+          projectId={projectId}
+          poleQaPhotoId={snagPole.id}
+          poleLabel={snagPole.pole_label}
+          onClose={() => setSnagPole(null)}
+          onChanged={() => { void mutatePoles(); }}
+        />
+      )}
     </div>
   );
 }
