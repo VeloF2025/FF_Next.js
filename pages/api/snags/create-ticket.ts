@@ -234,10 +234,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       log.warn('Snag WA group notification failed', { ticketId: ticket.id, error: err });
     });
 
-    // Attach noc_ticket_uid for immediate UI use
-    const snagWithUid = { ...updatedSnag, noc_ticket_uid: ticket.ticket_uid };
+    // 3c. Resolve the assignee's display name so the UI can render
+    //     "Assigned to <Name>" without a follow-up fetch. `maintenance_tickets`
+    //     has no name column — join `users` here, best-effort.
+    let assignedToName: string | null = null;
+    if (ticket.assigned_to) {
+      const assigneeRows = await sql`
+        SELECT (first_name || ' ' || last_name) AS full_name
+        FROM users WHERE id = ${ticket.assigned_to}
+        LIMIT 1
+      ` as Array<{ full_name: string | null }>;
+      assignedToName = assigneeRows[0]?.full_name ?? null;
+    }
 
-    return apiResponse.created(res, { ticket, snag: snagWithUid });
+    // Attach noc_ticket_uid for immediate UI use; enrich ticket with assignee name
+    const snagWithUid = { ...updatedSnag, noc_ticket_uid: ticket.ticket_uid };
+    const ticketWithName = { ...ticket, assigned_to_name: assignedToName };
+
+    return apiResponse.created(res, { ticket: ticketWithName, snag: snagWithUid });
   } catch (error) {
     log.error('create-ticket API error', { error });
     return apiResponse.internalError(res, error);

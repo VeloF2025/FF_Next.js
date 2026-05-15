@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useVerificationSnag } from '../hooks/useVerificationSnag';
 import { log } from '@/lib/logger';
-import type { CreateSnagRequest } from '@/modules/construction-qa/types/snag.types';
+import type { CreateSnagRequest, Snag } from '@/modules/construction-qa/types/snag.types';
 
 interface ConfirmPlantedModalProps {
   open: boolean;
@@ -25,12 +25,39 @@ export function ConfirmPlantedModal({ open, projectId, poleQaPhotoId, poleLabel,
   const [error, setError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<ConfirmationState | null>(null);
 
+  // Reset transient state whenever the modal is logically reopened. Without this,
+  // a prior open's confirmation panel persists across reopens (the parent keeps
+  // this component mounted; we render null when `open=false` rather than unmount).
+  useEffect(() => {
+    if (!open) {
+      setConfirmation(null);
+      setError(null);
+    }
+  }, [open]);
+
   if (!open) return null;
 
   function handleClose() {
     setConfirmation(null);
     setError(null);
     onClose();
+  }
+
+  // Fetches the latest verification snag for this pole and returns its noc_ticket_uid
+  // (if any). Used when create-ticket returns 409 (snag already has a ticket) to
+  // recover the existing UID rather than show an error.
+  async function fetchExistingTicketUid(): Promise<string | null> {
+    try {
+      const res = await fetch(
+        `/api/snags?projectId=${encodeURIComponent(projectId)}&category=verification&pole_qa_photo_id=${encodeURIComponent(poleQaPhotoId)}`,
+      );
+      if (!res.ok) return null;
+      const body = await res.json() as { data?: Snag[] } | Snag[];
+      const list = Array.isArray(body) ? body : body.data ?? [];
+      return list[0]?.noc_ticket_uid ?? null;
+    } catch {
+      return null;
+    }
   }
 
   async function answer(planted: boolean) {
@@ -101,6 +128,17 @@ export function ConfirmPlantedModal({ open, projectId, poleQaPhotoId, poleLabel,
           };
           ticketUid = ticketBody.data?.ticket?.ticket_uid ?? null;
           assignedToName = ticketBody.data?.ticket?.assigned_to_name ?? null;
+        } else if (ticketRes.status === 409) {
+          // Snag already linked to a ticket (likely created by a concurrent click
+          // or a stale SWR cache). Recover the existing UID instead of treating
+          // this as an error.
+          ticketUid = await fetchExistingTicketUid();
+          if (!ticketUid) {
+            ticketError = 'NOC ticket already exists for this snag, but the reference could not be retrieved. Open /snags to find it.';
+          }
+          log.info('works-qa: NOC ticket already exists for verification snag', {
+            snagId, recoveredUid: ticketUid, poleLabel,
+          });
         } else {
           // Snag is saved; surface the ticket failure to the user but don't roll back.
           ticketError = `NOC ticket could not be created (HTTP ${ticketRes.status}). The snag is saved — please escalate manually from the snags page.`;
