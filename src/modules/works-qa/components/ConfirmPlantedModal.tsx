@@ -45,6 +45,7 @@ export function ConfirmPlantedModal({ open, projectId, poleQaPhotoId, poleLabel,
         if (!createRes.ok) throw new Error(`Create failed: ${createRes.status}`);
         const created = await createRes.json() as { data?: { id: string } };
         snagId = created.data?.id;
+        if (!snagId) throw new Error('Snag POST did not return an id');
       }
 
       if (planted && snagId) {
@@ -98,7 +99,7 @@ export function ConfirmPlantedModal({ open, projectId, poleQaPhotoId, poleLabel,
           <button
             type="button"
             onClick={onClose}
-            disabled={busy}
+            disabled={busy || isLoading}
             className="px-3 py-1.5 rounded text-xs text-zinc-400 hover:text-zinc-200"
           >
             Cancel
@@ -106,7 +107,7 @@ export function ConfirmPlantedModal({ open, projectId, poleQaPhotoId, poleLabel,
           <button
             type="button"
             onClick={() => void answer(false)}
-            disabled={busy}
+            disabled={busy || isLoading}
             className="px-3 py-1.5 rounded bg-red-600 hover:bg-red-500 text-white text-xs font-medium disabled:opacity-40"
           >
             No — not planted
@@ -114,7 +115,7 @@ export function ConfirmPlantedModal({ open, projectId, poleQaPhotoId, poleLabel,
           <button
             type="button"
             onClick={() => void answer(true)}
-            disabled={busy}
+            disabled={busy || isLoading}
             className="px-3 py-1.5 rounded bg-green-600 hover:bg-green-500 text-white text-xs font-medium disabled:opacity-40"
           >
             Yes — planted
