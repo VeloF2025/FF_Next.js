@@ -80,8 +80,11 @@ export async function createPhotoSnag(input: CreatePhotoSnagInput): Promise<Crea
   const snag = snagRows[0]!;
 
   if (slotPhotoKey) {
+    // snag_photos.source is NOT NULL — 'works_qa' is the new value that
+    // distinguishes per-photo snags from TQR ('tqr_import'/'field_report')
+    // and manual uploads ('manual').
     await pool.query(
-      `INSERT INTO snag_photos (snag_id, phase, photo_url) VALUES ($1, 'before', $2)`,
+      `INSERT INTO snag_photos (snag_id, phase, photo_url, source) VALUES ($1, 'before', $2, 'works_qa')`,
       [snag.id, slotPhotoKey]
     );
   }
