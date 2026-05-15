@@ -26,11 +26,13 @@ export function TrayBucket({ trayKeys, onUpload, onView, disabled }: TrayBucketP
           }`}
         >
           + Add
+          {/* `sr-only` (not `hidden`): see PhotoSlotCard.tsx — Chromium won't
+              open the file picker for display:none inputs. */}
           <input
             type="file"
             accept="image/*"
             multiple
-            className="hidden"
+            className="sr-only"
             disabled={disabled}
             onChange={e => {
               const files = Array.from(e.target.files ?? []);

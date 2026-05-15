@@ -153,10 +153,14 @@ export function PhotoSlotCard({
               }`}
             >
               + Upload
+              {/* `sr-only` (not `hidden`): Chromium silently suppresses the file
+                  picker when the <input type="file"> is `display: none`, even
+                  when triggered via a wrapping <label>. The screen-reader-only
+                  utility keeps it in the layout tree so the picker opens. */}
               <input
                 type="file"
                 accept="image/*"
-                className="hidden"
+                className="sr-only"
                 disabled={disabled}
                 onChange={e => {
                   const f = e.target.files?.[0];
