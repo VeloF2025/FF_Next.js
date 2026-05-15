@@ -27,7 +27,8 @@ export type SnagCategory =
   | 'health'
   | 'safety'
   | 'environment'
-  | 'traffic';
+  | 'traffic'
+  | 'verification';   // NEW — for pole-presence confirmation snags created from Works QA
 
 export type SnagSeverity = 'critical' | 'major' | 'minor';
 

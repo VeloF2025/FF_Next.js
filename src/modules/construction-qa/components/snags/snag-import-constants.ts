@@ -18,6 +18,7 @@ export interface SnagEntry {
   pole_references: string;
 }
 
+// NOTE: 'verification' SnagCategory is intentionally excluded — system-managed (Works QA pole-presence flow), not user-selectable here.
 export const CATEGORY_OPTIONS: { value: SnagCategory; label: string }[] = [
   { value: 'quality',     label: 'Quality' },
   { value: 'safety',      label: 'Safety' },
