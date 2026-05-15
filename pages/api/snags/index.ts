@@ -242,12 +242,19 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse) {
 
   const updatedSnag = rows[0];
 
-  // Sync status to linked NOC ticket if applicable
+  // Sync status to linked NOC ticket if applicable.
+  // updateTicket does NOT auto-stamp resolved_at on status transitions —
+  // callers must pass it explicitly (same contract the works-qa snag
+  // resolve path follows). Without this, transitioning to RESOLVED leaves
+  // resolved_at NULL and breaks downstream SLA + activity-log queries.
   if (body.status && updatedSnag.noc_ticket_id) {
     const ticketStatus = mapSnagStatusToTicketStatus(body.status);
     if (ticketStatus) {
       try {
-        await updateTicket(updatedSnag.noc_ticket_id, { status: ticketStatus });
+        await updateTicket(updatedSnag.noc_ticket_id, {
+          status: ticketStatus,
+          ...(ticketStatus === TicketStatus.RESOLVED && { resolved_at: new Date() }),
+        });
         log.info('NOC ticket status synced', {
           snagId: body.id,
           ticketId: updatedSnag.noc_ticket_id,

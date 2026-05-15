@@ -140,4 +140,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(withPermission('construction-qa.works-qa.override', 'edit')(handler));
+export default withAuth(withPermission('construction-qa.works-qa.snags.create', 'create')(handler));
