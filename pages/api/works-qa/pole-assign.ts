@@ -152,7 +152,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       await pool.query(
         `UPDATE pole_qa_photos
          SET main_joint_tray_keys = array_append(main_joint_tray_keys, $1),
-             vlm_results = vlm_results || jsonb_build_object($2, $3::jsonb),
+             vlm_results = vlm_results || jsonb_build_object($2::text, $3::jsonb),
              updated_at = NOW()
          WHERE id = $4::uuid`,
         [photoKey, vlmKey, JSON.stringify(vlmResult), poleId]
@@ -163,7 +163,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       await pool.query(
         `UPDATE pole_qa_photos
          SET ${dbColumn} = $1,
-             vlm_results = vlm_results || jsonb_build_object($2, $3::jsonb),
+             vlm_results = vlm_results || jsonb_build_object($2::text, $3::jsonb),
              updated_at = NOW()
          WHERE id = $4::uuid`,
         [photoKey, slot, JSON.stringify(vlmResult), poleId]
