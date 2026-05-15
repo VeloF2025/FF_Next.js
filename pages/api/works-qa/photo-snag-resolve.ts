@@ -35,4 +35,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(withPermission('construction-qa.works-qa.approve', 'edit')(handler));
+export default withAuth(withPermission('construction-qa.works-qa.snags.verify', 'create')(handler));
