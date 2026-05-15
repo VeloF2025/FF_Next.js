@@ -69,7 +69,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             THEN 'ready' ELSE 'in_progress' END
           ELSE 'empty'
         END AS status,
-        approved_at
+        approved_at,
+        COALESCE((
+          SELECT COUNT(*)::int
+            FROM snags s
+           WHERE s.pole_qa_photo_id = pole_qa_photos.id
+             AND s.source = 'works_qa'
+             AND s.status NOT IN ('verified','closed')
+        ), 0) AS outstanding_snag_count
       FROM pole_qa_photos
       WHERE project_id = $1::uuid ${ponFilter}
       ORDER BY pon_no ASC NULLS LAST, pole_label ASC

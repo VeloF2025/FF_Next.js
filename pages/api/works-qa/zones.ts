@@ -9,6 +9,7 @@ interface PonRow {
   pon_no: number;
   pole_count: number;
   approved_count: number;
+  outstanding_snag_count: number;
 }
 
 interface ZoneOut {
@@ -16,7 +17,8 @@ interface ZoneOut {
   pon_count: number;
   pole_count: number;
   approved_count: number;
-  pons: { pon_no: number; pole_count: number; approved_count: number }[];
+  outstanding_snag_count: number;
+  pons: { pon_no: number; pole_count: number; approved_count: number; outstanding_snag_count: number }[];
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -31,6 +33,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Source of zone/PON metadata is sow_poles (FibreFlow IDs).
     // pole_qa_photos may carry zone/PON copied at sync time too — merge in case sync ran
     // and added rows that aren't in the SoW (manual additions).
+    // outstanding_snag_count groups open works-qa snags by the photo's
+    // (zone_no, pon_no) — joining on both keys avoids fan-out if a pon_no
+    // ever appears under multiple zones in pole_qa_photos (no DB constraint
+    // guarantees uniqueness on pon_no alone). Filter predicate mirrors
+    // photoSnagHelpers.findOpenSnagForSlot so the count stays consistent
+    // with the idempotency rule (verified/closed = resolved).
     const result = await pool.query<PonRow>(`
       WITH pole_pool AS (
         SELECT zone_no, pon_no, pole_number AS pole_label, NULL::timestamptz AS approved_at
@@ -51,15 +59,28 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           MAX(approved_at) AS approved_at
         FROM pole_pool
         GROUP BY zone_no, pon_no, pole_label
+      ),
+      snag_counts AS (
+        SELECT pqp.zone_no, pqp.pon_no, COUNT(*)::int AS outstanding_snag_count
+          FROM snags s
+          JOIN pole_qa_photos pqp ON pqp.id = s.pole_qa_photo_id
+         WHERE pqp.project_id = $1::uuid
+           AND s.source = 'works_qa'
+           AND s.status NOT IN ('verified','closed')
+         GROUP BY pqp.zone_no, pqp.pon_no
       )
       SELECT
-        zone_no,
-        pon_no,
-        COUNT(DISTINCT pole_label)::int                                AS pole_count,
-        COUNT(DISTINCT pole_label) FILTER (WHERE approved_at IS NOT NULL)::int AS approved_count
-      FROM pole_dedup
-      GROUP BY zone_no, pon_no
-      ORDER BY zone_no NULLS LAST, pon_no ASC
+        pd.zone_no,
+        pd.pon_no,
+        COUNT(DISTINCT pd.pole_label)::int                                AS pole_count,
+        COUNT(DISTINCT pd.pole_label) FILTER (WHERE pd.approved_at IS NOT NULL)::int AS approved_count,
+        COALESCE(sc.outstanding_snag_count, 0)::int                       AS outstanding_snag_count
+      FROM pole_dedup pd
+      LEFT JOIN snag_counts sc
+        ON sc.pon_no = pd.pon_no
+       AND sc.zone_no IS NOT DISTINCT FROM pd.zone_no
+      GROUP BY pd.zone_no, pd.pon_no, sc.outstanding_snag_count
+      ORDER BY pd.zone_no NULLS LAST, pd.pon_no ASC
     `, [project_id]);
 
     const grouped = new Map<number | null, ZoneOut>();
@@ -67,17 +88,26 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const key = row.zone_no;
       let zone = grouped.get(key);
       if (!zone) {
-        zone = { zone_no: key, pon_count: 0, pole_count: 0, approved_count: 0, pons: [] };
+        zone = {
+          zone_no: key,
+          pon_count: 0,
+          pole_count: 0,
+          approved_count: 0,
+          outstanding_snag_count: 0,
+          pons: [],
+        };
         grouped.set(key, zone);
       }
       zone.pons.push({
         pon_no: row.pon_no,
         pole_count: row.pole_count,
         approved_count: row.approved_count,
+        outstanding_snag_count: row.outstanding_snag_count,
       });
       zone.pon_count += 1;
       zone.pole_count += row.pole_count;
       zone.approved_count += row.approved_count;
+      zone.outstanding_snag_count += row.outstanding_snag_count;
     }
 
     return apiResponse.success(res, Array.from(grouped.values()));
