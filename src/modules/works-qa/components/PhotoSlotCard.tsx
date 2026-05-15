@@ -76,9 +76,9 @@ export function PhotoSlotCard({
           }}
           onDragLeave={() => setIsDragOver(false)}
           onDrop={e => {
+            if (disabled || photoKey) return;
             e.preventDefault();
             setIsDragOver(false);
-            if (disabled || photoKey) return;
             const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
             if (files.length === 0) return;
             if (files[0]) onUpload(files[0]);
