@@ -1,4 +1,13 @@
--- Migration 247: works-qa per-photo snag workflow
+-- Migration 351: works-qa per-photo snag workflow
+--
+-- Originally authored as 247_works_qa_photo_snags.sql in PR #1633 but
+-- accidentally committed to scripts/migrations/ instead of
+-- scripts/migrations/sql/ — the runner only scans the sql/ subdir, so
+-- the file never applied. Renumbered to 351 (247 is taken by
+-- 247_rbac_update_all_modules.sql) and moved to the correct location.
+-- All statements use IF NOT EXISTS / DROP CONSTRAINT IF EXISTS so the
+-- migration is idempotent even on environments where someone might
+-- have manually applied the original file.
 --
 -- Hooks the existing snags / snag_reports / snag_photos plumbing (migration 242)
 -- so per-photo snags raised from /field-ops/works-qa land in the same tables
