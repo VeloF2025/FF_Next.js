@@ -105,15 +105,20 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
   // Direct pole_qa_photo_id lookup (used by Works QA ConfirmPlantedModal to find
   // the verification snag for a specific pole). Filters by exact UUID match plus
-  // optional projectId/category narrowing.
+  // optional projectId/category narrowing. Joins maintenance_tickets to surface
+  // noc_ticket_uid so the modal can show the existing ticket reference instead
+  // of double-creating.
   const poleQaPhotoId = req.query.pole_qa_photo_id;
   if (typeof poleQaPhotoId === 'string' && poleQaPhotoId) {
     const projectIdFilter = (typeof projectId === 'string' && projectId) ? projectId : null;
     const categoryFilter = categoryArr[0] ?? null;
     const rows = await sql`
-      SELECT s.*, (u.first_name || ' ' || u.last_name) AS assigned_to_name
+      SELECT s.*,
+             (u.first_name || ' ' || u.last_name) AS assigned_to_name,
+             mt.ticket_uid AS noc_ticket_uid
       FROM snags s
       LEFT JOIN users u ON u.id = s.assigned_to
+      LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
       WHERE s.pole_qa_photo_id = ${poleQaPhotoId}::uuid
         AND (${projectIdFilter}::uuid IS NULL OR s.project_id = ${projectIdFilter}::uuid)
         AND (${categoryFilter}::text IS NULL OR s.category = ${categoryFilter}::text)
