@@ -76,7 +76,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
            WHERE s.pole_qa_photo_id = pole_qa_photos.id
              AND s.source = 'works_qa'
              AND s.status NOT IN ('verified','closed')
-        ), 0) AS outstanding_snag_count
+        ), 0) AS outstanding_snag_count,
+        EXISTS (
+          SELECT 1 FROM snags s
+          WHERE s.pole_qa_photo_id = pole_qa_photos.id
+            AND s.category = 'verification'
+            AND s.status = 'open'
+        ) AS has_open_verification_snag,
+        EXISTS (
+          SELECT 1 FROM snags s
+          WHERE s.pole_qa_photo_id = pole_qa_photos.id
+            AND s.category = 'verification'
+            AND s.status = 'verified'
+        ) AS has_verified_planted
       FROM pole_qa_photos
       WHERE project_id = $1::uuid ${ponFilter}
       ORDER BY pon_no ASC NULLS LAST, pole_label ASC
