@@ -29,6 +29,7 @@ import {
 import type { Discipline } from '../utils/approval-gates';
 import { log } from '@/lib/logger';
 import { PhotoLightbox } from '@/components/PhotoLightbox';
+import { ConfirmPlantedModal } from './ConfirmPlantedModal';
 import type { PoleQaPhoto } from '../types/works-qa.types';
 
 interface PoleDetailPanelProps {
@@ -42,6 +43,7 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
   const { users: assignableUsers, isLoading: loadingUsers } = useAssignableUsers(pole?.project_id ?? null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
+  const [showSnagModal, setShowSnagModal] = useState(false);
   const [tab, setTab] = useState<'photos' | 'snags'>('photos');
   // Accordion state: multi-open SET of expanded disciplines. Defaults to all
   // three so every Droppable has measurable geometry at drag start (rfd
@@ -210,7 +212,17 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
           >
             {expanded.size === 3 ? 'Collapse all' : 'Expand all'}
           </button>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-200 text-lg leading-none">×</button>
+          {pole && (
+            <button
+              type="button"
+              onClick={() => setShowSnagModal(true)}
+              className="px-2 py-1 rounded text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700"
+              title="Confirm: is this pole planted?"
+            >
+              🚩 Snag pole
+            </button>
+          )}
+          <button type="button" onClick={onClose} className="text-zinc-500 hover:text-zinc-200 text-lg leading-none">×</button>
         </div>
       </div>
 
@@ -287,6 +299,17 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
           photos={photos}
           initialIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
+        />
+      )}
+
+      {pole && showSnagModal && (
+        <ConfirmPlantedModal
+          open
+          projectId={pole.project_id}
+          poleQaPhotoId={pole.id}
+          poleLabel={pole.pole_label}
+          onClose={() => setShowSnagModal(false)}
+          onChanged={() => { void mutate(); }}
         />
       )}
     </div>
