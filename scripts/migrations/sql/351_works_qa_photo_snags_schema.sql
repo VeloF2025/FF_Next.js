@@ -54,7 +54,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_snag_reports_works_qa_per_pole
   WHERE source = 'works_qa';
 
 COMMENT ON COLUMN snag_reports.source IS
-  'tqr = weekly TQR audit PDF (migration 242); works_qa = auto-created per pole on first per-photo snag (migration 247).';
+  'tqr = weekly TQR audit PDF (migration 242); works_qa = auto-created per pole on first per-photo snag (migration 351).';
 COMMENT ON COLUMN snag_reports.pole_qa_photo_id IS
   'For source=works_qa reports: the pole_qa_photos row this report aggregates. NULL for TQR.';
 
@@ -136,6 +136,6 @@ ALTER TABLE pole_qa_photos
   ADD COLUMN IF NOT EXISTS slot_approvals JSONB NOT NULL DEFAULT '{}'::jsonb;
 
 COMMENT ON COLUMN pole_qa_photos.slot_approvals IS
-  'Per-slot approve/snag decisions, keyed by SLOT_META.key. See migration 247 for the JSONB shape.';
+  'Per-slot approve/snag decisions, keyed by SLOT_META.key. See migration 351 for the JSONB shape.';
 
 COMMIT;
