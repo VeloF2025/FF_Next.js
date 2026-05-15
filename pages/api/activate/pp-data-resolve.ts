@@ -471,6 +471,7 @@ async function run1MapLookup(): Promise<{
   total_errors: number;
 }> {
   const startTime = Date.now();
+  const cutoff = new Date();
   const results = { total_resolved: 0, total_searched: 0, total_not_found: 0, total_errors: 0 };
 
   // Get all unresolved serials (include ticket link for activity logging)
@@ -658,6 +659,19 @@ async function run1MapLookup(): Promise<{
   }
 
   logger.info('1Map per-serial lookup complete', { ...results, elapsed_seconds: elapsed });
+
+  // Cascade newly-resolved PPs (from this 1Map run) into tickets/drops/stock_serials.
+  // Best-effort: a cascade failure should not bubble up since run1MapLookup is
+  // fire-and-forget background work.
+  try {
+    const cascade = await cascadePpResolution(cutoff);
+    logger.info('1Map post-cascade', { ...cascade });
+  } catch (err) {
+    logger.error('1Map post-cascade failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   return results;
 }
 

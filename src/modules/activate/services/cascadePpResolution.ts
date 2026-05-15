@@ -123,6 +123,7 @@ export async function cascadePpResolution(
       FROM oes_pp_data pp
       WHERE pp.resolved_at >= $1
         AND pp.maintenance_ticket_id IS NOT NULL
+        AND pp.resolved_drop_number IS NOT NULL
         AND NOT EXISTS (
           SELECT 1 FROM maintenance_notes mn
           WHERE mn.ticket_id = pp.maintenance_ticket_id
@@ -135,6 +136,9 @@ export async function cascadePpResolution(
     );
     result.notes_added = notesInsert.rowCount ?? 0;
 
+    // Activities are append-only audit log. Cutoff filter is the canonical
+    // idempotency mechanism (only newly-resolved PPs are touched). Re-resolution
+    // (e.g. swap) intentionally produces a fresh activity entry.
     const activitiesInsert = await client.query(
       `
       INSERT INTO maintenance_activities (id, ticket_id, activity_type, description, field_changes, created_by_name, created_by_email, source, created_at)
@@ -161,11 +165,7 @@ export async function cascadePpResolution(
       FROM oes_pp_data pp
       WHERE pp.resolved_at >= $1
         AND pp.maintenance_ticket_id IS NOT NULL
-        AND NOT EXISTS (
-          SELECT 1 FROM maintenance_activities ma
-          WHERE ma.ticket_id = pp.maintenance_ticket_id
-            AND ma.created_by_name = 'System (PP Cascade)'
-        )
+        AND pp.resolved_drop_number IS NOT NULL
       RETURNING id
       `,
       [cutoffTime.toISOString()],
@@ -187,17 +187,42 @@ export async function cascadePpResolution(
     );
     result.drops_backfilled = dropsUpdate.rowCount ?? 0;
 
+    // stock_serials may key the inventory record by either the PP serial
+    // (procurement source) or the photo serial (what was actually installed,
+    // when VLM/OCR differs by 1 char). Prefer photo_serial when present —
+    // that's the physical unit on the wall. Fall back to pp_serial. Only
+    // update one record per resolution; if both rows happen to exist, the
+    // physical (photo) wins.
     const stockUpdate = await client.query(
       `
+      WITH ranked AS (
+        SELECT ss.serial_number,
+               pp.resolved_drop_number,
+               (pp.resolved_details->>'photo_date')::date AS photo_date,
+               ROW_NUMBER() OVER (
+                 PARTITION BY pp.id
+                 ORDER BY CASE
+                   WHEN ss.serial_number = pp.resolved_details->>'photo_serial' THEN 1
+                   WHEN ss.serial_number = pp.serial_number THEN 2
+                   ELSE 3
+                 END
+               ) AS rn
+        FROM oes_pp_data pp
+        JOIN stock_serials ss
+          ON ss.serial_number IN (pp.serial_number, COALESCE(pp.resolved_details->>'photo_serial', pp.serial_number))
+        WHERE pp.resolved_at >= $1
+          AND pp.resolved_drop_number IS NOT NULL
+          AND ss.installed_at_drop_number IS NULL
+      )
       UPDATE stock_serials ss
-      SET installed_at_drop_number = pp.resolved_drop_number,
-          installed_date = COALESCE((pp.resolved_details->>'photo_date')::date, CURRENT_DATE),
+      SET installed_at_drop_number = r.resolved_drop_number,
+          installed_date = COALESCE(r.photo_date, CURRENT_DATE),
           status = 'installed',
           updated_at = NOW()
-      FROM oes_pp_data pp
-      WHERE ss.serial_number = pp.serial_number
+      FROM ranked r
+      WHERE ss.serial_number = r.serial_number
+        AND r.rn = 1
         AND ss.installed_at_drop_number IS NULL
-        AND pp.resolved_at >= $1
       RETURNING ss.serial_number
       `,
       [cutoffTime.toISOString()],
