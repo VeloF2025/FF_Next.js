@@ -77,6 +77,7 @@ export function PoleListTable({ poles, selectedPoleId, onSelect, onSnagPole }: P
             <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3">Civil</th>
             <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3">Dome</th>
             <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3">Main Joint + Trays</th>
+            <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3 w-20">Snags</th>
             <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3 w-28">Status</th>
             <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide py-2 px-3 w-12">Verify</th>
           </tr>
@@ -104,6 +105,15 @@ export function PoleListTable({ poles, selectedPoleId, onSelect, onSnagPole }: P
                     <span className="text-xs text-zinc-500">+{pole.tray_count}t</span>
                   )}
                 </div>
+              </td>
+              <td className="py-2 px-3">
+                {pole.outstanding_snag_count > 0 ? (
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-500/20 text-red-400">
+                    {pole.outstanding_snag_count}
+                  </span>
+                ) : (
+                  <span className="text-xs text-zinc-600">—</span>
+                )}
               </td>
               <td className="py-2 px-3">
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[pole.status]}`}>
