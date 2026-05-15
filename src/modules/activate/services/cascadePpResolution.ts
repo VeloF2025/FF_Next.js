@@ -73,11 +73,19 @@ export async function cascadePpResolution(
       return result;
     }
 
+    // ont_serial: only replace if the ticket still shows the original PP serial
+    // (the auto-populated value when the PP ticket was created) or is empty.
+    // If a human operator manually corrected ont_serial to something else, keep
+    // their value — don't silently clobber a verified field correction.
     const ticketUpdate = await client.query(
       `
       UPDATE maintenance_tickets mt
       SET dr_number = pp.resolved_drop_number,
-          ont_serial = COALESCE(pp.resolved_details->>'photo_serial', mt.ont_serial),
+          ont_serial = CASE
+            WHEN mt.ont_serial IS NULL OR mt.ont_serial = pp.serial_number
+              THEN COALESCE(pp.resolved_details->>'photo_serial', mt.ont_serial)
+            ELSE mt.ont_serial
+          END,
           status = 'resolved',
           resolved_at = NOW(),
           resolution_path = COALESCE(NULLIF(mt.resolution_path, 'triage_required'), 'investigate_data_gap'),
@@ -103,7 +111,8 @@ export async function cascadePpResolution(
           'Auto-resolved via %s (source=%s).' || E'\n' ||
           'DR: %s' || E'\n' ||
           'Matched serial: %s%s' || E'\n' ||
-          'Project: %s%s%s',
+          'Project: %s%s%s' || E'\n' ||
+          '[pp=%s]',
           COALESCE(pp.resolved_details->>'method', pp.resolved_source),
           pp.resolved_source,
           pp.resolved_drop_number,
@@ -117,7 +126,8 @@ export async function cascadePpResolution(
           CASE WHEN pp.resolved_details ? 'technician_display_name'
                THEN E'\nTechnician: ' || COALESCE(pp.resolved_details->>'technician_display_name', 'unknown (LID ' || COALESCE(pp.resolved_details->>'technician_lid','?') || ')')
                ELSE ''
-          END
+          END,
+          pp.serial_number
         ),
         'internal', 'private', true, NOW(), NOW()
       FROM oes_pp_data pp
@@ -125,10 +135,14 @@ export async function cascadePpResolution(
         AND pp.maintenance_ticket_id IS NOT NULL
         AND pp.resolved_drop_number IS NOT NULL
         AND NOT EXISTS (
+          -- Dedup is per PP serial, not per ticket: a single ticket can cover
+          -- multiple PPs (rare but possible), and each PP gets its own note.
+          -- The [pp=<serial>] marker line is the stable anchor.
           SELECT 1 FROM maintenance_notes mn
           WHERE mn.ticket_id = pp.maintenance_ticket_id
             AND mn.is_resolution = true
             AND mn.content LIKE 'Auto-resolved via%'
+            AND mn.content LIKE '%[pp=' || pp.serial_number || ']%'
         )
       RETURNING id
       `,
