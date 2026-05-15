@@ -313,13 +313,15 @@ export interface CreateSnagReportRequest {
 }
 
 export interface CreateSnagRequest {
-  report_id: string;
+  report_id?: string | null;
   project_id: string;
-  snag_number: number;
+  snag_number?: number;
   category: SnagCategory;
   severity?: SnagSeverity;
   description: string;
-  pole_references?: string[];
+  pole_references?: string[] | null;
+  pole_qa_photo_id?: string | null;
+  verification_notes?: string;
 }
 
 export interface UpdateSnagRequest {

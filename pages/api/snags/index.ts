@@ -145,14 +145,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   const body = req.body as CreateSnagRequest;
 
-  if (!body.report_id) {
-    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'report_id is required');
-  }
   if (!body.project_id) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'project_id is required');
-  }
-  if (!body.snag_number) {
-    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'snag_number is required');
   }
   if (!body.category) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'category is required');
@@ -161,20 +155,45 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'description is required');
   }
 
+  const isVerification = body.category === 'verification';
+
+  if (!isVerification) {
+    if (!body.report_id) {
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'report_id is required');
+    }
+    if (!body.snag_number) {
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'snag_number is required');
+    }
+  }
+
+  let snagNumber = body.snag_number;
+  if (isVerification) {
+    const numRows = await sql`
+      SELECT COALESCE(MAX(snag_number), 0) + 1 AS next_num
+      FROM snags
+      WHERE project_id = ${body.project_id} AND report_id IS NULL
+    ` as Array<{ next_num: number }>;
+    snagNumber = numRows[0]?.next_num ?? 1;
+  }
+
   const rows = await sql`
     INSERT INTO snags (
       report_id, project_id, snag_number,
       category, severity, description,
-      pole_references, status
+      pole_references, pole_qa_photo_id, source,
+      status, verification_notes
     ) VALUES (
-      ${body.report_id},
+      ${body.report_id ?? null},
       ${body.project_id},
-      ${body.snag_number},
+      ${snagNumber},
       ${body.category},
-      ${body.severity ?? 'major'},
+      ${body.severity ?? (isVerification ? 'minor' : 'major')},
       ${body.description.trim()},
       ${body.pole_references ?? null},
-      'open'
+      ${body.pole_qa_photo_id ?? null},
+      ${isVerification ? 'works_qa' : null},
+      'open',
+      ${body.verification_notes ?? null}
     )
     RETURNING *
   ` as Snag[];
@@ -183,17 +202,19 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Failed to create snag');
   }
 
-  // Update total_findings count on report
-  await sql`
-    UPDATE snag_reports
-    SET total_findings = (
-      SELECT COUNT(*) FROM snags WHERE report_id = ${body.report_id}
-    ),
-    updated_at = NOW()
-    WHERE id = ${body.report_id}
-  `;
+  // Only update total_findings when snag belongs to a report
+  if (body.report_id) {
+    await sql`
+      UPDATE snag_reports
+      SET total_findings = (
+        SELECT COUNT(*) FROM snags WHERE report_id = ${body.report_id}
+      ),
+      updated_at = NOW()
+      WHERE id = ${body.report_id}
+    `;
+  }
 
-  log.info('Snag created', { snagId: rows[0].id, reportId: body.report_id });
+  log.info('Snag created', { snagId: rows[0].id, reportId: body.report_id ?? null, category: body.category });
   return apiResponse.created(res, rows[0]);
 }
 
