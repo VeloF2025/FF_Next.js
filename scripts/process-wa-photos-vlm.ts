@@ -1,18 +1,24 @@
 /**
  * Process unprocessed WA photos through VLM
  * Extracts ONT and UPS serials from WhatsApp submission photos
+ *
+ * After the batch completes, calls /api/activate/pp-data-resolve so any
+ * newly-extracted serials immediately get cross-referenced against unresolved
+ * PPs (and the resolution cascades to tickets/drops/stock_serials).
  */
 
 import pg from 'pg';
 const { Pool } = pg;
 import { extractSerialsFromWaPhoto } from '../src/modules/activate/services/vlmExtractionService';
+import { createLogger } from '../src/lib/logger';
 
+const log = createLogger('process-wa-photos-vlm');
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 const VPS_PHOTO_BASE = 'http://72.61.197.178:8866';
 
 async function processAllWaPhotos() {
-  console.log('=== WA Photo VLM Processing ===\n');
+  log.info('=== WA Photo VLM Processing ===');
 
   const client = await pool.connect();
 
@@ -26,7 +32,7 @@ async function processAllWaPhotos() {
     `);
 
     const photos = result.rows;
-    console.log(`Found ${photos.length} unprocessed photos\n`);
+    log.info(`Found ${photos.length} unprocessed photos`);
 
     let successCount = 0;
     let failCount = 0;
@@ -38,15 +44,17 @@ async function processAllWaPhotos() {
       );
       const photoUrl = `${VPS_PHOTO_BASE}${urlPath}`;
 
-      console.log(`\n=== Processing ${photo.drop_number} / ${photo.original_filename} ===`);
-      console.log(`URL: ${photoUrl}`);
+      log.info(`Processing ${photo.drop_number} / ${photo.original_filename}`, { url: photoUrl });
 
       try {
         const extraction = await extractSerialsFromWaPhoto(photoUrl);
-        console.log(`ONT: ${extraction.ontSerial || 'not found'}`);
-        console.log(`UPS: ${extraction.upsSerial || 'not found'}`);
-        console.log(`Confidence: ${(extraction.confidence * 100).toFixed(0)}%`);
-        console.log(`Time: ${extraction.processingTimeMs}ms`);
+        log.info('Extraction result', {
+          dr: photo.drop_number,
+          ont: extraction.ontSerial || 'not found',
+          ups: extraction.upsSerial || 'not found',
+          confidence: extraction.confidence,
+          ms: extraction.processingTimeMs,
+        });
 
         // Update wa_photos table
         await client.query(`
@@ -61,11 +69,10 @@ async function processAllWaPhotos() {
           WHERE id = $4
         `, [extraction.ontSerial, extraction.upsSerial, extraction.confidence, photo.id]);
 
-        console.log('✓ Updated database');
         successCount++;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        console.error(`✗ Error: ${message}`);
+        log.error('VLM extraction failed', { dr: photo.drop_number, error: message });
 
         // Mark as processed (with error) to avoid retrying indefinitely
         await client.query(`
@@ -79,10 +86,7 @@ async function processAllWaPhotos() {
     }
 
     // Print summary
-    console.log('\n\n=== SUMMARY ===');
-    console.log(`Total processed: ${photos.length}`);
-    console.log(`Successful: ${successCount}`);
-    console.log(`Failed: ${failCount}`);
+    log.info('=== SUMMARY ===', { total: photos.length, successful: successCount, failed: failCount });
 
     // Get overall stats
     const statsResult = await client.query(`
@@ -95,11 +99,45 @@ async function processAllWaPhotos() {
     `);
 
     const stats = statsResult.rows[0];
-    console.log('\n=== Database Stats ===');
-    console.log(`Total WA photos: ${stats.total}`);
-    console.log(`VLM processed: ${stats.processed}`);
-    console.log(`Unique ONT serials: ${stats.unique_onts}`);
-    console.log(`Unique UPS serials: ${stats.unique_ups}`);
+    log.info('=== Database Stats ===', {
+      total_wa_photos: stats.total,
+      vlm_processed: stats.processed,
+      unique_ont_serials: stats.unique_onts,
+      unique_ups_serials: stats.unique_ups,
+    });
+
+    // Post-batch hook: trigger the PP resolver so newly-extracted serials
+    // immediately cross-reference against unresolved PPs (and the resolution
+    // cascades to tickets/drops/stock_serials). Best-effort — failure is logged
+    // but doesn't fail the batch.
+    if (successCount > 0) {
+      const resolveBase = process.env.PP_RESOLVE_URL || 'http://localhost:3000';
+      const resolveSecret = process.env.CRON_SECRET;
+      if (!resolveSecret) {
+        log.warn('Post-VLM resolver hook skipped: CRON_SECRET not set');
+      } else {
+        try {
+          const resp = await fetch(`${resolveBase}/api/activate/pp-data-resolve`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-cron-secret': resolveSecret,
+            },
+            body: JSON.stringify({ action: 'local-scan' }),
+          });
+          if (resp.ok) {
+            const json = await resp.json();
+            log.info('Post-VLM resolver completed', { result: json.data ?? json });
+          } else {
+            log.warn('Post-VLM resolver returned non-OK', { status: resp.status });
+          }
+        } catch (err) {
+          log.warn('Post-VLM resolver call failed', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+    }
 
   } finally {
     client.release();
@@ -107,4 +145,8 @@ async function processAllWaPhotos() {
   }
 }
 
-processAllWaPhotos().catch(console.error);
+processAllWaPhotos().catch((err) => {
+  log.error('Batch failed', { error: err instanceof Error ? err.message : String(err) });
+  // Use process.exitCode to allow logger to flush before exit
+  process.exitCode = 1;
+});
