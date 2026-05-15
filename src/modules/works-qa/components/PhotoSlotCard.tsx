@@ -66,9 +66,24 @@ export function PhotoSlotCard({
         <div
           ref={dropProvided.innerRef}
           {...dropProvided.droppableProps}
-          className={`rounded-lg border ${borderColor} ${bgColor} p-3 flex flex-col gap-2 ${
+          className={`rounded-lg border ${borderColor} ${bgColor} p-3 flex flex-col gap-2 transition-colors ${
             dropSnap.isDraggingOver ? 'ring-2 ring-teal-400/60' : ''
-          }`}
+          } ${isDragOver ? 'ring-2 ring-teal-500/60 bg-teal-500/5' : ''}`}
+          onDragOver={e => {
+            if (disabled || photoKey) return;
+            e.preventDefault();
+            if (!isDragOver) setIsDragOver(true);
+          }}
+          onDragLeave={() => setIsDragOver(false)}
+          onDrop={e => {
+            e.preventDefault();
+            setIsDragOver(false);
+            if (disabled || photoKey) return;
+            const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+            if (files.length === 0) return;
+            if (files[0]) onUpload(files[0]);
+            log.debug('works-qa: slot drop', { slotKey, droppedCount: files.length });
+          }}
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-zinc-300">{label}</span>
