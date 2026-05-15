@@ -54,14 +54,24 @@ export function WorksQAFiltersBar({ zones, zoneNo, ponNo, onChange }: WorksQAFil
         </SelectTrigger>
         <SelectContent className="bg-zinc-800 border-zinc-700">
           <SelectItem value={ALL} className="text-zinc-100">All PONs</SelectItem>
-          {sortedPons.map(p => (
-            <SelectItem key={p.pon_no} value={String(p.pon_no)} className="text-zinc-100">
-              PON {p.pon_no} — {p.pole_count} pole{p.pole_count === 1 ? '' : 's'}
-              {p.outstanding_snag_count > 0 && (
-                <span className="text-red-400"> · {p.outstanding_snag_count} snag{p.outstanding_snag_count === 1 ? '' : 's'}</span>
-              )}
-            </SelectItem>
-          ))}
+          {sortedPons.map(p => {
+            // textValue feeds the trigger's SelectValue; without it Radix
+            // concatenates child text including the snag suffix.
+            const triggerText = `PON ${p.pon_no} — ${p.pole_count} pole${p.pole_count === 1 ? '' : 's'}`;
+            return (
+              <SelectItem
+                key={p.pon_no}
+                value={String(p.pon_no)}
+                textValue={triggerText}
+                className="text-zinc-100"
+              >
+                {triggerText}
+                {p.outstanding_snag_count > 0 && (
+                  <span className="text-red-400"> · {p.outstanding_snag_count} snag{p.outstanding_snag_count === 1 ? '' : 's'}</span>
+                )}
+              </SelectItem>
+            );
+          })}
         </SelectContent>
       </Select>
     </div>

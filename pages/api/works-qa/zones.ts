@@ -33,9 +33,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Source of zone/PON metadata is sow_poles (FibreFlow IDs).
     // pole_qa_photos may carry zone/PON copied at sync time too — merge in case sync ran
     // and added rows that aren't in the SoW (manual additions).
-    // outstanding_snag_count groups open works-qa snags by the photo's pon_no
-    // (snags.pole_qa_photo_id -> pole_qa_photos.pon_no). Filter predicate
-    // mirrors photoSnagHelpers.findOpenSnagForSlot so the count stays consistent
+    // outstanding_snag_count groups open works-qa snags by the photo's
+    // (zone_no, pon_no) — joining on both keys avoids fan-out if a pon_no
+    // ever appears under multiple zones in pole_qa_photos (no DB constraint
+    // guarantees uniqueness on pon_no alone). Filter predicate mirrors
+    // photoSnagHelpers.findOpenSnagForSlot so the count stays consistent
     // with the idempotency rule (verified/closed = resolved).
     const result = await pool.query<PonRow>(`
       WITH pole_pool AS (
@@ -59,13 +61,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         GROUP BY zone_no, pon_no, pole_label
       ),
       snag_counts AS (
-        SELECT pqp.pon_no, COUNT(*)::int AS outstanding_snag_count
+        SELECT pqp.zone_no, pqp.pon_no, COUNT(*)::int AS outstanding_snag_count
           FROM snags s
           JOIN pole_qa_photos pqp ON pqp.id = s.pole_qa_photo_id
          WHERE pqp.project_id = $1::uuid
            AND s.source = 'works_qa'
            AND s.status NOT IN ('verified','closed')
-         GROUP BY pqp.pon_no
+         GROUP BY pqp.zone_no, pqp.pon_no
       )
       SELECT
         pd.zone_no,
@@ -74,7 +76,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         COUNT(DISTINCT pd.pole_label) FILTER (WHERE pd.approved_at IS NOT NULL)::int AS approved_count,
         COALESCE(sc.outstanding_snag_count, 0)::int                       AS outstanding_snag_count
       FROM pole_dedup pd
-      LEFT JOIN snag_counts sc ON sc.pon_no = pd.pon_no
+      LEFT JOIN snag_counts sc
+        ON sc.pon_no = pd.pon_no
+       AND sc.zone_no IS NOT DISTINCT FROM pd.zone_no
       GROUP BY pd.zone_no, pd.pon_no, sc.outstanding_snag_count
       ORDER BY pd.zone_no NULLS LAST, pd.pon_no ASC
     `, [project_id]);
