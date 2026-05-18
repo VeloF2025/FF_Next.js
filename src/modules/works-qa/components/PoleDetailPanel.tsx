@@ -143,7 +143,17 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
                   slotApproval={pole.slot_approvals?.[slot.key]}
                   assignableUsers={assignableUsers}
                   loadingUsers={loadingUsers}
-                  onUpload={file => assignPhoto(pole.id, slot.key, file).then(() => mutate()).catch((e: unknown) => log.error('works-qa: upload failed', { error: e instanceof Error ? e.message : String(e) }))}
+                  onUpload={async file => {
+                    // Throw so PhotoSlotCard can display the error inline.
+                    // Logging happens at the boundary; do not swallow here.
+                    try {
+                      await assignPhoto(pole.id, slot.key, file);
+                      await mutate();
+                    } catch (e: unknown) {
+                      log.error('works-qa: upload failed', { error: e instanceof Error ? e.message : String(e) });
+                      throw e;
+                    }
+                  }}
                   onOverride={(d, r) => overrideSlot(pole.id, slot.key, d, r).then(() => mutate()).catch((e: unknown) => log.error('works-qa: override failed', { error: e instanceof Error ? e.message : String(e) }))}
                   onApprove={async () => { await approvePhotoApi(pole.id, slot.key); await mutate(); }}
                   onSnag={async input => {
