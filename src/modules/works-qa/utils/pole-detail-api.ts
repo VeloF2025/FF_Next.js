@@ -52,6 +52,8 @@ export async function movePhoto(poleId: string, photoKey: string, from: string, 
 }
 
 export async function uploadTrayPhotos(poleId: string, files: File[]): Promise<void> {
+  // Surface the first failure so TrayBucket can show it inline. Subsequent files
+  // are skipped — the user can retry the batch after fixing the issue.
   for (const file of files) {
     const form = new FormData();
     form.append('pole_id', poleId);
@@ -59,7 +61,10 @@ export async function uploadTrayPhotos(poleId: string, files: File[]): Promise<v
     form.append('photo', file);
     form.append('source', 'upload');
     const res = await fetch('/api/works-qa/pole-assign', { method: 'POST', body: form });
-    if (!res.ok) log.error('works-qa: tray upload failed', { status: res.status });
+    if (!res.ok) {
+      const body = await safeJson<{ error?: { message?: string } }>(res);
+      throw new Error(body?.error?.message ?? `Tray upload failed (${res.status})`);
+    }
   }
 }
 

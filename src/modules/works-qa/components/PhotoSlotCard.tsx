@@ -192,7 +192,11 @@ export function PhotoSlotCard({
           )}
 
           {uploadError && (
-            <div className="flex items-center justify-between gap-2 text-xs text-red-400">
+            <div
+              role="alert"
+              aria-live="assertive"
+              className="flex items-center justify-between gap-2 text-xs text-red-400"
+            >
               <span className="leading-tight">⚠ {uploadError}</span>
               <button
                 type="button"

@@ -1,16 +1,32 @@
 import { useState } from 'react';
+import { X } from 'lucide-react';
 import { log } from '@/lib/logger';
 import { photoUrl } from '../utils/photo-url';
 
 interface TrayBucketProps {
   trayKeys: string[];
-  onUpload: (files: File[]) => void;
+  onUpload: (files: File[]) => Promise<void> | void;
   onView?: (index: number) => void;
   disabled?: boolean;
 }
 
 export function TrayBucket({ trayKeys, onUpload, onView, disabled }: TrayBucketProps) {
   const [isDragOver, setIsDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  async function runUpload(files: File[]): Promise<void> {
+    if (uploading || files.length === 0) return;
+    setUploadError(null);
+    setUploading(true);
+    try {
+      await onUpload(files);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Tray upload failed');
+    } finally {
+      setUploading(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -20,12 +36,13 @@ export function TrayBucket({ trayKeys, onUpload, onView, disabled }: TrayBucketP
         </span>
         <label
           className={`text-xs ${
-            disabled
+            disabled || uploading
               ? 'opacity-50 cursor-not-allowed text-zinc-600'
               : 'text-teal-400 hover:text-teal-300 cursor-pointer'
           }`}
+          aria-busy={uploading}
         >
-          + Add
+          {uploading ? 'Uploading…' : '+ Add'}
           {/* `sr-only` (not `hidden`): see PhotoSlotCard.tsx — Chromium won't
               open the file picker for display:none inputs. */}
           <input
@@ -33,10 +50,10 @@ export function TrayBucket({ trayKeys, onUpload, onView, disabled }: TrayBucketP
             accept="image/*"
             multiple
             className="sr-only"
-            disabled={disabled}
+            disabled={disabled || uploading}
             onChange={e => {
               const files = Array.from(e.target.files ?? []);
-              if (files.length > 0) onUpload(files);
+              if (files.length > 0) void runUpload(files);
               e.target.value = '';
               log.debug('works-qa: tray files picked', { count: files.length });
             }}
@@ -56,7 +73,7 @@ export function TrayBucket({ trayKeys, onUpload, onView, disabled }: TrayBucketP
           e.preventDefault();
           setIsDragOver(false);
           const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-          if (files.length > 0) onUpload(files);
+          if (files.length > 0) void runUpload(files);
           log.debug('works-qa: tray drop', { droppedCount: files.length });
         }}
         className={`rounded-lg p-3 min-h-16 border transition-colors ${
@@ -88,6 +105,24 @@ export function TrayBucket({ trayKeys, onUpload, onView, disabled }: TrayBucketP
           </div>
         )}
       </div>
+
+      {uploadError && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="flex items-center justify-between gap-2 text-xs text-red-400"
+        >
+          <span className="leading-tight">⚠ {uploadError}</span>
+          <button
+            type="button"
+            onClick={() => setUploadError(null)}
+            className="text-zinc-500 hover:text-zinc-300"
+            aria-label="Dismiss tray upload error"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

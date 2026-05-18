@@ -283,7 +283,17 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
                 {renderSection('Main Joint', 'main_joint', MAIN_JOINT_SLOTS,
                   <TrayBucket
                     trayKeys={pole.main_joint_tray_keys}
-                    onUpload={files => uploadTrayPhotos(pole.id, files).then(() => mutate()).catch((e: unknown) => log.error('works-qa: tray upload error', { error: e instanceof Error ? e.message : String(e) }))}
+                    onUpload={async files => {
+                // Rethrow so TrayBucket can display the inline error instead
+                // of the failure disappearing into the logger.
+                try {
+                  await uploadTrayPhotos(pole.id, files);
+                  await mutate();
+                } catch (e: unknown) {
+                  log.error('works-qa: tray upload error', { error: e instanceof Error ? e.message : String(e) });
+                  throw e;
+                }
+              }}
                     onView={i => { const idx = trayIndex[i]; if (idx !== undefined) setLightboxIndex(idx); }}
                     disabled={pole[APPROVED_FLAG.main_joint] === true}
                   />
