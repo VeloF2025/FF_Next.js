@@ -4,6 +4,18 @@
 import { log } from '@/lib/logger';
 import type { SnagSubmitInput, SnagSubmitResult } from '../components/SnagInlineForm';
 
+// Best-effort parser for an apiResponse envelope when surfacing a non-OK response.
+// Returns null when the body isn't valid JSON (e.g. nginx-rendered 502 HTML) so the
+// caller can fall back to a generic "<verb> failed (<status>)" message.
+async function safeJson<T>(res: Response): Promise<T | null> {
+  try {
+    return await res.json() as T;
+  } catch (err) {
+    log.debug('works-qa: response body not JSON', { error: err instanceof Error ? err.message : String(err) });
+    return null;
+  }
+}
+
 export async function assignPhoto(poleId: string, slot: string, file: File): Promise<void> {
   const form = new FormData();
   form.append('pole_id', poleId);
@@ -11,7 +23,11 @@ export async function assignPhoto(poleId: string, slot: string, file: File): Pro
   form.append('photo', file);
   form.append('source', 'upload');
   const res = await fetch('/api/works-qa/pole-assign', { method: 'POST', body: form });
-  if (!res.ok) throw new Error('Upload failed');
+  if (!res.ok) {
+    // Surface the actual API error so PhotoSlotCard can show it inline to the user.
+    const body = await safeJson<{ error?: { message?: string } }>(res);
+    throw new Error(body?.error?.message ?? `Upload failed (${res.status})`);
+  }
 }
 
 export async function overrideSlot(poleId: string, slot: string, decision: 'pass' | 'fail', reason: string): Promise<void> {
@@ -30,12 +46,14 @@ export async function movePhoto(poleId: string, photoKey: string, from: string, 
     body: JSON.stringify({ pole_id: poleId, photo_key: photoKey, from, to }),
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({})) as { error?: string };
-    throw new Error(body.error ?? `Move failed: ${res.status}`);
+    const body = await safeJson<{ error?: string }>(res);
+    throw new Error(body?.error ?? `Move failed: ${res.status}`);
   }
 }
 
 export async function uploadTrayPhotos(poleId: string, files: File[]): Promise<void> {
+  // Surface the first failure so TrayBucket can show it inline. Subsequent files
+  // are skipped — the user can retry the batch after fixing the issue.
   for (const file of files) {
     const form = new FormData();
     form.append('pole_id', poleId);
@@ -43,7 +61,10 @@ export async function uploadTrayPhotos(poleId: string, files: File[]): Promise<v
     form.append('photo', file);
     form.append('source', 'upload');
     const res = await fetch('/api/works-qa/pole-assign', { method: 'POST', body: form });
-    if (!res.ok) log.error('works-qa: tray upload failed', { status: res.status });
+    if (!res.ok) {
+      const body = await safeJson<{ error?: { message?: string } }>(res);
+      throw new Error(body?.error?.message ?? `Tray upload failed (${res.status})`);
+    }
   }
 }
 
@@ -54,8 +75,8 @@ export async function approvePhotoApi(poleQaPhotoId: string, slotKey: string): P
     body: JSON.stringify({ pole_qa_photo_id: poleQaPhotoId, slot_key: slotKey }),
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({})) as { error?: { message?: string } };
-    throw new Error(body.error?.message ?? `Approve failed: ${res.status}`);
+    const body = await safeJson<{ error?: { message?: string } }>(res);
+    throw new Error(body?.error?.message ?? `Approve failed: ${res.status}`);
   }
 }
 
@@ -76,16 +97,16 @@ export async function snagPhotoApi(
       amend: input.amend ?? false,
     }),
   });
-  const body = await res.json().catch(() => ({})) as {
+  const body = await safeJson<{
     data?: { status?: 'created' | 'amended'; snag?: { id: string } };
     error?: { message?: string; details?: { existing_snag_id?: string } };
-  };
+  }>(res);
   if (res.status === 409) {
-    return { status: 'duplicate', existingSnagId: body.error?.details?.existing_snag_id };
+    return { status: 'duplicate', existingSnagId: body?.error?.details?.existing_snag_id };
   }
   if (!res.ok) {
-    return { status: 'error', errorMessage: body.error?.message ?? `Snag failed: ${res.status}` };
+    return { status: 'error', errorMessage: body?.error?.message ?? `Snag failed: ${res.status}` };
   }
-  const status = body.data?.status === 'amended' ? 'amended' : 'created';
+  const status = body?.data?.status === 'amended' ? 'amended' : 'created';
   return { status };
 }

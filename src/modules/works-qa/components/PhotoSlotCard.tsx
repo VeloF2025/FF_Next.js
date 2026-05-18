@@ -15,7 +15,7 @@ interface PhotoSlotCardProps {
   slotApproval?: SlotApproval | undefined;
   assignableUsers?: AssignableUser[];
   loadingUsers?: boolean;
-  onUpload: (file: File) => void;
+  onUpload: (file: File) => Promise<void> | void;
   onOverride: (decision: 'pass' | 'fail', reason: string) => void;
   onApprove?: () => Promise<void>;
   onSnag?: (input: SnagSubmitInput) => Promise<SnagSubmitResult>;
@@ -35,6 +35,24 @@ export function PhotoSlotCard({
   const [showSnagForm, setShowSnagForm] = useState(false);
   const [approving, setApproving] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Wrap caller-supplied onUpload to track in-flight state and surface errors
+  // inline. Without this, upload failures only hit the logger and the user
+  // saw nothing (root cause of Johan's "die upload funksie nog nie werk nie").
+  async function runUpload(file: File): Promise<void> {
+    if (uploading) return;
+    setUploadError(null);
+    setUploading(true);
+    try {
+      await onUpload(file);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  }
 
   // Close the snag form if the discipline becomes approved while it is open.
   // Without this, an un-approval (discipline re-opened) would silently restore
@@ -81,7 +99,7 @@ export function PhotoSlotCard({
             setIsDragOver(false);
             const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
             if (files.length === 0) return;
-            if (files[0]) onUpload(files[0]);
+            if (files[0]) void runUpload(files[0]);
             log.debug('works-qa: slot drop', { slotKey, droppedCount: files.length });
           }}
         >
@@ -145,14 +163,15 @@ export function PhotoSlotCard({
           ) : (
             <label
               className={`w-full h-28 flex items-center justify-center text-xs rounded transition-colors ${
-                disabled
+                disabled || uploading
                   ? 'opacity-50 cursor-not-allowed text-zinc-600'
                   : isDragOver
                     ? 'bg-teal-500/10 border border-teal-500 border-solid text-teal-300 cursor-copy'
                     : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 cursor-pointer'
               }`}
+              aria-busy={uploading}
             >
-              + Upload
+              {uploading ? 'Uploading…' : '+ Upload'}
               {/* `sr-only` (not `hidden`): Chromium silently suppresses the file
                   picker when the <input type="file"> is `display: none`, even
                   when triggered via a wrapping <label>. The screen-reader-only
@@ -161,15 +180,33 @@ export function PhotoSlotCard({
                 type="file"
                 accept="image/*"
                 className="sr-only"
-                disabled={disabled}
+                disabled={disabled || uploading}
                 onChange={e => {
                   const f = e.target.files?.[0];
                   log.debug('works-qa: slot file picked', { hasFile: Boolean(f) });
-                  if (f) onUpload(f);
+                  if (f) void runUpload(f);
                   e.target.value = '';
                 }}
               />
             </label>
+          )}
+
+          {uploadError && (
+            <div
+              role="alert"
+              aria-live="assertive"
+              className="flex items-center justify-between gap-2 text-xs text-red-400"
+            >
+              <span className="leading-tight">⚠ {uploadError}</span>
+              <button
+                type="button"
+                onClick={() => setUploadError(null)}
+                className="text-zinc-500 hover:text-zinc-300"
+                aria-label="Dismiss upload error"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
           )}
 
           {vlm?.feedback && (
