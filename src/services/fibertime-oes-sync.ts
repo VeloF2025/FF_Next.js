@@ -40,7 +40,7 @@ const logger = createLogger('services:fibertime-oes-sync');
 // CONSTANTS
 // ============================================================================
 
-export const ACTIVE_SITES = ['LAW', 'MAM', 'MOA', 'TEM'] as const;
+export const ACTIVE_SITES = ['LAW', 'MAM', 'MOA', 'TEM', 'TEM-3'] as const;
 export type Site = (typeof ACTIVE_SITES)[number];
 
 // ============================================================================
