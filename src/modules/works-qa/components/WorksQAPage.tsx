@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { ArrowLeft, RefreshCw, Download } from 'lucide-react';
@@ -48,6 +48,9 @@ export function WorksQAPage() {
   const [selectedPoleId, setSelectedPoleId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [snagPole, setSnagPole] = useState<{ id: string; pole_label: string } | null>(null);
+  // Tracks which projects this mount has already auto-synced so opening, leaving,
+  // and returning to the same project doesn't refire a sync on every navigation.
+  const autoSyncedRef = useRef<Set<string>>(new Set());
 
   const selectedProject = stats.find(s => s.project_id === projectId);
 
@@ -88,6 +91,34 @@ export function WorksQAPage() {
     }
     void mutatePoles();
   }
+
+  // Auto-sync QField photos the first time a project is opened in this session.
+  // Without this Johan's pole-tag photos sit in qfield_photo_validations until
+  // someone remembers to click Sync QField. Fires fire-and-forget; the user
+  // can still click the button explicitly to re-pull.
+  useEffect(() => {
+    if (!projectId) return;
+    if (autoSyncedRef.current.has(projectId)) return;
+    autoSyncedRef.current.add(projectId);
+    // Guard the post-fetch setSyncing(false) so it doesn't run on an unmounted
+    // component when the user navigates away mid-sync.
+    let cancelled = false;
+    const body = JSON.stringify({ project_id: projectId });
+    const headers = { 'Content-Type': 'application/json' };
+    setSyncing(true);
+    Promise.all([
+      fetch('/api/works-qa/sync-historical', { method: 'POST', headers, body }),
+      fetch('/api/works-qa/sync-qfield',      { method: 'POST', headers, body }),
+    ])
+      .catch(err => log.error('works-qa: auto-sync error', { error: err instanceof Error ? err.message : String(err) }))
+      .finally(() => {
+        if (cancelled) return;
+        setSyncing(false);
+        void mutatePoles();
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
 
   // ─── Level 1: Project dashboard ───────────────────────────────────────
   if (!projectId) {
