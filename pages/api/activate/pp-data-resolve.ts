@@ -287,69 +287,6 @@ async function runLocalResolution(): Promise<{
       AND pp.resolution_status = 'not_found'
   `);
 
-  // 7b. wa_photos_fuzzy — dist-1 match where exactly ONE candidate photo serial
-  //     and ONE drop are within edit-distance 1 of the PP serial in the same
-  //     project. Guards: drops.ont_serial must not conflict (different ONT on
-  //     that DR). HIGH-confidence only — multi-candidate ambiguity is left for
-  //     manual review.
-  matchedLocal += await matchSource('wa_photos_fuzzy', 'located_unified', `
-    WITH candidates AS (
-      SELECT pp.id AS pp_id,
-             pp.serial_number AS pp_serial,
-             wp.vlm_ont_serial AS photo_serial,
-             wp.drop_number,
-             wp.message_timestamp::date AS photo_date,
-             wp.vlm_confidence,
-             wp.sender_name,
-             levenshtein(pp.serial_number, wp.vlm_ont_serial) AS dist
-      FROM oes_pp_data pp
-      JOIN wa_photos wp
-        ON wp.vlm_ont_serial IS NOT NULL
-       AND length(wp.vlm_ont_serial) = 12
-       AND levenshtein(pp.serial_number, wp.vlm_ont_serial) = 1
-       AND wp.project = pp.project
-       AND wp.drop_number IS NOT NULL
-      WHERE pp.resolution_status = 'not_found'
-    ),
-    unambiguous AS (
-      SELECT pp_id, pp_serial
-      FROM candidates
-      GROUP BY pp_id, pp_serial
-      HAVING COUNT(DISTINCT photo_serial) = 1 AND COUNT(DISTINCT drop_number) = 1
-    ),
-    best_pick AS (
-      SELECT DISTINCT ON (c.pp_id)
-        c.pp_id, c.pp_serial, c.photo_serial, c.drop_number, c.photo_date, c.vlm_confidence, c.sender_name, c.dist
-      FROM candidates c
-      JOIN unambiguous u ON u.pp_id = c.pp_id
-      ORDER BY c.pp_id, c.vlm_confidence DESC NULLS LAST, c.photo_date DESC
-    ),
-    safe_pick AS (
-      SELECT bp.* FROM best_pick bp
-      LEFT JOIN drops d ON d.drop_number = bp.drop_number
-      WHERE d.ont_serial IS NULL
-         OR d.ont_serial = bp.photo_serial
-         OR d.ont_serial = bp.pp_serial
-    )
-    UPDATE oes_pp_data pp
-    SET resolution_status = 'located_unified',
-        resolved_drop_number = sp.drop_number,
-        resolved_source = 'wa_photos_fuzzy',
-        resolved_details = jsonb_build_object(
-          'pp_serial', sp.pp_serial,
-          'photo_serial', sp.photo_serial,
-          'edit_distance', sp.dist,
-          'photo_date', sp.photo_date::text,
-          'vlm_confidence', sp.vlm_confidence,
-          'technician_lid', sp.sender_name,
-          'method', 'wa_photo_fuzzy_dist1_unambiguous_v1'
-        ),
-        resolved_at = NOW(), first_resolved_at = COALESCE(first_resolved_at, NOW()), updated_at = NOW()
-    FROM safe_pick sp
-    WHERE pp.id = sp.pp_id
-      AND pp.resolution_status = 'not_found'
-  `);
-
   // 8. serial_change_history — Audit trail (old/new serial values linked to DRs)
   matchedLocal += await matchSource('serial_change_history', 'located_local', `
     UPDATE oes_pp_data pp
