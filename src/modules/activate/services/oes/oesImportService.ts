@@ -260,8 +260,7 @@ export async function importPPData(ppRows: PPRow[], filename: string): Promise<v
              WHEN oes_pp_data.resolution_status = 'activated' THEN NULL
              ELSE oes_pp_data.resolved_at
            END,
-           updated_at = NOW()
-         WHERE oes_pp_data.resolution_status IN ('not_found', 'activated')`,
+           updated_at = NOW()`,
         values
       );
     }

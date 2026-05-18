@@ -2,18 +2,16 @@ import ExcelJS from 'exceljs';
 import type {
   AllRow,
   PpRow,
-  PpSiteCount,
-  WaOnlyRow,
-  OesOnlyRow,
   FtDisputeRow,
+  DailySummary,
   TicketMap,
   TicketRow,
 } from './queries';
 import { addFtDisputeSheet } from './ftDisputeSheet';
+import { addDailySummarySheet } from './dailySummarySheet';
 
 const TICKET_BASE_URL = 'https://app.fibreflow.app/noc/tickets/';
 
-// ARGB fills for OES status values
 const OES_STATUS_FILLS: Record<string, Partial<ExcelJS.Fill>> = {
   active:       { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF16A34A' } },
   inactive:     { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6B7280' } },
@@ -33,9 +31,7 @@ function styleHeader(row: ExcelJS.Row): void {
     cell.fill = HEADER_FILL;
     cell.font = HEADER_FONT;
     cell.alignment = { vertical: 'middle', horizontal: 'left' };
-    cell.border = {
-      bottom: { style: 'thin', color: { argb: 'FF374151' } },
-    };
+    cell.border = { bottom: { style: 'thin', color: { argb: 'FF374151' } } };
   });
   row.height = 18;
 }
@@ -74,30 +70,46 @@ function addTicketCells(
   return tickets.length;
 }
 
+function maxTicketsFor(
+  rows: Array<{ dr?: string | null; serial?: string | null }>,
+  ticketMap: TicketMap,
+): number {
+  let max = 0;
+  for (const r of rows) {
+    const count = [r.dr?.toUpperCase(), r.serial?.toUpperCase()]
+      .filter(Boolean)
+      .flatMap(k => ticketMap.get(k!) ?? [])
+      .reduce((acc, t) => { acc.add(t.id); return acc; }, new Set<string>()).size;
+    if (count > max) max = count;
+  }
+  return max;
+}
+
 export async function buildOesWorkbook(opts: {
   allRows: AllRow[];
   ppRows: PpRow[];
-  ppSiteCounts: PpSiteCount[];
-  waOnlyRows: WaOnlyRow[];
-  oesOnlyRows: OesOnlyRow[];
   ftDisputeRows: FtDisputeRow[];
+  dailySummary: DailySummary;
   ticketMap: TicketMap;
-  reportDate: string; // YYYY-MM-DD
+  reportDate: string;
 }): Promise<Buffer> {
-  const { allRows, ppRows, ppSiteCounts, waOnlyRows, oesOnlyRows, ftDisputeRows, ticketMap } = opts;
+  const { allRows, ppRows, ftDisputeRows, dailySummary, ticketMap } = opts;
   const wb = new ExcelJS.Workbook();
   wb.creator = 'FibreFlow';
   wb.created = new Date();
 
-  // ── Tab 1: All ────────────────────────────────────────────────────────────
-  const sheetAll = wb.addWorksheet('All');
-  const allHeaders = [
+  // ── Tab 1: Daily Summary ─────────────────────────────────────────────────
+  const sheetSummary = addDailySummarySheet(wb, dailySummary);
+
+  // ── Tab 2: Activations ───────────────────────────────────────────────────
+  const sheetAct = wb.addWorksheet('Activations');
+  const actHeaders = [
     'Drop Number', 'Serial Number', 'Timestamp', 'OLT Address',
     'ONT Rx SIG (dBm)', 'Link Budget ONT->OLT (dB)',
     'OLT Rx SIG (dBm)', 'Link Budget OLT->ONT (dB)',
     'Status', 'Latitude', 'Longitude', 'Current ONT RX', 'Team',
   ];
-  sheetAll.columns = [
+  sheetAct.columns = [
     { key: 'drop_number',            width: 14 },
     { key: 'serial_number',          width: 18 },
     { key: 'activation_datetime',    width: 22 },
@@ -113,28 +125,22 @@ export async function buildOesWorkbook(opts: {
     { key: 'team',                   width: 10 },
   ];
 
-  // Calculate max ticket columns needed
-  let maxTicketColsAll = 0;
-  for (const r of allRows) {
-    const count = [r.drop_number?.toUpperCase(), r.serial_number?.toUpperCase()]
-      .filter(Boolean)
-      .flatMap(k => ticketMap.get(k!) ?? [])
-      .reduce((acc, t) => { acc.add(t.id); return acc; }, new Set<string>()).size;
-    if (count > maxTicketColsAll) maxTicketColsAll = count;
-  }
-  for (let i = 0; i < maxTicketColsAll; i++) {
-    sheetAll.getColumn(14 + i).width = 20;
-  }
-
-  const headerRowAll = sheetAll.addRow(
-    maxTicketColsAll > 0
-      ? [...allHeaders, ...Array.from({ length: maxTicketColsAll }, (_, i) => `Ticket ${i + 1}`)]
-      : allHeaders
+  const maxTicketColsAct = maxTicketsFor(
+    allRows.map(r => ({ dr: r.drop_number, serial: r.serial_number })),
+    ticketMap,
   );
-  styleHeader(headerRowAll);
+  for (let i = 0; i < maxTicketColsAct; i++) {
+    sheetAct.getColumn(14 + i).width = 20;
+  }
+
+  styleHeader(sheetAct.addRow(
+    maxTicketColsAct > 0
+      ? [...actHeaders, ...Array.from({ length: maxTicketColsAct }, (_, i) => `Ticket ${i + 1}`)]
+      : actHeaders
+  ));
 
   for (const r of allRows) {
-    const row = sheetAll.addRow([
+    const row = sheetAct.addRow([
       r.drop_number, r.serial_number,
       r.activation_datetime ?? r.activation_date,
       r.olt_address,
@@ -152,142 +158,54 @@ export async function buildOesWorkbook(opts: {
     addTicketCells(row, 14, r.drop_number, r.serial_number, ticketMap);
   }
 
-  // Summary row at bottom
-  const totalRowAll = sheetAll.addRow(['TOTAL', '', '', '', '', '', '', '', '', '', '', '', allRows.length.toString()]);
-  totalRowAll.font = { bold: true };
+  const totalRowAct = sheetAct.addRow(
+    ['TOTAL', '', '', '', '', '', '', '', '', '', '', '', allRows.length.toString()]
+  );
+  totalRowAct.font = { bold: true };
 
-  // ── Tab 2: PP ─────────────────────────────────────────────────────────────
-  const sheetPp = wb.addWorksheet('PP');
+  // ── Tab 3: PP's ──────────────────────────────────────────────────────────
+  const sheetPp = wb.addWorksheet("PP's");
+  const ppHeaders = [
+    'Project', 'Serial', 'Date Registered', 'Status', 'Matched Drop',
+  ];
   sheetPp.columns = [
-    { key: 'project',         width: 18 }, // A
-    { key: 'serial_number',   width: 18 }, // B
-    { key: 'date_registered', width: 18 }, // C
-    { key: 'empty1',          width: 4  }, // D
-    { key: 'empty2',          width: 4  }, // E
-    { key: 'project2',        width: 18 }, // F
-    { key: 'count',           width: 10 }, // G
+    { key: 'project',              width: 16 },
+    { key: 'serial_number',        width: 18 },
+    { key: 'date_registered',      width: 18 },
+    { key: 'resolution_status',    width: 16 },
+    { key: 'resolved_drop_number', width: 16 },
   ];
 
-  let maxTicketColsPp = 0;
-  for (const r of ppRows) {
-    const count = [r.serial_number?.toUpperCase()]
-      .filter(Boolean)
-      .flatMap(k => ticketMap.get(k!) ?? [])
-      .reduce((acc, t) => { acc.add(t.id); return acc; }, new Set<string>()).size;
-    if (count > maxTicketColsPp) maxTicketColsPp = count;
-  }
+  const maxTicketColsPp = maxTicketsFor(
+    ppRows.map(r => ({ dr: r.resolved_drop_number, serial: r.serial_number })),
+    ticketMap,
+  );
   for (let i = 0; i < maxTicketColsPp; i++) {
-    sheetPp.getColumn(8 + i).width = 20;
+    sheetPp.getColumn(6 + i).width = 20;
   }
 
-  const ppHeaders: string[] = ['Project', 'Serial', 'Date Registered', '', '', 'Project', 'Outstanding'];
-  if (maxTicketColsPp > 0) {
-    ppHeaders.push(...Array.from({ length: maxTicketColsPp }, (_, i) => `Ticket ${i + 1}`));
-  }
-  const headerRowPp = sheetPp.addRow(ppHeaders);
-  styleHeader(headerRowPp);
+  styleHeader(sheetPp.addRow(
+    maxTicketColsPp > 0
+      ? [...ppHeaders, ...Array.from({ length: maxTicketColsPp }, (_, i) => `Ticket ${i + 1}`)]
+      : ppHeaders
+  ));
 
-  const maxPpRows = Math.max(ppRows.length, ppSiteCounts.length);
-  for (let i = 0; i < maxPpRows; i++) {
-    const pp = ppRows[i];
-    const sc = ppSiteCounts[i];
-    const rowValues: (string | number | null)[] = [
-      pp?.project ?? null,
-      pp?.serial_number ?? null,
-      pp?.date_registered ?? null,
-      null,
-      null,
-      sc?.project ?? null,
-      sc?.count ?? null,
-    ];
-    const row = sheetPp.addRow(rowValues);
-    if (pp) {
-      addTicketCells(row, 8, null, pp.serial_number, ticketMap);
-    }
+  for (const r of ppRows) {
+    const row = sheetPp.addRow([
+      r.project, r.serial_number, r.date_registered,
+      r.resolution_status, r.resolved_drop_number,
+    ]);
+    addTicketCells(row, 6, r.resolved_drop_number, r.serial_number, ticketMap);
   }
 
-  const totalRowPp = sheetPp.addRow([`${ppRows.length} total`, '', '', '', '', '', '']);
+  const totalRowPp = sheetPp.addRow([`${ppRows.length} total`, '', '', '', '']);
   totalRowPp.font = { bold: true };
 
-  // ── Tab 3: WhatsApp Only ──────────────────────────────────────────────────
-  const sheetWa = wb.addWorksheet('WhatsApp Only');
-  const waHeaders = ['Drop Number', 'Installed Date', 'ONT Serial', 'Sender Phone'];
-
-  let maxTicketColsWa = 0;
-  for (const r of waOnlyRows) {
-    const count = [r.drop_number?.toUpperCase(), r.ont_serial_scanned?.toUpperCase()]
-      .filter(Boolean)
-      .flatMap(k => ticketMap.get(k!) ?? [])
-      .reduce((acc, t) => { acc.add(t.id); return acc; }, new Set<string>()).size;
-    if (count > maxTicketColsWa) maxTicketColsWa = count;
-  }
-
-  sheetWa.columns = [
-    { key: 'drop_number',       width: 14 },
-    { key: 'submitted_date',    width: 20 },
-    { key: 'ont_serial_scanned', width: 18 },
-    { key: 'sender_phone',      width: 16 },
-    ...Array.from({ length: maxTicketColsWa }, () => ({ width: 20 })),
-  ];
-
-  const headerRowWa = sheetWa.addRow(
-    maxTicketColsWa > 0
-      ? [...waHeaders, ...Array.from({ length: maxTicketColsWa }, (_, i) => `Ticket ${i + 1}`)]
-      : waHeaders
-  );
-  styleHeader(headerRowWa);
-
-  for (const r of waOnlyRows) {
-    const row = sheetWa.addRow([r.drop_number, r.submitted_date, r.ont_serial_scanned, r.sender_phone]);
-    addTicketCells(row, 5, r.drop_number, r.ont_serial_scanned, ticketMap);
-  }
-
-  // ── Tab 4: OES Only ───────────────────────────────────────────────────────
-  const sheetOes = wb.addWorksheet('OES Only');
-  const oesOnlyHeaders = ['Drop Number', 'Serial Number', 'Activation Date', 'Team', 'Status'];
-
-  let maxTicketColsOes = 0;
-  for (const r of oesOnlyRows) {
-    const count = [r.drop_number?.toUpperCase(), r.serial_number?.toUpperCase()]
-      .filter(Boolean)
-      .flatMap(k => ticketMap.get(k!) ?? [])
-      .reduce((acc, t) => { acc.add(t.id); return acc; }, new Set<string>()).size;
-    if (count > maxTicketColsOes) maxTicketColsOes = count;
-  }
-
-  sheetOes.columns = [
-    { key: 'drop_number',    width: 14 },
-    { key: 'serial_number',  width: 18 },
-    { key: 'activation_date', width: 18 },
-    { key: 'team',           width: 10 },
-    { key: 'status',         width: 14 },
-    ...Array.from({ length: maxTicketColsOes }, () => ({ width: 20 })),
-  ];
-
-  const headerRowOes = sheetOes.addRow(
-    maxTicketColsOes > 0
-      ? [...oesOnlyHeaders, ...Array.from({ length: maxTicketColsOes }, (_, i) => `Ticket ${i + 1}`)]
-      : oesOnlyHeaders
-  );
-  styleHeader(headerRowOes);
-
-  for (const r of oesOnlyRows) {
-    const row = sheetOes.addRow([r.drop_number, r.serial_number, r.activation_date, r.team, r.status]);
-    const statusLower = (r.status ?? '').toLowerCase();
-    const fill = OES_STATUS_FILLS[statusLower];
-    if (fill) {
-      const statusCell = row.getCell(5);
-      statusCell.fill = fill as ExcelJS.Fill;
-      statusCell.font = { color: { argb: 'FFFFFFFF' } };
-    }
-    addTicketCells(row, 6, r.drop_number, r.serial_number, ticketMap);
-  }
-
-  // ── Tab 5: FT Dispute ────────────────────────────────────────────────────
+  // ── Tab 4: FT Dispute ────────────────────────────────────────────────────
   const sheetDisp = addFtDisputeSheet(wb, ftDisputeRows, ticketMap);
 
   // ── Freeze header rows on all tabs ───────────────────────────────────────
-  for (const sheet of [sheetAll, sheetPp, sheetWa, sheetOes, sheetDisp]) {
+  for (const sheet of [sheetSummary, sheetAct, sheetPp, sheetDisp]) {
     sheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1, activeCell: 'A2' }];
   }
 
