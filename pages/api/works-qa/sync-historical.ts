@@ -49,6 +49,12 @@ function resolveSlot(discipline: string, step: number): { dbColumn: string; slot
     const s = String(step).padStart(2, '0');
     return { dbColumn: `civil_step_${s}_key`, slotKey: `civil_${s}`, approveColumn: 'civil_approved' };
   }
+  // Civil step 8 (Pole Label / pole tag) shares dome_08 with optical — see
+  // sync-qfield.ts. Without this, historical pole-tag photos coming through
+  // construction-qa get dropped at the BETWEEN 1 AND 7 filter below.
+  if (discipline === 'civil' && step === 8) {
+    return { dbColumn: 'optical_dome_08_key', slotKey: 'dome_08', approveColumn: 'dome_approved' };
+  }
   if (discipline === 'optical' && step >= 1 && step <= 8) {
     const s = String(step).padStart(2, '0');
     return { dbColumn: `optical_dome_${s}_key`, slotKey: `dome_${s}`, approveColumn: 'dome_approved' };
@@ -87,7 +93,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         AND p.checklist_step IS NOT NULL
         AND p.storage_key IS NOT NULL
         AND p.upload_status = 'available'
-        AND ((r.discipline = 'civil' AND p.checklist_step BETWEEN 1 AND 7)
+        AND ((r.discipline = 'civil' AND p.checklist_step BETWEEN 1 AND 8)
           OR (r.discipline = 'optical' AND p.checklist_step BETWEEN 1 AND 8)
           OR (r.discipline = 'optical' AND p.checklist_step BETWEEN 11 AND 16))
       ORDER BY r.feature_id, r.discipline, p.checklist_step,
