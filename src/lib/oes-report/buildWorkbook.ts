@@ -3,10 +3,10 @@ import type {
   AllRow,
   PpRow,
   FtDisputeRow,
-  DailySummary,
   TicketMap,
   TicketRow,
 } from './queries';
+import type { DailySummary } from './dailySummaryQueries';
 import { addFtDisputeSheet } from './ftDisputeSheet';
 import { addDailySummarySheet } from './dailySummarySheet';
 

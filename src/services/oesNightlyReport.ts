@@ -3,10 +3,10 @@ import {
   loadAllActivations,
   loadPpData,
   loadFtDisputeRows,
-  loadDailySummary,
   loadTicketsForKeys,
   loadLatestOesReportDate,
 } from '@/lib/oes-report/queries';
+import { loadDailySummary } from '@/lib/oes-report/dailySummaryQueries';
 import { buildOesWorkbook } from '@/lib/oes-report/buildWorkbook';
 import { uploadOesReport } from '@/lib/oes-report/storage';
 import { sendWhatsAppGroupDocument } from '@/modules/notifications/services/whatsappDelivery';

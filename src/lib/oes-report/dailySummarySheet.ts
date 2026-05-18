@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
-import type { DailySummary, DailyCount, SiteCode } from './queries';
+import type { DailySummary, DailyCount } from './dailySummaryQueries';
+import type { SiteCode } from './queries';
 import { siteLabel } from './queries';
 
 const HEADER_FILL: ExcelJS.Fill = {
