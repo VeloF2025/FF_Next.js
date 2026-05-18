@@ -46,8 +46,8 @@ export const PPDataRow = React.memo(function PPDataRow({
         {record.pon_no ?? '-'}
       </td>
       <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs font-mono whitespace-nowrap">
-        {record.olt_address ? (
-          <span title={record.olt_port ?? undefined}>{record.olt_address}</span>
+        {record.olt_port ? (
+          <span title={record.olt_address ?? undefined}>{record.olt_port}</span>
         ) : '-'}
       </td>
       <td className="px-3 py-2 text-[var(--ff-text-secondary)]" title="Date the serial first appeared on the OES PP sheet">
@@ -121,7 +121,7 @@ export const PPDataRow = React.memo(function PPDataRow({
 });
 
 export const TABLE_HEADERS = [
-  'Serial', 'Project', 'Status', 'DR', 'Zone', 'PON', 'OLT Address', 'PP',
+  'Serial', 'Project', 'Status', 'DR', 'Zone', 'PON', 'OLT Port', 'PP',
   'Located', 'Activation', 'Install Team', 'WA Technician', 'Source', 'Ticket', 'Priority',
 ] as const;
 
