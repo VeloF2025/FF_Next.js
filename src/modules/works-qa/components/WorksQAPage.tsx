@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
-import { ArrowLeft, RefreshCw, Download } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Download, LayoutGrid, Table2 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
 import { PoleListTable } from './PoleListTable';
 import { PoleDetailPanel } from './PoleDetailPanel';
-import { WorksQAProjectCard } from './WorksQAProjectCard';
+import { WorksQAProjectCardRich } from './dashboard/WorksQAProjectCardRich';
+import { WorksQAProjectTable } from './dashboard/WorksQAProjectTable';
 import { WorksQAFiltersBar } from './WorksQAFiltersBar';
 import { ConfirmPlantedModal } from './ConfirmPlantedModal';
 import { usePoleList } from '../hooks/usePoleList';
-import type { WorksQAProjectStats, WorksQAZoneSummary } from '../types/works-qa.types';
+import type { WorksQAZoneSummary } from '../types/works-qa.types';
+import type { WorksQADashboardResponse } from '../types/dashboard.types';
 
 interface ApiEnvelope<T> {
   success?: boolean;
@@ -34,10 +36,15 @@ export function WorksQAPage() {
   const zoneNo = typeof zone_no === 'string' ? Number(zone_no) : null;
   const ponNo = typeof pon_no === 'string' ? Number(pon_no) : null;
 
-  const { data: stats = [], isLoading: statsLoading } = useSWR<WorksQAProjectStats[]>(
-    !projectId ? '/api/works-qa/project-stats' : null,
+  // Rich dashboard endpoint — same shape used in QA Centre (cards + table view).
+  // We always fetch (even at Level 2) so the project header in the detail view
+  // can still resolve project_name without an extra round-trip.
+  const { data: dashboard, isLoading: dashboardLoading } = useSWR<WorksQADashboardResponse>(
+    '/api/works-qa/project-dashboard',
     fetcher,
   );
+  const projects = dashboard?.projects ?? [];
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
 
   const { data: zones = [], isLoading: zonesLoading } = useSWR<WorksQAZoneSummary[]>(
     projectId ? `/api/works-qa/zones?project_id=${encodeURIComponent(projectId)}` : null,
@@ -52,7 +59,7 @@ export function WorksQAPage() {
   // and returning to the same project doesn't refire a sync on every navigation.
   const autoSyncedRef = useRef<Set<string>>(new Set());
 
-  const selectedProject = stats.find(s => s.project_id === projectId);
+  const selectedProject = projects.find(p => p.project_id === projectId);
 
   function pushQuery(updates: Record<string, string | null>) {
     const next = { ...router.query };
@@ -122,27 +129,80 @@ export function WorksQAPage() {
 
   // ─── Level 1: Project dashboard ───────────────────────────────────────
   if (!projectId) {
+    const totalPoles      = projects.reduce((sum, p) => sum + p.total_poles, 0);
+    const totalApproved   = projects.reduce((sum, p) => sum + p.fully_approved, 0);
+    const totalOverrides  = projects.reduce((sum, p) => sum + p.override_count, 0);
+    const totalUnassigned = projects.reduce((sum, p) => sum + p.unassigned_total, 0);
+    const approvedPct = totalPoles > 0 ? Math.round((totalApproved / totalPoles) * 100) : 0;
+
     return (
       <div className="space-y-4">
-        {statsLoading ? (
+        {/* Header row: aggregation summary + view toggle */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-4 text-xs text-zinc-500 flex-wrap">
+            <span><span className="font-medium text-zinc-200">{projects.length}</span> projects</span>
+            <span>·</span>
+            <span><span className="font-medium text-zinc-200">{totalPoles.toLocaleString()}</span> total poles</span>
+            <span>·</span>
+            <span><span className="font-medium text-green-400">{totalApproved.toLocaleString()}</span> approved ({approvedPct}%)</span>
+            {totalOverrides > 0 && (
+              <>
+                <span>·</span>
+                <span><span className="font-medium text-amber-400">{totalOverrides}</span> overrides</span>
+              </>
+            )}
+            {totalUnassigned > 0 && (
+              <>
+                <span>·</span>
+                <span><span className="font-medium text-amber-400">{totalUnassigned.toLocaleString()}</span> unassigned photos</span>
+              </>
+            )}
+          </div>
+          <div className="inline-flex rounded-md border border-zinc-700 overflow-hidden" role="tablist" aria-label="View mode">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'cards'}
+              onClick={() => setViewMode('cards')}
+              className={`px-2.5 py-1.5 text-xs flex items-center gap-1 transition-colors ${viewMode === 'cards' ? 'bg-teal-700 text-white' : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'}`}
+              title="Card view"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'table'}
+              onClick={() => setViewMode('table')}
+              className={`px-2.5 py-1.5 text-xs flex items-center gap-1 transition-colors ${viewMode === 'table' ? 'bg-teal-700 text-white' : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'}`}
+              title="Table view"
+            >
+              <Table2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {dashboardLoading ? (
           <div className="flex items-center justify-center h-48">
             <LoadingSpinner size="md" label="" />
           </div>
-        ) : stats.length === 0 ? (
+        ) : projects.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-zinc-500">
             <p className="text-sm">No projects with pole photos yet.</p>
             <p className="text-xs mt-1">Sync from QField to start populating Johan&apos;s sweep.</p>
           </div>
-        ) : (
+        ) : viewMode === 'cards' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {stats.map(s => (
-              <WorksQAProjectCard
-                key={s.project_id}
-                stats={s}
-                onClick={() => selectProject(s.project_id)}
+            {projects.map(p => (
+              <WorksQAProjectCardRich
+                key={p.project_id}
+                project={p}
+                onClick={() => selectProject(p.project_id)}
               />
             ))}
           </div>
+        ) : (
+          <WorksQAProjectTable projects={projects} onSelect={selectProject} />
         )}
       </div>
     );
