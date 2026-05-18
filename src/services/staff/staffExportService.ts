@@ -1,6 +1,6 @@
 import { StaffMember } from '@/types/staff.types';
 import { staffNeonService } from './staffNeonService';
-import { formatDisplayDate } from '@/utils/dateFormat';
+import { formatDateISO } from '@/utils/dateFormat';
 import type { StaffAccessResult } from '@/types/staff/access.types';
 
 /**
@@ -36,7 +36,7 @@ export const staffExportService = {
         'City': s.city,
         'Province': s.province,
         'Postal Code': s.postalCode,
-        'Start Date': s.startDate ? formatDisplayDate(s.startDate, '') : '',
+        'Start Date': s.startDate ? formatDateISO(s.startDate) : '',
         'Contract Type': s.contractType,
         'Working Hours': s.workingHours,
         'Available Weekends': s.availableWeekends ? 'Yes' : 'No',
