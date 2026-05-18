@@ -164,7 +164,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         COUNT(m.pole_label)::int                                              AS total_poles,
         COUNT(*) FILTER (WHERE m.fully_approved)::int                         AS fully_approved,
         COUNT(*) FILTER (WHERE m.any_approved AND NOT m.fully_approved)::int  AS in_progress,
-        COUNT(*) FILTER (WHERE COALESCE(m.total_filled, 0) = 0)::int          AS empty,
+        -- "empty" = no photos anywhere: no slot, no tray, no unassigned bucket.
+        -- Otherwise a pole with only tray-uploads would be reported as untouched.
+        COUNT(*) FILTER (WHERE
+          COALESCE(m.total_filled, 0) = 0
+          AND COALESCE(m.tray_n, 0)      = 0
+          AND COALESCE(m.unassigned_n,0) = 0
+        )::int AS empty,
 
         COUNT(*) FILTER (WHERE m.civil_approved)::int                                              AS civil_approved,
         COUNT(*) FILTER (WHERE COALESCE(m.civil_filled,0) > 0 AND NOT m.civil_approved)::int       AS civil_in_progress,
@@ -185,7 +191,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         COUNT(*) FILTER (WHERE m.total_filled BETWEEN 14 AND 20)::int                              AS partial_high,
         COUNT(*) FILTER (WHERE m.total_filled BETWEEN 7  AND 13)::int                              AS partial_mid,
         COUNT(*) FILTER (WHERE m.total_filled BETWEEN 1  AND 6 )::int                              AS partial_low,
-        COUNT(*) FILTER (WHERE COALESCE(m.total_filled,0) = 0)::int                                AS no_photos,
+        -- "no_photos" band only counts poles with zero photos in any bucket
+        -- (slots, tray, unassigned) — tray-only or unassigned-only poles
+        -- still have *some* progress to surface.
+        COUNT(*) FILTER (WHERE
+          COALESCE(m.total_filled,0) = 0
+          AND COALESCE(m.tray_n,0)      = 0
+          AND COALESCE(m.unassigned_n,0) = 0
+        )::int AS no_photos,
 
         mm.most_missing_slot                                                                       AS most_missing_slot,
         COALESCE(mm.most_missing_count, 0)::int                                                    AS most_missing_count,
