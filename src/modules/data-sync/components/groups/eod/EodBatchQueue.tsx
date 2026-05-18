@@ -116,7 +116,27 @@ export function EodBatchQueue({ files, onAllDone }: EodBatchQueueProps) {
     try {
       const result = await saveEodSheet(payload, options);
       setMatchedTotal((t) => t + (result.matched_count ?? 0));
-      setSlots((prev) => prev.map((s, i) => (i === index ? { ...s, status: 'saved' } : s)));
+      // Merge edited payload back into slot.extraction so the post-save read-only
+      // summary reflects the values actually persisted to the DB, not the
+      // pre-edit VLM extraction.
+      setSlots((prev) => prev.map((s, i) => {
+        if (i !== index) return s;
+        const baseExtraction = s.extraction;
+        if (!baseExtraction) return { ...s, status: 'saved' };
+        return {
+          ...s,
+          status: 'saved',
+          extraction: {
+            ...baseExtraction,
+            date: payload.sheetDate,
+            velocity_rep_name: payload.velocityRepName,
+            velocity_rep_id: payload.velocityRepId,
+            technician_name: payload.technicianName,
+            technician_id: payload.technicianId,
+            entries: payload.entries,
+          },
+        };
+      }));
       setOverlap(null);
       advanceReview();
     } catch (err) {
