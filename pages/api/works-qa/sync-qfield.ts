@@ -12,7 +12,11 @@ interface SyncBody {
   pole_label?: string;
 }
 
-// Civil checklist_step -> slot key (steps 1-7)
+// Civil checklist_step -> slot key (steps 1-7).
+// Step 8 (Pole Label / pole tag) is also produced for civil/pole_installation jobs.
+// Share dome_08 since both disciplines record the same Pole ID photo and there is
+// no civil step 8 — without this, pole-tag photos uploaded from the field were
+// silently dropped (root cause of MOA.P.A830 missing photos, May 2026).
 const CIVIL_STEP_MAP: Record<number, string> = {
   1: 'civil_01',
   2: 'civil_02',
@@ -21,6 +25,7 @@ const CIVIL_STEP_MAP: Record<number, string> = {
   5: 'civil_05',
   6: 'civil_06',
   7: 'civil_07',
+  8: 'dome_08',
 };
 
 // Optical checklist_step -> slot key (steps 1-8 = dome, 11-16 = joint)
@@ -91,13 +96,57 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     let synced = 0;
     let skipped = 0;
+    let unassigned = 0;
+
+    // Push a photo into the per-pole `unassigned_photo_keys` bucket. Idempotent: only
+    // appends if the key isn't already in a slot column, the tray array, or the bucket.
+    const pushToUnassigned = async (poleLabel: string, photoKey: string): Promise<void> => {
+      // Ensure pole row exists first (sync may hit a pole with no slots yet).
+      await pool.query(`
+        INSERT INTO pole_qa_photos (project_id, pole_label, zone_no, pon_no)
+        SELECT $1::uuid, $2, sp.zone_no, sp.pon_no
+        FROM (SELECT 1) one
+        LEFT JOIN sow_poles sp ON sp.project_id = $1::uuid AND sp.pole_number = $2
+        ON CONFLICT (project_id, pole_label) DO NOTHING
+      `, [project_id, poleLabel]);
+
+      const upd = await pool.query(`
+        UPDATE pole_qa_photos qa
+        SET unassigned_photo_keys =
+              COALESCE(qa.unassigned_photo_keys, '{}'::text[]) || ARRAY[$3::text],
+            updated_at = NOW()
+        WHERE qa.project_id = $1::uuid
+          AND qa.pole_label = $2
+          AND NOT ($3 = ANY(COALESCE(qa.unassigned_photo_keys, '{}'::text[])))
+          AND NOT ($3 = ANY(COALESCE(qa.main_joint_tray_keys,  '{}'::text[])))
+          AND $3 NOT IN (
+            COALESCE(qa.civil_step_01_key,  ''), COALESCE(qa.civil_step_02_key,  ''),
+            COALESCE(qa.civil_step_03_key,  ''), COALESCE(qa.civil_step_04_key,  ''),
+            COALESCE(qa.civil_step_05_key,  ''), COALESCE(qa.civil_step_06_key,  ''),
+            COALESCE(qa.civil_step_07_key,  ''),
+            COALESCE(qa.optical_dome_01_key, ''), COALESCE(qa.optical_dome_02_key, ''),
+            COALESCE(qa.optical_dome_03_key, ''), COALESCE(qa.optical_dome_04_key, ''),
+            COALESCE(qa.optical_dome_05_key, ''), COALESCE(qa.optical_dome_06_key, ''),
+            COALESCE(qa.optical_dome_07_key, ''), COALESCE(qa.optical_dome_08_key, ''),
+            COALESCE(qa.main_joint_11_key,  ''), COALESCE(qa.main_joint_12_key,  ''),
+            COALESCE(qa.main_joint_13_key,  ''), COALESCE(qa.main_joint_14_key,  ''),
+            COALESCE(qa.main_joint_15_key,  ''), COALESCE(qa.main_joint_16_key,  '')
+          )
+      `, [project_id, poleLabel, photoKey]);
+      if ((upd.rowCount ?? 0) > 0) unassigned += 1;
+    }
 
     for (const row of qResult.rows) {
       const poleLabel = row.feature_id;
       if (!poleLabel) { skipped++; continue; }
 
       const slotKey = resolveSlotKey(row.checklist_step, row.work_type);
-      if (!slotKey) { skipped++; continue; }
+      // No slot mapping for this step/work_type combo — surface the photo in
+      // the per-pole unassigned bucket so reviewers can place it manually.
+      if (!slotKey) {
+        await pushToUnassigned(poleLabel, row.photo_key);
+        continue;
+      }
 
       const slotMeta = getSlotMeta(slotKey);
       if (!slotMeta) { skipped++; continue; }
@@ -127,8 +176,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       if (colCheckResult.rows.length === 0) { skipped++; continue; }
 
       if (colCheckResult.rows[0]!.col_val !== null) {
-        // Slot already populated — don't overwrite
-        skipped++;
+        // Slot already populated — don't overwrite a manual upload or earlier sync,
+        // but keep the extra photo visible in the unassigned bucket so retakes /
+        // duplicates aren't silently dropped.
+        if (colCheckResult.rows[0]!.col_val !== row.photo_key) {
+          await pushToUnassigned(poleLabel, row.photo_key);
+        }
         continue;
       }
 
@@ -153,7 +206,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       synced++;
     }
 
-    return apiResponse.success(res, { synced, skipped });
+    return apiResponse.success(res, { synced, skipped, unassigned });
   } catch (err) {
     log.error('works-qa/sync-qfield', { error: err instanceof Error ? err.message : String(err) });
     return apiResponse.internalError(res, err);
