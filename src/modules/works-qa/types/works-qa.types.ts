@@ -53,6 +53,11 @@ export interface PoleQaPhoto {
   joint_approved: boolean;          // DB column kept as-is, represents 'main_joint' discipline
   approved_by: string | null;
   approved_at: string | null;
+  // Force-approve audit trail (migration 354). Set when an approver bypasses
+  // disciplineGatesPass with a reason. Last-write-wins at row level.
+  override_reason: string | null;
+  overridden_by: string | null;
+  overridden_at: string | null;
   created_at: string;
   updated_at: string;
 
