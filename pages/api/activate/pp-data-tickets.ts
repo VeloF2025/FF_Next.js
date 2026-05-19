@@ -17,6 +17,7 @@ import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
 import { normalizePPTicketBatches } from '@/modules/activate/services/ticketBatchService';
 import { createTicket } from '@/modules/noc/services/ticketService';
+import { findDuplicateTickets, linkSourceToTicket } from '@/modules/noc/services/duplicateTicketService';
 import { classifyResolutionPath } from '@/modules/noc/services/resolutionPathClassifier';
 import { TicketSource, TicketType, TicketPriority, TicketStatus } from '@/modules/noc/types/ticket';
 import { PP_OLT_SUBTYPES } from '@/modules/noc/constants/ticketCategories';
@@ -204,7 +205,9 @@ async function handleCreate(
 
   try {
     const allTickets: { id: string; ticket_uid: string; pp_data_id: number }[] = [];
+    const allDuplicates: { ticket_id: string; ticket_uid: string; pp_data_id: number; match_reasons: string[] }[] = [];
     let totalSkipped = 0;
+    let totalLinkedToExisting = 0;
     const projectCounts: Record<string, number> = {};
 
     for (const batch of batches) {
@@ -286,6 +289,37 @@ async function handleCreate(
           hasDrNumber: Boolean(dr),
         });
 
+        // Dedup guard: if an open ticket already covers this DR or ONT serial,
+        // relink the PP row to that ticket instead of creating a duplicate.
+        // The OES re-entry path can clear maintenance_ticket_id while the
+        // prior ticket is still open, so source-level uniqueness alone is
+        // not enough.
+        const existingOpen = await findDuplicateTickets({ drNumber: dr, ontSerial: serial });
+        const match = existingOpen[0];
+        if (match) {
+          const link = await linkSourceToTicket(
+            'oes_pp_data.maintenance_ticket_id',
+            String(record.id),
+            match.id,
+          );
+          allDuplicates.push({
+            ticket_id: match.id,
+            ticket_uid: match.ticket_uid,
+            pp_data_id: record.id,
+            match_reasons: match.match_reasons,
+          });
+          totalLinkedToExisting++;
+          logger.info('PP Data row linked to existing open ticket (dedup)', {
+            pp_data_id: record.id,
+            dr,
+            serial,
+            existing_ticket_uid: match.ticket_uid,
+            match_reasons: match.match_reasons,
+            relinked: link.updated,
+          });
+          continue;
+        }
+
         const ticket = await createTicket({
           source: TicketSource.PP_DATA,
           title,
@@ -336,13 +370,19 @@ async function handleCreate(
       }
     }
 
-    logger.info('PP Data tickets created', { created: allTickets.length, skipped: totalSkipped });
+    logger.info('PP Data tickets created', {
+      created: allTickets.length,
+      skipped: totalSkipped,
+      linked_to_existing: totalLinkedToExisting,
+    });
 
-    if (allTickets.length === 0) {
-      return apiResponse.success(res, { created: 0, skipped: totalSkipped, tickets: [] });
-    }
-
-    return apiResponse.success(res, { created: allTickets.length, skipped: totalSkipped, tickets: allTickets });
+    return apiResponse.success(res, {
+      created: allTickets.length,
+      skipped: totalSkipped,
+      linked_to_existing: totalLinkedToExisting,
+      tickets: allTickets,
+      duplicates: allDuplicates,
+    });
   } catch (err) {
     logger.error('Failed to create PP Data tickets', { error: err });
     return apiResponse.internalError(res, err);

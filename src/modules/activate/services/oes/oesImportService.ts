@@ -235,13 +235,26 @@ export async function importPPData(ppRows: PPRow[], filename: string): Promise<v
            date_registered = COALESCE(EXCLUDED.date_registered, oes_pp_data.date_registered),
            import_batch_id = EXCLUDED.import_batch_id,
            -- Re-entry: an activated serial reappears in PP DATA → reset for fresh
-           -- ticket lifecycle. Prior maintenance_ticket_id stays resolved (history).
+           -- ticket lifecycle, but only clear maintenance_ticket_id when the
+           -- linked ticket is actually closed. Clearing it while the prior
+           -- ticket is still open caused daily duplicate creates (the
+           -- pp-data-tickets endpoint's eligibility query re-fires on
+           -- maintenance_ticket_id IS NULL).
            resolution_status = CASE
              WHEN oes_pp_data.resolution_status = 'activated' THEN 'not_found'
              ELSE oes_pp_data.resolution_status
            END,
            maintenance_ticket_id = CASE
-             WHEN oes_pp_data.resolution_status = 'activated' THEN NULL
+             WHEN oes_pp_data.resolution_status = 'activated'
+                  AND (
+                    oes_pp_data.maintenance_ticket_id IS NULL
+                    OR EXISTS (
+                      SELECT 1 FROM maintenance_tickets mt
+                       WHERE mt.id = oes_pp_data.maintenance_ticket_id
+                         AND mt.status IN ('resolved','closed','cancelled')
+                    )
+                  )
+               THEN NULL
              ELSE oes_pp_data.maintenance_ticket_id
            END,
            resolved_drop_number = CASE
