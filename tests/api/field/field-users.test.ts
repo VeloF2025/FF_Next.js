@@ -33,6 +33,7 @@ vi.mock('@/lib/db-logger', () => ({
 
 vi.mock('@/lib/auth/middleware', () => ({
   withAuth: (handler: (req: NextApiRequest, res: NextApiResponse) => unknown) => handler,
+  withRole: () => (handler: (req: NextApiRequest, res: NextApiResponse) => unknown) => handler,
 }));
 
 // ── Import handler after mocks ────────────────────────────────────────────────
@@ -231,5 +232,112 @@ describe('GET /api/field/users', () => {
     const body = res._json as { data: typeof rows };
     expect(body.data).toHaveLength(1);
     expect(body.data[0].role).toBe('technician');
+  });
+
+  // 7. GET rejects technician caller with 403 (HIGH #2 fix)
+  it('GET rejects technician caller with 403', async () => {
+    const req = makeReq({
+      method: 'GET',
+      user: { id: 'tech-uuid', role: 'technician' },
+      query: {},
+    });
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(403);
+    expect(mockSql).not.toHaveBeenCalled();
+  });
+
+  // 8. GET rejects viewer caller with 403 (HIGH #2 fix)
+  it('GET rejects viewer caller with 403', async () => {
+    const req = makeReq({
+      method: 'GET',
+      user: { id: 'viewer-uuid', role: 'viewer' },
+      query: {},
+    });
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(403);
+    expect(mockSql).not.toHaveBeenCalled();
+  });
+});
+
+// ── Role-gate tests (HIGH #2 + #3 fixes) ─────────────────────────────────────
+
+describe('Role gate — POST /api/field/users', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // 9. Technician POST is rejected with 403 (HIGH #2 fix)
+  it('technician caller → 403 on POST', async () => {
+    const req = makeReq({
+      method: 'POST',
+      user: { id: 'tech-uuid', role: 'technician' },
+      body: {
+        firstName: 'Test',
+        lastName: 'TechCaller',
+        phone: '+27TEST0000007',
+        role: 'technician',
+      },
+    });
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(403);
+    expect(mockSql).not.toHaveBeenCalled();
+  });
+
+  // 10. Manager creates technician → 201, account_status='pending' (HIGH #3 fix)
+  // Previously the inverted logic would have produced 'active' for manager callers.
+  it('manager caller creates technician → 201, pending (not active)', async () => {
+    const insertedRow = staffRow({ account_status: 'pending', created_by_staff_id: 'manager-uuid' });
+    mockSql.mockResolvedValueOnce([insertedRow]);
+
+    const req = makeReq({
+      method: 'POST',
+      user: { id: 'manager-uuid', role: 'manager' },
+      body: {
+        firstName: 'Test',
+        lastName: 'ManagerCreated',
+        phone: '+27TEST0000008',
+        role: 'technician',
+      },
+    });
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(201);
+    const body = res._json as { data: { user: { account_status: string } } };
+    expect(body.data.user.account_status).toBe('pending');
+  });
+
+  // 11. Admin creates technician → 201, account_status='active' (admin bypass)
+  it('admin caller creates technician → 201, active', async () => {
+    const insertedRow = staffRow({ account_status: 'active', created_by_staff_id: 'user-admin-uuid' });
+    mockSql.mockResolvedValueOnce([insertedRow]);
+
+    const req = makeReq({
+      method: 'POST',
+      user: { id: 'user-admin-uuid', role: 'admin' },
+      body: {
+        firstName: 'Test',
+        lastName: 'AdminCreated',
+        phone: '+27TEST0000009',
+        role: 'technician',
+      },
+    });
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(201);
+    const body = res._json as { data: { user: { account_status: string } } };
+    expect(body.data.user.account_status).toBe('active');
   });
 });

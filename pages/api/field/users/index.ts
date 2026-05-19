@@ -4,9 +4,13 @@
  * POST /api/field/users — create a staff member with a given role.
  * GET  /api/field/users — list staff with optional filters.
  *
+ * Role gate: only storeman, manager, admin, super_admin, system may access.
+ * Technician and viewer are explicitly excluded (they share level-2 with storeman
+ * so withRole('storeman') alone would admit technicians — we use a name allowlist).
+ *
  * Role-aware pending status:
- *   - storeman callers  → account_status='pending'  (admin must approve)
- *   - admin/super_admin → account_status='active'
+ *   - storeman/manager callers → account_status='pending'  (admin must approve)
+ *   - admin/super_admin/system → account_status='active'
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -16,6 +20,7 @@ import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth/middleware';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 import { logCreate } from '@/lib/db-logger';
+import type { AuthRole } from '@/lib/auth/types';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -23,8 +28,18 @@ import { logCreate } from '@/lib/db-logger';
 const ALLOWED_ROLES = ['technician', 'stores', 'supervisor', 'admin', 'driver', 'office'] as const;
 type FieldUserRole = (typeof ALLOWED_ROLES)[number];
 
+/**
+ * AuthRoles permitted to call this endpoint.
+ * Technician is intentionally excluded: it shares ROLE_HIERARCHY level 2 with
+ * storeman, so a level-based gate cannot distinguish them.
+ */
+const PERMITTED_AUTH_ROLES = new Set<AuthRole>(['storeman', 'manager', 'admin', 'super_admin', 'system']);
+
 /** AuthRoles that are considered "stores-level" callers (create pending accounts). */
 const STORES_AUTH_ROLES = new Set(['storeman']);
+
+/** AuthRoles that create accounts directly active (no approval required). */
+const ADMIN_AUTH_ROLES = new Set<AuthRole>(['admin', 'super_admin', 'system']);
 
 /** Prefix map for employee_id generation. */
 const ROLE_UPPER_PREFIX: Record<FieldUserRole, string> = {
@@ -89,8 +104,10 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
     return;
   }
 
-  // Determine account_status based on caller role
-  const accountStatus = STORES_AUTH_ROLES.has(callerRole) ? 'pending' : 'active';
+  // Determine account_status based on caller role.
+  // Admin-tier callers create accounts immediately active; everyone else (storeman, manager)
+  // creates pending accounts that require admin approval.
+  const accountStatus = ADMIN_AUTH_ROLES.has(callerRole) ? 'active' : 'pending';
 
   const employeeId = `${ROLE_UPPER_PREFIX[fieldRole]}-${String(Date.now()).slice(-8)}`;
   const resolvedDepartment = department ?? defaultDepartment(fieldRole);
@@ -244,6 +261,13 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
 
 async function fieldUsersHandler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   const authReq = req as AuthenticatedNextApiRequest;
+
+  // Role gate: technician and viewer are excluded by name (level-based check
+  // would admit technician since it shares ROLE_HIERARCHY level 2 with storeman).
+  if (!PERMITTED_AUTH_ROLES.has(authReq.user.role)) {
+    apiResponse.forbidden(res, 'Insufficient role to access field users');
+    return;
+  }
 
   if (req.method === 'POST') {
     return handlePost(authReq, res);
