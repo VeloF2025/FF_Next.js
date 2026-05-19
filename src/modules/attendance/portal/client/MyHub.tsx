@@ -28,6 +28,7 @@ import { getHubSummary, requestFleetHandoff } from './api';
 import type { AttendanceProfile, HubSummaryResponse } from './api';
 import { MyPortalShell } from './MyPortalShell';
 import { InstallPrompt } from './InstallPrompt';
+import { isStoresAuthorised } from '@/modules/field-stock-pwa/lib/storesRoles';
 
 type HubSummary = HubSummaryResponse;
 
@@ -115,7 +116,7 @@ export function MyHub({ profile }: MyHubProps) {
           summary={summary}
           onClick={() => router.push('/my/attendance/corrections')}
         />
-        {(profile.role === 'stores' || profile.role === 'admin') && (
+        {isStoresAuthorised(profile.role) && (
           <StoresTile onClick={() => router.push('/my/stores')} />
         )}
       </div>
