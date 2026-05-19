@@ -340,24 +340,24 @@ export async function parseFTPaymentPdf(
 
   // ── Pre-provisions ───────────────────────────────────────────────────────
   // Line format: "Pre-Provisioned 20% of Pre-provisioned withheld   0   -180 OES Report, as at 05 Apr 2026"
-  // The count we want is the negative number just before the trailing report
-  // label. Historical bug: when no negative existed, the fallback took
-  // max(|allNums|) which then picked up stray year numbers (e.g. 2026) from
-  // the "as at <date>" suffix. Fix: only accept explicitly negative values,
-  // default 0 otherwise. That matches FT's semantics — "no withhold".
+  // The first integer after the "<NN>%" token is the current-week withhold
+  // count. The second integer (the negative one) is the OES Report cumulative
+  // and is NOT a deduction from this week's payment — including it broke the
+  // claimable - deductions = totalClaimableForPayment validation across every
+  // FT site (see PR comments for the math). The "as at <date>" tail is
+  // stripped first so date digits can't leak into the candidate list.
   let preProvisionsCount = 0;
   let preProvLineFound = false;
   for (const line of lines) {
     if (/pre-prov/i.test(line)) {
       preProvLineFound = true;
-      // Strip any "as at <date>" tail so date digits can't leak in.
-      const stripped = line.replace(/as\s+at\b.*$/i, '');
-      const nums = [...stripped.matchAll(/-?\d+/g)]
-        .map((m) => parseInt(m[0], 10))
-        .filter((n) => !isNaN(n));
-      const negatives = nums.filter((n) => n < 0);
-      if (negatives.length > 0) {
-        preProvisionsCount = Math.abs(Math.min(...negatives));
+      const stripped = line
+        .replace(/as\s+at\b.*$/i, '')
+        // Drop "<NN>%" tokens — they belong to the label, not the value.
+        .replace(/\d+%/g, '');
+      const firstNum = stripped.match(/-?\d+/);
+      if (firstNum) {
+        preProvisionsCount = Math.abs(parseInt(firstNum[0], 10));
       }
       break;
     }
