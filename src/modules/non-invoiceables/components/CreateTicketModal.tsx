@@ -156,6 +156,11 @@ async function postJson(url: string, body: Record<string, unknown>): Promise<Cre
       linkedToExisting: typeof data.linked_to_existing === 'number' ? data.linked_to_existing as number : 0,
     };
   }
+  // link-to-existing endpoint returns { linked: true, ... } — count as a
+  // link, not a create.
+  if (data.linked === true) {
+    return { created: 0, linkedToExisting: 1 };
+  }
   // Single-item endpoints return { success, ticket_id|ticket_uid } at HTTP 200
   // regardless of whether a ticket was created or relinked.
   if (data.success === false) {

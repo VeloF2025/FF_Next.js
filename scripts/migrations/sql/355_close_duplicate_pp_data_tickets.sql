@@ -109,10 +109,17 @@ UPDATE oes_pp_data p
 -- findDuplicateTickets check. Predicate matches the dedup semantics:
 -- "one open pp_data ticket per ONT serial". Different serials on the same
 -- DR remain allowed (rare but legitimate — ONT swap mid-investigation).
+--
+-- Status predicate aligns with duplicateTicketService.OPEN_TICKET_STATUSES,
+-- which treats 'verified' as functionally closed (it usually precedes a
+-- formal close). Excluding 'verified' from the index keeps the unique
+-- index from firing on a status that findDuplicateTickets does NOT
+-- consider a duplicate — otherwise the application catch on 23505 would
+-- re-query and find nothing, then rethrow as a 500.
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_open_pp_data_ticket_per_serial
   ON maintenance_tickets (ont_serial)
   WHERE source = 'pp_data'
     AND ont_serial IS NOT NULL
-    AND status NOT IN ('resolved', 'closed', 'cancelled');
+    AND status NOT IN ('resolved', 'closed', 'cancelled', 'verified');
 
 COMMIT;
