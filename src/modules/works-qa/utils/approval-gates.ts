@@ -9,9 +9,12 @@ export interface GateResult {
 }
 
 /**
- * Check approval gates for a single discipline. Slots in that discipline must:
- *  1. Have a photo (slot key column non-null), AND
- *  2. Have a VLM result that's valid OR has been overridden.
+ * Check approval gates for a single discipline. Evaluation order (highest wins):
+ *  1. If the slot has no photo → blocked.
+ *  2. If the slot has a human verdict in `slot_approvals[key].decision`:
+ *     - 'snagged' → blocked regardless of VLM.
+ *     - 'approved' → passes regardless of VLM.
+ *  3. Otherwise: VLM result must be valid OR have been overridden.
  *
  * Main Joint additionally requires at least one tray photo.
  */
@@ -22,7 +25,19 @@ export function disciplineGatesPass(pole: PoleQaPhoto, discipline: Discipline): 
   for (const slot of slots) {
     const photoKey = pole[slot.dbColumn as keyof PoleQaPhoto] as string | null;
     if (!photoKey) { blocking.push(slot.key); continue; }
-    const vlm = pole.vlm_results[slot.key] as VlmSlotResult | undefined;
+
+    // Human verdict takes precedence over VLM verdict (Hein 2026-05-19).
+    // A snagged slot fails the gate even if VLM passed it.
+    const approval = pole.slot_approvals?.[slot.key];
+    if (approval?.decision === 'snagged') {
+      blocking.push(slot.key);
+      continue;
+    }
+    if (approval?.decision === 'approved') {
+      continue; // Human override beats VLM
+    }
+
+    const vlm = pole.vlm_results?.[slot.key] as VlmSlotResult | undefined;
     if (!vlm || (!vlm.valid && !vlm.overridden_by)) {
       blocking.push(slot.key);
     }

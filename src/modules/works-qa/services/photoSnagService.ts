@@ -140,6 +140,47 @@ export async function createPhotoSnag(input: CreatePhotoSnagInput): Promise<Crea
     [pole.id, input.slotKey, JSON.stringify(newApproval)]
   );
 
+  // VLM training feedback: capture the human override when VLM had a verdict.
+  // Snagging a VLM-fail is confirmation, not override — skip those.
+  const vlmSlot = pole.vlm_results?.[input.slotKey] as
+    | { valid?: boolean; confidence?: number; feedback?: string; overridden_by?: string }
+    | undefined;
+  if (vlmSlot) {
+    const vlmVerdict = vlmSlot.overridden_by ? 'overridden' : vlmSlot.valid ? 'pass' : 'fail';
+    if (vlmVerdict !== 'fail') {
+      try {
+        await pool.query(
+          `INSERT INTO works_qa_corrections (
+             pole_qa_photo_id, slot_key,
+             vlm_verdict, vlm_confidence, vlm_feedback,
+             human_verdict, correction_notes,
+             snag_id, created_by
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [
+            pole.id,
+            input.slotKey,
+            vlmVerdict,
+            vlmSlot.confidence ?? null,
+            vlmSlot.feedback ?? null,
+            'snagged',
+            input.comment,
+            snag.id,
+            input.createdBy,
+          ]
+        );
+      } catch (err) {
+        // Non-fatal: the snag was created successfully. A failed training
+        // row should not roll back the user-facing action.
+        log.error('works-qa.photoSnag.training_row_failed', {
+          snag_id: snag.id,
+          pole_qa_photo_id: pole.id,
+          slot_key: input.slotKey,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  }
+
   log.info('works-qa.photoSnag.created', {
     snag_id: snag.id,
     ticket_id: ticket.id,

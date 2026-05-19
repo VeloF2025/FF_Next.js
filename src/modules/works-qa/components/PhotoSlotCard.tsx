@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Droppable, Draggable } from '@hello-pangea/dnd';
 import { X, GripVertical } from 'lucide-react';
 import { log } from '@/lib/logger';
@@ -37,6 +37,7 @@ export function PhotoSlotCard({
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [confirmResnag, setConfirmResnag] = useState(false);
 
   // Wrap caller-supplied onUpload to track in-flight state and surface errors
   // inline. Without this, upload failures only hit the logger and the user
@@ -53,11 +54,6 @@ export function PhotoSlotCard({
       setUploading(false);
     }
   }
-
-  // Close the snag form if the discipline becomes approved while it is open.
-  // Without this, an un-approval (discipline re-opened) would silently restore
-  // the previously-open form because `showSnagForm` would still be true.
-  useEffect(() => { if (disabled) setShowSnagForm(false); }, [disabled]);
 
   const status: 'empty' | 'pass' | 'fail' | 'overridden' =
     !photoKey ? 'empty'
@@ -215,8 +211,42 @@ export function PhotoSlotCard({
 
           {/* Per-photo Approve / Snag — orthogonal to discipline approval (Hein 2026-05-14).
               Only render when a photo is present; an empty slot has nothing to judge. */}
-          {photoKey && slotApproval?.decision === 'approved' && (
-            <p className="text-xs text-green-400">✓ Approved</p>
+          {photoKey && slotApproval?.decision === 'approved' && !showSnagForm && !confirmResnag && (
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-green-400">✓ Approved</p>
+              {!disabled && onSnag && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmResnag(true)}
+                  className="text-[10px] px-1.5 py-0.5 rounded bg-red-600/60 hover:bg-red-500 text-white"
+                  title="Raise a snag against this approved photo"
+                >
+                  Re-snag
+                </button>
+              )}
+            </div>
+          )}
+
+          {confirmResnag && !showSnagForm && (
+            <div className="text-xs bg-amber-500/10 border border-amber-500/40 rounded p-2 flex flex-col gap-1">
+              <p className="text-amber-300">Are you sure? This slot was previously approved.</p>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => { setConfirmResnag(false); setShowSnagForm(true); }}
+                  className="text-xs px-2 py-1 rounded bg-red-600 hover:bg-red-500 text-white"
+                >
+                  Yes, raise snag
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmResnag(false)}
+                  className="text-xs px-2 py-1 rounded text-zinc-400 hover:text-zinc-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           )}
           {photoKey && slotApproval?.decision === 'snagged' && (
             <p className="text-xs text-red-400">⚠ Snagged</p>
@@ -243,12 +273,30 @@ export function PhotoSlotCard({
               </button>
             </div>
           )}
-          {showSnagForm && onSnag && !disabled && (
+          {photoKey && disabled && !slotApproval && !showSnagForm && onSnag && (
+            <button
+              type="button"
+              onClick={() => setShowSnagForm(true)}
+              className="text-[10px] self-start px-1.5 py-0.5 rounded bg-red-600/60 hover:bg-red-500 text-white"
+              title="Raise a snag against this photo (discipline is approved)"
+            >
+              Snag
+            </button>
+          )}
+          {showSnagForm && onSnag && (
             <SnagInlineForm
               assignableUsers={assignableUsers}
               loadingUsers={loadingUsers}
-              onSubmit={onSnag}
-              onCancel={() => setShowSnagForm(false)}
+              onSubmit={async (input) => {
+                const result = await onSnag(input);
+                // Reset the re-snag confirmation banner so it doesn't linger
+                // alongside the new "⚠ Snagged" badge after a successful submit.
+                if (result.status === 'created' || result.status === 'amended') {
+                  setConfirmResnag(false);
+                }
+                return result;
+              }}
+              onCancel={() => { setShowSnagForm(false); setConfirmResnag(false); }}
             />
           )}
 

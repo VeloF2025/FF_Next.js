@@ -264,6 +264,142 @@ describe('photoSnagService.createPhotoSnag', () => {
       createdBy: 'user-1',
     })).rejects.toThrow(/Unknown slot key/);
   });
+
+  it('inserts a works_qa_corrections row when snagging a VLM-pass slot', async () => {
+    const VLM_PASS_POLE = {
+      ...POLE_ROW,
+      vlm_results: {
+        civil_03: { valid: true, confidence: 0.91, feedback: 'OK' },
+      },
+    };
+    setupQueryQueue([
+      { match: /FROM snags/i, rows: [] },
+      { match: /FROM pole_qa_photos/i, rows: [VLM_PASS_POLE] },
+      { match: /SELECT id FROM snag_reports/i, rows: [{ id: 'report-uuid-1' }] },
+      { match: /COALESCE\(MAX\(snag_number\)/i, rows: [{ next: 1 }] },
+      { match: /INSERT INTO snags/i, rows: [SNAG_INSERT_ROW] },
+      { match: /INSERT INTO snag_photos/i, rows: [] },
+      { match: /UPDATE snags SET noc_ticket_id/i, rows: [] },
+      { match: /UPDATE pole_qa_photos/i, rows: [{ slot_approvals: { civil_03: { decision: 'snagged' } } }] },
+      { match: /INSERT INTO works_qa_corrections/i, rows: [] },
+    ]);
+    createTicketMock.mockResolvedValue({ id: 'ticket-uuid-1', uid: 'WQA-x' });
+
+    await createPhotoSnag({
+      poleQaPhotoId: 'pole-uuid-1',
+      slotKey: 'civil_03',
+      comment: 'Photo blurry — disagree with VLM',
+      createdBy: 'user-1',
+    });
+
+    const correctionCall = queryMock.mock.calls.find(
+      (c: [string, unknown[]]) => /INSERT INTO works_qa_corrections/.test(c[0])
+    );
+    expect(correctionCall).toBeDefined();
+    const params = correctionCall![1] as unknown[];
+    // Column order from photoSnagService: pole_qa_photo_id, slot_key,
+    // vlm_verdict, vlm_confidence, vlm_feedback, human_verdict,
+    // correction_notes, snag_id, created_by
+    expect(params[0]).toBe('pole-uuid-1');
+    expect(params[1]).toBe('civil_03');
+    expect(params[2]).toBe('pass');                       // VLM verdict before override
+    expect(params[3]).toBe(0.91);
+    expect(params[4]).toBe('OK');
+    expect(params[5]).toBe('snagged');                    // human verdict
+    expect(params[6]).toBe('Photo blurry — disagree with VLM');
+    expect(params[7]).toBe('snag-uuid-1');
+    expect(params[8]).toBe('user-1');
+  });
+
+  it('does not write works_qa_corrections when snagging a VLM-fail slot (confirmation, not override)', async () => {
+    const VLM_FAIL_POLE = {
+      ...POLE_ROW,
+      vlm_results: {
+        civil_03: { valid: false, confidence: 0.42, feedback: 'No trench visible' },
+      },
+    };
+    setupQueryQueue([
+      { match: /FROM snags/i, rows: [] },
+      { match: /FROM pole_qa_photos/i, rows: [VLM_FAIL_POLE] },
+      { match: /SELECT id FROM snag_reports/i, rows: [{ id: 'report-uuid-1' }] },
+      { match: /COALESCE\(MAX\(snag_number\)/i, rows: [{ next: 1 }] },
+      { match: /INSERT INTO snags/i, rows: [SNAG_INSERT_ROW] },
+      { match: /INSERT INTO snag_photos/i, rows: [] },
+      { match: /UPDATE snags SET noc_ticket_id/i, rows: [] },
+      { match: /UPDATE pole_qa_photos/i, rows: [{ slot_approvals: {} }] },
+      // No works_qa_corrections insert expected — queue ends here.
+    ]);
+    createTicketMock.mockResolvedValue({ id: 'ticket-x', uid: 'WQA-x' });
+
+    await createPhotoSnag({
+      poleQaPhotoId: 'pole-uuid-1',
+      slotKey: 'civil_03',
+      comment: 'Confirming VLM',
+      createdBy: 'user-1',
+    });
+
+    const correctionCall = queryMock.mock.calls.find(
+      (c: [string, unknown[]]) => /INSERT INTO works_qa_corrections/.test(c[0])
+    );
+    expect(correctionCall).toBeUndefined();
+  });
+
+  it('completes the snag even when works_qa_corrections insert throws (non-fatal)', async () => {
+    const VLM_PASS_POLE = {
+      ...POLE_ROW,
+      vlm_results: {
+        civil_03: { valid: true, confidence: 0.88, feedback: 'OK' },
+      },
+    };
+    let correctionAttempted = false;
+    queryMock.mockReset();
+    let step = 0;
+    const happyPath = [
+      /FROM snags/i,
+      /FROM pole_qa_photos/i,
+      /SELECT id FROM snag_reports/i,
+      /COALESCE\(MAX\(snag_number\)/i,
+      /INSERT INTO snags/i,
+      /INSERT INTO snag_photos/i,
+      /UPDATE snags SET noc_ticket_id/i,
+      /UPDATE pole_qa_photos/i,
+    ];
+    const happyRows: Record<string, unknown>[][] = [
+      [],
+      [VLM_PASS_POLE],
+      [{ id: 'report-uuid-1' }],
+      [{ next: 1 }],
+      [SNAG_INSERT_ROW],
+      [],
+      [],
+      [{ slot_approvals: { civil_03: { decision: 'snagged' } } }],
+    ];
+    queryMock.mockImplementation(async (text: string) => {
+      if (/INSERT INTO works_qa_corrections/.test(text)) {
+        correctionAttempted = true;
+        throw new Error('simulated FK violation');
+      }
+      const pattern = happyPath[step];
+      const rows = happyRows[step];
+      step++;
+      if (!pattern || !pattern.test(text)) {
+        throw new Error(`Unexpected query #${step}: ${text.slice(0, 80)}`);
+      }
+      return { rows };
+    });
+    createTicketMock.mockResolvedValue({ id: 'ticket-x', uid: 'WQA-x' });
+
+    const result = await createPhotoSnag({
+      poleQaPhotoId: 'pole-uuid-1',
+      slotKey: 'civil_03',
+      comment: 'still snag',
+      createdBy: 'user-1',
+    });
+
+    expect(correctionAttempted).toBe(true);
+    expect(result.status).toBe('created');                // snag succeeded despite training-row failure
+    expect(result.snag.id).toBe('snag-uuid-1');
+  });
 });
 
 describe('photoSnagService.resolvePhotoSnag', () => {

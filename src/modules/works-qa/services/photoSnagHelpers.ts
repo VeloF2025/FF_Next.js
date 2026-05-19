@@ -7,6 +7,7 @@
 import pool from '@/lib/db';
 import { TicketPriority, TicketType } from '@/modules/noc/types/ticket';
 import { getSlotMeta, type SlotMeta } from '../utils/slot-keys';
+import type { VlmSlotResult } from '../types/works-qa.types';
 import type { PhotoSnagRow, SlotApprovals, SnagSeverity } from './photoSnagTypes';
 
 export const SEVERITY_TO_PRIORITY: Record<SnagSeverity, TicketPriority> = {
@@ -35,6 +36,7 @@ export interface LoadedPole {
     zone_no: number | null;
     pon_no: number | null;
     slot_approvals: SlotApprovals;
+    vlm_results: Record<string, VlmSlotResult> | null;
   };
   slotPhotoKey: string | null;
   slotMeta: SlotMeta;
@@ -49,9 +51,10 @@ export async function loadPoleAndPhoto(poleQaPhotoId: string, slotKey: string): 
     zone_no: number | null;
     pon_no: number | null;
     slot_approvals: SlotApprovals | null;
+    vlm_results: Record<string, VlmSlotResult> | null;
     slot_photo_key: string | null;
   }>(
-    `SELECT id, project_id, pole_label, zone_no, pon_no, slot_approvals,
+    `SELECT id, project_id, pole_label, zone_no, pon_no, slot_approvals, vlm_results,
             ${slotMeta.dbColumn} AS slot_photo_key
        FROM pole_qa_photos
       WHERE id = $1
@@ -68,6 +71,7 @@ export async function loadPoleAndPhoto(poleQaPhotoId: string, slotKey: string): 
       zone_no: row.zone_no,
       pon_no: row.pon_no,
       slot_approvals: row.slot_approvals ?? {},
+      vlm_results: row.vlm_results ?? null,
     },
     slotPhotoKey: row.slot_photo_key,
     slotMeta,

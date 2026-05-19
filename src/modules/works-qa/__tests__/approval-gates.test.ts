@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { allGatesPass } from '../utils/approval-gates';
+import { allGatesPass, disciplineGatesPass } from '../utils/approval-gates';
 import type { PoleQaPhoto } from '../types/works-qa.types';
 
 const FULL_POLE: PoleQaPhoto = {
@@ -106,5 +106,40 @@ describe('allGatesPass', () => {
     const result = allGatesPass(pole);
     expect(result.pass).toBe(false);
     expect(result.blocking).toContain('tray_photos');
+  });
+});
+
+describe('disciplineGatesPass', () => {
+  it('fails civil gate when a slot has slot_approvals.decision === "snagged" even if VLM passes', () => {
+    const pole = {
+      ...FULL_POLE,
+      slot_approvals: {
+        civil_01: {
+          decision: 'snagged',
+          by: 'user-1',
+          at: '2026-05-19T12:00:00Z',
+          snag_id: 'snag-abc',
+        },
+      },
+    };
+    const result = disciplineGatesPass(pole, 'civil');
+    expect(result.pass).toBe(false);
+    expect(result.blocking).toContain('civil_01');
+  });
+
+  it('passes civil gate when reviewed slot has decision "approved" and other slots pass VLM', () => {
+    const pole = {
+      ...FULL_POLE,
+      slot_approvals: {
+        civil_01: {
+          decision: 'approved',
+          by: 'user-1',
+          at: '2026-05-19T12:00:00Z',
+        },
+      },
+    };
+    const result = disciplineGatesPass(pole, 'civil');
+    expect(result.pass).toBe(true);
+    expect(result.blocking).toHaveLength(0);
   });
 });
