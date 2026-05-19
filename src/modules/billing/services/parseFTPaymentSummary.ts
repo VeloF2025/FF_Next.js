@@ -91,6 +91,34 @@ function parseNaturalDate(raw: string): string | null {
 }
 
 /**
+ * Parse the Pre-Provisioned line of an FT payment summary.
+ *
+ * Layout: `Pre-Provisioned <X>% of Pre-provisioned withheld  <count>  <OES>  OES Report, as at <date>`
+ *
+ * The first integer after "withheld" is the current-week withhold count
+ * (deducted from this week's payment). The trailing number is the OES Report
+ * cumulative — running across all weeks, NOT a deduction from this week.
+ *
+ * Returns `isNegativeRaw: true` when FT emits a negative current-week value;
+ * the caller should surface this as a warning since count semantics are
+ * non-negative.
+ */
+export function parsePreProvisionLine(line: string): {
+  count: number;
+  isNegativeRaw: boolean;
+} {
+  // Strip the "as at <date>" tail so date digits can't leak into the match.
+  const stripped = line.replace(/as\s+at\b.*$/i, '');
+  // Anchor on "withheld" (the last word of the label) and take the integer
+  // immediately after. Skips the leading "<NN>%" rule and the trailing OES
+  // Report number.
+  const m = stripped.match(/withheld\s+(-?\d+)/i);
+  if (!m) return { count: 0, isNegativeRaw: false };
+  const raw = parseInt(m[1]!, 10);
+  return { count: Math.abs(raw), isNegativeRaw: raw < 0 };
+}
+
+/**
  * Extract a project name from a PDF filename.
  * "Lawley WE260322.pdf" → "Lawley"
  * "Mohlakeng WE 10 August 2025.pdf" → "Mohlakeng"
@@ -339,25 +367,17 @@ export async function parseFTPaymentPdf(
   }
 
   // ── Pre-provisions ───────────────────────────────────────────────────────
-  // Line format: "Pre-Provisioned 20% of Pre-provisioned withheld   0   -180 OES Report, as at 05 Apr 2026"
-  // The first integer after the "<NN>%" token is the current-week withhold
-  // count. The second integer (the negative one) is the OES Report cumulative
-  // and is NOT a deduction from this week's payment — including it broke the
-  // claimable - deductions = totalClaimableForPayment validation across every
-  // FT site (see PR comments for the math). The "as at <date>" tail is
-  // stripped first so date digits can't leak into the candidate list.
   let preProvisionsCount = 0;
   let preProvLineFound = false;
   for (const line of lines) {
     if (/pre-prov/i.test(line)) {
       preProvLineFound = true;
-      const stripped = line
-        .replace(/as\s+at\b.*$/i, '')
-        // Drop "<NN>%" tokens — they belong to the label, not the value.
-        .replace(/\d+%/g, '');
-      const firstNum = stripped.match(/-?\d+/);
-      if (firstNum) {
-        preProvisionsCount = Math.abs(parseInt(firstNum[0], 10));
+      const result = parsePreProvisionLine(line);
+      preProvisionsCount = result.count;
+      if (result.isNegativeRaw) {
+        warnings.push(
+          `Pre-Provisioned current-week value is negative (verify FT PDF format hasn't changed)`,
+        );
       }
       break;
     }
