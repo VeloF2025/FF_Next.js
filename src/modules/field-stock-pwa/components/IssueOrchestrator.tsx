@@ -1,14 +1,7 @@
 /**
- * IssueOrchestrator — state-machine orchestrator for the /my/stores/issue flow.
- *
- * Rendered by pages/my/stores/issue/index.tsx once session is confirmed.
- * Extracted to keep the page file under 300 lines.
- *
- * State machine (useState enum — no xstate):
- *   pick-warehouse → pick-tech → pick-item → scan-serials → sign-submit → done
- *
- * Dirty-state guard: inline confirm panel (no native confirm() — blocks iOS
- * Safari PWA main thread). Shown when user tries to leave mid-flow.
+ * IssueOrchestrator — state-machine orchestrator for /my/stores/issue.
+ * State: pick-warehouse → pick-tech → pick-item → scan-serials → sign-submit → done
+ * Sub-components: StepProgress, IssueDirtyConfirmDialog.
  * ⚪ UNTESTED: integration tests in follow-on task.
  */
 
@@ -25,29 +18,16 @@ import type { StockItem } from '@/modules/field-stock-pwa/components/PickItemSte
 import { ScanSerialsStep } from '@/modules/field-stock-pwa/components/ScanSerialsStep';
 import { SignAndSubmitStep } from '@/modules/field-stock-pwa/components/SignAndSubmitStep';
 import { IssueSuccess } from '@/modules/field-stock-pwa/components/IssueSuccess';
+import { StepProgress } from '@/modules/field-stock-pwa/components/StepProgress';
+import { IssueDirtyConfirmDialog } from '@/modules/field-stock-pwa/components/IssueDirtyConfirmDialog';
 import { FIELD_DEFAULT_LOCATION_ID } from '@/modules/field-stock-pwa/lib/locationDefaults';
-import type {
-  PwaTechSummary,
-  PwaScannedSerial,
-  PwaPickingResult,
-} from '@/modules/field-stock-pwa/types';
+import type { PwaTechSummary, PwaScannedSerial, PwaPickingResult } from '@/modules/field-stock-pwa/types';
 
-// =============================================================================
-// State machine types
-// =============================================================================
+// --- Types ---
 
-type IssueStep =
-  | 'pick-warehouse'
-  | 'pick-tech'
-  | 'pick-item'
-  | 'scan-serials'
-  | 'sign-submit'
-  | 'done';
+type IssueStep = 'pick-warehouse' | 'pick-tech' | 'pick-item' | 'scan-serials' | 'sign-submit' | 'done';
 
-interface SourceLocation {
-  id: string;
-  name: string;
-}
+interface SourceLocation { id: string; name: string; }
 
 interface IssueState {
   step: IssueStep;
@@ -59,55 +39,37 @@ interface IssueState {
 }
 
 const INITIAL_ISSUE_STATE: IssueState = {
-  step: 'pick-warehouse',
-  sourceLocation: null,
-  technician: null,
-  stockItem: null,
-  scanned: [],
-  result: null,
+  step: 'pick-warehouse', sourceLocation: null, technician: null,
+  stockItem: null, scanned: [], result: null,
 };
 
-/** Maps IssueStep to a 1-based progress index (done = same as sign-submit). */
+/** 1-based progress index — done renders at same position as sign-submit. */
 const STEP_INDEX: Record<IssueStep, number> = {
-  'pick-warehouse': 1,
-  'pick-tech': 2,
-  'pick-item': 3,
-  'scan-serials': 4,
-  'sign-submit': 5,
-  'done': 5,
+  'pick-warehouse': 1, 'pick-tech': 2, 'pick-item': 3,
+  'scan-serials': 4, 'sign-submit': 5, 'done': 5,
 };
-
 const STEP_LABELS = ['WH', 'Tech', 'Item', 'Serials', 'Sign'];
 
-// =============================================================================
-// Props
-// =============================================================================
+// --- Props ---
 
 export interface IssueOrchestratorProps {
   profile: AttendanceProfile;
 }
 
-// =============================================================================
-// Component
-// =============================================================================
+// --- Component ---
 
 export function IssueOrchestrator({ profile }: IssueOrchestratorProps) {
   const router = useRouter();
   const [flow, setFlow] = React.useState<IssueState>(INITIAL_ISSUE_STATE);
   const [showDiscardConfirm, setShowDiscardConfirm] = React.useState(false);
 
-  /** True when there is uncommitted work that would be lost on navigate away. */
   const isDirty =
     flow.step !== 'pick-warehouse' &&
     flow.step !== 'done' &&
     (flow.scanned.length > 0 || flow.technician !== null);
 
   const handleBackToHub = React.useCallback(() => {
-    if (isDirty) {
-      setShowDiscardConfirm(true);
-    } else {
-      void router.push('/my/stores');
-    }
+    if (isDirty) { setShowDiscardConfirm(true); } else { void router.push('/my/stores'); }
   }, [isDirty, router]);
 
   const resetAll = React.useCallback(() => {
@@ -115,166 +77,56 @@ export function IssueOrchestrator({ profile }: IssueOrchestratorProps) {
     setShowDiscardConfirm(false);
   }, []);
 
-  const currentStepIndex = STEP_INDEX[flow.step];
-  const showProgress = flow.step !== 'done';
-
   return (
-    <MyPortalShell
-      title="Issue stock"
-      staffName={profile.name}
-      staffPhotoUrl={profile.profilePhotoUrl}
-      showFooterNav={false}
-    >
-      {/* Top nav row */}
+    <MyPortalShell title="Issue stock" staffName={profile.name}
+      staffPhotoUrl={profile.profilePhotoUrl} showFooterNav={false}>
+
       <div className="flex items-center justify-between mb-4">
-        <button
-          type="button"
-          onClick={handleBackToHub}
-          className="inline-flex items-center gap-1 text-sm text-neutral-400 hover:text-neutral-200"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Stores
+        <button type="button" onClick={handleBackToHub}
+          className="inline-flex items-center gap-1 text-sm text-neutral-400 hover:text-neutral-200">
+          <ChevronLeft className="w-4 h-4" />Stores
         </button>
-        {showProgress && (
-          <StepProgress current={currentStepIndex} labels={STEP_LABELS} />
+        {flow.step !== 'done' && (
+          <StepProgress current={STEP_INDEX[flow.step]} labels={STEP_LABELS} />
         )}
       </div>
 
-      {/* Inline discard confirmation — avoids native confirm() on iOS PWA */}
       {showDiscardConfirm && (
-        <div
-          role="alertdialog"
-          aria-label="Discard issue?"
-          className="mb-4 rounded-lg border border-amber-800 bg-amber-950/60 px-4 py-3 space-y-3"
-        >
-          <p className="text-sm text-amber-200 font-medium">Discard this issue?</p>
-          <p className="text-xs text-amber-300/80">
-            Any scanned serials and entered data will be lost.
-          </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                resetAll();
-                void router.push('/my/stores');
-              }}
-              className="flex-1 py-2.5 rounded-lg bg-amber-700 text-white text-sm font-medium hover:bg-amber-600"
-            >
-              Discard
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowDiscardConfirm(false)}
-              className="flex-1 py-2.5 rounded-lg border border-neutral-700 text-neutral-300 text-sm font-medium hover:bg-neutral-800"
-            >
-              Continue
-            </button>
-          </div>
-        </div>
+        <IssueDirtyConfirmDialog
+          onDiscard={() => { resetAll(); void router.push('/my/stores'); }}
+          onContinue={() => setShowDiscardConfirm(false)}
+        />
       )}
 
-      {/* Step content */}
       {flow.step === 'pick-warehouse' && (
         <PickWarehouseStep
-          onPick={(loc) =>
-            setFlow((s) => ({ ...s, step: 'pick-tech', sourceLocation: loc }))
-          }
-        />
+          onPick={(loc) => setFlow((s) => ({ ...s, step: 'pick-tech', sourceLocation: loc }))} />
       )}
-
       {flow.step === 'pick-tech' && (
         <PickTechStep
-          onPick={(tech) =>
-            setFlow((s) => ({ ...s, step: 'pick-item', technician: tech }))
-          }
-        />
+          onPick={(tech) => setFlow((s) => ({ ...s, step: 'pick-item', technician: tech }))} />
       )}
-
       {flow.step === 'pick-item' && flow.technician && (
-        <PickItemStep
-          technician={flow.technician}
-          onPick={(item) =>
-            setFlow((s) => ({ ...s, step: 'scan-serials', stockItem: item }))
-          }
-        />
+        <PickItemStep technician={flow.technician}
+          onPick={(item) => setFlow((s) => ({ ...s, step: 'scan-serials', stockItem: item }))} />
       )}
-
       {flow.step === 'scan-serials' && flow.stockItem && (
-        <ScanSerialsStep
-          stockItem={flow.stockItem}
-          scanned={flow.scanned}
+        <ScanSerialsStep stockItem={flow.stockItem} scanned={flow.scanned}
           onChange={(next) => setFlow((s) => ({ ...s, scanned: next }))}
-          onDone={() => setFlow((s) => ({ ...s, step: 'sign-submit' }))}
-        />
+          onDone={() => setFlow((s) => ({ ...s, step: 'sign-submit' }))} />
       )}
-
-      {flow.step === 'sign-submit' &&
-        flow.technician &&
-        flow.stockItem &&
-        flow.sourceLocation && (
-          <SignAndSubmitStep
-            technician={flow.technician}
-            stockItem={flow.stockItem}
-            scanned={flow.scanned}
-            contractorId={flow.technician.contractorId}
-            sourceLocationId={flow.sourceLocation.id}
-            destinationLocationId={FIELD_DEFAULT_LOCATION_ID}
-            onSubmitted={(result) =>
-              setFlow((s) => ({ ...s, step: 'done', result }))
-            }
-            onBack={() => setFlow((s) => ({ ...s, step: 'scan-serials' }))}
-          />
-        )}
-
+      {flow.step === 'sign-submit' && flow.technician && flow.stockItem && flow.sourceLocation && (
+        <SignAndSubmitStep technician={flow.technician} stockItem={flow.stockItem}
+          scanned={flow.scanned} contractorId={flow.technician.contractorId}
+          sourceLocationId={flow.sourceLocation.id}
+          destinationLocationId={FIELD_DEFAULT_LOCATION_ID}
+          onSubmitted={(result) => setFlow((s) => ({ ...s, step: 'done', result }))}
+          onBack={() => setFlow((s) => ({ ...s, step: 'scan-serials' }))} />
+      )}
       {flow.step === 'done' && flow.result && (
-        <IssueSuccess
-          result={flow.result}
-          onStartAnother={resetAll}
-          onBackToHub={() => void router.push('/my/stores')}
-        />
+        <IssueSuccess result={flow.result} onStartAnother={resetAll}
+          onBackToHub={() => void router.push('/my/stores')} />
       )}
     </MyPortalShell>
-  );
-}
-
-// =============================================================================
-// StepProgress — numbered dot indicator
-// =============================================================================
-
-interface StepProgressProps {
-  current: number;
-  labels: string[];
-}
-
-function StepProgress({ current, labels }: StepProgressProps) {
-  return (
-    <ol className="flex items-center gap-1" aria-label="Progress">
-      {labels.map((label, idx) => {
-        const stepNum = idx + 1;
-        const isActive = stepNum === current;
-        const isDone = stepNum < current;
-        return (
-          <React.Fragment key={label}>
-            {idx > 0 && (
-              <li aria-hidden="true" className="h-px w-3 bg-neutral-700" />
-            )}
-            <li
-              aria-current={isActive ? 'step' : undefined}
-              aria-label={`Step ${stepNum}: ${label}`}
-              className={[
-                'flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold border transition-colors',
-                isActive
-                  ? 'bg-emerald-600 border-emerald-500 text-white'
-                  : isDone
-                    ? 'bg-emerald-900/50 border-emerald-800 text-emerald-400'
-                    : 'bg-neutral-900 border-neutral-700 text-neutral-500',
-              ].join(' ')}
-            >
-              {stepNum}
-            </li>
-          </React.Fragment>
-        );
-      })}
-    </ol>
   );
 }
