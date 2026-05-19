@@ -14,6 +14,12 @@ export interface AttendanceSession {
   expiresAt: string;        // ISO
 }
 
+/** Staff role values matching the `role` column on the `staff` table. */
+export type StaffRole = 'technician' | 'stores' | 'supervisor' | 'admin' | 'driver' | 'office';
+
+/** Account lifecycle status matching the `account_status` column on the `staff` table. */
+export type AccountStatus = 'pending' | 'active' | 'suspended';
+
 /** Public staff profile returned by /api/my/session. */
 export interface AttendanceSessionProfile {
   staffId: string;
@@ -23,4 +29,8 @@ export interface AttendanceSessionProfile {
   homeSiteId: string | null;
   hasAssignedVehicle: boolean;
   profilePhotoUrl: string | null;
+  /** Staff role — null when the column is not yet populated for legacy rows. */
+  role: StaffRole | null;
+  /** Account lifecycle status — always populated; defaults to 'active' for legacy rows. */
+  accountStatus: AccountStatus;
 }

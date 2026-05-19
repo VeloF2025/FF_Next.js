@@ -131,6 +131,9 @@ export interface AttendanceSessionMeta {
   expiresAt: string;
 }
 
+export type StaffRole = 'technician' | 'stores' | 'supervisor' | 'admin' | 'driver' | 'office';
+export type AccountStatus = 'pending' | 'active' | 'suspended';
+
 export interface AttendanceProfile {
   staffId: string;
   name: string;
@@ -139,6 +142,10 @@ export interface AttendanceProfile {
   homeSiteId: string | null;
   hasAssignedVehicle: boolean;
   profilePhotoUrl: string | null;
+  /** Staff role — null when the column is not yet populated for legacy rows. */
+  role: StaffRole | null;
+  /** Account lifecycle status — always populated; defaults to 'active' for legacy rows. */
+  accountStatus: AccountStatus;
 }
 
 export interface SessionResponse {

@@ -37,6 +37,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       home_site_id: string | null;
       has_vehicle: boolean;
       profile_photo_url: string | null;
+      role: string | null;
+      account_status: string;
     }>`
       SELECT
         s.id,
@@ -45,6 +47,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         s.email,
         s.home_site_id,
         s.profile_photo_url,
+        s.role,
+        COALESCE(s.account_status, 'active') AS account_status,
         EXISTS (
           SELECT 1 FROM vehicle_assignments va
           WHERE va.staff_id = s.id AND va.is_active = true
@@ -58,6 +62,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return apiResponse.success(res, { session: null, profile: null, reason: 'staff_not_found' });
     }
 
+    // SECURITY: enforce suspend gate before leaking any profile data
+    if (row.account_status === 'suspended') {
+      log.warn('[my-session] suspended staff attempted session access', { staffId: session.staffId });
+      return apiResponse.success(res, { session: null, profile: null, reason: 'suspended' });
+    }
+
     const profile: AttendanceSessionProfile = {
       staffId: row.id,
       name: row.full_name,
@@ -66,6 +76,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       homeSiteId: row.home_site_id,
       hasAssignedVehicle: row.has_vehicle,
       profilePhotoUrl: row.profile_photo_url,
+      role: (row.role as AttendanceSessionProfile['role']) ?? null,
+      accountStatus: row.account_status as AttendanceSessionProfile['accountStatus'],
     };
 
     return apiResponse.success(res, {
