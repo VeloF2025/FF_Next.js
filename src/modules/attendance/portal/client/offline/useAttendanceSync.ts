@@ -36,7 +36,7 @@ import {
   type FlushReport,
   type SubmitResult,
 } from './sync';
-import { useOnlineStatus } from './useOnlineStatus';
+import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
 
 const POLL_INTERVAL_MS = 60_000;
 
