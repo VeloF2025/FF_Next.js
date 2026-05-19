@@ -127,7 +127,7 @@ export async function validateFieldDefaultDestination(
  * @returns `{ ok: true }` if all serials are available; `{ ok: false, status, body }` to reject.
  */
 export async function validateSerialsAvailable(
-  sql: ReturnType<typeof neon>,
+  sql: ReturnType<typeof neon<false, false>>,
   lines: PickingLine[],
 ): Promise<ValidationResult> {
   const unavailableSerials: string[] = [];
