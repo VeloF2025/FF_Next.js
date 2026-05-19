@@ -133,7 +133,8 @@ export interface AttendanceSessionMeta {
 
 // Single source of truth: definitions live in types.ts, re-exported here for
 // backward-compatible import paths (consumers using this module's path still work).
-export type { StaffRole, AccountStatus } from '../types';
+import type { StaffRole, AccountStatus } from '../types';
+export type { StaffRole, AccountStatus };
 
 export interface AttendanceProfile {
   staffId: string;
