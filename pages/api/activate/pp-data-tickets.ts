@@ -12,6 +12,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
@@ -370,6 +371,12 @@ async function handleCreate(
           if (!isUniqueViolation) {
             throw err;
           }
+          log.warn('pp-data-tickets.create.unique_violation_retry', {
+            dr_number: dr,
+            ont_serial: serial,
+            pg_code: (err as { code?: string }).code,
+            pg_detail: (err as { detail?: string }).detail,
+          });
           const retry = await findDuplicateTickets({ drNumber: dr, ontSerial: serial });
           const retryMatch = retry[0];
           if (!retryMatch) {
