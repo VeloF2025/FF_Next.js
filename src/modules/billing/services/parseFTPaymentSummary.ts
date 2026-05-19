@@ -91,6 +91,34 @@ function parseNaturalDate(raw: string): string | null {
 }
 
 /**
+ * Parse the Pre-Provisioned line of an FT payment summary.
+ *
+ * Layout: `Pre-Provisioned <X>% of Pre-provisioned withheld  <count>  <OES>  OES Report, as at <date>`
+ *
+ * The first integer after "withheld" is the current-week withhold count
+ * (deducted from this week's payment). The trailing number is the OES Report
+ * cumulative — running across all weeks, NOT a deduction from this week.
+ *
+ * Returns `isNegativeRaw: true` when FT emits a negative current-week value;
+ * the caller should surface this as a warning since count semantics are
+ * non-negative.
+ */
+export function parsePreProvisionLine(line: string): {
+  count: number;
+  isNegativeRaw: boolean;
+} {
+  // Strip the "as at <date>" tail so date digits can't leak into the match.
+  const stripped = line.replace(/as\s+at\b.*$/i, '');
+  // Anchor on "withheld" (the last word of the label) and take the integer
+  // immediately after. Skips the leading "<NN>%" rule and the trailing OES
+  // Report number.
+  const m = stripped.match(/withheld\s+(-?\d+)/i);
+  if (!m) return { count: 0, isNegativeRaw: false };
+  const raw = parseInt(m[1]!, 10);
+  return { count: Math.abs(raw), isNegativeRaw: raw < 0 };
+}
+
+/**
  * Extract a project name from a PDF filename.
  * "Lawley WE260322.pdf" → "Lawley"
  * "Mohlakeng WE 10 August 2025.pdf" → "Mohlakeng"
@@ -339,25 +367,17 @@ export async function parseFTPaymentPdf(
   }
 
   // ── Pre-provisions ───────────────────────────────────────────────────────
-  // Line format: "Pre-Provisioned 20% of Pre-provisioned withheld   0   -180 OES Report, as at 05 Apr 2026"
-  // The count we want is the negative number just before the trailing report
-  // label. Historical bug: when no negative existed, the fallback took
-  // max(|allNums|) which then picked up stray year numbers (e.g. 2026) from
-  // the "as at <date>" suffix. Fix: only accept explicitly negative values,
-  // default 0 otherwise. That matches FT's semantics — "no withhold".
   let preProvisionsCount = 0;
   let preProvLineFound = false;
   for (const line of lines) {
     if (/pre-prov/i.test(line)) {
       preProvLineFound = true;
-      // Strip any "as at <date>" tail so date digits can't leak in.
-      const stripped = line.replace(/as\s+at\b.*$/i, '');
-      const nums = [...stripped.matchAll(/-?\d+/g)]
-        .map((m) => parseInt(m[0], 10))
-        .filter((n) => !isNaN(n));
-      const negatives = nums.filter((n) => n < 0);
-      if (negatives.length > 0) {
-        preProvisionsCount = Math.abs(Math.min(...negatives));
+      const result = parsePreProvisionLine(line);
+      preProvisionsCount = result.count;
+      if (result.isNegativeRaw) {
+        warnings.push(
+          `Pre-Provisioned current-week value is negative (verify FT PDF format hasn't changed)`,
+        );
       }
       break;
     }
