@@ -50,7 +50,6 @@ export default withAuth(withErrorHandler(async (
       `;
       
       // Transform data to match FieldTechnician format
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const transformedTechnicians = technicianData.map((s) => ({
         id: s.id,
         name: `${s.first_name} ${s.last_name}`,
@@ -92,6 +91,10 @@ export default withAuth(withErrorHandler(async (
     // POST is a deprecation shim that forwards to /api/field/users.
     // Normalises legacy body shape: { name: 'First Last' } → split into firstName/lastName.
     // role is forced to 'technician'.
+    //
+    // Response shape is translated back to legacy:
+    //   201 success → { message: 'Technician added successfully', technician: <full staff row> }
+    //   Any error   → forwarded verbatim (status + body unchanged)
     const incoming = req.body as {
       name?: string;
       firstName?: string;
@@ -110,9 +113,48 @@ export default withAuth(withErrorHandler(async (
       role: 'technician' as const,
       contractorId: incoming.contractorId,
     };
+
+    // Build a response interceptor to capture what usersHandler would emit
+    // without touching the real `res` object.
+    let capturedStatus = 500;
+    let capturedBody: unknown = null;
+    const interceptor = {
+      status(code: number) {
+        capturedStatus = code;
+        return this;
+      },
+      json(body: unknown) {
+        capturedBody = body;
+        return this;
+      },
+      setHeader: res.setHeader.bind(res),
+    } as unknown as typeof res;
+
     const usersHandler = (await import('@/pages/api/field/users/index')).default;
     (req as unknown as { body: unknown }).body = forwardBody;
-    await usersHandler(req, res);
+    await usersHandler(req, interceptor);
+
+    // Translate 201 success to the legacy response shape.
+    // Any other status (4xx, 5xx) is forwarded as-is so callers see real errors.
+    const body201 = capturedBody as { data?: { user?: { id?: string } } } | null;
+    if (capturedStatus === 201 && body201?.data?.user?.id) {
+      const newId = body201.data.user.id;
+      try {
+        const rows = await sql`
+          SELECT * FROM staff WHERE id = ${newId} LIMIT 1
+        `;
+        const technician = rows[0] ?? null;
+        res.status(201).json({ message: 'Technician added successfully', technician });
+      } catch (dbErr) {
+        log.error('Failed to fetch full staff row after technician create', { error: dbErr }, 'TechniciansShim');
+        // Fall through: still surface the 201 with whatever we have
+        res.status(201).json({ message: 'Technician added successfully', technician: body201.data.user });
+      }
+      return;
+    }
+
+    // Non-201 or unexpected shape: forward verbatim
+    res.status(capturedStatus).json(capturedBody);
     return;
   } else {
     apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
