@@ -19,11 +19,11 @@
 -- but are left untouched. A separate backfill could read source PDFs from
 -- storage if needed.
 
-ALTER TABLE ft_weekly_summaries
+ALTER TABLE ft_weekly_billing
   ADD COLUMN IF NOT EXISTS ft_pre_provisions_outstanding INTEGER NOT NULL DEFAULT 0;
 
-COMMENT ON COLUMN ft_weekly_summaries.ft_pre_provisions_count IS
+COMMENT ON COLUMN ft_weekly_billing.ft_pre_provisions_count IS
   'Current-week 20% withhold count (PDF Pre-Provisioned col 1). Deducted from this week''s payment.';
 
-COMMENT ON COLUMN ft_weekly_summaries.ft_pre_provisions_outstanding IS
+COMMENT ON COLUMN ft_weekly_billing.ft_pre_provisions_outstanding IS
   'OES Report cumulative — running balance of pre-provisioned drops awaiting resolution (PDF Pre-Provisioned col 2). Inventory metric, NOT a payment deduction.';

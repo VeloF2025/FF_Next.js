@@ -17,6 +17,7 @@ describe('parsePreProvisionLine', () => {
       count: 0,
       outstanding: 236,
       isNegativeRaw: false,
+      isOutstandingPositive: false,
     });
   });
 
@@ -25,6 +26,7 @@ describe('parsePreProvisionLine', () => {
       count: 0,
       outstanding: 57,
       isNegativeRaw: false,
+      isOutstandingPositive: false,
     });
   });
 
@@ -33,6 +35,7 @@ describe('parsePreProvisionLine', () => {
       count: 0,
       outstanding: 651,
       isNegativeRaw: false,
+      isOutstandingPositive: false,
     });
   });
 
@@ -41,6 +44,7 @@ describe('parsePreProvisionLine', () => {
       count: 0,
       outstanding: 0,
       isNegativeRaw: false,
+      isOutstandingPositive: false,
     });
   });
 
@@ -51,6 +55,7 @@ describe('parsePreProvisionLine', () => {
       count: 5,
       outstanding: 100,
       isNegativeRaw: false,
+      isOutstandingPositive: false,
     });
   });
 
@@ -61,6 +66,31 @@ describe('parsePreProvisionLine', () => {
       count: 3,
       outstanding: 100,
       isNegativeRaw: true,
+      isOutstandingPositive: false,
+    });
+  });
+
+  it('flags a positive OES cumulative via isOutstandingPositive', () => {
+    // FT prints OES negative in every observed PDF; a positive would indicate
+    // a net credit or format change and must surface a warning.
+    const line =
+      'Pre-Provisioned 20% of Pre-provisioned withheld \t0 \t50 OES Report, as at 17 May 2026';
+    expect(parsePreProvisionLine(line)).toEqual({
+      count: 0,
+      outstanding: 50,
+      isNegativeRaw: false,
+      isOutstandingPositive: true,
+    });
+  });
+
+  it('combines negative count and positive outstanding (double sign-flip)', () => {
+    const line =
+      'Pre-Provisioned 20% of Pre-provisioned withheld \t-2 \t50 OES Report, as at 17 May 2026';
+    expect(parsePreProvisionLine(line)).toEqual({
+      count: 2,
+      outstanding: 50,
+      isNegativeRaw: true,
+      isOutstandingPositive: true,
     });
   });
 
@@ -71,14 +101,16 @@ describe('parsePreProvisionLine', () => {
       count: 0,
       outstanding: 0,
       isNegativeRaw: false,
+      isOutstandingPositive: false,
     });
   });
 
-  it('returns both zeros when the "withheld" anchor is missing', () => {
+  it('returns all zeros when the "withheld" anchor is missing', () => {
     expect(parsePreProvisionLine('Pre-Provisioned 20% of Pre-provisioned')).toEqual({
       count: 0,
       outstanding: 0,
       isNegativeRaw: false,
+      isOutstandingPositive: false,
     });
   });
 
@@ -88,6 +120,7 @@ describe('parsePreProvisionLine', () => {
       count: 7,
       outstanding: 0,
       isNegativeRaw: false,
+      isOutstandingPositive: false,
     });
   });
 });

@@ -110,14 +110,18 @@ function parseNaturalDate(raw: string): string | null {
  *                  resolution. NOT a deduction; tracked as an inventory metric
  *                  that grows / shrinks week-to-week.
  *
- * Returns `isNegativeRaw: true` when FT emits a negative current-week value;
- * the caller should surface this as a warning since count semantics are
- * non-negative.
+ * Sign flags (callers should warn when set — both are unexpected):
+ * - `isNegativeRaw`:        current-week raw value < 0 (count semantics are
+ *                           non-negative; possible PDF format change).
+ * - `isOutstandingPositive`: OES cumulative raw value > 0 (FT prints this
+ *                           negative in every observed PDF; positive could
+ *                           mean a net credit or a format change).
  */
 export function parsePreProvisionLine(line: string): {
   count: number;
   outstanding: number;
   isNegativeRaw: boolean;
+  isOutstandingPositive: boolean;
 } {
   // Strip the "as at <date>" tail so date digits can't leak into the match.
   const stripped = line.replace(/as\s+at\b.*$/i, '');
@@ -125,13 +129,21 @@ export function parsePreProvisionLine(line: string): {
   // numbers that follow. Second number is optional (older PDFs have it as 0
   // or absent).
   const m = stripped.match(/withheld\s+(-?\d+)(?:\s+(-?\d+))?/i);
-  if (!m) return { count: 0, outstanding: 0, isNegativeRaw: false };
+  if (!m) {
+    return {
+      count: 0,
+      outstanding: 0,
+      isNegativeRaw: false,
+      isOutstandingPositive: false,
+    };
+  }
   const raw = parseInt(m[1]!, 10);
   const oes = m[2] != null ? parseInt(m[2], 10) : 0;
   return {
     count: Math.abs(raw),
     outstanding: Math.abs(oes),
     isNegativeRaw: raw < 0,
+    isOutstandingPositive: oes > 0,
   };
 }
 
@@ -396,6 +408,11 @@ export async function parseFTPaymentPdf(
       if (result.isNegativeRaw) {
         warnings.push(
           `Pre-Provisioned current-week value is negative (verify FT PDF format hasn't changed)`,
+        );
+      }
+      if (result.isOutstandingPositive) {
+        warnings.push(
+          `Pre-Provisioned OES cumulative is positive (FT prints this negative in every observed PDF — verify format hasn't changed)`,
         );
       }
       break;
