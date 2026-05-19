@@ -440,4 +440,49 @@ describe('POST /api/procurement/field-stock/pickings — pending-tech cap', () =
     );
     expect(allSql.some((s) => s.includes('stock_serials'))).toBe(false);
   });
+
+  // ── H10 (blind review 2026-05-19): serialIds.length fallback quantity ───────
+  // The handler computes qty = line.plannedQuantity ?? line.serialIds?.length.
+  // All existing tests supply plannedQuantity explicitly. This case verifies the
+  // fallback: when plannedQuantity is OMITTED and serialIds has 3 entries,
+  // the cap check uses 3 as the quantity (3 × R2,000 = R6,000 > R5,000 → blocked).
+
+  it('H10: pending tech + plannedQuantity omitted + serialIds: 3 items @ R2000 → 400 PENDING_TECH_VALUE_CAP_EXCEEDED (totalZar 6000)', async () => {
+    // 1. Staff lookup → pending
+    mockSql.mockResolvedValueOnce([{ account_status: 'pending' }]);
+    // 2. Stock item lookup → R2,000 per unit
+    mockSql.mockResolvedValueOnce([{ standard_cost: 2000 }]);
+
+    const req = makeReq({
+      body: validBody({
+        lines: [
+          {
+            stockItemId: 'item-uuid-1',
+            // plannedQuantity intentionally OMITTED — fallback must use serialIds.length
+            serialIds: ['S1', 'S2', 'S3'],
+          },
+        ],
+      }),
+    });
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(400);
+    const body = res._json as {
+      success: boolean;
+      error: { code: string; details: { code: string; totalZar: number; capZar: number } };
+    };
+    expect(body.success).toBe(false);
+    expect(body.error.code).toBe('BAD_REQUEST');
+    expect(body.error.details.code).toBe('PENDING_TECH_VALUE_CAP_EXCEEDED');
+    // 3 serials × R2,000 = R6,000; must exceed the R5,000 cap.
+    expect(body.error.details.totalZar).toBe(6000);
+    expect(body.error.details.capZar).toBe(5000);
+    // No INSERT should have been called (rejected before any write).
+    const callTemplates = mockSql.mock.calls.map(
+      (c) => String((c[0] as TemplateStringsArray)?.[0] ?? '').trim(),
+    );
+    expect(callTemplates.some((t) => t.startsWith('INSERT'))).toBe(false);
+  });
 });
