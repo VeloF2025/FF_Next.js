@@ -122,10 +122,13 @@ describe('POST /api/field/users', () => {
     expect(body.data.user.account_status).toBe('pending');
     expect(body.data.user.created_by_staff_id).toBe('stores-staff-uuid');
 
-    // Regression guard: status='active' must be present in the INSERT values to satisfy the NOT NULL constraint
-    const sqlCallArgs: unknown[] = mockSql.mock.calls[0] as unknown[];
-    const allArgs = sqlCallArgs.flat(Infinity);
-    expect(allArgs).toContain('active');
+    // Regression guard: positional check that the INSERT args contain the right values
+    // for the status (col 6, values index 5) and account_status (col 11, values index 10) columns.
+    // callArgs[0] is the tagged-template strings array; callArgs[1..N] are the interpolated values.
+    const callArgs = mockSql.mock.calls[0] as unknown[];
+    const values = callArgs.slice(1);
+    expect(values[5]).toBe('active');    // status column — must always be 'active' (NOT NULL)
+    expect(values[10]).toBe('pending');  // account_status column — storeman caller → pending
   });
 
   // 2. Admin creates a stores user → 201, account_status='active'

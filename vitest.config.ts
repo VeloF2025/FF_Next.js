@@ -61,6 +61,9 @@ export default defineConfig({
       { find: '@/lib/auth', replacement: path.resolve(__dirname, './src/lib/auth') },
       { find: '@/lib/permissions', replacement: path.resolve(__dirname, './src/lib/permissions') },
       { find: '@/lib/logger', replacement: path.resolve(__dirname, './src/lib/logger') },
+      // @/lib/hooks/* lives at src/lib/hooks/ — needed after useStockSync was updated
+      // to import from '@/lib/hooks/useOnlineStatus' (bucket B refactor).
+      { find: /^@\/lib\/hooks/, replacement: path.resolve(__dirname, './src/lib/hooks') },
       { find: '@/lib', replacement: path.resolve(__dirname, './lib') },
       { find: '@/components', replacement: path.resolve(__dirname, './src/components') },
       { find: '@/hooks', replacement: path.resolve(__dirname, './src/hooks') },

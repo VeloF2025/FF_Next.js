@@ -6,9 +6,18 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
-import { apiResponse } from '@/lib/apiResponse';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import {
+  checkPendingValueCap,
+  PENDING_TECH_VALUE_CAP_ZAR,
+} from '@/modules/field-stock-pwa/lib/stockValueGuard';
+import {
+  validateFieldDefaultDestination,
+  validateSerialsAvailable,
+  type PickingLine,
+} from './_validation';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -111,14 +120,6 @@ async function handleList(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-interface PickingLine {
-  stockItemId: string;
-  plannedQuantity: number;
-  serialIds?: string[];
-  lotNumber?: string;
-  notes?: string;
-}
-
 // WORKING: Create picking with lines
 async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -139,6 +140,74 @@ async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
     if (!lines || !Array.isArray(lines) || lines.length === 0) {
       return apiResponse.validationError(res, { lines: 'At least one picking line is required' });
     }
+
+    // ── H5: Require technicianId for FIELD-DEFAULT destination ───────────────
+    // Extracted to _validation.ts; see validateFieldDefaultDestination for rationale.
+    const fieldDefaultCheck = await validateFieldDefaultDestination({
+      destinationLocationId,
+      technicianId,
+    });
+    if (!fieldDefaultCheck.ok) {
+      return res.status(fieldDefaultCheck.status).json(fieldDefaultCheck.body);
+    }
+
+    // ── Pending-technician R5,000 stock-value cap (Task 2.6) ─────────────────
+    // Server-side enforcement: a malicious or buggy client could bypass the
+    // client-side guard in SignAndSubmitStep. We independently verify here,
+    // BEFORE any INSERT, so no partial state is written on a cap breach.
+    if (technicianId) {
+      const techResults = await sql`
+        SELECT account_status FROM staff WHERE id = ${technicianId} LIMIT 1
+      `;
+      const techRow = (techResults as Array<{ account_status: string }>)[0];
+
+      // Only enforce cap for pending technicians. Active/suspended fall through.
+      if (techRow?.account_status === 'pending') {
+        // Resolve standard_cost for each line — fail-closed on null.
+        const valueLines: Array<{ unitValueZar: number; quantity: number }> = [];
+        for (const line of lines as PickingLine[]) {
+          const itemResults = await sql`
+            SELECT standard_cost FROM stock_items WHERE id = ${line.stockItemId} LIMIT 1
+          `;
+          const itemRow = (itemResults as Array<{ standard_cost: number | null }>)[0];
+          if (itemRow?.standard_cost == null) {
+            // Cannot enforce cap if pricing is missing — block the issue.
+            return apiResponse.error(
+              res,
+              ErrorCode.BAD_REQUEST,
+              `Unit value for stock item ${line.stockItemId} is not set. ` +
+                'The procurement team must set standard_cost before this item can be issued to a pending technician.',
+              { code: 'PENDING_TECH_VALUE_UNKNOWN', stockItemId: line.stockItemId },
+            );
+          }
+          // Quantity: use plannedQuantity; fall back to serialIds count if present.
+          const qty =
+            line.plannedQuantity ??
+            (Array.isArray(line.serialIds) ? line.serialIds.length : 0);
+          valueLines.push({ unitValueZar: itemRow.standard_cost, quantity: qty });
+        }
+
+        const { over, totalZar, capZar } = checkPendingValueCap(valueLines, 'pending');
+        if (over) {
+          return apiResponse.error(
+            res,
+            ErrorCode.BAD_REQUEST,
+            `Issue value of R${totalZar.toFixed(2)} exceeds the R${PENDING_TECH_VALUE_CAP_ZAR} ` +
+              'limit for technicians with a pending account. An admin must approve the account first.',
+            { code: 'PENDING_TECH_VALUE_CAP_EXCEEDED', totalZar, capZar },
+          );
+        }
+      }
+    }
+    // ── End pending-tech cap check ────────────────────────────────────────────
+
+    // ── H7: Server-side serial availability check ────────────────────────────
+    // Extracted to _validation.ts; see validateSerialsAvailable for rationale.
+    const serialCheck = await validateSerialsAvailable(sql, lines as PickingLine[]);
+    if (!serialCheck.ok) {
+      return res.status(serialCheck.status).json(serialCheck.body);
+    }
+    // ── End serial availability check ────────────────────────────────────────
 
     // Generate picking number
     const countResult = await sql`SELECT COUNT(*) as count FROM stock_pickings`;

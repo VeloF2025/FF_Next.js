@@ -21,12 +21,14 @@ import {
   Receipt,
   History as HistoryIcon,
   AlertCircle,
+  Package,
 } from 'lucide-react';
 
 import { getHubSummary, requestFleetHandoff } from './api';
 import type { AttendanceProfile, HubSummaryResponse } from './api';
 import { MyPortalShell } from './MyPortalShell';
 import { InstallPrompt } from './InstallPrompt';
+import { isStoresAuthorised } from '@/modules/field-stock-pwa/lib/storesRoles';
 
 type HubSummary = HubSummaryResponse;
 
@@ -114,6 +116,9 @@ export function MyHub({ profile }: MyHubProps) {
           summary={summary}
           onClick={() => router.push('/my/attendance/corrections')}
         />
+        {isStoresAuthorised(profile.role) && (
+          <StoresTile onClick={() => router.push('/my/stores')} />
+        )}
       </div>
 
       <button
@@ -299,6 +304,18 @@ function CorrectionsTile({
       }
       badge={pending > 0 ? String(pending) : null}
       badgeClass="bg-blue-600 text-white border-blue-500"
+    />
+  );
+}
+
+function StoresTile({ onClick }: { onClick: () => void }) {
+  return (
+    <Tile
+      onClick={onClick}
+      icon={<Package className="w-5 h-5" />}
+      iconClass="bg-amber-500/15 text-amber-300"
+      title="Stores"
+      subtitle="Issue &amp; return field stock"
     />
   );
 }
