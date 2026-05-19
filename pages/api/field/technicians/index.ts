@@ -112,7 +112,8 @@ export default withAuth(withErrorHandler(async (
     };
     const usersHandler = (await import('@/pages/api/field/users/index')).default;
     (req as unknown as { body: unknown }).body = forwardBody;
-    return usersHandler(req, res);
+    await usersHandler(req, res);
+    return;
   } else {
     apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
