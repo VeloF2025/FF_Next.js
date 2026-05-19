@@ -21,10 +21,17 @@ import type { PwaTechSummary } from '@/modules/field-stock-pwa/types';
 // Types
 // =============================================================================
 
-interface StockItem {
+export interface StockItem {
   id: string;
   name: string;
   sku: string | null;
+  /**
+   * Per-unit value in ZAR (from stock_items.standard_cost).
+   * Null means the item has no recorded valuation — the R5k cap guard in
+   * SignAndSubmitStep will warn but will not hard-block the submit; the
+   * server enforces the cap independently (Task 2.6).
+   */
+  unitValueZar: number | null;
 }
 
 export interface PickItemStepProps {
