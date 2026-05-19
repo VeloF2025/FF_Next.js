@@ -26,6 +26,10 @@ export interface SignAndSubmitStepProps {
   /** Only state==='valid' rows count toward submission and value cap. */
   scanned: PwaScannedSerial[];
   contractorId: string | null;
+  /** FK to stock_locations.id — warehouse chosen by the stores person. */
+  sourceLocationId: string;
+  /** FK to stock_locations.id — fixed FIELD-DEFAULT UUID (migration 357). */
+  destinationLocationId: string;
   onSubmitted: (result: PwaPickingResult) => void;
   onBack: () => void;
 }
@@ -35,6 +39,8 @@ export function SignAndSubmitStep({
   stockItem,
   scanned,
   contractorId,
+  sourceLocationId,
+  destinationLocationId,
   onSubmitted,
   onBack,
 }: SignAndSubmitStepProps) {
@@ -78,6 +84,8 @@ export function SignAndSubmitStep({
       serials: validSerials,
       signatureDataUrl,
       notes,
+      sourceLocationId,
+      destinationLocationId,
     };
 
     try {
@@ -106,6 +114,7 @@ export function SignAndSubmitStep({
   }, [
     canSubmit, technician.id, contractorId, stockItem.id,
     validSerials, signatureDataUrl, notes, onSubmitted,
+    sourceLocationId, destinationLocationId,
   ]);
 
   return (

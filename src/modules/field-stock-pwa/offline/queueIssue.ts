@@ -10,6 +10,15 @@
  * two modules never share quota or risk key collisions).
  *
  * Object store: 'pending-issues', keyPath: 'id' (uuid generated client-side).
+ *
+ * Version history:
+ *   v1 — initial schema (PwaIssueDraft lacked sourceLocationId/destinationLocationId)
+ *   v2 — PwaIssueDraft now requires sourceLocationId + destinationLocationId.
+ *        Stale v1 queued items would be missing these FK columns and corrupt the
+ *        picking if drained. Strategy: purge the entire object store on upgrade
+ *        (deleteObjectStore + recreate). Any queued v1 items are lost — safer than
+ *        draining them with garbage location IDs. The stores flow is short enough
+ *        that an offline-queued item is unlikely to survive a full app reload.
  */
 
 // 🟢 WORKING: raw-IDB pattern mirrors attendance/portal/client/offline/db.ts
@@ -17,7 +26,7 @@
 import type { PwaIssueDraft } from '../types';
 
 const DB_NAME = 'field-stock-pwa-v1';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE = 'pending-issues';
 
 /** A single queued issue waiting to be submitted when the device comes online. */
@@ -41,8 +50,14 @@ function openDb(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (event) => {
       const d = req.result;
+      // On upgrade from v1: purge stale items that lack required location IDs.
+      // deleteObjectStore + recreate is the safest approach — v1 items had
+      // no sourceLocationId / destinationLocationId and would corrupt pickings.
+      if (event.oldVersion < 2 && d.objectStoreNames.contains(STORE)) {
+        d.deleteObjectStore(STORE);
+      }
       if (!d.objectStoreNames.contains(STORE)) {
         d.createObjectStore(STORE, { keyPath: 'id' });
       }

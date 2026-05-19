@@ -7,12 +7,12 @@
  * appear in pickings-pending-tech-cap.test.ts (edge-cap values, suspended-tech,
  * absent-technicianId) are NOT duplicated here.
  *
- * Body shape under test (mirrors api.ts submitIssue):
+ * Body shape under test (mirrors api.ts submitIssue after Task 2.10 fix):
  *   {
  *     pickingType: 'issue',
  *     technicianId:          '<staff uuid>',
- *     sourceLocationId:      '<location uuid>',
- *     destinationLocationId: '<location uuid>',
+ *     sourceLocationId:      '<warehouse location uuid>',   // from PickWarehouseStep
+ *     destinationLocationId: '00000000-0000-0000-0000-000000000001',  // FIELD-DEFAULT (migration 357)
  *     lines: [
  *       {
  *         stockItemId:      '<item uuid>',
@@ -97,15 +97,22 @@ function makeRes(): Partial<NextApiResponse> & { _status: number; _json: unknown
 }
 
 /**
- * The exact body shape the orchestrator sends (api.ts submitIssue).
+ * The exact body shape the orchestrator sends (api.ts submitIssue after Task 2.10).
+ *
+ * sourceLocationId:      warehouse chosen by the stores person in PickWarehouseStep.
+ * destinationLocationId: FIELD_DEFAULT_LOCATION_ID from migration 357
+ *                        ('00000000-0000-0000-0000-000000000001').
+ *
  * Callers may override individual keys.
  */
+const FIELD_DEFAULT_LOCATION_ID = '00000000-0000-0000-0000-000000000001';
+
 function orchestratorBody(overrides: Record<string, unknown> = {}) {
   return {
     pickingType: 'issue',
     technicianId: 'tech-staff-uuid',
     sourceLocationId: 'loc-warehouse-uuid',
-    destinationLocationId: 'loc-tech-uuid',
+    destinationLocationId: FIELD_DEFAULT_LOCATION_ID,
     lines: [
       {
         stockItemId: 'item-ont-uuid',
@@ -311,7 +318,7 @@ describe('POST /api/procurement/field-stock/pickings — orchestrator body shape
         pickingType: 'issue',
         technicianId: 'tech-staff-uuid',
         sourceLocationId: 'loc-warehouse-uuid',
-        destinationLocationId: 'loc-tech-uuid',
+        destinationLocationId: FIELD_DEFAULT_LOCATION_ID,
         // `lines` intentionally omitted to trigger existing validation
       },
     });

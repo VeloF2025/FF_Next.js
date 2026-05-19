@@ -367,25 +367,20 @@ export async function fetchSerialStockItems(
 /**
  * Submit a completed issue draft to the server.
  *
- * Maps PwaIssueDraft to the POST /api/procurement/field-stock/pickings body:
- *  - picking_type: 'issue'
- *  - source/destination locations are left to the server to resolve from defaults
- *    (TODO(Task 2.7): pass explicit locationId from the stores session context)
- *  - serial_ids on each line are the stock_serial UUIDs (not serial numbers);
- *    the draft holds serial numbers only — the UUIDs come from validateSerial
- *    responses. For now we pass serial numbers in a notes field and attach
- *    serialNumbers array; the pickings endpoint stores them in serial_ids on the line.
+ * Maps PwaIssueDraft to the POST /api/procurement/field-stock/pickings body.
+ * Both sourceLocationId and destinationLocationId are required fields on
+ * PwaIssueDraft and must be valid FK references to stock_locations.id:
+ *  - sourceLocationId: the warehouse chosen by the stores person (PickWarehouseStep).
+ *  - destinationLocationId: the fixed FIELD-DEFAULT UUID seeded by migration 357.
  *
- * NOTE: The pickings endpoint requires sourceLocationId + destinationLocationId.
- * These are placeholder values until Task 2.7 wires the stores session location.
- * TODO(Task 2.7): resolve real source/destination location IDs from session.
+ * serial_ids on each line are the stock serial number strings (not UUIDs); the
+ * pickings endpoint stores them in the serial_ids column on the picking line.
  */
 export async function submitIssue(draft: PwaIssueDraft): Promise<PwaPickingResult> {
   const body = {
     pickingType: 'issue',
-    // TODO(Task 2.7): replace with real location IDs from the stores session.
-    sourceLocationId: draft.stockItemId, // PARTIAL: must be a location UUID
-    destinationLocationId: draft.technicianId, // PARTIAL: must be a location UUID
+    sourceLocationId: draft.sourceLocationId,
+    destinationLocationId: draft.destinationLocationId,
     technicianId: draft.technicianId,
     contractorId: draft.contractorId ?? undefined,
     notes: draft.notes || undefined,

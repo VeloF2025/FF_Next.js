@@ -32,6 +32,10 @@ export interface PwaIssueDraft {
   serials: PwaScannedSerial[];
   signatureDataUrl: string | null;
   notes: string;
+  /** FK to stock_locations.id — the warehouse the stock is issued FROM. */
+  sourceLocationId: string;
+  /** FK to stock_locations.id — fixed FIELD-DEFAULT UUID (migration 357). */
+  destinationLocationId: string;
 }
 
 export interface PwaPickingResult {

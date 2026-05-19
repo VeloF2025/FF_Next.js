@@ -5,11 +5,11 @@
  * Extracted to keep the page file under 300 lines.
  *
  * State machine (useState enum — no xstate):
- *   pick-tech → pick-item → scan-serials → sign-submit → done
+ *   pick-warehouse → pick-tech → pick-item → scan-serials → sign-submit → done
  *
  * Dirty-state guard: inline confirm panel (no native confirm() — blocks iOS
  * Safari PWA main thread). Shown when user tries to leave mid-flow.
- * ⚪ UNTESTED: integration tests in Task 2.9
+ * ⚪ UNTESTED: integration tests in follow-on task.
  */
 
 import React from 'react';
@@ -18,12 +18,14 @@ import { ChevronLeft } from 'lucide-react';
 
 import type { AttendanceProfile } from '@/modules/attendance/portal/client/api';
 import { MyPortalShell } from '@/modules/attendance/portal/client/MyPortalShell';
+import { PickWarehouseStep } from '@/modules/field-stock-pwa/components/PickWarehouseStep';
 import { PickTechStep } from '@/modules/field-stock-pwa/components/PickTechStep';
 import { PickItemStep } from '@/modules/field-stock-pwa/components/PickItemStep';
 import type { StockItem } from '@/modules/field-stock-pwa/components/PickItemStep';
 import { ScanSerialsStep } from '@/modules/field-stock-pwa/components/ScanSerialsStep';
 import { SignAndSubmitStep } from '@/modules/field-stock-pwa/components/SignAndSubmitStep';
 import { IssueSuccess } from '@/modules/field-stock-pwa/components/IssueSuccess';
+import { FIELD_DEFAULT_LOCATION_ID } from '@/modules/field-stock-pwa/lib/locationDefaults';
 import type {
   PwaTechSummary,
   PwaScannedSerial,
@@ -34,10 +36,22 @@ import type {
 // State machine types
 // =============================================================================
 
-type IssueStep = 'pick-tech' | 'pick-item' | 'scan-serials' | 'sign-submit' | 'done';
+type IssueStep =
+  | 'pick-warehouse'
+  | 'pick-tech'
+  | 'pick-item'
+  | 'scan-serials'
+  | 'sign-submit'
+  | 'done';
+
+interface SourceLocation {
+  id: string;
+  name: string;
+}
 
 interface IssueState {
   step: IssueStep;
+  sourceLocation: SourceLocation | null;
   technician: PwaTechSummary | null;
   stockItem: StockItem | null;
   scanned: PwaScannedSerial[];
@@ -45,7 +59,8 @@ interface IssueState {
 }
 
 const INITIAL_ISSUE_STATE: IssueState = {
-  step: 'pick-tech',
+  step: 'pick-warehouse',
+  sourceLocation: null,
   technician: null,
   stockItem: null,
   scanned: [],
@@ -54,14 +69,15 @@ const INITIAL_ISSUE_STATE: IssueState = {
 
 /** Maps IssueStep to a 1-based progress index (done = same as sign-submit). */
 const STEP_INDEX: Record<IssueStep, number> = {
-  'pick-tech': 1,
-  'pick-item': 2,
-  'scan-serials': 3,
-  'sign-submit': 4,
-  'done': 4,
+  'pick-warehouse': 1,
+  'pick-tech': 2,
+  'pick-item': 3,
+  'scan-serials': 4,
+  'sign-submit': 5,
+  'done': 5,
 };
 
-const STEP_LABELS = ['Tech', 'Item', 'Serials', 'Sign'];
+const STEP_LABELS = ['WH', 'Tech', 'Item', 'Serials', 'Sign'];
 
 // =============================================================================
 // Props
@@ -82,7 +98,7 @@ export function IssueOrchestrator({ profile }: IssueOrchestratorProps) {
 
   /** True when there is uncommitted work that would be lost on navigate away. */
   const isDirty =
-    flow.step !== 'pick-tech' &&
+    flow.step !== 'pick-warehouse' &&
     flow.step !== 'done' &&
     (flow.scanned.length > 0 || flow.technician !== null);
 
@@ -158,6 +174,14 @@ export function IssueOrchestrator({ profile }: IssueOrchestratorProps) {
       )}
 
       {/* Step content */}
+      {flow.step === 'pick-warehouse' && (
+        <PickWarehouseStep
+          onPick={(loc) =>
+            setFlow((s) => ({ ...s, step: 'pick-tech', sourceLocation: loc }))
+          }
+        />
+      )}
+
       {flow.step === 'pick-tech' && (
         <PickTechStep
           onPick={(tech) =>
@@ -184,18 +208,23 @@ export function IssueOrchestrator({ profile }: IssueOrchestratorProps) {
         />
       )}
 
-      {flow.step === 'sign-submit' && flow.technician && flow.stockItem && (
-        <SignAndSubmitStep
-          technician={flow.technician}
-          stockItem={flow.stockItem}
-          scanned={flow.scanned}
-          contractorId={flow.technician.contractorId}
-          onSubmitted={(result) =>
-            setFlow((s) => ({ ...s, step: 'done', result }))
-          }
-          onBack={() => setFlow((s) => ({ ...s, step: 'scan-serials' }))}
-        />
-      )}
+      {flow.step === 'sign-submit' &&
+        flow.technician &&
+        flow.stockItem &&
+        flow.sourceLocation && (
+          <SignAndSubmitStep
+            technician={flow.technician}
+            stockItem={flow.stockItem}
+            scanned={flow.scanned}
+            contractorId={flow.technician.contractorId}
+            sourceLocationId={flow.sourceLocation.id}
+            destinationLocationId={FIELD_DEFAULT_LOCATION_ID}
+            onSubmitted={(result) =>
+              setFlow((s) => ({ ...s, step: 'done', result }))
+            }
+            onBack={() => setFlow((s) => ({ ...s, step: 'scan-serials' }))}
+          />
+        )}
 
       {flow.step === 'done' && flow.result && (
         <IssueSuccess
@@ -227,7 +256,7 @@ function StepProgress({ current, labels }: StepProgressProps) {
         return (
           <React.Fragment key={label}>
             {idx > 0 && (
-              <li aria-hidden="true" className="h-px w-4 bg-neutral-700" />
+              <li aria-hidden="true" className="h-px w-3 bg-neutral-700" />
             )}
             <li
               aria-current={isActive ? 'step' : undefined}
