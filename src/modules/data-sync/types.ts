@@ -372,6 +372,7 @@ export interface FtWeeklyBilling {
   ft_note4_count: number;
   ft_note5_count: number;
   ft_pre_provisions_count: number;
+  ft_pre_provisions_outstanding: number;
   ft_total_claimable: number;
   price_per_drop: number | null;
   tax_rate: number;

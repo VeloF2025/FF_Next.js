@@ -54,6 +54,7 @@ interface BundleSummary {
   note4Count: number;
   note5Count: number;
   preProvisionsCount: number;
+  preProvOutstanding: number;
   totalClaimableForPayment: number;
   lowerThanLinkBudgetCount: number;
 }
@@ -494,12 +495,25 @@ function ProjectResultCard({
 
       {/* Metrics */}
       {row.summary && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-          <Metric label="Total ONTs" value={row.summary.totalOnts.toLocaleString()} />
-          <Metric label="Claimable" value={row.summary.totalClaimableForPayment.toLocaleString()} />
-          <DeductionsMetric deductionCount={row.deductionCount} summary={row.summary} />
-          <Metric label="Zones / PONs" value={`${row.zoneRowCount} / ${row.ponRowCount}`} />
-        </div>
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <Metric label="Total ONTs" value={row.summary.totalOnts.toLocaleString()} />
+            <Metric label="Claimable" value={row.summary.totalClaimableForPayment.toLocaleString()} />
+            <DeductionsMetric deductionCount={row.deductionCount} summary={row.summary} />
+            <Metric label="Zones / PONs" value={`${row.zoneRowCount} / ${row.ponRowCount}`} />
+          </div>
+          {row.summary.preProvOutstanding > 0 && (
+            <p className="text-xs text-[var(--ff-text-tertiary)]">
+              PP outstanding (OES cumulative):{' '}
+              <span className="text-teal-300 font-medium">
+                {row.summary.preProvOutstanding.toLocaleString()}
+              </span>
+              <span className="ml-1 text-[var(--ff-text-tertiary)]">
+                — running inventory, not deducted from this week
+              </span>
+            </p>
+          )}
+        </>
       )}
 
       {/* Invoice total (only after import) */}

@@ -402,9 +402,15 @@ export function WeeklySummaryTab() {
                   </th>
                   <th
                     className="px-3 py-3 text-right text-xs font-medium text-cyan-300 uppercase tracking-wide"
-                    title="Pre-provisioned ONTs (20% withheld)"
+                    title="Current-week 20% withhold count (PDF col 1) — deducted from this week's payment"
                   >
                     Pre-Prov
+                  </th>
+                  <th
+                    className="px-3 py-3 text-right text-xs font-medium text-teal-300 uppercase tracking-wide"
+                    title="OES Report cumulative — running balance of pre-provisioned drops awaiting resolution (PDF col 2). Inventory metric, not a deduction."
+                  >
+                    PP Outstanding
                   </th>
                   <th className="px-3 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">FT Paid</th>
                   <th className="px-3 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">Invoice Total</th>
@@ -464,6 +470,15 @@ export function WeeklySummaryTab() {
                         <td className="px-3 py-2.5 text-right text-cyan-300 tabular-nums">
                           {sumField(weekRows, 'ft_pre_provisions_count').toLocaleString()}
                         </td>
+                        {/*
+                          PP Outstanding is a running balance per (week, project) — each row
+                          here is a different project, so summing across the week-group gives
+                          "total outstanding across all projects for this week" (matches the
+                          KPI tile semantics).
+                        */}
+                        <td className="px-3 py-2.5 text-right text-teal-300 tabular-nums">
+                          {sumField(weekRows, 'ft_pre_provisions_outstanding').toLocaleString()}
+                        </td>
                         <td className="px-3 py-2.5 text-right text-[var(--ff-text-secondary)] tabular-nums">
                           {sumField(weekRows, 'ft_total_claimable').toLocaleString()}
                         </td>
@@ -508,6 +523,9 @@ export function WeeklySummaryTab() {
                           </td>
                           <td className="px-3 py-3 text-right text-cyan-300 tabular-nums">
                             {row.ft_pre_provisions_count.toLocaleString()}
+                          </td>
+                          <td className="px-3 py-3 text-right text-teal-300 tabular-nums">
+                            {row.ft_pre_provisions_outstanding.toLocaleString()}
                           </td>
                           <td className="px-3 py-3 text-right text-[var(--ff-text-secondary)] tabular-nums">
                             {row.ft_total_claimable.toLocaleString()}
