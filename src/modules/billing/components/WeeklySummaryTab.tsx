@@ -470,6 +470,12 @@ export function WeeklySummaryTab() {
                         <td className="px-3 py-2.5 text-right text-cyan-300 tabular-nums">
                           {sumField(weekRows, 'ft_pre_provisions_count').toLocaleString()}
                         </td>
+                        {/*
+                          PP Outstanding is a running balance per (week, project) — each row
+                          here is a different project, so summing across the week-group gives
+                          "total outstanding across all projects for this week" (matches the
+                          KPI tile semantics).
+                        */}
                         <td className="px-3 py-2.5 text-right text-teal-300 tabular-nums">
                           {sumField(weekRows, 'ft_pre_provisions_outstanding').toLocaleString()}
                         </td>
