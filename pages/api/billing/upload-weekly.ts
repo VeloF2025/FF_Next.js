@@ -246,6 +246,7 @@ async function handler(
          ft_note4_count,
          ft_note5_count,
          ft_pre_provisions_count,
+         ft_pre_provisions_outstanding,
          ft_total_claimable,
          price_per_drop,
          tax_rate,
@@ -257,27 +258,28 @@ async function handler(
          updated_at
        ) VALUES (
          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-         $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW()
+         $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, NOW()
        )
        ON CONFLICT (week_ending, project) DO UPDATE SET
-         ft_total_onts            = EXCLUDED.ft_total_onts,
-         ft_previously_invoiced   = EXCLUDED.ft_previously_invoiced,
-         ft_claimable             = EXCLUDED.ft_claimable,
-         ft_note1_count           = EXCLUDED.ft_note1_count,
-         ft_note2_count           = EXCLUDED.ft_note2_count,
-         ft_note3_count           = EXCLUDED.ft_note3_count,
-         ft_note4_count           = EXCLUDED.ft_note4_count,
-         ft_note5_count           = EXCLUDED.ft_note5_count,
-         ft_pre_provisions_count  = EXCLUDED.ft_pre_provisions_count,
-         ft_total_claimable       = EXCLUDED.ft_total_claimable,
-         price_per_drop           = EXCLUDED.price_per_drop,
-         tax_rate                 = EXCLUDED.tax_rate,
-         invoice_subtotal         = EXCLUDED.invoice_subtotal,
-         invoice_total            = EXCLUDED.invoice_total,
-         pdf_filename             = EXCLUDED.pdf_filename,
-         notes_xlsx_filename      = EXCLUDED.notes_xlsx_filename,
-         uploaded_by              = EXCLUDED.uploaded_by,
-         updated_at               = NOW()
+         ft_total_onts                 = EXCLUDED.ft_total_onts,
+         ft_previously_invoiced        = EXCLUDED.ft_previously_invoiced,
+         ft_claimable                  = EXCLUDED.ft_claimable,
+         ft_note1_count                = EXCLUDED.ft_note1_count,
+         ft_note2_count                = EXCLUDED.ft_note2_count,
+         ft_note3_count                = EXCLUDED.ft_note3_count,
+         ft_note4_count                = EXCLUDED.ft_note4_count,
+         ft_note5_count                = EXCLUDED.ft_note5_count,
+         ft_pre_provisions_count       = EXCLUDED.ft_pre_provisions_count,
+         ft_pre_provisions_outstanding = EXCLUDED.ft_pre_provisions_outstanding,
+         ft_total_claimable            = EXCLUDED.ft_total_claimable,
+         price_per_drop                = EXCLUDED.price_per_drop,
+         tax_rate                      = EXCLUDED.tax_rate,
+         invoice_subtotal              = EXCLUDED.invoice_subtotal,
+         invoice_total                 = EXCLUDED.invoice_total,
+         pdf_filename                  = EXCLUDED.pdf_filename,
+         notes_xlsx_filename           = EXCLUDED.notes_xlsx_filename,
+         uploaded_by                   = EXCLUDED.uploaded_by,
+         updated_at                    = NOW()
        RETURNING id`,
       [
         summary.weekEnding,
@@ -291,6 +293,7 @@ async function handler(
         summary.note4Count,
         summary.note5Count,
         summary.preProvisionsCount,
+        summary.preProvOutstanding,
         summary.totalClaimableForPayment,
         pricePerDrop,
         taxRate,

@@ -54,6 +54,7 @@ interface BundleSummary {
   note4Count: number;
   note5Count: number;
   preProvisionsCount: number;
+  preProvOutstanding: number;
   totalClaimableForPayment: number;
   lowerThanLinkBudgetCount: number;
 }
