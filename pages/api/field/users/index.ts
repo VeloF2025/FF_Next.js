@@ -23,11 +23,8 @@ import { logCreate } from '@/lib/db-logger';
 const ALLOWED_ROLES = ['technician', 'stores', 'supervisor', 'admin', 'driver', 'office'] as const;
 type FieldUserRole = (typeof ALLOWED_ROLES)[number];
 
-/** AuthRoles that are considered "stores-level" callers. */
+/** AuthRoles that are considered "stores-level" callers (create pending accounts). */
 const STORES_AUTH_ROLES = new Set(['storeman']);
-
-/** AuthRoles that activate users immediately. */
-const ADMIN_AUTH_ROLES = new Set(['admin', 'super_admin']);
 
 /** Prefix map for employee_id generation. */
 const ROLE_UPPER_PREFIX: Record<FieldUserRole, string> = {
@@ -59,13 +56,14 @@ function defaultPosition(role: FieldUserRole): string {
 // ── POST handler ─────────────────────────────────────────────────────────────
 
 async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse): Promise<void> {
-  const { firstName, lastName, phone, email, role, contractorId, department, position } = req.body as {
+  // contractorId is intentionally NOT destructured/persisted on staff —
+  // contractor linkage lives on the picking row per the design plan.
+  const { firstName, lastName, phone, email, role, department, position } = req.body as {
     firstName?: string;
     lastName?: string;
     phone?: string;
     email?: string;
     role?: string;
-    contractorId?: string;
     department?: string;
     position?: string;
   };
