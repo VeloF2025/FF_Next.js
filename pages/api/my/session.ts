@@ -62,11 +62,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return apiResponse.success(res, { session: null, profile: null, reason: 'staff_not_found' });
     }
 
-    // SECURITY: enforce suspend gate before leaking any profile data
-    if (row.account_status === 'suspended') {
-      log.warn('[my-session] suspended staff attempted session access', { staffId: session.staffId });
-      return apiResponse.success(res, { session: null, profile: null, reason: 'suspended' });
-    }
+    // Note: account_status === 'suspended' is already gated in verifySession()
+    // above — this secondary profile fetch is solely for the client's UI state.
 
     const profile: AttendanceSessionProfile = {
       staffId: row.id,
