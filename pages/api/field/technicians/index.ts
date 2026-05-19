@@ -1,8 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import type { FieldTechnician } from '../../../../src/modules/field-app/types/field-app.types';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
-import { createLoggedSql, logCreate, logUpdate } from '@/lib/db-logger';
+import { createLoggedSql } from '@/lib/db-logger';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 
@@ -90,52 +89,33 @@ export default withAuth(withErrorHandler(async (
       apiResponse.internalError(res, new Error('Failed to fetch technicians'));
     }
   } else if (req.method === 'POST') {
-    try {
-      const newTechnician = req.body;
-      
-      // Generate employee ID if not provided
-      const employeeId = newTechnician.employeeId || `TECH-${Date.now().toString().slice(-8)}`;
-      
-      // Insert new staff member as technician
-      const insertedStaff = await sql`
-        INSERT INTO staff (
-          employee_id, first_name, last_name, email, phone,
-          department, position, status, contract_type
-        )
-        VALUES (
-          ${employeeId},
-          ${newTechnician.firstName || newTechnician.name?.split(' ')[0] || ''},
-          ${newTechnician.lastName || newTechnician.name?.split(' ')[1] || ''},
-          ${newTechnician.email},
-          ${newTechnician.phone},
-          'Field Operations',
-          'Field Technician',
-          'active',
-          'full-time'
-        )
-        RETURNING *
-      `;
-      
-      // Log technician creation
-      if (insertedStaff[0]) {
-        logCreate('field_technician', insertedStaff[0].id, {
-          employee_id: insertedStaff[0].employee_id,
-          name: `${insertedStaff[0].first_name} ${insertedStaff[0].last_name}`,
-          email: insertedStaff[0].email,
-          department: 'Field Operations'
-        });
-      }
-      
-      res.status(201).json({ 
-        message: 'Technician added successfully',
-        technician: insertedStaff[0]
-      });
-    } catch (error) {
-      log.error('Error adding technician', { error });
-      apiResponse.internalError(res, new Error('Failed to add technician'));
-    }
+    // POST is a deprecation shim that forwards to /api/field/users.
+    // Normalises legacy body shape: { name: 'First Last' } → split into firstName/lastName.
+    // role is forced to 'technician'.
+    const incoming = req.body as {
+      name?: string;
+      firstName?: string;
+      lastName?: string;
+      phone?: string;
+      email?: string;
+      contractorId?: string;
+      [k: string]: unknown;
+    };
+    const [splitFirst, ...splitRest] = (incoming.name ?? '').trim().split(/\s+/);
+    const forwardBody = {
+      firstName: incoming.firstName ?? splitFirst ?? '',
+      lastName: incoming.lastName ?? splitRest.join(' ') ?? '',
+      email: incoming.email,
+      phone: incoming.phone,
+      role: 'technician' as const,
+      contractorId: incoming.contractorId,
+    };
+    const usersHandler = (await import('@/pages/api/field/users/index')).default;
+    (req as unknown as { body: unknown }).body = forwardBody;
+    await usersHandler(req, res);
+    return;
   } else {
-    apiResponse.methodNotAllowed(res, req.method!, ['GET']);
+    apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
   }
 }))
 

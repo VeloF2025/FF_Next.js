@@ -131,6 +131,11 @@ export interface AttendanceSessionMeta {
   expiresAt: string;
 }
 
+// Single source of truth: definitions live in types.ts, re-exported here for
+// backward-compatible import paths (consumers using this module's path still work).
+import type { StaffRole, AccountStatus } from '../types';
+export type { StaffRole, AccountStatus };
+
 export interface AttendanceProfile {
   staffId: string;
   name: string;
@@ -139,6 +144,10 @@ export interface AttendanceProfile {
   homeSiteId: string | null;
   hasAssignedVehicle: boolean;
   profilePhotoUrl: string | null;
+  /** Staff role — null when the column is not yet populated for legacy rows. */
+  role: StaffRole | null;
+  /** Account lifecycle status — always populated; defaults to 'active' for legacy rows. */
+  accountStatus: AccountStatus;
 }
 
 export interface SessionResponse {

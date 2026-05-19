@@ -11,9 +11,10 @@ vi.mock('@/lib/logger', () => ({
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
-// Stub sql — these tests don't exercise DB paths.
+// Stub sql — DB-path tests configure return values per-test below.
+const mockSql = vi.fn();
 vi.mock('@/lib/db-pool', () => ({
-  sql: vi.fn(),
+  sql: mockSql,
 }));
 
 // Set the secret before sessionUtils.ts reads it at import time.
@@ -163,5 +164,91 @@ describe('readSessionCookie', () => {
     expect(readSessionCookie(req as never)).toBeNull();
     // Restore for subsequent tests.
     process.env.MY_PORTAL_SESSION_SECRET = TEST_SECRET;
+  });
+});
+
+describe('verifySession', () => {
+  const validPayload = {
+    sessionId: 'sid-verify-1',
+    staffId: 'staff-verify-1',
+    staffName: 'Verify Smoke',
+    method: 'password' as const,
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+  };
+
+  beforeEach(() => {
+    process.env.MY_PORTAL_SESSION_SECRET = TEST_SECRET;
+    vi.clearAllMocks();
+  });
+
+  it("returns reason='suspended' when staff.account_status is 'suspended'", async () => {
+    const { verifySession, MY_SESSION_COOKIE } = await loadSessionUtils();
+    const token = signSessionPayload(validPayload);
+    const req = makeReq(`${MY_SESSION_COOKIE}=${token}`);
+
+    // Mock the JOIN'd DB response: valid session row, staff is suspended.
+    mockSql.mockResolvedValueOnce([
+      {
+        revoked_at: null,
+        expires_at: new Date(Date.now() + 3600_000).toISOString(),
+        account_status: 'suspended',
+      },
+    ]);
+
+    const result = await verifySession(req as never);
+    expect(result.valid).toBe(false);
+    expect(result.session).toBeNull();
+    expect(result.reason).toBe('suspended');
+  });
+
+  it("returns valid=true when staff.account_status is 'active'", async () => {
+    const { verifySession, MY_SESSION_COOKIE } = await loadSessionUtils();
+    const token = signSessionPayload(validPayload);
+    const req = makeReq(`${MY_SESSION_COOKIE}=${token}`);
+
+    mockSql.mockResolvedValueOnce([
+      {
+        revoked_at: null,
+        expires_at: new Date(Date.now() + 3600_000).toISOString(),
+        account_status: 'active',
+      },
+    ]);
+
+    const result = await verifySession(req as never);
+    expect(result.valid).toBe(true);
+    expect(result.session).not.toBeNull();
+    expect(result.reason).toBeUndefined();
+  });
+
+  it("returns reason='session_revoked' for a revoked session (regardless of account_status)", async () => {
+    const { verifySession, MY_SESSION_COOKIE } = await loadSessionUtils();
+    const token = signSessionPayload(validPayload);
+    const req = makeReq(`${MY_SESSION_COOKIE}=${token}`);
+
+    mockSql.mockResolvedValueOnce([
+      {
+        revoked_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 3600_000).toISOString(),
+        account_status: 'active',
+      },
+    ]);
+
+    const result = await verifySession(req as never);
+    expect(result.valid).toBe(false);
+    expect(result.reason).toBe('session_revoked');
+  });
+
+  it("returns reason='session_not_found' when DB row is missing (LEFT JOIN null staff safe)", async () => {
+    const { verifySession, MY_SESSION_COOKIE } = await loadSessionUtils();
+    const token = signSessionPayload(validPayload);
+    const req = makeReq(`${MY_SESSION_COOKIE}=${token}`);
+
+    // Empty result — session row doesn't exist.
+    mockSql.mockResolvedValueOnce([]);
+
+    const result = await verifySession(req as never);
+    expect(result.valid).toBe(false);
+    expect(result.reason).toBe('session_not_found');
   });
 });
