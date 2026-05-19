@@ -288,4 +288,156 @@ describe('POST /api/procurement/field-stock/pickings — pending-tech cap', () =
     // No SQL calls at all — rejected before any DB access
     expect(mockSql).not.toHaveBeenCalled();
   });
+
+  // ── H5 new cases (blind review 2026-05-19) ────────────────────────────────
+
+  // Case H5-1: destination=FIELD_DEFAULT, technicianId omitted → 400
+  it('H5: destinationLocationId=FIELD_DEFAULT + technicianId omitted → 400 FIELD_DEFAULT_REQUIRES_TECHNICIAN', async () => {
+    const FIELD_DEFAULT_LOCATION_ID = '00000000-0000-0000-0000-000000000001';
+
+    const req = makeReq({
+      body: {
+        ...validBody({ technicianId: undefined, technicianName: undefined }),
+        destinationLocationId: FIELD_DEFAULT_LOCATION_ID,
+      },
+    });
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(400);
+    const body = res._json as {
+      success: boolean;
+      error: { code: string; details: { code: string } };
+    };
+    expect(body.success).toBe(false);
+    expect(body.error.code).toBe('BAD_REQUEST');
+    expect(body.error.details.code).toBe('FIELD_DEFAULT_REQUIRES_TECHNICIAN');
+    // No DB access before validation rejects
+    expect(mockSql).not.toHaveBeenCalled();
+  });
+
+  // Case H5-2: destination=FIELD_DEFAULT, technicianId present → allowed through (no 400)
+  it('H5: destinationLocationId=FIELD_DEFAULT + technicianId present → guard passes (active tech succeeds)', async () => {
+    const FIELD_DEFAULT_LOCATION_ID = '00000000-0000-0000-0000-000000000001';
+
+    // Active tech — no price check; no serials in line so no H7 check either.
+    mockSql.mockResolvedValueOnce([{ account_status: 'active' }]);  // staff
+    mockSql.mockResolvedValueOnce([{ count: '20' }]);               // COUNT
+    mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-5', picking_number: 'PCK-000021', status: 'draft' }]);
+    mockSql.mockResolvedValueOnce([]);                              // line insert
+    mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-5', lines: [] }]);
+
+    const req = makeReq({
+      body: {
+        ...validBody(),
+        destinationLocationId: FIELD_DEFAULT_LOCATION_ID,
+        // technicianId is set via validBody() default: 'tech-staff-uuid'
+      },
+    });
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(200);
+    const body = res._json as { success: boolean };
+    expect(body.success).toBe(true);
+  });
+
+  // ── H7 new cases (blind review 2026-05-19) ────────────────────────────────
+
+  // Case H7-1: active tech, 1 valid + 1 unavailable serial → 400 SERIAL_NOT_AVAILABLE
+  it('H7: active tech, mixed valid/unavailable serials → 400 with unavailable serial listed', async () => {
+    // Active tech — no price check needed; go straight to H7 serial check
+    mockSql.mockResolvedValueOnce([{ account_status: 'active' }]);    // staff
+    // H7: serial-valid → row returned (available)
+    mockSql.mockResolvedValueOnce([{ id: 'serial-valid' }]);
+    // H7: serial-taken → empty (not available)
+    mockSql.mockResolvedValueOnce([]);
+
+    const req = makeReq({
+      body: validBody({
+        lines: [
+          {
+            stockItemId: 'item-uuid-1',
+            plannedQuantity: 2,
+            serialIds: ['serial-valid', 'serial-taken'],
+          },
+        ],
+      }),
+    });
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(400);
+    const body = res._json as {
+      success: boolean;
+      error: { code: string; details: { code: string; unavailableSerials: string[] } };
+    };
+    expect(body.success).toBe(false);
+    expect(body.error.code).toBe('BAD_REQUEST');
+    expect(body.error.details.code).toBe('SERIAL_NOT_AVAILABLE');
+    expect(body.error.details.unavailableSerials).toContain('serial-taken');
+    expect(body.error.details.unavailableSerials).not.toContain('serial-valid');
+    // No INSERT after serial rejection
+    const callTemplates = mockSql.mock.calls.map(
+      (c) => String((c[0] as TemplateStringsArray)?.[0] ?? '').trim(),
+    );
+    expect(callTemplates.some((t) => t.startsWith('INSERT'))).toBe(false);
+  });
+
+  // Case H7-2: active tech, all serials available → proceeds to INSERT (200)
+  it('H7: active tech, all serials available → 200, INSERT proceeds', async () => {
+    // Active tech — no price check; 2 serials both available
+    mockSql.mockResolvedValueOnce([{ account_status: 'active' }]);    // staff
+    mockSql.mockResolvedValueOnce([{ id: 'serial-a' }]);              // H7 serial-a available
+    mockSql.mockResolvedValueOnce([{ id: 'serial-b' }]);              // H7 serial-b available
+    mockSql.mockResolvedValueOnce([{ count: '15' }]);                 // COUNT
+    mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-6', picking_number: 'PCK-000016', status: 'draft' }]);
+    mockSql.mockResolvedValueOnce([]);                                // line insert
+    mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-6', lines: [] }]);
+
+    const req = makeReq({
+      body: validBody({
+        lines: [
+          { stockItemId: 'item-uuid-1', plannedQuantity: 2, serialIds: ['serial-a', 'serial-b'] },
+        ],
+      }),
+    });
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(200);
+    const body = res._json as { success: boolean };
+    expect(body.success).toBe(true);
+  });
+
+  // Case H7-3: lines without serialIds → H7 check skipped, no extra SQL calls
+  it('H7: lines without serialIds → serial check skipped entirely', async () => {
+    // Active tech, line has no serialIds — re-uses the simple create path
+    mockSql.mockResolvedValueOnce([{ account_status: 'active' }]);    // staff
+    // H7: NO serial check SQL — line has no serialIds
+    mockSql.mockResolvedValueOnce([{ count: '3' }]);                  // COUNT
+    mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-7', picking_number: 'PCK-000004', status: 'draft' }]);
+    mockSql.mockResolvedValueOnce([]);                                // line insert
+    mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-7', lines: [] }]);
+
+    const req = makeReq({
+      body: validBody({ lines: [{ stockItemId: 'item-uuid-1', plannedQuantity: 3 }] }),
+    });
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(200);
+    const body = res._json as { success: boolean };
+    expect(body.success).toBe(true);
+    // Confirm no stock_serials SELECT was issued
+    const allSql = mockSql.mock.calls.map(
+      (c) => String((c[0] as TemplateStringsArray)?.[0] ?? '').toLowerCase(),
+    );
+    expect(allSql.some((s) => s.includes('stock_serials'))).toBe(false);
+  });
 });

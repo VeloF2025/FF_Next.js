@@ -146,6 +146,11 @@ function mockSuccessCreate(accountStatus: 'active' | 'suspended' | 'pending', st
     mockSql.mockResolvedValueOnce([{ standard_cost: standardCost }]);
   }
 
+  // H7 serial availability checks — 2 serials in the default orchestratorBody().
+  // Each serialId gets a SELECT from stock_serials returning an available row.
+  mockSql.mockResolvedValueOnce([{ id: 'serial-1' }]); // serial-1 available
+  mockSql.mockResolvedValueOnce([{ id: 'serial-2' }]); // serial-2 available
+
   // COUNT
   mockSql.mockResolvedValueOnce([{ count: '99' }]);
   // INSERT picking — returns the new picking row
