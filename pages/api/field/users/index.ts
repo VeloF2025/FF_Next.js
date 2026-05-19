@@ -100,7 +100,7 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
   try {
     const rows = await sql`
       INSERT INTO staff (
-        employee_id, first_name, last_name, email, phone,
+        employee_id, first_name, last_name, email, phone, status,
         department, position, contract_type,
         role, account_status, created_by_staff_id
       )
@@ -110,6 +110,7 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
         ${lastName},
         ${email ?? null},
         ${phone},
+        ${'active'},
         ${resolvedDepartment},
         ${resolvedPosition},
         ${contractType},

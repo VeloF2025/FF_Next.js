@@ -120,6 +120,11 @@ describe('POST /api/field/users', () => {
     const body = res._json as { data: { user: { account_status: string; created_by_staff_id: string } } };
     expect(body.data.user.account_status).toBe('pending');
     expect(body.data.user.created_by_staff_id).toBe('stores-staff-uuid');
+
+    // Regression guard: status='active' must be present in the INSERT values to satisfy the NOT NULL constraint
+    const sqlCallArgs: unknown[] = mockSql.mock.calls[0] as unknown[];
+    const allArgs = sqlCallArgs.flat(Infinity);
+    expect(allArgs).toContain('active');
   });
 
   // 2. Admin creates a stores user → 201, account_status='active'
