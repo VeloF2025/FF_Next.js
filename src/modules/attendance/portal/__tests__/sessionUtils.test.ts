@@ -4,7 +4,7 @@
  * revokeSession UPDATE) are covered by an integration test.
  */
 
-import { describe, it, expect, vi, beforeAll, beforeEach, type MockedFunction } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import crypto from 'crypto';
 
 vi.mock('@/lib/logger', () => ({
