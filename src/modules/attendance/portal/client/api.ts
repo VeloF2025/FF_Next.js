@@ -131,8 +131,9 @@ export interface AttendanceSessionMeta {
   expiresAt: string;
 }
 
-export type StaffRole = 'technician' | 'stores' | 'supervisor' | 'admin' | 'driver' | 'office';
-export type AccountStatus = 'pending' | 'active' | 'suspended';
+// Single source of truth: definitions live in types.ts, re-exported here for
+// backward-compatible import paths (consumers using this module's path still work).
+export type { StaffRole, AccountStatus } from '../types';
 
 export interface AttendanceProfile {
   staffId: string;

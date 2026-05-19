@@ -340,4 +340,101 @@ describe('Role gate — POST /api/field/users', () => {
     const body = res._json as { data: { user: { account_status: string } } };
     expect(body.data.user.account_status).toBe('active');
   });
+
+  // 12. REGRESSION: manager caller creating role=admin → 403 (privilege escalation fix)
+  it('manager caller creating role=admin → 403', async () => {
+    const req = makeReq({
+      method: 'POST',
+      user: { id: 'manager-uuid', role: 'manager' },
+      body: {
+        firstName: 'Test',
+        lastName: 'PrivEsc',
+        phone: '+27TEST0000010',
+        role: 'admin',
+      },
+    });
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(403);
+    expect(mockSql).not.toHaveBeenCalled();
+  });
+});
+
+// ── Mass-assignment guard tests ───────────────────────────────────────────────
+
+describe('Mass-assignment guard — POST /api/field/users', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // 13. REGRESSION: storeman with department override → department must be default (mass-assignment fix)
+  it('storeman caller with department=Operations in body → resolved department is Field Operations (override ignored)', async () => {
+    const insertedRow = staffRow({
+      account_status: 'pending',
+      created_by_staff_id: 'stores-staff-uuid',
+      role: 'technician',
+    });
+    mockSql.mockResolvedValueOnce([insertedRow]);
+
+    const req = makeReq({
+      method: 'POST',
+      user: { id: 'stores-staff-uuid', role: 'storeman' },
+      body: {
+        firstName: 'Test',
+        lastName: 'MassAssign',
+        phone: '+27TEST0000011',
+        role: 'technician',
+        department: 'Operations',   // attacker-supplied value — should be ignored
+        position: 'Director',       // attacker-supplied value — should be ignored
+      },
+    });
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(201);
+
+    // Verify the SQL was called with the role-default 'Field Operations' and 'Technician',
+    // NOT with the caller-supplied 'Operations' / 'Director'.
+    const sqlCallArgs: unknown[] = mockSql.mock.calls[0] as unknown[];
+    const allArgs = sqlCallArgs.flat(Infinity);
+    expect(allArgs).toContain('Field Operations');
+    expect(allArgs).toContain('Technician');
+    expect(allArgs).not.toContain('Operations');
+    expect(allArgs).not.toContain('Director');
+  });
+
+  // 14. Admin caller with department override → override IS respected
+  it('admin caller with department override → department is accepted', async () => {
+    const insertedRow = staffRow({
+      account_status: 'active',
+      created_by_staff_id: 'user-admin-uuid',
+    });
+    mockSql.mockResolvedValueOnce([insertedRow]);
+
+    const req = makeReq({
+      method: 'POST',
+      user: { id: 'user-admin-uuid', role: 'admin' },
+      body: {
+        firstName: 'Test',
+        lastName: 'AdminOverride',
+        phone: '+27TEST0000012',
+        role: 'technician',
+        department: 'Special Projects',
+        position: 'Lead Technician',
+      },
+    });
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(201);
+
+    const sqlCallArgs: unknown[] = mockSql.mock.calls[0] as unknown[];
+    const allArgs = sqlCallArgs.flat(Infinity);
+    expect(allArgs).toContain('Special Projects');
+    expect(allArgs).toContain('Lead Technician');
+  });
 });

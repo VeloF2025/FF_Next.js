@@ -115,7 +115,7 @@ export default withAuth(withErrorHandler(async (
     await usersHandler(req, res);
     return;
   } else {
-    apiResponse.methodNotAllowed(res, req.method!, ['GET']);
+    apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
   }
 }))
 

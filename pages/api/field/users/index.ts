@@ -35,9 +35,6 @@ type FieldUserRole = (typeof ALLOWED_ROLES)[number];
  */
 const PERMITTED_AUTH_ROLES = new Set<AuthRole>(['storeman', 'manager', 'admin', 'super_admin', 'system']);
 
-/** AuthRoles that are considered "stores-level" callers (create pending accounts). */
-const STORES_AUTH_ROLES = new Set(['storeman']);
-
 /** AuthRoles that create accounts directly active (no approval required). */
 const ADMIN_AUTH_ROLES = new Set<AuthRole>(['admin', 'super_admin', 'system']);
 
@@ -98,9 +95,10 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
   const fieldRole = role as FieldUserRole;
   const callerRole = req.user.role;
 
-  // 403: stores callers may only create technicians
-  if (STORES_AUTH_ROLES.has(callerRole) && fieldRole !== 'technician') {
-    apiResponse.forbidden(res, 'Stores users may only create technician accounts');
+  // 403: non-admin callers may only create technician accounts.
+  // Admin / super_admin / system can create any allowed role.
+  if (!ADMIN_AUTH_ROLES.has(callerRole) && fieldRole !== 'technician') {
+    apiResponse.forbidden(res, 'Only admin users may create non-technician accounts');
     return;
   }
 
@@ -110,8 +108,12 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
   const accountStatus = ADMIN_AUTH_ROLES.has(callerRole) ? 'active' : 'pending';
 
   const employeeId = `${ROLE_UPPER_PREFIX[fieldRole]}-${String(Date.now()).slice(-8)}`;
-  const resolvedDepartment = department ?? defaultDepartment(fieldRole);
-  const resolvedPosition = position ?? defaultPosition(fieldRole);
+
+  // Mass-assignment guard: non-admin callers cannot override department/position.
+  // Only admin-tier callers may set these fields; others get the role defaults.
+  const isAdminCaller = ADMIN_AUTH_ROLES.has(callerRole);
+  const resolvedDepartment = isAdminCaller ? (department ?? defaultDepartment(fieldRole)) : defaultDepartment(fieldRole);
+  const resolvedPosition = isAdminCaller ? (position ?? defaultPosition(fieldRole)) : defaultPosition(fieldRole);
   const contractType = fieldRole === 'technician' ? 'contractor' : 'full-time';
 
   try {
@@ -163,53 +165,23 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
 // ── GET handler ──────────────────────────────────────────────────────────────
 
 async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<void> {
-  const { role, accountStatus, contractorId } = req.query as {
+  // contractorId is intentionally not supported here — contractor linkage lives
+  // on the picking row, not on staff. The filter branches were dead code.
+  const { role, accountStatus } = req.query as {
     role?: string;
     accountStatus?: string;
-    contractorId?: string;
   };
 
   try {
     // Build dynamic filter conditions with explicit branches (Neon shim limitation workaround)
     let rows: Record<string, unknown>[];
 
-    if (role && accountStatus && contractorId) {
-      rows = await sql`
-        SELECT id, first_name, last_name, phone, email, role, account_status,
-               created_by_staff_id, created_at
-        FROM staff
-        WHERE role = ${role}
-          AND account_status = ${accountStatus}
-          AND metadata->>'contractorId' = ${contractorId}
-        ORDER BY created_at DESC
-        LIMIT 200
-      `;
-    } else if (role && accountStatus) {
+    if (role && accountStatus) {
       rows = await sql`
         SELECT id, first_name, last_name, phone, email, role, account_status,
                created_by_staff_id, created_at
         FROM staff
         WHERE role = ${role} AND account_status = ${accountStatus}
-        ORDER BY created_at DESC
-        LIMIT 200
-      `;
-    } else if (role && contractorId) {
-      rows = await sql`
-        SELECT id, first_name, last_name, phone, email, role, account_status,
-               created_by_staff_id, created_at
-        FROM staff
-        WHERE role = ${role}
-          AND metadata->>'contractorId' = ${contractorId}
-        ORDER BY created_at DESC
-        LIMIT 200
-      `;
-    } else if (accountStatus && contractorId) {
-      rows = await sql`
-        SELECT id, first_name, last_name, phone, email, role, account_status,
-               created_by_staff_id, created_at
-        FROM staff
-        WHERE account_status = ${accountStatus}
-          AND metadata->>'contractorId' = ${contractorId}
         ORDER BY created_at DESC
         LIMIT 200
       `;
@@ -228,15 +200,6 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
                created_by_staff_id, created_at
         FROM staff
         WHERE account_status = ${accountStatus}
-        ORDER BY created_at DESC
-        LIMIT 200
-      `;
-    } else if (contractorId) {
-      rows = await sql`
-        SELECT id, first_name, last_name, phone, email, role, account_status,
-               created_by_staff_id, created_at
-        FROM staff
-        WHERE metadata->>'contractorId' = ${contractorId}
         ORDER BY created_at DESC
         LIMIT 200
       `;
