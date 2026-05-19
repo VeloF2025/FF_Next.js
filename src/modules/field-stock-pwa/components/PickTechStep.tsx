@@ -70,8 +70,12 @@ export function PickTechStep({ onPick }: PickTechStepProps) {
     }
   }, []);
 
+  // Initial load + debounced reload on search change (300 ms, matching PickItemStep).
   useEffect(() => {
-    loadTechs(search);
+    const timer = setTimeout(() => {
+      loadTechs(search);
+    }, search ? 300 : 0);
+    return () => clearTimeout(timer);
   }, [search, loadTechs]);
 
   const handleCreated = useCallback(
