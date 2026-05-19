@@ -196,6 +196,49 @@ describe('POST /api/field/technicians (legacy shim)', () => {
     expect(body).not.toHaveProperty('data');
   });
 
+  // ── Test H9: DB-fetch failure after 201 → falls back to minimal user object ──
+  // The shim does a follow-up SELECT to hydrate the full staff row. If that
+  // SELECT throws, the shim falls back to body201.data.user (the minimal shape
+  // the inner handler returned). This test documents the fallback contract.
+
+  it('H9: on SELECT failure after 201 → returns 201 with minimal user shape (fallback)', async () => {
+    const minimalUser = {
+      id: 'X',
+      role: 'technician',
+      account_status: 'pending',
+      created_by_staff_id: null,
+    };
+
+    mockUsersHandler.mockImplementation(
+      async (_req: NextApiRequest, interceptorRes: NextApiResponse) => {
+        interceptorRes.status(201).json({
+          success: true,
+          data: { user: minimalUser },
+          message: 'Field user created successfully',
+        });
+      },
+    );
+
+    // Force the shim's own sql (the SELECT * FROM staff) to reject.
+    mockShimSql.mockRejectedValueOnce(new Error('DB connection lost'));
+
+    const req = makeReq({
+      body: { name: 'Jane Smith', phone: '+27829999999' },
+    });
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    // Still 201 — the shim falls back rather than propagating the DB error.
+    expect(res._status).toBe(201);
+    const body = res._json as { message: string; technician: typeof minimalUser };
+    expect(body.message).toBe('Technician added successfully');
+    // Fallback shape is the minimal user object from the inner handler, not a full row.
+    expect(body.technician).toEqual(minimalUser);
+    // Confirm the SELECT was attempted (the mock was called once).
+    expect(mockShimSql).toHaveBeenCalledTimes(1);
+  });
+
   // ── Test 3: inner-handler 403 → forwarded verbatim ────────────────────────
 
   it('on inner-handler 403 → forwards 403 + body verbatim, no legacy wrapping', async () => {
