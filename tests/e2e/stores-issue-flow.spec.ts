@@ -59,12 +59,11 @@ test.describe('Stores — Auth gate @smoke @field-stock', () => {
     await page.goto('/my/stores', { waitUntil: 'domcontentloaded' });
     // The page either redirected to /my (login) or rendered a "Redirecting…" shell.
     // It must NOT render the stores hub content.
-    const hubHeading = page.getByText('Stores');
-    // If a heading says "Stores" it could be the loading shell — that is acceptable.
-    // What is NOT acceptable is the "Issue stock" tile being visible without auth.
-    await expect(page.getByText('Issue stock').first()).not.toBeVisible({ timeout: 5000 }).catch(() => {
-      // Element simply not present → test passes silently.
-    });
+    // If the element is absent (never matched) .not.toBeVisible() succeeds.
+    // If it exists and IS visible the assertion fails — which is the correct
+    // behaviour for an auth-gate check.
+    // NOTE: the variable hubHeading was only used here; removed unused reference.
+    await expect(page.getByText('Issue stock').first()).not.toBeVisible({ timeout: 5000 });
   });
 });
 
