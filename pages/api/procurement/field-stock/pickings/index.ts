@@ -13,6 +13,7 @@ import {
   checkPendingValueCap,
   PENDING_TECH_VALUE_CAP_ZAR,
 } from '@/modules/field-stock-pwa/lib/stockValueGuard';
+import { FIELD_DEFAULT_LOCATION_ID } from '@/modules/field-stock-pwa/lib/locationDefaults';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -144,6 +145,23 @@ async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.validationError(res, { lines: 'At least one picking line is required' });
     }
 
+    // ── H5 (blind review 2026-05-19): Require technicianId for FIELD-DEFAULT ─
+    // When the destination is the FIELD_DEFAULT_LOCATION_ID (the virtual transit
+    // location used by /my/stores PWA issue flow), technicianId MUST be supplied.
+    // Omitting it bypasses the R5k pending-tech value cap because the cap guard
+    // short-circuits on `if (technicianId)`. A malicious or buggy client that
+    // sends destinationLocationId=FIELD_DEFAULT without a technicianId would
+    // silently skip the cap check. We reject early with 400 to close this hole.
+    // ─────────────────────────────────────────────────────────────────────────
+    if (destinationLocationId === FIELD_DEFAULT_LOCATION_ID && !technicianId) {
+      return apiResponse.error(
+        res,
+        ErrorCode.BAD_REQUEST,
+        'technicianId is required when issuing stock to the field default location.',
+        { code: 'FIELD_DEFAULT_REQUIRES_TECHNICIAN' },
+      );
+    }
+
     // ── Pending-technician R5,000 stock-value cap (Task 2.6) ─────────────────
     // Server-side enforcement: a malicious or buggy client could bypass the
     // client-side guard in SignAndSubmitStep. We independently verify here,
@@ -193,6 +211,37 @@ async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
       }
     }
     // ── End pending-tech cap check ────────────────────────────────────────────
+
+    // ── H7 (blind review 2026-05-19): Server-side serial availability check ──
+    // Re-validate every serialId in each line before any INSERT.
+    // Clients may send serials that were 'available' when the UI rendered but
+    // have since been picked by another user. Fail fast here so no partial
+    // state is written. Pattern borrowed from pickings/[pickingId]/process.ts.
+    // ─────────────────────────────────────────────────────────────────────────
+    const unavailableSerials: string[] = [];
+    for (const line of lines as PickingLine[]) {
+      if (!Array.isArray(line.serialIds) || line.serialIds.length === 0) continue;
+      for (const serialId of line.serialIds) {
+        const serialRows = await sql`
+          SELECT id FROM stock_serials
+          WHERE id = ${serialId}
+            AND status = 'available'
+          LIMIT 1
+        `;
+        if ((serialRows as Array<{ id: string }>).length === 0) {
+          unavailableSerials.push(serialId);
+        }
+      }
+    }
+    if (unavailableSerials.length > 0) {
+      return apiResponse.error(
+        res,
+        ErrorCode.BAD_REQUEST,
+        `The following serials are not available: ${unavailableSerials.join(', ')}`,
+        { code: 'SERIAL_NOT_AVAILABLE', unavailableSerials },
+      );
+    }
+    // ── End serial availability check ────────────────────────────────────────
 
     // Generate picking number
     const countResult = await sql`SELECT COUNT(*) as count FROM stock_pickings`;
