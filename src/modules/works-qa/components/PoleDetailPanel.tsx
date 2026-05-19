@@ -30,6 +30,7 @@ import type { Discipline } from '../utils/approval-gates';
 import { log } from '@/lib/logger';
 import { PhotoLightbox } from '@/components/PhotoLightbox';
 import { ConfirmPlantedModal } from './ConfirmPlantedModal';
+import { SnagPoleCommentModal } from './SnagPoleCommentModal';
 import type { PoleQaPhoto } from '../types/works-qa.types';
 
 interface PoleDetailPanelProps {
@@ -44,6 +45,7 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
   const [showSnagModal, setShowSnagModal] = useState(false);
+  const [showCommentModal, setShowCommentModal] = useState(false);
   const [tab, setTab] = useState<'photos' | 'snags'>('photos');
   // Accordion state: multi-open SET of expanded disciplines. Defaults to all
   // three so every Droppable has measurable geometry at drag start (rfd
@@ -227,9 +229,19 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
               type="button"
               onClick={() => setShowSnagModal(true)}
               className="px-2 py-1 rounded text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700"
-              title="Confirm: is this pole planted?"
+              title="Confirm: is this pole planted on site?"
             >
-              🚩 Snag pole
+              🚩 Snag pole (planted check)
+            </button>
+          )}
+          {pole && (
+            <button
+              type="button"
+              onClick={() => setShowCommentModal(true)}
+              className="px-2 py-1 rounded text-xs bg-red-900/40 hover:bg-red-800/60 text-zinc-100 border border-red-900/60"
+              title="Raise a snag against this pole with a free-text comment"
+            >
+              ⚠ Snag (other issue)
             </button>
           )}
           <button type="button" onClick={onClose} className="text-zinc-500 hover:text-zinc-200 text-lg leading-none">×</button>
@@ -329,6 +341,16 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
           poleQaPhotoId={pole.id}
           poleLabel={pole.pole_label}
           onClose={() => setShowSnagModal(false)}
+          onChanged={() => { void mutate(); }}
+        />
+      )}
+      {pole && showCommentModal && (
+        <SnagPoleCommentModal
+          open={showCommentModal}
+          projectId={pole.project_id}
+          poleQaPhotoId={pole.id}
+          poleLabel={pole.pole_label}
+          onClose={() => setShowCommentModal(false)}
           onChanged={() => { void mutate(); }}
         />
       )}

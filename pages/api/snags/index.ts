@@ -180,9 +180,14 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'description is required');
   }
 
-  const isVerification = body.category === 'verification';
+  // Ad-hoc works_qa snag: category=verification OR (category=quality + pole_qa_photo_id without report_id).
+  // The presence of pole_qa_photo_id without report_id is the canonical signal that this row
+  // originates from the Field App / Works QA dashboard rather than a TQR PDF import.
+  const isAdHocWorksQa =
+    body.category === 'verification' ||
+    (!!body.pole_qa_photo_id && !body.report_id);
 
-  if (!isVerification) {
+  if (!isAdHocWorksQa) {
     if (!body.report_id) {
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'report_id is required');
     }
@@ -192,7 +197,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   }
 
   let rows: Snag[];
-  if (isVerification) {
+  if (isAdHocWorksQa) {
     rows = await sql`
       INSERT INTO snags (
         report_id, project_id, snag_number,
