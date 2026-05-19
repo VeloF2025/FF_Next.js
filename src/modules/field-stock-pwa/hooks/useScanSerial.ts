@@ -88,7 +88,6 @@ export function useScanSerial({ stockItem, scanned, onChange }: UseScanSerialOpt
           .concat(resolved)
       );
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [scanned, scannedSet, stockItem, onChange]
   );
 
