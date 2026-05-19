@@ -106,7 +106,7 @@ async function tryFetchPhotos(dropNumber: string): Promise<{
     // the Gizzu shape so the bad value never enters our DB. The WA flow then
     // asks for a serial photo and routes through VLM extraction, which has its
     // own validation.
-    const rawUps = data.ups_serial || null;
+    const rawUps: string | null = typeof data.ups_serial === 'string' ? data.ups_serial : null;
     const ups_serial = rawUps && looksLikeGizzuSerial(rawUps) ? rawUps : null;
     if (rawUps && !ups_serial) {
       log.warn(
