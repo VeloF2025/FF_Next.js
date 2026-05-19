@@ -308,6 +308,49 @@ export async function validateSerial(serialNumber: string): Promise<{
 }
 
 // =============================================================================
+// Serial-tracked stock items
+// =============================================================================
+
+/**
+ * Server row shape returned by GET /api/procurement/field-stock/items.
+ * Only the fields needed for PickItemStep are mapped.
+ */
+interface StockItemRow {
+  id: string;
+  name: string;
+  item_code: string | null;
+  tracking_type: string;
+}
+
+/**
+ * Fetch all active stock items that use serial-number tracking.
+ *
+ * Uses GET /api/procurement/field-stock/items?trackingType=serial
+ * which filters server-side (Branch 5 in items.ts). Client-side
+ * search filtering is applied when `opts.search` is provided.
+ *
+ * The endpoint returns at most 100 rows. If the catalogue grows
+ * beyond that, a dedicated paginated endpoint will be needed.
+ * TODO(Task 2.7): evaluate if 100-row cap is sufficient in production.
+ */
+export async function fetchSerialStockItems(
+  opts: { search?: string } = {}
+): Promise<Array<{ id: string; name: string; sku: string | null }>> {
+  const params = new URLSearchParams({ trackingType: 'serial' });
+  if (opts.search) {
+    params.set('search', opts.search);
+  }
+  const rows = await request<StockItemRow[]>(
+    `/api/procurement/field-stock/items?${params.toString()}`
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    sku: r.item_code ?? null,
+  }));
+}
+
+// =============================================================================
 // Submit issue picking
 // =============================================================================
 
