@@ -28,6 +28,7 @@ import {
 import type { AttendanceProfile } from '@/modules/attendance/portal/client/api';
 import { MyPortalShell } from '@/modules/attendance/portal/client/MyPortalShell';
 import { useStockSync } from '@/modules/field-stock-pwa/offline/useStockSync';
+import { AbandonedIssuesBanner } from './AbandonedIssuesBanner';
 
 // =============================================================================
 // Props
@@ -43,7 +44,7 @@ export interface StoresHubProps {
 // =============================================================================
 
 export function StoresHub({ profile, onIssue }: StoresHubProps) {
-  const { pendingCount, syncing } = useStockSync();
+  const { pendingCount, abandonedCount, syncing, dismissAbandoned } = useStockSync();
   const isPending = profile.accountStatus === 'pending';
 
   return (
@@ -53,6 +54,17 @@ export function StoresHub({ profile, onIssue }: StoresHubProps) {
       staffPhotoUrl={profile.profilePhotoUrl}
       showFooterNav={false}
     >
+      {/* Abandoned-issues banner — permanently-failed queued pickings */}
+      {abandonedCount > 0 && (
+        <AbandonedIssuesBanner
+          count={abandonedCount}
+          onView={() => {
+            // Inline panel — no navigation needed yet.
+          }}
+          onDismiss={dismissAbandoned}
+        />
+      )}
+
       {/* Pending account banner */}
       {isPending && (
         <div

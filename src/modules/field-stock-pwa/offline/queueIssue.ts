@@ -9,7 +9,10 @@
  * DB name: 'field-stock-pwa-v1'  (distinct from 'AttendanceOfflineDB' so the
  * two modules never share quota or risk key collisions).
  *
- * Object store: 'pending-issues', keyPath: 'id' (uuid generated client-side).
+ * Object stores:
+ *   - 'pending-issues'  keyPath: 'id' — items waiting to sync
+ *   - 'abandoned-issues' keyPath: 'id' — items that hit MAX_ATTEMPTS on 4xx;
+ *     retained for manual review by the stores person.
  *
  * Version history:
  *   v1 — initial schema (PwaIssueDraft lacked sourceLocationId/destinationLocationId)
@@ -19,6 +22,8 @@
  *        (deleteObjectStore + recreate). Any queued v1 items are lost — safer than
  *        draining them with garbage location IDs. The stores flow is short enough
  *        that an offline-queued item is unlikely to survive a full app reload.
+ *   v3 — Adds 'abandoned-issues' store. ADDITIVE migration: pending-issues items
+ *        are preserved unchanged. Only the new store is created.
  */
 
 // 🟢 WORKING: raw-IDB pattern mirrors attendance/portal/client/offline/db.ts
@@ -26,8 +31,9 @@
 import type { PwaIssueDraft } from '../types';
 
 const DB_NAME = 'field-stock-pwa-v1';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE = 'pending-issues';
+const ABANDONED_STORE = 'abandoned-issues';
 
 /** A single queued issue waiting to be submitted when the device comes online. */
 export interface QueuedIssue {
@@ -38,6 +44,27 @@ export interface QueuedIssue {
   enqueuedAt: number;
   attempts: number;
   lastError?: string;
+}
+
+/**
+ * A permanently-failed queued issue, moved here after MAX_ATTEMPTS on a 4xx
+ * response. Retained on-device so the stores person can see what happened
+ * and re-issue manually if needed.
+ *
+ * Unlike pending-issues, abandoned items are NEVER auto-retried. They grow
+ * unbounded until explicitly dismissed via clearAbandoned(id).
+ * Future: add auto-archive after 30 days (separate ticket).
+ */
+export interface AbandonedIssue {
+  /** The original queue UUID. */
+  id: string;
+  draft: PwaIssueDraft;
+  /** Epoch ms when the issue was first enqueued. */
+  enqueuedAt: number;
+  /** Epoch ms when it was moved to abandoned. */
+  abandonedAt: number;
+  attempts: number;
+  lastError: string;
 }
 
 /** Singleton promise so concurrent callers share one `open` request. */
@@ -52,14 +79,19 @@ function openDb(): Promise<IDBDatabase> {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = (event) => {
       const d = req.result;
-      // On upgrade from v1: purge stale items that lack required location IDs.
-      // deleteObjectStore + recreate is the safest approach — v1 items had
+      // v1 → v2: purge stale pending-issues items that lacked required location IDs.
+      // deleteObjectStore + recreate was the safest approach — v1 items had
       // no sourceLocationId / destinationLocationId and would corrupt pickings.
       if (event.oldVersion < 2 && d.objectStoreNames.contains(STORE)) {
         d.deleteObjectStore(STORE);
       }
       if (!d.objectStoreNames.contains(STORE)) {
         d.createObjectStore(STORE, { keyPath: 'id' });
+      }
+      // v2 → v3: ADDITIVE — only add the abandoned-issues store.
+      // Existing pending-issues items are preserved unchanged.
+      if (!d.objectStoreNames.contains(ABANDONED_STORE)) {
+        d.createObjectStore(ABANDONED_STORE, { keyPath: 'id' });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -71,14 +103,15 @@ function openDb(): Promise<IDBDatabase> {
 }
 
 function tx<T>(
+  storeName: string,
   mode: IDBTransactionMode,
   fn: (store: IDBObjectStore) => Promise<T> | T
 ): Promise<T> {
   return openDb().then(
     (db) =>
       new Promise<T>((resolve, reject) => {
-        const transaction = db.transaction(STORE, mode);
-        const store = transaction.objectStore(STORE);
+        const transaction = db.transaction(storeName, mode);
+        const store = transaction.objectStore(storeName);
         let result: T;
         Promise.resolve(fn(store))
           .then((r) => { result = r; })
@@ -111,13 +144,13 @@ function promisifyRequest<T>(req: IDBRequest<T>): Promise<T> {
 export async function enqueueIssue(draft: PwaIssueDraft): Promise<string> {
   const id = crypto.randomUUID();
   const entry: QueuedIssue = { id, draft, enqueuedAt: Date.now(), attempts: 0 };
-  await tx('readwrite', (s) => promisifyRequest(s.put(entry)));
+  await tx(STORE, 'readwrite', (s) => promisifyRequest(s.put(entry)));
   return id;
 }
 
 /** Return all queued issues, oldest-first (sorted by `enqueuedAt`). */
 export async function listQueued(): Promise<QueuedIssue[]> {
-  return tx('readonly', async (s) => {
+  return tx(STORE, 'readonly', async (s) => {
     const all = await promisifyRequest(s.getAll() as IDBRequest<QueuedIssue[]>);
     return all.sort((a, b) => a.enqueuedAt - b.enqueuedAt);
   });
@@ -125,7 +158,7 @@ export async function listQueued(): Promise<QueuedIssue[]> {
 
 /** Remove a queued issue permanently (call on 2xx from the server). */
 export async function dropQueued(id: string): Promise<void> {
-  await tx('readwrite', (s) => promisifyRequest(s.delete(id)));
+  await tx(STORE, 'readwrite', (s) => promisifyRequest(s.delete(id)));
 }
 
 /**
@@ -136,11 +169,57 @@ export async function dropQueued(id: string): Promise<void> {
  * whether to also drop permanently after MAX_ATTEMPTS.
  */
 export async function bumpAttempt(id: string, error: string): Promise<void> {
-  await tx('readwrite', async (s) => {
+  await tx(STORE, 'readwrite', async (s) => {
     const row = await promisifyRequest(s.get(id) as IDBRequest<QueuedIssue | undefined>);
     if (!row) return;
     await promisifyRequest(s.put({ ...row, attempts: row.attempts + 1, lastError: error }));
   });
+}
+
+// =============================================================================
+// Abandoned-issues store — permanently-failed queue items
+// =============================================================================
+
+/**
+ * Move a queued item to the abandoned-issues store.
+ *
+ * The write to abandoned-issues is done first; only if that succeeds is the
+ * item deleted from pending-issues. This prevents silent data loss if either
+ * step fails mid-way.
+ *
+ * Called by useStockSync when MAX_ATTEMPTS is hit on a 4xx error.
+ */
+export async function abandonIssue(item: QueuedIssue): Promise<void> {
+  const abandoned: AbandonedIssue = {
+    id: item.id,
+    draft: item.draft,
+    enqueuedAt: item.enqueuedAt,
+    abandonedAt: Date.now(),
+    attempts: item.attempts,
+    lastError: item.lastError ?? 'Unknown error',
+  };
+  await tx(ABANDONED_STORE, 'readwrite', (s) =>
+    promisifyRequest(s.put(abandoned))
+  );
+  await tx(STORE, 'readwrite', (s) => promisifyRequest(s.delete(item.id)));
+}
+
+/** Return all abandoned issues, newest-first (most recently abandoned first). */
+export async function listAbandoned(): Promise<AbandonedIssue[]> {
+  return tx(ABANDONED_STORE, 'readonly', async (s) => {
+    const all = await promisifyRequest(s.getAll() as IDBRequest<AbandonedIssue[]>);
+    return all.sort((a, b) => b.abandonedAt - a.abandonedAt);
+  });
+}
+
+/**
+ * Remove a single abandoned issue from the audit store.
+ *
+ * Called when the stores person has handled the item manually and wants to
+ * dismiss it from the banner.
+ */
+export async function clearAbandoned(id: string): Promise<void> {
+  await tx(ABANDONED_STORE, 'readwrite', (s) => promisifyRequest(s.delete(id)));
 }
 
 // =============================================================================
