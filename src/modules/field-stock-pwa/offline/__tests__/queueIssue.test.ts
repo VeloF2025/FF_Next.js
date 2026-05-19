@@ -28,6 +28,9 @@ import {
   listQueued,
   dropQueued,
   bumpAttempt,
+  abandonIssue,
+  listAbandoned,
+  clearAbandoned,
   __resetDbForTests,
 } from '../queueIssue';
 import type { PwaIssueDraft } from '../../types';
@@ -245,5 +248,176 @@ describe('v1 → v2 upgrade', () => {
     const items = await listQueued();
     expect(items).toHaveLength(1);
     expect(items[0].id).toBe(id);
+  });
+});
+
+// =============================================================================
+// abandonIssue
+// =============================================================================
+
+describe('abandonIssue', () => {
+  it('happy path: moves item from pending to abandoned store', async () => {
+    const id = await enqueueIssue(draft());
+    const pending = await listQueued();
+    expect(pending).toHaveLength(1);
+
+    const queued = pending[0];
+    const beforeAbandon = Date.now();
+    await abandonIssue(queued);
+    const afterAbandon = Date.now();
+
+    // pending-issues store must be empty after move.
+    const remaining = await listQueued();
+    expect(remaining).toHaveLength(0);
+
+    // abandoned-issues store must have the item with required shape.
+    const abandoned = await listAbandoned();
+    expect(abandoned).toHaveLength(1);
+    expect(abandoned[0].id).toBe(id);
+    expect(abandoned[0].draft).toEqual(queued.draft);
+    expect(abandoned[0].enqueuedAt).toBe(queued.enqueuedAt);
+    expect(abandoned[0].abandonedAt).toBeGreaterThanOrEqual(beforeAbandon);
+    expect(abandoned[0].abandonedAt).toBeLessThanOrEqual(afterAbandon);
+    // lastError defaults to 'Unknown error' when undefined on the queued item.
+    expect(abandoned[0].lastError).toBe('Unknown error');
+  });
+
+  it('honours lastError from the queued item', async () => {
+    const id = await enqueueIssue(draft());
+    await bumpAttempt(id, '400 Invalid technicianId');
+    const pending = await listQueued();
+    await abandonIssue(pending[0]);
+
+    const abandoned = await listAbandoned();
+    expect(abandoned[0].lastError).toBe('400 Invalid technicianId');
+    expect(abandoned[0].attempts).toBe(1);
+  });
+
+  it('is a noop on the abandoned store when the queued item does not exist in pending', async () => {
+    // Construct a synthetic QueuedIssue that was never written to IDB.
+    // abandonIssue writes to abandoned FIRST, then deletes from pending.
+    // Deleting a non-existent key from IDB is a safe noop, so this must not throw.
+    // The abandoned store should still receive the item (write-first semantics).
+    const syntheticItem = {
+      id: 'ghost-id-abc123',
+      draft: draft(),
+      enqueuedAt: Date.now() - 10_000,
+      attempts: 3,
+      lastError: 'Synthetic error for idempotency test',
+    };
+
+    await expect(abandonIssue(syntheticItem)).resolves.toBeUndefined();
+
+    // The abandoned store should contain the item despite it never being in pending.
+    // This is the two-phase write's intentional behaviour: abandoned-first prevents
+    // silent data loss even if the delete from pending fails/is redundant.
+    const abandoned = await listAbandoned();
+    expect(abandoned.some((a) => a.id === 'ghost-id-abc123')).toBe(true);
+  });
+});
+
+// =============================================================================
+// listAbandoned — ordering
+// =============================================================================
+
+describe('listAbandoned', () => {
+  it('returns items newest-abandonedAt first (descending order)', async () => {
+    // Enqueue and abandon 3 items. Because Date.now() can return the same ms
+    // for fast ops, we verify the ordering property deterministically by
+    // inspecting the sort: each item's abandonedAt must be >= the next item's.
+    const id1 = await enqueueIssue(draft({ technicianId: 'tech-A' }));
+    const id2 = await enqueueIssue(draft({ technicianId: 'tech-B' }));
+    const id3 = await enqueueIssue(draft({ technicianId: 'tech-C' }));
+
+    const all = await listQueued();
+    const byId = Object.fromEntries(all.map((q) => [q.id, q]));
+
+    // Abandon in insertion order to generate naturally ascending abandonedAt values.
+    await abandonIssue(byId[id1]);
+    await abandonIssue(byId[id2]);
+    await abandonIssue(byId[id3]);
+
+    const abandoned = await listAbandoned();
+    expect(abandoned).toHaveLength(3);
+
+    // listAbandoned sorts newest-first: each item's abandonedAt >= next item's.
+    for (let i = 0; i + 1 < abandoned.length; i++) {
+      expect(abandoned[i].abandonedAt).toBeGreaterThanOrEqual(abandoned[i + 1].abandonedAt);
+    }
+
+    // All three IDs are present.
+    const ids = abandoned.map((a) => a.id);
+    expect(ids).toContain(id1);
+    expect(ids).toContain(id2);
+    expect(ids).toContain(id3);
+  });
+
+  it('returns an empty array when no items are abandoned', async () => {
+    const result = await listAbandoned();
+    expect(result).toEqual([]);
+  });
+});
+
+// =============================================================================
+// clearAbandoned
+// =============================================================================
+
+describe('clearAbandoned', () => {
+  it('removes a single abandoned item by id', async () => {
+    const id1 = await enqueueIssue(draft({ technicianId: 'keep' }));
+    const id2 = await enqueueIssue(draft({ technicianId: 'remove' }));
+    const all = await listQueued();
+    const byId = Object.fromEntries(all.map((q) => [q.id, q]));
+
+    await abandonIssue(byId[id1]);
+    await abandonIssue(byId[id2]);
+
+    await clearAbandoned(id2);
+
+    const abandoned = await listAbandoned();
+    expect(abandoned).toHaveLength(1);
+    expect(abandoned[0].id).toBe(id1);
+  });
+
+  it('is idempotent when called with a non-existent id', async () => {
+    await expect(clearAbandoned('never-abandoned-uuid')).resolves.toBeUndefined();
+    const abandoned = await listAbandoned();
+    expect(abandoned).toHaveLength(0);
+  });
+});
+
+// =============================================================================
+// v2 → v3 migration: additive (pending items survive, abandoned store created)
+// =============================================================================
+
+describe('v2 → v3 migration', () => {
+  it('pending items survive the upgrade; abandoned store is empty on first open', async () => {
+    // fake-indexeddb resets fully after each __resetDbForTests(). We cannot
+    // simulate a real v2→v3 upgrade at the IDB level in jsdom because a fresh
+    // deleteDatabase + reopen always creates the latest schema from scratch.
+    //
+    // What we CAN verify is the additive contract:
+    //  1. After a fresh open (v3), pending items can be enqueued and read back.
+    //  2. The abandoned store exists and starts empty.
+    //  3. Items abandoned AFTER the open behave correctly.
+    //
+    // This documents that the v2→v3 upgrade is additive — the abandoned store
+    // is created without touching pending-issues — as asserted in the source.
+
+    const id = await enqueueIssue(draft({ notes: 'v3-pending-item' }));
+
+    // Abandoned store must exist (not throw) and be empty at first open.
+    const abandonedBeforeAny = await listAbandoned();
+    expect(abandonedBeforeAny).toHaveLength(0);
+
+    // Pending item must still be present (i.e. was not affected by v3 setup).
+    const pendingItems = await listQueued();
+    expect(pendingItems).toHaveLength(1);
+    expect(pendingItems[0].id).toBe(id);
+
+    // Abandon the item and confirm both stores update correctly.
+    await abandonIssue(pendingItems[0]);
+    expect(await listQueued()).toHaveLength(0);
+    expect(await listAbandoned()).toHaveLength(1);
   });
 });

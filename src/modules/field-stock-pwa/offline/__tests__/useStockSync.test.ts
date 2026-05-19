@@ -33,7 +33,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 
 import { ApiError } from '../../api';
-import { enqueueIssue, listQueued, __resetDbForTests } from '../queueIssue';
+import {
+  abandonIssue,
+  enqueueIssue,
+  listAbandoned,
+  listQueued,
+  __resetDbForTests,
+} from '../queueIssue';
 import type { PwaIssueDraft } from '../../types';
 
 // =============================================================================
@@ -196,7 +202,7 @@ describe('useStockSync — drain with 4xx and MAX_ATTEMPTS boundary', () => {
     await bumpAttempt(id, 'prior 2');
     await bumpAttempt(id, 'prior 3');
     await bumpAttempt(id, 'prior 4');
-    // attempts == 4 now; drain bumps to 5 → drop.
+    // attempts == 4 now; drain bumps to 5 → abandonIssue called.
 
     mockSubmitIssue.mockRejectedValue(
       new ApiError(400, 'BAD_REQUEST', 'Invalid technicianId')
@@ -211,9 +217,19 @@ describe('useStockSync — drain with 4xx and MAX_ATTEMPTS boundary', () => {
       await result.current.drain();
     });
 
+    // Pending store must be empty — item moved to abandoned.
     const remaining = await listQueued();
     expect(remaining).toHaveLength(0);
     expect(result.current.pendingCount).toBe(0);
+
+    // Abandoned store must contain the item with the final lastError.
+    const abandoned = await listAbandoned();
+    expect(abandoned).toHaveLength(1);
+    expect(abandoned[0].id).toBe(id);
+    expect(abandoned[0].lastError).toBe('Invalid technicianId');
+
+    // Hook must surface abandonedCount=1 after the drain finishes.
+    expect(result.current.abandonedCount).toBe(1);
   });
 
   it('retains item with attempts=4 (one below MAX_ATTEMPTS of 5)', async () => {
@@ -474,5 +490,64 @@ describe('useStockSync — 60 s periodic poll', () => {
     expect(remaining).toHaveLength(0);
     // Confirm drain was called at least twice (once for online event, once manually).
     expect(mockSubmitIssue.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// =============================================================================
+// abandonedCount and dismissAbandoned
+// =============================================================================
+
+describe('useStockSync — abandonedCount reflects pre-seeded abandoned items', () => {
+  it('shows abandonedCount=1 on mount when one item is pre-seeded via abandonIssue', async () => {
+    mockOnline = false;
+
+    // Seed one item into the pending store then immediately abandon it so
+    // the abandoned store has one entry before the hook mounts.
+    const id = await enqueueIssue(draft({ technicianId: 'pre-abandoned' }));
+    const pending = await listQueued();
+    const queued = pending.find((q) => q.id === id)!;
+    await abandonIssue({ ...queued, lastError: 'Pre-seeded abandon' });
+
+    const useStockSync = await importHook();
+    const { result } = renderHook(() => useStockSync());
+
+    // Mount effect reads from IDB; abandonedCount must reflect the 1 pre-seeded item.
+    await waitFor(() => {
+      expect(result.current.abandonedCount).toBe(1);
+    });
+    // Pending store was cleared by abandonIssue; pendingCount must be 0.
+    expect(result.current.pendingCount).toBe(0);
+  });
+});
+
+describe('useStockSync — dismissAbandoned removes item and updates abandonedCount', () => {
+  it('clears abandonedCount and abandoned store after dismissAbandoned is called', async () => {
+    mockOnline = false;
+
+    // Pre-seed one abandoned item.
+    const id = await enqueueIssue(draft({ technicianId: 'dismiss-me' }));
+    const pending = await listQueued();
+    const queued = pending.find((q) => q.id === id)!;
+    await abandonIssue({ ...queued, lastError: 'Dismiss test' });
+
+    const useStockSync = await importHook();
+    const { result } = renderHook(() => useStockSync());
+
+    // Wait for mount count to settle.
+    await waitFor(() => {
+      expect(result.current.abandonedCount).toBe(1);
+    });
+
+    // Dismiss the item.
+    await act(async () => {
+      await result.current.dismissAbandoned(id);
+    });
+
+    // Hook count must drop to 0.
+    expect(result.current.abandonedCount).toBe(0);
+
+    // IDB abandoned store must also be empty.
+    const abandoned = await listAbandoned();
+    expect(abandoned).toHaveLength(0);
   });
 });
