@@ -11,6 +11,7 @@
 import { log } from '@/lib/logger';
 import { PhotoInput } from './categorizationVlmService';
 import { photoTypeToStep } from '../utils/stepMapper';
+import { looksLikeGizzuSerial } from './serialValidator';
 
 // OneMap API host
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';
@@ -99,11 +100,27 @@ async function tryFetchPhotos(dropNumber: string): Promise<{
       original_step: photo.type ? photoTypeToStep(photo.type) : null,
     }));
 
+    // OneMap returns 1Map's `br_ser` field verbatim. Field techs sometimes scan
+    // the EAN-13 barcode (e.g. 4897119170702) on the Gizzu UPS box instead of
+    // entering the GU18W12V serial below it. Drop anything that doesn't match
+    // the Gizzu shape so the bad value never enters our DB. The WA flow then
+    // asks for a serial photo and routes through VLM extraction, which has its
+    // own validation.
+    const rawUps = data.ups_serial || null;
+    const ups_serial = rawUps && looksLikeGizzuSerial(rawUps) ? rawUps : null;
+    if (rawUps && !ups_serial) {
+      log.warn(
+        `Rejected non-Gizzu UPS serial from OneMap for ${dropNumber}: ${rawUps}`,
+        undefined,
+        'PhotoFetch'
+      );
+    }
+
     return {
       success: photos.length > 0,
       photos,
       ont_barcode: data.ont_barcode || null,
-      ups_serial: data.ups_serial || null,
+      ups_serial,
       needsDownload: photos.length === 0,
     };
   } catch (error) {
