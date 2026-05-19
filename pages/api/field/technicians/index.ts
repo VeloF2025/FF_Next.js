@@ -79,10 +79,7 @@ export default withAuth(withErrorHandler(async (
         avgRating: transformedTechnicians.reduce((sum, t) => sum + t.rating, 0) / (transformedTechnicians.length || 1),
       };
 
-      res.status(200).json({ 
-        technicians: transformedTechnicians,
-        ...stats
-      });
+      return apiResponse.success(res, { technicians: transformedTechnicians, ...stats });
     } catch (error) {
       log.error('Error fetching technicians', { error });
       apiResponse.internalError(res, new Error('Failed to fetch technicians'));
@@ -140,10 +137,41 @@ export default withAuth(withErrorHandler(async (
     if (capturedStatus === 201 && body201?.data?.user?.id) {
       const newId = body201.data.user.id;
       try {
+        // ── H6 (blind review 2026-05-19): Explicit column projection ───────────
+        // Previously used SELECT * which exposes columns added by later migrations
+        // (e.g. role, account_status, created_by_staff_id from migration 346).
+        // We project only the columns that existed in the original pre-shim
+        // INSERT … RETURNING * surface: the nine INSERT columns plus id,
+        // created_at, updated_at. This preserves the legacy response contract
+        // without leaking newer additions to this public-facing shim endpoint.
+        // ────────────────────────────────────────────────────────────────────────
         const rows = await sql`
-          SELECT * FROM staff WHERE id = ${newId} LIMIT 1
+          SELECT
+            id,
+            employee_id,
+            first_name,
+            last_name,
+            email,
+            phone,
+            department,
+            position,
+            status,
+            contract_type,
+            created_at,
+            updated_at
+          FROM staff
+          WHERE id = ${newId}
+          LIMIT 1
         `;
         const technician = rows[0] ?? null;
+        // ── H1 (blind review 2026-05-19): LEGACY_RESPONSE_SHAPE ─────────────
+        // This POST path is a backward-compatibility shim. Its callers expect:
+        //   201  { message: 'Technician added successfully', technician: <row> }
+        // Using apiResponse.created() would emit { success:true, data:..., message }
+        // which breaks the contract. There is no apiResponse.raw() escape hatch.
+        // Decision: preserve raw JSON here and document the deviation. This shim
+        // exists specifically to bridge legacy callers — contract > strict convention.
+        // ────────────────────────────────────────────────────────────────────────
         res.status(201).json({ message: 'Technician added successfully', technician });
       } catch (dbErr) {
         log.error('Failed to fetch full staff row after technician create', { error: dbErr }, 'TechniciansShim');
