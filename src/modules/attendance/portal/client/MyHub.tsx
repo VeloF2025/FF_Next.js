@@ -21,6 +21,7 @@ import {
   Receipt,
   History as HistoryIcon,
   AlertCircle,
+  Package,
 } from 'lucide-react';
 
 import { getHubSummary, requestFleetHandoff } from './api';
@@ -114,6 +115,9 @@ export function MyHub({ profile }: MyHubProps) {
           summary={summary}
           onClick={() => router.push('/my/attendance/corrections')}
         />
+        {(profile.role === 'stores' || profile.role === 'admin') && (
+          <StoresTile onClick={() => router.push('/my/stores')} />
+        )}
       </div>
 
       <button
@@ -299,6 +303,18 @@ function CorrectionsTile({
       }
       badge={pending > 0 ? String(pending) : null}
       badgeClass="bg-blue-600 text-white border-blue-500"
+    />
+  );
+}
+
+function StoresTile({ onClick }: { onClick: () => void }) {
+  return (
+    <Tile
+      onClick={onClick}
+      icon={<Package className="w-5 h-5" />}
+      iconClass="bg-amber-500/15 text-amber-300"
+      title="Stores"
+      subtitle="Issue &amp; return field stock"
     />
   );
 }
