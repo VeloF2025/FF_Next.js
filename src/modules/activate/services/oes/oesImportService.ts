@@ -240,6 +240,12 @@ export async function importPPData(ppRows: PPRow[], filename: string): Promise<v
            -- ticket is still open caused daily duplicate creates (the
            -- pp-data-tickets endpoint's eligibility query re-fires on
            -- maintenance_ticket_id IS NULL).
+           --
+           -- PERF: the EXISTS sub-query runs once per conflicting row inside
+           -- the bulk INSERT. For our expected import sizes (≤ low thousands
+           -- of rows per chunk, with re-entries being a small fraction) this
+           -- is acceptable. If imports balloon, replace with a CTE that
+           -- pre-joins the open-ticket set once before the upsert.
            resolution_status = CASE
              WHEN oes_pp_data.resolution_status = 'activated' THEN 'not_found'
              ELSE oes_pp_data.resolution_status

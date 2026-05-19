@@ -72,8 +72,11 @@ UPDATE maintenance_tickets t
   FROM duplicates d
  WHERE t.id = d.id;
 
--- Also relink the source oes_pp_data row to the earliest ticket so the
--- post-import reconciliation sees a stable link going forward.
+-- Also relink the source oes_pp_data row to the earliest OPEN ticket so the
+-- post-import reconciliation sees a stable link going forward. Excluding
+-- resolved/closed/cancelled tickets matters: if the earliest ticket is
+-- already closed, the OES re-entry path will null out maintenance_ticket_id
+-- on the next import (correctly), so we shouldn't pin to a dead ticket here.
 WITH ranked AS (
   SELECT
     t.id,
@@ -89,6 +92,7 @@ WITH ranked AS (
     ) AS earliest_id
   FROM maintenance_tickets t
   WHERE t.source = 'pp_data'
+    AND t.status NOT IN ('resolved', 'closed', 'cancelled')
     AND t.dr_number IS NOT NULL
     AND t.ont_serial IS NOT NULL
 )
@@ -99,5 +103,16 @@ UPDATE oes_pp_data p
    AND p.resolved_drop_number = r.dr_number
    AND p.serial_number = r.ont_serial
    AND p.maintenance_ticket_id IS DISTINCT FROM r.earliest_id;
+
+-- Now that duplicates are closed, enforce uniqueness at the DB layer so
+-- concurrent POSTs against pp-data-tickets can't bypass the application-level
+-- findDuplicateTickets check. Predicate matches the dedup semantics:
+-- "one open pp_data ticket per ONT serial". Different serials on the same
+-- DR remain allowed (rare but legitimate — ONT swap mid-investigation).
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_open_pp_data_ticket_per_serial
+  ON maintenance_tickets (ont_serial)
+  WHERE source = 'pp_data'
+    AND ont_serial IS NOT NULL
+    AND status NOT IN ('resolved', 'closed', 'cancelled');
 
 COMMIT;

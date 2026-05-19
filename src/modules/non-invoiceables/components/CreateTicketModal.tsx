@@ -121,7 +121,18 @@ function bestSerial(item: SelectedItem): string | undefined {
 }
 
 
-async function postJson(url: string, body: Record<string, unknown>): Promise<void> {
+interface CreateTicketsResult {
+  created: number;
+  linkedToExisting: number;
+}
+
+/**
+ * POST and parse a count-bearing response. Handles three shapes:
+ *  - { created, linked_to_existing } (pp-data-tickets, olt-report/tickets — bulk)
+ *  - { success: false, ticket_uid } (serial-mismatches/create-ticket — single, dedup hit, HTTP 200)
+ *  - { success: true, ticket_id }   (serial-mismatches/create-ticket — single, created, HTTP 200)
+ */
+async function postJson(url: string, body: Record<string, unknown>): Promise<CreateTicketsResult> {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -134,6 +145,23 @@ async function postJson(url: string, body: Record<string, unknown>): Promise<voi
     });
     throw new Error((data as { message?: string }).message ?? `HTTP ${res.status}`);
   }
+  const payload = await res.json().catch((err: unknown) => {
+    log.debug('create-ticket-modal', { message: 'non-JSON success body', err: String(err) });
+    return {};
+  });
+  const data = (payload as { data?: Record<string, unknown> }).data ?? payload as Record<string, unknown>;
+  if (typeof data.created === 'number') {
+    return {
+      created: data.created as number,
+      linkedToExisting: typeof data.linked_to_existing === 'number' ? data.linked_to_existing as number : 0,
+    };
+  }
+  // Single-item endpoints return { success, ticket_id|ticket_uid } at HTTP 200
+  // regardless of whether a ticket was created or relinked.
+  if (data.success === false) {
+    return { created: 0, linkedToExisting: 1 };
+  }
+  return { created: 1, linkedToExisting: 0 };
 }
 
 async function fetchDuplicates(item: SelectedItem): Promise<DuplicateTicket[]> {
@@ -292,7 +320,7 @@ export function CreateTicketModal({
       assigned_team_id: assignedTeamId ?? undefined,
     };
 
-    const calls: Promise<void>[] = [
+    const calls: Promise<CreateTicketsResult>[] = [
       ...(ppIds.length > 0
         ? [postJson('/api/activate/pp-data-tickets', { pp_data_ids: ppIds, ...shared })]
         : []),
@@ -304,9 +332,23 @@ export function CreateTicketModal({
       ),
     ];
 
-    await Promise.all(calls);
-    log.info('CreateTicketModal: tickets created', { count: items.length, ticketType, priority });
-    toast.success(`${items.length} ticket${items.length !== 1 ? 's' : ''} created.`);
+    const results = await Promise.all(calls);
+    const totals = results.reduce<CreateTicketsResult>(
+      (acc, r) => ({ created: acc.created + r.created, linkedToExisting: acc.linkedToExisting + r.linkedToExisting }),
+      { created: 0, linkedToExisting: 0 },
+    );
+    log.info('CreateTicketModal: tickets processed', {
+      submitted: items.length,
+      created: totals.created,
+      linked_to_existing: totals.linkedToExisting,
+      ticketType,
+      priority,
+    });
+    const createdMsg = `${totals.created} ticket${totals.created !== 1 ? 's' : ''} created`;
+    const linkedMsg = totals.linkedToExisting > 0
+      ? `, ${totals.linkedToExisting} linked to existing`
+      : '';
+    toast.success(`${createdMsg}${linkedMsg}.`);
   };
 
   /** Apply "link" actions then create the remaining clean items. */

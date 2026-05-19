@@ -9,6 +9,10 @@
 
 BEGIN;
 
+-- Drop the unique index first; reopening tickets would otherwise fail
+-- the constraint as duplicates come back into the open set.
+DROP INDEX IF EXISTS uniq_open_pp_data_ticket_per_serial;
+
 WITH marker AS (
   SELECT DISTINCT ticket_id
     FROM maintenance_notes
@@ -23,8 +27,15 @@ UPDATE maintenance_tickets t
  WHERE t.id = m.ticket_id
    AND t.status = 'closed';
 
-DELETE FROM maintenance_notes
- WHERE note_type = 'system'
-   AND content LIKE 'Auto-closed as duplicate of % (migration 355_close_duplicate_pp_data_tickets).';
+DELETE FROM maintenance_notes n
+ USING (
+   SELECT DISTINCT ticket_id
+     FROM maintenance_notes
+    WHERE note_type = 'system'
+      AND content LIKE 'Auto-closed as duplicate of % (migration 355_close_duplicate_pp_data_tickets).'
+ ) m
+ WHERE n.ticket_id = m.ticket_id
+   AND n.note_type = 'system'
+   AND n.content LIKE 'Auto-closed as duplicate of % (migration 355_close_duplicate_pp_data_tickets).';
 
 COMMIT;
