@@ -6,10 +6,10 @@
  *  - IDB operations delegated to `queueIssue` (not `db.ts`)
  *  - Network call delegates to `submitIssue` from `../api` (DRY: same mapping
  *    shape used at submission time)
- *  - Simplified drain policy — no "dropped events" audit store needed for
- *    stocks (items can be reissued; a lost-shift on attendance has legal weight).
- *    A 4xx that still fails after MAX_ATTEMPTS is dropped silently from the
- *    queue (permanent client-side failures cannot be resolved by retrying).
+ *  - Audit-store pattern for permanently-failed items: stock pickings are signed
+ *    attestation artefacts, so a 4xx that exceeds MAX_ATTEMPTS is moved to the
+ *    'abandoned-issues' store rather than silently deleted. The stores person sees
+ *    them in the AbandonedIssuesBanner and can re-issue or dismiss manually.
  *
  * Drain triggers (same as attendance):
  *  1. Browser fires `online` event.
@@ -22,25 +22,27 @@
  * Error classification (4xx vs 5xx):
  *  - 2xx → `dropQueued(id)`.
  *  - Network error / 5xx / 408 / 429 → transient; `bumpAttempt` and leave.
- *  - 4xx (permanent) → `bumpAttempt`; if attempts >= MAX_ATTEMPTS, `dropQueued`.
+ *  - 4xx (permanent) → `bumpAttempt`; if attempts >= MAX_ATTEMPTS, `abandonIssue`.
  *    MAX_ATTEMPTS = 5 for field-stock: a permanent server-side validation error
  *    (e.g. invalid technicianId) will never self-heal; 5 attempts provides one
- *    retry burst per typical work day before the item is silently removed.
- *    The UI reads `lastError` from `listQueued()` directly if it needs to surface
- *    a reason to the stores person.
+ *    retry burst per typical work day before the item is escalated to abandoned.
  */
 
 // 🟢 WORKING: mirrors useAttendanceSync shape
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { log } from '@/lib/logger';
 import { submitIssue, ApiError } from '../api';
 import {
+  abandonIssue,
   bumpAttempt,
+  clearAbandoned,
   dropQueued,
+  listAbandoned,
   listQueued,
 } from './queueIssue';
-import { useOnlineStatus } from './useOnlineStatus';
+import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
 
 /** After this many failed 4xx attempts the queued issue is permanently dropped.
  *  5xx / network errors do NOT count toward this cap — they are transient. */
@@ -50,14 +52,22 @@ const POLL_INTERVAL_MS = 60_000;
 
 export interface UseStockSyncResult {
   pendingCount: number;
+  /** Number of permanently-failed issues waiting for manual review. */
+  abandonedCount: number;
   syncing: boolean;
   /** Force a sync cycle (e.g. after a fresh enqueue while already online). */
   drain: () => Promise<void>;
+  /**
+   * Dismiss a single abandoned issue from the audit store.
+   * Call after the stores person has handled the item manually.
+   */
+  dismissAbandoned: (id: string) => Promise<void>;
 }
 
 export function useStockSync(): UseStockSyncResult {
   const online = useOnlineStatus();
   const [pendingCount, setPendingCount] = useState(0);
+  const [abandonedCount, setAbandonedCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const inFlight = useRef(false);
   const pendingReflush = useRef(false);
@@ -66,11 +76,24 @@ export function useStockSync(): UseStockSyncResult {
     try {
       const queued = await listQueued();
       setPendingCount(queued.length);
-    } catch {
+    } catch (err) {
       // IDB is unreachable (private mode, quota exceeded, Safari lockdown).
-      // Keep the existing pendingCount rather than resetting to 0 — a stale
+      // Log the underlying failure but retain the last-known count — a stale
       // count is less dangerous than hiding known-queued items.
-      setPendingCount(0);
+      log.warn('useStockSync: listQueued failed, keeping stale pendingCount', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }, []);
+
+  const refreshAbandonedCount = useCallback(async () => {
+    try {
+      const abandoned = await listAbandoned();
+      setAbandonedCount(abandoned.length);
+    } catch (err) {
+      log.warn('useStockSync: listAbandoned failed, keeping stale abandonedCount', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }, []);
 
@@ -116,30 +139,57 @@ export function useStockSync(): UseStockSyncResult {
             // Permanent 4xx failure — increment attempts.
             await bumpAttempt(item.id, message);
 
-            // Drop after MAX_ATTEMPTS: a permanent 4xx (e.g. invalid UUID,
-            // validation error) will never self-heal client-side. After 5
-            // attempts the entry is removed to prevent the queue from wedging.
-            // The stores person must re-issue manually if needed.
+            // ==================================================================
+            // Why we abandon rather than silently drop:
+            //   Stock issue pickings carry a technician signature and serial
+            //   attestation. Silently deleting a failed picking means the
+            //   stores person has no record that the serials left the warehouse
+            //   — this is an audit gap. By moving to abandoned-issues, the item
+            //   is visible in the AbandonedIssuesBanner and can be re-issued or
+            //   acknowledged by a human.
+            //
+            // Abandoned items are NOT auto-retried — the 4xx is permanent
+            //   (e.g. invalid technicianId, validation error) and retrying would
+            //   just burn more attempts with the same result. The stores person
+            //   must take action.
+            //
+            // Audit store size:
+            //   The store grows unbounded today. The UX provides a per-item
+            //   "Dismiss" button (clearAbandoned) as the only drain. Auto-archive
+            //   after 30 days is a future ticket.
+            //
             // Use the pre-bump count + 1 to avoid a second DB read.
+            // ==================================================================
             if (item.attempts + 1 >= MAX_ATTEMPTS) {
-              await dropQueued(item.id);
+              await abandonIssue({ ...item, attempts: item.attempts + 1, lastError: message });
             }
           }
         }
       } while (pendingReflush.current);
     } finally {
       await refreshPendingCount();
+      await refreshAbandonedCount();
       setSyncing(false);
       inFlight.current = false;
     }
-  }, [refreshPendingCount]);
+  }, [refreshPendingCount, refreshAbandonedCount]);
 
-  // Seed pending count on mount. The `online` effect below fires on mount
-  // too (because `online` starts as `true` from useOnlineStatus), so a
-  // separate drain() call here would double-drain. Refresh only.
+  /**
+   * Dismiss a single abandoned issue after the stores person has manually
+   * re-issued or confirmed the item is no longer needed.
+   */
+  const dismissAbandoned = useCallback(async (id: string) => {
+    await clearAbandoned(id);
+    await refreshAbandonedCount();
+  }, [refreshAbandonedCount]);
+
+  // Seed pending + abandoned counts on mount. The `online` effect below fires
+  // on mount too (because `online` starts as `true` from useOnlineStatus), so
+  // a separate drain() call here would double-drain. Refresh counts only.
   useEffect(() => {
     void refreshPendingCount();
-  }, [refreshPendingCount]);
+    void refreshAbandonedCount();
+  }, [refreshPendingCount, refreshAbandonedCount]);
 
   // Drain on every online transition.
   useEffect(() => {
@@ -153,5 +203,5 @@ export function useStockSync(): UseStockSyncResult {
     return () => window.clearInterval(id);
   }, [online, pendingCount, drain]);
 
-  return { pendingCount, syncing, drain };
+  return { pendingCount, abandonedCount, syncing, drain, dismissAbandoned };
 }
