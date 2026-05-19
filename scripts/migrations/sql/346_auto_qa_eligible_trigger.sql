@@ -23,9 +23,12 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trg_set_auto_qa_eligible_at ON dr_photo_unified_reviews;
 
+-- No column list on UPDATE: any update to a broken row (NULL auto_qa_eligible_at
+-- with non-NULL wa_received_at) is self-healing. The IS NULL guard inside the
+-- function keeps the body a no-op for the common case where the column is
+-- already set, so the overhead is one row-level NULL check per update.
 CREATE TRIGGER trg_set_auto_qa_eligible_at
-BEFORE INSERT OR UPDATE OF wa_received_at, auto_qa_eligible_at
-ON dr_photo_unified_reviews
+BEFORE INSERT OR UPDATE ON dr_photo_unified_reviews
 FOR EACH ROW
 EXECUTE FUNCTION set_auto_qa_eligible_at();
 
