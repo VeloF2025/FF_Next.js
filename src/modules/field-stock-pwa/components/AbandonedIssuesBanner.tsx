@@ -14,7 +14,7 @@
  * ⚪ UNTESTED: integration tests in Task 2.9
  */
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronUp, X } from 'lucide-react';
 
 import type { AbandonedIssue } from '../offline/queueIssue';
