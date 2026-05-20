@@ -16,9 +16,14 @@ import { test, expect } from '@playwright/test';
  * playwright.config defaults). Assumes Lawley has at least one snag in zone 24.
  */
 
-const LAWLEY_PROJECT_ID = '4eb13426-b2a1-472d-9b3c-277082ae9b55';
+const LAWLEY_PROJECT_ID = process.env.E2E_LAWLEY_PROJECT_ID;
 
 test('P3: generate Zone 24 snag report from WorksQAPage and find it in the library', async ({ page, request }) => {
+  test.skip(
+    !LAWLEY_PROJECT_ID,
+    'E2E_LAWLEY_PROJECT_ID not set — see .env.local.example for the Lawley UUID on this environment',
+  );
+
   // 1. Land on WorksQAPage with zone_no=24 in the URL → button should label "Zone report"
   await page.goto(`/works-qa?project_id=${LAWLEY_PROJECT_ID}&zone_no=24`);
 

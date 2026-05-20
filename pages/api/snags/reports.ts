@@ -5,13 +5,11 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '@/lib/db';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import type { SnagReport, CreateSnagReportRequest } from '@/modules/construction-qa/types/snag.types';
-
-const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -48,8 +46,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       : null;
 
   if (projectId && typeof projectId === 'string') {
-    // Two explicit branches — the Neon serverless shim breaks on conditional
-    // tagged-template interpolation (${cond ? sql`...` : sql``}).
+    // Two explicit branches — the tagged-template sql helper interpolates values
+    // as $-params, not concatenable SQL fragments.
     const rows = sourceFilter
       ? await sql`
           SELECT
@@ -61,7 +59,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
             AND sr.source = ${sourceFilter}
           ORDER BY sr.audit_date DESC, sr.generated_at DESC NULLS LAST
           LIMIT ${pageSizeNum} OFFSET ${offset}
-        ` as Array<SnagReport & { project_name: string }>
+        ` as unknown as Array<SnagReport & { project_name: string }>
       : await sql`
           SELECT
             sr.*,
@@ -71,7 +69,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
           WHERE sr.project_id = ${projectId}
           ORDER BY sr.audit_date DESC, sr.generated_at DESC NULLS LAST
           LIMIT ${pageSizeNum} OFFSET ${offset}
-        ` as Array<SnagReport & { project_name: string }>;
+        ` as unknown as Array<SnagReport & { project_name: string }>;
 
     const countRows = sourceFilter
       ? await sql`
@@ -79,12 +77,12 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
           FROM snag_reports
           WHERE project_id = ${projectId}
             AND source = ${sourceFilter}
-        ` as Array<{ total: string }>
+        ` as unknown as Array<{ total: string }>
       : await sql`
           SELECT COUNT(*) AS total
           FROM snag_reports
           WHERE project_id = ${projectId}
-        ` as Array<{ total: string }>;
+        ` as unknown as Array<{ total: string }>;
 
     const total = parseInt(countRows[0]?.total ?? '0', 10);
 
@@ -96,7 +94,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   }
 
   // No projectId filter — return all reports (optionally filtered by source).
-  // Two explicit branches — same Neon shim constraint applies.
+  // Two explicit branches — same tagged-template constraint applies.
   const rows = sourceFilter
     ? await sql`
         SELECT
@@ -107,7 +105,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
         WHERE sr.source = ${sourceFilter}
         ORDER BY sr.audit_date DESC, sr.generated_at DESC NULLS LAST
         LIMIT ${pageSizeNum} OFFSET ${offset}
-      ` as Array<SnagReport & { project_name: string }>
+      ` as unknown as Array<SnagReport & { project_name: string }>
     : await sql`
         SELECT
           sr.*,
@@ -116,17 +114,17 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
         INNER JOIN projects p ON p.id = sr.project_id
         ORDER BY sr.audit_date DESC, sr.generated_at DESC NULLS LAST
         LIMIT ${pageSizeNum} OFFSET ${offset}
-      ` as Array<SnagReport & { project_name: string }>;
+      ` as unknown as Array<SnagReport & { project_name: string }>;
 
   const countRows = sourceFilter
     ? await sql`
         SELECT COUNT(*) AS total
         FROM snag_reports
         WHERE source = ${sourceFilter}
-      ` as Array<{ total: string }>
+      ` as unknown as Array<{ total: string }>
     : await sql`
         SELECT COUNT(*) AS total FROM snag_reports
-      ` as Array<{ total: string }>;
+      ` as unknown as Array<{ total: string }>;
 
   const total = parseInt(countRows[0]?.total ?? '0', 10);
 
@@ -183,7 +181,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       'pending'
     )
     RETURNING *
-  ` as SnagReport[];
+  ` as unknown as SnagReport[];
 
   if (!rows[0]) {
     return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Failed to create snag report');
@@ -203,7 +201,7 @@ async function handleDelete(req: NextApiRequest, res: NextApiResponse) {
   // Verify the report exists before deleting
   const existing = await sql`
     SELECT id FROM snag_reports WHERE id = ${id}
-  ` as Array<{ id: string }>;
+  ` as unknown as Array<{ id: string }>;
 
   if (existing.length === 0) {
     return apiResponse.notFound(res, 'Snag report', id);
