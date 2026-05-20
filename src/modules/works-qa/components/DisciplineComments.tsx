@@ -40,8 +40,22 @@ export function DisciplineComments({ poleId, discipline, comments, disabled, onA
         body: JSON.stringify({ pole_id: poleId, discipline, comment: trimmed }),
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        setError(body.error ?? `Request failed (${res.status})`);
+        // apiResponse envelope: { error: { code, message } }. Unwrap so we
+        // never render "[object Object]". JSON parse failure is non-fatal —
+        // fall back to the HTTP status in the next branch.
+        const body = await res.json().catch((jsonErr) => {
+          log.warn('works-qa: comment error JSON parse failed', {
+            error: jsonErr instanceof Error ? jsonErr.message : String(jsonErr),
+          });
+          return {};
+        }) as {
+          error?: string | { message?: string };
+        };
+        const apiErr = body.error;
+        const msg =
+          typeof apiErr === 'string' ? apiErr :
+          (apiErr?.message ?? `Request failed (${res.status})`);
+        setError(msg);
         return;
       }
       setText('');
