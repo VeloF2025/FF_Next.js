@@ -11,7 +11,10 @@ import { type ReportRow, statusLabel } from './LegacySnagReportCard';
 
 function fmt(d: string | null | undefined): string {
   if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' });
+  // Prefer ISO slice over locale strings (feedback_excel_date_format).
+  return d.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(d)
+    ? d.slice(0, 10)
+    : new Date(d).toISOString().slice(0, 10);
 }
 
 /** Build and download an Excel workbook from the current report rows. */
