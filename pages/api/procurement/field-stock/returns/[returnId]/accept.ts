@@ -103,7 +103,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // The neon shim re-exports pg.Client; use a dedicated connection for the
     // transaction so BEGIN and COMMIT are on the same connection.
     const connectionString = process.env.DATABASE_URL!;
-    const client = new Client({ connectionString });
+    // Match the SSL handling used by the neon shim's Pool — bare new Client()
+    // defaults to SSL on, which fails on self-hosted Supabase (localhost:5437,
+    // no sslmode=require in DATABASE_URL). The shim treats absence of
+    // sslmode=require as "no SSL"; mirror that here.
+    const useSSL = connectionString.includes('sslmode=require');
+    const client = new Client({
+      connectionString,
+      ssl: useSSL ? { rejectUnauthorized: false } : false,
+    });
     await client.connect();
 
     let linesProcessed = 0;
