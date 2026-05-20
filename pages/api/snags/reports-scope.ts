@@ -5,7 +5,7 @@
  * → reserves report number → renders HTML → puppeteer PDF → VF Storage upload
  * → persists snag_reports row → returns 201 with the row.
  *
- * Permission: construction-qa.snags.report.read (view action).
+ * Permission: construction-qa.snags.reports (view action).
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -242,4 +242,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
 // ── Export with auth middleware ────────────────────────────────────────────────
 
-export default withAuth(withPermission('construction-qa.snags.report.read', 'view')(handler));
+export default withAuth(withPermission('construction-qa.snags.reports', 'create')(handler));

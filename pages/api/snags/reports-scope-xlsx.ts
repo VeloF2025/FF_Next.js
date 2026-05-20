@@ -5,7 +5,7 @@
  * Re-runs the same scope query the POST route uses and builds a 3-sheet
  * workbook (Summary / Snags / Scope) via buildScopeSnagWorkbook.
  *
- * Permission: construction-qa.snags.report.read
+ * Permission: construction-qa.snags.reports
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -157,5 +157,5 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 }
 
 export default withAuth(
-  withPermission('construction-qa.snags.report.read', 'view')(handler),
+  withPermission('construction-qa.snags.reports', 'view')(handler),
 );

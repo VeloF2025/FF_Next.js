@@ -5,7 +5,7 @@
  * snag report.  The PDF itself lives in VF Storage (immutable snapshot);
  * this route just gates it behind the RBAC permission and redirects.
  *
- * Permission: construction-qa.snags.report.read
+ * Permission: construction-qa.snags.reports
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -40,5 +40,5 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 }
 
 export default withAuth(
-  withPermission('construction-qa.snags.report.read', 'view')(handler),
+  withPermission('construction-qa.snags.reports', 'view')(handler),
 );
