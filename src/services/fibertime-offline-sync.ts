@@ -1,6 +1,6 @@
 /**
  * Fibertime Offline ONT Sync Service — nightly pull from SharePoint.
- * Sites: LAW, MAM, MOA, TEM. File: offline_ont_report_{SITE}_{YYYYMMDD}.xlsx
+ * Sites: LAW, MAM, MOA, TEM, ETW. File: offline_ont_report_{SITE}_{YYYYMMDD}.xlsx
  * Uses listFolderFilesAlt (GetFolderByServerRelativeUrl) — Path API returns 403.
  * DB helpers live in fibertime-offline-db.ts.
  */
@@ -33,7 +33,7 @@ const logger = createLogger('services:fibertime-offline-sync');
 // CONSTANTS
 // ============================================================================
 
-export const OFFLINE_SITES = ['LAW', 'MAM', 'MOA', 'TEM'] as const;
+export const OFFLINE_SITES = ['LAW', 'MAM', 'MOA', 'TEM', 'ETW'] as const;
 
 // ============================================================================
 // TYPES
@@ -249,7 +249,7 @@ export async function syncOfflineSite(
 // ============================================================================
 
 /**
- * Run the nightly offline ONT sync for all 4 active sites.
+ * Run the nightly offline ONT sync for every site in OFFLINE_SITES.
  * @param date - YYYYMMDD (defaults to today SAST / UTC+2)
  */
 export async function runOfflineSync(date?: string): Promise<OfflineSyncReport> {
