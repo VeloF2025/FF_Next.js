@@ -11,12 +11,10 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
-
-const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
