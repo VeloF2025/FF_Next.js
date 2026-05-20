@@ -19,10 +19,9 @@ import { Pool } from 'pg';
 
 const realPool = new Pool({ connectionString: process.env.TEST_DATABASE_URL, ssl: false, max: 5 });
 
-// Mock @neondatabase/serverless so the route's `neon(...)` returns a tagged-template
-// function backed by our real pg.Pool.
-vi.mock('@neondatabase/serverless', () => ({
-  neon: () => async (strings: TemplateStringsArray, ...values: unknown[]) => {
+// Mock @/lib/db so the route's `sql` tagged template runs against our real pg.Pool.
+vi.mock('@/lib/db', () => ({
+  sql: async (strings: TemplateStringsArray, ...values: unknown[]) => {
     const text = strings.reduce(
       (acc: string, s: string, i: number) => acc + s + (i < values.length ? `$${i + 1}` : ''),
       '',
@@ -30,7 +29,6 @@ vi.mock('@neondatabase/serverless', () => ({
     const r = await realPool.query(text, values);
     return r.rows;
   },
-  neonConfig: { fetchConnectionCache: false },
 }));
 
 // Mock auth so the handler runs as a privileged user.

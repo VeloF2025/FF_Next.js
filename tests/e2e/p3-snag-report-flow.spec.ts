@@ -16,11 +16,18 @@ import { test, expect } from '@playwright/test';
  * playwright.config defaults). Assumes Lawley has at least one snag in zone 24.
  */
 
-const LAWLEY_PROJECT_ID = '4eb13426-b2a1-472d-9b3c-277082ae9b55';
+const LAWLEY_PROJECT_ID = process.env.E2E_LAWLEY_PROJECT_ID;
 
 test('P3: generate Zone 24 snag report from WorksQAPage and find it in the library', async ({ page, request }) => {
+  test.skip(
+    !LAWLEY_PROJECT_ID,
+    'E2E_LAWLEY_PROJECT_ID not set — see .env.local.example for the Lawley UUID on this environment',
+  );
+  // test.skip aborts the test but TS doesn't narrow string|undefined across it.
+  const projectId = LAWLEY_PROJECT_ID as string;
+
   // 1. Land on WorksQAPage with zone_no=24 in the URL → button should label "Zone report"
-  await page.goto(`/works-qa?project_id=${LAWLEY_PROJECT_ID}&zone_no=24`);
+  await page.goto(`/works-qa?project_id=${projectId}&zone_no=24`);
 
   const zoneButton = page.getByRole('button', { name: /Zone report/i });
   await expect(zoneButton).toBeVisible({ timeout: 15_000 });
@@ -55,7 +62,7 @@ test('P3: generate Zone 24 snag report from WorksQAPage and find it in the libra
   expect(headRes.status()).toBeLessThan(400);
 
   // 6. Library — switch to Scoped filter
-  await page.goto(`/field-ops/snags/reports?projectId=${LAWLEY_PROJECT_ID}`);
+  await page.goto(`/field-ops/snags/reports?projectId=${projectId}`);
   const scopedChip = page.getByRole('button', { name: /^Scoped$/i });
   await expect(scopedChip).toBeVisible({ timeout: 10_000 });
   await scopedChip.click();
