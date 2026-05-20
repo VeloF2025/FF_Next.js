@@ -116,6 +116,32 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
   const resolvedPosition = isAdminCaller ? (position ?? defaultPosition(fieldRole)) : defaultPosition(fieldRole);
   const contractType = fieldRole === 'technician' ? 'contractor' : 'full-time';
 
+  // Resolve the caller's staff.id via staff.user_id → users.id linkage.
+  // req.user.id is users.id (auth_users), NOT staff.id. The column
+  // created_by_staff_id is UUID REFERENCES staff(id) (migration 346), so we
+  // must look up the staff row whose user_id matches the caller's users.id.
+  // If no staff row exists (e.g. a super_admin account with no staff record),
+  // we insert NULL — the column is nullable per migration 346.
+  const callerUserId = req.user.id;
+  let createdByStaffId: string | null = null;
+  try {
+    const staffLookup = await sql<{ id: string }>`
+      SELECT id FROM staff WHERE user_id = ${callerUserId} LIMIT 1
+    `;
+    if (staffLookup.length > 0 && staffLookup[0]?.id) {
+      createdByStaffId = staffLookup[0].id;
+    } else {
+      log.warn('Field user created by user with no staff record', { userId: callerUserId }, 'FieldUsersAPI');
+    }
+  } catch (lookupError) {
+    // Non-fatal: log and proceed with NULL so the INSERT is not blocked.
+    log.warn(
+      'Failed to resolve staff record for created_by_staff_id; inserting NULL',
+      { userId: callerUserId, error: lookupError instanceof Error ? lookupError.message : String(lookupError) },
+      'FieldUsersAPI'
+    );
+  }
+
   try {
     const rows = await sql`
       INSERT INTO staff (
@@ -135,7 +161,7 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
         ${contractType},
         ${fieldRole},
         ${accountStatus},
-        ${req.user.id}
+        ${createdByStaffId}
       )
       RETURNING id, role, account_status, created_by_staff_id
     `;
