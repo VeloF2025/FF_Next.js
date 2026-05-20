@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { RETURN_REASONS, type ReturnReason } from '../returnReasons';
-import { CONDITION_OPTIONS, type ReturnCondition } from '../conditionOptions';
-import { DISPOSITION_OPTIONS, type ReturnDisposition } from '../dispositionOptions';
+import { RETURN_REASONS } from '../returnReasons';
+import { CONDITION_OPTIONS } from '../conditionOptions';
+import { DISPOSITION_OPTIONS } from '../dispositionOptions';
 
 describe('Return vocabulary constants', () => {
   it('RETURN_REASONS codes match stock_return_lines.return_reason CHECK', () => {

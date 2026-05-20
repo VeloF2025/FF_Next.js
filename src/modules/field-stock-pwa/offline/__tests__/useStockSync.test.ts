@@ -382,12 +382,7 @@ describe('useStockSync — online event triggers drain', () => {
 
     await enqueueIssue(draft({ technicianId: 'reconnect-tech' }));
 
-    // Track call count before going online to isolate the "after-online" calls.
-    let callsBeforeOnline = 0;
-    mockSubmitIssue.mockImplementation(() => {
-      callsBeforeOnline++;
-      return Promise.resolve(undefined);
-    });
+    mockSubmitIssue.mockImplementation(() => Promise.resolve(undefined));
 
     const useStockSync = await importHook();
     const { result, rerender } = renderHook(() => useStockSync());
@@ -397,7 +392,6 @@ describe('useStockSync — online event triggers drain', () => {
 
     // Reset call tracking to only count submissions AFTER going online.
     mockSubmitIssue.mockClear();
-    callsBeforeOnline = 0;
 
     // Simulate coming online: flip the mock and rerender.
     mockOnline = true;

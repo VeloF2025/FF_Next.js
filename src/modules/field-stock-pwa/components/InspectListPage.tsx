@@ -9,7 +9,7 @@
  * Empty state when both sections are empty.
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import {
   ClipboardCheck,

@@ -12,7 +12,6 @@
  * Fully controlled — caller owns all state, passes onChange for every field.
  */
 
-import React from 'react';
 import {
   CONDITION_OPTIONS,
   type ReturnCondition,

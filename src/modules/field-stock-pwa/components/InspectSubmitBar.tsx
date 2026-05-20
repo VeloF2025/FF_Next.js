@@ -7,7 +7,6 @@
  * Extracted from InspectOrchestrator to keep that file under 200 lines.
  */
 
-import React from 'react';
 import { Loader2, AlertTriangle, RefreshCcw } from 'lucide-react';
 import { SignaturePad } from './SignaturePad';
 

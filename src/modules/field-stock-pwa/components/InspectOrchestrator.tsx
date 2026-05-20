@@ -11,7 +11,7 @@
  *  5. On success: show inline success view, then navigate back to the queue.
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { ChevronLeft, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
 
