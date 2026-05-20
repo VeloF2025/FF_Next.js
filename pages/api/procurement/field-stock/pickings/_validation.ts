@@ -50,9 +50,17 @@ export interface PickingBody {
   technicianId?: string;
 }
 
-/** Discriminated union returned by every validator. */
+/**
+ * Discriminated union returned by every validator.
+ *
+ * The success branch carries an optional resolvedSerialIds map so the caller
+ * can swap the client-supplied serial_number strings for the authoritative
+ * stock_serials.id UUIDs before writing to stock_picking_lines.serial_ids
+ * (a uuid[] column). The map is only populated when at least one line carried
+ * serialIds; lines without serials produce an empty map.
+ */
 export type ValidationResult =
-  | { ok: true }
+  | { ok: true; resolvedSerialIds?: Map<string, string> } // serial_number → uuid
   | { ok: false; status: number; body: object };
 
 // ---------------------------------------------------------------------------
@@ -116,34 +124,52 @@ export async function validateFieldDefaultDestination(
 // ---------------------------------------------------------------------------
 
 /**
- * Re-validate every serialId in every line before any INSERT.
+ * Re-validate every serial in every line before any INSERT, and resolve the
+ * client-supplied serial_number strings to their authoritative
+ * stock_serials.id UUIDs.
  *
- * Clients may send serials that were 'available' when the UI rendered but have
- * since been picked by another user. Fail fast here so no partial state is
- * written. Pattern borrowed from pickings/[pickingId]/process.ts.
+ * The PWA client sends `serialIds` as an array of serial_number strings
+ * (human-readable labels printed on the hardware, e.g. 'ALCLB48CA1DC').
+ * stock_picking_lines.serial_ids is a uuid[] column that holds the PK of each
+ * serial. Querying by serial_number (text) instead of id (uuid) avoids the
+ * Postgres uuid-format error that was causing the 500.
+ *
+ * Fail fast here so no partial state is written. Pattern borrowed from
+ * pickings/[pickingId]/process.ts.
  *
  * @param sql - The Neon SQL client instance from the calling handler.
  * @param lines - Array of picking lines from the request body.
- * @returns `{ ok: true }` if all serials are available; `{ ok: false, status, body }` to reject.
+ * @returns `{ ok: true; resolvedSerialIds }` where resolvedSerialIds maps
+ *   each serial_number to its UUID; `{ ok: false, status, body }` to reject.
  */
 export async function validateSerialsAvailable(
   sql: ReturnType<typeof neon<false, false>>,
   lines: PickingLine[],
 ): Promise<ValidationResult> {
   const unavailableSerials: string[] = [];
+  // Maps serial_number (client-supplied label) → stock_serials.id (uuid)
+  const resolvedSerialIds = new Map<string, string>();
 
   for (const line of lines) {
     if (!Array.isArray(line.serialIds) || line.serialIds.length === 0) continue;
 
-    for (const serialId of line.serialIds) {
+    for (const serialNumber of line.serialIds) {
+      // Scope by stock_item_id: the UNIQUE constraint is composite
+      // (stock_item_id, serial_number), so the same label can exist across
+      // different item types. Without this filter LIMIT 1 picks an arbitrary
+      // row when labels collide across products.
       const serialRows = await sql`
-        SELECT id FROM stock_serials
-        WHERE id = ${serialId}
+        SELECT id, serial_number FROM stock_serials
+        WHERE serial_number = ${serialNumber}
+          AND stock_item_id = ${line.stockItemId}
           AND status = 'available'
         LIMIT 1
       `;
-      if ((serialRows as Array<{ id: string }>).length === 0) {
-        unavailableSerials.push(serialId);
+      const row = (serialRows as Array<{ id: string; serial_number: string }>)[0];
+      if (!row) {
+        unavailableSerials.push(serialNumber);
+      } else {
+        resolvedSerialIds.set(serialNumber, row.id);
       }
     }
   }
@@ -159,5 +185,5 @@ export async function validateSerialsAvailable(
     };
   }
 
-  return { ok: true };
+  return { ok: true, resolvedSerialIds };
 }

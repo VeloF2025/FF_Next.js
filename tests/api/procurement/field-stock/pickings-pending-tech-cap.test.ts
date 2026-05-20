@@ -347,12 +347,14 @@ describe('POST /api/procurement/field-stock/pickings — pending-tech cap', () =
   // ── H7 new cases (blind review 2026-05-19) ────────────────────────────────
 
   // Case H7-1: active tech, 1 valid + 1 unavailable serial → 400 SERIAL_NOT_AVAILABLE
+  // NOTE: serialIds are serial_number strings (client label). The validator now queries
+  // WHERE serial_number = $1 and returns { id, serial_number } for available rows.
   it('H7: active tech, mixed valid/unavailable serials → 400 with unavailable serial listed', async () => {
     // Active tech — no price check needed; go straight to H7 serial check
-    mockSql.mockResolvedValueOnce([{ account_status: 'active' }]);    // staff
-    // H7: serial-valid → row returned (available)
-    mockSql.mockResolvedValueOnce([{ id: 'serial-valid' }]);
-    // H7: serial-taken → empty (not available)
+    mockSql.mockResolvedValueOnce([{ account_status: 'active' }]);
+    // H7: 'SN-VALID' → found in stock_serials by serial_number, status=available
+    mockSql.mockResolvedValueOnce([{ id: 'uuid-serial-valid', serial_number: 'SN-VALID' }]);
+    // H7: 'SN-TAKEN' → not found (unavailable or non-existent)
     mockSql.mockResolvedValueOnce([]);
 
     const req = makeReq({
@@ -361,7 +363,7 @@ describe('POST /api/procurement/field-stock/pickings — pending-tech cap', () =
           {
             stockItemId: 'item-uuid-1',
             plannedQuantity: 2,
-            serialIds: ['serial-valid', 'serial-taken'],
+            serialIds: ['SN-VALID', 'SN-TAKEN'],
           },
         ],
       }),
@@ -378,8 +380,9 @@ describe('POST /api/procurement/field-stock/pickings — pending-tech cap', () =
     expect(body.success).toBe(false);
     expect(body.error.code).toBe('BAD_REQUEST');
     expect(body.error.details.code).toBe('SERIAL_NOT_AVAILABLE');
-    expect(body.error.details.unavailableSerials).toContain('serial-taken');
-    expect(body.error.details.unavailableSerials).not.toContain('serial-valid');
+    // Error body surfaces the client-visible serial_number, not internal UUID.
+    expect(body.error.details.unavailableSerials).toContain('SN-TAKEN');
+    expect(body.error.details.unavailableSerials).not.toContain('SN-VALID');
     // No INSERT after serial rejection
     const callTemplates = mockSql.mock.calls.map(
       (c) => String((c[0] as TemplateStringsArray)?.[0] ?? '').trim(),
@@ -388,20 +391,22 @@ describe('POST /api/procurement/field-stock/pickings — pending-tech cap', () =
   });
 
   // Case H7-2: active tech, all serials available → proceeds to INSERT (200)
-  it('H7: active tech, all serials available → 200, INSERT proceeds', async () => {
+  // The validator resolves serial_number → UUID; the INSERT must receive UUIDs.
+  it('H7: active tech, all serials available → 200, INSERT receives UUIDs not serial_numbers', async () => {
     // Active tech — no price check; 2 serials both available
-    mockSql.mockResolvedValueOnce([{ account_status: 'active' }]);    // staff
-    mockSql.mockResolvedValueOnce([{ id: 'serial-a' }]);              // H7 serial-a available
-    mockSql.mockResolvedValueOnce([{ id: 'serial-b' }]);              // H7 serial-b available
+    mockSql.mockResolvedValueOnce([{ account_status: 'active' }]);
+    // H7: validator returns { id, serial_number } for each available serial
+    mockSql.mockResolvedValueOnce([{ id: 'uuid-a', serial_number: 'SN-A' }]);
+    mockSql.mockResolvedValueOnce([{ id: 'uuid-b', serial_number: 'SN-B' }]);
     mockSql.mockResolvedValueOnce([{ count: '15' }]);                 // COUNT
     mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-6', picking_number: 'PCK-000016', status: 'draft' }]);
-    mockSql.mockResolvedValueOnce([]);                                // line insert
+    mockSql.mockResolvedValueOnce([]);                                // line INSERT
     mockSql.mockResolvedValueOnce([{ id: 'picking-uuid-6', lines: [] }]);
 
     const req = makeReq({
       body: validBody({
         lines: [
-          { stockItemId: 'item-uuid-1', plannedQuantity: 2, serialIds: ['serial-a', 'serial-b'] },
+          { stockItemId: 'item-uuid-1', plannedQuantity: 2, serialIds: ['SN-A', 'SN-B'] },
         ],
       }),
     });
@@ -412,6 +417,14 @@ describe('POST /api/procurement/field-stock/pickings — pending-tech cap', () =
     expect(res._status).toBe(200);
     const body = res._json as { success: boolean };
     expect(body.success).toBe(true);
+
+    // Assert the line INSERT received the UUID array, not the original serial_number strings.
+    // The INSERT is call index 5 (0:staff, 1:SN-A, 2:SN-B, 3:COUNT, 4:INSERT picking, 5:INSERT line).
+    const lineInsertCall = mockSql.mock.calls[5];
+    const lineInsertValues = lineInsertCall?.slice(1) as unknown[][];
+    // The uuidArray ['uuid-a', 'uuid-b'] is passed as a single parameter after pickingId, stockItemId, plannedQuantity.
+    // Position 3 (0-indexed) in the values list corresponds to serial_ids.
+    expect(lineInsertValues).toContainEqual(['uuid-a', 'uuid-b']);
   });
 
   // Case H7-3: lines without serialIds → H7 check skipped, no extra SQL calls

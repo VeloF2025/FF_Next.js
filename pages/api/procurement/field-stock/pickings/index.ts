@@ -201,12 +201,16 @@ async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
     }
     // ── End pending-tech cap check ────────────────────────────────────────────
 
-    // ── H7: Server-side serial availability check ────────────────────────────
+    // ── H7: Server-side serial availability check + serial_number → UUID resolution
     // Extracted to _validation.ts; see validateSerialsAvailable for rationale.
+    // The validator also resolves each serial_number to its stock_serials.id UUID
+    // so the INSERT into stock_picking_lines.serial_ids (uuid[]) receives the
+    // correct type — not the human-readable label string from the client.
     const serialCheck = await validateSerialsAvailable(sql, lines as PickingLine[]);
     if (!serialCheck.ok) {
       return res.status(serialCheck.status).json(serialCheck.body);
     }
+    const resolvedSerialIds = serialCheck.resolvedSerialIds ?? new Map<string, string>();
     // ── End serial availability check ────────────────────────────────────────
 
     // Generate picking number
@@ -242,14 +246,24 @@ async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
     const pickingId = pickingRecord.id as string;
 
     // Insert lines
+    // serial_ids on stock_picking_lines is uuid[] — the client sends serial_number
+    // strings, which validateSerialsAvailable resolved to stock_serials.id UUIDs.
+    // Pass a JS string[] (not JSON.stringify); node-postgres serialises it correctly
+    // as a Postgres array literal for uuid[] columns.
     for (const line of lines as PickingLine[]) {
+      const uuidArray: string[] | null = Array.isArray(line.serialIds) && line.serialIds.length > 0
+        ? line.serialIds
+            .map((sn) => resolvedSerialIds.get(sn))
+            .filter((u): u is string => Boolean(u))
+        : null;
+
       await sql`
         INSERT INTO stock_picking_lines (
           picking_id, stock_item_id, planned_quantity,
           serial_ids, lot_number, notes, status
         ) VALUES (
           ${pickingId}, ${line.stockItemId}, ${line.plannedQuantity},
-          ${line.serialIds ? JSON.stringify(line.serialIds) : null},
+          ${uuidArray},
           ${line.lotNumber || null}, ${line.notes || null}, 'pending'
         )
       `;
