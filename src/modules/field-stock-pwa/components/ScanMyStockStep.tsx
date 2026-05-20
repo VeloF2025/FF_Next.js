@@ -53,13 +53,18 @@ export function ScanMyStockStep({
   // Load serials held by this tech on mount.
   React.useEffect(() => {
     let cancelled = false;
-    fetch('/api/procurement/field-stock/my-serials')
+    fetch('/api/procurement/field-stock/my-serials', { credentials: 'same-origin' })
       .then(async (res) => {
         if (!res.ok) {
           const text = await res.text().catch(() => res.statusText);
           throw new Error(text || `HTTP ${res.status}`);
         }
-        return res.json() as Promise<PwaMyHeldSerial[]>;
+        // API returns the apiResponse envelope { success, data, meta } — unwrap.
+        const envelope = (await res.json()) as {
+          success: boolean;
+          data: PwaMyHeldSerial[];
+        };
+        return envelope.data ?? [];
       })
       .then((data) => {
         if (!cancelled) {
