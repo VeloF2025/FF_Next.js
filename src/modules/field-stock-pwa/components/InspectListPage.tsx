@@ -70,7 +70,9 @@ async function fetchReturnsByStatus(status: 'pending' | 'inspected'): Promise<Re
     const text = await res.text().catch(() => res.statusText);
     throw new Error(text || `HTTP ${res.status}`);
   }
-  const data = (await res.json()) as unknown;
+  // API returns the apiResponse envelope { success, data, meta } — unwrap.
+  const envelope = (await res.json()) as { success?: boolean; data?: unknown };
+  const data = envelope?.data;
   if (!Array.isArray(data)) return [];
   return data as ReturnRow[];
 }
