@@ -27,6 +27,7 @@ import {
   hasConfirmedCorrect,
 } from '@/modules/qa-learning';
 import { VLM_CHAT_ENDPOINT, VLM_CATEGORIZATION_MODEL, VLM_TIMEOUT_BATCH, VLM_BATCH_SIZE, VLM_MAX_TOKENS_CATEGORIZATION, VLM_TEMPERATURE } from '@/lib/vlm';
+import { QA_PHOTO_CRITERIA } from './qaPhotoCriteria';
 
 // ============================================================================
 // CONFIGURATION
@@ -121,6 +122,9 @@ DO still classify when the installation subject is clearly visible:
 - Clear power meter display with dBm reading = Step 7
 - Clear signature on a form = Step 10
 - Clear cable spanning sky between pole and building = Step 2`;
+
+  // Inject per-step QA photo quality criteria (maintained by QA team)
+  prompt += QA_PHOTO_CRITERIA;
 
   // Inject few-shot examples from human corrections (HITL learning)
   if (fewShotExamples && fewShotExamples.length > 0) {

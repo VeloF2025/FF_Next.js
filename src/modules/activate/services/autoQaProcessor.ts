@@ -114,6 +114,7 @@ import { persistAutoQaResults, makeResult } from './autoQaHelpers';
 import { STEP_LABELS } from '../utils/stepMapper';
 import { extractExifDatesForPhotos } from './photoDateValidator';
 import { validateOntBackCables } from './ontBackCableValidator';
+import { validateStepQuality, QUALITY_CHECK_STEPS } from './stepQualityValidationService';
 import type { VlmCategorizationResult, QaDecision } from '../types/unified.types';
 
 // ============================================================================
@@ -444,6 +445,37 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
       }
       if (noCableCount > 0) {
         log.info(`Reclassified ${noCableCount} Step 6 photo(s) to Step 0 for missing green fiber cable on ${dropNumber}`);
+      }
+    }
+
+    // --- STEP QUALITY CHECK ---
+    // For each photo that is currently PASS and belongs to a quality-checked step,
+    // run a targeted VLM check against the step-specific visual criteria.
+    // Step 6 is excluded here — already handled by validateOntBackCables above.
+    const qualityCheckStepsSet = new Set<number>(QUALITY_CHECK_STEPS);
+    const photosForQualityCheck: Array<{ filename: string; url: string; step: number }> = [];
+    for (const p of photoResults) {
+      if (!qualityCheckStepsSet.has(p.step) || p.decision !== 'PASS') continue;
+      const url = urlByFilename.get(p.filename);
+      if (!url) continue;
+      photosForQualityCheck.push({ filename: p.filename, url, step: p.step });
+    }
+
+    if (photosForQualityCheck.length > 0) {
+      const qualityResults = await validateStepQuality(dropNumber, photosForQualityCheck);
+      let qualityFailCount = 0;
+      for (const photo of photoResults) {
+        if (!qualityCheckStepsSet.has(photo.step)) continue;
+        const result = qualityResults.get(photo.filename);
+        if (!result || result.checkFailed) continue; // preserve original on VLM/network error
+        if (!result.passes && result.failReason) {
+          photo.decision = 'FAIL';
+          photo.comment = result.failReason;
+          qualityFailCount++;
+        }
+      }
+      if (qualityFailCount > 0) {
+        log.info(`Step quality check failed ${qualityFailCount} photo(s) for ${dropNumber}`);
       }
     }
 
