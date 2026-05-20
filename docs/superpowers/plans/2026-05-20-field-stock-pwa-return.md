@@ -464,7 +464,7 @@ import type { ReturnDisposition } from './lib/dispositionOptions';
 
 /**
  * A serial currently held by the calling tech, returned by GET /my-serials.
- * Only serials with status='assigned' are returned; consumed/returned are filtered out.
+ * Only serials with status='issued' are returned; installed/returned/scrapped filtered out.
  */
 export interface PwaMyHeldSerial {
   serialId: string;             // stock_serials.id (UUID)
@@ -1071,47 +1071,44 @@ git commit -m "feat(field-stock-pwa): submitReturn + submitInspectAndAccept clie
 - Create: `pages/api/procurement/field-stock/my-serials.ts`
 - Create: `tests/api/procurement/field-stock/my-serials.test.ts`
 
-- [ ] **Step 1: Verify the "currently held by tech" SQL (from schema probe A.1)**
+- [ ] **Step 1: SQL strategy (confirmed by Task A.1 schema probe)**
 
-The query shape — adjust column names if Task A.1 found different ones. Likely shape:
+Schema probe finding (commit `c955d1898`): there is **no** `stock_serials.assigned_to_staff_id` column. "Currently held by tech" must be derived via the picking chain — the serial is in the field with the tech whose latest `picking_type='issue'` `stock_pickings.status='done'` row included that serial in `stock_picking_lines.serial_ids`, AND `stock_serials.status='issued'` (NOT `'assigned'` — `assigned` is not in the CHECK).
+
+Final SQL the endpoint will run (CTE-based, single query):
 
 ```sql
+WITH tech_serials AS (
+  SELECT DISTINCT ss.id, ss.serial_number, ss.stock_item_id,
+                  sp.source_location_id, sp.id AS picking_id, sp.created_at AS picking_at
+  FROM stock_serials ss
+  JOIN stock_picking_lines spl ON ss.id = ANY(spl.serial_ids)
+  JOIN stock_pickings sp ON sp.id = spl.picking_id
+  WHERE sp.picking_type = 'issue'
+    AND sp.status = 'done'
+    AND sp.technician_id = $1                  -- staff.id, NOT users.id
+    AND ss.status = 'issued'                   -- in field with tech (not consumed/returned/scrapped)
+),
+latest_per_serial AS (
+  -- A serial may appear in multiple issue pickings if it was re-issued; pick the most recent.
+  SELECT DISTINCT ON (id) id, serial_number, stock_item_id, source_location_id, picking_id
+  FROM tech_serials
+  ORDER BY id, picking_at DESC
+)
 SELECT
-  ss.id AS serial_id,
-  ss.serial_number,
-  ss.stock_item_id,
-  si.name AS stock_item_name,
-  -- Derive source warehouse: most recent issue-picking line that included this serial.
-  -- stock_picking_lines.serial_ids is uuid[] — match via ANY().
-  (
-    SELECT sp.source_location_id
-    FROM stock_pickings sp
-    JOIN stock_picking_lines spl ON spl.picking_id = sp.id
-    WHERE ss.id = ANY(spl.serial_ids)
-      AND sp.picking_type = 'issue'
-      AND sp.status = 'done'
-    ORDER BY sp.created_at DESC
-    LIMIT 1
-  ) AS source_location_id,
-  (
-    SELECT sl.name
-    FROM stock_pickings sp
-    JOIN stock_picking_lines spl ON spl.picking_id = sp.id
-    JOIN stock_locations sl ON sl.id = sp.source_location_id
-    WHERE ss.id = ANY(spl.serial_ids)
-      AND sp.picking_type = 'issue'
-      AND sp.status = 'done'
-    ORDER BY sp.created_at DESC
-    LIMIT 1
-  ) AS source_location_name
-FROM stock_serials ss
-JOIN stock_items si ON si.id = ss.stock_item_id
-WHERE ss.assigned_to_staff_id = $1            -- staff.id, NOT users.id
-  AND ss.status = 'assigned'
-ORDER BY ss.serial_number;
+  lps.id            AS serial_id,
+  lps.serial_number,
+  lps.stock_item_id,
+  si.name           AS stock_item_name,
+  lps.source_location_id,
+  sl.name           AS source_location_name
+FROM latest_per_serial lps
+JOIN stock_items si ON si.id = lps.stock_item_id
+JOIN stock_locations sl ON sl.id = lps.source_location_id
+ORDER BY lps.serial_number;
 ```
 
-If `stock_serials.assigned_to_staff_id` doesn't exist (schema probe will say), use the alternative: serials whose latest issue-picking targeted this staff and which haven't been consumed/returned/restocked.
+The endpoint takes the staff.id from `req.user.id` → `staff WHERE user_id = $userId LIMIT 1` (Phase 2 helper).
 
 - [ ] **Step 2: Implement the endpoint**
 
@@ -1119,7 +1116,11 @@ If `stock_serials.assigned_to_staff_id` doesn't exist (schema probe will say), u
 // pages/api/procurement/field-stock/my-serials.ts
 /**
  * GET /api/procurement/field-stock/my-serials
- * Returns the calling tech's currently-held serials (status='assigned').
+ * Returns the calling tech's currently-held serials (status='issued', NOT 'assigned' —
+ * 'assigned' is not in the stock_serials.status CHECK; 'issued' is the correct value).
+ * Holding relationship derived via picking chain (stock_pickings.technician_id), since
+ * stock_serials has no direct assigned_to_staff_id column.
+ *
  * Used by the Phase 3 return wizard to populate the scan step.
  */
 
@@ -1154,37 +1155,34 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const staffId = staffRow.id as string;
 
     const rows = await sql`
+      WITH tech_serials AS (
+        SELECT DISTINCT
+          ss.id, ss.serial_number, ss.stock_item_id,
+          sp.source_location_id, sp.id AS picking_id, sp.created_at AS picking_at
+        FROM stock_serials ss
+        JOIN stock_picking_lines spl ON ss.id = ANY(spl.serial_ids)
+        JOIN stock_pickings sp ON sp.id = spl.picking_id
+        WHERE sp.picking_type = 'issue'
+          AND sp.status = 'done'
+          AND sp.technician_id = ${staffId}
+          AND ss.status = 'issued'
+      ),
+      latest_per_serial AS (
+        SELECT DISTINCT ON (id) id, serial_number, stock_item_id, source_location_id, picking_id
+        FROM tech_serials
+        ORDER BY id, picking_at DESC
+      )
       SELECT
-        ss.id            AS serial_id,
-        ss.serial_number AS serial_number,
-        ss.stock_item_id AS stock_item_id,
-        si.name          AS stock_item_name,
-        (
-          SELECT sp.source_location_id
-          FROM stock_pickings sp
-          JOIN stock_picking_lines spl ON spl.picking_id = sp.id
-          WHERE ss.id = ANY(spl.serial_ids)
-            AND sp.picking_type = 'issue'
-            AND sp.status = 'done'
-          ORDER BY sp.created_at DESC
-          LIMIT 1
-        ) AS source_location_id,
-        (
-          SELECT sl.name
-          FROM stock_pickings sp
-          JOIN stock_picking_lines spl ON spl.picking_id = sp.id
-          JOIN stock_locations sl ON sl.id = sp.source_location_id
-          WHERE ss.id = ANY(spl.serial_ids)
-            AND sp.picking_type = 'issue'
-            AND sp.status = 'done'
-          ORDER BY sp.created_at DESC
-          LIMIT 1
-        ) AS source_location_name
-      FROM stock_serials ss
-      JOIN stock_items si ON si.id = ss.stock_item_id
-      WHERE ss.assigned_to_staff_id = ${staffId}
-        AND ss.status = 'assigned'
-      ORDER BY ss.serial_number
+        lps.id            AS serial_id,
+        lps.serial_number,
+        lps.stock_item_id,
+        si.name           AS stock_item_name,
+        lps.source_location_id,
+        sl.name           AS source_location_name
+      FROM latest_per_serial lps
+      JOIN stock_items si ON si.id = lps.stock_item_id
+      JOIN stock_locations sl ON sl.id = lps.source_location_id
+      ORDER BY lps.serial_number
     `;
 
     log.info('my-serials.list', { staffId, count: rows.length });
@@ -1223,9 +1221,11 @@ import handler from '@/pages/api/procurement/field-stock/my-serials';
 
 describe('GET /api/procurement/field-stock/my-serials', () => {
   it('returns serials with status=assigned belonging to the calling staff', async () => {
-    // seed: 1 staff, 2 serials assigned to staff, 1 serial assigned to OTHER staff,
-    //       1 serial with status='consumed'
-    // expect: response data length === 2, all rows belong to caller, no consumed
+    // seed: 1 tech staff, 2 issued pickings to that staff with serial_ids set,
+    //       1 issued picking to a DIFFERENT staff, 1 picking with status='installed'
+    //       (so the picking's serial is filtered out by status='issued' guard)
+    // expect: response data length === 2, all rows trace back to caller's staff.id
+    //         via the picking-chain join, no installed/returned/scrapped serials
     // (test body to be filled in matching the pickings-issue-flow-integration pattern)
   });
 
@@ -2115,7 +2115,7 @@ git commit -m "feat(field-stock-pwa): AbandonedReturnsBanner in StoresHub"
 ```typescript
 describe('Returns full flow integration', () => {
   it('tech creates return → storeman inspects → accept restocks serial', async () => {
-    // 1. Seed: tech staff, stores staff, 2 issued serials (status='assigned') from Lawley
+    // 1. Seed: tech staff, stores staff, 2 issued serials (status='issued') from Lawley
     // 2. POST /returns as tech → status='pending', returns RET-… id
     // 3. POST /returns/[id]/inspect as stores with one restock, one scrap → status='inspected'
     // 4. POST /returns/[id]/accept as stores → status='restocked', stock_serials.status updated
