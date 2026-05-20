@@ -126,10 +126,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         if (disposition === 'restock') {
           // Add back to destination quant
+          // The stock_quants unique index is on
+          //   (stock_item_id, location_id, COALESCE(lot_number, ''))
+          // so the ON CONFLICT target MUST match that expression — using the
+          // bare 3-column form throws "no unique or exclusion constraint matching".
           await client.query(
             `INSERT INTO stock_quants (stock_item_id, location_id, quantity, last_movement_date)
              VALUES ($1, $2, $3, NOW())
-             ON CONFLICT (stock_item_id, location_id, lot_number)
+             ON CONFLICT (stock_item_id, location_id, (COALESCE(lot_number, ''::varchar)))
              DO UPDATE SET
                quantity = stock_quants.quantity + $3,
                last_movement_date = NOW(),
