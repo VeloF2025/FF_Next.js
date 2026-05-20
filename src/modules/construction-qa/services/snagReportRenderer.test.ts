@@ -48,26 +48,26 @@ const rows: SnagReportScopeRow[] = [
 
 describe('renderScopeSnagReportHtml', () => {
   it('emits an HTML document with the universal template wrapper', async () => {
-    const html = await renderScopeSnagReportHtml(meta, rows, { slotUrls: {} });
+    const html = await renderScopeSnagReportHtml(meta, rows);
     expect(html).toMatch(/<!DOCTYPE html>/);
     expect(html).toContain('Lawley');
     expect(html).toContain('SCOPE-LAWL-20260520-001');
   });
 
   it('subtitle is past tense and lists the scope summary', async () => {
-    const html = await renderScopeSnagReportHtml(meta, rows, { slotUrls: {} });
+    const html = await renderScopeSnagReportHtml(meta, rows);
     expect(html).toMatch(/covered? snags raised between 2026-04-20 and 2026-05-20/i);
     expect(html).toContain('Zone 24');
   });
 
   it('includes ticket UID and pole number in the table row', async () => {
-    const html = await renderScopeSnagReportHtml(meta, rows, { slotUrls: {} });
+    const html = await renderScopeSnagReportHtml(meta, rows);
     expect(html).toContain('NOC-12345');
     expect(html).toContain('LAW.P.X001');
   });
 
   it('KPIs: Total/Critical/Major/Minor/Resolved render with correct counts', async () => {
-    const html = await renderScopeSnagReportHtml(meta, rows, { slotUrls: {} });
+    const html = await renderScopeSnagReportHtml(meta, rows);
     // KPI label then value appear in sequence in the HTML
     expect(html).toMatch(/Total snags[\s\S]*?1/);
     expect(html).toMatch(/Major[\s\S]*?1/);
@@ -75,7 +75,7 @@ describe('renderScopeSnagReportHtml', () => {
   });
 
   it('does NOT emit locale date strings (only ISO YYYY-MM-DD)', async () => {
-    const html = await renderScopeSnagReportHtml(meta, rows, { slotUrls: {} });
+    const html = await renderScopeSnagReportHtml(meta, rows);
     expect(html).not.toMatch(/\d{1,2}\/\d{1,2}\/\d{4}/); // US locale
     expect(html).not.toMatch(/\d{1,2} May 2026/); // en-GB long form
   });

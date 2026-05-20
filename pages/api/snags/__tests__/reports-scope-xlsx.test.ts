@@ -5,8 +5,13 @@
  * Auth is mocked to bypass RBAC; xlsx output is validated by headers + status.
  */
 
-process.env.DATABASE_URL =
-  'postgresql://postgres.ironman-platform:a23f6104debd1d3e88e8f00c0067f22f@localhost:5436/fibreflow';
+if (!process.env.TEST_DATABASE_URL) {
+  throw new Error(
+    'Integration test needs TEST_DATABASE_URL set (real DB connection string). ' +
+    'See .env.local.example.',
+  );
+}
+process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 import { createMocks } from 'node-mocks-http';
@@ -19,8 +24,7 @@ const { realPool, realSql } = vi.hoisted(() => {
   const { Pool } = require('pg') as { Pool: typeof import('pg').Pool };
 
   const pool = new Pool({
-    connectionString:
-      'postgresql://postgres.ironman-platform:a23f6104debd1d3e88e8f00c0067f22f@localhost:5436/fibreflow',
+    connectionString: process.env.TEST_DATABASE_URL,
     ssl: false,
     max: 5,
   });
@@ -77,12 +81,12 @@ describe('GET /api/snags/reports-scope-xlsx', () => {
     const ins = (await realSql`
       INSERT INTO snag_reports (
         project_id, report_number, source, audit_date,
-        scope, scope_zone_no, scope_from_date, scope_to_date,
+        scope, scope_zone_nos, scope_from_date, scope_to_date,
         scope_severities, scope_categories,
         pdf_url, generated_at, total_findings
       ) VALUES (
         ${projectId}, 'SCOPE-XLSX-TEST', 'scope', CURRENT_DATE,
-        'zone', 24, '2026-04-20', '2026-05-20',
+        'zone', ARRAY[24]::int[], '2026-04-20', '2026-05-20',
         ARRAY['major']::text[], ARRAY['pole_quality']::text[],
         'https://example/test.pdf', NOW(), 0
       )

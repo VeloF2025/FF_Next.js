@@ -5,14 +5,19 @@
  * The Neon serverless shim and auth layer are mocked for hermeticity.
  */
 
-process.env.DATABASE_URL =
-  'postgresql://postgres.ironman-platform:a23f6104debd1d3e88e8f00c0067f22f@localhost:5436/fibreflow';
+if (!process.env.TEST_DATABASE_URL) {
+  throw new Error(
+    'Integration test needs TEST_DATABASE_URL set (real DB connection string). ' +
+    'See .env.local.example.',
+  );
+}
+process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 import { createMocks } from 'node-mocks-http';
 import { Pool } from 'pg';
 
-const realPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: false, max: 5 });
+const realPool = new Pool({ connectionString: process.env.TEST_DATABASE_URL, ssl: false, max: 5 });
 
 // Mock @neondatabase/serverless so the route's `neon(...)` returns a tagged-template
 // function backed by our real pg.Pool.
