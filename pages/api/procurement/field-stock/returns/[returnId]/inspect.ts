@@ -130,6 +130,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       for (const [lineId, disposition] of Object.entries(lineDispositions)) {
         if (disposition && typeof disposition === 'object') {
           const d = disposition as { condition?: string; disposition?: string; notes?: string };
+          // IDOR guard: scope the UPDATE to lines that belong to THIS return.
+          // Without this, an authenticated inspector could mutate stock_return_lines
+          // from any other return by passing arbitrary lineIds in the body.
           await sql`
             UPDATE stock_return_lines
             SET
@@ -138,6 +141,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               notes = COALESCE(${d.notes || null}, notes),
               status = 'inspected'
             WHERE id = ${lineId}
+              AND return_id = ${returnId}
           `;
         }
       }

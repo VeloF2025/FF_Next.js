@@ -49,7 +49,7 @@ export interface StoresHubProps {
 // =============================================================================
 
 export function StoresHub({ profile, onIssue, onReturn, onInspect }: StoresHubProps) {
-  const { pendingCount, abandonedCount, abandonedReturnsCount, syncing, dismissAbandoned } = useStockSync();
+  const { pendingCount, abandonedIssuesCount, abandonedReturnsCount, syncing, dismissAbandoned } = useStockSync();
   const isPending = profile.accountStatus === 'pending';
 
   return (
@@ -60,9 +60,9 @@ export function StoresHub({ profile, onIssue, onReturn, onInspect }: StoresHubPr
       showFooterNav={false}
     >
       {/* Abandoned-issues banner — permanently-failed queued pickings */}
-      {abandonedCount > 0 && (
+      {abandonedIssuesCount > 0 && (
         <AbandonedIssuesBanner
-          count={abandonedCount}
+          count={abandonedIssuesCount}
           onView={() => {
             // Inline panel — no navigation needed yet.
           }}
