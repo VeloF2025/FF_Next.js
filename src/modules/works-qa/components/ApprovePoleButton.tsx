@@ -58,9 +58,21 @@ export function ApproveDisciplineButton({ pole, discipline, onApproved }: Approv
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const data = await res.json() as { success?: boolean; error?: string; blocking?: string[] };
+      // /api/works-qa/pole-approve returns either:
+      //  - 422 with { error: string, blocking: string[] } (gate-failure path), or
+      //  - apiResponse envelope { error: { code, message } } (all other errors)
+      // Unwrap both so the user never sees "[object Object]".
+      const data = await res.json() as {
+        success?: boolean;
+        error?: string | { message?: string };
+        blocking?: string[];
+      };
       if (!res.ok) {
-        setError(data.error ?? 'Approval failed');
+        const apiErr = data.error;
+        const msg =
+          typeof apiErr === 'string' ? apiErr :
+          (apiErr?.message ?? 'Approval failed');
+        setError(msg);
         return;
       }
       setShowOverride(false);

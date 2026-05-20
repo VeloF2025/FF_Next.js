@@ -98,10 +98,14 @@ describe('SnagReportScopeDialog', () => {
         return Promise.resolve({ ok: true, json: async () => ({ data: { zones: [24], pons: [] } }) });
       }
       if (typeof url === 'string' && url.includes('reports-scope')) {
+        // Match the real apiResponse shape: { success: false, error: { code, message } }
         return Promise.resolve({
           ok: false,
           status: 400,
-          json: async () => ({ error: 'No snags match the requested scope' }),
+          json: async () => ({
+            success: false,
+            error: { code: 'BAD_REQUEST', message: 'No snags match the requested scope' },
+          }),
         });
       }
       return Promise.resolve({ ok: false, json: async () => ({}) });
@@ -109,6 +113,9 @@ describe('SnagReportScopeDialog', () => {
 
     render(<SnagReportScopeDialog open projectId="p1" defaultCtx={{ zone_no: 24 }} onClose={() => {}} />, { wrapper });
     fireEvent.click(screen.getByRole('button', { name: /Generate/i }));
+    // Regression: prior code did `new Error(payload.error)` on an object → "[object Object]".
+    // Assert the human message renders, NOT the stringified object.
     await waitFor(() => expect(screen.getByText(/No snags match/i)).toBeInTheDocument());
+    expect(screen.queryByText(/\[object Object\]/i)).not.toBeInTheDocument();
   });
 });

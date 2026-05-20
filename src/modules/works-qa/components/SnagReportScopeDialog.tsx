@@ -89,7 +89,15 @@ export function SnagReportScopeDialog({ open, projectId, defaultCtx, onClose }: 
         body: JSON.stringify(body),
       });
       const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error ?? `HTTP ${res.status}`);
+      if (!res.ok) {
+        // apiResponse error shape is { error: { code, message } }. The whole
+        // object stringifies to "[object Object]", so unwrap the message.
+        const apiErr = payload.error;
+        const msg =
+          typeof apiErr === 'string' ? apiErr :
+          (apiErr?.message ?? `HTTP ${res.status}`);
+        throw new Error(msg);
+      }
       const data: ReportResult = payload.data ?? payload;
       setResult(data);
       log.info('snag-report-scope.created', { id: data.id, reportNumber: data.report_number });
