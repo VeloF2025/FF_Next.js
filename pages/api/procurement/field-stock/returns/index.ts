@@ -8,9 +8,14 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { isReturnCreator } from '@/modules/field-stock-pwa/lib/storesRoles';
 
 const sql = neon(process.env.DATABASE_URL!);
+
+// Valid CHECK constraint values
+const VALID_RETURN_REASONS = ['unused', 'job_cancelled', 'wrong_item', 'excess', 'faulty', 'customer_refused'] as const;
+const VALID_CONDITIONS = ['new', 'good', 'fair', 'poor', 'damaged', 'non_functional'] as const;
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
@@ -166,15 +171,57 @@ async function handleList(req: NextApiRequest, res: NextApiResponse) {
 
 async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
   try {
+    // ── Role gate ──────────────────────────────────────────────────────────────
+    const userId = (req as AuthenticatedNextApiRequest).user?.id;
+    if (!userId) {
+      return apiResponse.unauthorized(res, 'User session required');
+    }
+
+    const staffRows = await sql`
+      SELECT s.id, s.role, s.first_name, s.last_name, u.role AS auth_role
+      FROM staff s
+      JOIN users u ON u.id = s.user_id
+      WHERE u.id = ${userId}
+      LIMIT 1
+    `;
+    const staffRow = staffRows[0];
+
+    if (!staffRow) {
+      return apiResponse.forbidden(res, 'No staff record linked to user');
+    }
+
+    const staffId = staffRow.id as string;
+    const staffRole = staffRow.role as string;
+    const authRole = staffRow.auth_role as string;
+    const returnedByName = `${staffRow.first_name ?? ''} ${staffRow.last_name ?? ''}`.trim();
+
+    if (!isReturnCreator(staffRole as Parameters<typeof isReturnCreator>[0], authRole)) {
+      return apiResponse.forbidden(res, 'Insufficient role to create a return');
+    }
+
     const {
       originalPickingId,
-      returnedById,
-      returnedByName,
       returnToLocationId,
       lines,
-      notes
+      notes,
+      idempotencyKey,
     } = req.body;
 
+    // ── Idempotency check ──────────────────────────────────────────────────────
+    if (idempotencyKey && typeof idempotencyKey === 'string' && idempotencyKey.trim() !== '') {
+      const existing = await sql`
+        SELECT id, return_number, status
+        FROM stock_returns
+        WHERE idempotency_key = ${idempotencyKey}
+        LIMIT 1
+      `;
+      if (existing[0]) {
+        log.warn('returns.create.idempotent_replay', { idempotencyKey, returnId: existing[0].id });
+        return apiResponse.success(res, existing[0]);
+      }
+    }
+
+    // ── Input validation ───────────────────────────────────────────────────────
     if (!returnToLocationId) {
       return apiResponse.validationError(res, { returnToLocationId: 'Return location is required' });
     }
@@ -183,13 +230,32 @@ async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.validationError(res, { lines: 'At least one return line is required' });
     }
 
-    // Generate return number
-    const countResult = await sql`SELECT COUNT(*) as count FROM stock_returns`;
-    const countRecord = countResult[0];
-    const count = countRecord ? Number(countRecord.count || 0) : 0;
-    const returnNumber = `RET-${String(count + 1).padStart(6, '0')}`;
+    // Validate per-line fields against CHECK constraints
+    for (const line of lines) {
+      if (!line.stockItemId || typeof line.stockItemId !== 'string' || line.stockItemId.trim() === '') {
+        return apiResponse.validationError(res, { stockItemId: 'stockItemId is required on each line' });
+      }
+      if (line.returnReason !== undefined && line.returnReason !== null) {
+        if (!(VALID_RETURN_REASONS as ReadonlyArray<string>).includes(line.returnReason)) {
+          return apiResponse.validationError(res, {
+            returnReason: `Invalid returnReason "${line.returnReason}". Must be one of: ${VALID_RETURN_REASONS.join(', ')}`
+          });
+        }
+      }
+      if (line.condition !== undefined && line.condition !== null) {
+        if (!(VALID_CONDITIONS as ReadonlyArray<string>).includes(line.condition)) {
+          return apiResponse.validationError(res, {
+            condition: `Invalid condition "${line.condition}". Must be one of: ${VALID_CONDITIONS.join(', ')}`
+          });
+        }
+      }
+    }
 
-    // Create return header
+    // ── Generate return number via SQL function (race-safe) ────────────────────
+    const numResult = await sql`SELECT generate_return_number() AS num`;
+    const returnNumber = numResult[0]?.num as string;
+
+    // ── Create return header ───────────────────────────────────────────────────
     const returnResult = await sql`
       INSERT INTO stock_returns (
         return_number,
@@ -199,16 +265,18 @@ async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
         return_to_location_id,
         status,
         notes,
-        return_date
+        return_date,
+        idempotency_key
       ) VALUES (
         ${returnNumber},
         ${originalPickingId || null},
-        ${returnedById || null},
+        ${staffId},
         ${returnedByName || null},
         ${returnToLocationId},
         'pending',
         ${notes || null},
-        NOW()
+        NOW(),
+        ${(idempotencyKey && typeof idempotencyKey === 'string' && idempotencyKey.trim() !== '') ? idempotencyKey : null}
       )
       RETURNING *
     `;
@@ -220,7 +288,7 @@ async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
 
     const returnId = returnRecord.id as string;
 
-    // Create return lines
+    // ── Create return lines ────────────────────────────────────────────────────
     for (const line of lines) {
       await sql`
         INSERT INTO stock_return_lines (
@@ -245,7 +313,7 @@ async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
       `;
     }
 
-    // Fetch complete return with lines
+    // ── Fetch complete return with lines ───────────────────────────────────────
     const result = await sql`
       SELECT
         r.*,
@@ -269,9 +337,8 @@ async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
       WHERE r.id = ${returnId}
     `;
 
-    log.info('Stock return created', { returnNumber, returnId, lineCount: lines.length }, 'field-stock');
-    res.status(201);
-    return apiResponse.success(res, result[0]);
+    log.info('returns.create', { staffId, returnNumber, lineCount: lines.length, idempotencyKey: idempotencyKey ?? null });
+    return apiResponse.created(res, result[0]);
   } catch (error: unknown) {
     log.error('Error creating return', { error }, 'field-stock');
     return apiResponse.internalError(res, error);
