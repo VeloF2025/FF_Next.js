@@ -5,14 +5,12 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { isReturnCreator } from '@/modules/field-stock-pwa/lib/storesRoles';
 import { handleList } from './_list';
-
-const sql = neon(process.env.DATABASE_URL!);
 
 // Valid CHECK constraint values
 const VALID_RETURN_REASONS = ['unused', 'job_cancelled', 'wrong_item', 'excess', 'faulty', 'customer_refused'] as const;

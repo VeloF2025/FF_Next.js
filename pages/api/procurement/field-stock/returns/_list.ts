@@ -13,13 +13,11 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { isReturnInspector } from '@/modules/field-stock-pwa/lib/storesRoles';
-
-const sql = neon(process.env.DATABASE_URL!);
 
 export async function handleList(req: NextApiRequest, res: NextApiResponse) {
   try {
