@@ -453,9 +453,13 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
     // run a targeted VLM check against the step-specific visual criteria.
     // Step 6 is excluded here — already handled by validateOntBackCables above.
     const qualityCheckStepsSet = new Set<number>(QUALITY_CHECK_STEPS);
-    const photosForQualityCheck = photoResults
-      .filter((p) => qualityCheckStepsSet.has(p.step) && p.decision === 'PASS' && urlByFilename.has(p.filename))
-      .map((p) => ({ filename: p.filename, url: urlByFilename.get(p.filename)!, step: p.step }));
+    const photosForQualityCheck: Array<{ filename: string; url: string; step: number }> = [];
+    for (const p of photoResults) {
+      if (!qualityCheckStepsSet.has(p.step) || p.decision !== 'PASS') continue;
+      const url = urlByFilename.get(p.filename);
+      if (!url) continue;
+      photosForQualityCheck.push({ filename: p.filename, url, step: p.step });
+    }
 
     if (photosForQualityCheck.length > 0) {
       const qualityResults = await validateStepQuality(dropNumber, photosForQualityCheck);

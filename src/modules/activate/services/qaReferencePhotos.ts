@@ -2,17 +2,18 @@
  * QA Reference Photos Registry
  *
  * Maps each installation step to example reference images (correct and incorrect)
- * provided by the QA team. These are used for visual few-shot prompting in the
- * step quality validation service — the VLM sees real examples alongside the
- * new photo it is evaluating.
+ * provided by the QA team. Used for visual few-shot prompting in the step
+ * quality validation service — the VLM sees real examples alongside the new
+ * photo it is evaluating.
  *
  * Reference photos live in: src/modules/activate/services/qa-reference-photos/
- * They are loaded server-side via fs.readFileSync (API route context only).
+ * Loaded server-side via fs.readFileSync at module init, then memoised per step.
  *
- * To update examples: replace the PNG files in qa-reference-photos/ and update
- * the registry below if the filenames change.
+ * Registry only contains entries for steps in QUALITY_CHECK_STEPS — adding a new
+ * step requires both a registry entry here AND inclusion in QUALITY_CHECK_STEPS
+ * in stepQualityCriteria.ts.
  *
- * Last updated: 2026-05-19
+ * Step 6 is excluded — handled by ontBackCableValidator, not this service.
  */
 
 import fs from 'fs';
@@ -26,20 +27,11 @@ const REFS_DIR = path.join(
 
 const MODULE = 'QaReferencePhotos';
 
-// ============================================================================
-// REGISTRY
-// ============================================================================
-
 interface StepReferenceEntry {
   correct: string[];
   incorrect: Array<{ file: string; reason: string }>;
 }
 
-/**
- * Per-step reference photo registry.
- * Steps 3 and 4 share cross-reference examples to reinforce inside/outside distinction.
- * Step 6 is excluded — handled by ontBackCableValidator, not stepQualityValidationService.
- */
 const REGISTRY: Record<number, StepReferenceEntry> = {
   1: {
     correct: ['step-1-correct.png'],
@@ -47,14 +39,6 @@ const REGISTRY: Record<number, StepReferenceEntry> = {
   },
   2: {
     correct: ['step-2-correct-1.png', 'step-2-correct-2.png'],
-    incorrect: [],
-  },
-  3: {
-    correct: ['step-3-correct-1.png', 'step-3-correct-2.png'],
-    incorrect: [],
-  },
-  4: {
-    correct: ['step-4-correct-1.png', 'step-4-correct-2.png'],
     incorrect: [],
   },
   5: {
@@ -72,19 +56,7 @@ const REGISTRY: Record<number, StepReferenceEntry> = {
     correct: ['step-9-correct.png'],
     incorrect: [{ file: 'step-9-incorrect.png', reason: 'Not all lights in view — only 3 of 4 lights are on' }],
   },
-  11: {
-    correct: ['step-11-correct-1.png', 'step-11-correct-2.png'],
-    incorrect: [],
-  },
-  12: {
-    correct: ['step-12-correct-1.png', 'step-12-correct-2.png'],
-    incorrect: [],
-  },
 };
-
-// ============================================================================
-// LOADER
-// ============================================================================
 
 export interface LoadedReference {
   base64: string;
@@ -96,14 +68,23 @@ export interface StepReferences {
   incorrect: LoadedReference[];
 }
 
+// Per-step memo cache. Populated on first call per step.
+const CACHE = new Map<number, StepReferences | null>();
+
 /**
  * Load reference images for a given step as base64 strings.
- * Returns null if no references are registered for that step.
- * Individual images that fail to load are skipped with a warning (non-fatal).
+ * Returns null if no references are registered (or all reads failed).
+ * Result is memoised per-step — disk is hit at most once per step per process.
  */
 export function loadStepReferences(step: number): StepReferences | null {
+  const cached = CACHE.get(step);
+  if (cached !== undefined) return cached;
+
   const entry = REGISTRY[step];
-  if (!entry) return null;
+  if (!entry) {
+    CACHE.set(step, null);
+    return null;
+  }
 
   const correct: LoadedReference[] = [];
   for (const filename of entry.correct) {
@@ -117,8 +98,11 @@ export function loadStepReferences(step: number): StepReferences | null {
     if (base64) incorrect.push({ base64, reason });
   }
 
-  if (correct.length === 0 && incorrect.length === 0) return null;
-  return { correct, incorrect };
+  const result = correct.length === 0 && incorrect.length === 0
+    ? null
+    : { correct, incorrect };
+  CACHE.set(step, result);
+  return result;
 }
 
 function readImageAsBase64(filename: string): string | null {
