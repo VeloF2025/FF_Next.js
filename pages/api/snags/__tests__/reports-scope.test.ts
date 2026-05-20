@@ -11,8 +11,7 @@ process.env.DATABASE_URL =
 
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 import { createMocks } from 'node-mocks-http';
-import { Pool } from 'pg';
-import type { PoolClient } from 'pg';
+// Pool is required via require('pg') inside vi.hoisted below (hoisting constraint).
 
 // ── Real DB helpers ────────────────────────────────────────────────────────────
 // vi.mock factories are hoisted, so helpers must be declared with vi.hoisted.
@@ -37,13 +36,30 @@ const { realPool, realSql, realTransaction } = vi.hoisted(() => {
     return r.rows;
   };
 
-  const transaction = async <T>(cb: (client: PoolClient) => Promise<T>): Promise<T> => {
+  const transaction = async <T>(
+    cb: (txn: {
+      query: <R>(text: string, params?: unknown[]) => Promise<R[]>;
+      queryOne: <R>(text: string, params?: unknown[]) => Promise<R | null>;
+    }) => Promise<T>,
+  ): Promise<T> => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const r = await cb(client);
+      // Wrap pg.PoolClient in a TxnClient-shaped object matching src/lib/db-pool.ts.
+      // TxnClient.query<T> returns T[] directly, not pg.QueryResult.
+      const txn = {
+        query: async <R>(text: string, params: unknown[] = []): Promise<R[]> => {
+          const r = await client.query<R>(text, params);
+          return r.rows;
+        },
+        queryOne: async <R>(text: string, params: unknown[] = []): Promise<R | null> => {
+          const r = await client.query<R>(text, params);
+          return r.rows[0] ?? null;
+        },
+      };
+      const result = await cb(txn);
       await client.query('COMMIT');
-      return r;
+      return result;
     } catch (e) {
       await client.query('ROLLBACK');
       throw e;

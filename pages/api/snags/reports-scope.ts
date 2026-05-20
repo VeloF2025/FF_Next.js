@@ -82,7 +82,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   // ── 1. Fetch snags matching scope ──────────────────────────────────────────
 
-  const rows = await sql<SnagReportScopeRow>`
+  // Cast required: SnagReportScopeRow doesn't extend SqlRow (Record<string, unknown>)
+  const rows = (await sql`
     SELECT
       s.id,
       s.snag_number,
@@ -113,7 +114,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       p.pon_no     NULLS LAST,
       p.pole_label NULLS LAST,
       s.created_at
-  `;
+  `) as unknown as SnagReportScopeRow[];
 
   if (rows.length === 0) {
     return apiResponse.error(
@@ -135,7 +136,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   // ── 3. Resolve auth context ────────────────────────────────────────────────
 
-  const authReq = req as AuthenticatedNextApiRequest;
+  const authReq = req as unknown as AuthenticatedNextApiRequest;
   const userId = authReq.user?.id ?? null;
   const generatedBy = authReq.user?.email ?? authReq.user?.id ?? 'system';
 
@@ -204,7 +205,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   // ── 8. Persist snag_reports row ────────────────────────────────────────────
 
   const inserted = await transaction(async (txn) => {
-    const r = await txn.query<Record<string, unknown>>(
+    // txn.query<T> returns T[] directly (per TxnClient interface in db-pool.ts)
+    const r = await txn.query(
       `INSERT INTO snag_reports
          (project_id, report_number, source, audit_date,
           scope, scope_zone_no, scope_pon_no, scope_poles,
@@ -232,7 +234,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
         rows.length,
       ],
     );
-    return r.rows[0];
+    return r[0];
   });
 
   return apiResponse.created(res, inserted);
