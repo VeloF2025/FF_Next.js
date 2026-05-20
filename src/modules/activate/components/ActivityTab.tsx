@@ -301,7 +301,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
       }
 
       const blob = await generateDrTimelinePdf({
-        drNumber,
+        drNumber: dropNumber,
         project: ctx.project ?? null,
         team: ctx.team ?? null,
         oesSerial: ctx.oesSerial ?? null,
