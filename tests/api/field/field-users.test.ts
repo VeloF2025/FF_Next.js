@@ -133,6 +133,59 @@ describe('POST /api/field/users', () => {
     expect(values[5]).toBe('active');              // status column — must always be 'active' (NOT NULL)
     expect(values[10]).toBe('pending');            // account_status column — storeman caller → pending
     expect(values[11]).toBe('stores-staff-uuid'); // created_by_staff_id — resolved staff.id, not users.id
+    // Email fallback: body had no `email`, so synthetic `<phone>@phone.local` is used (staff.email NOT NULL)
+    expect(values[3]).toBe('+27TEST0000001@phone.local'); // email column ← synthetic from phone
+  });
+
+  // 1c. Missing email falls back to phone for staff.email NOT NULL
+  it('no email in body → email column uses phone as fallback', async () => {
+    mockSql.mockResolvedValueOnce([{ id: 'stores-staff-uuid' }]);
+    mockSql.mockResolvedValueOnce([staffRow({ account_status: 'pending' })]);
+
+    const req = makeReq({
+      method: 'POST',
+      user: { id: 'stores-user-uuid', role: 'storeman' },
+      body: {
+        firstName: 'NoEmail',
+        lastName: 'Tech',
+        phone: '+27991234567',
+        role: 'technician',
+      },
+    });
+    const res = makeRes();
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(201);
+    const insertCallArgs = mockSql.mock.calls[1] as unknown[];
+    const values = insertCallArgs.slice(1);
+    expect(values[3]).toBe('+27991234567@phone.local'); // email ← synthetic from phone
+    expect(values[4]).toBe('+27991234567');             // phone column unchanged
+  });
+
+  // 1d. Email provided → email used as-is, phone stays in phone column
+  it('email in body → email used verbatim, phone untouched', async () => {
+    mockSql.mockResolvedValueOnce([{ id: 'stores-staff-uuid' }]);
+    mockSql.mockResolvedValueOnce([staffRow({ account_status: 'pending' })]);
+
+    const req = makeReq({
+      method: 'POST',
+      user: { id: 'stores-user-uuid', role: 'storeman' },
+      body: {
+        firstName: 'WithEmail',
+        lastName: 'Tech',
+        phone: '+27991234568',
+        email: 'tech@example.com',
+        role: 'technician',
+      },
+    });
+    const res = makeRes();
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(201);
+    const insertCallArgs = mockSql.mock.calls[1] as unknown[];
+    const values = insertCallArgs.slice(1);
+    expect(values[3]).toBe('tech@example.com'); // email column = body.email
+    expect(values[4]).toBe('+27991234568');     // phone column = body.phone
   });
 
   // 1b. Staff lookup returns no row → INSERT uses NULL for created_by_staff_id

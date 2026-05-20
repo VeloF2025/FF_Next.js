@@ -112,6 +112,13 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
   // Mass-assignment guard: non-admin callers cannot override department/position.
   // Only admin-tier callers may set these fields; others get the role defaults.
   const isAdminCaller = ADMIN_AUTH_ROLES.has(callerRole);
+  // staff.email is NOT NULL UNIQUE but contractor techs often have no real email.
+  // Use a synthetic email-shaped string keyed off phone. The `@phone.local` suffix
+  // is intentional: it's not a real domain, so downstream code that filters real
+  // emails (e.g. provision-from-staff, email send paths) can grep it out.
+  // Uniqueness is guaranteed by the staff.email UNIQUE constraint itself, not by
+  // any constraint on phone (which currently has none — see ALTER TABLE follow-up).
+  const resolvedEmail = email ?? `${phone}@phone.local`;
   const resolvedDepartment = isAdminCaller ? (department ?? defaultDepartment(fieldRole)) : defaultDepartment(fieldRole);
   const resolvedPosition = isAdminCaller ? (position ?? defaultPosition(fieldRole)) : defaultPosition(fieldRole);
   const contractType = fieldRole === 'technician' ? 'contractor' : 'full-time';
@@ -153,7 +160,7 @@ async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse
         ${employeeId},
         ${firstName},
         ${lastName},
-        ${email ?? null},
+        ${resolvedEmail},
         ${phone},
         ${'active'},
         ${resolvedDepartment},
