@@ -7,7 +7,7 @@
 
 ## Revision history
 
-- **v1 (2026-05-20)** — original spec assumed `stock_pickings` with `type='return'` and a new migration 358 for virtual REPAIR-QUEUE/SCRAPPED locations.
+- **v1 (2026-05-20)** — original spec assumed `stock_pickings` with `type='return'` and a new migration 359 for virtual REPAIR-QUEUE/SCRAPPED locations.
 - **v2 (2026-05-20)** — discovered existing `stock_returns` + `stock_return_lines` tables (migration 029) and three existing endpoints (`POST /returns`, `POST /returns/[id]/inspect`, `POST /returns/[id]/accept`). Spec rewritten to build on top of the existing backend rather than create a parallel one. Migration dropped; vocabulary aligned to existing CHECK constraints; disposition flow is two-call (inspect then accept).
 
 ## Context
@@ -280,7 +280,7 @@ lockedSourceWarehouseId: UUID | null
 - Sent as `idempotency_key` in POST bodies.
 - Server stores in `stock_returns.idempotency_key` (new column, NULLABLE, with a UNIQUE partial index `WHERE idempotency_key IS NOT NULL`). Adding this column is a **schema change** — see below.
 
-**Schema change required:** Add `idempotency_key VARCHAR(64) UNIQUE` to `stock_returns`. This is a small addition — Phase 3 includes a migration `358_returns_idempotency_key.sql` strictly for this one column + partial unique index.
+**Schema change required:** Add `idempotency_key VARCHAR(64) UNIQUE` to `stock_returns`. This is a small addition — Phase 3 includes a migration `359_returns_idempotency_key.sql` strictly for this one column + partial unique index.
 
 ---
 
@@ -350,7 +350,7 @@ Phase 2 lesson: unit tests with mocked `sql` missed all five real bugs. The brow
 ## Migration
 
 ```
-scripts/migrations/sql/358_returns_idempotency_key.sql
+scripts/migrations/sql/359_returns_idempotency_key.sql
 ```
 
 Single column add + partial unique index:
@@ -368,7 +368,7 @@ Optional but recommended addition: a column for the tech-side signature data URL
 
 ## Success criteria
 
-1. Migration 358 applied to dev DB; `stock_returns.idempotency_key` column + unique partial index exist.
+1. Migration 359 applied to dev DB; `stock_returns.idempotency_key` column + unique partial index exist.
 2. A technician can complete a return wizard end-to-end on `dev.fibreflow.app`, with signature captured and a `RET-YYYYMM-NNNNN` returned.
 3. A storeman can open `/my/stores/inspect`, see the pending return, set per-line condition + disposition (with optional notes), submit, and verify:
    - `stock_returns.status='restocked'`
@@ -408,7 +408,7 @@ Optional but recommended addition: a column for the tech-side signature data URL
    ```
    If it does, the existing `index.ts` count-based generator is replaced with the function call to avoid races. *Task 1 (Schema probe) does this.*
 
-5. **Existing `stock_returns.idempotency_key` column** — confirm it doesn't already exist before writing migration 358:
+5. **Existing `stock_returns.idempotency_key` column** — confirm it doesn't already exist before writing migration 359:
    ```sql
    SELECT column_name FROM information_schema.columns
    WHERE table_name='stock_returns' AND column_name='idempotency_key';

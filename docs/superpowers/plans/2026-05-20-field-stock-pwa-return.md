@@ -4,7 +4,7 @@
 
 **Goal:** Add a technician-side return wizard at `/my/stores/return` and a warehouse-side disposition+restock screen at `/my/stores/inspect` to the staff-portal PWA, building on the existing `stock_returns` backend.
 
-**Architecture:** Three new pages under `/my/stores/`. Mirror Phase 2 (`src/modules/field-stock-pwa/`) component patterns: an orchestrator state machine, step components, shared SignaturePad / StepProgress / role gating. Two new flat API endpoints (`my-serials`, `serial-source`); the three existing return endpoints (`POST /returns`, `/inspect`, `/accept`) get hardened (role gate, idempotency, audit fields derived from `req.user`, transactional accept). One small migration (`358_returns_idempotency_key.sql`).
+**Architecture:** Three new pages under `/my/stores/`. Mirror Phase 2 (`src/modules/field-stock-pwa/`) component patterns: an orchestrator state machine, step components, shared SignaturePad / StepProgress / role gating. Two new flat API endpoints (`my-serials`, `serial-source`); the three existing return endpoints (`POST /returns`, `/inspect`, `/accept`) get hardened (role gate, idempotency, audit fields derived from `req.user`, transactional accept). One small migration (`359_returns_idempotency_key.sql`).
 
 **Tech Stack:** Next.js 14 (Pages Router), React, Tailwind, Vitest, Postgres via `@neondatabase/serverless` shim (legacy — DO NOT migrate to `pg.Pool` in this PR; rest of returns/* uses the shim), IndexedDB (raw, no `idb` wrapper).
 
@@ -92,16 +92,16 @@ git commit -m "docs(plan): record Phase 3 schema probe results"
 
 ---
 
-### Task A.2: Migration 358 — `idempotency_key` on `stock_returns`
+### Task A.2: Migration 359 — `idempotency_key` on `stock_returns`
 
 **Files:**
-- Create: `scripts/migrations/sql/358_returns_idempotency_key.sql`
+- Create: `scripts/migrations/sql/359_returns_idempotency_key.sql`
 - Modify (only if Task A.1 finds it): expand to include `stock_serials.status` CHECK if values are missing
 
 - [ ] **Step 1: Write the migration**
 
 ```sql
--- scripts/migrations/sql/358_returns_idempotency_key.sql
+-- scripts/migrations/sql/359_returns_idempotency_key.sql
 -- Phase 3 of field-stock PWA: client-generated idempotency key on stock_returns
 -- so duplicate submissions from the offline queue dedupe server-side.
 -- See spec: docs/superpowers/specs/2026-05-20-field-stock-pwa-return-design.md
@@ -120,7 +120,7 @@ COMMENT ON COLUMN stock_returns.idempotency_key IS
 - [ ] **Step 2: Apply to dev**
 
 ```bash
-ssh velo@100.96.203.105 'cd /home/velo/fibreflow-dev && source .env.local && psql "$DATABASE_URL" -f -' < scripts/migrations/sql/358_returns_idempotency_key.sql
+ssh velo@100.96.203.105 'cd /home/velo/fibreflow-dev && source .env.local && psql "$DATABASE_URL" -f -' < scripts/migrations/sql/359_returns_idempotency_key.sql
 ```
 
 Expected: two `NOTICE` lines (column already exists / index already exists) on a re-run, or two creates on first run. Zero errors.
@@ -136,8 +136,8 @@ Expected: one row, `idempotency_key`.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add scripts/migrations/sql/358_returns_idempotency_key.sql
-git commit -m "feat(field-stock-pwa): migration 358 — idempotency_key on stock_returns"
+git add scripts/migrations/sql/359_returns_idempotency_key.sql
+git commit -m "feat(field-stock-pwa): migration 359 — idempotency_key on stock_returns"
 ```
 
 ---
@@ -2170,7 +2170,7 @@ ssh velo@100.96.203.105 'cd /home/velo/fibreflow-dev && bash scripts/deploy-loca
 - [ ] **Step 2: Apply migration if not already**
 
 ```bash
-ssh velo@100.96.203.105 'cd /home/velo/fibreflow-dev && source .env.local && psql "$DATABASE_URL" -f scripts/migrations/sql/358_returns_idempotency_key.sql'
+ssh velo@100.96.203.105 'cd /home/velo/fibreflow-dev && source .env.local && psql "$DATABASE_URL" -f scripts/migrations/sql/359_returns_idempotency_key.sql'
 ```
 
 (Idempotent — safe to re-run.)
@@ -2216,7 +2216,7 @@ gh pr create --base master --head feat/field-stock-pwa-return-flow \
 - Warehouse-side inspect+accept screen at `/my/stores/inspect/[id]` (per-line condition + disposition + sign)
 - Mixed-source returns blocked client-side and server-side
 - Offline queue + drain via `useStockSync` (DB version 4, additive)
-- Migration 358: `idempotency_key` on `stock_returns` with partial unique index
+- Migration 359: `idempotency_key` on `stock_returns` with partial unique index
 - Hardening on existing `POST /returns`, `/inspect`, `/accept` (role gate, idempotency, audit fields from req.user, atomic accept)
 - 2 new flat endpoints: `GET /my-serials`, `GET /serial-source`
 
@@ -2224,7 +2224,7 @@ gh pr create --base master --head feat/field-stock-pwa-return-flow \
 
 - [ ] `npm run ci:quick` clean (no ratchet regressions)
 - [ ] Integration tests pass (`returns-flow-integration.test.ts` + endpoint hardening tests)
-- [ ] Migration 358 applied to dev DB
+- [ ] Migration 359 applied to dev DB
 - [ ] Browser smoke on dev: tech return → stores inspect → restock (all 12 steps in plan §G.3)
 - [ ] Blind review-team approval
 
@@ -2464,7 +2464,7 @@ Mismatches:
 
 **3. `stock_returns.idempotency_key` — confirmed does NOT exist**
 
-0 rows returned. Migration 358 in Task A.2 must `ALTER TABLE stock_returns ADD COLUMN idempotency_key ...` — safe to proceed.
+0 rows returned. Migration 359 in Task A.2 must `ALTER TABLE stock_returns ADD COLUMN idempotency_key ...` — safe to proceed.
 
 **4. `generate_return_number()` — confirmed working**
 
@@ -2498,7 +2498,7 @@ After writing this plan, verify:
 1. Every spec requirement maps to at least one task — ✅ checked.
 2. No placeholders left (search "TODO", "TBD", "fill in") — see Task D.3, E.1, E.2 which reference patterns rather than full code; this is intentional for components <200 lines that mirror Phase 2 verbatim.
 3. Names consistent throughout: `isReturnCreator` not `canCreateReturn`; `submitInspectAndAccept` not `inspectAndAccept`; `lockedSourceWarehouseId` not `sourceLock`.
-4. Migration filename: `358_returns_idempotency_key.sql` (matches `scripts/migrations/sql/` per CLAUDE.md feedback_migration_directory rule).
+4. Migration filename: `359_returns_idempotency_key.sql` (matches `scripts/migrations/sql/` per CLAUDE.md feedback_migration_directory rule).
 
 ## Execution
 
