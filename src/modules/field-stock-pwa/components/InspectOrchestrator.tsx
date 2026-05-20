@@ -74,7 +74,9 @@ async function fetchReturnById(id: string): Promise<ReturnDetail | null> {
       { credentials: 'same-origin' },
     );
     if (!res.ok) continue;
-    const rows = (await res.json()) as ReturnDetail[];
+    // API returns the apiResponse envelope { success, data, meta } — unwrap.
+    const envelope = (await res.json()) as { success?: boolean; data?: unknown };
+    const rows = Array.isArray(envelope?.data) ? (envelope.data as ReturnDetail[]) : [];
     const found = rows.find((r) => r.id === id);
     if (found) return found;
   }

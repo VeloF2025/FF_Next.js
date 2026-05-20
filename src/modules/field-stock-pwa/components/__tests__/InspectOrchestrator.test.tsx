@@ -118,7 +118,7 @@ function setupFetch(pendingRows: unknown[] = [], inspectedRows: unknown[] = []) 
     const rows = url.includes('status=inspected') ? inspectedRows : pendingRows;
     return Promise.resolve({
       ok: true,
-      json: () => Promise.resolve(rows),
+      json: () => Promise.resolve({ success: true, data: rows, meta: { timestamp: '' } }),
     } as Response);
   });
 }
