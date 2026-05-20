@@ -74,10 +74,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   const severities = body.severities ?? ['minor', 'major', 'critical'];
   const categories = body.categories ?? null;
 
-  // Coerce undefined to null so Postgres can apply IS NULL checks.
-  const zones: number[] | null = body.zones ?? null;
-  const pons: number[] | null = body.pons ?? null;
-  const poles: string[] | null = body.poles ?? null;
+  // Coerce undefined OR empty array to null so Postgres can apply IS NULL
+  // checks. The dialog sends [] for non-active scope dimensions (e.g. when
+  // scope=zone it sends pons:[] / poles:[]) — without this coercion the
+  // `${arr}::int[] IS NULL` branch is false and `= ANY('{}'::int[])` matches
+  // zero rows, silently filtering out every snag.
+  const zones: number[] | null = body.zones && body.zones.length > 0 ? body.zones : null;
+  const pons: number[] | null = body.pons && body.pons.length > 0 ? body.pons : null;
+  const poles: string[] | null = body.poles && body.poles.length > 0 ? body.poles : null;
 
   // ── 1. Fetch snags matching scope ──────────────────────────────────────────
 
