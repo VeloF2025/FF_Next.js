@@ -6,8 +6,13 @@
  * VF Storage, and the auth layer are mocked so tests remain hermetic.
  */
 
-process.env.DATABASE_URL =
-  'postgresql://postgres.ironman-platform:a23f6104debd1d3e88e8f00c0067f22f@localhost:5436/fibreflow';
+if (!process.env.TEST_DATABASE_URL) {
+  throw new Error(
+    'Integration test needs TEST_DATABASE_URL set (real DB connection string). ' +
+    'See .env.local.example.',
+  );
+}
+process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 import { createMocks } from 'node-mocks-http';
@@ -21,8 +26,7 @@ const { realPool, realSql, realTransaction } = vi.hoisted(() => {
   const { Pool } = require('pg') as { Pool: typeof import('pg').Pool };
 
   const pool = new Pool({
-    connectionString:
-      'postgresql://postgres.ironman-platform:a23f6104debd1d3e88e8f00c0067f22f@localhost:5436/fibreflow',
+    connectionString: process.env.TEST_DATABASE_URL,
     ssl: false,
     max: 5,
   });
@@ -142,6 +146,8 @@ describe('POST /api/snags/reports-scope', () => {
   });
 
   afterAll(async () => {
+    await realSql`DELETE FROM snag_reports WHERE source = 'scope' AND report_number LIKE 'SCOPE-%'`;
+    await realSql`DELETE FROM snag_report_seq`;
     await realPool.end();
   });
 
@@ -215,5 +221,8 @@ describe('POST /api/snags/reports-scope', () => {
     expect(persisted[0]!.pdf_url).toBe('/storage/snag-reports/mock.pdf');
     expect(persisted[0]!.generated_at).not.toBeNull();
     expect(Number(persisted[0]!.total_findings)).toBeGreaterThan(0);
+    // H1: multi-zone/PON stored as INT[] not scalar
+    expect(Array.isArray(persisted[0]!.scope_zone_nos)).toBe(true);
+    expect((persisted[0]!.scope_zone_nos as number[])).toEqual([24]);
   });
 });

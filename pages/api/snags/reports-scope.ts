@@ -5,7 +5,7 @@
  * → reserves report number → renders HTML → puppeteer PDF → VF Storage upload
  * → persists snag_reports row → returns 201 with the row.
  *
- * Permission: construction-qa.snags.reports (view action).
+ * Permission: construction-qa.snags.reports (create action).
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -17,10 +17,9 @@ import { vfStorage } from '@/services/vfStorageAdapter';
 import { generateScopeReportNumber } from '@/modules/construction-qa/services/reportNumberGenerator';
 import {
   renderScopeSnagReportHtml,
-  resolveSlotUrls,
   type SnagReportMeta,
-  type SnagReportScopeRow,
 } from '@/modules/construction-qa/services/snagReportRenderer';
+import { runSnagScopeQuery } from '@/modules/construction-qa/services/snagScopeQuery';
 
 // ── Request body shape ─────────────────────────────────────────────────────────
 
@@ -82,39 +81,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   // ── 1. Fetch snags matching scope ──────────────────────────────────────────
 
-  // Cast required: SnagReportScopeRow doesn't extend SqlRow (Record<string, unknown>)
-  const rows = (await sql`
-    SELECT
-      s.id,
-      s.snag_number,
-      s.category,
-      s.severity,
-      s.status,
-      s.description,
-      p.zone_no,
-      p.pon_no,
-      p.pole_label AS pole_number,
-      s.pole_qa_photo_id,
-      s.slot_key,
-      s.created_at::text AS created_at,
-      mt.ticket_uid      AS noc_ticket_uid
-    FROM snags s
-    LEFT JOIN pole_qa_photos p       ON p.id = s.pole_qa_photo_id
-    LEFT JOIN maintenance_tickets mt ON mt.id = s.noc_ticket_id
-    WHERE s.project_id = ${body.project_id}
-      AND (${zones}::int[]  IS NULL OR p.zone_no    = ANY(${zones}::int[]))
-      AND (${pons}::int[]   IS NULL OR p.pon_no     = ANY(${pons}::int[]))
-      AND (${poles}::text[] IS NULL OR p.pole_label = ANY(${poles}::text[]))
-      AND s.created_at >= ${fromDate}::date
-      AND s.created_at <  (${toDate}::date + INTERVAL '1 day')
-      AND s.severity = ANY(${severities}::text[])
-      AND (${categories}::text[] IS NULL OR s.category = ANY(${categories}::text[]))
-    ORDER BY
-      p.zone_no    NULLS LAST,
-      p.pon_no     NULLS LAST,
-      p.pole_label NULLS LAST,
-      s.created_at
-  `) as unknown as SnagReportScopeRow[];
+  const rows = await runSnagScopeQuery({
+    project_id: body.project_id,
+    zones,
+    pons,
+    poles,
+    from_date: fromDate,
+    to_date: toDate,
+    severities,
+    categories,
+  });
 
   if (rows.length === 0) {
     return apiResponse.error(
@@ -163,8 +139,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   };
 
   log.info('reports-scope.rendering', { reportNumber, rowCount: rows.length });
-  const slotUrls = await resolveSlotUrls(rows);
-  const html = await renderScopeSnagReportHtml(meta, rows, { slotUrls });
+  const html = await renderScopeSnagReportHtml(meta, rows);
 
   // ── 6. Generate PDF with puppeteer ─────────────────────────────────────────
 
@@ -202,40 +177,57 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     size: uploadResult.size,
   });
 
-  // ── 8. Persist snag_reports row ────────────────────────────────────────────
+  // ── 8. Persist snag_reports row — cleanup orphaned PDF on failure ──────────
 
-  const inserted = await transaction(async (txn) => {
-    // txn.query<T> returns T[] directly (per TxnClient interface in db-pool.ts)
-    const r = await txn.query(
-      `INSERT INTO snag_reports
-         (project_id, report_number, source, audit_date,
-          scope, scope_zone_no, scope_pon_no, scope_poles,
-          scope_from_date, scope_to_date, scope_severities, scope_categories,
-          pdf_url, generated_by, generated_at, total_findings)
-       VALUES ($1, $2, 'scope', CURRENT_DATE,
-               $3, $4, $5, $6,
-               $7, $8, $9, $10,
-               $11, $12, NOW(), $13)
-       RETURNING *`,
-      [
-        body.project_id,
+  let inserted: Record<string, unknown>;
+  try {
+    inserted = await transaction(async (txn) => {
+      // txn.query<T> returns T[] directly (per TxnClient interface in db-pool.ts)
+      const r = await txn.query(
+        `INSERT INTO snag_reports
+           (project_id, report_number, source, audit_date,
+            scope, scope_zone_nos, scope_pon_nos, scope_poles,
+            scope_from_date, scope_to_date, scope_severities, scope_categories,
+            pdf_url, generated_by, generated_at, total_findings)
+         VALUES ($1, $2, 'scope', CURRENT_DATE,
+                 $3, $4, $5, $6,
+                 $7, $8, $9, $10,
+                 $11, $12, NOW(), $13)
+         RETURNING *`,
+        [
+          body.project_id,
+          reportNumber,
+          body.scope,
+          zones,    // INT[] — preserves all selected zones
+          pons,     // INT[] — preserves all selected PONs
+          poles ?? null,
+          fromDate,
+          toDate,
+          severities,
+          categories,
+          uploadResult.url,
+          userId,
+          rows.length,
+        ],
+      );
+      return r[0] as Record<string, unknown>;
+    });
+  } catch (insertErr) {
+    log.error('reports-scope.insert_failed', {
+      reportNumber,
+      error: insertErr instanceof Error ? insertErr.message : String(insertErr),
+    });
+    // Best-effort cleanup of orphaned PDF from VF Storage.
+    try {
+      await vfStorage.deleteFile('snag-reports', body.project_id, `${reportNumber}.pdf`);
+    } catch (cleanupErr) {
+      log.warn('reports-scope.pdf_cleanup_failed', {
         reportNumber,
-        body.scope,
-        // Scalar zone/pon only when a single value is selected; multi stored in JSON columns.
-        zones && zones.length === 1 ? zones[0] : null,
-        pons && pons.length === 1 ? pons[0] : null,
-        poles ?? null,
-        fromDate,
-        toDate,
-        severities,
-        categories,
-        uploadResult.url,
-        userId,
-        rows.length,
-      ],
-    );
-    return r[0];
-  });
+        error: cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
+      });
+    }
+    throw insertErr;
+  }
 
   return apiResponse.created(res, inserted);
 }

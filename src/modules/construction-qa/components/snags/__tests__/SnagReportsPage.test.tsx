@@ -43,7 +43,7 @@ describe('SnagReportsPage source filter', () => {
       json: async () => ({
         data: [{
           id: 'r1', source: 'scope', report_number: 'SCOPE-LAWL-20260520-001',
-          scope: 'zone', scope_zone_no: 24, scope_pon_no: null, scope_poles: null,
+          scope: 'zone', scope_zone_nos: [24], scope_pon_nos: null, scope_poles: null,
           scope_from_date: '2026-04-20', scope_to_date: '2026-05-20',
           pdf_url: 'https://x/r.pdf', project_name: 'Lawley', total_findings: 7,
           audit_date: '2026-05-20', generated_at: '2026-05-20T02:30:00Z',

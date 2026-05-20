@@ -15,6 +15,6 @@ ALTER TABLE snag_reports
   DROP COLUMN IF EXISTS scope_to_date,
   DROP COLUMN IF EXISTS scope_from_date,
   DROP COLUMN IF EXISTS scope_poles,
-  DROP COLUMN IF EXISTS scope_pon_no,
-  DROP COLUMN IF EXISTS scope_zone_no,
+  DROP COLUMN IF EXISTS scope_pon_nos,
+  DROP COLUMN IF EXISTS scope_zone_nos,
   DROP COLUMN IF EXISTS scope;

@@ -14,10 +14,8 @@ import { sql } from '@/lib/db-pool';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth, withPermission } from '@/lib/auth';
 import { buildScopeSnagWorkbook } from '@/modules/construction-qa/services/snagReportXlsx';
-import type {
-  SnagReportMeta,
-  SnagReportScopeRow,
-} from '@/modules/construction-qa/services/snagReportRenderer';
+import { runSnagScopeQuery } from '@/modules/construction-qa/services/snagScopeQuery';
+import type { SnagReportMeta } from '@/modules/construction-qa/services/snagReportRenderer';
 
 // ── Internal types ────────────────────────────────────────────────────────────
 
@@ -27,8 +25,8 @@ interface ScopeReportRow {
   project_name: string;
   report_number: string;
   scope: 'pole' | 'pon' | 'zone';
-  scope_zone_no: number | null;
-  scope_pon_no: number | null;
+  scope_zone_nos: number[] | null;
+  scope_pon_nos: number[] | null;
   scope_poles: string[] | null;
   scope_from_date: string;
   scope_to_date: string;
@@ -58,8 +56,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
            p.project_name,
            sr.report_number,
            sr.scope,
-           sr.scope_zone_no,
-           sr.scope_pon_no,
+           sr.scope_zone_nos,
+           sr.scope_pon_nos,
            sr.scope_poles,
            sr.scope_from_date::text AS scope_from_date,
            sr.scope_to_date::text   AS scope_to_date,
@@ -79,11 +77,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   const r = reportRows[0]!;
 
-  // ── Rebuild scope arrays ──────────────────────────────────────────────────
+  // ── Rebuild scope arrays from stored INT[] columns ────────────────────────
 
-  const zones = r.scope_zone_no !== null ? [r.scope_zone_no] : [];
-  const pons  = r.scope_pon_no  !== null ? [r.scope_pon_no]  : [];
-  const poles = r.scope_poles   ?? [];
+  const zones = r.scope_zone_nos ?? [];
+  const pons  = r.scope_pon_nos  ?? [];
+  const poles = r.scope_poles    ?? [];
 
   const meta: SnagReportMeta = {
     reportNumber: r.report_number,
@@ -98,47 +96,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     generatedBy:  r.generated_by ?? 'system',
   };
 
-  // SQL arrays — null means "no filter" (all values match).
-  const zonesArr      = zones.length ? zones : null;
-  const ponsArr       = pons.length  ? pons  : null;
-  const polesArr      = poles.length ? poles : null;
-  const severitiesArr = r.scope_severities ?? [];
-  const categoriesArr = r.scope_categories;
+  // ── Re-run scope query (same filter as POST route via shared helper) ───────
 
-  // ── Re-run scope query (same filter as POST route) ────────────────────────
-  // pole_label aliased as pole_number; maintenance_tickets aliased noc_ticket_uid
-  // per DB-verified schema (no pole_number column, no noc_tickets table).
-
-  const rows = (await sql`
-    SELECT s.id,
-           s.snag_number,
-           s.category,
-           s.severity,
-           s.status,
-           s.description,
-           p.zone_no,
-           p.pon_no,
-           p.pole_label               AS pole_number,
-           s.pole_qa_photo_id,
-           s.slot_key,
-           s.created_at::text         AS created_at,
-           nt.ticket_uid              AS noc_ticket_uid
-    FROM   snags s
-    LEFT   JOIN pole_qa_photos      p  ON p.id  = s.pole_qa_photo_id
-    LEFT   JOIN maintenance_tickets nt ON nt.id = s.noc_ticket_id
-    WHERE  s.project_id = ${r.project_id}
-      AND  (${zonesArr}::int[]   IS NULL OR p.zone_no    = ANY(${zonesArr}::int[]))
-      AND  (${ponsArr}::int[]    IS NULL OR p.pon_no     = ANY(${ponsArr}::int[]))
-      AND  (${polesArr}::text[]  IS NULL OR p.pole_label = ANY(${polesArr}::text[]))
-      AND  s.created_at >= ${r.scope_from_date}::date
-      AND  s.created_at <  (${r.scope_to_date}::date + INTERVAL '1 day')
-      AND  s.severity = ANY(${severitiesArr}::text[])
-      AND  (${categoriesArr}::text[] IS NULL OR s.category = ANY(${categoriesArr}::text[]))
-    ORDER  BY p.zone_no NULLS LAST,
-              p.pon_no  NULLS LAST,
-              p.pole_label NULLS LAST,
-              s.created_at
-  ` as unknown) as SnagReportScopeRow[];
+  const rows = await runSnagScopeQuery({
+    project_id:  r.project_id,
+    zones:       zones.length ? zones : null,
+    pons:        pons.length  ? pons  : null,
+    poles:       poles.length ? poles : null,
+    from_date:   r.scope_from_date,
+    to_date:     r.scope_to_date,
+    severities:  r.scope_severities ?? [],
+    categories:  r.scope_categories,
+  });
 
   // ── Build workbook and stream ─────────────────────────────────────────────
 

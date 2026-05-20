@@ -1,9 +1,9 @@
 /**
  * ScopeReportCard — Card variant for snag_reports rows with source='scope'.
  *
- * Shows scope summary (Zone N · PON M · Poles X,Y) + date range + total
- * findings + Open PDF / Excel action buttons. Matches the dark-theme styling
- * of existing TQR/Works-QA report cards.
+ * Shows scope summary (Zones 24, 25 · PONs 265, 266 · Poles X,Y) + date range
+ * + total findings + Open PDF / Excel action buttons. Matches the dark-theme
+ * styling of existing TQR/Works-QA report cards.
  */
 
 export interface ScopeReport {
@@ -11,8 +11,8 @@ export interface ScopeReport {
   report_number: string;
   source: 'scope';
   scope: 'pole' | 'pon' | 'zone';
-  scope_zone_no: number | null;
-  scope_pon_no: number | null;
+  scope_zone_nos: number[] | null;
+  scope_pon_nos: number[] | null;
   scope_poles: string[] | null;
   scope_from_date: string;
   scope_to_date: string;
@@ -25,11 +25,14 @@ export interface ScopeReport {
 /** Build a human-readable scope summary line from the scope fields. */
 function scopeSummary(r: ScopeReport): string {
   const parts: string[] = [];
-  if (r.scope_zone_no !== null) parts.push(`Zone ${r.scope_zone_no}`);
-  if (r.scope_pon_no !== null) parts.push(`PON ${r.scope_pon_no}`);
+  if (r.scope_zone_nos && r.scope_zone_nos.length > 0) {
+    parts.push(`Zone${r.scope_zone_nos.length > 1 ? 's' : ''} ${r.scope_zone_nos.join(', ')}`);
+  }
+  if (r.scope_pon_nos && r.scope_pon_nos.length > 0) {
+    parts.push(`PON${r.scope_pon_nos.length > 1 ? 's' : ''} ${r.scope_pon_nos.join(', ')}`);
+  }
   if (r.scope_poles && r.scope_poles.length > 0) {
-    const label = r.scope_poles.length > 1 ? 'Poles' : 'Pole';
-    parts.push(`${label} ${r.scope_poles.join(', ')}`);
+    parts.push(`Pole${r.scope_poles.length > 1 ? 's' : ''} ${r.scope_poles.join(', ')}`);
   }
   return parts.join(' · ') || 'Whole project';
 }

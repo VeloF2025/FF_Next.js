@@ -13,7 +13,6 @@ import type {
   ReportPill,
   ReportAccent,
 } from '@/templates/reports/report-template';
-import { sql } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -47,12 +46,6 @@ export interface SnagReportScopeRow {
   slot_key: string | null;         // e.g. "civil_after"
   created_at: string;              // ISO datetime
   noc_ticket_uid: string | null;
-}
-
-export interface RenderOptions {
-  /** Pre-resolved slot URLs keyed `${pole_qa_photo_id}:${slot_key}`.
-   *  Reserved for future thumbnail rendering — pass resolveSlotUrls() result. */
-  slotUrls: Record<string, string | null>;
 }
 
 // ── Column key constants ──────────────────────────────────────────────────────
@@ -115,59 +108,17 @@ function severityPill(severity: 'minor' | 'major' | 'critical'): ReportPill {
 // ── Exports ───────────────────────────────────────────────────────────────────
 
 /**
- * Batched pole_qa_photos lookup for slot thumbnail URLs.
- * Returns map keyed `${pole_qa_photo_id}:${slot_key}` → URL | null.
- */
-export async function resolveSlotUrls(
-  rows: SnagReportScopeRow[],
-): Promise<Record<string, string | null>> {
-  type PairedRow = SnagReportScopeRow & {
-    pole_qa_photo_id: string;
-    slot_key: string;
-  };
-
-  const pairs = rows.filter(
-    (r): r is PairedRow => r.pole_qa_photo_id !== null && r.slot_key !== null,
-  );
-
-  if (pairs.length === 0) return {};
-
-  const ids = Array.from(new Set(pairs.map(p => p.pole_qa_photo_id)));
-  const photoRows = await sql`
-    SELECT * FROM pole_qa_photos WHERE id = ANY(${ids})
-  ` as Array<Record<string, unknown> & { id: string }>;
-
-  const byId = new Map(photoRows.map(p => [p.id, p]));
-  const result: Record<string, string | null> = {};
-
-  for (const p of pairs) {
-    const photo = byId.get(p.pole_qa_photo_id);
-    if (!photo) continue;
-    const urlCol = `${p.slot_key}_url`;
-    const url = photo[urlCol];
-    result[`${p.pole_qa_photo_id}:${p.slot_key}`] =
-      typeof url === 'string' ? url : null;
-  }
-
-  return result;
-}
-
-/**
  * Renders a scoped snag report as a self-contained HTML string.
- * Ready for puppeteer → PDF in the T4 route handler.
+ * Ready for puppeteer → PDF in the POST route handler.
  */
 export async function renderScopeSnagReportHtml(
   meta: SnagReportMeta,
   rows: SnagReportScopeRow[],
-  opts: RenderOptions,
 ): Promise<string> {
   log.info('snagReportRenderer.start', {
     reportNumber: meta.reportNumber,
     rowCount: rows.length,
   });
-
-  // slotUrls reserved for future per-photo thumbnail rendering.
-  void opts.slotUrls;
 
   // ── KPI aggregation ────────────────────────────────────────────────────────
 

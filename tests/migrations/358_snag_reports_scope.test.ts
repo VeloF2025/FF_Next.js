@@ -6,12 +6,17 @@
  * 358 should produce.
  *
  * Run order: apply 358 → run this test → (optional) apply rollback_358.
+ *
+ * Requires TEST_DATABASE_URL env var (see .env.local.example).
  */
 
-// Override DATABASE_URL at process level before any pool singleton initialises.
-// vitest.setup.ts sets a fake "test" URL; migration tests need the real DB.
-process.env.DATABASE_URL =
-  'postgresql://postgres.ironman-platform:a23f6104debd1d3e88e8f00c0067f22f@localhost:5436/fibreflow';
+if (!process.env.TEST_DATABASE_URL) {
+  throw new Error(
+    'Integration test needs TEST_DATABASE_URL set (real DB connection string). ' +
+    'See .env.local.example.',
+  );
+}
+process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { Pool } from 'pg';
@@ -49,12 +54,12 @@ describe('migration 358 — snag_reports scope columns', () => {
     // verifies the resulting schema shape.
   });
 
-  it('adds scope, scope_zone_no, scope_pon_no, scope_poles columns', async () => {
+  it('adds scope, scope_zone_nos, scope_pon_nos, scope_poles columns', async () => {
     const rows = await sql`
       SELECT column_name, data_type
       FROM information_schema.columns
       WHERE table_name = 'snag_reports'
-        AND column_name IN ('scope', 'scope_zone_no', 'scope_pon_no', 'scope_poles',
+        AND column_name IN ('scope', 'scope_zone_nos', 'scope_pon_nos', 'scope_poles',
                             'scope_from_date', 'scope_to_date', 'scope_severities',
                             'scope_categories', 'pdf_url', 'generated_by', 'generated_at')
       ORDER BY column_name
@@ -62,7 +67,7 @@ describe('migration 358 — snag_reports scope columns', () => {
     expect(rows.map(r => r.column_name)).toEqual([
       'generated_at', 'generated_by', 'pdf_url',
       'scope', 'scope_categories', 'scope_from_date', 'scope_poles',
-      'scope_pon_no', 'scope_severities', 'scope_to_date', 'scope_zone_no',
+      'scope_pon_nos', 'scope_severities', 'scope_to_date', 'scope_zone_nos',
     ]);
   });
 
