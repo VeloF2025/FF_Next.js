@@ -37,7 +37,15 @@ fi
 
 echo "CRON_SECRET found (${#CRON_SECRET} chars)"
 
-# Write service unit
+# Write a dedicated env file with strict perms. We use EnvironmentFile= in the
+# unit rather than expanding CRON_SECRET into ExecStart= so the secret never
+# lands in /etc/systemd/system/*.service (which `systemctl cat` prints in the
+# clear and is typically world-readable).
+SECRET_ENV_FILE="/etc/systemd/system/${SERVICE_PREFIX}.env"
+sudo install -m 600 -o root -g root /dev/null "$SECRET_ENV_FILE"
+printf 'CRON_SECRET=%s\n' "$CRON_SECRET" | sudo tee "$SECRET_ENV_FILE" > /dev/null
+
+# Write service unit (secret referenced from EnvironmentFile, not inlined).
 sudo tee "/etc/systemd/system/${SERVICE_PREFIX}.service" > /dev/null <<EOF
 [Unit]
 Description=FibreFlow Auto-QA runner (${ENV})
@@ -45,8 +53,9 @@ After=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/curl -s -X POST \\
-  -H "Authorization: Bearer ${CRON_SECRET}" \\
+EnvironmentFile=${SECRET_ENV_FILE}
+ExecStart=/usr/bin/curl -sS --fail -X POST \\
+  -H "Authorization: Bearer \${CRON_SECRET}" \\
   -H "Content-Type: application/json" \\
   "${APP_URL}/api/cron/auto-qa"
 StandardOutput=journal
