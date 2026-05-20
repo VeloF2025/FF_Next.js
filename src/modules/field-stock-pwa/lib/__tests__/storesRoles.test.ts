@@ -100,3 +100,50 @@ describe('isStoresAuthorised', () => {
     expect(isStoresAuthorised('technician')).toBe(false);
   });
 });
+
+import { isReturnCreator, isReturnInspector } from '../storesRoles';
+
+describe('isReturnCreator', () => {
+  it('technician staff.role → true', () => {
+    expect(isReturnCreator('technician', null)).toBe(true);
+  });
+  it('stores staff.role → true', () => {
+    expect(isReturnCreator('stores', null)).toBe(true);
+  });
+  it('admin staff.role → true', () => {
+    expect(isReturnCreator('admin', null)).toBe(true);
+  });
+  it('driver staff.role → false', () => {
+    expect(isReturnCreator('driver', null)).toBe(false);
+  });
+  it('null role, super_admin authRole → true', () => {
+    expect(isReturnCreator(null, 'super_admin')).toBe(true);
+  });
+  it('null role, system authRole → true', () => {
+    expect(isReturnCreator(null, 'system')).toBe(true);
+  });
+  it('null role, no authRole → false', () => {
+    expect(isReturnCreator(null, null)).toBe(false);
+  });
+});
+
+describe('isReturnInspector', () => {
+  it('stores staff.role → true', () => {
+    expect(isReturnInspector('stores', null)).toBe(true);
+  });
+  it('admin staff.role → true', () => {
+    expect(isReturnInspector('admin', null)).toBe(true);
+  });
+  it('technician staff.role → false (techs cannot inspect)', () => {
+    expect(isReturnInspector('technician', null)).toBe(false);
+  });
+  it('null role, super_admin authRole → true', () => {
+    expect(isReturnInspector(null, 'super_admin')).toBe(true);
+  });
+  it('null role, system authRole → true', () => {
+    expect(isReturnInspector(null, 'system')).toBe(true);
+  });
+  it('null role, no authRole → false', () => {
+    expect(isReturnInspector(null, null)).toBe(false);
+  });
+});

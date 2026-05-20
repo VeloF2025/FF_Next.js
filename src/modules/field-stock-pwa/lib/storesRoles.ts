@@ -63,3 +63,43 @@ export function isStoresAuthorised(
   if (role === null) return false;
   return (STORES_ROLES as ReadonlyArray<string>).includes(role);
 }
+
+// =============================================================================
+// Return-flow helpers (Phase 3)
+// =============================================================================
+
+/**
+ * Staff roles permitted to create a return via /my/stores/return.
+ * Technicians create returns (their own stock); stores/admin can also create
+ * one on a tech's behalf.
+ */
+export const RETURN_CREATOR_ROLES = ['technician', 'stores', 'admin'] as const;
+
+/**
+ * Staff roles permitted to inspect+accept a return via /my/stores/inspect/[id].
+ * Excludes technician — only stores staff and admins can disposition serials.
+ */
+export const RETURN_INSPECTOR_ROLES = ['stores', 'admin'] as const;
+
+/** Same authRole bypass as isStoresAuthorised. */
+export function isReturnCreator(
+  role: StaffRole | null,
+  authRole?: string | null,
+): boolean {
+  if (authRole !== undefined && authRole !== null) {
+    if ((STORES_AUTH_ROLES as ReadonlyArray<string>).includes(authRole)) return true;
+  }
+  if (role === null) return false;
+  return (RETURN_CREATOR_ROLES as ReadonlyArray<string>).includes(role);
+}
+
+export function isReturnInspector(
+  role: StaffRole | null,
+  authRole?: string | null,
+): boolean {
+  if (authRole !== undefined && authRole !== null) {
+    if ((STORES_AUTH_ROLES as ReadonlyArray<string>).includes(authRole)) return true;
+  }
+  if (role === null) return false;
+  return (RETURN_INSPECTOR_ROLES as ReadonlyArray<string>).includes(role);
+}
