@@ -1,0 +1,59 @@
+| PROPERTY NUMBER | DR NUMBER | S/N ONT | S/N GIZZU | ADDITIONAL NOTES |
+| :-: | :-: | :-: | :-: | :-: |
+| 10896 | DR1856756 | ALCLB484F568 |  |  |
+| 10897 | DR1856755 | ALCLB480FE83 |  |  |
+| 10898 | DR1856752 | ALCLB484F563 |  | MAIN HOUSE |
+|  | DR1856751 | ALCLB48F1E84 |  | BACK ROOM |
+| 10899 | DR1856747 | ALCLB484F656 |  | MAIN HOUSE |
+|  | DR1856748 | ALCLB485153A |  | BACK ROOM |
+| 10900 | DR1856742 | ALCLB484F423 |  | MAIN HOUSE |
+|  | DR1856731 | ALCLB484F4F8 |  | BACK ROOM |
+| 10901 |  |  |  |  |
+| 10902 |  |  |  |  |
+| 10903 |  |  |  |  |
+| 10904 |  |  |  |  |
+| 10905 |  |  |  |  |
+| 10906 |  |  |  |  |
+| 10907 |  |  |  |  |
+| 10908 |  |  |  |  |
+| 10909 | DR1856728 | ALCLB480E58F |  | MAIN HOUSE |
+|  | DR1856727 | ALCLB48F1D6D |  | BACK ROOM |
+| 10910 |  |  |  |  |
+| 10911 | DR1856737 | ALCLB484F4FC |  | MAIN HOUSE |
+|  | DR1856739 | ALCLB484F5D9 |  | BACK ROOM |
+| 10912 | DR1856738 | ALCLB484F275 |  |  |
+| 10913 | DR1856744 | ALCLB484F237 |  |  |
+| 10914 |  |  |  |  |
+| 10915 |  |  |  |  |
+| 10916 | DR1856753 | ALCLB484FA40 |  |  |
+| 10917 | DR1856759 | ALCLB484F938 |  |  |
+| 10918 | DR1856754 | ALCLB48AB4F4 |  | MAIN HOUSE |
+|  | DR1856730 | ALCLB480FFD7 |  | BACK ROOM |
+| 10884 |  |  |  |  |
+| 10885 | DR1856785 | ALCLB48F1D75 |  |  |
+| 10886 |  |  |  |  |
+| 10887 | DR1856770 | ALCLB484F4FF |  |  |
+| 10888 |  |  |  |  |
+| 10889 |  |  |  |  |
+| 10890 | DR1856763 | ALCLB480FD04 |  |  |
+| 10891 | DR1856769 | ALCLB484F26B |  |  |
+| 10892 |  |  |  |  |
+| 10893 |  |  |  |  |
+| 10894 |  |  |  |  |
+| 10895 | DR1856782 | ALCLB4850071 |  | MAIN HOUSE |
+|  | DR1856781 | ALCLB480E58A |  | BACK ROOM |
+| 10869 |  |  |  |  |
+| 10870 | DR1856790 | ALCLB480E6C7 |  | MAIN HOUSE |
+|  | DR1856794 | ALCLB480E57F |  | BACK ROOM |
+|  | DR1856793 | ALCLB484FBFE |  | BACK ROOM |
+| 10871 | DR1856792 | ALCLB484F608 |  | MAIN HOUSE |
+|  | DR1856795 | ALCLB484F5C1 |  | BACK ROOM ONT SN STICKER IS UPSIDE DOWN |
+| 10872 |  |  |  |  |
+| 10873 | DR1856787 | ALCLB484FBD1 |  |  |
+| 10874 |  |  |  |  |
+| 10875 |  |  |  |  |
+| 10876 |  |  |  |  |
+| 10877 |  |  |  |  |
+| 10878 |  |  |  |  |
+| 10879 |  |  |  |  |
+| 10880 |  |  |  |  |
