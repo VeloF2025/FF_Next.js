@@ -81,7 +81,7 @@ describe('renderScopeSnagReportHtml', () => {
   });
 
   it('handles empty rows array — KPIs all zero, no table crash', async () => {
-    const html = await renderScopeSnagReportHtml(meta, [], { slotUrls: {} });
+    const html = await renderScopeSnagReportHtml(meta, []);
     expect(html).toMatch(/Total snags[\s\S]*?0/);
     expect(html).toContain('Lawley');
   });
