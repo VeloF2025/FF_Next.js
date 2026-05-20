@@ -72,7 +72,7 @@ beforeEach(() => {
     'fetch',
     vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(MOCK_SERIALS),
+      json: () => Promise.resolve({ success: true, data: MOCK_SERIALS, meta: { timestamp: '' } }),
     }),
   );
 });
@@ -223,7 +223,7 @@ describe('ScanMyStockStep', () => {
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve([]),
+        json: () => Promise.resolve({ success: true, data: [], meta: { timestamp: '' } }),
       }),
     );
     render(<ScanMyStockStep {...buildProps()} />);
