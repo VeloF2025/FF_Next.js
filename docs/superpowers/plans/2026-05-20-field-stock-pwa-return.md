@@ -2273,11 +2273,222 @@ git branch -d feat/field-stock-pwa-return-flow   # already deleted on remote via
 
 ## Schema probe results
 
-(Filled in by Task A.1.)
+(Filled in by Task A.1 — 2026-05-20.)
+
+### Probe 1 — `stock_serials` CHECK constraints
 
 ```
-(replace with actual psql output)
+                conname                |                                                                                                                                                                      pg_get_constraintdef
+-------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ stock_serials_condition_check | CHECK (((condition)::text = ANY (ARRAY[('new'::character varying)::text, ('good'::character varying)::text, ('fair'::character varying)::text, ('poor'::character varying)::text, ('damaged'::character varying)::text, ('non_functional'::character varying)::text])))
+ stock_serials_status_check    | CHECK (((status)::text = ANY (ARRAY[('available'::character varying)::text, ('reserved'::character varying)::text, ('issued'::character varying)::text, ('installed'::character varying)::text, ('faulty'::character varying)::text, ('returned'::character varying)::text, ('scrapped'::character varying)::text, ('in_transit'::character varying)::text])))
+(2 rows)
 ```
+
+### Probe 2 — `staff` linkage columns
+
+```
+ column_name | data_type
+-------------+-----------
+ id          | uuid
+ role        | text
+ user_id     | uuid
+(3 rows)
+```
+
+### Probe 3a — `stock_serials` columns (all)
+
+```
+         column_name          |        data_type
+------------------------------+--------------------------
+ id                           | uuid
+ stock_item_id                | uuid
+ serial_number                | character varying
+ mac_address                  | character varying
+ imei                         | character varying
+ current_location_id          | uuid
+ status                       | character varying
+ installed_at_drop_id         | uuid
+ installed_at_drop_number     | character varying
+ installed_at_home_install_id | uuid
+ installed_date               | timestamp with time zone
+ installed_by                 | character varying
+ received_date                | date
+ received_reference           | character varying
+ warranty_end_date            | date
+ condition                    | character varying
+ created_at                   | timestamp with time zone
+ updated_at                   | timestamp with time zone
+ previous_status              | character varying
+ status_changed_at            | timestamp with time zone
+ status_changed_by            | character varying
+ fault_report_id              | uuid
+ pp_flagged                   | boolean
+ pp_flagged_at                | timestamp with time zone
+ pp_resolution_status         | text
+(25 rows)
+```
+
+### Probe 3b — `stock_pickings` columns (all)
+
+```
+       column_name       |        data_type
+-------------------------+--------------------------
+ id                      | uuid
+ picking_number          | character varying
+ picking_type            | character varying
+ source_location_id      | uuid
+ destination_location_id | uuid
+ project_id              | uuid
+ job_reference           | character varying
+ job_type                | character varying
+ contractor_id           | uuid
+ contractor_name         | character varying
+ team_name               | character varying
+ technician_id           | uuid
+ technician_name         | character varying
+ signature_data          | text
+ signed_at               | timestamp with time zone
+ signed_by               | character varying
+ status                  | character varying
+ scheduled_date          | date
+ effective_date          | timestamp with time zone
+ requested_by            | character varying
+ approved_by             | character varying
+ approved_at             | timestamp with time zone
+ notes                   | text
+ created_at              | timestamp with time zone
+ updated_at              | timestamp with time zone
+(25 rows)
+```
+
+### Probe 3c — `stock_picking_lines` columns (all)
+
+```
+   column_name    |        data_type
+------------------+--------------------------
+ id               | uuid
+ picking_id       | uuid
+ stock_item_id    | uuid
+ planned_quantity | numeric
+ actual_quantity  | numeric
+ serial_ids       | ARRAY
+ lot_number       | character varying
+ unit_cost        | numeric
+ total_cost       | numeric
+ status           | character varying
+ notes            | text
+ created_at       | timestamp with time zone
+(12 rows)
+```
+
+### Probe 4 — `generate_return_number()` function
+
+```
+ generate_return_number
+------------------------
+ RET-202605-01000
+(1 row)
+```
+
+### Probe 5 — `stock_returns.idempotency_key` existence check
+
+```
+ column_name
+-------------
+(0 rows)
+```
+
+### Probe 6 — `stock_return_lines` CHECK constraints
+
+```
+                conname                 |                                                                                                                                       pg_get_constraintdef
+----------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ stock_return_lines_condition_check     | CHECK (((condition)::text = ANY (ARRAY[('new'::character varying)::text, ('good'::character varying)::text, ('fair'::character varying)::text, ('poor'::character varying)::text, ('damaged'::character varying)::text, ('non_functional'::character varying)::text])))
+ stock_return_lines_disposition_check   | CHECK (((disposition)::text = ANY (ARRAY[('restock'::character varying)::text, ('repair'::character varying)::text, ('scrap'::character varying)::text, ('supplier_return'::character varying)::text])))
+ stock_return_lines_return_reason_check | CHECK (((return_reason)::text = ANY (ARRAY[('unused'::character varying)::text, ('job_cancelled'::character varying)::text, ('wrong_item'::character varying)::text, ('excess'::character varying)::text, ('faulty'::character varying)::text, ('customer_refused'::character varying)::text])))
+ stock_return_lines_status_check        | CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('inspected'::character varying)::text, ('processed'::character varying)::text])))
+(4 rows)
+```
+
+### Bonus — `stock_returns` columns (all, for Task C.1 context)
+
+```
+      column_name      |        data_type
+-----------------------+--------------------------
+ id                    | uuid
+ return_number         | character varying
+ original_picking_id   | uuid
+ returned_by_id        | uuid
+ returned_by_name      | character varying
+ contractor_id         | uuid
+ contractor_name       | character varying
+ return_to_location_id | uuid
+ status                | character varying
+ inspected_by          | character varying
+ inspected_at          | timestamp with time zone
+ inspection_notes      | text
+ return_date           | timestamp with time zone
+ received_date         | timestamp with time zone
+ notes                 | text
+ created_at            | timestamp with time zone
+ updated_at            | timestamp with time zone
+(17 rows)
+```
+
+---
+
+### Decisions (for downstream tasks)
+
+**1. Canonical "currently held by tech" column on `stock_serials`**
+
+`stock_serials` has **no `assigned_to_staff_id` or `current_holder_staff_id` column**. The spec assumed one of these would exist. The actual holding relationship is tracked indirectly:
+- `current_location_id` — the warehouse/location UUID where the serial currently lives
+- `installed_by` — character varying (name, not FK to staff)
+- `status` — `issued` means it is in the field with a technician
+
+For the `GET /my-serials` endpoint (Task B.4): the query must join `stock_serials` → `stock_picking_lines` → `stock_pickings` where `stock_pickings.technician_id = staff.id` (staff looked up by `users.id = session.userId`) **AND** `stock_serials.status IN ('issued', 'reserved', 'in_transit')`. There is no direct FK from `stock_serials` to `staff` — the link goes through the picking chain. Task B.4 must be updated to reflect this join strategy.
+
+**2. `stock_serials.status` — spec vs actual**
+
+Spec assumed: `available`, `assigned`, `consumed`, `scrapped`, `faulty`
+
+Actual CHECK allows: `available`, `reserved`, `issued`, `installed`, `faulty`, `returned`, `scrapped`, `in_transit`
+
+Mismatches:
+- `assigned` does **not exist** — use `issued` (semantically equivalent for "in field with tech")
+- `consumed` does **not exist** — use `installed` (item installed at a drop/premises)
+- `returned` and `in_transit` exist but were not in spec vocabulary — these are valid additional states
+
+**Action for Task A.2 / A.4:** Vocabulary constants (`STOCK_SERIAL_STATUSES`) must use the actual DB values (`issued` not `assigned`, `installed` not `consumed`). No ALTER needed — the existing CHECK is a superset of the spec's intent.
+
+**3. `stock_returns.idempotency_key` — confirmed does NOT exist**
+
+0 rows returned. Migration 358 in Task A.2 must `ALTER TABLE stock_returns ADD COLUMN idempotency_key ...` — safe to proceed.
+
+**4. `generate_return_number()` — confirmed working**
+
+Returns `RET-202605-01000` format (`RET-YYYYMM-NNNNN`). Function exists and is callable. No changes needed.
+
+**5. `stock_return_lines` CHECK constraint vocabulary — spec vs actual**
+
+| Field | Spec `RETURN_REASONS` | Actual DB |
+|---|---|---|
+| `return_reason` | `unused`, `job_cancelled`, `wrong_item`, `excess`, `faulty`, `customer_refused` | `unused`, `job_cancelled`, `wrong_item`, `excess`, `faulty`, `customer_refused` ✅ exact match |
+| `condition` (on `stock_return_lines`) | `new`, `good`, `fair`, `poor`, `damaged`, `non_functional` | `new`, `good`, `fair`, `poor`, `damaged`, `non_functional` ✅ exact match (same as `stock_serials.condition`) |
+| `disposition` | `restock`, `repair`, `scrap`, `supplier_return` | `restock`, `repair`, `scrap`, `supplier_return` ✅ exact match |
+| `status` | `pending`, `inspected`, `processed` | `pending`, `inspected`, `processed` ✅ exact match |
+
+All four CHECK fields match the spec verbatim. No ALTER needed on `stock_return_lines`.
+
+**6. `stock_pickings` — `source_location_id` and `picking_type` confirmed**
+
+Both columns exist (`source_location_id uuid`, `picking_type character varying`). The spec's references to these columns in the return-flow query are correct. Also confirmed: `technician_id uuid` and `contractor_id uuid` exist for linking pickings to staff.
+
+**Summary of surprises requiring task updates:**
+- **Task B.4 (`GET /my-serials`):** Must use picking-chain join (`stock_pickings.technician_id`) — no direct `assigned_to_staff_id` on `stock_serials`.
+- **Task A.4 (vocabulary constants):** Use `issued` (not `assigned`) and `installed` (not `consumed`) in `STOCK_SERIAL_STATUSES`.
+- **Task A.5 (types.ts):** `StockSerialStatus` union type must include actual values: `'available' | 'reserved' | 'issued' | 'installed' | 'faulty' | 'returned' | 'scrapped' | 'in_transit'`.
 
 ---
 
