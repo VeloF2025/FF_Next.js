@@ -9,7 +9,7 @@ In Mohadin PONs 17–32 the `drops` table is missing `ont_serial` on ~1,000 rows
 ## Workflow (stage + review, never writes drops directly)
 
 1. **Snapshot** the Drive sheets (one-off; requires Claude with Drive MCP access). Snapshots live in `data/pon-NN.md`. To refresh, replace the `.md` files — sheet IDs are in `import.ts`.
-2. **Migration** — run `scripts/migrations/sql/346_loeks_field_mapping_staging.sql` to create the staging table.
+2. **Migration** — run `scripts/migrations/sql/347_loeks_field_mapping_staging.sql` to create the staging table (or `npm run db:migrate`).
 3. **Import**
 
    ```bash
