@@ -38,8 +38,8 @@ const { realPool, realSql, realTransaction } = vi.hoisted(() => {
 
   const transaction = async <T>(
     cb: (txn: {
-      query: <R>(text: string, params?: unknown[]) => Promise<R[]>;
-      queryOne: <R>(text: string, params?: unknown[]) => Promise<R | null>;
+      query: <R extends Record<string, unknown>>(text: string, params?: unknown[]) => Promise<R[]>;
+      queryOne: <R extends Record<string, unknown>>(text: string, params?: unknown[]) => Promise<R | null>;
     }) => Promise<T>,
   ): Promise<T> => {
     const client = await pool.connect();
@@ -48,11 +48,11 @@ const { realPool, realSql, realTransaction } = vi.hoisted(() => {
       // Wrap pg.PoolClient in a TxnClient-shaped object matching src/lib/db-pool.ts.
       // TxnClient.query<T> returns T[] directly, not pg.QueryResult.
       const txn = {
-        query: async <R>(text: string, params: unknown[] = []): Promise<R[]> => {
+        query: async <R extends Record<string, unknown>>(text: string, params: unknown[] = []): Promise<R[]> => {
           const r = await client.query<R>(text, params);
           return r.rows;
         },
-        queryOne: async <R>(text: string, params: unknown[] = []): Promise<R | null> => {
+        queryOne: async <R extends Record<string, unknown>>(text: string, params: unknown[] = []): Promise<R | null> => {
           const r = await client.query<R>(text, params);
           return r.rows[0] ?? null;
         },
