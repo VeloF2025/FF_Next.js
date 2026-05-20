@@ -14,7 +14,7 @@ beforeEach(() => {
     if (typeof url === 'string' && url.includes('zone-pon-options')) {
       return Promise.resolve({
         ok: true,
-        json: async () => ({ data: { zones: [{ zone_no: 24 }], pons: [{ zone_no: 24, pon_no: 265 }] } }),
+        json: async () => ({ data: { zones: [24], pons: [{ zone_no: 24, pon_no: 265 }] } }),
       });
     }
     return Promise.resolve({ ok: false, json: async () => ({ error: 'unhandled' }) });
@@ -50,7 +50,7 @@ describe('SnagReportScopeDialog', () => {
   it('submits to /api/snags/reports-scope on Generate click', async () => {
     fetchMock.mockImplementation((url: string) => {
       if (typeof url === 'string' && url.includes('zone-pon-options')) {
-        return Promise.resolve({ ok: true, json: async () => ({ data: { zones: [{ zone_no: 24 }], pons: [] } }) });
+        return Promise.resolve({ ok: true, json: async () => ({ data: { zones: [24], pons: [] } }) });
       }
       if (typeof url === 'string' && url.includes('reports-scope')) {
         return Promise.resolve({
@@ -73,7 +73,7 @@ describe('SnagReportScopeDialog', () => {
   it('shows confirmation panel with report_number and Open PDF / Excel links on success', async () => {
     fetchMock.mockImplementation((url: string) => {
       if (typeof url === 'string' && url.includes('zone-pon-options')) {
-        return Promise.resolve({ ok: true, json: async () => ({ data: { zones: [{ zone_no: 24 }], pons: [] } }) });
+        return Promise.resolve({ ok: true, json: async () => ({ data: { zones: [24], pons: [] } }) });
       }
       if (typeof url === 'string' && url.includes('reports-scope')) {
         return Promise.resolve({
@@ -95,7 +95,7 @@ describe('SnagReportScopeDialog', () => {
   it('renders inline error on HTTP failure', async () => {
     fetchMock.mockImplementation((url: string) => {
       if (typeof url === 'string' && url.includes('zone-pon-options')) {
-        return Promise.resolve({ ok: true, json: async () => ({ data: { zones: [{ zone_no: 24 }], pons: [] } }) });
+        return Promise.resolve({ ok: true, json: async () => ({ data: { zones: [24], pons: [] } }) });
       }
       if (typeof url === 'string' && url.includes('reports-scope')) {
         return Promise.resolve({

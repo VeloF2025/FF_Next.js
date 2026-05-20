@@ -24,7 +24,7 @@ interface Props {
 }
 
 interface ZonePonResponse {
-  zones: { zone_no: number }[];
+  zones: number[];
   pons: { zone_no: number; pon_no: number }[];
 }
 
@@ -60,7 +60,7 @@ export function SnagReportScopeDialog({ open, projectId, defaultCtx, onClose }: 
     fetcher,
   );
 
-  const allZones = opts?.zones.map(z => z.zone_no) ?? [];
+  const allZones = opts?.zones ?? [];
   // Filter PONs to those belonging to any selected zone (or show all when no zones selected)
   const allPons =
     form.zones.length === 0
