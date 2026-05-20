@@ -2,7 +2,7 @@
  * reportNumberGenerator.ts
  *
  * Generates unique `SCOPE-<projectCode>-<YYYYMMDD>-<seq>` report numbers.
- * Uses the `snag_report_seq` counter table (created on first use) combined
+ * Uses the `snag_report_seq` counter table (created by migration 358) combined
  * with `pg_advisory_xact_lock` to serialise concurrent generators for the
  * same project+day — guaranteeing distinct sequence values under load.
  */
@@ -23,18 +23,6 @@ function yyyymmdd(d: Date): string {
   ].join('');
 }
 
-/** Creates the counter table if it doesn't exist (idempotent). */
-async function ensureSeqTable(): Promise<void> {
-  await sql`
-    CREATE TABLE IF NOT EXISTS snag_report_seq (
-      project_id  UUID NOT NULL,
-      date_part   TEXT NOT NULL,
-      last_seq    INT  NOT NULL DEFAULT 0,
-      PRIMARY KEY (project_id, date_part)
-    )
-  `;
-}
-
 /**
  * Generates the next unique report number: `SCOPE-<CODE>-<YYYYMMDD>-<NNN>`.
  *
@@ -50,14 +38,12 @@ export async function generateScopeReportNumber(
   projectId: string,
   when: Date = new Date()
 ): Promise<string> {
-  await ensureSeqTable();
-
   const projectRows = await sql<{ project_name: string }>`
     SELECT project_name FROM projects WHERE id = ${projectId} LIMIT 1
   `;
   if (projectRows.length === 0) throw new Error(`Project not found: ${projectId}`);
 
-  const code = projectCode(projectRows[0].project_name);
+  const code = projectCode(projectRows[0]!.project_name);
   const datePart = yyyymmdd(when);
   const prefix = `SCOPE-${code}-${datePart}-`;
 
@@ -83,6 +69,6 @@ export async function generateScopeReportNumber(
       [projectId, datePart, `${prefix}%`]
     );
 
-    return `${prefix}${String(rows[0].last_seq).padStart(3, '0')}`;
+    return `${prefix}${String(rows[0]!.last_seq).padStart(3, '0')}`;
   });
 }

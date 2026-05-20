@@ -26,3 +26,14 @@ CREATE INDEX snag_reports_scope_idx
 CREATE INDEX snag_reports_generated_at_idx
   ON snag_reports (generated_at DESC)
   WHERE source = 'scope';
+
+-- Per-(project, day) counter for generating SCOPE-<code>-<YYYYMMDD>-<seq> report numbers.
+-- The reportNumberGenerator service uses INSERT ... ON CONFLICT DO UPDATE on this table
+-- under an advisory lock to guarantee distinct sequence values when two managers click
+-- "Generate" simultaneously.
+CREATE TABLE snag_report_seq (
+  project_id  UUID NOT NULL,
+  date_part   TEXT NOT NULL,
+  last_seq    INT  NOT NULL DEFAULT 0,
+  PRIMARY KEY (project_id, date_part)
+);

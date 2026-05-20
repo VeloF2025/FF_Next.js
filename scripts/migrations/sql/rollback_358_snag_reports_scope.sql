@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS snag_report_seq;
 DROP INDEX IF EXISTS snag_reports_generated_at_idx;
 DROP INDEX IF EXISTS snag_reports_scope_idx;
 ALTER TABLE snag_reports DROP CONSTRAINT IF EXISTS snag_reports_scope_requires_pdf;

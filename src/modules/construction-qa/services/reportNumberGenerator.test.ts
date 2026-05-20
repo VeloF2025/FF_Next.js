@@ -7,7 +7,6 @@ process.env.DATABASE_URL =
 
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 import { Pool } from 'pg';
-import type { TxnClient } from '@/lib/db-pool';
 
 // ---------------------------------------------------------------------------
 // Real-DB pool — bypasses the globally-mocked @/lib/db in vitest.setup.ts
@@ -36,38 +35,6 @@ async function realSql<T extends Record<string, unknown> = Record<string, unknow
   });
   const r = await realPool.query<T>(text, params);
   return r.rows;
-}
-
-async function realTransaction<T>(cb: (txn: TxnClient) => Promise<T>): Promise<T> {
-  const client = await realPool.connect();
-  try {
-    await client.query('BEGIN');
-    const txn: TxnClient = {
-      client,
-      async query<R extends Record<string, unknown> = Record<string, unknown>>(
-        text: string,
-        params: unknown[] = []
-      ): Promise<R[]> {
-        const res = await client.query<R>(text, params);
-        return res.rows;
-      },
-      async queryOne<R extends Record<string, unknown> = Record<string, unknown>>(
-        text: string,
-        params: unknown[] = []
-      ): Promise<R | null> {
-        const res = await client.query<R>(text, params);
-        return res.rows[0] ?? null;
-      },
-    };
-    const result = await cb(txn);
-    await client.query('COMMIT');
-    return result;
-  } catch (e) {
-    await client.query('ROLLBACK');
-    throw e;
-  } finally {
-    client.release();
-  }
 }
 
 // vi.mock is hoisted, so the factory must not reference module-level variables.
