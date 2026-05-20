@@ -42,6 +42,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/auto-qa",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/action-centre-rules",
       "schedule": "0 5 * * *"
     },
