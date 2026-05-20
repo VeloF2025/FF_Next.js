@@ -148,6 +148,12 @@ export interface AttendanceProfile {
   role: StaffRole | null;
   /** Account lifecycle status — always populated; defaults to 'active' for legacy rows. */
   accountStatus: AccountStatus;
+  /**
+   * Auth-tier role from users.role (AuthRole). Null when no user_id link exists.
+   * Used by isStoresAuthorised() to admit super_admin/system callers who have no
+   * 'stores' or 'admin' staff.role but do have a privileged users.role.
+   */
+  authRole: string | null;
 }
 
 export interface SessionResponse {

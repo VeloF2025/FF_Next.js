@@ -1,52 +1,65 @@
 /**
  * Shared role-gate constant for all /my/stores routes.
  *
- * IMPORTANT — super_admin resolution:
- *   The plan specifies ['stores', 'admin', 'super_admin'] but the current session
- *   shape only exposes staff.role (type StaffRole), which is constrained by the
- *   DB CHECK constraint in migration 346 to the six values in StaffRole. There is
- *   no 'super_admin' in StaffRole, so adding it here is a no-op against the current
- *   session API.
+ * Two-layer check:
+ *   1. staff.role (StaffRole) — 'stores' or 'admin' staff have direct access.
+ *   2. users.role (AuthRole) — 'super_admin' and 'system' callers are admitted
+ *      regardless of their staff.role value (they may have no staff row at all,
+ *      or may have a staff row with role='technician').
  *
- *   The session (/api/my/session) fetches from staff.role only — it does NOT expose
- *   a separate auth-tier role (e.g. system/super_admin from attendance_auth_sessions).
- *
- *   TODO(Task 3.x): surface an `authRole` field in /api/my/session by reading
- *     attendance_auth_sessions.auth_tier or a separate super-admin flag, then update
- *     the isStoresAuthorised helper to also accept authRole === 'super_admin'.
- *
- *   For now: effective gate is ['stores', 'admin']. 'super_admin' is carried in the
- *   constant so it is ready when authRole is surfaced.
+ * isStoresAuthorised() accepts both role and authRole so callers pass
+ * `profile.role` and `profile.authRole` directly from the session response
+ * without additional null-checks.
  */
 
 import type { StaffRole } from '@/modules/attendance/portal/types';
 
 // =============================================================================
-// Constant
+// Constants
 // =============================================================================
 
 /**
- * Staff roles permitted to access /my/stores routes.
- * Note: 'super_admin' is included per the plan but is a no-op until the session
- * API surfaces an authRole field — see module comment above.
+ * Staff roles (staff.role) permitted to access /my/stores routes.
+ * 'super_admin' is excluded because it is not a valid StaffRole value
+ * (migration 346 CHECK constraint only allows the six StaffRole values).
+ * Super-admin access is handled via the authRole check in isStoresAuthorised().
  */
-export const STORES_ROLES = ['stores', 'admin', 'super_admin'] as const;
+export const STORES_ROLES = ['stores', 'admin'] as const;
 
-/** Union of the role strings in STORES_ROLES. */
+/** Union of the staff role strings in STORES_ROLES. */
 export type StoresRole = (typeof STORES_ROLES)[number];
+
+/**
+ * AuthRole values (users.role) that unconditionally admit the caller,
+ * independent of their staff.role.
+ */
+export const STORES_AUTH_ROLES = ['super_admin', 'system'] as const;
 
 // =============================================================================
 // Helper
 // =============================================================================
 
 /**
- * Returns true when the staff role is permitted to access /my/stores.
+ * Returns true when the caller is permitted to access /my/stores.
  *
- * Accepts `StaffRole | null` so callers can pass profile.role directly
- * without a null-check. The `super_admin` value in STORES_ROLES cannot
- * currently match because StaffRole does not include it — see module comment.
+ * Evaluates two checks — either is sufficient:
+ *   - staff.role is in STORES_ROLES ('stores' | 'admin')
+ *   - users.role (authRole) is in STORES_AUTH_ROLES ('super_admin' | 'system')
+ *
+ * Both `role` and `authRole` accept null so callers can pass profile fields
+ * directly without null-guards.
  */
-export function isStoresAuthorised(role: StaffRole | null): boolean {
+export function isStoresAuthorised(
+  role: StaffRole | null,
+  authRole?: string | null,
+): boolean {
+  // Auth-tier super-user bypass: super_admin and system always get through.
+  if (authRole !== undefined && authRole !== null) {
+    if ((STORES_AUTH_ROLES as ReadonlyArray<string>).includes(authRole)) {
+      return true;
+    }
+  }
+  // Staff-role gate: stores and admin.
   if (role === null) return false;
   return (STORES_ROLES as ReadonlyArray<string>).includes(role);
 }

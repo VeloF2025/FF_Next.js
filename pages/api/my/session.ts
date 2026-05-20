@@ -39,6 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       profile_photo_url: string | null;
       role: string | null;
       account_status: string;
+      auth_role: string | null;
     }>`
       SELECT
         s.id,
@@ -52,8 +53,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         EXISTS (
           SELECT 1 FROM vehicle_assignments va
           WHERE va.staff_id = s.id AND va.is_active = true
-        ) AS has_vehicle
+        ) AS has_vehicle,
+        u.role AS auth_role
       FROM staff s
+      LEFT JOIN users u ON u.id = s.user_id
       WHERE s.id = ${session.staffId}
       LIMIT 1
     `;
@@ -75,6 +78,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       profilePhotoUrl: row.profile_photo_url,
       role: (row.role as AttendanceSessionProfile['role']) ?? null,
       accountStatus: row.account_status as AttendanceSessionProfile['accountStatus'],
+      // auth_role comes from users.role (AuthRole enum) via staff.user_id → users.id.
+      // Null for PIN-only staff with no linked user account.
+      authRole: row.auth_role ?? null,
     };
 
     return apiResponse.success(res, {

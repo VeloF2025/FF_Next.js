@@ -33,4 +33,16 @@ export interface AttendanceSessionProfile {
   role: StaffRole | null;
   /** Account lifecycle status — always populated; defaults to 'active' for legacy rows. */
   accountStatus: AccountStatus;
+  /**
+   * Auth-tier role from the `users` table (AuthRole), surfaced via the
+   * staff.user_id → users.id join in /api/my/session.
+   *
+   * Null when the staff row has no user_id link (e.g. PIN-only field staff
+   * who were never given a web-app account). In that case the gate falls back
+   * to the staff.role check only.
+   *
+   * Values: 'super_admin' | 'system' | 'admin' | 'manager' | 'storeman' |
+   *         'technician' | 'viewer' (mirrors AuthRole in src/lib/auth/types.ts)
+   */
+  authRole: string | null;
 }
