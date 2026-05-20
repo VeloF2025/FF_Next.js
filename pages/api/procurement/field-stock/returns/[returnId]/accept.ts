@@ -116,6 +116,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         const disposition = line.disposition || 'restock';
 
+        if (disposition === 'supplier_return') {
+          await client.query('ROLLBACK');
+          log.error('returns.accept.supplier_return_not_supported', { returnId, lineId: line.id }, 'field-stock');
+          return apiResponse.validationError(res, {
+            disposition: 'supplier_return is not yet supported. Re-inspect with restock/repair/scrap.',
+          });
+        }
+
         if (disposition === 'restock') {
           // Add back to destination quant
           await client.query(

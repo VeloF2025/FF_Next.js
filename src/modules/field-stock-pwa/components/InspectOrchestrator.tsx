@@ -13,7 +13,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { ChevronLeft, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Loader2, AlertCircle } from 'lucide-react';
 
 import type { AttendanceProfile } from '@/modules/attendance/portal/client/api';
 import { MyPortalShell } from '@/modules/attendance/portal/client/MyPortalShell';
@@ -26,6 +26,7 @@ import {
 import type { ReturnCondition } from '@/modules/field-stock-pwa/lib/conditionOptions';
 import type { ReturnDisposition } from '@/modules/field-stock-pwa/lib/dispositionOptions';
 import type { PwaReturnResult } from '@/modules/field-stock-pwa/types';
+import { InspectSuccess } from './InspectSuccess';
 
 // =============================================================================
 // Types
@@ -212,24 +213,7 @@ export function InspectOrchestrator({ profile, returnId }: InspectOrchestratorPr
     return (
       <MyPortalShell title="Inspect return" staffName={profile.name}
         staffPhotoUrl={profile.profilePhotoUrl} showFooterNav={false}>
-        <div className="flex flex-col items-center gap-6 pt-8 pb-4 text-center">
-          <div className="flex items-center justify-center w-20 h-20 rounded-full bg-emerald-500/15 text-emerald-300">
-            <CheckCircle className="w-10 h-10" aria-hidden="true" />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-neutral-100">Restocked</h1>
-            <p className="text-sm text-neutral-400">Stock returned to warehouse successfully.</p>
-            <div className="inline-flex items-center gap-2 mt-1 px-4 py-2 rounded-lg border border-neutral-700 bg-neutral-900">
-              <span className="text-xs text-neutral-500 uppercase tracking-wide">Return</span>
-              <span className="font-mono text-sm font-semibold text-emerald-300">{result.returnNumber}</span>
-            </div>
-          </div>
-          <button type="button"
-            onClick={() => void router.push('/my/stores/inspect')}
-            className="w-full max-w-xs py-3.5 rounded-lg bg-emerald-700 text-white font-medium text-sm hover:bg-emerald-600">
-            Back to queue
-          </button>
-        </div>
+        <InspectSuccess result={result} onBack={() => void router.push('/my/stores/inspect')} />
       </MyPortalShell>
     );
   }

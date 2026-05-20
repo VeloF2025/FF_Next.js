@@ -211,6 +211,52 @@ describe('POST /returns/[id]/accept hardening (C.3)', () => {
     expect(hasCommit).toBe(true);
   });
 
+  it('rejects supplier_return disposition with 422 and rolls back', async () => {
+    // Staff lookup
+    mockSql.mockResolvedValueOnce([{
+      id: 'staff-stores-uuid',
+      role: 'stores',
+      auth_role: 'staff',
+    }]);
+    // Return with a supplier_return line
+    mockSql.mockResolvedValueOnce([{
+      id: RETURN_ID,
+      status: 'inspected',
+      return_to_location_id: 'loc-warehouse-uuid',
+      lines: [
+        {
+          id: 'line-uuid-1',
+          stock_item_id: 'item-ont-uuid',
+          serial_id: 'serial-uuid-1',
+          quantity: 1,
+          disposition: 'supplier_return',
+        },
+      ],
+    }]);
+
+    // Client: BEGIN succeeds, then supplier_return check triggers ROLLBACK
+    mockClientQuery.mockResolvedValue({ rows: [] });
+
+    const req = makePostReq();
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(422);
+    const body = res._json as { success: boolean; error: { code: string; details: Record<string, string> } };
+    expect(body.success).toBe(false);
+    expect(body.error.details.disposition).toMatch(/supplier_return/i);
+
+    // ROLLBACK must have been called
+    const allClientCalls = mockClientQuery.mock.calls.map((call) => call[0] as string);
+    const hasRollback = allClientCalls.some((s) => s === 'ROLLBACK');
+    expect(hasRollback).toBe(true);
+
+    // COMMIT must NOT have been called
+    const hasCommit = allClientCalls.some((s) => s === 'COMMIT');
+    expect(hasCommit).toBe(false);
+  });
+
   it('rolls back all changes if any single line update fails', async () => {
     // Pool sql calls
     mockSql.mockResolvedValueOnce([{

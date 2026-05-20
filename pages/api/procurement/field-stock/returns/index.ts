@@ -1,6 +1,6 @@
 /**
  * Stock Returns API
- * GET /api/procurement/field-stock/returns - List returns
+ * GET /api/procurement/field-stock/returns - List returns (role-scoped, see _list.ts)
  * POST /api/procurement/field-stock/returns - Create return
  */
 
@@ -10,6 +10,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { isReturnCreator } from '@/modules/field-stock-pwa/lib/storesRoles';
+import { handleList } from './_list';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -24,149 +25,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return handleCreate(req, res);
   }
   return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
-}
-
-async function handleList(req: NextApiRequest, res: NextApiResponse) {
-  try {
-    const { status, returnedBy } = req.query;
-
-    // Use separate queries based on filters to keep tagged template literals
-    let result;
-
-    if (status && typeof status === 'string' && returnedBy && typeof returnedBy === 'string') {
-      result = await sql`
-        SELECT
-          r.*,
-          sl.name as return_location_name,
-          sl.code as return_location_code,
-          (
-            SELECT json_agg(
-              json_build_object(
-                'id', rl.id,
-                'stock_item_id', rl.stock_item_id,
-                'serial_id', rl.serial_id,
-                'serial_number', rl.serial_number,
-                'quantity', rl.quantity,
-                'condition', rl.condition,
-                'return_reason', rl.return_reason,
-                'disposition', rl.disposition,
-                'notes', rl.notes,
-                'item_name', si.name,
-                'item_code', si.item_code
-              )
-            )
-            FROM stock_return_lines rl
-            LEFT JOIN stock_items si ON si.id = rl.stock_item_id
-            WHERE rl.return_id = r.id
-          ) as lines
-        FROM stock_returns r
-        LEFT JOIN stock_locations sl ON sl.id = r.return_to_location_id
-        WHERE r.status = ${status} AND r.returned_by_id = ${returnedBy}
-        ORDER BY r.created_at DESC
-        LIMIT 50
-      `;
-    } else if (status && typeof status === 'string') {
-      result = await sql`
-        SELECT
-          r.*,
-          sl.name as return_location_name,
-          sl.code as return_location_code,
-          (
-            SELECT json_agg(
-              json_build_object(
-                'id', rl.id,
-                'stock_item_id', rl.stock_item_id,
-                'serial_id', rl.serial_id,
-                'serial_number', rl.serial_number,
-                'quantity', rl.quantity,
-                'condition', rl.condition,
-                'return_reason', rl.return_reason,
-                'disposition', rl.disposition,
-                'notes', rl.notes,
-                'item_name', si.name,
-                'item_code', si.item_code
-              )
-            )
-            FROM stock_return_lines rl
-            LEFT JOIN stock_items si ON si.id = rl.stock_item_id
-            WHERE rl.return_id = r.id
-          ) as lines
-        FROM stock_returns r
-        LEFT JOIN stock_locations sl ON sl.id = r.return_to_location_id
-        WHERE r.status = ${status}
-        ORDER BY r.created_at DESC
-        LIMIT 50
-      `;
-    } else if (returnedBy && typeof returnedBy === 'string') {
-      result = await sql`
-        SELECT
-          r.*,
-          sl.name as return_location_name,
-          sl.code as return_location_code,
-          (
-            SELECT json_agg(
-              json_build_object(
-                'id', rl.id,
-                'stock_item_id', rl.stock_item_id,
-                'serial_id', rl.serial_id,
-                'serial_number', rl.serial_number,
-                'quantity', rl.quantity,
-                'condition', rl.condition,
-                'return_reason', rl.return_reason,
-                'disposition', rl.disposition,
-                'notes', rl.notes,
-                'item_name', si.name,
-                'item_code', si.item_code
-              )
-            )
-            FROM stock_return_lines rl
-            LEFT JOIN stock_items si ON si.id = rl.stock_item_id
-            WHERE rl.return_id = r.id
-          ) as lines
-        FROM stock_returns r
-        LEFT JOIN stock_locations sl ON sl.id = r.return_to_location_id
-        WHERE r.returned_by_id = ${returnedBy}
-        ORDER BY r.created_at DESC
-        LIMIT 50
-      `;
-    } else {
-      result = await sql`
-        SELECT
-          r.*,
-          sl.name as return_location_name,
-          sl.code as return_location_code,
-          (
-            SELECT json_agg(
-              json_build_object(
-                'id', rl.id,
-                'stock_item_id', rl.stock_item_id,
-                'serial_id', rl.serial_id,
-                'serial_number', rl.serial_number,
-                'quantity', rl.quantity,
-                'condition', rl.condition,
-                'return_reason', rl.return_reason,
-                'disposition', rl.disposition,
-                'notes', rl.notes,
-                'item_name', si.name,
-                'item_code', si.item_code
-              )
-            )
-            FROM stock_return_lines rl
-            LEFT JOIN stock_items si ON si.id = rl.stock_item_id
-            WHERE rl.return_id = r.id
-          ) as lines
-        FROM stock_returns r
-        LEFT JOIN stock_locations sl ON sl.id = r.return_to_location_id
-        ORDER BY r.created_at DESC
-        LIMIT 50
-      `;
-    }
-
-    return apiResponse.success(res, result);
-  } catch (error: unknown) {
-    log.error('Error listing returns', { error }, 'field-stock');
-    return apiResponse.internalError(res, error);
-  }
 }
 
 async function handleCreate(req: NextApiRequest, res: NextApiResponse) {

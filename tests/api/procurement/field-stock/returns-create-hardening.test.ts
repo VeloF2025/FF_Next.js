@@ -377,3 +377,119 @@ describe('POST /returns hardening (C.1)', () => {
     expect(hasCountCall).toBe(false);
   });
 });
+
+// ── GET /returns role-gate tests (Fix 1 — role-scoped list) ──────────────────
+
+function makeGetReq(overrides: Partial<PartialReq> = {}): PartialReq {
+  return {
+    method: 'GET',
+    body: {},
+    query: {},
+    user: { id: 'user-tech-uuid', role: 'technician' },
+    ...overrides,
+  };
+}
+
+describe('GET /returns role gate', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns 403 when no staff row linked to user', async () => {
+    mockSql.mockResolvedValueOnce([]); // staff lookup returns empty
+
+    const req = makeGetReq();
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(403);
+    const body = res._json as { success: boolean; error: { message: string } };
+    expect(body.success).toBe(false);
+    expect(body.error.message).toMatch(/no staff record/i);
+  });
+
+  it('technician (non-inspector) only sees own returns — query includes returned_by_id predicate', async () => {
+    const TECH_STAFF_ID = 'staff-tech-uuid-list';
+    // Staff lookup → technician role
+    mockSql.mockResolvedValueOnce([{
+      id: TECH_STAFF_ID,
+      role: 'technician',
+      auth_role: 'staff',
+    }]);
+    // SQL query returns a row
+    mockSql.mockResolvedValueOnce([{
+      id: 'return-uuid-own',
+      returned_by_id: TECH_STAFF_ID,
+      status: 'pending',
+    }]);
+
+    const req = makeGetReq({
+      query: { returnedBy: 'some-other-staff-id' }, // client tries to spoof another staff's id
+    });
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(200);
+
+    // The SQL call should contain TECH_STAFF_ID (the server-enforced predicate),
+    // NOT 'some-other-staff-id' (the client-supplied value).
+    const allArgs = JSON.stringify(mockSql.mock.calls);
+    expect(allArgs).toContain(TECH_STAFF_ID);
+    expect(allArgs).not.toContain('some-other-staff-id');
+  });
+
+  it('inspector (stores role) can list all returns without ownership predicate', async () => {
+    // Staff lookup → stores role
+    mockSql.mockResolvedValueOnce([{
+      id: 'staff-stores-uuid-list',
+      role: 'stores',
+      auth_role: 'staff',
+    }]);
+    // SQL query returns multiple rows from different technicians
+    mockSql.mockResolvedValueOnce([
+      { id: 'return-uuid-1', returned_by_id: 'staff-tech-a', status: 'pending' },
+      { id: 'return-uuid-2', returned_by_id: 'staff-tech-b', status: 'pending' },
+    ]);
+
+    const req = makeGetReq({
+      user: { id: 'user-stores-uuid', role: 'stores' },
+      query: {},
+    });
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(200);
+    const body = res._json as { success: boolean; data: unknown[] };
+    expect(body.success).toBe(true);
+    expect(body.data).toHaveLength(2);
+  });
+
+  it('inspector with returnedBy param uses that param (not forced to own id)', async () => {
+    const STORES_STAFF_ID = 'staff-stores-uuid-param';
+    const TARGET_TECH_ID = 'staff-tech-target';
+    mockSql.mockResolvedValueOnce([{
+      id: STORES_STAFF_ID,
+      role: 'stores',
+      auth_role: 'staff',
+    }]);
+    mockSql.mockResolvedValueOnce([
+      { id: 'return-uuid-x', returned_by_id: TARGET_TECH_ID, status: 'pending' },
+    ]);
+
+    const req = makeGetReq({
+      user: { id: 'user-stores-uuid', role: 'stores' },
+      query: { returnedBy: TARGET_TECH_ID },
+    });
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(200);
+    // The SQL call should include TARGET_TECH_ID (inspector's filter is honoured)
+    const allArgs = JSON.stringify(mockSql.mock.calls);
+    expect(allArgs).toContain(TARGET_TECH_ID);
+  });
+});
