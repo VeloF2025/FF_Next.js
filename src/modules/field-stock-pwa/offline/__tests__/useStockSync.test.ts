@@ -2,7 +2,8 @@
  * Unit tests for useStockSync — the offline-queue drain hook.
  *
  * Strategy:
- *  - Mock `submitIssue` from `../../api` via vi.mock so network is never hit.
+ *  - Mock `submitIssue` and `submitReturn` from `../../api` via vi.mock so network
+ *    is never hit.
  *  - Use `__resetDbForTests` from `../queueIssue` between tests for IDB isolation.
  *  - Use `@testing-library/react` `renderHook` + `act` to drive React effects.
  *  - Use `vi.useFakeTimers` for the 60 s periodic poll test.
@@ -17,8 +18,8 @@
  *  3. Periodic 60 s poll while online + pendingCount > 0 → drain() fires.
  *
  * Error classification from useStockSync.ts:
- *  - 2xx → dropQueued
- *  - 4xx (permanent) → bumpAttempt; if attempts >= MAX_ATTEMPTS (5) → dropQueued
+ *  - 2xx → dropQueued / dropQueuedReturn
+ *  - 4xx (permanent) → bumpAttempt; if attempts >= MAX_ATTEMPTS (5) → abandon
  *  - 5xx / network / 408 / 429 → bumpAttempt, leave in queue
  *
  * useOnlineStatus is mocked per-test to control the auto-drain behaviour.
@@ -40,22 +41,29 @@ import {
   listQueued,
   __resetDbForTests,
 } from '../queueIssue';
-import type { PwaIssueDraft } from '../../types';
+import {
+  enqueueReturn,
+  listQueuedReturns,
+  listAbandonedReturns,
+} from '../queueReturn';
+import type { PwaIssueDraft, PwaReturnDraft } from '../../types';
 
 // =============================================================================
 // Module mocks (hoisted so they are in place before imports resolve)
 // =============================================================================
 
-const { mockSubmitIssue } = vi.hoisted(() => ({
+const { mockSubmitIssue, mockSubmitReturn } = vi.hoisted(() => ({
   mockSubmitIssue: vi.fn(),
+  mockSubmitReturn: vi.fn(),
 }));
 
-// Mock submitIssue only — keep ApiError from the real api module.
+// Mock submitIssue and submitReturn — keep ApiError from the real api module.
 vi.mock('../../api', async () => {
   const actual = await vi.importActual<typeof import('../../api')>('../../api');
   return {
     ...actual,
     submitIssue: mockSubmitIssue,
+    submitReturn: mockSubmitReturn,
   };
 });
 
@@ -90,6 +98,28 @@ function draft(overrides: Partial<PwaIssueDraft> = {}): PwaIssueDraft {
     notes: '',
     sourceLocationId: 'loc-wh',
     destinationLocationId: 'loc-field',
+    ...overrides,
+  };
+}
+
+function returnDraft(overrides: Partial<PwaReturnDraft> = {}): PwaReturnDraft {
+  return {
+    reason: 'unused',
+    reasonNotes: null,
+    serials: [
+      {
+        serialId: 'serial-uuid-001',
+        serialNumber: 'SN-RET-A',
+        stockItemId: 'item-uuid-001',
+        stockItemName: 'ONT',
+        sourceLocationId: 'loc-wh',
+        sourceLocationName: 'Warehouse',
+      },
+    ],
+    signatureDataUrl: null,
+    returnToLocationId: 'loc-wh',
+    originalPickingId: null,
+    notes: '',
     ...overrides,
   };
 }
@@ -148,7 +178,7 @@ describe('useStockSync — pre-seeded queue on mount', () => {
     const useStockSync = await importHook();
     const { result } = renderHook(() => useStockSync());
 
-    // refreshPendingCount fires on mount; it reads 2 items from IDB.
+    // refreshPendingCounts fires on mount; it reads 2 items from IDB.
     await waitFor(() => {
       expect(result.current.pendingCount).toBe(2);
     });
@@ -352,12 +382,7 @@ describe('useStockSync — online event triggers drain', () => {
 
     await enqueueIssue(draft({ technicianId: 'reconnect-tech' }));
 
-    // Track call count before going online to isolate the "after-online" calls.
-    let callsBeforeOnline = 0;
-    mockSubmitIssue.mockImplementation(() => {
-      callsBeforeOnline++;
-      return Promise.resolve(undefined);
-    });
+    mockSubmitIssue.mockImplementation(() => Promise.resolve(undefined));
 
     const useStockSync = await importHook();
     const { result, rerender } = renderHook(() => useStockSync());
@@ -367,7 +392,6 @@ describe('useStockSync — online event triggers drain', () => {
 
     // Reset call tracking to only count submissions AFTER going online.
     mockSubmitIssue.mockClear();
-    callsBeforeOnline = 0;
 
     // Simulate coming online: flip the mock and rerender.
     mockOnline = true;
@@ -452,7 +476,7 @@ describe('useStockSync — 60 s periodic poll', () => {
     // We verify the 60s poll indirectly:
     //  1. Start offline so no auto-drain on mount.
     //  2. Enqueue 1 item.
-    //  3. Mount the hook → mount effect fires refreshPendingCount → pendingCount=1.
+    //  3. Mount the hook → mount effect fires refreshPendingCounts → pendingCount=1.
     //  4. Go online via mockOnline=true + rerender → online effect fires drain → item drops.
     //  5. Enqueue another item while online.
     //  6. Directly call drain() → simulates what the poll interval does.
@@ -548,6 +572,213 @@ describe('useStockSync — dismissAbandoned removes item and updates abandonedCo
 
     // IDB abandoned store must also be empty.
     const abandoned = await listAbandoned();
+    expect(abandoned).toHaveLength(0);
+  });
+});
+
+// =============================================================================
+// Return queue: drain() — 2xx path
+// =============================================================================
+
+describe('useStockSync — drain calls submitReturn for a queued return and drops it on 2xx', () => {
+  it('drops return item and sets pendingReturnsCount=0 on success', async () => {
+    mockOnline = false;
+    mockSubmitReturn.mockResolvedValue({ returnId: 'ret-001', returnNumber: 'RET-202501-00001', status: 'pending' });
+
+    const id = await enqueueReturn(returnDraft());
+
+    const useStockSync = await importHook();
+    const { result } = renderHook(() => useStockSync());
+
+    await waitFor(() => expect(result.current.pendingReturnsCount).toBe(1));
+    // Total pending should also be 1.
+    expect(result.current.pendingCount).toBe(1);
+    expect(result.current.pendingIssuesCount).toBe(0);
+
+    await act(async () => {
+      await result.current.drain();
+    });
+
+    expect(result.current.pendingReturnsCount).toBe(0);
+    expect(result.current.pendingCount).toBe(0);
+
+    // submitReturn must have been called with the draft and the queue id as idempotency key.
+    expect(mockSubmitReturn).toHaveBeenCalledTimes(1);
+    expect(mockSubmitReturn).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'unused' }),
+      id,
+    );
+
+    const remaining = await listQueuedReturns();
+    expect(remaining).toHaveLength(0);
+  });
+});
+
+// =============================================================================
+// Return queue: drain() — 4xx path (bumps attempts, keeps item)
+// =============================================================================
+
+describe('useStockSync — drain bumps attempts for a 4xx return and keeps it queued', () => {
+  it('retains return item on 4xx with attempts bumped to 1 (below MAX_ATTEMPTS)', async () => {
+    mockOnline = false;
+    const id = await enqueueReturn(returnDraft());
+
+    mockSubmitReturn.mockRejectedValue(
+      new ApiError(400, 'VALIDATION_ERROR', 'Invalid returnToLocationId')
+    );
+
+    const useStockSync = await importHook();
+    const { result } = renderHook(() => useStockSync());
+
+    await waitFor(() => expect(result.current.pendingReturnsCount).toBe(1));
+
+    await act(async () => {
+      await result.current.drain();
+    });
+
+    const remaining = await listQueuedReturns();
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].id).toBe(id);
+    expect(remaining[0].attempts).toBe(1);
+    expect(remaining[0].lastError).toBe('Invalid returnToLocationId');
+    // Not yet abandoned — 1 attempt is below MAX_ATTEMPTS=5.
+    const abandoned = await listAbandonedReturns();
+    expect(abandoned).toHaveLength(0);
+  });
+});
+
+// =============================================================================
+// Return queue: drain() — abandon after MAX_ATTEMPTS=5 4xx failures
+// =============================================================================
+
+describe('useStockSync — drain abandons a return after MAX_ATTEMPTS=5 4xx failures', () => {
+  it('moves return to abandoned-returns on 5th 4xx attempt', async () => {
+    mockOnline = false;
+
+    const { bumpReturnAttempt } = await import('../queueReturn');
+    const id = await enqueueReturn(returnDraft());
+
+    // Pre-bump to attempts=4 so drain is the 5th (final) attempt.
+    await bumpReturnAttempt(id, 'prior 1');
+    await bumpReturnAttempt(id, 'prior 2');
+    await bumpReturnAttempt(id, 'prior 3');
+    await bumpReturnAttempt(id, 'prior 4');
+
+    mockSubmitReturn.mockRejectedValue(
+      new ApiError(400, 'VALIDATION_ERROR', 'Invalid returnToLocationId')
+    );
+
+    const useStockSync = await importHook();
+    const { result } = renderHook(() => useStockSync());
+
+    await waitFor(() => expect(result.current.pendingReturnsCount).toBe(1));
+
+    await act(async () => {
+      await result.current.drain();
+    });
+
+    // Pending queue must be empty.
+    const remaining = await listQueuedReturns();
+    expect(remaining).toHaveLength(0);
+    expect(result.current.pendingReturnsCount).toBe(0);
+
+    // Item must appear in abandoned-returns.
+    const abandoned = await listAbandonedReturns();
+    expect(abandoned).toHaveLength(1);
+    expect(abandoned[0].id).toBe(id);
+    expect(abandoned[0].lastError).toBe('Invalid returnToLocationId');
+
+    // Hook must surface abandonedCount=1 (via abandonedReturnsCount).
+    expect(result.current.abandonedReturnsCount).toBe(1);
+    expect(result.current.abandonedCount).toBe(1);
+  });
+});
+
+// =============================================================================
+// Mixed queues: drain() processes both issue + return in one cycle
+// =============================================================================
+
+describe('useStockSync — drain processes both queued issue + queued return in one cycle', () => {
+  it('submits one issue and one return; both queues empty; pendingCount === pendingIssuesCount + pendingReturnsCount', async () => {
+    mockOnline = false;
+    mockSubmitIssue.mockResolvedValue(undefined);
+    mockSubmitReturn.mockResolvedValue({ returnId: 'ret-002', returnNumber: 'RET-202501-00002', status: 'pending' });
+
+    await enqueueIssue(draft({ technicianId: 'mixed-tech-1' }));
+    const retId = await enqueueReturn(returnDraft({ reason: 'excess' }));
+
+    const useStockSync = await importHook();
+    const { result } = renderHook(() => useStockSync());
+
+    // Both queues should be visible before drain.
+    await waitFor(() => expect(result.current.pendingIssuesCount).toBe(1));
+    await waitFor(() => expect(result.current.pendingReturnsCount).toBe(1));
+
+    // Invariant: total equals sum of per-queue counts.
+    expect(result.current.pendingCount).toBe(
+      result.current.pendingIssuesCount + result.current.pendingReturnsCount
+    );
+
+    await act(async () => {
+      await result.current.drain();
+    });
+
+    expect(result.current.pendingCount).toBe(0);
+    expect(result.current.pendingIssuesCount).toBe(0);
+    expect(result.current.pendingReturnsCount).toBe(0);
+
+    expect(mockSubmitIssue).toHaveBeenCalledTimes(1);
+    expect(mockSubmitReturn).toHaveBeenCalledTimes(1);
+    // Verify idempotency key is the queue id.
+    expect(mockSubmitReturn).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'excess' }),
+      retId,
+    );
+
+    const remainingIssues = await listQueued();
+    expect(remainingIssues).toHaveLength(0);
+    const remainingReturns = await listQueuedReturns();
+    expect(remainingReturns).toHaveLength(0);
+  });
+});
+
+// =============================================================================
+// dismissAbandoned: clears an abandoned return when called with its id
+// =============================================================================
+
+describe('useStockSync — dismissAbandoned clears an abandoned return when called with its id', () => {
+  it('removes abandoned return from store and decrements abandonedReturnsCount', async () => {
+    mockOnline = false;
+
+    const { bumpReturnAttempt, abandonReturn } = await import('../queueReturn');
+    const id = await enqueueReturn(returnDraft({ reason: 'faulty' }));
+
+    // Pre-bump to attempts=4 then manually abandon (simulates prior drain runs).
+    await bumpReturnAttempt(id, 'err 1');
+    await bumpReturnAttempt(id, 'err 2');
+    await bumpReturnAttempt(id, 'err 3');
+    await bumpReturnAttempt(id, 'err 4');
+    const returns = await listQueuedReturns();
+    const queued = returns.find((r) => r.id === id)!;
+    await abandonReturn({ ...queued, attempts: 5, lastError: 'Final failure' });
+
+    const useStockSync = await importHook();
+    const { result } = renderHook(() => useStockSync());
+
+    // Mount should surface the 1 abandoned return.
+    await waitFor(() => expect(result.current.abandonedReturnsCount).toBe(1));
+    expect(result.current.abandonedCount).toBe(1);
+
+    // Dismiss by id — hook tries both stores (issue + return).
+    await act(async () => {
+      await result.current.dismissAbandoned(id);
+    });
+
+    expect(result.current.abandonedReturnsCount).toBe(0);
+    expect(result.current.abandonedCount).toBe(0);
+
+    // IDB abandoned-returns store must also be empty.
+    const abandoned = await listAbandonedReturns();
     expect(abandoned).toHaveLength(0);
   });
 });

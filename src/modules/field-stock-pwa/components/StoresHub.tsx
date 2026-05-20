@@ -18,6 +18,7 @@ import React from 'react';
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
+  ClipboardCheck,
   LayoutDashboard,
   Loader2,
   AlertCircle,
@@ -28,7 +29,9 @@ import {
 import type { AttendanceProfile } from '@/modules/attendance/portal/client/api';
 import { MyPortalShell } from '@/modules/attendance/portal/client/MyPortalShell';
 import { useStockSync } from '@/modules/field-stock-pwa/offline/useStockSync';
+import { isReturnCreator, isReturnInspector } from '../lib/storesRoles';
 import { AbandonedIssuesBanner } from './AbandonedIssuesBanner';
+import { AbandonedReturnsBanner } from './AbandonedReturnsBanner';
 
 // =============================================================================
 // Props
@@ -37,14 +40,16 @@ import { AbandonedIssuesBanner } from './AbandonedIssuesBanner';
 export interface StoresHubProps {
   profile: AttendanceProfile;
   onIssue: () => void;
+  onReturn: () => void;
+  onInspect: () => void;
 }
 
 // =============================================================================
 // Component
 // =============================================================================
 
-export function StoresHub({ profile, onIssue }: StoresHubProps) {
-  const { pendingCount, abandonedCount, syncing, dismissAbandoned } = useStockSync();
+export function StoresHub({ profile, onIssue, onReturn, onInspect }: StoresHubProps) {
+  const { pendingCount, abandonedIssuesCount, abandonedReturnsCount, syncing, dismissAbandoned } = useStockSync();
   const isPending = profile.accountStatus === 'pending';
 
   return (
@@ -55,12 +60,20 @@ export function StoresHub({ profile, onIssue }: StoresHubProps) {
       showFooterNav={false}
     >
       {/* Abandoned-issues banner — permanently-failed queued pickings */}
-      {abandonedCount > 0 && (
+      {abandonedIssuesCount > 0 && (
         <AbandonedIssuesBanner
-          count={abandonedCount}
+          count={abandonedIssuesCount}
           onView={() => {
             // Inline panel — no navigation needed yet.
           }}
+          onDismiss={dismissAbandoned}
+        />
+      )}
+
+      {/* Abandoned-returns banner — permanently-failed queued returns */}
+      {abandonedReturnsCount > 0 && (
+        <AbandonedReturnsBanner
+          count={abandonedReturnsCount}
           onDismiss={dismissAbandoned}
         />
       )}
@@ -109,14 +122,27 @@ export function StoresHub({ profile, onIssue }: StoresHubProps) {
           onClick={onIssue}
         />
 
-        {/* Return stock — Phase 3 */}
-        <StoreTile
-          icon={<ArrowUpFromLine className="w-5 h-5" />}
-          iconClass="bg-neutral-800 text-neutral-500"
-          title="Return stock"
-          subtitle="Coming in Phase 3"
-          disabled
-        />
+        {/* Return stock — active (Phase 3) */}
+        {isReturnCreator(profile.role, profile.authRole) && (
+          <StoreTile
+            icon={<ArrowUpFromLine className="w-5 h-5" />}
+            iconClass="bg-blue-500/15 text-blue-300"
+            title="Return stock"
+            subtitle="Return serials from the field"
+            onClick={onReturn}
+          />
+        )}
+
+        {/* Inspect returns — stores/admin only (Phase 3) */}
+        {isReturnInspector(profile.role, profile.authRole) && (
+          <StoreTile
+            icon={<ClipboardCheck className="w-5 h-5" />}
+            iconClass="bg-amber-500/15 text-amber-300"
+            title="Inspect returns"
+            subtitle="Disposition and restock"
+            onClick={onInspect}
+          />
+        )}
 
         {/* Today's summary — Phase 4, full width */}
         <div className="col-span-2">

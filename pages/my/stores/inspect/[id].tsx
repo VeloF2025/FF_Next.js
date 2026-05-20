@@ -1,15 +1,8 @@
 /**
- * /my/stores — stores PWA landing page.
+ * /my/stores/inspect/[id] — single return disposition screen (thin session shell).
  *
- * Thin session shell: delegates session loading + role gating to
- * useStoresSession(). Renders StoresHub once authorised.
- *
- * Access-gated to STORES_ROLES (see storesRoles.ts). All other roles see a
- * "Not authorised" screen with a back link.
- *
- * Session is checked client-side so SSR renders a cacheable loading shell
- * without leaking auth state into cached HTML.
- * ⚪ UNTESTED: integration tests in Task 2.9
+ * Gated to isReturnInspector. Gets returnId from router.query.id.
+ * Delegates rendering to InspectOrchestrator once authorised.
  */
 
 import React from 'react';
@@ -18,22 +11,25 @@ import { useRouter } from 'next/router';
 import { Loader2, AlertCircle, ChevronLeft } from 'lucide-react';
 
 import { MyPortalShell } from '@/modules/attendance/portal/client/MyPortalShell';
-import { StoresHub } from '@/modules/field-stock-pwa/components/StoresHub';
+import { InspectOrchestrator } from '@/modules/field-stock-pwa/components/InspectOrchestrator';
 import { useStoresSession } from '@/modules/field-stock-pwa/hooks/useStoresSession';
+import { isReturnInspector } from '@/modules/field-stock-pwa/lib/storesRoles';
 
 // =============================================================================
 // Page
 // =============================================================================
 
-const StoresIndexPage: NextPage & {
+const StoresInspectDetailPage: NextPage & {
   getLayout?: (page: React.ReactElement) => React.ReactElement;
 } = () => {
   const router = useRouter();
   const { state, profile, error } = useStoresSession();
 
+  const returnId = typeof router.query.id === 'string' ? router.query.id : null;
+
   if (state === 'loading') {
     return (
-      <MyPortalShell title="Stores" showFooterNav={false}>
+      <MyPortalShell title="Inspect return" showFooterNav={false}>
         <div className="flex items-center justify-center pt-24 gap-2 text-sm text-neutral-400">
           <Loader2 className="w-4 h-4 animate-spin" />
           Loading…
@@ -45,7 +41,7 @@ const StoresIndexPage: NextPage & {
   if (state === 'guest') {
     if (typeof window !== 'undefined') void router.replace('/my');
     return (
-      <MyPortalShell title="Stores" showFooterNav={false}>
+      <MyPortalShell title="Inspect return" showFooterNav={false}>
         <div className="flex items-center justify-center pt-24 text-sm text-neutral-400">
           Redirecting…
         </div>
@@ -55,7 +51,7 @@ const StoresIndexPage: NextPage & {
 
   if (state === 'error') {
     return (
-      <MyPortalShell title="Stores" showFooterNav={false}>
+      <MyPortalShell title="Inspect return" showFooterNav={false}>
         <div className="flex items-start gap-2 rounded-lg bg-red-950/50 border border-red-800 px-3 py-3 text-sm text-red-200 mt-4">
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <span>{error ?? 'Session check failed'}</span>
@@ -64,10 +60,10 @@ const StoresIndexPage: NextPage & {
     );
   }
 
-  if (state === 'unauthorised' || !profile) {
+  if (!profile || !isReturnInspector(profile.role, profile.authRole)) {
     return (
       <MyPortalShell
-        title="Stores"
+        title="Inspect return"
         staffName={profile?.name}
         showFooterNav={false}
       >
@@ -75,7 +71,7 @@ const StoresIndexPage: NextPage & {
           <AlertCircle className="w-12 h-12 text-neutral-600" aria-hidden="true" />
           <h1 className="text-lg font-semibold text-neutral-200">Not authorised</h1>
           <p className="text-sm text-neutral-400 max-w-xs">
-            The stores section is only available to stores staff and administrators.
+            The inspection screen is only available to stores staff and administrators.
           </p>
           <button
             type="button"
@@ -90,16 +86,20 @@ const StoresIndexPage: NextPage & {
     );
   }
 
-  return (
-    <StoresHub
-      profile={profile}
-      onIssue={() => void router.push('/my/stores/issue')}
-      onReturn={() => void router.push('/my/stores/return')}
-      onInspect={() => void router.push('/my/stores/inspect')}
-    />
-  );
+  if (!returnId) {
+    return (
+      <MyPortalShell title="Inspect return" staffName={profile.name} showFooterNav={false}>
+        <div className="flex items-start gap-2 rounded-lg bg-red-950/50 border border-red-800 px-3 py-3 text-sm text-red-200 mt-4">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>Missing return ID</span>
+        </div>
+      </MyPortalShell>
+    );
+  }
+
+  return <InspectOrchestrator profile={profile} returnId={returnId} />;
 };
 
-StoresIndexPage.getLayout = (page: React.ReactElement) => page;
+StoresInspectDetailPage.getLayout = (page: React.ReactElement) => page;
 
-export default StoresIndexPage;
+export default StoresInspectDetailPage;

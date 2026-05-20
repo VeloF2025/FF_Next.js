@@ -15,3 +15,4 @@ export { fetchContractors } from './contractors';
 export { validateSerial } from './serials';
 export { fetchSerialStockItems } from './items';
 export { submitIssue } from './pickings';
+export { submitReturn, submitInspectAndAccept, retryAccept } from './returns';
