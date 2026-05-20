@@ -34,6 +34,12 @@ export async function runSnagScopeQuery(
   // TQR-imported snags (linked via pole_ids[1] → poles, or drop_id → drops).
   // Mirrors the join pattern used by /api/snags/zone-pon-options so the
   // chip picker and the scope query see the same set of zones/PONs.
+  //
+  // INVARIANT: a snag is either Works QA-originated (pole_qa_photo_id IS NOT
+  // NULL, source='works_qa') or TQR-imported (pole_qa_photo_id IS NULL,
+  // source IS NULL) — never both. The COALESCE precedence
+  // (pole_qa_photos → poles → drops) is therefore unambiguous in practice;
+  // each snag's zone/PON resolves from exactly one source.
   return (await sql`
     SELECT
       s.id,

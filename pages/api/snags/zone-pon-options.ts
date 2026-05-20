@@ -26,16 +26,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     type RawRow = { zone_no: string | null; pon_no: string | null };
 
+    // Resolves zone/PON across all three location sources so the picker
+    // sees the same universe as runSnagScopeQuery (Works QA snags via
+    // pole_qa_photos + TQR snags via pole_ids[1] / drop_id).
     const rows = await sql`
       SELECT DISTINCT
-        COALESCE(pole.zone_no, dr.zone_no) AS zone_no,
-        COALESCE(pole.pon_no, dr.pon_no) AS pon_no
+        COALESCE(pqa.zone_no, pole.zone_no, dr.zone_no) AS zone_no,
+        COALESCE(pqa.pon_no,  pole.pon_no,  dr.pon_no)  AS pon_no
       FROM snags s
-      LEFT JOIN poles pole ON pole.id = s.pole_ids[1]
-      LEFT JOIN drops dr ON dr.id = s.drop_id
+      LEFT JOIN pole_qa_photos pqa  ON pqa.id  = s.pole_qa_photo_id
+      LEFT JOIN poles          pole ON pole.id = s.pole_ids[1]
+      LEFT JOIN drops          dr   ON dr.id   = s.drop_id
       WHERE s.project_id = ${projectId}
-        AND (COALESCE(pole.zone_no, dr.zone_no) IS NOT NULL
-             OR COALESCE(pole.pon_no, dr.pon_no) IS NOT NULL)
+        AND (COALESCE(pqa.zone_no, pole.zone_no, dr.zone_no) IS NOT NULL
+             OR COALESCE(pqa.pon_no,  pole.pon_no,  dr.pon_no)  IS NOT NULL)
       ORDER BY zone_no ASC NULLS LAST, pon_no ASC NULLS LAST
     ` as RawRow[];
 

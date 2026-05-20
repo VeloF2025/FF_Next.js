@@ -230,4 +230,44 @@ describe('POST /api/snags/reports-scope', () => {
     expect(Array.isArray(persisted[0]!.scope_zone_nos)).toBe(true);
     expect((persisted[0]!.scope_zone_nos as number[])).toEqual([24]);
   });
+
+  it('includes TQR-style snags (pole_qa_photo_id NULL, pole_ids[1] populated)', async () => {
+    // Locate a TQR-imported snag — pole_qa_photo_id IS NULL but pole_ids[1]
+    // resolves to a pole with zone_no. The pre-fix query joined ONLY
+    // pole_qa_photos, so these snags were silently excluded.
+    const tqrCandidate = (await realSql`
+      SELECT s.id, pl.zone_no
+      FROM   snags s
+      INNER  JOIN poles pl ON pl.id = s.pole_ids[1]
+      WHERE  s.project_id = ${projectId}
+        AND  s.pole_qa_photo_id IS NULL
+        AND  pl.zone_no IS NOT NULL
+      LIMIT  1
+    `) as Array<{ id: string; zone_no: number }>;
+
+    if (tqrCandidate.length === 0) {
+      // No TQR snags available for this project — assertion skipped.
+      return;
+    }
+
+    const targetZone = tqrCandidate[0]!.zone_no;
+
+    const { req, res } = createMocks({
+      method: 'POST',
+      body: { project_id: projectId, scope: 'zone', zones: [targetZone] },
+    });
+    await handler(req as never, res as never);
+
+    expect(res._getStatusCode()).toBe(201);
+
+    const body = JSON.parse(res._getData() as string) as { data?: { id?: string } };
+    const reportId = (body.data ?? body).id;
+
+    const persisted = (await realSql`
+      SELECT total_findings FROM snag_reports WHERE id = ${reportId}
+    `) as Array<{ total_findings: number }>;
+
+    // The TQR snag must be included in the result — pre-fix this was 0.
+    expect(Number(persisted[0]!.total_findings)).toBeGreaterThan(0);
+  });
 });
