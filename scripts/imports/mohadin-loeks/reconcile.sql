@@ -63,7 +63,10 @@ ORDER BY pon_no, property_number;
 
 -- ============================================================================
 -- APPLY (DO NOT RUN UNTIL REVIEWED).
--- Uncomment, wrap in BEGIN; … COMMIT;, and run after eyeballing #2 above.
+-- Uncomment the block below after eyeballing #2 — it already includes
+-- BEGIN/COMMIT. The double-idempotency guards (drops.ont_serial empty AND
+-- drops.notes does not already contain the Loeks marker) make re-running
+-- after a snapshot refresh safe; previously-applied rows become no-ops.
 -- ============================================================================
 -- BEGIN;
 --
@@ -77,14 +80,23 @@ ORDER BY pon_no, property_number;
 -- FROM loeks_field_mappings s
 -- WHERE s.match_status = 'new_fill'
 --   AND s.apply_status IS NULL
---   AND s.match_drop_id = d.id;
+--   AND s.match_drop_id = d.id
+--   AND (d.ont_serial IS NULL OR d.ont_serial = '')
+--   AND (d.notes IS NULL OR d.notes NOT LIKE '%Loeks field PON ' || s.pon_no::text || '%');
 --
--- UPDATE loeks_field_mappings
--- SET apply_status = 'applied', applied_at = NOW()
--- WHERE match_status = 'new_fill' AND apply_status IS NULL;
+-- UPDATE loeks_field_mappings s
+-- SET apply_status = CASE
+--       WHEN EXISTS (
+--         SELECT 1 FROM drops d
+--         WHERE d.id = s.match_drop_id AND d.ont_serial = s.ont_serial
+--       ) THEN 'applied'
+--       ELSE 'skipped'  -- guard blocked the write (already filled or note marker present)
+--     END,
+--     applied_at = NOW()
+-- WHERE s.match_status = 'new_fill' AND s.apply_status IS NULL;
 --
--- -- Sanity check (should be 0)
--- SELECT COUNT(*) FROM loeks_field_mappings
--- WHERE match_status = 'new_fill' AND apply_status IS NULL;
+-- -- Sanity check: every new_fill row should now have apply_status set
+-- SELECT apply_status, COUNT(*) FROM loeks_field_mappings
+-- WHERE match_status = 'new_fill' GROUP BY apply_status;
 --
 -- COMMIT;

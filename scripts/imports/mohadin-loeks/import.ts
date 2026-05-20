@@ -168,94 +168,69 @@ async function stage(pool: Pool, rows: Row[]): Promise<void> {
   }
 }
 
+// Order matters. pre_provision MUST precede needs_dr — a "TO BE ACTIVATED"
+// row has pre_provision=true and dr_number=NULL; the needs_dr predicate
+// would otherwise swallow it. invalid_dr is the catch-all for malformed
+// DR strings (e.g. 'CURRENT: DR…', duplicates, 'DAR…') that needs_dr
+// didn't claim. Anything still NULL after this list surfaces as a warning.
+const CLASSIFIERS: ReadonlyArray<{ sql: string; params?: unknown[] }> = [
+  { sql: `UPDATE loeks_field_mappings SET match_status='no_dr_no_serial' WHERE dr_number IS NULL AND ont_serial IS NULL AND property_number IS NULL` },
+  { sql: `UPDATE loeks_field_mappings SET match_status='property_only' WHERE match_status IS NULL AND property_number IS NOT NULL AND dr_number IS NULL AND ont_serial IS NULL` },
+  { sql: `UPDATE loeks_field_mappings SET match_status='pre_provision', match_notes='ONT pre-provisioned on site; no DR linked in sheet' WHERE match_status IS NULL AND ont_serial IS NOT NULL AND dr_number IS NULL AND pre_provision` },
+  { sql: `UPDATE loeks_field_mappings SET match_status='needs_dr', match_notes='Sheet flagged: ' || COALESCE(dr_number, notes_raw) WHERE match_status IS NULL AND ont_serial IS NOT NULL AND (dr_number IS NULL OR dr_number !~ '^DR[0-9]{6,8}$') AND needs_dr` },
+  { sql: `UPDATE loeks_field_mappings SET match_status='invalid_serial', match_notes='ONT serial fails ALCLB+hex format check' WHERE match_status IS NULL AND ont_serial IS NOT NULL AND ont_serial !~* '^ALCLB[A-F0-9]{7,13}$'` },
+  {
+    sql: `UPDATE loeks_field_mappings s
+          SET match_status = CASE
+                WHEN d.ont_serial IS NULL OR d.ont_serial = '' THEN 'new_fill'
+                WHEN d.ont_serial = s.ont_serial THEN 'already_set'
+                ELSE 'conflict' END,
+              match_drop_id = d.id,
+              match_notes = CASE
+                WHEN d.ont_serial IS NOT NULL AND d.ont_serial <> ''
+                     AND d.ont_serial <> s.ont_serial
+                  THEN 'DB has serial ' || d.ont_serial || '; sheet has ' || s.ont_serial
+                ELSE NULL END
+          FROM drops d
+          WHERE s.match_status IS NULL AND s.dr_number ~ '^DR[0-9]{6,8}$'
+            AND d.drop_number = s.dr_number AND d.project_id = $1`,
+    params: [MOHADIN_PROJECT_ID],
+  },
+  { sql: `UPDATE loeks_field_mappings SET match_status='dr_not_found', match_notes='DR ' || dr_number || ' not found in drops for Mohadin' WHERE match_status IS NULL AND dr_number ~ '^DR[0-9]{6,8}$'` },
+  { sql: `UPDATE loeks_field_mappings SET match_status='invalid_dr', match_notes='DR field does not match DRNNNNNNN format: ' || dr_number WHERE match_status IS NULL AND dr_number IS NOT NULL AND dr_number !~ '^DR[0-9]{6,8}$'` },
+  { sql: `UPDATE loeks_field_mappings SET match_status='serial_orphan', match_notes='ONT serial captured without DR or activation note' WHERE match_status IS NULL AND ont_serial IS NOT NULL AND dr_number IS NULL` },
+];
+
 async function reconcile(pool: Pool): Promise<void> {
-  await pool.query(
-    `UPDATE loeks_field_mappings SET match_status=NULL, match_drop_id=NULL, match_notes=NULL`,
-  );
-
-  await pool.query(`
-    UPDATE loeks_field_mappings SET match_status='no_dr_no_serial'
-    WHERE dr_number IS NULL AND ont_serial IS NULL AND property_number IS NULL`);
-
-  await pool.query(`
-    UPDATE loeks_field_mappings
-    SET match_status='property_only'
-    WHERE match_status IS NULL
-      AND property_number IS NOT NULL
-      AND dr_number IS NULL AND ont_serial IS NULL`);
-
-  await pool.query(`
-    UPDATE loeks_field_mappings
-    SET match_status='needs_dr',
-        match_notes='Sheet flagged: ' || COALESCE(dr_number, notes_raw)
-    WHERE match_status IS NULL
-      AND ont_serial IS NOT NULL
-      AND (dr_number IS NULL OR dr_number !~ '^DR[0-9]{6,8}$')
-      AND (pre_provision OR needs_dr)`);
-
-  await pool.query(`
-    UPDATE loeks_field_mappings
-    SET match_status='invalid_serial',
-        match_notes='ONT serial fails ALCLB+hex format check'
-    WHERE match_status IS NULL
-      AND ont_serial IS NOT NULL
-      AND ont_serial !~* '^ALCLB[A-F0-9]{7,13}$'`);
-
-  await pool.query(
-    `UPDATE loeks_field_mappings s
-     SET match_status = CASE
-           WHEN d.ont_serial IS NULL OR d.ont_serial = '' THEN 'new_fill'
-           WHEN d.ont_serial = s.ont_serial THEN 'already_set'
-           ELSE 'conflict'
-         END,
-         match_drop_id = d.id,
-         match_notes = CASE
-           WHEN d.ont_serial IS NOT NULL AND d.ont_serial <> ''
-                AND d.ont_serial <> s.ont_serial
-             THEN 'DB has serial ' || d.ont_serial || '; sheet has ' || s.ont_serial
-           ELSE NULL
-         END
-     FROM drops d
-     WHERE s.match_status IS NULL
-       AND s.dr_number ~ '^DR[0-9]{6,8}$'
-       AND d.drop_number = s.dr_number
-       AND d.project_id = $1`,
-    [MOHADIN_PROJECT_ID],
-  );
-
-  await pool.query(`
-    UPDATE loeks_field_mappings
-    SET match_status='dr_not_found',
-        match_notes='DR ' || dr_number || ' not found in drops for Mohadin'
-    WHERE match_status IS NULL
-      AND dr_number ~ '^DR[0-9]{6,8}$'`);
-
-  await pool.query(`
-    UPDATE loeks_field_mappings
-    SET match_status='pre_provision',
-        match_notes='ONT pre-provisioned on site; no DR linked in sheet'
-    WHERE match_status IS NULL
-      AND ont_serial IS NOT NULL
-      AND dr_number IS NULL
-      AND pre_provision`);
-
-  await pool.query(`
-    UPDATE loeks_field_mappings
-    SET match_status='serial_orphan',
-        match_notes='ONT serial captured without DR or activation note'
-    WHERE match_status IS NULL
-      AND ont_serial IS NOT NULL
-      AND dr_number IS NULL`);
+  await pool.query('BEGIN');
+  try {
+    await pool.query(`UPDATE loeks_field_mappings SET match_status=NULL, match_drop_id=NULL, match_notes=NULL`);
+    for (const step of CLASSIFIERS) {
+      await pool.query(step.sql, step.params);
+    }
+    await pool.query('COMMIT');
+  } catch (e) {
+    await pool.query('ROLLBACK');
+    throw e;
+  }
 }
+
+const out = (s: string): void => { process.stdout.write(s + '\n'); };
+const err = (s: string): void => { process.stderr.write(s + '\n'); };
 
 async function summary(pool: Pool): Promise<void> {
   const res = await pool.query(
     `SELECT COALESCE(match_status, '(unclassified)') AS status, COUNT(*)::int AS n
      FROM loeks_field_mappings GROUP BY status ORDER BY n DESC`,
   );
-  console.log('\nReconciliation summary:');
+  out('\nReconciliation summary:');
   for (const r of res.rows) {
-    console.log(`  ${r.status.padEnd(20)} ${r.n}`);
+    out(`  ${r.status.padEnd(20)} ${r.n}`);
+  }
+  const unclassified = res.rows.find((r: { status: string; n: number }) => r.status === '(unclassified)');
+  if (unclassified && unclassified.n > 0) {
+    err(`\nWARNING: ${unclassified.n} rows ended reconciliation unclassified.`);
+    err('Inspect them with: SELECT * FROM loeks_field_mappings WHERE match_status IS NULL;');
   }
 }
 
@@ -263,7 +238,7 @@ async function main(): Promise<void> {
   const dry = process.argv.includes('--dry');
   const rows = loadAll();
   const pons = new Set(rows.map((r) => r.pon_no));
-  console.log(`Parsed ${rows.length} rows across ${pons.size} PONs.`);
+  out(`Parsed ${rows.length} rows across ${pons.size} PONs.`);
 
   const counts = {
     with_dr: rows.filter((r) => r.dr_number).length,
@@ -274,11 +249,11 @@ async function main(): Promise<void> {
     back_room: rows.filter((r) => r.dwelling_label === 'BACK ROOM').length,
   };
   for (const [k, v] of Object.entries(counts)) {
-    console.log(`  ${k.padEnd(15)} ${v}`);
+    out(`  ${k.padEnd(15)} ${v}`);
   }
 
   if (dry) {
-    console.log('\n--dry: skipping DB writes');
+    out('\n--dry: skipping DB writes');
     return;
   }
 
@@ -287,7 +262,7 @@ async function main(): Promise<void> {
   const pool = new Pool({ connectionString: url });
   try {
     await stage(pool, rows);
-    console.log(`Staged ${rows.length} rows.`);
+    out(`Staged ${rows.length} rows.`);
     await reconcile(pool);
     await summary(pool);
   } finally {
@@ -295,4 +270,4 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => { err(String(e)); process.exit(1); });
