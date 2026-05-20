@@ -1,6 +1,6 @@
 /**
  * Fibertime OES Sync Service — nightly pull from SharePoint into OES pipeline.
- * Sites: LAW, MAM, MOA, TEM (ETW excluded). Final file has no numeric suffix.
+ * Sites: LAW, MAM, MOA, TEM, TEM-3, ETW. Final file has no numeric suffix.
  */
 
 import * as os from 'os';
@@ -40,7 +40,7 @@ const logger = createLogger('services:fibertime-oes-sync');
 // CONSTANTS
 // ============================================================================
 
-export const ACTIVE_SITES = ['LAW', 'MAM', 'MOA', 'TEM', 'TEM-3'] as const;
+export const ACTIVE_SITES = ['LAW', 'MAM', 'MOA', 'TEM', 'TEM-3', 'ETW'] as const;
 export type Site = (typeof ACTIVE_SITES)[number];
 
 // ============================================================================
@@ -248,7 +248,7 @@ export async function syncSite(site: Site, date: string): Promise<SiteResult> {
 // ============================================================================
 
 /**
- * Run the nightly OES sync for all 4 active sites.
+ * Run the nightly OES sync for every site in ACTIVE_SITES.
  * @param date - YYYYMMDD (defaults to today SAST / UTC+2)
  */
 export async function runOesSync(date?: string): Promise<SyncReport> {
