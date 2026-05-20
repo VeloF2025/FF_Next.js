@@ -270,4 +270,37 @@ describe('POST /api/snags/reports-scope', () => {
     // The TQR snag must be included in the result — pre-fix this was 0.
     expect(Number(persisted[0]!.total_findings)).toBeGreaterThan(0);
   });
+
+  it('treats empty pons/poles arrays as "no filter" when scope=zone', async () => {
+    // Dialog sends pons:[] and poles:[] for the non-active scope dimensions.
+    // Pre-fix the route forwarded [] verbatim and `= ANY('{}')` filtered out
+    // every row → 400 "No snags match". This locks the empty-array-as-no-filter
+    // coercion in place.
+    const candidate = (await realSql`
+      SELECT COALESCE(pqa.zone_no, pl.zone_no, dr.zone_no) AS zone_no
+      FROM   snags s
+      LEFT   JOIN pole_qa_photos pqa ON pqa.id = s.pole_qa_photo_id
+      LEFT   JOIN poles          pl  ON pl.id  = s.pole_ids[1]
+      LEFT   JOIN drops          dr  ON dr.id  = s.drop_id
+      WHERE  s.project_id = ${projectId}
+        AND  COALESCE(pqa.zone_no, pl.zone_no, dr.zone_no) IS NOT NULL
+      LIMIT  1
+    `) as Array<{ zone_no: number }>;
+
+    if (candidate.length === 0) return;
+
+    const { req, res } = createMocks({
+      method: 'POST',
+      body: {
+        project_id: projectId,
+        scope: 'zone',
+        zones: [candidate[0]!.zone_no],
+        pons:  [],
+        poles: [],
+      },
+    });
+    await handler(req as never, res as never);
+
+    expect(res._getStatusCode()).toBe(201);
+  });
 });
