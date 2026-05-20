@@ -62,7 +62,11 @@ export function useStoresSession(): UseStoresSessionResult {
           return;
         }
         setProfile(res.profile);
-        setState(isStoresAuthorised(res.profile.role) ? 'authorised' : 'unauthorised');
+        setState(
+          isStoresAuthorised(res.profile.role, res.profile.authRole)
+            ? 'authorised'
+            : 'unauthorised',
+        );
       })
       .catch((err: unknown) => {
         if (cancelled) return;
