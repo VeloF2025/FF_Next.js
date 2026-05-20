@@ -116,7 +116,7 @@ export function MyHub({ profile }: MyHubProps) {
           summary={summary}
           onClick={() => router.push('/my/attendance/corrections')}
         />
-        {isStoresAuthorised(profile.role) && (
+        {isStoresAuthorised(profile.role, profile.authRole) && (
           <StoresTile onClick={() => router.push('/my/stores')} />
         )}
       </div>
