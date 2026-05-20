@@ -94,6 +94,8 @@ const StoresIndexPage: NextPage & {
     <StoresHub
       profile={profile}
       onIssue={() => void router.push('/my/stores/issue')}
+      onReturn={() => void router.push('/my/stores/return')}
+      onInspect={() => void router.push('/my/stores/inspect')}
     />
   );
 };
