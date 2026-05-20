@@ -147,9 +147,10 @@ function mockSuccessCreate(accountStatus: 'active' | 'suspended' | 'pending', st
   }
 
   // H7 serial availability checks — 2 serials in the default orchestratorBody().
-  // Each serialId gets a SELECT from stock_serials returning an available row.
-  mockSql.mockResolvedValueOnce([{ id: 'serial-1' }]); // serial-1 available
-  mockSql.mockResolvedValueOnce([{ id: 'serial-2' }]); // serial-2 available
+  // Validator queries WHERE serial_number = $1 and returns { id, serial_number }.
+  // The id fields here are the UUIDs that will be stored in stock_picking_lines.serial_ids.
+  mockSql.mockResolvedValueOnce([{ id: 'uuid-serial-1', serial_number: 'serial-1' }]);
+  mockSql.mockResolvedValueOnce([{ id: 'uuid-serial-2', serial_number: 'serial-2' }]);
 
   // COUNT
   mockSql.mockResolvedValueOnce([{ count: '99' }]);
@@ -337,5 +338,63 @@ describe('POST /api/procurement/field-stock/pickings — orchestrator body shape
     expect(body.error.code).toBe('VALIDATION_ERROR');
     // Validation must short-circuit before any DB access.
     expect(mockSql).not.toHaveBeenCalled();
+  });
+
+  // Case 6: serial_number round-trip → INSERT receives UUIDs, not serial_number strings
+  //
+  // The client sends serialIds: ['ALCLB48CA1DC', 'ALCLB48CD7FF'] (serial_number labels).
+  // The validator resolves them via WHERE serial_number = $1 → uuid.
+  // The INSERT into stock_picking_lines must receive the UUIDs ['uuid-alc-dc', 'uuid-alc-ff'],
+  // NOT the original serial_number strings — failing to resolve causes a Postgres
+  // "invalid input syntax for type uuid" error (the original Bug 5 root cause).
+  it('serial_number strings → validator resolves to UUIDs → INSERT line receives UUID array', async () => {
+    // Active tech (no price check). Two serials by serial_number.
+    mockSql.mockResolvedValueOnce([{ account_status: 'active' }]); // staff
+    // Validator: serial_number → id (UUID)
+    mockSql.mockResolvedValueOnce([{ id: 'uuid-alc-dc', serial_number: 'ALCLB48CA1DC' }]);
+    mockSql.mockResolvedValueOnce([{ id: 'uuid-alc-ff', serial_number: 'ALCLB48CD7FF' }]);
+    mockSql.mockResolvedValueOnce([{ count: '200' }]); // COUNT
+    mockSql.mockResolvedValueOnce([{
+      id: 'picking-uuid-rt',
+      picking_number: 'PCK-000201',
+      status: 'draft',
+    }]); // INSERT picking
+    mockSql.mockResolvedValueOnce([]); // INSERT line
+    mockSql.mockResolvedValueOnce([{
+      id: 'picking-uuid-rt',
+      picking_number: 'PCK-000201',
+      status: 'draft',
+      lines: [],
+    }]); // refetch
+
+    const req = makeReq({
+      body: orchestratorBody({
+        lines: [
+          {
+            stockItemId: 'item-ont-uuid',
+            plannedQuantity: 2,
+            serialIds: ['ALCLB48CA1DC', 'ALCLB48CD7FF'],
+            notes: 'Bug 5 round-trip test',
+          },
+        ],
+      }),
+    });
+    const res = makeRes();
+
+    await handler(req as NextApiRequest, res as NextApiResponse);
+
+    expect(res._status).toBe(200);
+    const body = res._json as { success: boolean };
+    expect(body.success).toBe(true);
+
+    // The line INSERT is call index 5:
+    //   0: staff  1: ALCLB48CA1DC serial  2: ALCLB48CD7FF serial
+    //   3: COUNT  4: INSERT picking  5: INSERT line  6: refetch
+    const lineInsertParams = mockSql.mock.calls[5]?.slice(1) as unknown[];
+    // UUID array ['uuid-alc-dc', 'uuid-alc-ff'] must appear as a parameter, not
+    // the original serial_number strings.
+    expect(lineInsertParams).toContainEqual(['uuid-alc-dc', 'uuid-alc-ff']);
+    // The original serial_number strings must NOT appear as the serial_ids value.
+    expect(lineInsertParams).not.toContainEqual(['ALCLB48CA1DC', 'ALCLB48CD7FF']);
   });
 });
