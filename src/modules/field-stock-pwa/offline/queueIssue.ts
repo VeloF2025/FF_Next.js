@@ -24,16 +24,19 @@
  *        that an offline-queued item is unlikely to survive a full app reload.
  *   v3 — Adds 'abandoned-issues' store. ADDITIVE migration: pending-issues items
  *        are preserved unchanged. Only the new store is created.
+ *   v4 — Adds 'pending-returns' + 'abandoned-returns' stores (Phase 3). ADDITIVE:
+ *        all existing issue stores are preserved unchanged.
+ *        IDB primitives now live in ./db.ts (shared with queueReturn.ts).
  */
 
-// 🟢 WORKING: raw-IDB pattern mirrors attendance/portal/client/offline/db.ts
+// 🟢 WORKING: refactored to import shared IDB primitives from ./db.ts
 
 import type { PwaIssueDraft } from '../types';
+import { tx, promisifyRequest, STORES, __resetDbForTests } from './db';
+export { __resetDbForTests };
 
-const DB_NAME = 'field-stock-pwa-v1';
-const DB_VERSION = 3;
-const STORE = 'pending-issues';
-const ABANDONED_STORE = 'abandoned-issues';
+const STORE = STORES.pendingIssues;
+const ABANDONED_STORE = STORES.abandonedIssues;
 
 /** A single queued issue waiting to be submitted when the device comes online. */
 export interface QueuedIssue {
@@ -65,71 +68,6 @@ export interface AbandonedIssue {
   abandonedAt: number;
   attempts: number;
   lastError: string;
-}
-
-/** Singleton promise so concurrent callers share one `open` request. */
-let dbPromise: Promise<IDBDatabase> | null = null;
-
-function openDb(): Promise<IDBDatabase> {
-  if (typeof indexedDB === 'undefined') {
-    return Promise.reject(new Error('IndexedDB unavailable in this environment'));
-  }
-  if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = (event) => {
-      const d = req.result;
-      // v1 → v2: purge stale pending-issues items that lacked required location IDs.
-      // deleteObjectStore + recreate was the safest approach — v1 items had
-      // no sourceLocationId / destinationLocationId and would corrupt pickings.
-      if (event.oldVersion < 2 && d.objectStoreNames.contains(STORE)) {
-        d.deleteObjectStore(STORE);
-      }
-      if (!d.objectStoreNames.contains(STORE)) {
-        d.createObjectStore(STORE, { keyPath: 'id' });
-      }
-      // v2 → v3: ADDITIVE — only add the abandoned-issues store.
-      // Existing pending-issues items are preserved unchanged.
-      if (!d.objectStoreNames.contains(ABANDONED_STORE)) {
-        d.createObjectStore(ABANDONED_STORE, { keyPath: 'id' });
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error ?? new Error('IDB open failed'));
-    req.onblocked = () =>
-      reject(new Error('IDB open blocked — another tab holds an older version'));
-  });
-  return dbPromise;
-}
-
-function tx<T>(
-  storeName: string,
-  mode: IDBTransactionMode,
-  fn: (store: IDBObjectStore) => Promise<T> | T
-): Promise<T> {
-  return openDb().then(
-    (db) =>
-      new Promise<T>((resolve, reject) => {
-        const transaction = db.transaction(storeName, mode);
-        const store = transaction.objectStore(storeName);
-        let result: T;
-        Promise.resolve(fn(store))
-          .then((r) => { result = r; })
-          .catch(reject);
-        transaction.oncomplete = () => resolve(result);
-        transaction.onerror = () =>
-          reject(transaction.error ?? new Error('IDB tx failed'));
-        transaction.onabort = () =>
-          reject(transaction.error ?? new Error('IDB tx aborted'));
-      })
-  );
-}
-
-function promisifyRequest<T>(req: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error ?? new Error('IDB request failed'));
-  });
 }
 
 // =============================================================================
@@ -220,25 +158,4 @@ export async function listAbandoned(): Promise<AbandonedIssue[]> {
  */
 export async function clearAbandoned(id: string): Promise<void> {
   await tx(ABANDONED_STORE, 'readwrite', (s) => promisifyRequest(s.delete(id)));
-}
-
-// =============================================================================
-// Test helper
-// =============================================================================
-
-/** Test-only: close and delete the DB so each test starts clean. */
-export async function __resetDbForTests(): Promise<void> {
-  if (dbPromise) {
-    const db = await dbPromise;
-    db.close();
-    dbPromise = null;
-  }
-  if (typeof indexedDB === 'undefined') return;
-  await new Promise<void>((resolve, reject) => {
-    const req = indexedDB.deleteDatabase(DB_NAME);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error ?? new Error('delete failed'));
-    req.onblocked = () =>
-      reject(new Error('IDB delete blocked — close other handles first'));
-  });
 }
