@@ -180,11 +180,16 @@ describe('POST /api/snags/reports-scope', () => {
   });
 
   it('persists a snag_reports row with scope columns, pdf_url, and total_findings', async () => {
-    // Check if there are any snags in zone 24 for this project.
+    // Check if there are any snags in zone 24 for this project — mirrors the
+    // multi-source resolution used by runSnagScopeQuery (pole_qa_photos OR
+    // poles via pole_ids[1] OR drops via drop_id).
     const existing = (await realSql`
       SELECT COUNT(*)::int AS n FROM snags s
-      LEFT JOIN pole_qa_photos p ON p.id = s.pole_qa_photo_id
-      WHERE s.project_id = ${projectId} AND p.zone_no = 24
+      LEFT JOIN pole_qa_photos pqa ON pqa.id = s.pole_qa_photo_id
+      LEFT JOIN poles          pl  ON pl.id  = s.pole_ids[1]
+      LEFT JOIN drops          dr  ON dr.id  = s.drop_id
+      WHERE s.project_id = ${projectId}
+        AND COALESCE(pqa.zone_no, pl.zone_no, dr.zone_no) = 24
     `) as { n: number }[];
 
     if (existing[0]!.n === 0) {
