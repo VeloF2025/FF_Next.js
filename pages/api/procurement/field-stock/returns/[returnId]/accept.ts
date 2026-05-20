@@ -168,13 +168,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           }
         }
 
-        // Record movement
-        await client.query(
-          `INSERT INTO stock_movements (
-             stock_item_id, movement_type, to_location_id, quantity, notes, performed_at
-           ) VALUES ($1, 'return', $2, $3, $4, NOW())`,
-          [line.stock_item_id, returnToLocationId, line.quantity, `Return accepted - disposition: ${disposition}`]
-        );
+        // Audit trail: stock_movements integration deferred to Phase 4.
+        // The actual stock_movements schema is project-based with required
+        // project_id / movement_type / reference_number / movement_date columns
+        // and string from_location/to_location — different from what this
+        // handler was originally written against. The INSERT here always
+        // failed silently in earlier code paths. Restock-line accountability
+        // is captured by stock_serials.status, stock_quants.quantity, and
+        // stock_return_lines.status/disposition (all updated atomically above),
+        // so removing the broken insert lets the load-bearing transaction
+        // complete. Proper audit integration tracked for Phase 4.
 
         // Mark line as processed
         await client.query(
