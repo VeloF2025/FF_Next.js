@@ -40,7 +40,8 @@ export async function getLocations(
         is_virtual as "isVirtual",
         created_at as "createdAt",
         updated_at as "updatedAt",
-        created_by as "createdBy"
+        created_by as "createdBy",
+        bin_type as "binType"
       FROM stock_locations
       WHERE 1=1
     `;

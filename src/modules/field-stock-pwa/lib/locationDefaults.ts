@@ -27,6 +27,15 @@ export interface PwaStockLocation {
   code: string;
   locationType: string;
   isActive: boolean;
+  /**
+   * Logical bin classification. Defined by migration 182 CHECK constraint:
+   *   main | department | project | technician | in_transit | faulty | quarantine
+   *
+   * The "Faulty Equipment Bin" has locationType='warehouse' and binType='faulty'
+   * (seeded in migration 182) — it must be excluded from the picker.
+   * Not all rows have this populated; null is allowed.
+   */
+  binType: string | null;
 }
 
 // =============================================================================
@@ -40,9 +49,13 @@ interface ApiEnvelope<T> {
 }
 
 async function fetchLocationsRaw(): Promise<PwaStockLocation[]> {
+  // Request warehouse-type only at the server to reduce payload size.
+  // The server may still return non-warehouse rows if it doesn't support the
+  // locationType query param yet, so we apply client-side filtering defensively.
+  const url = '/api/procurement/field-stock/locations?locationType=warehouse';
   let res: Response;
   try {
-    res = await fetch('/api/procurement/field-stock/locations', {
+    res = await fetch(url, {
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
     });
@@ -82,13 +95,50 @@ export interface UseStoresLocationsResult {
   reload: () => void;
 }
 
+// =============================================================================
+// Pure filter helper (exported for unit tests)
+// =============================================================================
+
+/**
+ * Pure predicate: returns true only for locations that belong in the warehouse picker.
+ *
+ * Exclusion rules:
+ *   1. locationType !== 'warehouse' — only warehouse rows are selectable
+ *   2. !isActive — inactive locations are hidden
+ *   3. id === FIELD_DEFAULT_LOCATION_ID — the synthetic transit destination row must never
+ *      appear as a source
+ *   4. binType === 'faulty' — "Faulty Equipment Bin" is seeded with locationType='warehouse'
+ *      AND binType='faulty' (migration 182); the locationType check alone cannot exclude it
+ *   5. code === 'FAULTY' — belt-and-braces heuristic: if the API stops returning binType
+ *      (column dropped in a future migration), we still exclude this row by its stable code
+ *
+ * Exported so unit tests can assert the predicate without mounting the hook.
+ */
+export function filterWarehouseLocations(
+  locations: PwaStockLocation[],
+): PwaStockLocation[] {
+  return locations.filter(
+    (l) =>
+      l.locationType === 'warehouse' &&
+      l.isActive &&
+      l.id !== FIELD_DEFAULT_LOCATION_ID &&
+      l.binType !== 'faulty' &&
+      l.code !== 'FAULTY',
+  );
+}
+
 /**
  * Fetch active warehouse locations for the PickWarehouseStep picker.
  *
- * Filters applied client-side after the full list is returned:
- *   - locationType === 'warehouse'
+ * Filters applied client-side after the server-filtered list is returned:
+ *   - locationType === 'warehouse' (defence-in-depth: server already filters)
  *   - isActive === true
- *   - id !== FIELD_DEFAULT_LOCATION_ID (excludes the destination row from picker)
+ *   - id !== FIELD_DEFAULT_LOCATION_ID (excludes the synthetic destination row)
+ *   - binType !== 'faulty' (excludes "Faulty Equipment Bin" seeded by migration 182;
+ *       that row has locationType='warehouse' AND binType='faulty', so the locationType
+ *       filter alone cannot remove it — we must check binType explicitly)
+ *   - code !== 'FAULTY' (belt-and-braces heuristic in case binType is not returned
+ *       by a future API version that drops the bin_type column)
  */
 export function useStoresLocations(): UseStoresLocationsResult {
   const [warehouses, setWarehouses] = useState<PwaStockLocation[]>([]);
@@ -108,13 +158,7 @@ export function useStoresLocations(): UseStoresLocationsResult {
     fetchLocationsRaw()
       .then((all) => {
         if (cancelled) return;
-        const filtered = all.filter(
-          (l) =>
-            l.locationType === 'warehouse' &&
-            l.isActive &&
-            l.id !== FIELD_DEFAULT_LOCATION_ID,
-        );
-        setWarehouses(filtered);
+        setWarehouses(filterWarehouseLocations(all));
       })
       .catch((err: unknown) => {
         if (cancelled) return;
