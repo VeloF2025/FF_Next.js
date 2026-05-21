@@ -79,20 +79,20 @@ import JSZip from 'jszip';
 
 // Note: pon-zip.ts is currently not unit-tested. Project precedent
 // (see pages/api/works-qa/__tests__/photo-snag-api.test.ts) mocks the
-// pool import via jest.mock. Follow that pattern.
-jest.mock('@/lib/db', () => ({
+// pool import via vi.mock. Follow that pattern.
+vi.mock('@/lib/db', () => ({
   __esModule: true,
-  default: { query: jest.fn() },
+  default: { query: vi.fn() },
 }));
 
-jest.mock('@/lib/auth', () => ({
+vi.mock('@/lib/auth', () => ({
   withAuth: (h: unknown) => h,
   withPermission: () => (h: unknown) => h,
 }));
 
 // Stub fetch for photo retrieval — return a tiny PNG buffer.
 const tinyPng = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
-global.fetch = jest.fn(async () => ({
+global.fetch = vi.fn(async () => ({
   ok: true,
   arrayBuffer: async () => tinyPng,
   status: 200,
@@ -102,7 +102,7 @@ import pool from '@/lib/db';
 import handler from '../pon-zip';
 import { createMocks } from 'node-mocks-http';
 
-const mockedQuery = pool.query as jest.Mock;
+const mockedQuery = pool.query as ReturnType<typeof vi.fn>;
 
 const FIXTURE_POLE = {
   id: 'pole-1',
@@ -183,7 +183,7 @@ describe('pon-zip — unassigned bucket', () => {
 
 ```bash
 cd /home/hein/Workspace/FF_Next.js-worktrees/works-qa-johan-sweep
-npx jest pages/api/works-qa/__tests__/pon-zip-unassigned.test.ts -t "includes unassigned" 2>&1 | tail -20
+npx vitest run pages/api/works-qa/__tests__/pon-zip-unassigned.test.ts -t "includes unassigned" 2>&1 | tail -20
 ```
 
 Expected: FAIL because `pon-zip.ts` doesn't yet write `unassigned/` and doesn't yet honour `include_unapproved`. The query check should also fail because the SQL currently always has `approved_at IS NOT NULL` regardless of param.
@@ -278,7 +278,7 @@ to:
 - [ ] **Step 2: Run the test, confirm it passes**
 
 ```bash
-npx jest pages/api/works-qa/__tests__/pon-zip-unassigned.test.ts 2>&1 | tail -10
+npx vitest run pages/api/works-qa/__tests__/pon-zip-unassigned.test.ts 2>&1 | tail -10
 ```
 
 Expected: PASS on both cases.
@@ -397,21 +397,21 @@ git -C /home/hein/Workspace/FF_Next.js-worktrees/works-qa-johan-sweep rebase ori
 - [ ] **Step 1: Write the failing test**
 
 ```typescript
-jest.mock('@/lib/db', () => ({
+vi.mock('@/lib/db', () => ({
   __esModule: true,
-  default: { query: jest.fn() },
+  default: { query: vi.fn() },
 }));
-jest.mock('@/lib/auth', () => ({
+vi.mock('@/lib/auth', () => ({
   withAuth: (h: unknown) => h,
   withPermission: () => (h: unknown) => h,
 }));
-jest.mock('@/services/vfStorageAdapter', () => ({
+vi.mock('@/services/vfStorageAdapter', () => ({
   vfStorage: {
-    uploadFile: jest.fn(async () => ({ path: 'works-qa/proj-1/PA001/unassigned/x.jpg' })),
+    uploadFile: vi.fn(async () => ({ path: 'works-qa/proj-1/PA001/unassigned/x.jpg' })),
   },
 }));
-jest.mock('@/modules/works-qa/services/worksQaVlmService', () => ({
-  validatePhotoWithVlm: jest.fn(async () => ({
+vi.mock('@/modules/works-qa/services/worksQaVlmService', () => ({
+  validatePhotoWithVlm: vi.fn(async () => ({
     valid: true, confidence: 0.9, feedback: 'ok',
   })),
 }));
@@ -423,8 +423,8 @@ import formidable from 'formidable';
 import fs from 'fs';
 
 // Replace formidable.parse to feed canned fields/files
-jest.mock('formidable', () => {
-  return jest.fn(() => ({
+vi.mock('formidable', () => {
+  return vi.fn(() => ({
     parse: (_req: unknown, cb: (err: unknown, fields: unknown, files: unknown) => void) => {
       const tmp = '/tmp/_test-upload.jpg';
       fs.writeFileSync(tmp, Buffer.from('fakeimg'));
@@ -435,7 +435,7 @@ jest.mock('formidable', () => {
   }));
 });
 
-const mockedQuery = pool.query as jest.Mock;
+const mockedQuery = pool.query as ReturnType<typeof vi.fn>;
 
 describe('pole-assign — slot=unassigned', () => {
   beforeEach(() => {
@@ -466,7 +466,7 @@ describe('pole-assign — slot=unassigned', () => {
 - [ ] **Step 2: Run test, confirm it fails**
 
 ```bash
-npx jest pages/api/works-qa/__tests__/pole-assign-unassigned.test.ts 2>&1 | tail -15
+npx vitest run pages/api/works-qa/__tests__/pole-assign-unassigned.test.ts 2>&1 | tail -15
 ```
 
 Expected: FAIL — `pole-assign.ts` returns `badRequest('Unknown slot: unassigned')` because `slot=unassigned` isn't recognised.
@@ -600,7 +600,7 @@ Replace with:
 - [ ] **Step 2: Run the test, confirm it passes**
 
 ```bash
-npx jest pages/api/works-qa/__tests__/pole-assign-unassigned.test.ts 2>&1 | tail -10
+npx vitest run pages/api/works-qa/__tests__/pole-assign-unassigned.test.ts 2>&1 | tail -10
 ```
 
 Expected: PASS.
@@ -608,7 +608,7 @@ Expected: PASS.
 - [ ] **Step 3: Verify the existing slot=tray test still passes (regression check)**
 
 ```bash
-npx jest pages/api/works-qa/__tests__/ 2>&1 | tail -15
+npx vitest run pages/api/works-qa/__tests__/ 2>&1 | tail -15
 ```
 
 Expected: all green.
@@ -1176,7 +1176,7 @@ import { classifyPhotoToSlot } from '../worksQaVlmService';
 afterAll(() => { global.fetch = originalFetch; });
 
 function mockVlm(content: string) {
-  global.fetch = jest.fn(async () => ({
+  global.fetch = vi.fn(async () => ({
     ok: true,
     json: async () => ({ choices: [{ message: { content } }] }),
     text: async () => content,
@@ -1219,7 +1219,7 @@ describe('classifyPhotoToSlot', () => {
 - [ ] **Step 3: Run tests**
 
 ```bash
-npx jest src/modules/works-qa/services/__tests__/worksQaVlmService.classify.test.ts 2>&1 | tail -15
+npx vitest run src/modules/works-qa/services/__tests__/worksQaVlmService.classify.test.ts 2>&1 | tail -15
 ```
 
 Expected: 4 PASS.
@@ -1263,17 +1263,17 @@ Expected: at least one row.
 - [ ] **Step 1: Write the failing test**
 
 ```typescript
-jest.mock('@/lib/db', () => ({
+vi.mock('@/lib/db', () => ({
   __esModule: true,
-  default: { query: jest.fn(), connect: jest.fn() },
+  default: { query: vi.fn(), connect: vi.fn() },
 }));
-jest.mock('@/lib/auth', () => ({
+vi.mock('@/lib/auth', () => ({
   withAuth: (h: unknown) => h,
   withPermission: () => (h: unknown) => h,
 }));
-jest.mock('@/modules/works-qa/services/worksQaVlmService', () => ({
-  classifyPhotoToSlot: jest.fn(),
-  validatePhotoWithVlm: jest.fn(),
+vi.mock('@/modules/works-qa/services/worksQaVlmService', () => ({
+  classifyPhotoToSlot: vi.fn(),
+  validatePhotoWithVlm: vi.fn(),
 }));
 
 import pool from '@/lib/db';
@@ -1281,8 +1281,8 @@ import { classifyPhotoToSlot } from '@/modules/works-qa/services/worksQaVlmServi
 import handler from '../auto-sort';
 import { createMocks } from 'node-mocks-http';
 
-const mockedQuery = pool.query as jest.Mock;
-const mockedClassify = classifyPhotoToSlot as jest.Mock;
+const mockedQuery = pool.query as ReturnType<typeof vi.fn>;
+const mockedClassify = classifyPhotoToSlot as ReturnType<typeof vi.fn>;
 
 describe('auto-sort', () => {
   beforeEach(() => {
@@ -1409,7 +1409,7 @@ describe('auto-sort', () => {
 - [ ] **Step 2: Run test, confirm it fails (no handler yet)**
 
 ```bash
-npx jest pages/api/works-qa/__tests__/auto-sort.test.ts 2>&1 | tail -10
+npx vitest run pages/api/works-qa/__tests__/auto-sort.test.ts 2>&1 | tail -10
 ```
 
 Expected: FAIL — module not found.
@@ -1578,7 +1578,7 @@ export default withAuth(withPermission('construction-qa.works-qa.auto-sort', 'cr
 - [ ] **Step 2: Run the test**
 
 ```bash
-npx jest pages/api/works-qa/__tests__/auto-sort.test.ts 2>&1 | tail -15
+npx vitest run pages/api/works-qa/__tests__/auto-sort.test.ts 2>&1 | tail -15
 ```
 
 Expected: all 4 PASS.
@@ -1922,7 +1922,7 @@ kill $DEV_PID
 - [ ] **Step 5: Run full works-qa test suite for regression**
 
 ```bash
-npx jest src/modules/works-qa/ pages/api/works-qa/ 2>&1 | tail -15
+npx vitest run src/modules/works-qa/ pages/api/works-qa/ 2>&1 | tail -15
 ```
 
 Expected: all green.
@@ -1986,6 +1986,6 @@ These are out of the writing-plans scope but listed for handoff:
 - **Run all commands from inside the worktree** (`~/Workspace/FF_Next.js-worktrees/works-qa-johan-sweep`), not from the main tree (`feedback_always_use_worktree` — there's a hook that blocks main-tree writes).
 - **Always use `git -C <worktree-path>`** for git commands when your shell's CWD is the main tree, or `cd` into the worktree first.
 - **Re-query the migration version (`SELECT MAX(version) FROM migrations`) at PR 3 time** — side branches may have landed migrations between when this plan was written and when PR 3 ships (`feedback_migration_version_collision`).
-- **Test command convention**: this project uses `npx jest <path>` directly (verify by checking `package.json` — there may be a `test` script that does the same).
+- **Test command convention**: this project uses `npx vitest run <path>` directly (verify by checking `package.json` — there may be a `test` script that does the same).
 - **No `--no-verify` commits.** If pre-commit hooks fail, fix the underlying issue (CLAUDE.md hard rule).
 - **Before each PR**, run `npm run ci:quick` as the floor check before pushing.

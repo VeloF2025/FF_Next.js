@@ -100,4 +100,37 @@ describe('pon-zip — unassigned bucket', () => {
     const sql = poolMock.query.mock.calls[0]![0] as string;
     expect(sql).toMatch(/approved_at IS NOT NULL/);
   });
+
+  it('include_unapproved=true drops the approved_at filter from the SQL', async () => {
+    const IN_PROGRESS_POLE = { ...FIXTURE_POLE, approved_at: null };
+    poolMock.query.mockResolvedValueOnce({ rows: [IN_PROGRESS_POLE] });
+    const { req, res } = createMocks({
+      method: 'GET',
+      query: { project_id: 'proj-1', pon_no: '999', include_unapproved: 'true' },
+    });
+    // @ts-expect-error
+    await handler(req, res);
+    expect(res._getStatusCode()).toBe(200);
+
+    const sql = poolMock.query.mock.calls[0]![0] as string;
+    expect(sql).not.toMatch(/approved_at IS NOT NULL/);
+  });
+
+  it('omits the unassigned/ folder when a pole has no unassigned keys (default-ZIP byte stability)', async () => {
+    const CLEAN_POLE = { ...FIXTURE_POLE, unassigned_photo_keys: [] };
+    poolMock.query.mockResolvedValueOnce({ rows: [CLEAN_POLE] });
+    const { req, res } = createMocks({
+      method: 'GET',
+      query: { project_id: 'proj-1', pon_no: '999' },
+    });
+    // @ts-expect-error
+    await handler(req, res);
+
+    const buf = res._getBuffer();
+    const zip = await JSZip.loadAsync(buf);
+    const paths = Object.keys(zip.files);
+
+    expect(paths.some(p => p.includes('/unassigned/'))).toBe(false);
+    expect(paths.some(p => p.includes('/unassigned'))).toBe(false);
+  });
 });

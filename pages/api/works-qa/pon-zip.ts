@@ -118,11 +118,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         if (buf) opticalFolder.file(`tray_${String(i + 1).padStart(2, '0')}.jpg`, buf);
       });
 
-      // Unassigned bucket — photos that came in via QField sync or bulk upload
-      // but haven't been placed in a slot yet. Only register the folder when
-      // there are photos to put in it; otherwise JSZip records an empty
-      // directory stub in every pole's ZIP entry, which is noise in the
-      // approved-only default case where most poles have no unassigned photos.
+      // but haven't been placed in a slot yet. Only emit the folder when keys
+      // exist so the default (approved-only) ZIP shape stays byte-stable for
+      // existing callers; approved poles should not have unassigned photos.
       const unassignedKeys: string[] = Array.isArray(pole.unassigned_photo_keys)
         ? pole.unassigned_photo_keys
         : [];

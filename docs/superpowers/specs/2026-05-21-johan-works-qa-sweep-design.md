@@ -195,11 +195,11 @@ Each PR ships under the standard `/review` → `/pr` → merge → `bash scripts
 - Multi-pole bulk upload (folder dump spanning many poles via filename convention). Per Johan's reply on phone-call sequencing: per-pole is enough for now.
 - Auto-sort running automatically on QField sync (button-triggered only per Johan's exact ask).
 - Multi-pole "Auto-sort all poles in PON" batch button. Not asked for; can be a fast follow-up if Johan needs it after using PR 3.
-- Replacing `qa_correction_examples` writes — `move-photo.ts` continues to write there in parallel with new `works_qa_corrections` writes. Resolve the two-table redundancy in a separate cleanup PR if/when it becomes a real problem.
+- Touching `works_qa_corrections` (slot-approval overrides from PR #1664). It's a different concept and shape; PR 3's auto-sort writes go to `qa_correction_examples` only (per Task 0 in the plan).
 - Tonga / Etwatwa photo-source memory verification (only fixing Thembisa).
 
 ## 12. Open questions to firm up at PR-writing time
 
 1. Confidence threshold values (0.95 / 0.6) are first-pass guesses. Revisit after 1 week of real classifier output if too many suggestions are wrong, or too few photos are auto-placed.
 2. Bulk upload batch cap — start unbounded; if Johan hits perf issues at >50 files, introduce a 50-file chunk cap with a "continue" prompt.
-3. Whether to also write the auto-place row into `qa_correction_examples` (alongside `works_qa_corrections`) for compatibility with any downstream report — TBD when the PR is open.
+3. ~~Whether to also write the auto-place row into `qa_correction_examples`~~ Resolved by Task 0 in the plan: auto-place rows write to `qa_correction_examples` only.

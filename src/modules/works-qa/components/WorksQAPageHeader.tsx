@@ -83,6 +83,7 @@ export function WorksQAPageHeader(p: Props) {
               href={`/api/works-qa/pon-zip?project_id=${encodeURIComponent(p.projectId)}&pon_no=${p.ponNo}`}
               className="inline-flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs px-3 py-2 rounded-md font-medium transition-colors"
               title="Download approved poles only"
+              aria-label={`Download ZIP of approved poles in PON ${p.ponNo}`}
             >
               <Download className="h-3.5 w-3.5" />
               ZIP
@@ -91,6 +92,7 @@ export function WorksQAPageHeader(p: Props) {
               href={`/api/works-qa/pon-zip?project_id=${encodeURIComponent(p.projectId)}&pon_no=${p.ponNo}&include_unapproved=true`}
               className="text-xs text-zinc-400 hover:text-zinc-200 underline underline-offset-2"
               title="Download every pole in this PON (including in-progress) plus their unassigned photos"
+              aria-label={`Download ZIP of all poles in PON ${p.ponNo} including in-progress and unassigned photos`}
             >
               + in-progress
             </a>
