@@ -75,7 +75,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     );
 
     if (result.rows.length === 0) {
-      return apiResponse.notFound(res, 'Approved poles', project_id);
+      return apiResponse.notFound(res, includeUnapproved ? 'Poles' : 'Approved poles', project_id);
     }
 
     const ponLabel = ponNum !== undefined ? `PON_${ponNum}` : 'works-qa';
@@ -119,11 +119,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
 
       // Unassigned bucket — photos that came in via QField sync or bulk upload
-      // but haven't been placed in a slot yet. Ship them in their own folder.
+      // but haven't been placed in a slot yet. Only register the folder when
+      // there are photos to put in it; otherwise JSZip records an empty
+      // directory stub in every pole's ZIP entry, which is noise in the
+      // approved-only default case where most poles have no unassigned photos.
       const unassignedKeys: string[] = Array.isArray(pole.unassigned_photo_keys)
         ? pole.unassigned_photo_keys
         : [];
-      const unassignedFolder = zip.folder(`${ponLabel}/${pole.pole_label}/unassigned`);
+      const unassignedFolder = unassignedKeys.length > 0
+        ? zip.folder(`${ponLabel}/${pole.pole_label}/unassigned`)
+        : null;
       const unassignedPromises = unassignedFolder ? unassignedKeys.map(async (key, i) => {
         const buf = await fetchPhoto(photoUrl(key), cookie);
         if (buf) unassignedFolder.file(`photo_${String(i + 1).padStart(2, '0')}.jpg`, buf);
