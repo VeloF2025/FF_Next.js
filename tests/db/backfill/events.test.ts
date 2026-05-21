@@ -153,6 +153,8 @@ describe('Backfill D+E: source=all', () => {
         SELECT event_type FROM stock_serial_events
         WHERE serial_id = '88888888-8888-8888-8888-888888888888'
         ORDER BY event_type`);
+      // Exactly 2 — guards against accidental duplicate inserts within a run.
+      expect(ev.rows).toHaveLength(2);
       const types = ev.rows.map((x: { event_type: string }) => x.event_type);
       expect(types).toContain('issued');
       expect(types).toContain('returned');

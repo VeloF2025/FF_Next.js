@@ -44,6 +44,10 @@ async function backfillPickingEvents(pool: Pool, commit: boolean): Promise<numbe
            'stock_pickings',
            sp.id,
            sp.staff_id,
+           -- Trade-off: pickings with done_at IS NULL fall back to NOW(),
+           -- which loses historical accuracy of when the issue happened.
+           -- Acceptable for the initial backfill; a future migration can
+           -- re-derive timestamps from audit logs if reporting requires it.
            COALESCE(sp.done_at, NOW()),
            jsonb_build_object('picking_type', sp.picking_type,
                               'backfilled', true)

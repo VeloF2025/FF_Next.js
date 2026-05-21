@@ -66,10 +66,11 @@ describe('Cross-script idempotency: A → B → C → D+E twice = no-op', () => 
         VALUES ('ALCL12345002', 'OLT-TEST-01')`);
 
       // ── First run ──────────────────────────────────────────────────────────
-      // A: assets → stock_serials (inserts ALCL12345003).
+      // A: assets → stock_serials. fullReset() deleted ALCL12345003's
+      // stock_serial row, so first run MUST re-insert it from assets.
       const a1 = await backfillAssetsToSerials({
         pool, deviceTypes: ['ont', 'gizzu'], commit: true });
-      expect((a1.inserted ?? 0) + (a1.skipped ?? 0)).toBeGreaterThanOrEqual(0);
+      expect(a1.inserted).toBeGreaterThanOrEqual(1);
 
       // B: qa_photo_reviews → installed_at_drop_id.
       // ALCL12345002 is 'issued' — B should mark it installed.
