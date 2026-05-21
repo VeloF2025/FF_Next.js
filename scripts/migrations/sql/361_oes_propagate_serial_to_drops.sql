@@ -7,8 +7,9 @@
 -- Guards:
 --   * Only fills drops where ont_serial IS NULL or empty (never overwrites).
 --   * Only valid ALCLB+hex serials (skips garbage / Gizzu strings in oes_activations).
---   * Appends a one-line provenance marker to drops.notes; the marker doubles
---     as an idempotency guard if the migration is somehow re-run.
+--   * Appends a one-line provenance marker to drops.notes ('OES propagation')
+--     matching the runtime path in oesImportService.ts; doubles as an
+--     idempotency guard if the migration is somehow re-run.
 --
 -- Expected impact (per cross-reference 2026-05-21):
 --   Lawley   ~4,749
@@ -33,13 +34,13 @@ BEGIN
   UPDATE drops d
   SET ont_serial = src.serial_number,
       notes = TRIM(BOTH E'\n' FROM
-              COALESCE(d.notes, '') || E'\nOES propagation 361'),
+              COALESCE(d.notes, '') || E'\nOES propagation'),
       updated_at = NOW()
   FROM src
   WHERE d.drop_number = src.drop_number
     AND (d.ont_serial IS NULL OR d.ont_serial = '')
-    AND (d.notes IS NULL OR d.notes NOT LIKE '%OES propagation 361%');
+    AND (d.notes IS NULL OR d.notes NOT LIKE '%OES propagation%');
 
   GET DIAGNOSTICS v_updated = ROW_COUNT;
-  RAISE NOTICE 'OES propagation 361: % drops updated', v_updated;
+  RAISE NOTICE 'OES propagation (361): % drops updated', v_updated;
 END $$;
