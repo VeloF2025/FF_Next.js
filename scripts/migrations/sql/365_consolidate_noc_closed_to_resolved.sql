@@ -1,4 +1,9 @@
--- Migration 364: Consolidate NOC ticket statuses 'closed' → 'resolved'
+-- Migration 365: Consolidate NOC ticket statuses 'closed' → 'resolved'
+--
+-- (Originally numbered 364 in PR #1710, but version 364 was claimed by
+-- migration `serial_event_triggers` while #1710 was in review — see
+-- `feedback_migration_version_collision` for the side-branch hazard.
+-- Renumbered to 365 in the follow-up so the runner picks it up.)
 --
 -- Context: The Kanban board hid the 'closed' column by default
 -- (DEFAULT_EXCLUDED_STATUSES in KanbanBoard.tsx), so any ticket moved to
@@ -32,7 +37,7 @@ BEGIN
   SELECT COUNT(*) INTO closed_count
   FROM maintenance_tickets
   WHERE status = 'closed';
-  RAISE NOTICE 'Migration 364: rewriting % maintenance_tickets rows from closed to resolved', closed_count;
+  RAISE NOTICE 'Migration 365: rewriting % maintenance_tickets rows from closed to resolved', closed_count;
 END $$;
 
 ALTER TABLE maintenance_tickets DISABLE TRIGGER trigger_calculate_resolution_time;
