@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest';
 import { Pool } from 'pg';
 import {
   resetState,
-  SERIAL_ID_1, SERIAL_ID_2,
+  SERIAL_ID_1,
   DROP_ID,
 } from './_helpers';
 
