@@ -45,12 +45,14 @@ async function fullReset(pool: Pool): Promise<void> {
     DELETE FROM oes_pp_data WHERE serial_number = 'ALCL12345002'`);
 
   // Clean up test-inserted return lines + returns (seed has none).
+  // Prod schema: stock_return_lines.serial_id (not stock_serial_id);
+  // stock_returns.returned_by_id (not staff_id).
   await pool.query(`
     DELETE FROM stock_return_lines
-    WHERE stock_serial_id = '88888888-8888-8888-8888-888888888888'`);
+    WHERE serial_id = '88888888-8888-8888-8888-888888888888'`);
   await pool.query(`
     DELETE FROM stock_returns
-    WHERE staff_id = '33333333-3333-3333-3333-333333333333'`);
+    WHERE returned_by_id = '33333333-3333-3333-3333-333333333333'`);
 }
 
 describe('Cross-script idempotency: A → B → C → D+E twice = no-op', () => {

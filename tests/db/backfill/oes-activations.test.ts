@@ -14,6 +14,13 @@ async function resetSeedSerial(pool: Pool) {
             updated_at = NOW()
       WHERE serial_number = 'ALCL12345002'`);
   await pool.query(`DELETE FROM oes_pp_data WHERE serial_number = 'ALCL12345002'`);
+  // PR-6 triggers emit stock_serial_events on every oes_pp_data INSERT.
+  // Wipe those so tests don't see stale events from prior tests
+  // (code-quality reviewer Important #2).
+  await pool.query(`
+    DELETE FROM stock_serial_events
+    WHERE serial_id IN (
+      SELECT id FROM stock_serials WHERE serial_number = 'ALCL12345002')`);
 }
 
 describe('Backfill C: oes_pp_data → status=activated', () => {

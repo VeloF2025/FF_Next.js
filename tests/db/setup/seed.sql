@@ -1,3 +1,14 @@
+-- tests/db/setup/seed.sql
+--
+-- Test database seed. Mirrors the prod schema for the tables that the Wave 1
+-- backfill scripts + PR-6 triggers touch. Verified against migrations
+-- 027_field_stock_core.sql, 028_field_stock_transactions.sql, and
+-- 029_field_stock_returns.sql.
+--
+-- Hard rule (from PR-6 schema review): any new column the trigger or backfill
+-- touches MUST be added here. If a future migration changes a column,
+-- update this seed in the same PR so tests reflect prod.
+
 BEGIN;
 
 CREATE TABLE projects (
@@ -39,15 +50,28 @@ INSERT INTO stock_items (id, sku, device_type) VALUES
   ('55555555-5555-5555-5555-555555555555', 'ONT-NOKIA-G140W-H', 'ont'),
   ('66666666-6666-6666-6666-666666666666', 'GIZZU-30W',         'gizzu');
 
+-- stock_locations (prod migration 027). Required because stock_pickings has
+-- two NOT NULL FK columns referencing it (source_location_id, destination_location_id).
+CREATE TABLE stock_locations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code VARCHAR(50) NOT NULL UNIQUE,
+  name VARCHAR(255) NOT NULL,
+  location_type VARCHAR(50) NOT NULL
+);
+INSERT INTO stock_locations (id, code, name, location_type) VALUES
+  ('10000000-0000-0000-0000-000000000001', 'WH-MAIN',  'Main Warehouse', 'warehouse'),
+  ('10000000-0000-0000-0000-000000000002', 'TECH-001', 'Tech 1 truck',   'technician');
+
 CREATE TABLE stock_serials (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   stock_item_id UUID NOT NULL REFERENCES stock_items(id),
   serial_number TEXT NOT NULL,
   mac_address TEXT,
   status TEXT NOT NULL DEFAULT 'available',
-  current_holder_staff_id UUID REFERENCES staff(id),
-  current_location_id UUID,
+  -- Prod has current_location_id (NOT current_holder_staff_id).
+  current_location_id UUID REFERENCES stock_locations(id),
   installed_at_drop_id UUID REFERENCES drops(id),
+  installed_by VARCHAR(255),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (stock_item_id, serial_number),
@@ -63,11 +87,11 @@ INSERT INTO stock_serials (id, stock_item_id, serial_number, status) VALUES
    'ALCL12345001', 'available');
 
 INSERT INTO stock_serials (id, stock_item_id, serial_number, status,
-                           current_holder_staff_id) VALUES
+                           current_location_id) VALUES
   ('88888888-8888-8888-8888-888888888888',
    '55555555-5555-5555-5555-555555555555',
    'ALCL12345002', 'issued',
-   '33333333-3333-3333-3333-333333333333');
+   '10000000-0000-0000-0000-000000000002');
 
 CREATE TABLE assets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -99,53 +123,103 @@ CREATE TABLE oes_pp_data (
   activated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- stock_pickings — prod schema (migration 028):
+--   picking_number NOT NULL UNIQUE, picking_type NOT NULL CHECK,
+--   source_location_id / destination_location_id NOT NULL FKs,
+--   contractor_id / contractor_name (used by accountability trigger),
+--   technician_id (NOT staff_id).
 CREATE TABLE stock_pickings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  picking_type TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'planned',
+  picking_number VARCHAR(50) NOT NULL UNIQUE,
+  picking_type VARCHAR(50) NOT NULL CHECK (picking_type IN
+    ('issue','receipt','return','transfer','scrap')),
+  source_location_id UUID NOT NULL REFERENCES stock_locations(id),
+  destination_location_id UUID NOT NULL REFERENCES stock_locations(id),
   contractor_id UUID,
-  staff_id UUID REFERENCES staff(id),
-  done_at TIMESTAMPTZ
-);
-
-CREATE TABLE stock_picking_lines (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  picking_id UUID NOT NULL REFERENCES stock_pickings(id) ON DELETE CASCADE,
-  stock_serial_id UUID REFERENCES stock_serials(id),
-  serial_number TEXT
-);
-
-WITH p AS (
-  INSERT INTO stock_pickings (id, picking_type, status, staff_id, done_at)
-  VALUES ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'issue', 'done',
-          '33333333-3333-3333-3333-333333333333', NOW())
-  RETURNING id
-)
-INSERT INTO stock_picking_lines (picking_id, stock_serial_id, serial_number)
-  SELECT id, '88888888-8888-8888-8888-888888888888', 'ALCL12345002' FROM p;
-
-CREATE TABLE stock_returns (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  status TEXT NOT NULL DEFAULT 'pending_inspection',
-  staff_id UUID REFERENCES staff(id),
+  contractor_name VARCHAR(255),
+  technician_id UUID,
+  technician_name VARCHAR(255),
+  status VARCHAR(50) NOT NULL DEFAULT 'planned',
+  done_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- stock_picking_lines — prod schema:
+--   stock_item_id NOT NULL, serial_ids UUID[] for serial-tracked items.
+--   NO stock_serial_id (column does not exist in prod).
+CREATE TABLE stock_picking_lines (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  picking_id UUID NOT NULL REFERENCES stock_pickings(id) ON DELETE CASCADE,
+  stock_item_id UUID NOT NULL REFERENCES stock_items(id),
+  serial_ids UUID[],
+  serial_number TEXT,
+  status VARCHAR(50) DEFAULT 'pending'
+);
+
+-- Seed: one done picking with one serial-tracked line for ALCL12345002.
+WITH p AS (
+  INSERT INTO stock_pickings
+    (id, picking_number, picking_type, status,
+     source_location_id, destination_location_id,
+     technician_id, done_at)
+  VALUES (
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    'PICK-SEED-001',
+    'issue',
+    'done',
+    '10000000-0000-0000-0000-000000000001',
+    '10000000-0000-0000-0000-000000000002',
+    '33333333-3333-3333-3333-333333333333',
+    NOW())
+  RETURNING id
+)
+INSERT INTO stock_picking_lines (picking_id, stock_item_id, serial_ids, serial_number)
+  SELECT id,
+         '55555555-5555-5555-5555-555555555555',
+         ARRAY['88888888-8888-8888-8888-888888888888'::uuid],
+         'ALCL12345002'
+  FROM p;
+
+-- stock_returns — prod schema (migration 029):
+--   return_number NOT NULL UNIQUE, returned_by_id (NOT staff_id),
+--   returned_by_name, contractor_id, contractor_name.
+CREATE TABLE stock_returns (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  return_number VARCHAR(50) NOT NULL UNIQUE,
+  original_picking_id UUID REFERENCES stock_pickings(id),
+  returned_by_id UUID,
+  returned_by_name VARCHAR(255),
+  contractor_id UUID,
+  contractor_name VARCHAR(255),
+  return_to_location_id UUID REFERENCES stock_locations(id),
+  status VARCHAR(50) DEFAULT 'pending',
+  return_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- stock_return_lines — prod schema:
+--   serial_id (NOT stock_serial_id), stock_item_id NOT NULL, disposition CHECK.
 CREATE TABLE stock_return_lines (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   return_id UUID NOT NULL REFERENCES stock_returns(id) ON DELETE CASCADE,
-  stock_serial_id UUID REFERENCES stock_serials(id),
+  stock_item_id UUID NOT NULL REFERENCES stock_items(id),
+  serial_id UUID REFERENCES stock_serials(id),
   serial_number TEXT,
-  disposition TEXT
+  disposition VARCHAR(50) CHECK (disposition IN
+    ('restock','repair','scrap','supplier_return'))
 );
 
+-- contractor_stock_accountability — prod has contractor_name NOT NULL plus
+-- additional counter columns. Mirror them so the trigger UPSERT works.
 CREATE TABLE contractor_stock_accountability (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  contractor_id UUID NOT NULL,
+  contractor_id UUID NOT NULL UNIQUE,
+  contractor_name VARCHAR(255) NOT NULL,
   total_issued_count INTEGER NOT NULL DEFAULT 0,
+  total_issued_value DECIMAL(14,2) NOT NULL DEFAULT 0,
   total_returned_count INTEGER NOT NULL DEFAULT 0,
-  is_blocked BOOLEAN NOT NULL DEFAULT FALSE,
-  UNIQUE (contractor_id)
+  total_returned_value DECIMAL(14,2) NOT NULL DEFAULT 0,
+  is_blocked BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 CREATE TABLE migrations (

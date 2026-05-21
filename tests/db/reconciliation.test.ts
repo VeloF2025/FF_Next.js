@@ -36,6 +36,11 @@ describe('reconcile-serials CLI', () => {
   it('exits 0 and prints [OK ] when database is consistent', async () => {
     // The seed has 2 assets (ALCL12345003/GZU0000004) with no stock_serials rows.
     // Register them temporarily so assets_without_serial=0, then clean up after.
+    //
+    // Note on latest_event_matches_status (Tolerance 0): expected drift = 0 here
+    // because the test DB has no stock_serial_events rows yet (no backfill or
+    // trigger has fired during global-setup), so the check's join finds zero
+    // serials with events and the COUNT(*) is 0 trivially.
     const pool = new Pool({ connectionString: URL });
     let stdout = '';
     let exitCode = 1;
@@ -77,20 +82,36 @@ describe('reconcile-serials CLI', () => {
 
     try {
       // Insert a done picking with contractor_id so derived count = 1.
+      // Prod schema: stock_pickings needs picking_number/picking_type/source_location_id/
+      // destination_location_id; technician_id (not staff_id).
       const { rows: [{ id: pickId }] } = await pool.query<{ id: string }>(`
-        INSERT INTO stock_pickings (picking_type, status, staff_id, contractor_id, done_at)
-        VALUES ('issue', 'done', '33333333-3333-3333-3333-333333333333', $1, NOW())
+        INSERT INTO stock_pickings
+          (picking_number, picking_type, status,
+           source_location_id, destination_location_id,
+           technician_id, contractor_id, contractor_name, done_at)
+        VALUES ('PICK-RECONCILE-' || substr(md5(random()::text), 1, 8),
+                'issue', 'done',
+                '10000000-0000-0000-0000-000000000001',
+                '10000000-0000-0000-0000-000000000002',
+                '33333333-3333-3333-3333-333333333333',
+                $1, 'Test Contractor', NOW())
         RETURNING id`, [contractorId]);
 
+      // Prod schema: stock_picking_lines uses serial_ids UUID[]; stock_item_id NOT NULL.
       await pool.query(`
-        INSERT INTO stock_picking_lines (picking_id, stock_serial_id, serial_number)
-        VALUES ($1, '77777777-7777-7777-7777-777777777777', 'ALCL12345001')`, [pickId]);
+        INSERT INTO stock_picking_lines
+          (picking_id, stock_item_id, serial_ids, serial_number)
+        VALUES ($1,
+                '55555555-5555-5555-5555-555555555555',
+                ARRAY['77777777-7777-7777-7777-777777777777'::uuid],
+                'ALCL12345001')`, [pickId]);
 
       // Force the accountability counter to 999 — creates drift vs derived count (1).
+      // contractor_name is NOT NULL in prod, must provide on INSERT.
       await pool.query(`
         INSERT INTO contractor_stock_accountability
-          (contractor_id, total_issued_count, total_returned_count)
-        VALUES ($1, 999, 0)
+          (contractor_id, contractor_name, total_issued_count, total_returned_count)
+        VALUES ($1, 'Test Contractor', 999, 0)
         ON CONFLICT (contractor_id) DO UPDATE SET total_issued_count = 999`,
         [contractorId]);
 
