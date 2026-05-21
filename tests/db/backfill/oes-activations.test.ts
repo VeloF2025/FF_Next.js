@@ -74,8 +74,10 @@ describe('Backfill C: oes_pp_data → status=activated', () => {
         VALUES ('ALCL12345002', 'OLT-CT-01')`);
       await backfillActivationsFromOES({ pool, commit: true });
       const s = await pool.query(
-        `SELECT status FROM stock_serials WHERE serial_number = 'ALCL12345002'`);
+        `SELECT status, activated_at_olt_id FROM stock_serials
+         WHERE serial_number = 'ALCL12345002'`);
       expect(s.rows[0].status).toBe('scrapped');
+      expect(s.rows[0].activated_at_olt_id).toBeNull();
     } finally {
       await resetSeedSerial(pool);
       await pool.end();
@@ -92,8 +94,9 @@ describe('Backfill C: oes_pp_data → status=activated', () => {
         ('ALCL12345002', 'OLT-NEW', '2026-05-01T00:00:00Z')`);
       await backfillActivationsFromOES({ pool, commit: true });
       const s = await pool.query(
-        `SELECT activated_at_olt_id FROM stock_serials
+        `SELECT status, activated_at_olt_id FROM stock_serials
          WHERE serial_number = 'ALCL12345002'`);
+      expect(s.rows[0].status).toBe('activated');
       expect(s.rows[0].activated_at_olt_id).toBe('OLT-NEW');
     } finally {
       await resetSeedSerial(pool);

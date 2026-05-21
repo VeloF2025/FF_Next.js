@@ -12,16 +12,33 @@ interface Opts { pool: Pool; commit: boolean; }
  * "Latest per serial" is enforced via DISTINCT ON (serial_number)
  * ORDER BY activated_at DESC — the newest OES row wins.
  *
- * Never downgrades from faulty, in_repair, or scrapped.
- * Idempotent: only touches rows where status <> 'activated' OR olt_id changed.
+ * Never downgrades terminal/quarantine states (faulty, scrapped, in_repair,
+ * returned) or in-flight states (reserved, allocated_to_project, in_transit).
+ * See ALLOWED_FROM below for the full scope rationale.
+ * Idempotent: only touches rows where status <> 'activated' OR olt_name changed.
  */
 export async function backfillActivationsFromOES(
   opts: Opts,
 ): Promise<BackfillResult> {
   const { pool, commit } = opts;
 
-  // Statuses that may be promoted to 'activated'. Must mirror PR-6's trigger
-  // (spec §State machine) — see oes-activations.test.ts notes block.
+  // Statuses that may be promoted to 'activated' by this backfill.
+  // Scope rationale (kept narrow per commit 46fc86a60 to mirror the PR-6
+  // trigger that will enforce these transitions live):
+  //   - 'available', 'issued', 'installed' are the canonical pre-activation
+  //     states from the spec §State machine. A serial in any of these states
+  //     is legitimately reachable on the network and may light up in OES.
+  //   - 'activated' is included to enable OLT-pointer corrections: a serial
+  //     activated against the wrong olt_name can be re-pointed by a fresh
+  //     OES row. The IS DISTINCT FROM guard below keeps this idempotent —
+  //     when the OLT already matches, no row is updated.
+  // The implicit exclusion list (every status NOT in this array) is what
+  // prevents downgrades from terminal / quarantine / in-flight states:
+  // 'faulty', 'scrapped', 'in_repair', 'returned', 'reserved',
+  // 'allocated_to_project', and 'in_transit' are never touched here. The
+  // in-flight states are deliberately excluded — promoting them via a
+  // bulk historical backfill would mask dispatch/logistics bugs; PR-6's
+  // live trigger will handle them with proper event-log audit trails.
   const ALLOWED_FROM: string[] = [
     'available',
     'installed',
@@ -71,6 +88,11 @@ export async function backfillActivationsFromOES(
   return { updated: r.rowCount ?? 0, wouldUpdate: 0 };
 }
 
+// No --limit flag: the backfill is a single atomic SQL UPDATE driven by a
+// CTE, so chunking would not reduce lock duration meaningfully and would
+// complicate idempotency reasoning. If row-count ever justifies batching,
+// add a serial_number-range filter rather than LIMIT (which interacts
+// poorly with DISTINCT ON ordering).
 async function main() {
   const commit = process.argv.includes('--commit');
   const url = process.env.DATABASE_URL;
