@@ -58,6 +58,9 @@ BRIDGE_SECRET = os.environ.get('WA_BRIDGE_SECRET')
 CURSOR_PATH = Path(os.environ.get('CURSOR_PATH', '/var/lib/wa-mention-poller/cursor'))
 LOOKBACK_SECONDS = int(os.environ.get('LOOKBACK_SECONDS', '900'))
 
+# Cloudflare 403s the default Python-urllib UA; identify ourselves explicitly.
+USER_AGENT = 'wa-mention-poller/1.0'
+
 
 def load_cursor() -> datetime:
     if not CURSOR_PATH.exists():
@@ -100,7 +103,7 @@ def load_skip_jids() -> set[str]:
     """
     req = urllib.request.Request(
         SKIP_JIDS_URL,
-        headers={'x-wa-bridge-secret': BRIDGE_SECRET or ''},
+        headers={'x-wa-bridge-secret': BRIDGE_SECRET or '', 'User-Agent': USER_AGENT},
         method='GET',
     )
     try:
@@ -131,7 +134,7 @@ def post_message(msg: dict) -> bool:
     req = urllib.request.Request(
         WEBHOOK_URL,
         data=json.dumps(payload).encode('utf-8'),
-        headers={'Content-Type': 'application/json'},
+        headers={'Content-Type': 'application/json', 'User-Agent': USER_AGENT},
         method='POST',
     )
     try:
