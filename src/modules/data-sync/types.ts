@@ -269,6 +269,7 @@ export interface OltStats {
   empty: number;
   total: number;
   investigateBreakdown?: { cross_dr: number; not_found: number; other: number };
+  projectBreakdown?: { project: string; count: number }[];
 }
 
 export interface AutoDetectStatus {

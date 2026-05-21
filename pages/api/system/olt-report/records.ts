@@ -6,7 +6,8 @@
  * Query params:
  * - status: pending | needs_investigation | fixed | escalated | all
  * - page: page number (default 1)
- * - pageSize: records per page (default 50, max 100)
+ * - pageSize: records per page (default 50, max 100; max 10000 with bulk=1)
+ * - bulk: set to 1 to allow large bulk-selection page sizes
  * - dateFrom: ISO date string (filter by date range)
  * - dateTo: ISO date string (filter by date range)
  *
@@ -32,12 +33,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const dateFrom = req.query.dateFrom ? String(req.query.dateFrom) : null;
     const dateTo = req.query.dateTo ? String(req.query.dateTo) : null;
     const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-    const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '50'), 10)));
+    const pageSizeCap = req.query.bulk === '1' ? 10000 : 100;
+    const pageSize = Math.min(pageSizeCap, Math.max(1, parseInt(String(req.query.pageSize || '50'), 10)));
     const offset = (page - 1) * pageSize;
 
     // Build WHERE clause based on status
     let whereClause = '';
-    const params: (string | number)[] = [];
+    const params: Array<string | number | string[]> = [];
 
     if (status === 'pending') {
       whereClause = "WHERE r.fix_status = 'pending' AND r.olt_serial IS NOT NULL";
@@ -98,7 +100,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Optional project filter — matches on import project or drops→projects.project_name
     const project = req.query.project ? String(req.query.project).trim() : null;
-    if (project) {
+    const projectsParam = req.query.projects ? String(req.query.projects).trim() : null;
+    const projects = projectsParam
+      ? projectsParam.split('|').map((name) => name.trim()).filter(Boolean)
+      : [];
+    if (projects.length > 0) {
+      params.push(projects);
+      const cond = `COALESCE(i.project, p.project_name) = ANY($${params.length}::text[])`;
+      whereClause = whereClause ? `${whereClause} AND ${cond}` : `WHERE ${cond}`;
+    } else if (project) {
       params.push(project);
       const cond = `COALESCE(i.project, p.project_name) = $${params.length}`;
       whereClause = whereClause ? `${whereClause} AND ${cond}` : `WHERE ${cond}`;
@@ -106,7 +116,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Get total count — JOIN needed when project filter applied so count matches list
     const countResult = await pool.query(`
-      SELECT COUNT(*)::int as total
+      SELECT COUNT(DISTINCT r.id)::int as total
       FROM olt_mismatch_records r
       LEFT JOIN olt_report_imports i ON r.import_id = i.id
       LEFT JOIN drops d ON r.drop_number = d.drop_number
