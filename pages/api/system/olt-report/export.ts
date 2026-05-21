@@ -30,6 +30,9 @@ interface OltExportRow {
   wrong_onemap_serial: string | null;
   fix_status: string | null;
   ticket_uid: string | null;
+  installer_name: string | null;
+  onemap_install_team: string | null;
+  wa_activation_team: string | null;
   import_filename: string | null;
   import_date: string | null;
   created_at: string | null;
@@ -156,6 +159,9 @@ function toExcel(rows: OltExportRow[], filters: Record<string, string>) {
     '1Map Serial',
     'Status',
     'Ticket',
+    'Installer',
+    '1Map Install Team',
+    'WhatsApp Activation Team',
     'Detection Source',
     'Investigation Summary',
     'Import File',
@@ -178,6 +184,9 @@ function toExcel(rows: OltExportRow[], filters: Record<string, string>) {
     row.wrong_onemap_serial || '',
     row.fix_status || '',
     row.ticket_uid || '',
+    row.installer_name || '',
+    row.onemap_install_team || '',
+    row.wa_activation_team || '',
     row.detection_source || '',
     investigationSummary(row.investigation_context),
     row.import_filename || '',
@@ -241,12 +250,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         mt.ticket_uid,
         i.filename as import_filename,
         i.imported_at as import_date,
-        COALESCE(i.project, p.project_name) as project
+        COALESCE(i.project, p.project_name) as project,
+        NULLIF(COALESCE(d.installed_by_name, op.installer_name, dur.installer_name), '') as installer_name,
+        NULLIF(COALESCE(d.raw_data->>'last_modified_install_by', d.raw_data->>'last_modified_install_by ', d.site_submitted_by), '') as onemap_install_team,
+        NULLIF(COALESCE(dur.oes_team, wc.team), '') as wa_activation_team
       FROM olt_mismatch_records r
       LEFT JOIN olt_report_imports i ON r.import_id = i.id
       LEFT JOIN drops d ON r.drop_number = d.drop_number
       LEFT JOIN projects p ON d.project_id = p.id
       LEFT JOIN maintenance_tickets mt ON r.maintenance_ticket_id = mt.id
+      LEFT JOIN dr_photo_unified_reviews dur ON dur.drop_number = r.drop_number
+      LEFT JOIN wa_contacts wc ON wc.sender_phone = dur.sender_phone
+      LEFT JOIN LATERAL (
+        SELECT op.installer_name
+        FROM onemap_properties op
+        WHERE op.drop_number = r.drop_number
+        ORDER BY op.updated_at DESC NULLS LAST, op.id DESC
+        LIMIT 1
+      ) op ON true
       ${filters.whereClause}
       ORDER BY r.id, r.created_at DESC
     `, filters.params);

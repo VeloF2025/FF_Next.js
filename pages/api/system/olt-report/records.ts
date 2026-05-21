@@ -154,12 +154,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         mt.ticket_uid,
         i.filename as import_filename,
         i.imported_at as import_date,
-        COALESCE(i.project, p.project_name) as project
+        COALESCE(i.project, p.project_name) as project,
+        NULLIF(COALESCE(d.installed_by_name, op.installer_name, dur.installer_name), '') as installer_name,
+        NULLIF(COALESCE(d.raw_data->>'last_modified_install_by', d.raw_data->>'last_modified_install_by ', d.site_submitted_by), '') as onemap_install_team,
+        NULLIF(COALESCE(dur.oes_team, wc.team), '') as wa_activation_team
       FROM olt_mismatch_records r
       LEFT JOIN olt_report_imports i ON r.import_id = i.id
       LEFT JOIN drops d ON r.drop_number = d.drop_number
       LEFT JOIN projects p ON d.project_id = p.id
       LEFT JOIN maintenance_tickets mt ON r.maintenance_ticket_id = mt.id
+      LEFT JOIN dr_photo_unified_reviews dur ON dur.drop_number = r.drop_number
+      LEFT JOIN wa_contacts wc ON wc.sender_phone = dur.sender_phone
+      LEFT JOIN LATERAL (
+        SELECT op.installer_name
+        FROM onemap_properties op
+        WHERE op.drop_number = r.drop_number
+        ORDER BY op.updated_at DESC NULLS LAST, op.id DESC
+        LIMIT 1
+      ) op ON true
       ${whereClause}
       ORDER BY r.created_at DESC
       LIMIT $${limitIdx} OFFSET $${offsetIdx}

@@ -218,6 +218,9 @@ export interface OltRecord {
   import_filename?: string;
   import_date?: string;
   project?: string;
+  installer_name?: string | null;
+  onemap_install_team?: string | null;
+  wa_activation_team?: string | null;
   maintenance_ticket_id?: string | null;
   ticket_uid?: string | null;
 }
