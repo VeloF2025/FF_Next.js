@@ -82,10 +82,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     tempPath = photoFile.filepath;
 
     // 3. Resolve slot metadata (tray is a special case — no fixed column)
+    // Three kinds of slot:
+    //   - 'tray'       → main_joint_tray_keys (splice tray photos)
+    //   - 'unassigned' → unassigned_photo_keys (no categorisation yet)
+    //   - civil_*/dome_*/main_joint_* → fixed slot column
     const isTray = slot === 'tray';
-    const slotMeta = isTray ? null : getSlotMeta(slot);
+    const isUnassigned = slot === 'unassigned';
+    const slotMeta = isTray || isUnassigned ? null : getSlotMeta(slot);
 
-    if (!isTray && !slotMeta) {
+    if (!isTray && !isUnassigned && !slotMeta) {
       return apiResponse.badRequest(res, `Unknown slot: ${slot}`);
     }
 
@@ -102,7 +107,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // 5. Build storage path components
     const discipline =
-      isTray
+      isTray || isUnassigned
         ? 'optical'
         : slotMeta!.discipline === 'civil'
           ? 'civil'
@@ -123,10 +128,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const photoUrl = `${APP_BASE}/storage/${uploadResult.path}`; // absolute URL for VLM
 
     // 7. Run VLM validation
-    const vlmLabel = isTray ? 'Optical Joint Tray' : slotMeta!.label;
+    const vlmLabel = isTray
+      ? 'Optical Joint Tray'
+      : isUnassigned
+        ? 'Unassigned pole photo'
+        : slotMeta!.label;
     const vlmCheck = isTray
       ? 'Splice tray with fibre routing and splice protectors visible.'
-      : slotMeta!.vlmCheck;
+      : isUnassigned
+        ? 'Any photo related to fibre pole installation, optical dome, or splice work.'
+        : slotMeta!.vlmCheck;
 
     let vlmResult: VlmSlotResult;
     try {
@@ -147,12 +158,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // 8. Persist to DB
     if (isTray) {
-      // Tray: append photo key to array, store VLM under timestamped key
       const vlmKey = `tray_${crypto.randomUUID()}`;
       await pool.query(
         `UPDATE pole_qa_photos
          SET main_joint_tray_keys = array_append(main_joint_tray_keys, $1),
-             vlm_results = vlm_results || jsonb_build_object($2::text, $3::jsonb),
+             vlm_results = vlm_results || jsonb_build_object($2, $3::jsonb),
+             updated_at = NOW()
+         WHERE id = $4::uuid`,
+        [photoKey, vlmKey, JSON.stringify(vlmResult), poleId]
+      );
+    } else if (isUnassigned) {
+      const vlmKey = `unassigned_${crypto.randomUUID()}`;
+      await pool.query(
+        `UPDATE pole_qa_photos
+         SET unassigned_photo_keys = array_append(COALESCE(unassigned_photo_keys, '{}'::text[]), $1),
+             vlm_results = vlm_results || jsonb_build_object($2, $3::jsonb),
              updated_at = NOW()
          WHERE id = $4::uuid`,
         [photoKey, vlmKey, JSON.stringify(vlmResult), poleId]
