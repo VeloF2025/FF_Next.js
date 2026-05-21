@@ -36,4 +36,15 @@ describe('Wave 1 migration', () => {
     expect(names).toContain('idx_sse_event_type');
     expect(names).toContain('idx_sse_source');
   });
+
+  it('creates the uq_sse_dedupe partial unique index for backfill idempotency', async () => {
+    const pool = new Pool({ connectionString: URL });
+    const r = await pool.query(`
+      SELECT indexdef FROM pg_indexes
+      WHERE tablename = 'stock_serial_events' AND indexname = 'uq_sse_dedupe'`);
+    await pool.end();
+    expect(r.rows.length).toBe(1);
+    expect(r.rows[0].indexdef).toMatch(/UNIQUE/);
+    expect(r.rows[0].indexdef).toMatch(/source_id IS NOT NULL/);
+  });
 });

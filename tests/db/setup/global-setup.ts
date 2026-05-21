@@ -6,21 +6,40 @@ import { Pool } from 'pg';
 const COMPOSE = 'tests/db/setup/docker-compose.test.yml';
 const URL = 'postgres://fibreflow_test:fibreflow_test@localhost:55432/fibreflow_test';
 
+async function waitForReady(timeoutMs = 30_000): Promise<void> {
+  const start = Date.now();
+  let lastErr: unknown;
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const pool = new Pool({ connectionString: URL, connectionTimeoutMillis: 1000 });
+      await pool.query('SELECT 1');
+      await pool.end();
+      return;
+    } catch (e) {
+      lastErr = e;
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+  throw new Error(`test DB not ready after ${timeoutMs}ms: ${String(lastErr)}`);
+}
+
 export async function setup() {
-  execFileSync('docker-compose',
-    ['-f', COMPOSE, 'up', '-d', '--wait'],
+  // Up without --wait (works on Compose v1 + v2.x without v2.20+). Readiness
+  // is polled in TS via waitForReady() so we don't race Postgres startup.
+  // Using `docker-compose` (standalone) because the `docker compose` plugin
+  // is not registered on this machine; standalone v2.32.0 is installed.
+  execFileSync('docker-compose', ['-f', COMPOSE, 'up', '-d'],
     { stdio: 'inherit' });
+  await waitForReady();
 
   const seed = await fs.readFile(path.join(process.cwd(),
     'tests/db/setup/seed.sql'), 'utf8');
   const migration = await fs.readFile(path.join(process.cwd(),
     'scripts/migrations/sql/362_serial_master_register.sql'), 'utf8');
-
   const pool = new Pool({ connectionString: URL });
   await pool.query(seed);
   await pool.query(migration);
   await pool.end();
-
   process.env.DATABASE_URL_TEST = URL;
 }
 
