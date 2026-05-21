@@ -155,12 +155,55 @@ export async function upsertActivations(
     .map(r => r.drop_number);
 
   if (matchedDropNumbers.length > 0) {
-    await pool.query(
-      `UPDATE drops
-       SET oes_confirmed = true, oes_confirmed_at = NOW()
-       WHERE drop_number = ANY($1)`,
-      [matchedDropNumbers]
-    );
+    // oes_confirmed + ont_serial propagation share a transaction so a
+    // mid-flow failure can't leave drops marked confirmed without their
+    // serial filled. Wrapped in try/catch — propagation is best-effort,
+    // since the next batch (or migration 361) will catch any unprocessed
+    // drops via the idempotent `ont_serial IS NULL` guard.
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `UPDATE drops
+         SET oes_confirmed = true, oes_confirmed_at = NOW()
+         WHERE drop_number = ANY($1)`,
+        [matchedDropNumbers]
+      );
+
+      // Propagate OES serial_number to drops.ont_serial when the drops row
+      // has no serial yet. Never overwrites — drops.ont_serial may already
+      // hold a field-captured (1Map / stock / QField / Loeks) serial that
+      // should win. Format guard skips Gizzu and other non-ALCLB strings
+      // that appear in oes_activations.serial_number occasionally.
+      // oes_activations has UNIQUE (drop_number) so this UPDATE touches each
+      // drops row at most once — no DISTINCT ON needed.
+      const propResult = await client.query(
+        `UPDATE drops d
+         SET ont_serial = oa.serial_number,
+             notes = TRIM(BOTH E'\n' FROM
+                     COALESCE(d.notes, '') || E'\nOES propagation'),
+             updated_at = NOW()
+         FROM oes_activations oa
+         WHERE oa.drop_number = d.drop_number
+           AND oa.drop_number = ANY($1)
+           AND oa.serial_number IS NOT NULL
+           AND oa.serial_number <> ''
+           AND oa.serial_number ~* '^ALCLB[A-F0-9]{7,13}$'
+           AND (d.ont_serial IS NULL OR d.ont_serial = '')`,
+        [matchedDropNumbers]
+      );
+      await client.query('COMMIT');
+      if (propResult.rowCount && propResult.rowCount > 0) {
+        logger.info(`Propagated OES serial to ${propResult.rowCount} drops`);
+      }
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => { /* best-effort */ });
+      const msg = err instanceof Error ? err.message : 'unknown';
+      logger.error(`OES confirmed+propagation failed: ${msg}`);
+      errors.push(`Confirmation+propagation: ${msg}`);
+    } finally {
+      client.release();
+    }
   }
 
   const matched = dropsMap.size;
