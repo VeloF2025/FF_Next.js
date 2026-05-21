@@ -16,18 +16,12 @@ import {
   type IncomingWAMessage,
   type ProcessedMessage,
 } from '@/modules/noc/services/waMaintenanceProcessor';
+import { resolveMonitoredGroup } from '@/modules/noc/services/waGroupResolver';
 import { apiResponse } from '@/lib/apiResponse';
 const logger = createLogger('api:maintenance:wa-message');
 
 // Shared secret for Bridge authentication (same as whatsapp/inbound)
 const BRIDGE_SECRET = process.env.WA_BRIDGE_SECRET;
-
-// Known maintenance group JIDs
-const MAINTENANCE_GROUP_JIDS = new Set([
-  '120363424360693693@g.us', // Mohadin Maintenance
-  '120363423947610853@g.us', // Lawley Maintenance
-  '120363422808656601@g.us', // Marketing Activations (DR submissions)
-]);
 
 interface ApiResponse {
   success: boolean;
@@ -90,12 +84,13 @@ async function handler(
       });
     }
 
-    // Validate group JID is a known maintenance group
-    if (!MAINTENANCE_GROUP_JIDS.has(body.group_jid)) {
-      logger.warn('Message from unknown maintenance group', { received: body.group_jid });
+    // Validate group JID is in wa_monitored_groups (and active).
+    const group = await resolveMonitoredGroup(body.group_jid);
+    if (!group) {
+      logger.warn('Message from unmonitored group, dropping', { received: body.group_jid });
       return res.status(400).json({
         success: false,
-        error: `Unknown maintenance group: ${body.group_jid}`,
+        error: `Unmonitored group: ${body.group_jid}`,
       });
     }
 

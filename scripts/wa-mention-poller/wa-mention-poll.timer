@@ -1,0 +1,13 @@
+[Unit]
+Description=WA Mention Poller Timer
+Documentation=https://github.com/VelocityFibre/FF_Next.js
+Requires=wa-mention-poll.service
+
+[Timer]
+# First fire 1 minute after boot, then every 60 seconds.
+OnBootSec=1min
+OnUnitActiveSec=60s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

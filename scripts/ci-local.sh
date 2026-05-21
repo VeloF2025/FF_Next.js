@@ -36,9 +36,10 @@ START_TIME=$(date +%s)
 # 2026-05-08: raised 180→183 warnings — pre-existing master regressions from PRs #1554/#1556 that landed without bumping the baseline (npm run lint on origin/master = 183). Multiple feature PRs (1558/1559/1560/1555) inherited the drift; baseline is master's actual state.
 # 2026-05-19: raised 74→75 catches — olt-report/reporting.ts + wa-monitor-sync-sharepoint*.ts contain pre-existing silent catches not tracked at baseline; verified via git stash (count is 75 without any field-stock-pwa changes).
 # 2026-05-20: raised 183→185 warnings — P3 scoped-snag-reports adds new test files using the established `(req: any, res: any)` withAuth mock pattern + one react-refresh warning on LegacySnagReportCard.tsx (helpers co-located with the row component). Test-file `any` casts in this codebase predate P3.
+# 2026-05-21: raised 75→76 catches — origin/master already at 76 before this branch (olt-report/reporting.ts:166, date-parse fallback for CSV export); verified by counting on a clean checkout of origin/master HEAD. Not introduced by feat/wa-dr-ticket-linking — my new files have 0 silent catches.
 MAX_LINT_WARNINGS=185
 MAX_LINT_ERRORS=0
-MAX_SILENT_CATCHES=75
+MAX_SILENT_CATCHES=76
 
 pass() { echo -e "${GREEN}  ✓ $*${NC}"; PASSED=$((PASSED + 1)); }
 fail() { echo -e "${RED}  ✗ $*${NC}"; FAILED=$((FAILED + 1)); }
