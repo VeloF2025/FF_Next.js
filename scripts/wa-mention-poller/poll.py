@@ -47,13 +47,16 @@ BRIDGE_DB_PATH = os.environ.get(
 WEBHOOK_URL = os.environ.get(
     'WEBHOOK_URL', 'https://dev.fibreflow.app/api/noc/wa-message'
 )
+# Source of truth for "which JIDs does the Go bridge already POST?". The
+# poller hits this endpoint each run; previously we parsed bridge.log
+# text, which was brittle to log format changes.
+SKIP_JIDS_URL = os.environ.get(
+    'SKIP_JIDS_URL',
+    'https://dev.fibreflow.app/api/noc/wa-monitored-groups?types=maintenance,dr_submission',
+)
 BRIDGE_SECRET = os.environ.get('WA_BRIDGE_SECRET')
 CURSOR_PATH = Path(os.environ.get('CURSOR_PATH', '/var/lib/wa-mention-poller/cursor'))
 LOOKBACK_SECONDS = int(os.environ.get('LOOKBACK_SECONDS', '900'))
-
-# Group types whose messages the Go bridge already POSTs directly. Anything
-# else (pre_provision, admin, civil, ...) is re-emitted here.
-SKIP_GROUP_TYPES = {'maintenance', 'dr_submission'}
 
 
 def load_cursor() -> datetime:
@@ -88,37 +91,29 @@ def fetch_new_messages(since: datetime) -> list[dict]:
 
 
 def load_skip_jids() -> set[str]:
-    """Return JIDs whose group_type is in SKIP_GROUP_TYPES per the bridge log.
+    """Return JIDs whose group_type is one the Go bridge POSTs directly.
 
-    The bridge prints '   - <name> (<jid>) [<type>]' on every reload. We
-    parse the most recent such block. Falling back to an empty set means
-    we'd re-emit everything (still safe, dedupe handles it).
+    Fetches the authoritative list from FibreFlow's wa-monitored-groups
+    endpoint (Postgres-backed). On failure we return an empty set so the
+    poller keeps working; downstream ON-CONFLICT dedupe will absorb the
+    extra emits, at a small CPU cost on the FibreFlow side.
     """
-    log_path = Path('/opt/whatsapp-bridge/bridge.log')
-    if not log_path.exists():
+    req = urllib.request.Request(
+        SKIP_JIDS_URL,
+        headers={'x-wa-bridge-secret': BRIDGE_SECRET or ''},
+        method='GET',
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            payload = json.loads(resp.read().decode('utf-8'))
+    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as e:
+        log.warning('Skip-JID lookup failed (%s); continuing with empty skip set', e)
         return set()
-    skip: set[str] = set()
-    # Read the tail (last ~200KB is plenty for one reload block)
-    with log_path.open('rb') as f:
-        f.seek(0, os.SEEK_END)
-        size = f.tell()
-        f.seek(max(0, size - 200_000))
-        tail = f.read().decode('utf-8', errors='replace')
-    for line in tail.splitlines():
-        line = line.strip()
-        if not line.startswith('- '):
-            continue
-        # '- <name> (<jid>) [<type>]'
-        if '@g.us)' not in line or '[' not in line:
-            continue
-        try:
-            jid = line.split('(')[1].split(')')[0]
-            gtype = line.rsplit('[', 1)[1].rstrip(']').strip()
-        except (IndexError, ValueError):
-            continue
-        if gtype in SKIP_GROUP_TYPES:
-            skip.add(jid)
-    return skip
+
+    if not payload.get('success'):
+        log.warning('Skip-JID endpoint returned non-success: %s', payload)
+        return set()
+    return set(payload.get('data', {}).get('group_jids', []))
 
 
 def post_message(msg: dict) -> bool:

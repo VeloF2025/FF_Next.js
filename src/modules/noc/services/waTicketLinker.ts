@@ -20,11 +20,17 @@ import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('waTicketLinker');
 
+// system@fibreflow.app — the bot account used as the author of WA-mention
+// notes and attachments. Override via WA_BRIDGE_SYSTEM_USER_ID env var so
+// future environments can point at a different bot user.
+const SYSTEM_USER_ID =
+  process.env.WA_BRIDGE_SYSTEM_USER_ID ?? '81abd560-48ae-414e-ad31-9d82f1a9ed49';
+
 export interface OpenTicket {
   id: string;
   ticket_uid: string;
   status: string;
-  drop_number: string | null;
+  dr_number: string | null;
   ont_serial: string | null;
 }
 
@@ -48,17 +54,18 @@ function getDb() {
 }
 
 /**
- * Open tickets for a drop_number. Returns at most a few rows in practice.
+ * Open tickets for a dr_number. Returns at most a few rows in practice.
+ * `verified` is treated as terminal (post-QA approval) and excluded.
  */
 export async function findOpenTicketsByDR(
   dropNumber: string
 ): Promise<OpenTicket[]> {
   const sql = getDb();
   const rows = (await sql`
-    SELECT id, ticket_uid, status, drop_number, ont_serial
+    SELECT id, ticket_uid, status, dr_number, ont_serial
     FROM maintenance_tickets
-    WHERE drop_number = ${dropNumber}
-      AND status NOT IN ('closed', 'resolved', 'cancelled')
+    WHERE dr_number = ${dropNumber}
+      AND status NOT IN ('closed', 'resolved', 'cancelled', 'verified')
     ORDER BY created_at DESC
   `) as OpenTicket[];
   return rows;
@@ -73,10 +80,10 @@ export async function findOpenTicketsByOntSerial(
 ): Promise<OpenTicket[]> {
   const sql = getDb();
   const rows = (await sql`
-    SELECT id, ticket_uid, status, drop_number, ont_serial
+    SELECT id, ticket_uid, status, dr_number, ont_serial
     FROM maintenance_tickets
     WHERE ont_serial = ${serial}
-      AND status NOT IN ('closed', 'resolved', 'cancelled')
+      AND status NOT IN ('closed', 'resolved', 'cancelled', 'verified')
     ORDER BY created_at DESC
   `) as OpenTicket[];
   return rows;
@@ -242,7 +249,7 @@ export async function linkPhotoToTicket(
   await sql`
     INSERT INTO maintenance_attachments (
       ticket_id, filename, file_url, file_type, file_size, mime_type,
-      description, is_internal, is_evidence
+      description, is_internal, is_evidence, uploaded_by
     ) VALUES (
       ${ticket.id},
       ${filename},
@@ -252,7 +259,8 @@ export async function linkPhotoToTicket(
       ${photo.mime_type},
       ${`WA photo from ${ctx.group_name} via ${ctx.sender_name ?? ctx.sender_jid}`},
       false,
-      true
+      true,
+      ${SYSTEM_USER_ID}
     )
   `;
 }

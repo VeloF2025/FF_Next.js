@@ -12,8 +12,9 @@ ExecStart=/usr/bin/python3 /opt/wa-mention-poller/poll.py
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=wa-mention-poller
-Restart=on-failure
-RestartSec=60s
+# No Restart=: the .timer fires every 60s, which is the right retry cadence
+# for a oneshot. Restart=on-failure on a oneshot can rapid-loop on persistent
+# failures (DB down, webhook 5xx) instead of backing off via the timer.
 
 [Install]
 WantedBy=multi-user.target

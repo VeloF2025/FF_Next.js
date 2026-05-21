@@ -7,7 +7,8 @@ groups (pre_provision, admin, civil, ...) still flow into the maintenance
 pipeline.
 
 The Go bridge already POSTs maintenance + dr_submission groups directly;
-this poller skips those JIDs by parsing the bridge's reload log.
+this poller skips those JIDs by querying FibreFlow's
+`/api/noc/wa-monitored-groups` endpoint (Postgres-backed source of truth).
 
 ## Deploy
 

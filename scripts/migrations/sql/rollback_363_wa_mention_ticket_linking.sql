@@ -13,6 +13,13 @@ ALTER TABLE maintenance_wa_photos DROP COLUMN IF EXISTS ticket_id;
 ALTER TABLE maintenance_notes DROP COLUMN IF EXISTS wa_message_id;
 
 -- Restore the pre-migration note_type CHECK.
+-- Any wa_mention rows are rewritten to 'system' first so the restored
+-- CHECK constraint does not abort the transaction. The forensic value of
+-- the comment text + sender metadata is preserved.
+UPDATE maintenance_notes
+   SET note_type = 'system'
+ WHERE note_type = 'wa_mention';
+
 ALTER TABLE maintenance_notes DROP CONSTRAINT IF EXISTS maintenance_notes_note_type_check;
 ALTER TABLE maintenance_notes ADD CONSTRAINT maintenance_notes_note_type_check CHECK (
   note_type IN ('internal', 'external', 'system')
