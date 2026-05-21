@@ -60,17 +60,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       ponFilter = `AND pon_no = $${params.length}`;
     }
 
+    // Default ships only approved poles (backward compat). include_unapproved=true
+    // lets Johan ZIP a PON mid-sweep so he can re-distribute uncategorised photos.
+    const includeUnapproved = req.query.include_unapproved === 'true';
+    const approvedFilter = includeUnapproved ? '' : 'AND approved_at IS NOT NULL';
+
     const result = await pool.query<PoleQaPhoto>(
       `SELECT * FROM pole_qa_photos
        WHERE project_id = $1::uuid
-         AND approved_at IS NOT NULL
+         ${approvedFilter}
          ${ponFilter}
        ORDER BY pole_label ASC`,
       params,
     );
 
     if (result.rows.length === 0) {
-      return apiResponse.notFound(res, 'Approved poles', project_id);
+      return apiResponse.notFound(res, includeUnapproved ? 'Poles' : 'Approved poles', project_id);
     }
 
     const ponLabel = ponNum !== undefined ? `PON_${ponNum}` : 'works-qa';
@@ -113,7 +118,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         if (buf) opticalFolder.file(`tray_${String(i + 1).padStart(2, '0')}.jpg`, buf);
       });
 
-      await Promise.all([...civilPromises, ...opticalPromises, ...trayPromises]);
+      // but haven't been placed in a slot yet. Only emit the folder when keys
+      // exist so the default (approved-only) ZIP shape stays byte-stable for
+      // existing callers; approved poles should not have unassigned photos.
+      const unassignedKeys: string[] = Array.isArray(pole.unassigned_photo_keys)
+        ? pole.unassigned_photo_keys
+        : [];
+      const unassignedFolder = unassignedKeys.length > 0
+        ? zip.folder(`${ponLabel}/${pole.pole_label}/unassigned`)
+        : null;
+      const unassignedPromises = unassignedFolder ? unassignedKeys.map(async (key, i) => {
+        const buf = await fetchPhoto(photoUrl(key), cookie);
+        if (buf) unassignedFolder.file(`photo_${String(i + 1).padStart(2, '0')}.jpg`, buf);
+      }) : [];
+
+      await Promise.all([...civilPromises, ...opticalPromises, ...trayPromises, ...unassignedPromises]);
     }
 
     const zipBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
