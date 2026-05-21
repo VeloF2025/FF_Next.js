@@ -5,13 +5,19 @@
 
 -- @name assets_without_serial
 -- Tolerance: 0
--- ONT/Gizzu assets that have no corresponding stock_serials row (by serial_number).
+-- ONT/Gizzu assets (stock_item_id → FT-ONT/FT-GIZZU) that have no
+-- corresponding stock_serials row (by serial_number + stock_item_id).
+-- Prod schema correction (PR-7): assets has no asset_type column.
+-- Identification is via assets.stock_item_id → stock_items.item_code.
 SELECT COUNT(*) AS drift_count
 FROM assets a
-WHERE a.asset_type IN ('ont', 'gizzu')
+JOIN stock_items si ON si.id = a.stock_item_id
+WHERE si.item_code IN ('FT-ONT', 'FT-GIZZU')
+  AND a.serial_number IS NOT NULL
   AND NOT EXISTS (
     SELECT 1 FROM stock_serials ss
-    WHERE ss.serial_number = a.serial_number
+    WHERE ss.serial_number  = a.serial_number
+      AND ss.stock_item_id  = a.stock_item_id
   );
 
 -- @name issued_without_open_picking

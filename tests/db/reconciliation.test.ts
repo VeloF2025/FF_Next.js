@@ -45,16 +45,18 @@ describe('reconcile-serials CLI', () => {
     let stdout = '';
     let exitCode = 1;
     try {
+      // Prod schema correction (PR-7): stock_items has no device_type column.
+      // ONT/Gizzu items are identified by item_code ('FT-ONT', 'FT-GIZZU').
       await pool.query(`
         INSERT INTO stock_serials (stock_item_id, serial_number, status)
         VALUES (
-          (SELECT id FROM stock_items WHERE device_type = 'ont' LIMIT 1),
+          (SELECT id FROM stock_items WHERE item_code = 'FT-ONT' LIMIT 1),
           'ALCL12345003', 'available'
         ) ON CONFLICT DO NOTHING`);
       await pool.query(`
         INSERT INTO stock_serials (stock_item_id, serial_number, status)
         VALUES (
-          (SELECT id FROM stock_items WHERE device_type = 'gizzu' LIMIT 1),
+          (SELECT id FROM stock_items WHERE item_code = 'FT-GIZZU' LIMIT 1),
           'GZU0000004', 'available'
         ) ON CONFLICT DO NOTHING`);
 

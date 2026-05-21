@@ -47,13 +47,17 @@ export async function backfillActivationsFromOES(
   ];
 
   // DISTINCT ON picks the latest OES row per serial.
+  // Prod schema correction (PR-7): oes_pp_data has no `activated_at` column.
+  // The closest timestamp is `created_at` (when the row was imported).
+  // `date_registered` is a DATE (not TIMESTAMPTZ) and loses time precision,
+  // so created_at is the better ordering key.
   const selectCandidates = `
     SELECT DISTINCT ON (oes.serial_number)
       oes.serial_number,
       oes.olt_name
     FROM oes_pp_data oes
     WHERE oes.serial_number IS NOT NULL
-    ORDER BY oes.serial_number, oes.activated_at DESC`;
+    ORDER BY oes.serial_number, oes.created_at DESC`;
 
   if (!commit) {
     const c = await pool.query(
@@ -96,11 +100,11 @@ export async function backfillActivationsFromOES(
 async function main() {
   const commit = process.argv.includes('--commit');
   const url = process.env.DATABASE_URL;
-  if (!url) { console.error('DATABASE_URL not set'); process.exit(1); }
+  if (!url) { process.stderr.write('DATABASE_URL not set\n'); process.exit(1); }
   const pool = new Pool({ connectionString: url });
   try {
     const r = await backfillActivationsFromOES({ pool, commit });
-    console.log(JSON.stringify(r, null, 2));
+    process.stdout.write(JSON.stringify(r, null, 2) + '\n');
   } finally {
     await pool.end();
   }

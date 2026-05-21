@@ -41,14 +41,20 @@ INSERT INTO drops (id, drop_number, project_id) VALUES
   ('44444444-4444-4444-4444-444444444444', 'DR0000001',
    '11111111-1111-1111-1111-111111111111');
 
+-- stock_items — prod schema (PR-7 probe):
+--   NO device_type column. Items are identified by item_code.
+--   ONT/Gizzu items use item_code 'FT-ONT'/'FT-GIZZU' and category='bootstock'.
+--   tracking_type column exists in prod.
 CREATE TABLE stock_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sku TEXT UNIQUE NOT NULL,
-  device_type TEXT NOT NULL
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  item_code     TEXT UNIQUE NOT NULL,
+  name          TEXT NOT NULL,
+  category      TEXT,
+  tracking_type TEXT NOT NULL DEFAULT 'serial'
 );
-INSERT INTO stock_items (id, sku, device_type) VALUES
-  ('55555555-5555-5555-5555-555555555555', 'ONT-NOKIA-G140W-H', 'ont'),
-  ('66666666-6666-6666-6666-666666666666', 'GIZZU-30W',         'gizzu');
+INSERT INTO stock_items (id, item_code, name, category, tracking_type) VALUES
+  ('55555555-5555-5555-5555-555555555555', 'FT-ONT',   'FT-ONT',   'bootstock', 'serial'),
+  ('66666666-6666-6666-6666-666666666666', 'FT-GIZZU', 'FT-GIZZU', 'bootstock', 'serial');
 
 -- stock_locations (prod migration 027). Required because stock_pickings has
 -- two NOT NULL FK columns referencing it (source_location_id, destination_location_id).
@@ -93,34 +99,68 @@ INSERT INTO stock_serials (id, stock_item_id, serial_number, status,
    'ALCL12345002', 'issued',
    '10000000-0000-0000-0000-000000000002');
 
+-- asset_categories — required for assets.category_id FK.
+-- Prod schema (PR-7 probe): id UUID PK, name VARCHAR, code VARCHAR, type VARCHAR.
+CREATE TABLE asset_categories (
+  id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(255) NOT NULL,
+  code VARCHAR(50),
+  type VARCHAR(50)
+);
+INSERT INTO asset_categories (id, name, code, type) VALUES
+  ('cc000000-0000-0000-0000-000000000001', 'ONT Device',   'ONTD', 'network_device'),
+  ('cc000000-0000-0000-0000-000000000002', 'UPS/Gizzu',    'GZZU', 'network_device');
+
+-- assets — prod schema (PR-7 probe):
+--   NO asset_type column, NO mac_address column at top-level.
+--   Identified by category_id (FK → asset_categories) + name.
+--   Serial-to-stock_item linkage uses stock_item_id FK (nullable).
 CREATE TABLE assets (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  asset_type TEXT NOT NULL,
-  serial_number TEXT NOT NULL,
-  mac_address TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  asset_number   VARCHAR(255) NOT NULL DEFAULT '',
+  name           VARCHAR(255) NOT NULL,
+  category_id    UUID NOT NULL REFERENCES asset_categories(id),
+  serial_number  VARCHAR(255),
+  stock_item_id  UUID REFERENCES stock_items(id),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_by     VARCHAR(255) NOT NULL DEFAULT 'seed'
 );
-INSERT INTO assets (id, asset_type, serial_number, mac_address) VALUES
-  ('99999999-9999-9999-9999-999999999999', 'ont', 'ALCL12345003', 'AA:BB:CC:00:00:03'),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'gizzu', 'GZU0000004', NULL);
+-- One ONT asset linked to FT-ONT stock_item so the backfill can find it.
+INSERT INTO assets (id, asset_number, name, category_id, serial_number, stock_item_id) VALUES
+  ('99999999-9999-9999-9999-999999999999',
+   'ASSET-ONT-001', 'FT-ONT-UNIT-03',
+   'cc000000-0000-0000-0000-000000000001',
+   'ALCL12345003',
+   '55555555-5555-5555-5555-555555555555'),
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+   'ASSET-GZU-001', 'FT-GIZZU-UNIT-04',
+   'cc000000-0000-0000-0000-000000000002',
+   'GZU0000004',
+   '66666666-6666-6666-6666-666666666666');
 
+-- qa_photo_reviews — prod schema (PR-7 probe):
+--   NO drop_id column (no FK to drops).
+--   Serial column is `ont_serial_scanned`, NOT `ont_serial`.
+--   Links to drops via drop_number (text match).
 CREATE TABLE qa_photo_reviews (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  drop_id UUID REFERENCES drops(id),
-  drop_number TEXT,
-  ont_serial TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  drop_number        TEXT NOT NULL,
+  ont_serial_scanned TEXT,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-INSERT INTO qa_photo_reviews (drop_id, drop_number, ont_serial) VALUES
-  ('44444444-4444-4444-4444-444444444444', 'DR0000001', 'ALCL12345002');
+INSERT INTO qa_photo_reviews (drop_number, ont_serial_scanned) VALUES
+  ('DR0000001', 'ALCL12345002');
 
--- Probe 3 confirmed prod uses olt_name, not olt_id. Seed mirrors prod.
+-- Probe 3 confirmed prod uses olt_name, not olt_id.
+-- Probe PR-7: oes_pp_data.id is INTEGER (SERIAL), NOT UUID.
+--             No `activated_at` or `pon_id` column.
+--             Ordering uses `created_at`. PON reference uses `olt_pon` (smallint).
 CREATE TABLE oes_pp_data (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id            SERIAL PRIMARY KEY,
   serial_number TEXT,
-  olt_name TEXT,
-  pon_id TEXT,
-  activated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  olt_name      TEXT,
+  olt_pon       SMALLINT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- stock_pickings — prod schema (migration 028):
