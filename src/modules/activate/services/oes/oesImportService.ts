@@ -161,6 +161,27 @@ export async function upsertActivations(
        WHERE drop_number = ANY($1)`,
       [matchedDropNumbers]
     );
+
+    // Propagate OES serial_number to drops.ont_serial when the drops row has
+    // no serial yet. Never overwrites — drops.ont_serial may already hold a
+    // field-captured (1Map / stock / QField / Loeks) serial that should win.
+    // Format guard skips Gizzu and other non-ALCLB strings that appear in
+    // oes_activations.serial_number occasionally.
+    const propResult = await pool.query(
+      `UPDATE drops d
+       SET ont_serial = oa.serial_number, updated_at = NOW()
+       FROM oes_activations oa
+       WHERE oa.drop_number = d.drop_number
+         AND oa.drop_number = ANY($1)
+         AND oa.serial_number IS NOT NULL
+         AND oa.serial_number <> ''
+         AND oa.serial_number ~* '^ALCLB[A-F0-9]{7,13}$'
+         AND (d.ont_serial IS NULL OR d.ont_serial = '')`,
+      [matchedDropNumbers]
+    );
+    if (propResult.rowCount && propResult.rowCount > 0) {
+      logger.info(`Propagated OES serial to ${propResult.rowCount} drops`);
+    }
   }
 
   const matched = dropsMap.size;
