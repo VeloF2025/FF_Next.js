@@ -312,8 +312,10 @@ export function PoleDetailPanel({ poleId, onClose }: PoleDetailPanelProps) {
                 )}
 
                 <UnassignedBucket
+                  poleId={pole.id}
                   photoKeys={pole.unassigned_photo_keys ?? []}
                   onView={i => { const idx = unassignedIndex[i]; if (idx !== undefined) setLightboxIndex(idx); }}
+                  onUploaded={() => mutate()}
                   disabled={!!pole.approved_at}
                 />
               </div>
