@@ -50,8 +50,8 @@ describe('Backfill B: qa_photo_reviews → installed_at_drop_id', () => {
         VALUES ('55555555-aaaa-aaaa-aaaa-555555555555', 'DR0000099')
         ON CONFLICT DO NOTHING`);
       await pool.query(`INSERT INTO qa_photo_reviews
-        (drop_id, drop_number, ont_serial)
-        VALUES ('55555555-aaaa-aaaa-aaaa-555555555555', 'DR0000099', 'ALCL12345002')`);
+        (drop_number, ont_serial_scanned)
+        VALUES ('DR0000099', 'ALCL12345002')`);
       await backfillInstallsFromQA({ pool, commit: true });
       const s = await pool.query(
         `SELECT installed_at_drop_id FROM stock_serials

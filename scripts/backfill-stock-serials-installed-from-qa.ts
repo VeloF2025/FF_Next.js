@@ -8,23 +8,31 @@ interface Opts { pool: Pool; commit: boolean; }
 /**
  * For each qa_photo_reviews row, find the matching stock_serials row by
  * serial_number. If status is one of the "pre-install" set and
- * installed_at_drop_id IS NULL, set installed_at_drop_id = qa.drop_id and
- * status='installed'. Never downgrade from activated/faulty/scrapped.
+ * installed_at_drop_id IS NULL, set installed_at_drop_id from drops.id
+ * (looked up via drop_number) and status='installed'.
+ * Never downgrade from activated/faulty/scrapped.
  *
- * "latest per serial" is enforced via DISTINCT ON (ont_serial)
+ * Prod schema corrections (PR-7):
+ *   - qa_photo_reviews.ont_serial does NOT exist; prod column is
+ *     `ont_serial_scanned`.
+ *   - qa_photo_reviews.drop_id does NOT exist; prod has `drop_number`
+ *     (text). Join drops on drop_number to obtain the UUID.
+ *
+ * "latest per serial" is enforced via DISTINCT ON (ont_serial_scanned)
  * ORDER BY created_at DESC.
  */
 export async function backfillInstallsFromQA(opts: Opts): Promise<BackfillResult> {
   const { pool, commit } = opts;
   const select = `
-    SELECT DISTINCT ON (qa.ont_serial)
-      qa.ont_serial AS serial_number,
-      qa.drop_id,
+    SELECT DISTINCT ON (qa.ont_serial_scanned)
+      qa.ont_serial_scanned AS serial_number,
+      d.id                  AS drop_id,
       qa.created_at
     FROM qa_photo_reviews qa
-    WHERE qa.ont_serial IS NOT NULL
-      AND qa.drop_id   IS NOT NULL
-    ORDER BY qa.ont_serial, qa.created_at DESC`;
+    JOIN drops d ON d.drop_number = qa.drop_number
+    WHERE qa.ont_serial_scanned IS NOT NULL
+      AND qa.drop_number         IS NOT NULL
+    ORDER BY qa.ont_serial_scanned, qa.created_at DESC`;
 
   const candidates = (await pool.query(select)).rows;
 
@@ -61,11 +69,11 @@ export async function backfillInstallsFromQA(opts: Opts): Promise<BackfillResult
 async function main() {
   const commit = process.argv.includes('--commit');
   const url = process.env.DATABASE_URL;
-  if (!url) { console.error('DATABASE_URL not set'); process.exit(1); }
+  if (!url) { process.stderr.write('DATABASE_URL not set\n'); process.exit(1); }
   const pool = new Pool({ connectionString: url });
   try {
     const r = await backfillInstallsFromQA({ pool, commit });
-    console.log(JSON.stringify(r, null, 2));
+    process.stdout.write(JSON.stringify(r, null, 2) + '\n');
   } finally { await pool.end(); }
 }
 

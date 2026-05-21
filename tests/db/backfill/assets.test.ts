@@ -4,19 +4,38 @@ import { backfillAssetsToSerials } from '../../../scripts/backfill-stock-serials
 
 const URL = process.env.DATABASE_URL_TEST!;
 
-async function reseedAsset(pool: Pool, serial: string, type: string) {
+/**
+ * Seed an extra asset linked to FT-ONT stock_item (for dry-run / extra-serial tests).
+ * Prod schema: assets has name, category_id, serial_number, stock_item_id.
+ * The stock_item_id FK must point to the FT-ONT row seeded in stock_items.
+ */
+async function reseedAsset(pool: Pool, serial: string, itemCode: string) {
+  // Look up the stock_item_id for the given item_code
+  const si = await pool.query(
+    `SELECT id FROM stock_items WHERE item_code = $1`, [itemCode]);
+  const stockItemId: string | undefined = si.rows[0]?.id;
+
+  // Look up or use a placeholder category_id
+  const cat = await pool.query(
+    `SELECT id FROM asset_categories LIMIT 1`);
+  const catId: string | undefined = cat.rows[0]?.id;
+
+  if (!stockItemId || !catId) return;
+
   await pool.query(
-    `INSERT INTO assets (asset_type, serial_number) VALUES ($1, $2)
-     ON CONFLICT DO NOTHING`, [type, serial]);
+    `INSERT INTO assets (asset_number, name, category_id, serial_number, stock_item_id)
+     VALUES ('', $1, $2, $3, $4)
+     ON CONFLICT DO NOTHING`,
+    [`Asset-${serial}`, catId, serial, stockItemId]);
 }
 
 describe('Backfill A: assets → stock_serials', () => {
   it('inserts a new stock_serials row for an ONT asset not yet registered', async () => {
     const pool = new Pool({ connectionString: URL });
     try {
-      // seed.sql provides asset ALCL12345003 with no stock_serials row.
+      // seed.sql provides asset ALCL12345003 linked to FT-ONT, no stock_serials row yet.
       const result = await backfillAssetsToSerials({
-        pool, deviceTypes: ['ont', 'gizzu'], commit: true });
+        pool, itemCodes: ['FT-ONT', 'FT-GIZZU'], commit: true });
       expect(result.inserted).toBeGreaterThanOrEqual(1);
       const r = await pool.query(
         `SELECT status FROM stock_serials WHERE serial_number = 'ALCL12345003'`);
@@ -27,9 +46,9 @@ describe('Backfill A: assets → stock_serials', () => {
   it('is idempotent — second run inserts zero rows', async () => {
     const pool = new Pool({ connectionString: URL });
     try {
-      await backfillAssetsToSerials({ pool, deviceTypes: ['ont','gizzu'], commit: true });
+      await backfillAssetsToSerials({ pool, itemCodes: ['FT-ONT','FT-GIZZU'], commit: true });
       const second = await backfillAssetsToSerials({
-        pool, deviceTypes: ['ont','gizzu'], commit: true });
+        pool, itemCodes: ['FT-ONT','FT-GIZZU'], commit: true });
       expect(second.inserted).toBe(0);
     } finally { await pool.end(); }
   });
@@ -37,9 +56,9 @@ describe('Backfill A: assets → stock_serials', () => {
   it('--dry-run inserts nothing', async () => {
     const pool = new Pool({ connectionString: URL });
     try {
-      await reseedAsset(pool, 'ALCL12345099', 'ont');
+      await reseedAsset(pool, 'ALCL12345099', 'FT-ONT');
       const result = await backfillAssetsToSerials({
-        pool, deviceTypes: ['ont','gizzu'], commit: false });
+        pool, itemCodes: ['FT-ONT','FT-GIZZU'], commit: false });
       expect(result.wouldInsert).toBeGreaterThanOrEqual(1);
       const r = await pool.query(
         `SELECT COUNT(*) FROM stock_serials WHERE serial_number = 'ALCL12345099'`);
@@ -47,13 +66,21 @@ describe('Backfill A: assets → stock_serials', () => {
     } finally { await pool.end(); }
   });
 
-  it('skips device types not in the allow-list', async () => {
+  it('skips assets whose stock_item is not in the allow-list', async () => {
     const pool = new Pool({ connectionString: URL });
+    // Insert a stock_item not in the allow-list
+    await pool.query(`INSERT INTO stock_items (item_code, name, category, tracking_type)
+                      VALUES ('TOOL-SPLITTER', 'Optical Splitter', 'optics', 'serial')
+                      ON CONFLICT DO NOTHING`);
     try {
-      await pool.query(`INSERT INTO assets (asset_type, serial_number)
-                        VALUES ('splitter', 'SPL0000001')`);
+      const catId = (await pool.query(`SELECT id FROM asset_categories LIMIT 1`)).rows[0]?.id;
+      const siId  = (await pool.query(`SELECT id FROM stock_items WHERE item_code='TOOL-SPLITTER'`)).rows[0]?.id;
+      await pool.query(
+        `INSERT INTO assets (asset_number, name, category_id, serial_number, stock_item_id)
+         VALUES ('', 'Splitter-SPL0000001', $1, 'SPL0000001', $2)`,
+        [catId, siId]);
       await backfillAssetsToSerials({
-        pool, deviceTypes: ['ont','gizzu'], commit: true });
+        pool, itemCodes: ['FT-ONT','FT-GIZZU'], commit: true });
       const r = await pool.query(
         `SELECT COUNT(*) FROM stock_serials WHERE serial_number = 'SPL0000001'`);
       expect(Number(r.rows[0].count)).toBe(0);

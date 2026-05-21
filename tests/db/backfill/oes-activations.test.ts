@@ -100,11 +100,14 @@ describe('Backfill C: oes_pp_data → status=activated', () => {
   });
 
   it('latest OES row wins (DISTINCT ON ordering)', async () => {
+    // Prod schema correction (PR-7): oes_pp_data has no `activated_at` column.
+    // Ordering uses `created_at`. Insert rows with explicit created_at values
+    // so the DISTINCT ON ordering is deterministic.
     const pool = new Pool({ connectionString: URL });
     try {
       await resetSeedSerial(pool);
       await pool.query(`INSERT INTO oes_pp_data
-        (serial_number, olt_name, activated_at) VALUES
+        (serial_number, olt_name, created_at) VALUES
         ('ALCL12345002', 'OLT-OLD', '2025-01-01T00:00:00Z'),
         ('ALCL12345002', 'OLT-NEW', '2026-05-01T00:00:00Z')`);
       await backfillActivationsFromOES({ pool, commit: true });

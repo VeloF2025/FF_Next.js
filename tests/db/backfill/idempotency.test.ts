@@ -65,7 +65,7 @@ describe('Cross-script idempotency: A → B → C → D+E twice = no-op', () => 
       // A: assets → stock_serials. fullReset() deleted ALCL12345003's
       // stock_serial row, so first run MUST re-insert it from assets.
       const a1 = await backfillAssetsToSerials({
-        pool, deviceTypes: ['ont', 'gizzu'], commit: true });
+        pool, itemCodes: ['FT-ONT', 'FT-GIZZU'], commit: true });
       expect(a1.inserted).toBeGreaterThanOrEqual(1);
 
       // B: qa_photo_reviews → installed_at_drop_id.

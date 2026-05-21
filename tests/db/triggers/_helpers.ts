@@ -50,9 +50,10 @@ export async function resetState(pool: Pool): Promise<void> {
   // Clean up test-inserted oes_pp_data rows.
   await pool.query(`DELETE FROM oes_pp_data`);
   // Delete qa_photo_reviews rows targeting the test-only serials (preserve seed).
+  // Prod schema correction (PR-7): column is ont_serial_scanned, not ont_serial.
   await pool.query(
     `DELETE FROM qa_photo_reviews
-     WHERE ont_serial IN ('ALCL12345001', 'UNKNOWN-SERIAL-XYZ')`);
+     WHERE ont_serial_scanned IN ('ALCL12345001', 'UNKNOWN-SERIAL-XYZ')`);
   // Remove test-inserted return lines + returns.
   await pool.query(
     `DELETE FROM stock_return_lines WHERE serial_id IN ($1,$2)`,

@@ -38,10 +38,16 @@ export async function setup() {
     'scripts/migrations/sql/362_serial_master_register.sql'), 'utf8');
   const triggers = await fs.readFile(path.join(process.cwd(),
     'scripts/migrations/sql/364_serial_event_triggers.sql'), 'utf8');
+  // Migration 365 (PR-7): fixes Trigger 2 + Trigger 3 against actual prod schema.
+  //   Trigger 2 (qa_photo_reviews): ont_serial_scanned + drop_number-to-id lookup.
+  //   Trigger 3 (oes_pp_data): olt_pon, created_at, md5-uuid for source_id.
+  const triggerFix = await fs.readFile(path.join(process.cwd(),
+    'scripts/migrations/sql/365_fix_qa_oes_triggers.sql'), 'utf8');
   const pool = new Pool({ connectionString: URL });
   await pool.query(seed);
   await pool.query(migration);
   await pool.query(triggers);
+  await pool.query(triggerFix);
   await pool.end();
   process.env.DATABASE_URL_TEST = URL;
 }
