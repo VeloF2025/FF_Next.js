@@ -180,7 +180,11 @@ CREATE TABLE stock_pickings (
   technician_id UUID,
   technician_name VARCHAR(255),
   status VARCHAR(50) NOT NULL DEFAULT 'planned',
-  done_at TIMESTAMPTZ,
+  -- Prod has no done_at column. Issue moment is COALESCE(signed_at,
+  -- effective_date, approved_at) — the trigger reads in that priority.
+  signed_at TIMESTAMPTZ,
+  effective_date TIMESTAMPTZ,
+  approved_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -201,7 +205,7 @@ WITH p AS (
   INSERT INTO stock_pickings
     (id, picking_number, picking_type, status,
      source_location_id, destination_location_id,
-     technician_id, done_at)
+     technician_id, signed_at)
   VALUES (
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
     'PICK-SEED-001',
