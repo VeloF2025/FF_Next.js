@@ -805,7 +805,7 @@ export async function listTickets(
     if (filters.status) {
       // Support meta-groups (active/completed) used by sub-tabs, not just individual DB statuses
       const ACTIVE_STATUSES = ['open', 'assigned', 'in_progress', 'pending_qa'];
-      const COMPLETED_STATUSES = ['resolved', 'verified', 'closed'];
+      const COMPLETED_STATUSES = ['resolved', 'verified'];
 
       if (filters.status === 'active') {
         const placeholders = ACTIVE_STATUSES.map((_, i) => `$${paramCounter + i}`).join(', ');

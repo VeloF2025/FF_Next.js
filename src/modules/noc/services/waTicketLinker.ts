@@ -65,7 +65,7 @@ export async function findOpenTicketsByDR(
     SELECT id, ticket_uid, status, dr_number, ont_serial
     FROM maintenance_tickets
     WHERE dr_number = ${dropNumber}
-      AND status NOT IN ('closed', 'resolved', 'cancelled', 'verified')
+      AND status NOT IN ('resolved', 'cancelled', 'verified')
     ORDER BY created_at DESC
   `) as OpenTicket[];
   return rows;
@@ -83,7 +83,7 @@ export async function findOpenTicketsByOntSerial(
     SELECT id, ticket_uid, status, dr_number, ont_serial
     FROM maintenance_tickets
     WHERE ont_serial = ${serial}
-      AND status NOT IN ('closed', 'resolved', 'cancelled', 'verified')
+      AND status NOT IN ('resolved', 'cancelled', 'verified')
     ORDER BY created_at DESC
   `) as OpenTicket[];
   return rows;

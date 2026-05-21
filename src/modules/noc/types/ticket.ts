@@ -137,9 +137,8 @@ export enum TicketStatus {
   QA_APPROVED = 'qa_approved',
   PENDING_HANDOVER = 'pending_handover',
   HANDED_TO_OPS = 'handed_to_ops', // Renamed from HANDED_TO_MAINTENANCE
-  RESOLVED = 'resolved', // Work completed, pending formal closure
+  RESOLVED = 'resolved', // Terminal state: work completed. Replaces former 'closed' (migration 364).
   VERIFIED = 'verified',
-  CLOSED = 'closed',
   CANCELLED = 'cancelled',
 }
 
@@ -375,7 +374,7 @@ export type TicketStatusGroup = 'active' | 'completed';
  */
 export interface TicketFilters {
   status?: TicketStatus | TicketStatus[] | TicketStatusGroup;
-  /** Explicit status blacklist (e.g. `['closed','cancelled']` to hide completed work) */
+  /** Explicit status blacklist (e.g. `['resolved','cancelled']` to hide completed work) */
   exclude_status?: TicketStatus[] | string[];
   ticket_type?: TicketType | TicketType[];
   /**

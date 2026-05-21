@@ -352,7 +352,7 @@ describe('NotificationTriggerService', () => {
     it('should send notification when ticket is closed', async () => {
       const closedTicket = {
         ...sampleTicket,
-        status: TicketStatus.CLOSED,
+        status: TicketStatus.RESOLVED,
         closed_at: new Date(),
       };
 
@@ -361,7 +361,7 @@ describe('NotificationTriggerService', () => {
         ticket_id: closedTicket.id,
         ticket: closedTicket,
         previous_status: TicketStatus.HANDED_TO_OPS,
-        new_status: TicketStatus.CLOSED,
+        new_status: TicketStatus.RESOLVED,
         timestamp: new Date(),
       };
 

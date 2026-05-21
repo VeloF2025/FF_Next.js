@@ -957,6 +957,9 @@ export async function syncFiberTimeInboundTickets(
           'SELECT status FROM maintenance_tickets WHERE id = $1',
           [existingId]
         );
+        // Migration 364: 'closed' was consolidated into 'resolved'. Keep
+        // 'closed' in the check defensively in case a legacy row predates
+        // the migration or QContact inbound writes it before mapping.
         if (existing && ['resolved', 'closed', 'cancelled'].includes(existing.status)) {
           stats.skipped++;
           continue;

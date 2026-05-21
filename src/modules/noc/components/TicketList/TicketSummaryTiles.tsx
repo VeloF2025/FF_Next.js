@@ -73,13 +73,13 @@ const STATUS_GROUPS: { label: string; statuses: TicketStatus[]; color: string; b
   },
   {
     label: 'Resolved',
-    statuses: [TicketStatus.RESOLVED],
+    statuses: [TicketStatus.RESOLVED, TicketStatus.VERIFIED],
     color: 'text-green-400',
     bg: 'bg-green-500/10 border-green-500/20',
   },
   {
-    label: 'Closed',
-    statuses: [TicketStatus.CLOSED, TicketStatus.CANCELLED],
+    label: 'Cancelled',
+    statuses: [TicketStatus.CANCELLED],
     color: 'text-gray-400',
     bg: 'bg-gray-500/10 border-gray-500/20',
   },

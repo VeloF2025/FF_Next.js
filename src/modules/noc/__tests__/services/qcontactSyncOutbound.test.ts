@@ -165,12 +165,12 @@ describe.skip('QContact Outbound Sync Service', () => {
       await pushStatusUpdate(ticketId, TicketStatus.OPEN);
       expect(mockUpdateTicket).toHaveBeenCalledWith(qcontactTicketId, { status: 'open' });
 
-      // Test CLOSED status
+      // Test RESOLVED status (migration 364: replaces former CLOSED)
       vi.mocked(queryOne)
         .mockResolvedValueOnce({ id: ticketId, external_id: qcontactTicketId })
         .mockResolvedValueOnce({ id: 'log-123' });
-      await pushStatusUpdate(ticketId, TicketStatus.CLOSED);
-      expect(mockUpdateTicket).toHaveBeenCalledWith(qcontactTicketId, { status: 'closed' });
+      await pushStatusUpdate(ticketId, TicketStatus.RESOLVED);
+      expect(mockUpdateTicket).toHaveBeenCalledWith(qcontactTicketId, { status: 'Solved' });
 
       // Test CANCELLED status
       vi.mocked(queryOne)
@@ -435,10 +435,10 @@ describe.skip('QContact Outbound Sync Service', () => {
         external_id: qcontactTicketId,
       });
 
-      // Mock: QContact client update status to closed
+      // Mock: QContact client update status to Solved (closure)
       const mockUpdateTicket = vi.fn().mockResolvedValueOnce({
         id: qcontactTicketId,
-        status: 'closed',
+        status: 'Solved',
       });
       vi.mocked(getDefaultQContactClient).mockReturnValue({
         updateTicket: mockUpdateTicket,
@@ -452,7 +452,7 @@ describe.skip('QContact Outbound Sync Service', () => {
 
       expect(result.success).toBe(true);
       expect(mockUpdateTicket).toHaveBeenCalledWith(qcontactTicketId, {
-        status: 'closed',
+        status: 'Solved',
       });
     });
 
@@ -699,7 +699,7 @@ describe.skip('QContact Outbound Sync Service', () => {
       const ticketId = 'ticket-123';
       const qcontactTicketId = 'QC-12345';
       const changes = {
-        status: TicketStatus.CLOSED,
+        status: TicketStatus.RESOLVED,
       };
 
       vi.mocked(queryOne).mockResolvedValueOnce({

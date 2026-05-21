@@ -681,7 +681,7 @@ export async function pushTicketClosure(
       ticket?.external_id || null,
       SyncType.STATUS_UPDATE,
       SyncStatus.FAILED,
-      { status: 'closed', closure_note: closureNote || null },
+      { status: 'Solved', closure_note: closureNote || null },
       null,
       errorMessage
     );
@@ -738,7 +738,9 @@ export async function syncOutboundUpdate(
     }
 
     // Skip tickets in terminal status — QContact returns 422
-    // "can't be changed, you can't re-open a Closed case"
+    // "can't be changed, you can't re-open a Closed case".
+    // 'closed' stays in this list defensively for legacy rows that predate
+    // migration 364 (closed → resolved consolidation).
     const TERMINAL_STATUSES = ['resolved', 'closed', 'cancelled'];
     if (ticket.status && TERMINAL_STATUSES.includes(ticket.status)) {
       logger.info('Ticket in terminal status, skipping outbound sync', {

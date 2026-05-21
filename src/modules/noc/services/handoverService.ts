@@ -682,7 +682,7 @@ export async function getPendingHandovers(
     let paramIndex = 1;
 
     // Only fetch tickets in relevant statuses for handover
-    conditions.push(`t.status IN ('in_progress', 'qa_ready', 'resolved', 'closed')`);
+    conditions.push(`t.status IN ('in_progress', 'qa_ready', 'resolved')`);
 
     if (filters.project_id) {
       conditions.push(`t.project_id = $${paramIndex}`);

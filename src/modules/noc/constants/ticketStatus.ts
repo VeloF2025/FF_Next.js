@@ -90,8 +90,8 @@ export const TICKET_STATUS_DEFINITIONS: Record<TicketStatus, TicketStatusMetadat
   [TicketStatus.RESOLVED]: {
     value: TicketStatus.RESOLVED,
     label: 'Resolved',
-    description: 'Work completed, pending team lead approval to close',
-    color: 'info',
+    description: 'Terminal state: work completed (replaces former Closed bucket)',
+    color: 'success',
     order: 10,
   },
   [TicketStatus.VERIFIED]: {
@@ -100,13 +100,6 @@ export const TICKET_STATUS_DEFINITIONS: Record<TicketStatus, TicketStatusMetadat
     description: 'Resolution verified by team lead',
     color: 'success',
     order: 11,
-  },
-  [TicketStatus.CLOSED]: {
-    value: TicketStatus.CLOSED,
-    label: 'Closed',
-    description: 'Ticket approved and closed by team lead',
-    color: 'success',
-    order: 12,
   },
   [TicketStatus.CANCELLED]: {
     value: TicketStatus.CANCELLED,
@@ -136,7 +129,7 @@ export const TICKET_STATUS_OPTIONS = Object.values(TICKET_STATUS_DEFINITIONS).so
  * 🟢 WORKING: Filter for active tickets
  */
 export const ACTIVE_TICKET_STATUSES = TICKET_STATUSES.filter(
-  (status) => status !== TicketStatus.CANCELLED && status !== TicketStatus.CLOSED
+  (status) => status !== TicketStatus.CANCELLED && status !== TicketStatus.RESOLVED
 );
 
 /**
@@ -167,7 +160,7 @@ export const WAITING_STATUSES = [
 export const COMPLETED_STATUSES = [
   TicketStatus.QA_APPROVED,
   TicketStatus.HANDED_TO_OPS,
-  TicketStatus.CLOSED,
+  TicketStatus.RESOLVED,
 ];
 
 /**
@@ -210,7 +203,7 @@ export function getTicketStatusColor(
  * 🟢 WORKING: Helper to check if status is final
  */
 export function isTerminalStatus(status: TicketStatus): boolean {
-  return status === TicketStatus.CLOSED || status === TicketStatus.CANCELLED;
+  return status === TicketStatus.RESOLVED || status === TicketStatus.CANCELLED;
 }
 
 /**
@@ -268,14 +261,11 @@ export const VALID_STATUS_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   ],
   [TicketStatus.RESOLVED]: [
     TicketStatus.VERIFIED,     // Team lead verifies resolution
-    TicketStatus.CLOSED,       // Team lead approves → closed
     TicketStatus.IN_PROGRESS,  // Team lead rejects → back to work
   ],
   [TicketStatus.VERIFIED]: [
-    TicketStatus.CLOSED,       // Verified → ready to close
     TicketStatus.IN_PROGRESS,  // Revert if issue found
   ],
-  [TicketStatus.CLOSED]: [],
   [TicketStatus.CANCELLED]: [],
 };
 

@@ -289,7 +289,7 @@ describe('Dashboard Service - Statistics', () => {
       // Assert: Query should exclude closed/cancelled
       expect(queryOne).toHaveBeenCalledWith(
         expect.stringContaining('NOT IN'),
-        expect.arrayContaining(['closed', 'cancelled'])
+        expect.arrayContaining(['resolved', 'cancelled'])
       );
     });
 
@@ -375,7 +375,7 @@ describe('Dashboard Service - Statistics', () => {
       // Assert: Should exclude closed/cancelled
       expect(query).toHaveBeenCalledWith(
         expect.stringContaining('NOT IN'),
-        expect.arrayContaining(['closed', 'cancelled'])
+        expect.arrayContaining(['resolved', 'cancelled'])
       );
     });
 
@@ -433,7 +433,7 @@ describe('Dashboard Service - Statistics', () => {
       // Assert: Should filter by closed status
       expect(queryOne).toHaveBeenCalledWith(
         expect.stringContaining('status'),
-        expect.arrayContaining(['closed'])
+        expect.arrayContaining(['resolved'])
       );
     });
 

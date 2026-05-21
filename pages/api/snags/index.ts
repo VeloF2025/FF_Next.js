@@ -30,7 +30,8 @@ function mapSnagStatusToTicketStatus(snagStatus: SnagStatus): TicketStatus | und
     case 'fixed':       return TicketStatus.PENDING_QA;  // legacy: treat as pending_qa
     case 'resolved':    return TicketStatus.RESOLVED;
     case 'verified':    return TicketStatus.VERIFIED;
-    case 'closed':      return TicketStatus.CLOSED;
+    // Migration 364: snag 'closed' maps to ticket 'resolved' (consolidated bucket).
+    case 'closed':      return TicketStatus.RESOLVED;
     default:            return undefined;
   }
 }
