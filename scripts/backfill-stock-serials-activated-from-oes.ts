@@ -20,15 +20,13 @@ export async function backfillActivationsFromOES(
 ): Promise<BackfillResult> {
   const { pool, commit } = opts;
 
-  // Statuses that may be promoted to 'activated'.
+  // Statuses that may be promoted to 'activated'. Must mirror PR-6's trigger
+  // (spec §State machine) — see oes-activations.test.ts notes block.
   const ALLOWED_FROM: string[] = [
     'available',
-    'reserved',
-    'issued',
     'installed',
-    'allocated_to_project',
-    'in_transit',
-    'activated',          // already activated but OLT pointer may differ
+    'issued',
+    'activated',          // re-entry to update OLT pointer; guarded by IS DISTINCT FROM
   ];
 
   // DISTINCT ON picks the latest OES row per serial.
