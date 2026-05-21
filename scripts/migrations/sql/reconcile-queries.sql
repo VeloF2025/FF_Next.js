@@ -61,6 +61,9 @@ FROM (
 -- Tolerance: 0
 -- For each serial that has at least one event, the current status must equal
 -- the to_state of the most-recent event.
+-- NOTE: id DESC is a deterministic tiebreaker — backfilled events (PR-5) share
+-- identical occurred_at AND recorded_at within a single run, so ORDER BY without
+-- id would be non-deterministic and could randomly flag drift on tolerance 0.
 SELECT COUNT(*) AS drift_count
 FROM (
   SELECT
@@ -72,7 +75,7 @@ FROM (
     SELECT to_state
     FROM   stock_serial_events
     WHERE  serial_id = ss.id
-    ORDER  BY occurred_at DESC, recorded_at DESC
+    ORDER  BY occurred_at DESC, recorded_at DESC, id DESC
     LIMIT  1
   ) latest ON TRUE
   WHERE ss.status <> latest.to_state

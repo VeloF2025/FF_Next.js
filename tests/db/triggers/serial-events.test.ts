@@ -182,6 +182,37 @@ describe('Trigger 5: stock_return_lines disposition update', () => {
       await pool.end();
     }
   });
+
+  it('does not un-scrap a scrapped serial on restock disposition', async () => {
+    const pool = new Pool({ connectionString: URL });
+    try {
+      await resetSeedSerial(pool);
+      await clearEvents(pool);
+      // Force scrapped state on ALCL12345002.
+      await pool.query(
+        `UPDATE stock_serials SET status='scrapped' WHERE serial_number='ALCL12345002'`);
+      const retId = '11111111-2222-2222-2222-111111111111';
+      await pool.query(`INSERT INTO stock_returns (id, status, staff_id)
+        VALUES ($1, 'pending_inspection', $2)`, [retId, STAFF_ID]);
+      const lineId = '22222222-3333-3333-3333-222222222222';
+      await pool.query(`INSERT INTO stock_return_lines
+        (id, return_id, stock_serial_id, serial_number) VALUES
+        ($1, $2, $3, 'ALCL12345002')`, [lineId, retId, SERIAL_ID_2]);
+      // Apply restock disposition — must NOT un-scrap.
+      await pool.query(
+        `UPDATE stock_return_lines SET disposition='restock' WHERE id=$1`,
+        [lineId]);
+      const s = await pool.query(
+        `SELECT status FROM stock_serials WHERE serial_number='ALCL12345002'`);
+      expect(s.rows[0].status).toBe('scrapped');
+    } finally {
+      await pool.query(`DELETE FROM stock_return_lines WHERE id='22222222-3333-3333-3333-222222222222'`);
+      await pool.query(`DELETE FROM stock_returns WHERE id='11111111-2222-2222-2222-111111111111'`);
+      await clearEvents(pool);
+      await resetSeedSerial(pool);
+      await pool.end();
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

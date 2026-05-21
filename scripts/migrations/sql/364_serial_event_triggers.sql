@@ -65,6 +65,12 @@ BEGIN
     END LOOP;
 
     -- PRD-027 §10: accountability counter (contractor pickings only).
+    --
+    -- KNOWN LIMITATION: if a picking is reverted from 'done' to 'planned' and
+    -- then set back to 'done', this trigger fires twice and the counter
+    -- increments by line_count both times. There is no decrement path on
+    -- revert. The reconcile-serials CLI's accountability_issued_counter_drift
+    -- check (tolerance 0) will surface this so an operator can correct manually.
     IF NEW.contractor_id IS NOT NULL AND v_count > 0 THEN
       INSERT INTO contractor_stock_accountability
         (contractor_id, total_issued_count, total_returned_count)
@@ -405,10 +411,15 @@ BEGIN
       WHERE source_id IS NOT NULL
       DO NOTHING;
 
+    -- Guard: never overwrite the terminal 'scrapped' state. Setting disposition
+    -- to 'scrap' on a non-scrapped serial still works (UPDATE runs, status →
+    -- 'scrapped'); setting any disposition on an already-scrapped serial is a
+    -- no-op, preventing accidental un-scrap.
     UPDATE stock_serials
     SET    status     = v_next_state,
            updated_at = NOW()
-    WHERE  id = NEW.stock_serial_id;
+    WHERE  id     = NEW.stock_serial_id
+      AND  status <> 'scrapped';
 
     -- Accountability: increment total_returned_count when disposition = 'restock'.
     IF NEW.disposition = 'restock' THEN
