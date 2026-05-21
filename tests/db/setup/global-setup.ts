@@ -48,12 +48,18 @@ export async function setup() {
   // effective_date, approved_at, NOW()).
   const triggerFix2 = await fs.readFile(path.join(process.cwd(),
     'scripts/migrations/sql/366_fix_picking_trigger_done_at.sql'), 'utf8');
+  // Migration 367 (HOTFIX — PR-7 blind review): drops AFTER UPDATE OF ont_serial
+  //   trigger. Trigger 2 fires on qa_photo_reviews.ont_serial_scanned which is
+  //   NULL in all prod rows; this trigger fires on the canonical install column.
+  const dropsTrigger = await fs.readFile(path.join(process.cwd(),
+    'scripts/migrations/sql/367_drops_install_trigger.sql'), 'utf8');
   const pool = new Pool({ connectionString: URL });
   await pool.query(seed);
   await pool.query(migration);
   await pool.query(triggers);
   await pool.query(triggerFix);
   await pool.query(triggerFix2);
+  await pool.query(dropsTrigger);
   await pool.end();
   process.env.DATABASE_URL_TEST = URL;
 }
