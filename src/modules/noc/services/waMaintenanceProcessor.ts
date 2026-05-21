@@ -1,17 +1,34 @@
 /**
  * WhatsApp Maintenance Message Processor
  *
- * Processes incoming WhatsApp messages from maintenance QA groups:
- * - Extracts DR numbers from message text
+ * Processes incoming WhatsApp messages from every active monitored group
+ * (wa_monitored_groups) and:
+ * - Extracts DR numbers and ONT serials
  * - Tracks sender context for photo association
  * - Creates maintenance flags for flagged DRs
- * - Handles photo metadata storage
+ * - Stores message + photo metadata
+ * - Links the message to open maintenance tickets and the DR lifecycle log
  *
  * @module maintenance/services/waMaintenanceProcessor
  */
 
 import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
+import { resolveMonitoredGroup } from './waGroupResolver';
+import {
+  extractDRNumbers as extractDRNumbersFromText,
+  extractOntSerials,
+} from './waReferenceExtractor';
+import {
+  findOpenTicketsByDR,
+  findOpenTicketsByOntSerial,
+  linkMessageToTicket,
+  linkPhotoToTicket,
+  logDrActivityForMention,
+  resolveDropFromSerial,
+  type LinkContext,
+  type OpenTicket,
+} from './waTicketLinker';
 
 // ============================================================================
 // Types
@@ -59,17 +76,6 @@ const CONTEXT_WINDOW_MINUTES = parseInt(
   10
 );
 
-// Known maintenance group JIDs (must match wa-message.ts allowlist)
-const MAINTENANCE_GROUP_JIDS = new Set([
-  process.env.MAINTENANCE_WA_GROUP_JID || '120363424360693693@g.us', // Mohadin Maintenance
-  '120363423947610853@g.us', // Lawley Maintenance
-  '120363422808656601@g.us', // Marketing Activations (DR submissions)
-]);
-
-// DR number regex pattern (DR followed by 6-8 digits)
-// Allow optional space/dash between DR and number (e.g., "DR1856394", "DR 1856394", "DR-1856394")
-const DR_PATTERN = /\bDR[\s-]?(\d{6,8})\b/gi;
-
 // ============================================================================
 // Database Connection
 // ============================================================================
@@ -83,22 +89,11 @@ function getDb() {
 }
 
 // ============================================================================
-// DR Extraction
+// DR Extraction (re-exported for back-compat with existing callers)
 // ============================================================================
 
-/**
- * Extract all DR numbers from message text
- */
-export function extractDRNumbers(text: string | null | undefined): string[] {
-  if (!text) return [];
-
-  const matches = text.match(DR_PATTERN);
-  if (!matches) return [];
-
-  // Normalize: uppercase, remove spaces/dashes, deduplicate
-  const normalized = matches.map((m) => m.toUpperCase().replace(/[\s-]/g, ''));
-  return [...new Set(normalized)];
-}
+/** @deprecated Import extractDRNumbers from './waReferenceExtractor' instead. */
+export const extractDRNumbers = extractDRNumbersFromText;
 
 // ============================================================================
 // Sender Context Management
@@ -263,116 +258,151 @@ export async function storePhotoMetadata(
 // ============================================================================
 
 /**
- * Process an incoming WhatsApp message from the maintenance group
+ * Process an incoming WhatsApp message from any active monitored group.
  *
  * Flow:
- * 1. Check if message is from the monitored group
- * 2. Extract any DR numbers from the message text
- * 3. If no DR in text, check sender context for recent DR mention
- * 4. Store the message with DR association
- * 5. If photos present, store photo metadata
- * 6. Update sender context if DR was mentioned
- * 7. Auto-create maintenance flag via trigger
+ *  1. Resolve group_jid against wa_monitored_groups (drops unknown groups).
+ *  2. Extract DR numbers and ONT serials from message text.
+ *  3. If no DR found, attempt serial-fallback: drops.ont_serial -> drop_number.
+ *  4. Fall back to sender context for media-only messages.
+ *  5. Persist the message and any photo metadata.
+ *  6. Link the message to every open maintenance ticket for the resolved DR
+ *     (or the resolved ONT serial when no DR was found).
+ *  7. Always write a dr_activity_log entry when a DR is in play, even when no
+ *     open ticket matches.
+ *  8. Stamp each linked photo with ticket_id and mirror it into
+ *     maintenance_attachments.
  */
 export async function processMaintenanceMessage(
   message: IncomingWAMessage
 ): Promise<ProcessedMessage> {
   const logger = createLogger('waMaintenanceProcessor');
 
-  // Validate group
-  if (!MAINTENANCE_GROUP_JIDS.has(message.group_jid)) {
+  // Validate group via wa_monitored_groups (replaces the old hard-coded set).
+  const group = await resolveMonitoredGroup(message.group_jid);
+  if (!group) {
     logger.warn(
-      'Message from unexpected group, ignoring',
-      { groupJid: message.group_jid, allowedGroups: [...MAINTENANCE_GROUP_JIDS] }
+      'Message from unmonitored group, ignoring',
+      { groupJid: message.group_jid }
     );
-    throw new Error(`Message from unexpected group: ${message.group_jid}`);
+    throw new Error(`Message from unmonitored group: ${message.group_jid}`);
   }
 
+  const project = group.project_name ?? 'Unassigned';
   const messageTimestamp = new Date(message.timestamp);
 
-  // Step 1: Extract DRs from message text
-  const extractedDRs = extractDRNumbers(message.text);
+  // Step 1: Extract DRs and ONT serials from message text.
+  const extractedDRs = extractDRNumbersFromText(message.text);
+  const extractedSerials = extractOntSerials(message.text);
   const drMentionedDirectly = extractedDRs.length > 0;
 
-  // Step 2: Determine which DR to associate with this message
+  // Step 2: Resolve drop_number from the message itself.
   let dropNumber: string | null = null;
+  let dropResolvedVia: 'text' | 'serial' | 'sender_context' | null = null;
 
   if (drMentionedDirectly && extractedDRs[0]) {
-    // Use the first DR mentioned (could be enhanced to handle multiple)
     dropNumber = extractedDRs[0];
-
-    // Update sender context
+    dropResolvedVia = 'text';
     await updateSenderContext(
       message.group_jid,
       message.sender_jid,
       dropNumber,
       messageTimestamp
     );
-
-    logger.info(
-      'DR mentioned directly in message',
-      { dropNumber, sender: message.sender_jid }
-    );
-  } else if (message.has_media) {
-    // No DR in text but has media - check sender context
-    const context = await getSenderContext(
-      message.group_jid,
-      message.sender_jid
-    );
-
-    if (context?.last_drop_number) {
-      dropNumber = context.last_drop_number;
-      logger.info(
-        'Photo associated with DR via sender context',
-        {
-          dropNumber,
-          sender: message.sender_jid,
-          contextAge: Math.round(
-            (Date.now() - (context.last_drop_timestamp?.getTime() || 0)) / 1000
-          ),
-        }
-      );
-    } else {
-      logger.warn(
-        'Photo received with no DR context - storing as unassociated',
-        { sender: message.sender_jid }
-      );
+    logger.info('DR mentioned directly in message', {
+      dropNumber,
+      sender: message.sender_jid,
+    });
+  } else if (extractedSerials.length > 0 && extractedSerials[0]) {
+    // ONT serial fallback: serial -> drops.ont_serial -> drop_number.
+    const resolved = await resolveDropFromSerial(extractedSerials[0]);
+    if (resolved) {
+      dropNumber = resolved;
+      dropResolvedVia = 'serial';
+      logger.info('DR resolved via ONT serial fallback', {
+        serial: extractedSerials[0],
+        dropNumber,
+      });
     }
   }
 
-  // Step 3: Store the message
-  const messageId = await storeMessage(
-    message,
-    dropNumber,
-    drMentionedDirectly
-  );
+  // Step 3: Sender-context fallback for media-only messages.
+  if (!dropNumber && message.has_media) {
+    const context = await getSenderContext(message.group_jid, message.sender_jid);
+    if (context?.last_drop_number) {
+      dropNumber = context.last_drop_number;
+      dropResolvedVia = 'sender_context';
+      logger.info('Photo associated with DR via sender context', {
+        dropNumber,
+        sender: message.sender_jid,
+        contextAge: Math.round(
+          (Date.now() - (context.last_drop_timestamp?.getTime() || 0)) / 1000
+        ),
+      });
+    } else {
+      logger.warn('Photo received with no DR context - storing as unassociated', {
+        sender: message.sender_jid,
+      });
+    }
+  }
 
-  // Step 4: Store photo metadata if present
+  // Step 4: Persist the message and any photos.
+  const messageId = await storeMessage(message, dropNumber, drMentionedDirectly, project);
+
   let photosCount = 0;
+  const photoIds: string[] = [];
   if (message.has_media && message.media && dropNumber) {
     for (let i = 0; i < message.media.length; i++) {
       const photo = message.media[i];
       if (!photo) continue;
       if (photo.type === 'image' || photo.mime_type?.startsWith('image/')) {
-        await storePhotoMetadata(messageId, dropNumber, photo, i);
+        const photoId = await storePhotoMetadata(messageId, dropNumber, photo, i, project);
+        photoIds.push(photoId);
         photosCount++;
       }
     }
   }
 
-  // The trigger auto_create_maintenance_flag handles creating/updating
-  // the dr_maintenance_flags record
+  // Step 5: Build the shared LinkContext once for all writers.
+  const linkCtx: LinkContext = {
+    wa_message_id: message.message_id,
+    group_jid: message.group_jid,
+    group_name: group.group_name,
+    sender_jid: message.sender_jid,
+    sender_name: message.sender_name ?? null,
+    message_text: message.text ?? null,
+    message_timestamp: messageTimestamp,
+    project,
+  };
 
-  logger.info(
-    'Maintenance message processed',
-    {
-      messageId,
-      dropNumber,
-      drMentionedDirectly,
-      photosCount,
-      sender: message.sender_name || message.sender_jid,
+  // Step 6: Resolve open tickets and write per-ticket linkage rows.
+  const openTickets = await collectOpenTickets(dropNumber, extractedSerials);
+  for (const ticket of openTickets) {
+    await linkMessageToTicket(ticket, linkCtx, dropNumber);
+    for (const photoId of photoIds) {
+      await linkPhotoToTicket(photoId, ticket, linkCtx);
     }
-  );
+  }
+
+  // Step 7: DR lifecycle entry (written whether or not any ticket matched).
+  if (dropNumber) {
+    await logDrActivityForMention(
+      dropNumber,
+      linkCtx,
+      openTickets.map((t) => t.id)
+    );
+  }
+
+  logger.info('Maintenance message processed', {
+    messageId,
+    dropNumber,
+    dropResolvedVia,
+    drMentionedDirectly,
+    serialsExtracted: extractedSerials.length,
+    photosCount,
+    openTicketsLinked: openTickets.length,
+    sender: message.sender_name || message.sender_jid,
+  });
 
   return {
     id: messageId,
@@ -381,6 +411,32 @@ export async function processMaintenanceMessage(
     photos_count: photosCount,
     maintenance_flag_created: drMentionedDirectly && dropNumber !== null,
   };
+}
+
+/**
+ * Build the union of open tickets matched by drop_number (preferred) and by
+ * ONT serial (fallback). Deduplicates by ticket id so a ticket matched on both
+ * legs only produces one note + activity row pair.
+ */
+async function collectOpenTickets(
+  dropNumber: string | null,
+  serials: string[]
+): Promise<OpenTicket[]> {
+  const byId = new Map<string, OpenTicket>();
+
+  if (dropNumber) {
+    for (const t of await findOpenTicketsByDR(dropNumber)) {
+      byId.set(t.id, t);
+    }
+  }
+
+  for (const serial of serials) {
+    for (const t of await findOpenTicketsByOntSerial(serial)) {
+      if (!byId.has(t.id)) byId.set(t.id, t);
+    }
+  }
+
+  return [...byId.values()];
 }
 
 // ============================================================================
