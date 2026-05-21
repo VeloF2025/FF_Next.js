@@ -29,6 +29,14 @@ describe('Backfill C: oes_pp_data → status=activated', () => {
           WHERE serial_number = 'ALCL12345002'`);
       await pool.query(`INSERT INTO oes_pp_data (serial_number, olt_name)
         VALUES ('ALCL12345002', 'OLT-CT-01')`);
+      // NOTE: With PR-6 triggers installed, the INSERT above fires
+      // emit_serial_event_on_oes_activate which already sets status='activated'.
+      // Reset the serial back to 'installed' so the backfill script itself has
+      // work to do (tests backfill logic in isolation).
+      await pool.query(
+        `UPDATE stock_serials
+            SET status='installed', activated_at_olt_id=NULL
+          WHERE serial_number='ALCL12345002'`);
       const r = await backfillActivationsFromOES({ pool, commit: true });
       expect(r.updated).toBeGreaterThanOrEqual(1);
       const s = await pool.query(
@@ -125,13 +133,20 @@ describe('Backfill C: oes_pp_data → status=activated', () => {
       await resetSeedSerial(pool);
       await pool.query(`INSERT INTO oes_pp_data (serial_number, olt_name)
         VALUES ('ALCL12345002', 'OLT-CT-01')`);
+      // NOTE: PR-6 trigger fires on INSERT and sets status='activated'.
+      // Reset back to 'issued' so the backfill dry-run has work to report
+      // and the status check below reflects the dry-run invariant (no mutation).
+      await pool.query(
+        `UPDATE stock_serials
+            SET status='issued', activated_at_olt_id=NULL
+          WHERE serial_number='ALCL12345002'`);
       const r = await backfillActivationsFromOES({ pool, commit: false });
       expect(r.wouldUpdate).toBeGreaterThanOrEqual(1);
       const s = await pool.query(
         `SELECT status, activated_at_olt_id FROM stock_serials
          WHERE serial_number = 'ALCL12345002'`);
-      expect(s.rows[0].status).toBe('issued');                   // unchanged
-      expect(s.rows[0].activated_at_olt_id).toBeNull();          // unchanged
+      expect(s.rows[0].status).toBe('issued');                   // unchanged by dry-run
+      expect(s.rows[0].activated_at_olt_id).toBeNull();          // unchanged by dry-run
     } finally {
       await resetSeedSerial(pool);
       await pool.end();

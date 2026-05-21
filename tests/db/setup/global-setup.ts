@@ -36,9 +36,12 @@ export async function setup() {
     'tests/db/setup/seed.sql'), 'utf8');
   const migration = await fs.readFile(path.join(process.cwd(),
     'scripts/migrations/sql/362_serial_master_register.sql'), 'utf8');
+  const triggers = await fs.readFile(path.join(process.cwd(),
+    'scripts/migrations/sql/363_serial_event_triggers.sql'), 'utf8');
   const pool = new Pool({ connectionString: URL });
   await pool.query(seed);
   await pool.query(migration);
+  await pool.query(triggers);
   await pool.end();
   process.env.DATABASE_URL_TEST = URL;
 }

@@ -108,6 +108,14 @@ describe('Backfill E: stock_returns → returned events', () => {
         VALUES ($1, '88888888-8888-8888-8888-888888888888', 'ALCL12345002')`,
         [retId]);
 
+      // NOTE: PR-6 triggers fire on AFTER INSERT on stock_return_lines and emit
+      // a 'returned' event immediately. We delete that trigger-created event so
+      // the backfill script has its own fresh work to do (testing backfill E in
+      // isolation from the trigger).
+      await pool.query(`
+        DELETE FROM stock_serial_events
+        WHERE serial_id = '88888888-8888-8888-8888-888888888888'`);
+
       const r = await backfillSerialEvents({ pool, source: 'returns', commit: true });
       expect(r.inserted).toBeGreaterThanOrEqual(1);
 
@@ -144,6 +152,15 @@ describe('Backfill D+E: source=all', () => {
         INSERT INTO stock_return_lines (return_id, stock_serial_id, serial_number)
         VALUES ($1, '88888888-8888-8888-8888-888888888888', 'ALCL12345002')`,
         [retId]);
+
+      // NOTE: PR-6 triggers fire on AFTER INSERT on stock_return_lines and emit
+      // a 'returned' event immediately. We delete that trigger-created event so
+      // the backfill script has its own fresh work to do (testing backfill E in
+      // isolation from the trigger). After clearing, both D (picking) and E (return)
+      // have work to do, giving total inserted >= 2.
+      await pool.query(`
+        DELETE FROM stock_serial_events
+        WHERE serial_id = '88888888-8888-8888-8888-888888888888'`);
 
       const r = await backfillSerialEvents({ pool, source: 'all', commit: true });
       // 1 picking event + 1 return event.

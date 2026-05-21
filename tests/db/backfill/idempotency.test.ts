@@ -59,12 +59,6 @@ describe('Cross-script idempotency: A → B → C → D+E twice = no-op', () => 
     try {
       await fullReset(pool);
 
-      // Plant OES data so Backfill C has work to do on first run.
-      // ALCL12345002 starts as 'issued'; C needs it in an ALLOWED_FROM state.
-      await pool.query(`
-        INSERT INTO oes_pp_data (serial_number, olt_name)
-        VALUES ('ALCL12345002', 'OLT-TEST-01')`);
-
       // ── First run ──────────────────────────────────────────────────────────
       // A: assets → stock_serials. fullReset() deleted ALCL12345003's
       // stock_serial row, so first run MUST re-insert it from assets.
@@ -77,8 +71,21 @@ describe('Cross-script idempotency: A → B → C → D+E twice = no-op', () => 
       const b1 = await backfillInstallsFromQA({ pool, commit: true });
       expect(b1.updated).toBeGreaterThanOrEqual(1);
 
+      // Plant OES data so Backfill C has work to do.
+      // NOTE: With PR-6 triggers, this INSERT immediately fires the
+      // emit_serial_event_on_oes_activate trigger which sets status='activated'.
+      // We then reset status back to 'installed' so Backfill C has work to do
+      // (testing the backfill script's own logic in isolation from the trigger).
+      await pool.query(`
+        INSERT INTO oes_pp_data (serial_number, olt_name)
+        VALUES ('ALCL12345002', 'OLT-TEST-01')`);
+      await pool.query(`
+        UPDATE stock_serials
+           SET status='installed', activated_at_olt_id=NULL
+         WHERE serial_number='ALCL12345002'`);
+
       // C: oes_pp_data → activated.
-      // Serial is now 'installed' (after B).
+      // Serial is now 'installed' (reset above); C marks it activated.
       const c1 = await backfillActivationsFromOES({ pool, commit: true });
       expect(c1.updated).toBeGreaterThanOrEqual(1);
 
