@@ -3,6 +3,11 @@
 **Branch:** `docs/phase-4-probes`  
 **Purpose:** Resolve 6 open verification items before Wave 1 implementation begins. All queries are SELECT-only — no schema changes.
 
+### Cross-links
+- **Spec:** `docs/superpowers/specs/2026-05-21-serial-master-register-design.md`
+- **Plan:** `docs/superpowers/plans/2026-05-21-serial-master-register-wave1.md` (currently on branch `docs/procurement-audit`, commit `f3f4036ed`)
+- **Audit (predecessor):** `docs/superpowers/audits/2026-05-21-procurement-field-stock-integration.md`
+
 ---
 
 ## Probe 0 — Migration Version
@@ -78,18 +83,18 @@ SELECT status, COUNT(*) FROM stock_serials GROUP BY 1 ORDER BY 2 DESC;
   in the constraint but have zero rows — they are valid future states.
 - **No unexpected status values found** (e.g. `used` is NOT present). The spec's expected list matches
   the constraint exactly.
-- **No surprises** — the spec's planned new status values (`pending_receive`) must be added to this CHECK
-  in PR-1's migration. All 8 existing values must be preserved.
+- **No surprises** — the spec's three new status values (`activated`, `in_repair`, `allocated_to_project`)
+  must be added to this CHECK in PR-1's migration. All 8 existing values must be preserved.
 
 ### Downstream PR Impact
 - **PR-1** — The `ALTER TABLE stock_serials DROP CONSTRAINT stock_serials_status_check` + `ADD CONSTRAINT`
-  must include all 8 existing values PLUS any new values added by the serial master register design.
+  must include all 8 existing values PLUS the 3 new values added by the serial master register design.
   Minimum safe CHECK list for PR-1:
   ```sql
   CHECK (status IN (
     'available','reserved','issued','installed',
     'faulty','returned','scrapped','in_transit',
-    'pending_receive'  -- new in Wave 1
+    'activated','in_repair','allocated_to_project'  -- new in Wave 1 (per spec)
   ))
   ```
 
@@ -167,6 +172,9 @@ WHERE table_name = 'oes_pp_data'
 - **No UUID FK** to an `olts` table exists. OLT identity in `oes_pp_data` is by name string.
 - Therefore, the new `activated_at_olt_id` column on `stock_serials` should be **`TEXT`**, storing
   the `olt_name` value from the activation source.
+- **Future hardening:** introduce an `olts` table (UUID PK, unique `name`, normalised address/port
+  metadata) and migrate `activated_at_olt_id` to a UUID FK once OLT inventory is canonicalised.
+  Out of scope for Wave 1.
 
 ### Downstream PR Impact
 - **PR-1** — New column:
@@ -363,7 +371,7 @@ Current pages at `/procurement/field-stock/`:
 | Probe | Key Finding | Downstream Value |
 |-------|-------------|------------------|
 | 0 — Migration version | `current_max = 361` | Wave 1 migration = **362** |
-| 1 — status CHECK values | 8 values; only `available`+`installed` have data; no `used` | PR-1 must preserve all 8 + add `pending_receive` |
+| 1 — status CHECK values | 8 values; only `available`+`installed` have data; no `used` | PR-1 must preserve all 8 + add `activated`, `in_repair`, `allocated_to_project` |
 | 2 — projects PK | `public.projects.id uuid NOT NULL` | FK: `REFERENCES projects(id)` (uuid) |
 | 3 — OLT identifier | No UUID FK; OLT = text `olt_name` in `oes_pp_data` | `activated_at_olt_id text` column |
 | 4 — GRN confirm path | `pages/api/procurement/grn-confirm.ts`; no `grn_lines`; serials in array | PR-6 extends grn-confirm to explode serial array → stock_serials rows |
