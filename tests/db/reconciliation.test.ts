@@ -90,7 +90,7 @@ describe('reconcile-serials CLI', () => {
         INSERT INTO stock_pickings
           (picking_number, picking_type, status,
            source_location_id, destination_location_id,
-           technician_id, contractor_id, contractor_name, done_at)
+           technician_id, contractor_id, contractor_name, signed_at)
         VALUES ('PICK-RECONCILE-' || substr(md5(random()::text), 1, 8),
                 'issue', 'done',
                 '10000000-0000-0000-0000-000000000001',

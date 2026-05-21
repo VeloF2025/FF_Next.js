@@ -35,7 +35,7 @@ describe('Trigger 1: stock_pickings status→done (issue branch)', () => {
         [pickId, STOCK_ITEM_ID, SERIAL_ID_1]);
 
       await pool.query(
-        `UPDATE stock_pickings SET status='done', done_at=NOW() WHERE id=$1`,
+        `UPDATE stock_pickings SET status='done', signed_at=NOW() WHERE id=$1`,
         [pickId]);
 
       const ev = await pool.query(`
@@ -82,7 +82,7 @@ describe('Trigger 1: stock_pickings status→done (transfer branch)', () => {
         [pickId, STOCK_ITEM_ID, SERIAL_ID_1]);
 
       await pool.query(
-        `UPDATE stock_pickings SET status='done', done_at=NOW() WHERE id=$1`,
+        `UPDATE stock_pickings SET status='done', signed_at=NOW() WHERE id=$1`,
         [pickId]);
 
       const ev = await pool.query(`
@@ -126,7 +126,7 @@ describe('Trigger 1: contractor_stock_accountability counter', () => {
         [pickId, STOCK_ITEM_ID, SERIAL_ID_1]);
 
       await pool.query(
-        `UPDATE stock_pickings SET status='done', done_at=NOW() WHERE id=$1`,
+        `UPDATE stock_pickings SET status='done', signed_at=NOW() WHERE id=$1`,
         [pickId]);
 
       const acc = await pool.query(`
@@ -167,7 +167,7 @@ describe('Trigger 1: no-downgrade guard', () => {
         [pickId, STOCK_ITEM_ID, SERIAL_ID_1]);
 
       await pool.query(
-        `UPDATE stock_pickings SET status='done', done_at=NOW() WHERE id=$1`,
+        `UPDATE stock_pickings SET status='done', signed_at=NOW() WHERE id=$1`,
         [pickId]);
 
       // Event was emitted (trigger ran), but status update was blocked by guard.

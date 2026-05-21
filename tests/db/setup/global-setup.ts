@@ -43,11 +43,17 @@ export async function setup() {
   //   Trigger 3 (oes_pp_data): olt_pon, created_at, md5-uuid for source_id.
   const triggerFix = await fs.readFile(path.join(process.cwd(),
     'scripts/migrations/sql/365_fix_qa_oes_triggers.sql'), 'utf8');
+  // Migration 366 (PR-8): fixes Trigger 1 (picking_done) against actual prod
+  // schema — replaces done_at (which doesn't exist) with COALESCE(signed_at,
+  // effective_date, approved_at, NOW()).
+  const triggerFix2 = await fs.readFile(path.join(process.cwd(),
+    'scripts/migrations/sql/366_fix_picking_trigger_done_at.sql'), 'utf8');
   const pool = new Pool({ connectionString: URL });
   await pool.query(seed);
   await pool.query(migration);
   await pool.query(triggers);
   await pool.query(triggerFix);
+  await pool.query(triggerFix2);
   await pool.end();
   process.env.DATABASE_URL_TEST = URL;
 }
