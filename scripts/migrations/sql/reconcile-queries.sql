@@ -17,6 +17,7 @@ WHERE a.asset_type IN ('ont', 'gizzu')
 -- @name issued_without_open_picking
 -- Tolerance: 100
 -- stock_serials in 'issued' state with no done picking that references them.
+-- Prod schema: stock_picking_lines.serial_ids UUID[] (UNNEST to compare).
 SELECT COUNT(*) AS drift_count
 FROM stock_serials ss
 WHERE ss.status = 'issued'
@@ -24,8 +25,8 @@ WHERE ss.status = 'issued'
     SELECT 1
     FROM   stock_picking_lines spl
     JOIN   stock_pickings      sp  ON sp.id = spl.picking_id
-    WHERE  spl.stock_serial_id = ss.id
-      AND  sp.status           = 'done'
+    WHERE  ss.id = ANY(spl.serial_ids)
+      AND  sp.status = 'done'
   );
 
 -- @name installed_serial_inconsistent_status
@@ -39,22 +40,50 @@ WHERE ss.installed_at_drop_id IS NOT NULL
 -- @name accountability_issued_counter_drift
 -- Tolerance: 0
 -- Contractor accountability counter differs from derived count from done pickings.
+-- Derived count = total number of serial_ids issued across all done pickings for
+-- that contractor (UNNEST the serial_ids array to count per-serial).
 -- Only checks contractors that have at least one done picking.
 SELECT COUNT(*) AS drift_count
 FROM (
   SELECT
     sp.contractor_id,
-    COALESCE(csa.total_issued_count, 0)                         AS stored_count,
-    COUNT(DISTINCT spl.id)::integer                              AS derived_count
+    COALESCE(csa.total_issued_count, 0)         AS stored_count,
+    COUNT(*)::integer                            AS derived_count
   FROM   stock_pickings           sp
   JOIN   stock_picking_lines      spl ON spl.picking_id = sp.id
-                                      AND spl.stock_serial_id IS NOT NULL
+                                      AND spl.serial_ids IS NOT NULL
+                                      AND array_length(spl.serial_ids, 1) > 0
+  JOIN   LATERAL unnest(spl.serial_ids) AS u(serial_id) ON TRUE
   LEFT   JOIN contractor_stock_accountability csa
            ON csa.contractor_id = sp.contractor_id
   WHERE  sp.status        = 'done'
     AND  sp.contractor_id IS NOT NULL
   GROUP  BY sp.contractor_id, csa.total_issued_count
-  HAVING COALESCE(csa.total_issued_count, 0) <> COUNT(DISTINCT spl.id)
+  HAVING COALESCE(csa.total_issued_count, 0) <> COUNT(*)
+) sub;
+
+-- @name accountability_returned_counter_drift
+-- Tolerance: 0
+-- Contractor accountability returned counter differs from derived count.
+-- Derived count = number of stock_return_lines where the parent stock_returns
+-- has status='accepted' (the workflow state at which a return is finalized
+-- per migration 029's status CHECK).
+-- Mirrors the _issued_ check's structure but operates on returns.
+SELECT COUNT(*) AS drift_count
+FROM (
+  SELECT
+    sr.contractor_id,
+    COALESCE(csa.total_returned_count, 0)        AS stored_count,
+    COUNT(*)::integer                             AS derived_count
+  FROM   stock_returns       sr
+  JOIN   stock_return_lines  srl ON srl.return_id = sr.id
+                                  AND srl.serial_id IS NOT NULL
+  LEFT   JOIN contractor_stock_accountability csa
+           ON csa.contractor_id = sr.contractor_id
+  WHERE  sr.status        = 'accepted'
+    AND  sr.contractor_id IS NOT NULL
+  GROUP  BY sr.contractor_id, csa.total_returned_count
+  HAVING COALESCE(csa.total_returned_count, 0) <> COUNT(*)
 ) sub;
 
 -- @name latest_event_matches_status

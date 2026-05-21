@@ -60,10 +60,18 @@ async function runChecks(
   const results: CheckResult[] = [];
 
   for (const check of checks) {
-    const r = await pool.query<{ drift_count: string }>(check.sql);
-    const drift = parseInt(r.rows[0]?.drift_count ?? '0', 10);
-    const passed = drift <= check.tolerance;
-    results.push({ name: check.name, tolerance: check.tolerance, drift, passed });
+    // Per-check try/catch — prepends the check name to any error so a single
+    // failing SQL doesn't crash the CLI without telling the operator which
+    // invariant blew up (CLI/reconcile reviewer Important #2).
+    try {
+      const r = await pool.query<{ drift_count: string }>(check.sql);
+      const drift = parseInt(r.rows[0]?.drift_count ?? '0', 10);
+      const passed = drift <= check.tolerance;
+      results.push({ name: check.name, tolerance: check.tolerance, drift, passed });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`reconcile check "${check.name}" failed to execute: ${message}`);
+    }
   }
 
   return results;
