@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { Pool } from 'pg';
 import { log } from '../src/lib/logger';
+import { BackfillResult } from './backfill-types';
 
 interface BackfillOptions {
   pool: Pool;
@@ -9,19 +10,28 @@ interface BackfillOptions {
   limit?: number;
 }
 
-export interface BackfillResult {
-  inserted: number;
-  wouldInsert: number;
-  skipped: number;
-}
-
 async function loadStockItemIds(pool: Pool, deviceTypes: string[]) {
   const r = await pool.query(
     `SELECT id, device_type FROM stock_items WHERE device_type = ANY($1::text[])`,
     [deviceTypes]);
   const byType = new Map<string, string>();
+  const seen = new Map<string, string[]>();
   for (const row of r.rows) {
-    if (!byType.has(row.device_type)) byType.set(row.device_type, row.id);
+    const arr = seen.get(row.device_type) ?? [];
+    arr.push(row.id);
+    seen.set(row.device_type, arr);
+  }
+  for (const [type, ids] of seen) {
+    if (ids.length > 1) {
+      log.error('backfill-assets: multiple stock_items share device_type — ambiguous mapping', {
+        device_type: type, candidate_ids: ids,
+      });
+      throw new Error(
+        `Ambiguous device_type "${type}" maps to ${ids.length} stock_items. ` +
+        `Resolve the duplication before running backfill.`
+      );
+    }
+    byType.set(type, ids[0]);
   }
   return byType;
 }
@@ -77,6 +87,10 @@ async function main() {
   const commit = args.includes('--commit');
   const limitIdx = args.indexOf('--limit');
   const limit = limitIdx >= 0 ? parseInt(args[limitIdx + 1], 10) : undefined;
+  if (limit !== undefined && !Number.isFinite(limit)) {
+    console.error('--limit must be a positive integer');
+    process.exit(1);
+  }
 
   const url = process.env.DATABASE_URL;
   if (!url) { console.error('DATABASE_URL not set'); process.exit(1); }

@@ -57,6 +57,9 @@ describe('Backfill A: assets → stock_serials', () => {
       const r = await pool.query(
         `SELECT COUNT(*) FROM stock_serials WHERE serial_number = 'SPL0000001'`);
       expect(Number(r.rows[0].count)).toBe(0);
-    } finally { await pool.end(); }
+    } finally {
+      await pool.query(`DELETE FROM assets WHERE serial_number = 'SPL0000001'`);
+      await pool.end();
+    }
   });
 });
