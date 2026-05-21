@@ -60,10 +60,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       ponFilter = `AND pon_no = $${params.length}`;
     }
 
+    // Default ships only approved poles (backward compat). include_unapproved=true
+    // lets Johan ZIP a PON mid-sweep so he can re-distribute uncategorised photos.
+    const includeUnapproved = req.query.include_unapproved === 'true';
+    const approvedFilter = includeUnapproved ? '' : 'AND approved_at IS NOT NULL';
+
     const result = await pool.query<PoleQaPhoto>(
       `SELECT * FROM pole_qa_photos
        WHERE project_id = $1::uuid
-         AND approved_at IS NOT NULL
+         ${approvedFilter}
          ${ponFilter}
        ORDER BY pole_label ASC`,
       params,
@@ -113,7 +118,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         if (buf) opticalFolder.file(`tray_${String(i + 1).padStart(2, '0')}.jpg`, buf);
       });
 
-      await Promise.all([...civilPromises, ...opticalPromises, ...trayPromises]);
+      // Unassigned bucket — photos that came in via QField sync or bulk upload
+      // but haven't been placed in a slot yet. Ship them in their own folder.
+      const unassignedKeys: string[] = Array.isArray(pole.unassigned_photo_keys)
+        ? pole.unassigned_photo_keys
+        : [];
+      const unassignedFolder = zip.folder(`${ponLabel}/${pole.pole_label}/unassigned`);
+      const unassignedPromises = unassignedFolder ? unassignedKeys.map(async (key, i) => {
+        const buf = await fetchPhoto(photoUrl(key), cookie);
+        if (buf) unassignedFolder.file(`photo_${String(i + 1).padStart(2, '0')}.jpg`, buf);
+      }) : [];
+
+      await Promise.all([...civilPromises, ...opticalPromises, ...trayPromises, ...unassignedPromises]);
     }
 
     const zipBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
