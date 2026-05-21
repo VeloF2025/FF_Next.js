@@ -309,18 +309,19 @@ export async function PUT(
       });
     }
 
-    // When ticket is resolved/closed, mark linked Data Sync records as resolved
-    if (body.status && ['resolved', 'closed'].includes(body.status)) {
+    // When ticket is resolved, mark linked Data Sync records as resolved.
+    // (Migration 364 removed the 'closed' status; 'resolved' is terminal.)
+    if (body.status === 'resolved') {
       markLinkedDataSyncResolved(ticketId)
         .catch(err => {
           logger.error('Data Sync resolution error', { ticketId, error: err.message });
         });
     }
 
-    // Bi-directional sync: propagate NOC status back to linked snag
-    // resolved → snag.status = 'fixed'; closed → snag.status = 'closed'
-    if (body.status && ['resolved', 'closed'].includes(body.status) && updatedTicket.source === 'snags') {
-      const snagStatus = body.status === 'resolved' ? 'fixed' : 'closed';
+    // Bi-directional sync: propagate NOC resolution back to linked snag
+    // (resolved → snag.status = 'fixed').
+    if (body.status === 'resolved' && updatedTicket.source === 'snags') {
+      const snagStatus = 'fixed';
       sql`
         UPDATE snags
         SET status = ${snagStatus}, updated_at = NOW()

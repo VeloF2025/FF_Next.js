@@ -73,7 +73,7 @@ const STATUS_GROUPS: { label: string; statuses: TicketStatus[]; color: string; b
   },
   {
     label: 'Resolved',
-    statuses: [TicketStatus.RESOLVED, TicketStatus.VERIFIED],
+    statuses: [TicketStatus.RESOLVED],
     color: 'text-green-400',
     bg: 'bg-green-500/10 border-green-500/20',
   },

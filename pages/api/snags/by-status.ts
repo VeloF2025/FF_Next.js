@@ -19,10 +19,14 @@ const STATUS_SQL_MAP: Record<string, { ticketStatuses: string[]; snagStatuses: s
   assigned:    { ticketStatuses: ['assigned'],                                                     snagStatuses: ['assigned'] },
   in_progress: { ticketStatuses: ['in_progress', 'qa_rejected'],                                   snagStatuses: ['in_progress'] },
   pending_qa:  { ticketStatuses: ['pending_qa', 'qa_in_progress'],                                 snagStatuses: ['pending_qa', 'fixed'] },
-  // Migration 364: ticket 'closed' was consolidated into 'resolved'.
+  // Migration 364: ticket 'closed' was consolidated into 'resolved'. The
+  // 'closed' bucket now matches only cancelled tickets (so cancelled work
+  // still has a home in the UI) plus snags whose own status is 'closed'.
+  // Resolved tickets stay in the resolved bucket — putting 'resolved' in
+  // both bucket arrays would double-count.
   resolved:    { ticketStatuses: ['qa_approved', 'pending_handover', 'handed_to_ops', 'resolved'], snagStatuses: ['resolved'] },
   verified:    { ticketStatuses: ['verified'],                                                     snagStatuses: ['verified'] },
-  closed:      { ticketStatuses: ['resolved', 'cancelled'],                                        snagStatuses: ['closed'] },
+  closed:      { ticketStatuses: ['cancelled'],                                                    snagStatuses: ['closed'] },
 };
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {

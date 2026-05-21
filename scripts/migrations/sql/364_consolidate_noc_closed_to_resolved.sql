@@ -12,6 +12,14 @@
 -- No CHECK constraint exists on maintenance_tickets.status, so no schema
 -- change is required.
 --
+-- Trigger handling: `calculate_resolution_time` fires on UPDATE and sets
+-- NEW.resolved_at := NOW() unconditionally when transitioning into
+-- 'resolved' — which would overwrite the original closure timestamp on
+-- every migrated row. We disable the trigger for the duration of the
+-- UPDATE, copy closed_at → resolved_at via COALESCE so historical
+-- timestamps survive, then re-enable. The trigger's dead 'closed' branch
+-- is removed at the end (no callers can produce that status anymore).
+--
 -- Idempotent: safe to re-run (no-op once the closed→resolved rewrite is done).
 
 BEGIN;
@@ -27,10 +35,33 @@ BEGIN
   RAISE NOTICE 'Migration 364: rewriting % maintenance_tickets rows from closed to resolved', closed_count;
 END $$;
 
+ALTER TABLE maintenance_tickets DISABLE TRIGGER trigger_calculate_resolution_time;
+
 UPDATE maintenance_tickets
    SET status = 'resolved',
-       status_changed_at = COALESCE(status_changed_at, NOW()),
+       resolved_at = COALESCE(resolved_at, closed_at, NOW()),
+       resolution_time = COALESCE(resolution_time, closed_at - created_at, NOW() - created_at),
+       status_changed_at = COALESCE(status_changed_at, closed_at, NOW()),
        updated_at = NOW()
  WHERE status = 'closed';
+
+ALTER TABLE maintenance_tickets ENABLE TRIGGER trigger_calculate_resolution_time;
+
+-- Drop the now-unreachable 'closed' branch from the resolution-time trigger.
+-- After this migration, no UPDATE can land on status='closed', so the branch
+-- is dead — and keeping it would mislead anyone reading the function later.
+CREATE OR REPLACE FUNCTION public.calculate_resolution_time()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $function$
+BEGIN
+  IF NEW.status = 'resolved' AND OLD.status != 'resolved' THEN
+    NEW.resolved_at := NOW();
+    NEW.resolution_time := NOW() - NEW.created_at;
+  END IF;
+
+  RETURN NEW;
+END;
+$function$;
 
 COMMIT;
