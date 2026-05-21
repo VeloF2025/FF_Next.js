@@ -21,9 +21,14 @@ sudo cp poll.py /opt/wa-mention-poller/poll.py
 sudo chmod +x /opt/wa-mention-poller/poll.py
 
 # 2. Environment file (matches WA_BRIDGE_SECRET on FibreFlow)
+# Point WEBHOOK_URL + SKIP_JIDS_URL at the same host (dev or production).
+# If SKIP_JIDS_URL is unreachable the poller falls back to an empty skip
+# set, which re-emits already-handled maintenance/dr_submission messages
+# (idempotent on the FF side, but wasted work).
 sudo tee /etc/wa-mention-poller.env >/dev/null <<'EOF'
 WA_BRIDGE_SECRET=<paste matching secret>
 WEBHOOK_URL=https://dev.fibreflow.app/api/noc/wa-message
+SKIP_JIDS_URL=https://dev.fibreflow.app/api/noc/wa-monitored-groups?types=maintenance,dr_submission
 EOF
 sudo chmod 600 /etc/wa-mention-poller.env
 
