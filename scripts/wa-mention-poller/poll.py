@@ -78,6 +78,9 @@ def fetch_new_messages(since: datetime) -> list[dict]:
     conn = sqlite3.connect(f'file:{BRIDGE_DB_PATH}?mode=ro', uri=True)
     conn.row_factory = sqlite3.Row
     try:
+        # Bridge stores timestamps with a space separator ('2026-05-21 15:01:25+00:00'),
+        # not 'T'. Lexical comparison breaks if cursor uses 'T' because 'T' > ' '
+        # (ASCII 84 vs 32), making every row "older" than the cursor.
         rows = conn.execute(
             """
             SELECT id, chat_jid, sender, content, timestamp, is_from_me,
@@ -86,7 +89,7 @@ def fetch_new_messages(since: datetime) -> list[dict]:
             WHERE timestamp > ?
             ORDER BY timestamp ASC
             """,
-            (since.isoformat(),),
+            (since.isoformat().replace('T', ' '),),
         ).fetchall()
     finally:
         conn.close()
