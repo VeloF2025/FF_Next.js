@@ -4,9 +4,11 @@
 
 **Goal:** Rebuild the `/procurement/field-stock/*` admin UI as a serial-centric surface over the Wave-1 master register, with master search, lifecycle timeline, reconciliation drift, dashboard tiles, and per-warehouse/per-project drill-downs.
 
-**Architecture:** Three reusable React components (`<SerialSearch>`, `<SerialTimeline>`, `<ReconciliationReport>`) shipped first (PR-7) and consumed by 8 page PRs (PR-8 through PR-15). Each page PR is independently deployable, rebuilds at most one canonical path, and ships its `/legacy/` re-mount in the same commit so revert is a single `git revert`. PR-15 (accountability) merges last because counter logic is the highest-blast-radius surface and gets a `/review-team` blind review.
+**Architecture:** Three reusable React components (`<SerialSearch>`, `<SerialTimeline>`, `<ReconciliationReport>`) shipped first (PR-7) and consumed by 8 page PRs (PR-8 through PR-15). Each page PR is independently deployable. **Rebuild PRs (PR-10 and PR-11 only)** replace one existing canonical path and ship a `/legacy/` re-mount in the same commit so revert is a single `git revert`. **Greenfield PRs (PR-8, PR-9, PR-12, PR-13, PR-14, PR-15)** add new routes only — revert simply removes them; no legacy re-mount needed. PR-15 (accountability) merges last because counter logic is the highest-blast-radius surface and gets a `/review-team` blind review.
 
 **Tech Stack:** Next.js Pages Router (no App Router), TypeScript strict, Postgres (Supabase pooler `100.96.203.105:5436`), `pg.Pool` via `@/lib/db-pool` for new code (Neon-shim only in pre-existing `lib/db/pool.js`), Vitest + docker-compose Postgres for real-DB tests, Tailwind for UI, lucide-react for icons, `@/lib/apiResponse` envelope for every API.
+
+**Spec reference:** all `spec lines NNN-MMM` citations in this plan refer to `docs/superpowers/specs/2026-05-21-serial-master-register-design.md` (the design doc this plan implements). When an agent reads "spec lines 172-194" below, open that file at those line numbers.
 
 ---
 
@@ -15,15 +17,16 @@
 | # | Decision | Source |
 |---|---|---|
 | 1 | Persona = procurement admins/managers. Desktop. `/stock/portal` and `/my/stores/*` are out of scope. | Grill 2026-05-21 Q1 |
-| 2 | Cutover = hard per-PR. Each PR ships its `/legacy/` re-mount in the same commit. Revert = `git revert <merge-sha>` + redeploy. | Grill Q2 |
+| 2 | Cutover = hard per-PR. **Rebuild PRs (PR-10, PR-11)** ship a `/legacy/` re-mount in the same commit; **greenfield PRs (PR-8, PR-9, PR-12-15)** ship only the new route. Revert in both cases = `git revert <merge-sha>` + redeploy. | Grill Q2 |
 | 3 | `<SerialTimeline>` ships with no pagination in PR-7. PR-9 adds `LIMIT 50 + Load more` if data volume warrants. | Self-resolved (only 66 serials have any event today, all single-event) |
 | 4 | Reconciliation "resolve" emits a `note_added` event only — never mutates `stock_serials.status`. State changes go through the separate force-state-correction admin action in PR-9. | Spec line 309 + Grill |
 | 5 | PR-15 merges LAST. | Grill Q6 |
 | 6 | PR-8 through PR-14 are parallelizable across multiple agent tracks once PR-7 lands and has ≥1 consumer in `__tests__/`. | Grill Q6 |
 | 7 | All field-stock API endpoints use `withAuth` (main app `ff_auth_token`). No changes to auth surface in Wave 2. | Spec + audit |
 | 8 | Existing `pages/stock/portal.tsx` (storeman mobile counter UI) MUST keep working through the entire Wave 2. Not touched. | Grill Q1 |
-| 9 | Existing `pages/procurement/field-stock/{index,reconciliation}.tsx` and `pages/procurement/field-stock/pickings/[pickingId].tsx` are the **only** existing pages — most Wave-2 PRs create *new* pages, only PR-10 / PR-11 / PR-14 trigger the `/legacy/` re-mount. | Repo inspection 2026-05-21 |
+| 9 | Existing `pages/procurement/field-stock/{index,reconciliation}.tsx` and `pages/procurement/field-stock/pickings/[pickingId].tsx` are the **only** existing pages. Only PR-10 (index → `legacy/index.tsx`) and PR-11 (reconciliation → `legacy/reconciliation.tsx`) trigger the `/legacy/` re-mount. PR-14 does NOT re-mount: `pickings/[pickingId].tsx` stays canonical (PR-14 only adds new sibling `pickings.tsx` event-filter view). All other Wave-2 PRs create new pages with no canonical to displace. | Repo inspection 2026-05-21 |
 | 10 | `event_type` column on `stock_serial_events` has no CHECK constraint — adding a new event type is code-only, no migration. | Spec line 196 |
+| 11 | **ModuleNav tab state lives in `src/components/layout/FieldStockModuleNav.tsx`, not `pages/.../index.tsx`.** PR-10 creates the shared component with all tabs declared (some `disabled: true`). PR-12/13/14/15 each flip exactly one tab's `disabled` flag on a separate line — git's auto-merge handles non-overlapping line edits cleanly. If two parallel PRs target the *same* tab line, second-merger rebases (≤2-line conflict, trivial). **No PR may inline tab state in `index.tsx`.** | Concurrency review of parallel PR-12/13/14/15 |
 
 ---
 
@@ -35,7 +38,7 @@ These MUST be true before PR-7 enters the queue. Verify in the PR description.
 - [ ] **`reconcile-serials` exits 0** against prod (all 6 checks at drift=0).
 - [ ] **`npm run ci:quick` clean** on origin/master.
 - [ ] **Lint ratchet baselines unchanged** — 77 errors / ~1833 warnings / 94 catches per `.claude/memory/feedback_local_ci_pipeline.md`.
-- [ ] **Direct port 5437 auth issue investigated or worked-around documented.** Plans that run psql use 5436 (pooler).
+- [ ] **Direct port 5437 auth issue investigated or worked-around documented.** Plans that run psql use 5436 (pooler). Pooler credentials (`PG_USER`, `PG_PASS`, etc.) are read from `.claude/credentials.local.md` — never inline credentials in this plan or in commits. Probe commands use `$PG_USER` / `$PGPASSWORD` env vars only.
 
 ---
 
@@ -77,7 +80,7 @@ src/components/field-stock/
 ├── ReconciliationReport.types.ts    (≤50 lines)
 ├── StatusBadge.tsx                  (≤80 lines)
 ├── EventIcon.tsx                    (≤80 lines)
-├── statusVocabulary.ts              (≤60 lines)  ← 12-state → label/colour map
+├── statusVocabulary.ts              (≤60 lines)  ← 11-state → label/colour map (10 active + 1 terminal 'scrapped')
 ├── eventVocabulary.ts               (≤80 lines)  ← event_type → label/icon/colour map
 └── __tests__/
     ├── SerialSearch.test.tsx
@@ -103,20 +106,18 @@ pages/procurement/field-stock/
 ├── items.tsx                          PR-15 new
 ├── locations.tsx                      PR-15 new
 └── legacy/
-    ├── index.tsx                      PR-10
-    ├── reconciliation.tsx             PR-11
-    └── pickings/[pickingId].tsx       PR-14 (only if rebuilt; otherwise stays canonical)
+    ├── index.tsx                      PR-10 (canonical index → legacy on cutover)
+    └── reconciliation.tsx             PR-11 (canonical reconciliation → legacy on cutover)
+    # NOTE: pickings/[pickingId].tsx STAYS CANONICAL — no legacy re-mount in PR-14.
 
 pages/api/procurement/field-stock/
 ├── serials/
-│   ├── search.ts                      PR-8  new (extends existing serials.ts? — task in PR-8)
-│   └── [serial]/
-│       ├── timeline.ts                PR-9  new
-│       └── force-correct.ts           PR-9  new
+│   └── search.ts                      PR-8  new (extends existing serials.ts? — task in PR-8)
+├── serial-timeline.ts                 PR-9  new (FLAT — accepts ?serial=<n> per CLAUDE.md "no nested dynamic routes")
+├── serial-force-correct.ts            PR-9  new (FLAT — accepts ?serial=<n> per CLAUDE.md "no nested dynamic routes")
 ├── dashboard.ts                       PR-10 modify (exists)
-├── reconciliation/
-│   ├── list.ts                        PR-11 new
-│   └── resolve.ts                     PR-11 new
+├── reconciliation-list.ts             PR-11 new (FLAT)
+├── reconciliation-resolve.ts          PR-11 new (FLAT)
 ├── warehouses/
 │   ├── index.ts                       PR-12 new
 │   └── [warehouseId].ts               PR-12 new
@@ -181,7 +182,7 @@ Creates the three reusable embedded components (`<SerialSearch>`, `<SerialTimeli
 
 - [ ] **Task 1 — Status + event vocabularies (no UI yet)**
 
-Define the 12-state vocabulary and event-type vocabulary as pure data. These are imported by every Wave-2 component and page.
+Define the 11-state vocabulary (10 active states + the terminal `scrapped`) and the event-type vocabulary as pure data. These are imported by every Wave-2 component and page.
 
 `src/components/field-stock/statusVocabulary.ts`:
 
@@ -212,7 +213,33 @@ export const STATUS_VOCABULARY: Record<SerialStatus, StatusMeta> = {
 };
 ```
 
-`src/components/field-stock/eventVocabulary.ts`: same shape, keyed on event_type strings per spec lines 172-194.
+`src/components/field-stock/eventVocabulary.ts`: same shape, keyed on event_type strings. The 21 initial event types (extensible via code; `event_type` column has no CHECK constraint per Decision #10):
+
+```ts
+export type SerialEventType =
+  | 'received_at_dc' | 'imported_from_excel' | 'imported_from_assets'
+  | 'reserved' | 'unreserved'
+  | 'allocated_to_project' | 'unallocated'
+  | 'transferred'
+  | 'issued'
+  | 'installed_at_drop'
+  | 'activated' | 'deactivated'
+  | 'returned' | 'inspected' | 'restocked' | 'sent_to_repair' | 'scrapped'
+  | 'repaired'
+  | 'flagged_faulty' | 'unflagged_faulty'
+  | 'force_state_correction';
+
+export interface EventMeta {
+  label: string;
+  icon: string;        // lucide-react icon name
+  colour: 'gray' | 'blue' | 'amber' | 'green' | 'red' | 'purple';
+}
+
+export const EVENT_VOCABULARY: Record<SerialEventType, EventMeta> = {
+  // 21 entries — one per event type above. Implementer chooses icon names from lucide-react.
+  // Source of truth for from→to transitions: docs/superpowers/specs/2026-05-21-serial-master-register-design.md §"Event type vocabulary" (spec lines 172-194 in that file).
+};
+```
 
 Commit: `feat(field-stock): add status + event vocabularies for Wave 2 UI`
 
@@ -244,11 +271,11 @@ describe('<StatusBadge>', () => {
 
 Run: `npm test -- src/components/field-stock/__tests__/StatusBadge.test.tsx`. Expect 5/5 pass.
 
-Commit: `feat(field-stock): <StatusBadge> with 12-state vocabulary`
+Commit: `feat(field-stock): <StatusBadge> with 11-state vocabulary`
 
 - [ ] **Task 3 — `<EventIcon>` + test**
 
-Same pattern as `<StatusBadge>` but mapping `event_type` → lucide icon + colour. Render all spec event types (per spec lines 172-194). Add a `data-event-type` attribute for test selectors.
+Same pattern as `<StatusBadge>` but mapping `event_type` → lucide icon + colour. Render all 21 event types from `EVENT_VOCABULARY` (defined in Task 1 above; source of truth `docs/superpowers/specs/2026-05-21-serial-master-register-design.md` §"Event type vocabulary"). Add a `data-event-type` attribute for test selectors.
 
 Commit: `feat(field-stock): <EventIcon> for event-type vocabulary`
 
@@ -356,7 +383,7 @@ export interface DriftRow {
   check_name: string;              // e.g. 'accountability_issued_counter_drift'
   drift_count: number;
   tolerance: number;
-  sample_rows?: Record<string, unknown>[];  // up to 10 sample drift records, supplied by /api/.../reconciliation/list
+  sample_rows?: Record<string, unknown>[];  // up to 10 sample drift records, supplied by /api/procurement/field-stock/reconciliation-list
 }
 
 export interface ReconciliationReportProps {
@@ -366,7 +393,7 @@ export interface ReconciliationReportProps {
 }
 ```
 
-Three sections per spec lines 301-309: cross-source disagreements, orphans, accountability counter drift. Section assignment is data-driven (`check_name` prefix routes to a section). "Mark as resolved" modal: free-text reason, posts via `onResolve`. Non-admin users see the data but not the resolve button.
+Three sections per spec §"Reconciliation report" (`docs/superpowers/specs/2026-05-21-serial-master-register-design.md` lines 301-309): cross-source disagreements, orphans, accountability counter drift. Section assignment is data-driven (`check_name` prefix routes to a section). "Mark as resolved" modal: free-text reason, posts via `onResolve`. Non-admin users see the data but not the resolve button.
 
 Tests: section grouping, resolve modal opens/closes, onResolve is called with reason, non-admin hides resolve buttons.
 
@@ -398,7 +425,7 @@ gh pr create --title "feat(field-stock): Wave 2 PR-7 shared components" --body "
 - Dev demo at /dev/field-stock-components (not nav-linked)
 
 ## Test plan
-- [x] npm test -- src/components/field-stock — 28/28 pass
+- [x] npm test -- src/components/field-stock — 42/42 pass (5 StatusBadge + 22 EventIcon + 6 SerialSearch + 5 SerialTimeline + 4 ReconciliationReport)
 - [x] npm run ci:quick clean
 - [x] Browser smoke: screenshots attached
 - [x] reconcile-serials drift=0 (output attached)
@@ -413,7 +440,7 @@ EOF
 | File | Layer | Notes |
 |---|---|---|
 | `src/components/field-stock/__tests__/StatusBadge.test.tsx` | Unit (Vitest + Testing Library) | 5 test cases per status vocabulary |
-| `src/components/field-stock/__tests__/EventIcon.test.tsx` | Unit | One case per event-type |
+| `src/components/field-stock/__tests__/EventIcon.test.tsx` | Unit | 21 cases (one per event-type in `EVENT_VOCABULARY`) + 1 unknown-type throw = 22 |
 | `src/components/field-stock/__tests__/SerialSearch.test.tsx` | Unit | 6 cases (debounce, render, filters, callbacks, empty) |
 | `src/components/field-stock/__tests__/SerialTimeline.test.tsx` | Unit | 5 cases (header, rows, payload toggle, empty, render-prop) |
 | `src/components/field-stock/__tests__/ReconciliationReport.test.tsx` | Unit | 4 cases (grouping, resolve modal, callback, admin-gating) |
@@ -429,7 +456,7 @@ EOF
 ### Acceptance criteria
 
 - Five components exist at the file paths above.
-- All 28 unit tests pass.
+- All 42 unit tests pass.
 - `npm run ci:quick` clean.
 - `reconcile-serials` exits 0 (no regression from data-layer state).
 - Dev demo page renders all three composite components with no errors in console.
@@ -654,10 +681,10 @@ Creates `/procurement/field-stock/serials/[serial]` (detail/timeline) + the admi
 | File | Action | Budget |
 |---|---|---|
 | `pages/procurement/field-stock/serials/[serial].tsx` | Create | ≤200 lines |
-| `pages/api/procurement/field-stock/serials/[serial]/timeline.ts` | Create | ≤180 lines |
-| `pages/api/procurement/field-stock/serials/[serial]/force-correct.ts` | Create | ≤200 lines |
-| `pages/api/procurement/field-stock/serials/[serial]/__tests__/timeline.test.ts` | Create | ≤200 lines |
-| `pages/api/procurement/field-stock/serials/[serial]/__tests__/force-correct.test.ts` | Create | ≤250 lines |
+| `pages/api/procurement/field-stock/serial-timeline.ts` | Create | ≤180 lines |
+| `pages/api/procurement/field-stock/serial-force-correct.ts` | Create | ≤200 lines |
+| `pages/api/procurement/field-stock/__tests__/serial-timeline.test.ts` | Create | ≤200 lines |
+| `pages/api/procurement/field-stock/__tests__/serial-force-correct.test.ts` | Create | ≤250 lines |
 | `tests/pages/procurement/field-stock/serials/[serial].test.tsx` | Create | ≤180 lines |
 | `scripts/migrations/sql/<NNN>_force_state_correction_event.sql` | Create only if needed | ≤30 lines |
 | `scripts/migrations/sql/rollback_<NNN>_force_state_correction_event.sql` | Same | ≤10 lines |
@@ -667,7 +694,8 @@ Creates `/procurement/field-stock/serials/[serial]` (detail/timeline) + the admi
 - [ ] **Task 1 — Probe: is a migration needed for `force_state_correction`?**
 
 ```bash
-PGPASSWORD=$PG_PASS psql -h 100.96.203.105 -p 5436 -U postgres.ironman-platform -d fibreflow -c "\d stock_serial_events"
+# Credentials sourced from .claude/credentials.local.md — do NOT inline.
+PGPASSWORD=$PG_PASS psql -h 100.96.203.105 -p 5436 -U "$PG_USER" -d fibreflow -c "\d stock_serial_events"
 ```
 
 If `event_type` has no CHECK and no enum, no migration needed; the event-type vocabulary in `eventVocabulary.ts` (PR-7) just gets a new entry.
@@ -676,12 +704,12 @@ If there IS a CHECK, add the migration: pick version via `SELECT MAX(version) FR
 
 Document the probe result in the PR body.
 
-- [ ] **Task 2 — `timeline.ts` failing test**
+- [ ] **Task 2 — `serial-timeline.ts` failing test**
 
-`pages/api/procurement/field-stock/serials/[serial]/__tests__/timeline.test.ts`:
+`pages/api/procurement/field-stock/__tests__/serial-timeline.test.ts`:
 
 ```ts
-describe('GET /api/procurement/field-stock/serials/[serial]/timeline', () => {
+describe('GET /api/procurement/field-stock/serial-timeline?serial=<n>', () => {
   it('returns header + ordered events (newest first) for a known serial', async () => { /* ... */ });
   it('returns 404 for an unknown serial', async () => { /* ... */ });
   it('returns LIMIT 50 + nextOffset when serial has >50 events', async () => { /* ... */ });
@@ -692,20 +720,20 @@ describe('GET /api/procurement/field-stock/serials/[serial]/timeline', () => {
 
 Run, expect 5/5 fail.
 
-- [ ] **Task 3 — Implement `timeline.ts`**
+- [ ] **Task 3 — Implement `serial-timeline.ts`**
 
-SQL: lookup serial by `serial_number` → return header (`stock_serials.* JOIN stock_locations`) + events (`stock_serial_events WHERE serial_id = $1 ORDER BY occurred_at DESC LIMIT 50 OFFSET $2`). Include `actor_name` via JOIN to `staff` or `users` based on which actor column is populated.
+Read `serial` from `req.query` (string). SQL: lookup serial by `serial_number` → return header (`stock_serials.* JOIN stock_locations`) + events (`stock_serial_events WHERE serial_id = $1 ORDER BY occurred_at DESC LIMIT 50 OFFSET $2`). Include `actor_name` via JOIN to `staff` or `users` based on which actor column is populated.
 
 Run tests, watch them pass.
 
-- [ ] **Task 4 — `force-correct.ts` failing test**
+- [ ] **Task 4 — `serial-force-correct.ts` failing test**
 
-`pages/api/procurement/field-stock/serials/[serial]/__tests__/force-correct.test.ts`:
+`pages/api/procurement/field-stock/__tests__/serial-force-correct.test.ts`:
 
 ```ts
-describe('POST /api/procurement/field-stock/serials/[serial]/force-correct', () => {
+describe('POST /api/procurement/field-stock/serial-force-correct', () => {
   it('updates stock_serials.status + emits a force_state_correction event', async () => {
-    // POST { from: 'issued', to: 'available', reason: 'physical recount' }
+    // POST { serial: '<n>', from: 'issued', to: 'available', reason: 'physical recount' }
     // expect 200, stock_serials.status === 'available', new event row exists
   });
   it('400 if reason is empty or <10 chars', async () => { /* ... */ });
@@ -719,9 +747,9 @@ describe('POST /api/procurement/field-stock/serials/[serial]/force-correct', () 
 
 Run, expect 5/5 fail.
 
-- [ ] **Task 5 — Implement `force-correct.ts`**
+- [ ] **Task 5 — Implement `serial-force-correct.ts`**
 
-Within a single transaction:
+Read `serial` from `req.body` (POST JSON body). Within a single transaction:
 1. `SELECT FOR UPDATE` on `stock_serials WHERE serial_number = $1`
 2. Verify `current.status === body.from` (optimistic lock)
 3. `INSERT INTO stock_serial_events` with `event_type='force_state_correction'`, `from_state=body.from`, `to_state=body.to`, `actor_user_id=user.id`, `payload={reason: body.reason}`
@@ -741,7 +769,7 @@ Run tests, watch them pass.
 ```tsx
 // Pseudocode contract
 function SerialDetailPage() {
-  const { data, isLoading } = useSWR(`/api/.../timeline`, fetcher);
+  const { data, isLoading } = useSWR(`/api/procurement/field-stock/serial-timeline?serial=${router.query.serial}`, fetcher);
   const user = useAuth();
   return (
     <AppLayout>
@@ -783,8 +811,8 @@ Smoke per "Browser smoke" below. PR body must include before/after screenshots o
 
 | File | Layer | Cases |
 |---|---|---|
-| `pages/api/.../timeline.test.ts` | API integration | 5 |
-| `pages/api/.../force-correct.test.ts` | API integration | 5 |
+| `pages/api/procurement/field-stock/__tests__/serial-timeline.test.ts` | API integration | 5 |
+| `pages/api/procurement/field-stock/__tests__/serial-force-correct.test.ts` | API integration | 5 |
 | `tests/pages/.../[serial].test.tsx` | Component integration | 4 |
 
 ### Browser smoke
@@ -813,7 +841,7 @@ Smoke per "Browser smoke" below. PR body must include before/after screenshots o
 
 ### Scope
 
-Rebuilds `/procurement/field-stock` (the dashboard) using the new tile vocabulary from spec lines 311-318. Moves the existing `pages/procurement/field-stock/index.tsx` to `pages/procurement/field-stock/legacy/index.tsx` AND updates `pages/api/procurement/field-stock/dashboard.ts` response shape to feed the new tiles.
+Rebuilds `/procurement/field-stock` (the dashboard) using the new tile vocabulary from spec §"Dashboard tiles" (`docs/superpowers/specs/2026-05-21-serial-master-register-design.md` lines 311-318). Moves the existing `pages/procurement/field-stock/index.tsx` to `pages/procurement/field-stock/legacy/index.tsx` AND updates `pages/api/procurement/field-stock/dashboard.ts` response shape to feed the new tiles.
 
 ### Files
 
@@ -823,6 +851,7 @@ Rebuilds `/procurement/field-stock` (the dashboard) using the new tile vocabular
 | `pages/procurement/field-stock/legacy/index.tsx` | Create (moved from above) | (unchanged) |
 | `pages/api/procurement/field-stock/dashboard.ts` | Modify (extend response shape) | ≤250 lines |
 | `pages/api/procurement/field-stock/__tests__/dashboard.test.ts` | Create | ≤250 lines |
+| `src/components/layout/FieldStockModuleNav.tsx` | Create (shared tab state, per Decision #11) | ≤120 lines |
 | `tests/pages/procurement/field-stock/index.test.tsx` | Create | ≤150 lines |
 
 ### Tasks
@@ -888,11 +917,15 @@ Performance budget: <500ms p50 on the production corpus. If it exceeds budget, s
 
 `pages/procurement/field-stock/index.tsx`: 5 tiles + 1 donut chart. Donut via `recharts` (existing dep). Each tile is a `<Card>` with click-through to filtered view.
 
-- [ ] **Task 5 — Add ModuleNav per project rule**
+- [ ] **Task 5 — Add ModuleNav per project rule (in dedicated component, not inline)**
 
-Per `feedback_module_nav.md`, multi-page modules use ModuleNav horizontal tab bar. This dashboard IS the module landing — surface the tab bar pointing at: Dashboard (active) | Serials | Pickings | Movements | Returns | Reconciliation | Accountability | Warehouses | Projects.
+Per `feedback_module_nav.md`, multi-page modules use ModuleNav horizontal tab bar. Per Decision #11, the tab state must live in `src/components/layout/FieldStockModuleNav.tsx` (NEW file in this PR, ≤120 lines) — NOT inline in `pages/.../index.tsx`. The dashboard mounts the component; downstream PR-12/13/14/15 flip individual `disabled` flags on isolated lines, which git's auto-merge handles cleanly across parallel branches.
 
-Some tabs route to pages that don't exist yet (PR-12, PR-13, PR-14). Leave them as `disabled` or `coming soon` until those PRs land. Track this debt in the PR body so PR-12/13/14 know to flip the flag.
+Tabs (in this order): Dashboard (active) | Serials | Pickings | Movements | Returns | Reconciliation | Accountability | Warehouses | Projects.
+
+Some tabs route to pages that don't exist yet (PR-12, PR-13, PR-14, PR-15). Their entries are declared with `disabled: true` and a `// PR-XX flips this` comment on the same line so parallel PRs can locate their flip target instantly. Track this debt in the PR body so PR-12/13/14/15 know which line to edit.
+
+File budget added to the table below: `src/components/layout/FieldStockModuleNav.tsx` ≤120 lines.
 
 - [ ] **Task 6 — Page integration test**
 
@@ -909,7 +942,7 @@ it('renders ModuleNav with the right tabs (some disabled)', async () => { /* ...
 1. `dev.fibreflow.app/procurement/field-stock` → new dashboard renders within 1.5s
 2. Old `/procurement/field-stock/legacy` route still serves the old page (verify revert path works)
 3. Each tile click navigates to the right child route (or "coming soon" for disabled tabs)
-4. Donut shows the 11 active states with proportional slices
+4. Donut shows the 10 active states (terminal `scrapped` excluded by SQL `WHERE status NOT IN ('scrapped')`) with proportional slices
 5. `reconcile-serials` drift=0
 
 - [ ] **Task 8 — PR**
@@ -934,7 +967,7 @@ Body: before/after screenshots, mention `/legacy/` re-mount for revert, paste `d
 
 ### Scope
 
-Rebuilds `/procurement/field-stock/reconciliation` using `<ReconciliationReport>`. Adds `/api/.../reconciliation/list.ts` and `/api/.../reconciliation/resolve.ts`. Resolve emits a `note_added` event only — no status mutation (Decision #4).
+Rebuilds `/procurement/field-stock/reconciliation` using `<ReconciliationReport>`. Adds `/api/procurement/field-stock/reconciliation-list.ts` and `/api/procurement/field-stock/reconciliation-resolve.ts` (FLAT paths per CLAUDE.md). Resolve emits a `note_added` event only — no status mutation (Decision #4).
 
 ### Files
 
@@ -942,10 +975,12 @@ Rebuilds `/procurement/field-stock/reconciliation` using `<ReconciliationReport>
 |---|---|---|
 | `pages/procurement/field-stock/reconciliation.tsx` | Replace | ≤180 lines |
 | `pages/procurement/field-stock/legacy/reconciliation.tsx` | Create (moved) | (unchanged) |
-| `pages/api/procurement/field-stock/reconciliation/list.ts` | Create | ≤250 lines |
-| `pages/api/procurement/field-stock/reconciliation/resolve.ts` | Create | ≤180 lines |
-| `pages/api/procurement/field-stock/reconciliation/__tests__/list.test.ts` | Create | ≤200 lines |
-| `pages/api/procurement/field-stock/reconciliation/__tests__/resolve.test.ts` | Create | ≤200 lines |
+| `pages/api/procurement/field-stock/reconciliation-list.ts` | Create (FLAT path per CLAUDE.md) | ≤250 lines |
+| `pages/api/procurement/field-stock/reconciliation-resolve.ts` | Create (FLAT path per CLAUDE.md) | ≤180 lines |
+| `pages/api/procurement/field-stock/__tests__/reconciliation-list.test.ts` | Create | ≤200 lines |
+| `pages/api/procurement/field-stock/__tests__/reconciliation-resolve.test.ts` | Create | ≤200 lines |
+| `scripts/reconcile-parse.ts` | Create (extracted shared util — `parseChecks` is currently private in `scripts/reconcile-serials.ts:24`) | ≤80 lines |
+| `scripts/migrations/sql/reconcile-sample-queries.sql` | Create (companion to existing `reconcile-queries.sql` — same `@name` markers, SELECT concrete rows instead of counts) | ≤250 lines |
 | `tests/pages/procurement/field-stock/reconciliation.test.tsx` | Create | ≤150 lines |
 
 ### Tasks
@@ -957,10 +992,10 @@ git mv pages/procurement/field-stock/reconciliation.tsx pages/procurement/field-
 touch pages/procurement/field-stock/reconciliation.tsx
 ```
 
-- [ ] **Task 2 — `list.ts` failing test**
+- [ ] **Task 2 — `reconciliation-list.ts` failing test**
 
 ```ts
-describe('GET /api/procurement/field-stock/reconciliation/list', () => {
+describe('GET /api/procurement/field-stock/reconciliation-list', () => {
   it('returns one DriftRow per check from reconcile-queries.sql', async () => {
     // expect 6 rows: assets_without_serial, ..., latest_event_matches_status
   });
@@ -969,17 +1004,26 @@ describe('GET /api/procurement/field-stock/reconciliation/list', () => {
 });
 ```
 
-- [ ] **Task 3 — Implement `list.ts`**
+- [ ] **Task 3 — Extract shared parser + implement `reconciliation-list.ts`**
 
-Strategy: re-use `scripts/migrations/sql/reconcile-queries.sql` (the file the CLI reads). Parse the named checks via the same regex the CLI uses (`scripts/reconcile-serials.ts:parseChecks`). For each check, run the COUNT query AND additionally a sample-row query (top 10).
+`parseChecks` in `scripts/reconcile-serials.ts:24` is currently a **private** (non-exported) function. The API route cannot import it as-is. First refactor:
 
-Sample-row queries: write a second `reconcile-sample-queries.sql` file alongside the main one, with matching `@name` markers but selecting concrete rows instead of counts. This keeps the CLI single-purpose and lets the UI surface deeper detail.
+1. Create `scripts/reconcile-parse.ts` containing the lifted `parseChecks` (now `export function parseChecks(source: string): CheckSpec[]`) plus the `CheckSpec` type.
+2. Update `scripts/reconcile-serials.ts` to `import { parseChecks } from './reconcile-parse';` and remove the local definition. Verify the CLI still passes (`npx tsx scripts/reconcile-serials.ts` → drift=0).
+3. Create the companion SQL file `scripts/migrations/sql/reconcile-sample-queries.sql` — same `@name` markers as `reconcile-queries.sql`, but each query SELECTs concrete drift rows (LIMIT 10) instead of COUNT. The marker set must be a 1:1 superset, asserted by a test.
+
+Then implement the endpoint. Read the SQL files via `fs.readFileSync` (Next.js Pages Router serverless function — `process.cwd()` is the repo root):
 
 ```ts
 // Skeleton
+import { parseChecks } from '@/scripts/reconcile-parse';
+import fs from 'fs';
+import path from 'path';
+
 async function listDrift(): Promise<DriftRow[]> {
-  const checks = parseChecksFromSqlFile('scripts/migrations/sql/reconcile-queries.sql');
-  const samples = parseChecksFromSqlFile('scripts/migrations/sql/reconcile-sample-queries.sql');
+  const root = process.cwd();
+  const checks = parseChecks(fs.readFileSync(path.join(root, 'scripts/migrations/sql/reconcile-queries.sql'), 'utf8'));
+  const samples = parseChecks(fs.readFileSync(path.join(root, 'scripts/migrations/sql/reconcile-sample-queries.sql'), 'utf8'));
   return Promise.all(checks.map(async (c) => ({
     check_name: c.name,
     drift_count: parseInt((await pool.query(c.sql)).rows[0].drift_count),
@@ -989,10 +1033,12 @@ async function listDrift(): Promise<DriftRow[]> {
 }
 ```
 
-- [ ] **Task 4 — `resolve.ts` failing test**
+**Note on the import path:** if `@/scripts/*` is not in `tsconfig.json` `paths`, use a relative import (`../../../../scripts/reconcile-parse`) or extend `tsconfig.json` paths in the same PR. Decide in Task 3 based on existing convention.
+
+- [ ] **Task 4 — `reconciliation-resolve.ts` failing test**
 
 ```ts
-describe('POST /api/procurement/field-stock/reconciliation/resolve', () => {
+describe('POST /api/procurement/field-stock/reconciliation-resolve', () => {
   it('emits a note_added event with the supplied reason', async () => { /* ... */ });
   it('does NOT mutate stock_serials.status', async () => {
     // POST resolve, then SELECT status FROM stock_serials WHERE id = $1
@@ -1006,13 +1052,15 @@ describe('POST /api/procurement/field-stock/reconciliation/resolve', () => {
 
 The idempotency rule: a drift row is identified by `check_name + sample_row_pkey`. Calling resolve twice with the same identifier inserts only one event. Encode this as: `ON CONFLICT (serial_id, source_table, source_id, event_type) DO NOTHING` where `source_table = 'reconciliation_resolve'` and `source_id = <stable hash of check_name + sample_pkey>`.
 
-- [ ] **Task 5 — Implement `resolve.ts`**
+**Constraint citation:** the `ON CONFLICT` target is the existing unique index `uq_sse_dedupe ON stock_serial_events(serial_id, source_table, source_id, event_type)` created in `scripts/migrations/sql/362_serial_master_register.sql:63-64`. Verify before implementation: `PGPASSWORD=$PG_PASS psql -h 100.96.203.105 -p 5436 -U $PG_USER -d fibreflow -c "\d stock_serial_events"` and confirm `uq_sse_dedupe` is present. If absent (rolled back / schema drift), this PR MUST include a migration to re-create it BEFORE the resolve endpoint ships.
+
+- [ ] **Task 5 — Implement `reconciliation-resolve.ts`**
 
 Per the test signatures. Wrap in `withAuth` + admin role check. Insert a `note_added` event with `payload = {reason, check_name, sample_pkey}`. Do NOT update `stock_serials.status`.
 
 - [ ] **Task 6 — Page**
 
-`pages/procurement/field-stock/reconciliation.tsx`: fetches `/list` on mount, passes rows to `<ReconciliationReport>`, wires `onResolve` to POST `/resolve`. After resolve, re-fetch.
+`pages/procurement/field-stock/reconciliation.tsx`: fetches `/api/procurement/field-stock/reconciliation-list` on mount, passes rows to `<ReconciliationReport>`, wires `onResolve` to POST `/api/procurement/field-stock/reconciliation-resolve`. After resolve, re-fetch.
 
 - [ ] **Task 7 — Page integration test**
 
@@ -1027,14 +1075,14 @@ it('non-admin user sees data but not resolve buttons', async () => { /* ... */ }
 Browser smoke:
 1. `/procurement/field-stock/reconciliation` → 6 sections render
 2. Today all 6 should show drift=0 — verify the UI handles "all clear" gracefully (empty state message, no empty tables)
-3. Manually introduce drift on a test serial (e.g. UPDATE stock_serials SET status='issued' WHERE id = '<test>' — bypassing the event log) → `/list` returns drift_count=1 in the relevant check
+3. Manually introduce drift on a test serial (e.g. UPDATE stock_serials SET status='issued' WHERE id = '<test>' — bypassing the event log) → `/reconciliation-list` returns drift_count=1 in the relevant check
 4. As admin, resolve with a reason → event appears in the timeline of that serial
 5. Repeat resolve → idempotent, no duplicate event
 6. Undo the manual drift, reconcile-serials drift=0
 
 ### Acceptance criteria
 
-- 13 tests pass.
+- 11 tests pass (3 list + 5 resolve + 3 page).
 - Resolve is idempotent.
 - Resolve emits `note_added`, never changes `status`.
 - Sample rows render within `<ReconciliationReport>` (max 10 per check).
@@ -1083,7 +1131,7 @@ Browser smoke:
 1. `/procurement/field-stock/warehouses` → list renders, click-through works
 2. `/procurement/field-stock/warehouses/<id>` → detail renders with donut + embedded search filtered to that warehouse
 3. `reconcile-serials` drift=0
-4. Flip the ModuleNav tab from disabled to enabled in `pages/procurement/field-stock/index.tsx` — verify navigation works from dashboard
+4. Flip the **Warehouses** tab from `disabled: true` to `disabled: false` in `src/components/layout/FieldStockModuleNav.tsx` (per Decision #11, single-line edit, line marked `// PR-12 flips this`) — verify navigation works from dashboard
 
 - [ ] **Task 8 — PR**
 
@@ -1118,6 +1166,8 @@ Mirror of PR-12 for projects. `/procurement/field-stock/projects` (list) + `/pro
 ### Tasks
 
 Tasks 1-8: mirror PR-12 step-by-step. Substitute "warehouse" → "project". The project table is `projects` (existing). On-hand counts join `stock_serials.allocated_to_project_id` (added in Wave 1).
+
+**ModuleNav flip:** Task 7 flips the **Projects** tab in `src/components/layout/FieldStockModuleNav.tsx` (line marked `// PR-13 flips this`). Per Decision #11, this is a single-line edit on a different line from PR-12's flip, so parallel merge is conflict-free.
 
 Smoke step extra: verify a project with 0 allocated serials still renders gracefully (`<SerialSearch>` shows empty state, not an error).
 
@@ -1186,7 +1236,7 @@ Actually, defer `<EventList>` to a follow-up if it overflows file-count budget. 
 
 - [ ] **Task 6 — Flip ModuleNav tabs**
 
-In `pages/procurement/field-stock/index.tsx`: remove the `disabled` state on the Pickings / Movements / Returns tabs.
+In `src/components/layout/FieldStockModuleNav.tsx` (per Decision #11): flip `disabled: true` → `disabled: false` on the three lines marked `// PR-14 flips this` — one each for Pickings, Movements, Returns. These three lines are non-contiguous with PR-12/13/15's flips so parallel merges are conflict-free.
 
 - [ ] **Task 7 — Lint + smoke**
 
@@ -1263,7 +1313,7 @@ Per-file unit/integration tests. Critical test on accountability: counters as di
 
 - [ ] **Task 7 — Flip ModuleNav tabs**
 
-Accountability + Items + Locations tabs go live.
+In `src/components/layout/FieldStockModuleNav.tsx` (per Decision #11): flip the three lines marked `// PR-15 flips this` — one each for Accountability, Items, Locations. Because PR-15 merges last (per Decision #5), there is no parallel-merge risk on these lines, but they remain isolated regardless.
 
 - [ ] **Task 8 — Open PR + dispatch `/review-team`**
 
@@ -1290,7 +1340,7 @@ Invoke `/review-team` in the PR description (the review team itself runs against
 
 ---
 
-## Wave 2 success criteria (per spec lines 363-369)
+## Wave 2 success criteria (per spec §"Success criteria", `docs/superpowers/specs/2026-05-21-serial-master-register-design.md` lines 363-369)
 
 - [ ] `<SerialSearch>` resolves any serial by serial_number OR mac_address.
 - [ ] `<SerialTimeline>` renders every event with click-through to source records.
@@ -1304,7 +1354,7 @@ Invoke `/review-team` in the PR description (the review team itself runs against
 
 ## Self-review
 
-**Spec coverage check** (skimming spec lines 277-378 against the plan):
+**Spec coverage check** (skimming `docs/superpowers/specs/2026-05-21-serial-master-register-design.md` §UI structure, lines 277-378, against the plan):
 
 | Spec section | Covered by |
 |---|---|
@@ -1321,10 +1371,10 @@ Invoke `/review-team` in the PR description (the review team itself runs against
 | `/accountability` + `/items` + `/locations` | PR-15 |
 | Admin force-state-correction | PR-9 Task 5 |
 | "Mark as resolved" with reason | PR-11 Task 5 |
-| 12-state status vocabulary | PR-7 Task 1 |
+| 11-state status vocabulary (10 active + 1 terminal `scrapped`) | PR-7 Task 1 |
 | Event-type vocabulary | PR-7 Task 1 |
 | Testing strategy (real DB, no mocks) | All PRs |
-| Browser smoke (spec lines 371-376) | Each PR's "Browser smoke" section |
+| Browser smoke (spec §"Browser smoke" lines 371-376) | Each PR's "Browser smoke" section |
 
 **No gaps identified.**
 
