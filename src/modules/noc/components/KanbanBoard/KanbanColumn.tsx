@@ -31,7 +31,6 @@ const statusConfig: Partial<Record<DatabaseStatus, { label: string; color: strin
   'in_progress': { label: 'In Progress', color: 'text-indigo-400', bgColor: 'bg-indigo-500/20', borderColor: 'border-indigo-500/40', glowColor: 'ring-indigo-500/30' },
   'pending_qa': { label: 'Pending QA', color: 'text-amber-400', bgColor: 'bg-amber-500/20', borderColor: 'border-amber-500/40', glowColor: 'ring-amber-500/30' },
   'resolved': { label: 'Resolved', color: 'text-green-400', bgColor: 'bg-green-500/20', borderColor: 'border-green-500/40', glowColor: 'ring-green-500/30' },
-  'closed': { label: 'Closed', color: 'text-slate-400', bgColor: 'bg-slate-500/20', borderColor: 'border-slate-500/40', glowColor: 'ring-slate-500/30' },
   'cancelled': { label: 'Cancelled', color: 'text-red-400', bgColor: 'bg-red-500/10', borderColor: 'border-red-500/30', glowColor: 'ring-red-500/20' },
 };
 

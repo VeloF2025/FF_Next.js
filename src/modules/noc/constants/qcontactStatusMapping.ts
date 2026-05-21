@@ -13,10 +13,12 @@
  * - Solved (white) - work completed
  * - Unsolved - No Response (dark) - closed without resolution
  *
- * FibreFlow has 11 statuses in a kanban workflow:
+ * FibreFlow has 10 statuses in a kanban workflow:
  * Work Phase: open, assigned, in_progress
  * QA Phase: pending_qa, qa_in_progress, qa_rejected, qa_approved
- * Handover Phase: pending_handover, handed_to_ops, closed, cancelled
+ * Handover Phase: pending_handover, handed_to_ops, resolved, verified, cancelled
+ * (Migration 364: 'closed' was consolidated into 'resolved' — QContact's
+ * external 'Closed'/'Solved' status maps to FF 'resolved' on the boundary.)
  */
 
 import { TicketStatus } from '../types/ticket';
@@ -43,8 +45,9 @@ export const QCONTACT_TO_FIBREFLOW_STATUS: Record<string, TicketStatus> = {
   'Solved': TicketStatus.RESOLVED,
   'Unsolved - No Response': TicketStatus.CANCELLED,
 
-  // Legacy/fallback mappings (for historical data)
-  'Closed': TicketStatus.CLOSED,
+  // Legacy/fallback mappings (for historical data).
+  // 'Closed' from QContact → 'resolved' in FibreFlow (migration 364 consolidation).
+  'Closed': TicketStatus.RESOLVED,
   'Open': TicketStatus.OPEN,
   'Pending': TicketStatus.OPEN,
   'Pending Company Response': TicketStatus.IN_PROGRESS, // QC UI shows this under "In Progress" column
@@ -79,9 +82,10 @@ export const FIBREFLOW_TO_QCONTACT_STATUS: Partial<Record<TicketStatus, string>>
   [TicketStatus.PENDING_HANDOVER]: 'Reviewed',
   [TicketStatus.HANDED_TO_OPS]: 'Solved',
 
-  // Terminal states
+  // Terminal states (FF outbound 'resolved' → QContact's 'Solved'; QContact
+  // still uses 'Closed' internally for terminal cases, but their API
+  // accepts 'Solved'.)
   [TicketStatus.RESOLVED]: 'Solved',
-  [TicketStatus.CLOSED]: 'Solved',
   [TicketStatus.CANCELLED]: 'Solved', // QC has no "Unsolved" via API
 };
 
@@ -132,7 +136,7 @@ export function mapFibreFlowStatusToQContact(fibreflowStatus: TicketStatus): str
  */
 export function isQContactStatusTerminal(qcontactStatus: string): boolean {
   const mapped = mapQContactStatusToFibreFlow(qcontactStatus);
-  return mapped === TicketStatus.RESOLVED || mapped === TicketStatus.CLOSED || mapped === TicketStatus.CANCELLED;
+  return mapped === TicketStatus.RESOLVED || mapped === TicketStatus.CANCELLED;
 }
 
 /**
@@ -166,7 +170,7 @@ export function getStatusAlignment(
   // Determine suggested action based on status transition
   const isQContactTerminal = isQContactStatusTerminal(qcontactStatus);
   const isFibreFlowTerminal =
-    fibreflowStatus === TicketStatus.RESOLVED || fibreflowStatus === TicketStatus.CLOSED || fibreflowStatus === TicketStatus.CANCELLED;
+    fibreflowStatus === TicketStatus.RESOLVED || fibreflowStatus === TicketStatus.CANCELLED;
 
   if (isQContactTerminal && !isFibreFlowTerminal) {
     // QContact closed but FibreFlow still open - should close

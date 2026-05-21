@@ -78,8 +78,8 @@ const STATUS_GROUPS: { label: string; statuses: TicketStatus[]; color: string; b
     bg: 'bg-green-500/10 border-green-500/20',
   },
   {
-    label: 'Closed',
-    statuses: [TicketStatus.CLOSED, TicketStatus.CANCELLED],
+    label: 'Cancelled',
+    statuses: [TicketStatus.CANCELLED],
     color: 'text-gray-400',
     bg: 'bg-gray-500/10 border-gray-500/20',
   },

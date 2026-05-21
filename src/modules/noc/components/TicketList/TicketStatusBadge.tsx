@@ -100,11 +100,6 @@ function getStatusConfig(status: TicketStatus) {
       label: 'Verified',
       Icon: CheckCircle2,
     },
-    closed: {
-      style: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-      label: 'Closed',
-      Icon: CheckCircle2,
-    },
     cancelled: {
       style: 'bg-red-500/20 text-red-400 border-red-500/30',
       label: 'Cancelled',

@@ -339,7 +339,7 @@ export async function getOverdueTickets(
   filters: DashboardFilters = {}
 ): Promise<OverdueTicketsResponse> {
   try {
-    const params: (string | number | boolean | Date)[] = ['closed', 'cancelled'];
+    const params: (string | number | boolean | Date)[] = ['resolved', 'cancelled'];
 
     if (filters.include_details) {
       // Get detailed list of overdue tickets
@@ -414,10 +414,10 @@ export async function getWorkloadByAssignee(
     let whereClause = 'WHERE 1=1';
     let paramIndex = 1;
 
-    // Filter to active tickets only (exclude closed/cancelled)
+    // Filter to active tickets only (exclude resolved/cancelled — terminal states)
     if (filters.active_only) {
       whereClause += ` AND t.status NOT IN ($${paramIndex}, $${paramIndex + 1})`;
-      params.push('closed', 'cancelled');
+      params.push('resolved', 'cancelled');
       paramIndex += 2;
     }
 
@@ -433,7 +433,7 @@ export async function getWorkloadByAssignee(
         COUNT(*) FILTER (
           WHERE t.due_at IS NOT NULL
             AND t.due_at < NOW()
-            AND t.status NOT IN ('closed', 'cancelled')
+            AND t.status NOT IN ('resolved', 'cancelled')
         ) as overdue_count
       FROM maintenance_tickets t
       LEFT JOIN users u ON t.assigned_to = u.id
@@ -468,24 +468,27 @@ export async function getAverageResolutionTime(
   filters: DashboardFilters = {}
 ): Promise<AverageResolutionTimeResponse> {
   try {
-    const params: (string | number | boolean | Date)[] = ['closed'];
+    const params: (string | number | boolean | Date)[] = ['resolved'];
     let whereClause = 'WHERE status = $1';
     let paramIndex = 2;
 
-    // Filter by closed date range
+    // Filter by resolution date range. Use resolved_at (set by the
+    // calculate_resolution_time trigger) rather than the legacy closed_at
+    // column, which is no longer written by any code path after
+    // migration 364.
     if (filters.start_date && filters.end_date) {
-      whereClause += ` AND closed_at >= $${paramIndex} AND closed_at <= $${paramIndex + 1}`;
+      whereClause += ` AND resolved_at >= $${paramIndex} AND resolved_at <= $${paramIndex + 1}`;
       params.push(filters.start_date, filters.end_date);
       paramIndex += 2;
     }
 
     const sql = `
       SELECT
-        AVG(EXTRACT(EPOCH FROM (closed_at - created_at)) / 3600) as avg_hours,
+        AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600) as avg_hours,
         COUNT(*) as total_resolved
       FROM maintenance_tickets
       ${whereClause}
-        AND closed_at IS NOT NULL
+        AND resolved_at IS NOT NULL
     `;
 
     logger.debug('Fetching average resolution time', { sql, params });

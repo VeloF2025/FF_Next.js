@@ -173,7 +173,6 @@ export function TicketFilters({ filters, onFiltersChange, compact = false }: Tic
               <option value="">All Statuses</option>
               <option value="assigned">Assigned</option>
               <option value="cancelled">Cancelled</option>
-              <option value="closed">Closed</option>
               <option value="handed_to_ops">Handed to Ops</option>
               <option value="in_progress">In Progress</option>
               <option value="open">Open</option>
