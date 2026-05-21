@@ -87,7 +87,15 @@ export const VLM_TIMEOUT_DOCUMENT = 90_000;
 /** Default max tokens for VLM responses */
 export const VLM_MAX_TOKENS_DEFAULT = 1000;
 
-/** Max tokens for photo categorization (needs structured JSON for batches) */
+/**
+ * Max tokens for photo categorization (needs structured JSON for batches).
+ *
+ * Sizing: typical batch is 6 photos. Each photo's JSON response (reasoning +
+ * predicted_step + predicted_category + confidence) averages ~800-900 tokens
+ * worst-case. 6 × 900 = 5,400 tokens for content; +500 for prompt overhead and
+ * JSON scaffolding ≈ 5,900. We bumped from 4,000 to 6,000 after DR1744677 and
+ * DR1860041 hit "Unterminated string in JSON" at the previous cap.
+ */
 export const VLM_MAX_TOKENS_CATEGORIZATION = 6000;
 
 /** Max tokens for QA validation */
