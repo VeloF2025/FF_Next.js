@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import path from 'node:path';
-import fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
 import { Pool } from 'pg';
 
 const COMPOSE = 'tests/db/setup/docker-compose.test.yml';
