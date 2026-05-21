@@ -65,10 +65,13 @@ FROM (
 -- @name accountability_returned_counter_drift
 -- Tolerance: 0
 -- Contractor accountability returned counter differs from derived count.
--- Derived count = number of stock_return_lines where the parent stock_returns
--- has status='accepted' (the workflow state at which a return is finalized
--- per migration 029's status CHECK).
--- Mirrors the _issued_ check's structure but operates on returns.
+-- Derived count = number of stock_return_lines with disposition='restock'.
+-- Mirrors the trigger 5 write path exactly: Trigger 5 increments
+-- total_returned_count ONLY when NEW.disposition='restock' (the
+-- restock branch in emit_serial_event_on_return_disposition). Filtering
+-- on srl.disposition rather than sr.status keeps reconcile and trigger
+-- aligned regardless of return workflow timing — a line restocked while
+-- the parent return is still 'inspected' (pre-accepted) is still credited.
 SELECT COUNT(*) AS drift_count
 FROM (
   SELECT
@@ -78,10 +81,10 @@ FROM (
   FROM   stock_returns       sr
   JOIN   stock_return_lines  srl ON srl.return_id = sr.id
                                   AND srl.serial_id IS NOT NULL
+                                  AND srl.disposition = 'restock'
   LEFT   JOIN contractor_stock_accountability csa
            ON csa.contractor_id = sr.contractor_id
-  WHERE  sr.status        = 'accepted'
-    AND  sr.contractor_id IS NOT NULL
+  WHERE  sr.contractor_id IS NOT NULL
   GROUP  BY sr.contractor_id, csa.total_returned_count
   HAVING COALESCE(csa.total_returned_count, 0) <> COUNT(*)
 ) sub;
