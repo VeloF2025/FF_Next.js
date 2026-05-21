@@ -19,6 +19,7 @@ import {
   Ticket,
   ClipboardList,
   Calendar,
+  Download,
 } from 'lucide-react';
 import type { OltRecord, OltStats, InvestigationContext, SwapLookupResult, DateFilter } from '../../../types';
 import { getDateRange } from '../../../types';
@@ -118,6 +119,7 @@ export function OltInvestigateTab({
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [creatingTickets, setCreatingTickets] = useState(false);
   const [selectingAll, setSelectingAll] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Cross-DR swap state
   const [swapLookups, setSwapLookups] = useState<Record<string, SwapLookupResult>>({});
@@ -234,6 +236,16 @@ export function OltInvestigateTab({
     ? 'Ticket Filtered'
     : 'Ticket All';
 
+  const buildActiveFilterParams = (extra?: Record<string, string>) => {
+    const params = new URLSearchParams({ status: 'needs_investigation', ...(extra || {}) });
+    if (selectedProjects.length > 0) params.set('projects', selectedProjects.join('|'));
+    if (investigateSubFilter !== 'all') params.set('subStatus', investigateSubFilter);
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (customDateRange.dateFrom) params.set('dateFrom', customDateRange.dateFrom);
+    if (customDateRange.dateTo) params.set('dateTo', customDateRange.dateTo);
+    return params;
+  };
+
   const toggleProject = (project: string) => {
     setSelectedProjects((prev) =>
       prev.includes(project)
@@ -278,16 +290,10 @@ export function OltInvestigateTab({
   const handleSelectAllNotFound = async () => {
     setSelectingAll(true);
     try {
-      const params = new URLSearchParams({
-        status: 'needs_investigation',
+      const params = buildActiveFilterParams({
         pageSize: '10000',
         bulk: '1',
       });
-      if (selectedProjects.length > 0) params.set('projects', selectedProjects.join('|'));
-      if (investigateSubFilter !== 'all') params.set('subStatus', investigateSubFilter);
-      if (debouncedSearch) params.set('search', debouncedSearch);
-      if (customDateRange.dateFrom) params.set('dateFrom', customDateRange.dateFrom);
-      if (customDateRange.dateTo) params.set('dateTo', customDateRange.dateTo);
       const res = await fetch(`/api/system/olt-report/records?${params.toString()}`);
       const data = await res.json();
       const allRecords = (data.data?.records || data.records || []) as OltRecord[];
@@ -301,6 +307,33 @@ export function OltInvestigateTab({
       toast.error('Failed to load all records');
     } finally {
       setSelectingAll(false);
+    }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const params = buildActiveFilterParams();
+      const res = await fetch(`/api/system/olt-report/export?${params.toString()}`);
+      if (!res.ok) throw new Error('Failed to export OLT records');
+
+      const blob = await res.blob();
+      const disposition = res.headers.get('Content-Disposition') || '';
+      const filenameMatch = disposition.match(/filename="?([^";]+)"?/);
+      const filename = filenameMatch?.[1] || `olt-investigate-export-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success(`Exported ${res.headers.get('X-Export-Count') || total} records`);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to export OLT records');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -790,6 +823,19 @@ export function OltInvestigateTab({
               ))}
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={handleExport}
+                disabled={exporting || total === 0}
+                className="px-3 py-1.5 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] text-xs rounded hover:border-[var(--ff-accent)]
+                           disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                aria-label="Export filtered OLT investigate records to Excel"
+              >
+                {exporting ? (
+                  <><InlineSpinner size="sm" /> Exporting...</>
+                ) : (
+                  <><Download className="w-3 h-3" /> Export Excel ({total})</>
+                )}
+              </button>
               <button
                 onClick={handleSelectAllNotFound}
                 disabled={selectingAll}

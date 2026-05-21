@@ -65,10 +65,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Optional sub-status filter (within needs_investigation group)
-    const validSubStatuses = ['needs_investigation', 'not_found', 'empty_serial', 'rejected'];
+    const validSubStatuses = ['needs_investigation', 'not_found', 'empty_serial', 'rejected', 'other'];
     if (subStatus && validSubStatuses.includes(subStatus)) {
       if (subStatus === 'needs_investigation') {
         const cond = `r.fix_status IN ('needs_investigation', 'needs_reinvestigation')`;
+        whereClause = whereClause ? `${whereClause} AND ${cond}` : `WHERE ${cond}`;
+      } else if (subStatus === 'other') {
+        const cond = `(r.fix_status IS NULL OR r.fix_status NOT IN ('needs_investigation', 'needs_reinvestigation', 'not_found'))`;
         whereClause = whereClause ? `${whereClause} AND ${cond}` : `WHERE ${cond}`;
       } else {
         params.push(subStatus);

@@ -5,7 +5,7 @@
  * Optional query params:
  * - dateFrom/dateTo: ISO date range
  * - status: pending | needs_investigation | fixed | escalated | resolved | all
- * - subStatus: needs_investigation | not_found | empty_serial | rejected
+ * - subStatus: needs_investigation | not_found | empty_serial | rejected | other
  * - search: DR number or serial search
  * - project: single project name
  * - projects: pipe-delimited project names for multi-select
@@ -53,11 +53,16 @@ function appendStatusFilter(status: string, whereParts: string[]) {
 }
 
 function appendSubStatusFilter(subStatus: string | null, whereParts: string[], params: SqlParam[]) {
-  const validSubStatuses = ['needs_investigation', 'not_found', 'empty_serial', 'rejected'];
+  const validSubStatuses = ['needs_investigation', 'not_found', 'empty_serial', 'rejected', 'other'];
   if (!subStatus || !validSubStatuses.includes(subStatus)) return;
 
   if (subStatus === 'needs_investigation') {
     whereParts.push("r.fix_status IN ('needs_investigation', 'needs_reinvestigation')");
+    return;
+  }
+
+  if (subStatus === 'other') {
+    whereParts.push("(r.fix_status IS NULL OR r.fix_status NOT IN ('needs_investigation', 'needs_reinvestigation', 'not_found'))");
     return;
   }
 
