@@ -176,7 +176,7 @@ def qfieldcloud_upload(qf_project_id: str, gpkg_path: str, src: str) -> bool:
 
 # ── Main sync logic ───────────────────────────────────────────────────────────
 
-def sync_project(project_name: str, config: dict, dry_run: bool = False):
+def sync_project(project_name: str, config: dict, dry_run: bool = False, approved_only: bool = False):
     """Sync QA decisions for one project to its QField GPKG."""
     print(f"\n{'='*60}")
     print(f"Syncing: {project_name}")
@@ -282,6 +282,9 @@ def sync_project(project_name: str, config: dict, dry_run: bool = False):
             stats["qa_complete"] += 1
 
         elif wf_status in ("retake_required", "rejected", "rework_needed"):
+            if approved_only:
+                stats["unchanged"] += 1
+                continue
             new_status = "Q/A Failed"
             qa_comment = review.get("qa_notes") or f"QA {wf_status}"
             qa_dt = review["qa_decision_at"].strftime("%Y-%m-%d") if review["qa_decision_at"] else datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -289,6 +292,9 @@ def sync_project(project_name: str, config: dict, dry_run: bool = False):
             stats["qa_failed"] += 1
 
         elif photo_count > 0:
+            if approved_only:
+                stats["unchanged"] += 1
+                continue
             # Has photos but QA not done yet → planted, awaiting QA
             if current_status == "(ADMIN) Q/A Complete":
                 stats["unchanged"] += 1
@@ -361,6 +367,8 @@ def main():
     parser = argparse.ArgumentParser(description="Sync QA decisions to QField")
     parser.add_argument("--project", type=str, default=None, help="Single project name")
     parser.add_argument("--dry-run", action="store_true", help="Preview changes only")
+    parser.add_argument("--approved-only", action="store_true",
+                        help="Only write '(ADMIN) Q/A Complete' for approved poles; skip rework and planted updates")
     args = parser.parse_args()
 
     projects = FF_TO_QF_CIVIL_AUDIT
@@ -375,7 +383,7 @@ def main():
 
     for name, config in projects.items():
         try:
-            sync_project(name, config, dry_run=args.dry_run)
+            sync_project(name, config, dry_run=args.dry_run, approved_only=args.approved_only)
         except Exception as e:
             print(f"\n  ERROR syncing {name}: {e}")
 
