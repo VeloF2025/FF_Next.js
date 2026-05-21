@@ -1,10 +1,13 @@
 import { Droppable, Draggable } from '@hello-pangea/dnd';
 import { GripVertical } from 'lucide-react';
 import { photoUrl } from '../utils/photo-url';
+import { useBulkUpload, BulkUploadButton, UploadChipList } from './BulkUnassignedUpload';
 
 interface UnassignedBucketProps {
+  poleId: string;
   photoKeys: string[];
   onView?: (index: number) => void;
+  onUploaded: () => void | Promise<void>;
   disabled?: boolean;
 }
 
@@ -13,16 +16,33 @@ interface UnassignedBucketProps {
  * a slot. Photos can be dragged in (delete from slot) or out (place into the
  * right slot). Each move goes through /api/works-qa/move-photo which records a
  * row in qa_correction_examples so the VLM model learns the categorisation.
+ *
+ * Also accepts bulk uploads — multi-select via the [+ Bulk upload] button OR
+ * drag-drop of image files anywhere onto the bucket. Both paths share the
+ * same useBulkUpload hook so per-file status (uploading / done / error) is
+ * identical regardless of how the upload was triggered.
  */
-export function UnassignedBucket({ photoKeys, onView, disabled }: UnassignedBucketProps) {
+export function UnassignedBucket({ poleId, photoKeys, onView, onUploaded, disabled }: UnassignedBucketProps) {
+  const { chips, running, handleFiles, handleDrop } = useBulkUpload({ poleId, onUploaded });
   return (
-    <section className="border border-dashed border-zinc-700 rounded-lg p-3 flex flex-col gap-2">
+    <section
+      onDrop={disabled ? undefined : e => void handleDrop(e)}
+      onDragOver={disabled ? undefined : e => e.preventDefault()}
+      className="border border-dashed border-zinc-700 rounded-lg p-3 flex flex-col gap-2"
+    >
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
           Unassigned Photos ({photoKeys.length})
         </h3>
-        <span className="text-[10px] text-zinc-500">drag to slot →</span>
+        <div className="flex items-center gap-2">
+          {!disabled && (
+            <BulkUploadButton running={running} onFilesPicked={handleFiles} />
+          )}
+          <span className="text-[10px] text-zinc-500">drag to slot →</span>
+        </div>
       </div>
+
+      <UploadChipList chips={chips} />
 
       <Droppable droppableId="unassigned" direction="horizontal" isDropDisabled={disabled}>
         {(provided, snapshot) => (
@@ -37,7 +57,7 @@ export function UnassignedBucket({ photoKeys, onView, disabled }: UnassignedBuck
               <p className="text-xs text-zinc-600 text-center py-4">
                 {snapshot.isDraggingOver
                   ? 'Drop here to send back for re-categorisation'
-                  : 'No unassigned photos for this pole.'}
+                  : 'No unassigned photos for this pole. Use [+ Bulk upload] or drop image files here.'}
               </p>
             ) : (
               <div className="grid grid-cols-4 gap-1">
@@ -51,8 +71,6 @@ export function UnassignedBucket({ photoKeys, onView, disabled }: UnassignedBuck
                           dragSnap.isDragging ? 'ring-2 ring-teal-400 shadow-lg shadow-teal-500/30 z-50' : ''
                         }`}
                       >
-                        {/* Drag handle — small grip icon, dragHandleProps lives
-                            here so the photo button below remains clickable. */}
                         {!disabled && (
                           <div
                             {...dragProvided.dragHandleProps}
