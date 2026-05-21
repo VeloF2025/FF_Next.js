@@ -34,20 +34,24 @@ export interface OntBackCableCheckResult {
 
 const PROMPT = `You are inspecting a photo that has been categorized as "ONT Back After Install" for a fiber optic installation.
 
-Your ONLY task: determine whether a GREEN fiber optic cable is physically plugged into the fiber port on the back panel of the ONT (Optical Network Terminal) shown in the photo.
+Your task has TWO parts:
+1. First confirm the photo actually shows an ONT device (Optical Network Terminal).
+2. Then check if a GREEN fiber optic cable is plugged into the fiber port.
 
-The fiber port is typically a yellow or orange socket on the back of the ONT. A correctly installed ONT will have a thin green fiber cable inserted into that port.
+An ONT is a rectangular plastic networking device with labeled ports on its back panel: a yellow/orange fiber port, LAN ports, and a power port. It is NOT a wooden board, wall bracket, cable holder, cable clip, or cable management accessory.
 
 Return STRICT JSON in this exact format:
 {
   "has_green_cable": true | false,
-  "reasoning": "Short description of what you see at the fiber port"
+  "reasoning": "Short description of what you see"
 }
 
 Rules:
-- has_green_cable = true ONLY if you can clearly see a green fiber cable physically inserted into the fiber port.
-- has_green_cable = false if the fiber port is empty, covered, obscured, not visible, or only non-green cables are present.
-- Be STRICT: if you are unsure, return false. Only power cables (black/white) do not count — we only care about the GREEN fiber cable at the fiber port.`;
+- has_green_cable = true ONLY if (a) you can clearly identify an actual ONT device body in the photo AND (b) you can see a green fiber cable physically inserted into its fiber port.
+- has_green_cable = false if you cannot identify a clear ONT device, or the fiber port is empty, covered, obscured, or only non-green cables are present.
+- A wooden board with cables, a wall bracket, or a cable management mount WITHOUT a visible ONT device body = has_green_cable false.
+- A cable connector that is not clearly inserted into an ONT fiber port = has_green_cable false.
+- Be STRICT: if you are unsure whether you are looking at an actual ONT device, return false.`;
 
 /**
  * Call VLM to check if a single photo shows a green fiber cable plugged into the ONT back.
