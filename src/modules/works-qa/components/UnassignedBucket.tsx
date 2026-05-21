@@ -1,7 +1,7 @@
 import { Droppable, Draggable } from '@hello-pangea/dnd';
 import { GripVertical } from 'lucide-react';
 import { photoUrl } from '../utils/photo-url';
-import { BulkUnassignedUpload, handleBulkDrop } from './BulkUnassignedUpload';
+import { useBulkUpload, BulkUploadButton, UploadChipList } from './BulkUnassignedUpload';
 
 interface UnassignedBucketProps {
   poleId: string;
@@ -18,13 +18,15 @@ interface UnassignedBucketProps {
  * row in qa_correction_examples so the VLM model learns the categorisation.
  *
  * Also accepts bulk uploads — multi-select via the [+ Bulk upload] button OR
- * drag-drop of image files anywhere onto the bucket. Uploaded files land in
- * unassigned_photo_keys via /api/works-qa/pole-assign with slot='unassigned'.
+ * drag-drop of image files anywhere onto the bucket. Both paths share the
+ * same useBulkUpload hook so per-file status (uploading / done / error) is
+ * identical regardless of how the upload was triggered.
  */
 export function UnassignedBucket({ poleId, photoKeys, onView, onUploaded, disabled }: UnassignedBucketProps) {
+  const { chips, running, handleFiles, handleDrop } = useBulkUpload({ poleId, onUploaded });
   return (
     <section
-      onDrop={disabled ? undefined : e => void handleBulkDrop(poleId, e, onUploaded)}
+      onDrop={disabled ? undefined : e => void handleDrop(e)}
       onDragOver={disabled ? undefined : e => e.preventDefault()}
       className="border border-dashed border-zinc-700 rounded-lg p-3 flex flex-col gap-2"
     >
@@ -33,10 +35,14 @@ export function UnassignedBucket({ poleId, photoKeys, onView, onUploaded, disabl
           Unassigned Photos ({photoKeys.length})
         </h3>
         <div className="flex items-center gap-2">
-          {!disabled && <BulkUnassignedUpload poleId={poleId} onUploaded={onUploaded} />}
+          {!disabled && (
+            <BulkUploadButton running={running} onFilesPicked={handleFiles} />
+          )}
           <span className="text-[10px] text-zinc-500">drag to slot →</span>
         </div>
       </div>
+
+      <UploadChipList chips={chips} />
 
       <Droppable droppableId="unassigned" direction="horizontal" isDropDisabled={disabled}>
         {(provided, snapshot) => (

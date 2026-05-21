@@ -1,17 +1,16 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Upload, Loader2 } from 'lucide-react';
 import { log } from '@/lib/logger';
 
-interface BulkUnassignedUploadProps {
-  poleId: string;
-  onUploaded: () => void | Promise<void>;
-  disabled?: boolean;
-}
-
-interface UploadChip {
+export interface UploadChip {
   name: string;
   status: 'uploading' | 'done' | 'error';
   error?: string;
+}
+
+interface UseBulkUploadOptions {
+  poleId: string;
+  onUploaded: () => void | Promise<void>;
 }
 
 async function uploadOne(poleId: string, file: File): Promise<void> {
@@ -28,42 +27,77 @@ async function uploadOne(poleId: string, file: File): Promise<void> {
 }
 
 /**
- * Bulk-upload manual photos into a pole's unassigned bucket. Multi-select via
- * file picker (no folder picker — browsers don't expose paths reliably). Each
- * upload runs the standard VLM validation pipeline server-side.
+ * Shared upload state + handlers for the works-qa unassigned bucket. Both the
+ * button-driven file picker AND the drag-drop region of UnassignedBucket route
+ * through this hook so error feedback is identical. `done`-status chips
+ * auto-clear after 2.5s via a timeout that's properly cleaned up on unmount;
+ * errors stay visible until the next upload starts.
  */
-export function BulkUnassignedUpload({ poleId, onUploaded, disabled }: BulkUnassignedUploadProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+export function useBulkUpload({ poleId, onUploaded }: UseBulkUploadOptions) {
   const [chips, setChips] = useState<UploadChip[]>([]);
   const [running, setRunning] = useState(false);
+  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function handleFiles(files: File[]) {
-    if (!files.length) return;
+  useEffect(() => () => {
+    if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+  }, []);
+
+  const scheduleClearDone = useCallback(() => {
+    if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+    clearTimerRef.current = setTimeout(() => {
+      setChips(prev => prev.filter(c => c.status !== 'done'));
+    }, 2500);
+  }, []);
+
+  const handleFiles = useCallback(async (files: File[]) => {
     const imageFiles = files.filter(f => f.type.startsWith('image/'));
     if (!imageFiles.length) return;
 
     setRunning(true);
-    setChips(imageFiles.map(f => ({ name: f.name, status: 'uploading' })));
+    // Reserve indices for these uploads by appending to whatever's already on
+    // screen — concurrent drop+button calls don't clobber each other.
+    let startIdx = 0;
+    setChips(prev => {
+      startIdx = prev.length;
+      return [...prev, ...imageFiles.map(f => ({ name: f.name, status: 'uploading' as const }))];
+    });
 
     await Promise.all(imageFiles.map(async (file, idx) => {
+      const chipIdx = startIdx + idx;
       try {
         await uploadOne(poleId, file);
-        setChips(prev => prev.map((c, i) => i === idx ? { ...c, status: 'done' } : c));
+        setChips(prev => prev.map((c, i) => i === chipIdx ? { ...c, status: 'done' as const } : c));
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
         log.error('works-qa: bulk-upload failed', { error: msg, name: file.name });
-        setChips(prev => prev.map((c, i) => i === idx ? { ...c, status: 'error', error: msg } : c));
+        setChips(prev => prev.map((c, i) => i === chipIdx ? { ...c, status: 'error' as const, error: msg } : c));
       }
     }));
 
-    await onUploaded();
     setRunning(false);
-    // Clear chips after a short delay so the user sees the green ticks
-    setTimeout(() => setChips([]), 2500);
-  }
+    await onUploaded();
+    scheduleClearDone();
+  }, [poleId, onUploaded, scheduleClearDone]);
 
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer.files);
+    await handleFiles(files);
+  }, [handleFiles]);
+
+  return { chips, running, handleFiles, handleDrop };
+}
+
+interface BulkUploadButtonProps {
+  running: boolean;
+  disabled?: boolean;
+  onFilesPicked: (files: File[]) => void | Promise<void>;
+}
+
+export function BulkUploadButton({ running, disabled, onFilesPicked }: BulkUploadButtonProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
   return (
-    <div className="flex flex-col gap-2">
+    <>
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
@@ -83,55 +117,36 @@ export function BulkUnassignedUpload({ poleId, onUploaded, disabled }: BulkUnass
         className="sr-only"
         onChange={e => {
           const files = Array.from(e.target.files ?? []);
-          void handleFiles(files);
+          void onFilesPicked(files);
           // Reset so picking the same files again retriggers change.
           e.target.value = '';
         }}
       />
-
-      {chips.length > 0 && (
-        <ul role="status" aria-live="polite" className="flex flex-wrap gap-1">
-          {chips.map((chip, i) => (
-            <li
-              key={i}
-              className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                chip.status === 'uploading' ? 'bg-zinc-800 border-zinc-700 text-zinc-400'
-                : chip.status === 'done' ? 'bg-green-900/40 border-green-700/50 text-green-300'
-                : 'bg-red-900/40 border-red-700/50 text-red-300'
-              }`}
-              title={chip.error}
-            >
-              {chip.status === 'uploading' ? '…' : chip.status === 'done' ? '✓' : '×'} {chip.name}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    </>
   );
 }
 
-/**
- * Sibling helper: wires onDrop on an existing element. Use from
- * UnassignedBucket so dragging files onto the bucket also uploads.
- */
-export async function handleBulkDrop(
-  poleId: string,
-  e: React.DragEvent,
-  onUploaded: () => void | Promise<void>,
-): Promise<void> {
-  e.preventDefault();
-  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-  if (!files.length) return;
+interface UploadChipListProps {
+  chips: UploadChip[];
+}
 
-  await Promise.all(files.map(async file => {
-    try {
-      await uploadOne(poleId, file);
-    } catch (err: unknown) {
-      log.error('works-qa: bulk-drop upload failed', {
-        error: err instanceof Error ? err.message : String(err),
-        name: file.name,
-      });
-    }
-  }));
-  await onUploaded();
+export function UploadChipList({ chips }: UploadChipListProps) {
+  if (!chips.length) return null;
+  return (
+    <ul role="status" aria-live="polite" className="flex flex-wrap gap-1">
+      {chips.map((chip, i) => (
+        <li
+          key={i}
+          className={`text-[10px] px-1.5 py-0.5 rounded border ${
+            chip.status === 'uploading' ? 'bg-zinc-800 border-zinc-700 text-zinc-400'
+            : chip.status === 'done' ? 'bg-green-900/40 border-green-700/50 text-green-300'
+            : 'bg-red-900/40 border-red-700/50 text-red-300'
+          }`}
+          title={chip.error}
+        >
+          {chip.status === 'uploading' ? '…' : chip.status === 'done' ? '✓' : '×'} {chip.name}
+        </li>
+      ))}
+    </ul>
+  );
 }
