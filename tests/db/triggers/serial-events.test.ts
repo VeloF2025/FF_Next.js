@@ -1,8 +1,8 @@
 /**
  * tests/db/triggers/serial-events.test.ts
  *
- * Integration tests for the 5 serial-event PostgreSQL triggers (migration 363).
- * Requires global-setup.ts to have already applied seed.sql + migrations 362+363.
+ * Integration tests for the 5 serial-event PostgreSQL triggers (migration 364).
+ * Requires global-setup.ts to have already applied seed.sql + migrations 362+364.
  *
  * Reset helpers are called at the START of each test AND in every finally block
  * to prevent state leaks (pattern established in PR-3/4/5).

@@ -1,4 +1,4 @@
--- Rollback for migration 363: serial_event_triggers
+-- Rollback for migration 364: serial_event_triggers
 -- Removes all triggers (5 primary + 1 return_line insert) and their backing functions.
 
 BEGIN;
@@ -17,6 +17,6 @@ DROP FUNCTION IF EXISTS trg_emit_serial_event_on_return();
 DROP FUNCTION IF EXISTS trg_emit_serial_event_on_return_line_insert();
 DROP FUNCTION IF EXISTS trg_emit_serial_event_on_return_disposition();
 
-DELETE FROM migrations WHERE version = 363;
+DELETE FROM migrations WHERE version = 364;
 
 COMMIT;

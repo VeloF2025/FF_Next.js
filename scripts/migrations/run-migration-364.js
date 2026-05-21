@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
 
-const VERSION = 363;
+const VERSION = 364;
 const NAME = 'serial_event_triggers';
 
 async function main() {

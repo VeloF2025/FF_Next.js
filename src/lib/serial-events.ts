@@ -1,7 +1,7 @@
 /**
  * serial-events.ts — Application-layer helpers for stock_serial_events.
  *
- * The live path is handled by PostgreSQL triggers (migration 363).
+ * The live path is handled by PostgreSQL triggers (migration 364).
  * This module provides query helpers used by API routes and services.
  */
 import type { Pool, PoolClient } from 'pg';
@@ -109,7 +109,7 @@ export async function getSerialEventCounts(
  * table does not have a PostgreSQL trigger — e.g., manual corrections).
  * Idempotent via the uq_sse_dedupe partial index when source_id is provided.
  */
-export async function insertSerialEvent(
+export async function emitSerialEvent(
   db: DbClient,
   opts: {
     serialId: string;
@@ -154,7 +154,7 @@ export async function insertSerialEvent(
   );
 
   if (r.rows.length === 0) {
-    log.info('serial-events: insertSerialEvent was a no-op (duplicate)', {
+    log.info('serial-events: emitSerialEvent was a no-op (duplicate)', {
       serialId, eventType, sourceTable, sourceId,
     });
     return null;

@@ -452,7 +452,7 @@ CREATE TRIGGER emit_serial_event_on_return_disposition
 -- Migration record
 -- ---------------------------------------------------------------------------
 INSERT INTO migrations (version, name)
-  VALUES (363, 'serial_event_triggers')
+  VALUES (364, 'serial_event_triggers')
   ON CONFLICT (version) DO NOTHING;
 
 COMMIT;
