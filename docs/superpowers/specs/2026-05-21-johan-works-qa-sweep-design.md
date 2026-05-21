@@ -93,7 +93,7 @@ Handler iterates over `pole.unassigned_photo_keys`. For each photo, runs a singl
 
 | Confidence | Target slot empty? | Action |
 |---|---|---|
-| ≥ 0.95 | yes | Auto-place: write slot column, remove from `unassigned_photo_keys`, write `works_qa_corrections` row with `decision='auto-placed'` |
+| ≥ 0.95 | yes | Auto-place: write slot column, remove from `unassigned_photo_keys`, write `qa_correction_examples` row with `correction_reason='auto_sort_placed'` |
 | ≥ 0.95 | no (slot already filled) | Stay in bucket. Write suggestion at full confidence. UX surfaces it identically to the 0.6–0.95 tier so Johan sees the same `Accept` mini-button; clicking Accept calls `move-photo` which will surface the slot-already-filled conflict to him. |
 | 0.6 – 0.95 | n/a | Suggestion: write `unassigned_suggestions[photo_key] = { suggested_slot, confidence, generated_at }`. Photo stays. |
 | < 0.6 | n/a | No-op. |
@@ -137,7 +137,7 @@ Shape of `unassigned_suggestions`:
 - After response, suggestion-tier photos render a badge overlay `→ civil_03 · 87%` plus a small `Accept` button.
 - `[Accept all suggestions]` button appears at top if any suggestions exist. Each accept fires the existing `/api/works-qa/move-photo` endpoint (which already writes `qa_correction_examples`).
 
-**Training data:** `works_qa_corrections` table (created in PR #1664, migration 356, specifically for works-qa VLM correction shape). Each auto-placement and each accepted/rejected suggestion writes a row. Over time this becomes the fine-tuning corpus for the upstream QField VLM (handed off in PR 4).
+**Training data:** `qa_correction_examples` table — same table `move-photo.ts` already writes to. Its `(vlm_predicted_step, vlm_predicted_category)` columns match the classifier's prediction shape, and `workflow_type='works_qa'` keeps these rows distinct from DR-photo corrections. (`works_qa_corrections` is a separate concept — slot-approval overrides — and is not the right table here.) Over time these rows become the fine-tuning corpus for the upstream QField VLM (handed off in PR 4).
 
 **Concurrency:** sequential VLM calls per pole. Multiple users on different poles can run auto-sort simultaneously — each request serialises its own GPU work, GPU saturation is fine.
 
