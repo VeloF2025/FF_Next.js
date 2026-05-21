@@ -32,14 +32,23 @@ CREATE TABLE staff (
 INSERT INTO staff (id, full_name) VALUES
   ('33333333-3333-3333-3333-333333333333', 'Test Tech');
 
+-- drops — mirror prod columns needed by:
+--   * Trigger 2 (qa_photo_reviews): drop_number text match
+--   * Migration 366 trigger (drops AFTER UPDATE OF ont_serial): ont_serial, installed_at
 CREATE TABLE drops (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  drop_number TEXT UNIQUE NOT NULL,
-  project_id UUID REFERENCES projects(id)
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  drop_number  TEXT UNIQUE NOT NULL,
+  project_id   UUID REFERENCES projects(id),
+  ont_serial   TEXT,
+  installed_at TIMESTAMPTZ
 );
 INSERT INTO drops (id, drop_number, project_id) VALUES
   ('44444444-4444-4444-4444-444444444444', 'DR0000001',
    '11111111-1111-1111-1111-111111111111');
+-- A second drop row with ont_serial=NULL so the trigger test can UPDATE it.
+INSERT INTO drops (id, drop_number, project_id, ont_serial) VALUES
+  ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'DR0000002',
+   '11111111-1111-1111-1111-111111111111', NULL);
 
 -- stock_items — prod schema (PR-7 probe):
 --   NO device_type column. Items are identified by item_code.
@@ -77,13 +86,16 @@ CREATE TABLE stock_serials (
   -- Prod has current_location_id (NOT current_holder_staff_id).
   current_location_id UUID REFERENCES stock_locations(id),
   installed_at_drop_id UUID REFERENCES drops(id),
+  installed_at_drop_number VARCHAR(255),
   installed_by VARCHAR(255),
+  activated_at_olt_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (stock_item_id, serial_number),
+  -- Prod status check (migration 362): includes activated, allocated_to_project, in_repair.
   CONSTRAINT stock_serials_status_check CHECK (
-    status IN ('available','reserved','in_transit','issued',
-               'installed','returned','scrapped','faulty')
+    status IN ('available','reserved','allocated_to_project','in_transit','issued',
+               'installed','activated','returned','scrapped','faulty','in_repair')
   )
 );
 
@@ -155,12 +167,15 @@ INSERT INTO qa_photo_reviews (drop_number, ont_serial_scanned) VALUES
 -- Probe PR-7: oes_pp_data.id is INTEGER (SERIAL), NOT UUID.
 --             No `activated_at` or `pon_id` column.
 --             Ordering uses `created_at`. PON reference uses `olt_pon` (smallint).
+-- HOTFIX (PR-7 blind review): resolution_status column added to mirror prod.
+--   Backfill C must filter WHERE resolution_status = 'activated'.
 CREATE TABLE oes_pp_data (
-  id            SERIAL PRIMARY KEY,
-  serial_number TEXT,
-  olt_name      TEXT,
-  olt_pon       SMALLINT,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                SERIAL PRIMARY KEY,
+  serial_number     TEXT,
+  olt_name          TEXT,
+  olt_pon           SMALLINT,
+  resolution_status TEXT,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- stock_pickings — prod schema (migration 028):

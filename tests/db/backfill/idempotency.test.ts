@@ -78,9 +78,11 @@ describe('Cross-script idempotency: A → B → C → D+E twice = no-op', () => 
       // emit_serial_event_on_oes_activate trigger which sets status='activated'.
       // We then reset status back to 'installed' so Backfill C has work to do
       // (testing the backfill script's own logic in isolation from the trigger).
+      // HOTFIX (PR-7 blind review): resolution_status='activated' required —
+      // the selectCandidates CTE now filters WHERE resolution_status = 'activated'.
       await pool.query(`
-        INSERT INTO oes_pp_data (serial_number, olt_name)
-        VALUES ('ALCL12345002', 'OLT-TEST-01')`);
+        INSERT INTO oes_pp_data (serial_number, olt_name, resolution_status)
+        VALUES ('ALCL12345002', 'OLT-TEST-01', 'activated')`);
       await pool.query(`
         UPDATE stock_serials
            SET status='installed', activated_at_olt_id=NULL

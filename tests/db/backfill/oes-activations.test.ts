@@ -34,8 +34,8 @@ describe('Backfill C: oes_pp_data → status=activated', () => {
             SET status='installed',
                 installed_at_drop_id = '44444444-4444-4444-4444-444444444444'
           WHERE serial_number = 'ALCL12345002'`);
-      await pool.query(`INSERT INTO oes_pp_data (serial_number, olt_name)
-        VALUES ('ALCL12345002', 'OLT-CT-01')`);
+      await pool.query(`INSERT INTO oes_pp_data (serial_number, olt_name, resolution_status)
+        VALUES ('ALCL12345002', 'OLT-CT-01', 'activated')`);
       // NOTE: With PR-6 triggers installed, the INSERT above fires
       // emit_serial_event_on_oes_activate which already sets status='activated'.
       // Reset the serial back to 'installed' so the backfill script itself has
@@ -64,8 +64,8 @@ describe('Backfill C: oes_pp_data → status=activated', () => {
       await pool.query(
         `UPDATE stock_serials SET status='faulty'
          WHERE serial_number = 'ALCL12345002'`);
-      await pool.query(`INSERT INTO oes_pp_data (serial_number, olt_name)
-        VALUES ('ALCL12345002', 'OLT-CT-01')`);
+      await pool.query(`INSERT INTO oes_pp_data (serial_number, olt_name, resolution_status)
+        VALUES ('ALCL12345002', 'OLT-CT-01', 'activated')`);
       await backfillActivationsFromOES({ pool, commit: true });
       const s = await pool.query(
         `SELECT status, activated_at_olt_id FROM stock_serials
@@ -85,8 +85,8 @@ describe('Backfill C: oes_pp_data → status=activated', () => {
       await pool.query(
         `UPDATE stock_serials SET status='scrapped'
          WHERE serial_number = 'ALCL12345002'`);
-      await pool.query(`INSERT INTO oes_pp_data (serial_number, olt_name)
-        VALUES ('ALCL12345002', 'OLT-CT-01')`);
+      await pool.query(`INSERT INTO oes_pp_data (serial_number, olt_name, resolution_status)
+        VALUES ('ALCL12345002', 'OLT-CT-01', 'activated')`);
       await backfillActivationsFromOES({ pool, commit: true });
       const s = await pool.query(
         `SELECT status, activated_at_olt_id FROM stock_serials
@@ -107,9 +107,9 @@ describe('Backfill C: oes_pp_data → status=activated', () => {
     try {
       await resetSeedSerial(pool);
       await pool.query(`INSERT INTO oes_pp_data
-        (serial_number, olt_name, created_at) VALUES
-        ('ALCL12345002', 'OLT-OLD', '2025-01-01T00:00:00Z'),
-        ('ALCL12345002', 'OLT-NEW', '2026-05-01T00:00:00Z')`);
+        (serial_number, olt_name, created_at, resolution_status) VALUES
+        ('ALCL12345002', 'OLT-OLD', '2025-01-01T00:00:00Z', 'activated'),
+        ('ALCL12345002', 'OLT-NEW', '2026-05-01T00:00:00Z', 'activated')`);
       await backfillActivationsFromOES({ pool, commit: true });
       const s = await pool.query(
         `SELECT status, activated_at_olt_id FROM stock_serials
@@ -126,8 +126,8 @@ describe('Backfill C: oes_pp_data → status=activated', () => {
     const pool = new Pool({ connectionString: URL });
     try {
       await resetSeedSerial(pool);
-      await pool.query(`INSERT INTO oes_pp_data (serial_number, olt_name)
-        VALUES ('ALCL12345002', 'OLT-CT-01')`);
+      await pool.query(`INSERT INTO oes_pp_data (serial_number, olt_name, resolution_status)
+        VALUES ('ALCL12345002', 'OLT-CT-01', 'activated')`);
       await backfillActivationsFromOES({ pool, commit: true });
       const second = await backfillActivationsFromOES({ pool, commit: true });
       expect(second.updated).toBe(0);
@@ -141,8 +141,8 @@ describe('Backfill C: oes_pp_data → status=activated', () => {
     const pool = new Pool({ connectionString: URL });
     try {
       await resetSeedSerial(pool);
-      await pool.query(`INSERT INTO oes_pp_data (serial_number, olt_name)
-        VALUES ('ALCL12345002', 'OLT-CT-01')`);
+      await pool.query(`INSERT INTO oes_pp_data (serial_number, olt_name, resolution_status)
+        VALUES ('ALCL12345002', 'OLT-CT-01', 'activated')`);
       // NOTE: PR-6 trigger fires on INSERT and sets status='activated'.
       // Reset back to 'issued' so the backfill dry-run has work to report
       // and the status check below reflects the dry-run invariant (no mutation).
@@ -157,6 +157,46 @@ describe('Backfill C: oes_pp_data → status=activated', () => {
          WHERE serial_number = 'ALCL12345002'`);
       expect(s.rows[0].status).toBe('issued');                   // unchanged by dry-run
       expect(s.rows[0].activated_at_olt_id).toBeNull();          // unchanged by dry-run
+    } finally {
+      await resetSeedSerial(pool);
+      await pool.end();
+    }
+  });
+
+  it('HOTFIX: oes_pp_data row with resolution_status!=activated is excluded', async () => {
+    // Regression guard for PR-7 blind-review finding: the original selectCandidates
+    // CTE had no resolution_status filter, which would falsely promote ~807 stock_serials
+    // to 'activated' in prod (not_found / located_* rows matched ALLOWED_FROM states).
+    //
+    // The Trigger 3 (trg_emit_serial_event_on_oes_activate) fires on every
+    // oes_pp_data INSERT regardless of resolution_status — it is the live-ingest
+    // trigger, not a validation layer. We reset the serial back to 'issued' after
+    // the trigger fires so we can isolate the *backfill script's* resolution_status
+    // filtering logic.
+    const pool = new Pool({ connectionString: URL });
+    try {
+      await resetSeedSerial(pool);
+      // Serial starts at seed status 'issued' (ALLOWED_FROM state).
+      await pool.query(`
+        INSERT INTO oes_pp_data (serial_number, olt_name, resolution_status)
+        VALUES ('ALCL12345002', 'OLT-CT-01', 'not_found')`);
+
+      // Trigger 3 may have set the serial to 'activated' — reset to 'issued'
+      // so the backfill has a candidate to promote *if* it incorrectly includes
+      // the not_found row.
+      await pool.query(
+        `UPDATE stock_serials
+            SET status='issued', activated_at_olt_id=NULL
+          WHERE serial_number='ALCL12345002'`);
+
+      const r = await backfillActivationsFromOES({ pool, commit: true });
+      expect(r.updated).toBe(0);  // backfill must exclude not_found rows
+
+      const s = await pool.query(
+        `SELECT status, activated_at_olt_id FROM stock_serials
+         WHERE serial_number = 'ALCL12345002'`);
+      expect(s.rows[0].status).toBe('issued');  // backfill left it unchanged
+      expect(s.rows[0].activated_at_olt_id).toBeNull();
     } finally {
       await resetSeedSerial(pool);
       await pool.end();

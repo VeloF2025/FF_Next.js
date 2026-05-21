@@ -51,12 +51,18 @@ export async function backfillActivationsFromOES(
   // The closest timestamp is `created_at` (when the row was imported).
   // `date_registered` is a DATE (not TIMESTAMPTZ) and loses time precision,
   // so created_at is the better ordering key.
+  //
+  // HOTFIX (PR-7 blind review): filter to resolution_status='activated' only.
+  // Prod has 933 rows with resolution_status != 'activated' (not_found,
+  // located_1map, located_local, located_unified, located_oes). Including
+  // those would falsely promote ~807 stock_serials to 'activated'.
   const selectCandidates = `
     SELECT DISTINCT ON (oes.serial_number)
       oes.serial_number,
       oes.olt_name
     FROM oes_pp_data oes
     WHERE oes.serial_number IS NOT NULL
+      AND oes.resolution_status = 'activated'   -- HOTFIX: only confirmed activations
     ORDER BY oes.serial_number, oes.created_at DESC`;
 
   if (!commit) {
