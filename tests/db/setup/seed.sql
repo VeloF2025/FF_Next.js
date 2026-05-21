@@ -90,10 +90,11 @@ CREATE TABLE qa_photo_reviews (
 INSERT INTO qa_photo_reviews (drop_id, drop_number, ont_serial) VALUES
   ('44444444-4444-4444-4444-444444444444', 'DR0000001', 'ALCL12345002');
 
+-- Probe 3 confirmed prod uses olt_name, not olt_id. Seed mirrors prod.
 CREATE TABLE oes_pp_data (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   serial_number TEXT,
-  olt_id TEXT,
+  olt_name TEXT,
   pon_id TEXT,
   activated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
