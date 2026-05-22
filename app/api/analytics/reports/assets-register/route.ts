@@ -19,6 +19,11 @@ import { userHasPermission } from '@/lib/permissions';
 import { getWorksheetRange } from '@/lib/graph/sharepoint-excel';
 import type { AssetItem } from '@/modules/analytics/reports/assets-register/useAssetsRegisterData';
 
+
+// Opt out of build-time static collection. Route depends on runtime
+// SharePoint/Graph data + auth cookies that are not available during
+// `next build`. Matches sibling analytics report routes.
+export const dynamic = 'force-dynamic';
 /** Categories in the Data tab that represent Fixed Assets */
 const FIXED_ASSET_CATEGORIES = new Set([
   'Fixed Assets',
