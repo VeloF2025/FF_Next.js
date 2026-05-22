@@ -34,7 +34,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           tc.expected_return_date, tc.checked_out_at, tc.status,
           si.name AS item_name, si.item_code, si.category,
           u.first_name || ' ' || u.last_name AS checked_out_by_name,
-          p.name AS project_name,
+          p.project_name AS project_name,
           tc.expected_return_date < CURRENT_DATE AS is_overdue
         FROM tool_checkouts tc
         JOIN stock_items si ON si.id = tc.stock_item_id
@@ -54,7 +54,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           tc.expected_return_date, tc.checked_out_at, tc.status,
           si.name AS item_name, si.item_code, si.category,
           u.first_name || ' ' || u.last_name AS checked_out_by_name,
-          p.name AS project_name,
+          p.project_name AS project_name,
           tc.expected_return_date < CURRENT_DATE AS is_overdue
         FROM tool_checkouts tc
         JOIN stock_items si ON si.id = tc.stock_item_id
@@ -73,7 +73,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           tc.expected_return_date, tc.checked_out_at, tc.status,
           si.name AS item_name, si.item_code, si.category,
           u.first_name || ' ' || u.last_name AS checked_out_by_name,
-          p.name AS project_name,
+          p.project_name AS project_name,
           tc.expected_return_date < CURRENT_DATE AS is_overdue
         FROM tool_checkouts tc
         JOIN stock_items si ON si.id = tc.stock_item_id
@@ -92,7 +92,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           tc.expected_return_date, tc.checked_out_at, tc.status,
           si.name AS item_name, si.item_code, si.category,
           u.first_name || ' ' || u.last_name AS checked_out_by_name,
-          p.name AS project_name,
+          p.project_name AS project_name,
           tc.expected_return_date < CURRENT_DATE AS is_overdue
         FROM tool_checkouts tc
         JOIN stock_items si ON si.id = tc.stock_item_id
@@ -111,7 +111,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           tc.expected_return_date, tc.checked_out_at, tc.status,
           si.name AS item_name, si.item_code, si.category,
           u.first_name || ' ' || u.last_name AS checked_out_by_name,
-          p.name AS project_name,
+          p.project_name AS project_name,
           tc.expected_return_date < CURRENT_DATE AS is_overdue
         FROM tool_checkouts tc
         JOIN stock_items si ON si.id = tc.stock_item_id
@@ -129,7 +129,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           tc.expected_return_date, tc.checked_out_at, tc.status,
           si.name AS item_name, si.item_code, si.category,
           u.first_name || ' ' || u.last_name AS checked_out_by_name,
-          p.name AS project_name,
+          p.project_name AS project_name,
           tc.expected_return_date < CURRENT_DATE AS is_overdue
         FROM tool_checkouts tc
         JOIN stock_items si ON si.id = tc.stock_item_id
@@ -147,7 +147,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           tc.expected_return_date, tc.checked_out_at, tc.status,
           si.name AS item_name, si.item_code, si.category,
           u.first_name || ' ' || u.last_name AS checked_out_by_name,
-          p.name AS project_name,
+          p.project_name AS project_name,
           tc.expected_return_date < CURRENT_DATE AS is_overdue
         FROM tool_checkouts tc
         JOIN stock_items si ON si.id = tc.stock_item_id
@@ -165,7 +165,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           tc.expected_return_date, tc.checked_out_at, tc.status,
           si.name AS item_name, si.item_code, si.category,
           u.first_name || ' ' || u.last_name AS checked_out_by_name,
-          p.name AS project_name,
+          p.project_name AS project_name,
           tc.expected_return_date < CURRENT_DATE AS is_overdue
         FROM tool_checkouts tc
         JOIN stock_items si ON si.id = tc.stock_item_id
