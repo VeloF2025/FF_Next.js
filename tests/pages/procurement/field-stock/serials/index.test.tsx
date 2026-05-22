@@ -29,7 +29,7 @@ vi.mock('@/components/field-stock/SerialSearch', () => ({
   ),
 }));
 
-import SerialsSearchPage from '../index';
+import SerialsSearchPage from '@/pages/procurement/field-stock/serials/index';
 
 function mockFetchSuccess(rows: Array<Record<string, unknown>>, total: number) {
   global.fetch = vi.fn().mockResolvedValue({
