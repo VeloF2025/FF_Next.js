@@ -589,6 +589,14 @@ export default function SnagResolvePage() {
             <p className="text-xs text-zinc-400 mb-4">
               We need your details before you can start work. Stamped on every photo and step you complete.
             </p>
+            {error && (
+              <div
+                role="alert"
+                className="mb-3 rounded-md bg-red-900/20 border border-red-700/40 px-4 py-3 text-xs text-red-300"
+              >
+                {error}
+              </div>
+            )}
             <div className="space-y-3">
               <label className="block">
                 <span className="text-xs text-zinc-300">Your name *</span>
