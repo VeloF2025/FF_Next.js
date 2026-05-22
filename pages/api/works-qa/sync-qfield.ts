@@ -82,13 +82,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       poleFilter = `AND feature_id = $${params.length}`;
     }
 
-    // project_id from the client is a FibreFlow project ID. qfield_photo_validations stores
-    // QField project IDs; translate via qfield_project_links so we pull every QField project
-    // mapped to this FibreFlow project.
+    // project_id from the client is a FibreFlow project ID. qfield_photo_validations.project_id
+    // stores the EXTERNAL QField project UUID. Translate it through
+    // qfield_projects.qfield_project_id to qfield_projects.id, then join
+    // qfield_project_links by qfield_projects.id. The two-hop translation handles both
+    // "id == qfield_project_id" rows (most projects) AND aliased rows where
+    // qfield_projects.id was historically aliased to the FF project UUID
+    // (FT_Etwatwa_POP_2, VT_Tonga, MAM Pole Audit (Offline), Grabouw QA, Grabouw
+    // Drill Survey). Without the translation those projects' photos are invisible
+    // to this sync — see migration 376 which links them safely now.
     const qResult = await pool.query<QFieldRow>(`
       SELECT q.feature_id, q.photo_key, q.checklist_step, q.work_type, q.vlm_confidence, q.vlm_feedback
       FROM qfield_photo_validations q
-      INNER JOIN qfield_project_links l ON l.qfield_project_id = q.project_id
+      INNER JOIN qfield_projects qp ON qp.qfield_project_id = q.project_id::text
+      INNER JOIN qfield_project_links l ON l.qfield_project_id = qp.id
       WHERE l.fibreflow_project_id = $1::uuid
         AND q.feature_type = 'pole'
         ${poleFilter ? poleFilter.replace('feature_id', 'q.feature_id') : ''}
