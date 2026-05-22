@@ -9,6 +9,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 import {
   checkPendingValueCap,
   PENDING_TECH_VALUE_CAP_ZAR,
@@ -141,6 +142,15 @@ async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.validationError(res, { lines: 'At least one picking line is required' });
     }
 
+    // Resolve creator staff_id from the authenticated user. Nullable — admin /
+    // system users without a staff row write NULL (matches the partial-index
+    // predicate `WHERE created_by_staff_id IS NOT NULL` from migration 370).
+    const authUser = (req as AuthenticatedNextApiRequest).user;
+    const staffRows = await sql`
+      SELECT id FROM staff WHERE user_id = ${authUser.id} LIMIT 1
+    `;
+    const createdByStaffId = (staffRows as Array<{ id: string }>)[0]?.id ?? null;
+
     // ── H5: Require technicianId for FIELD-DEFAULT destination ───────────────
     // Extracted to _validation.ts; see validateFieldDefaultDestination for rationale.
     const fieldDefaultCheck = await validateFieldDefaultDestination({
@@ -226,14 +236,16 @@ async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
         project_id, job_reference, job_type,
         contractor_id, contractor_name, team_name,
         technician_id, technician_name,
-        scheduled_date, status, notes
+        scheduled_date, status, notes,
+        created_by_staff_id
       ) VALUES (
         ${pickingNumber}, ${pickingType || null},
         ${sourceLocationId}, ${destinationLocationId},
         ${projectId || null}, ${jobReference || null}, ${jobType || null},
         ${contractorId || null}, ${contractorName || null}, ${teamName || null},
         ${technicianId || null}, ${technicianName || null},
-        ${scheduledDate || null}, 'draft', ${notes || null}
+        ${scheduledDate || null}, 'draft', ${notes || null},
+        ${createdByStaffId}
       )
       RETURNING *
     `;
