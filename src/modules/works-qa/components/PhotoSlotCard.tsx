@@ -74,8 +74,11 @@ export function PhotoSlotCard({
     status === 'fail' ? 'bg-red-500/5' :
     'bg-zinc-900';
 
+  // Slot Droppable: only `!!photoKey` gates drop (slot already filled).
+  // Pole-level `disabled` is intentionally NOT consulted — unassigned-→-slot
+  // is a cleanup action allowed on approved poles too (Johan WA 2026-05-22).
   return (
-    <Droppable droppableId={`slot:${slotKey}`} isDropDisabled={disabled || !!photoKey}>
+    <Droppable droppableId={`slot:${slotKey}`} isDropDisabled={!!photoKey}>
       {(dropProvided, dropSnap) => (
         <div
           ref={dropProvided.innerRef}
@@ -84,12 +87,17 @@ export function PhotoSlotCard({
             dropSnap.isDraggingOver ? 'ring-2 ring-teal-400/60' : ''
           } ${isDragOver ? 'ring-2 ring-teal-500/60 bg-teal-500/5' : ''}`}
           onDragOver={e => {
-            if (disabled || photoKey) return;
+            if (photoKey) return;
             e.preventDefault();
             if (!isDragOver) setIsDragOver(true);
           }}
           onDragLeave={() => setIsDragOver(false)}
           onDrop={e => {
+            // OS file-drop path (drops from the user's file manager). This is
+            // a NEW-content path, distinct from the @hello-pangea/dnd
+            // unassigned→slot move handled by the Droppable above. NEW content
+            // is still gated on `disabled` (= pole approved) — same policy as
+            // the upload button.
             if (disabled || photoKey) return;
             e.preventDefault();
             setIsDragOver(false);

@@ -78,6 +78,11 @@ export function UnassignedBucket({
 
       <UploadChipList chips={chips} />
 
+      {/* `disabled` (= pole approved) blocks NEW content into unassigned:
+          - the [+ Bulk upload] button is hidden (above)
+          - dropping a photo back FROM a slot INTO unassigned is disabled (this Droppable)
+        but it does NOT block dragging existing unassigned photos OUT to slots
+        — that's a cleanup action, allowed even on approved poles. */}
       <Droppable droppableId="unassigned" direction="horizontal" isDropDisabled={disabled}>
         {(provided, snapshot) => (
           <div
@@ -98,7 +103,7 @@ export function UnassignedBucket({
                 {photoKeys.map((key, i) => {
                   const suggestion = suggestionMap[key];
                   return (
-                    <Draggable key={key} draggableId={`unassigned:${key}`} index={i} isDragDisabled={disabled}>
+                    <Draggable key={key} draggableId={`unassigned:${key}`} index={i}>
                       {(dragProvided, dragSnap) => (
                         <div
                           ref={dragProvided.innerRef}
@@ -107,15 +112,17 @@ export function UnassignedBucket({
                             dragSnap.isDragging ? 'ring-2 ring-teal-400 shadow-lg shadow-teal-500/30 z-50' : ''
                           }`}
                         >
-                          {!disabled && (
-                            <div
-                              {...dragProvided.dragHandleProps}
-                              aria-label="Drag to slot"
-                              className="absolute top-1 left-1 z-10 p-0.5 rounded bg-black/60 text-zinc-200 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
-                            >
-                              <GripVertical className="w-3 h-3" aria-hidden="true" />
-                            </div>
-                          )}
+                          {/* Drag handle is always shown — dragging unassigned photos
+                              OUT to slots is allowed even on approved poles
+                              (cleanup action; the slot Droppable still rejects when
+                              the slot already has a photo or pole is approved). */}
+                          <div
+                            {...dragProvided.dragHandleProps}
+                            aria-label="Drag to slot"
+                            className="absolute top-1 left-1 z-10 p-0.5 rounded bg-black/60 text-zinc-200 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+                          >
+                            <GripVertical className="w-3 h-3" aria-hidden="true" />
+                          </div>
 
                           <UnassignedThumb photoKey={key} index={i} onView={onView} />
 
