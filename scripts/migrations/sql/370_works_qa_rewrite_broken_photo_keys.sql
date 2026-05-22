@@ -46,6 +46,17 @@ CREATE TABLE IF NOT EXISTS works_qa_photo_key_rewrites_2026_05_22 (
   rewritten_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Clear leftover rows from a prior aborted attempt — but ONLY if 370 has not
+-- yet been successfully applied. The rollback script reads from this audit
+-- table to reverse rewrites; truncating it after a successful apply would
+-- silently destroy the rollback history.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM migrations WHERE version = '370') THEN
+    TRUNCATE works_qa_photo_key_rewrites_2026_05_22;
+  END IF;
+END $$;
+
 -- Identify rewrites
 WITH broken AS (
   SELECT p.id AS pole_id, p.pole_label, k AS broken_key,
