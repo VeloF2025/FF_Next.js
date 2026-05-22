@@ -26,6 +26,12 @@ function toggleStatus(prev: string[] | undefined, value: string): string[] {
   return Array.from(set);
 }
 
+/**
+ * Caller contract: `onFiltersChange` MUST be a stable reference (wrap in
+ * `useCallback` at the call site). The 300ms debounce keys off this prop's
+ * identity — passing an inline arrow function will reset the timer on every
+ * parent re-render and silently break debouncing.
+ */
 export function SerialSearch({ initialFilters, onFiltersChange, categories = [] }: SerialSearchProps) {
   const [filters, setFilters] = useState<SerialSearchFilters>(initialFilters);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);

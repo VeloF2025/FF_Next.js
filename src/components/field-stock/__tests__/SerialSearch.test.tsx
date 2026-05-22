@@ -1,9 +1,13 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SerialSearch } from '../SerialSearch';
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('SerialSearch', () => {
   it('renders search input prefilled from initialFilters.q', () => {
