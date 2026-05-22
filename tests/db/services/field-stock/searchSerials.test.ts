@@ -47,7 +47,7 @@ beforeAll(async () => {
     [WAREHOUSE]
   );
   await pool.query(
-    `INSERT INTO projects (id, name) VALUES ($1, 'PR8 Test Project')
+    `INSERT INTO projects (id, project_name) VALUES ($1, 'PR8 Test Project')
      ON CONFLICT (id) DO NOTHING`,
     [PROJECT_PR8]
   );
