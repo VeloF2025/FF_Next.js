@@ -51,7 +51,7 @@ export async function getSerialTimeline(serialNumber: string): Promise<TimelineR
       si.name AS item_name,
       ss.status,
       sl.name AS location_name,
-      p.name AS project_name,
+      p.project_name AS project_name,
       ss.installed_at_drop_number AS drop_number,
       ss.installed_date,
       ss.received_date,
