@@ -35,3 +35,18 @@ export interface ForceCorrectTarget {
   installedAtDropNumber?: string | null;
   activatedAtOltId?: string | null;
 }
+
+/**
+ * Snapshot of correctable stock_serials columns observed at a point in time.
+ * Used by ForceCorrectRowResult.before / after to record what changed and what
+ * the new state is. Distinct from ForceCorrectTarget (write intent) so callers
+ * cannot accidentally pass a write-intent object where an observed-state snapshot
+ * is expected. Sparse by design — only fields that actually changed appear.
+ */
+export interface ForceCorrectSnapshot {
+  status?: ForceCorrectStatus;
+  currentLocationId?: string | null;
+  allocatedToProjectId?: string | null;
+  installedAtDropNumber?: string | null;
+  activatedAtOltId?: string | null;
+}

@@ -1,12 +1,12 @@
-import type { ForceCorrectTarget } from './forceCorrectTarget';
+import type { ForceCorrectTarget, ForceCorrectSnapshot } from './forceCorrectTarget';
 
 export interface ForceCorrectRowResult {
   serialNumber: string;
   found: boolean;
   applied: boolean;
-  before?: Partial<ForceCorrectTarget>;
-  after?: Partial<ForceCorrectTarget>;
-  changedFields: string[];
+  before?: ForceCorrectSnapshot;
+  after?: ForceCorrectSnapshot;
+  changedFields: (keyof ForceCorrectTarget)[];
   error?: string;
 }
 
