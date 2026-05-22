@@ -93,7 +93,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
 
       const slotEmpty = pole[meta.dbColumn] == null;
-      const canAutoPlace = confidence >= AUTO_PLACE_THRESHOLD && slotEmpty;
+
+      // If the target slot is already filled, leave the photo as leftover.
+      // Don't write a "suggested" entry — that would render an Accept badge,
+      // and Accept routes through move-photo whose swap behavior pushes the
+      // existing (manually placed or earlier-synced) photo out of the slot
+      // into unassigned. From the reviewer's perspective the slot now shows
+      // a different photo, which reads as "auto-sort overwrote my civil
+      // photo" (Johan, 2026-05-22 15:08 WA).
+      if (!slotEmpty) {
+        leftover++;
+        results.push({ photo_key, predicted_slot: slot_key, confidence, action: 'leftover' });
+        continue;
+      }
+
+      const canAutoPlace = confidence >= AUTO_PLACE_THRESHOLD;
 
       if (canAutoPlace) {
         const client = await pool.connect();
@@ -131,7 +145,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           auto_placed++;
           results.push({ photo_key, predicted_slot: slot_key, confidence, action: 'auto-placed' });
         } catch (err) {
-          await client.query('ROLLBACK').catch(() => {});
+          await client.query('ROLLBACK').catch(rbErr => {
+            log.warn('works-qa/auto-sort: rollback failed', {
+              error: rbErr instanceof Error ? rbErr.message : String(rbErr),
+            });
+          });
           log.error('works-qa/auto-sort: auto-place failed', {
             error: err instanceof Error ? err.message : String(err),
             pole_id, photo_key, slot_key,
@@ -144,9 +162,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         continue;
       }
 
-      // Suggestion tier (≥0.6 but either <0.95 or slot already filled). Per-photo
-      // try/catch so a single UPDATE failure doesn't lose the auto-placed photos
-      // already committed in previous loop iterations — fall back to leftover.
+      // Suggestion tier (0.6 ≤ confidence < 0.95 AND slot was empty when we
+      // started this iteration). Higher-confidence + empty-slot already
+      // auto-placed above; filled slots are leftover by the guard at line ~95.
+      // Per-photo try/catch so a single UPDATE failure doesn't lose the
+      // auto-placed photos already committed in previous loop iterations.
       try {
         await pool.query(
           `UPDATE pole_qa_photos
