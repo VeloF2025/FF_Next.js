@@ -26,6 +26,15 @@
 -- is removed at the end (no callers can produce that status anymore).
 --
 -- Idempotent: safe to re-run (no-op once the closed→resolved rewrite is done).
+--
+-- Hotfix 2026-05-22: dropped `status_changed_at = COALESCE(...)` from the
+-- UPDATE. That column was never added to maintenance_tickets — application
+-- code (src/modules/noc/types/ticket.ts, KanbanCard.tsx) references it as
+-- optional and falls back to `updated_at` when null/undefined, so removing
+-- the line is harmless. Re-adding it would require a separate migration to
+-- ADD COLUMN + a trigger to maintain it (out of scope here). Without this
+-- fix, the migration parser rejects the UPDATE before evaluating WHERE,
+-- blocking the deploy pipeline even when 0 'closed' rows exist.
 
 BEGIN;
 
@@ -46,7 +55,6 @@ UPDATE maintenance_tickets
    SET status = 'resolved',
        resolved_at = COALESCE(resolved_at, closed_at, NOW()),
        resolution_time = COALESCE(resolution_time, closed_at - created_at, NOW() - created_at),
-       status_changed_at = COALESCE(status_changed_at, closed_at, NOW()),
        updated_at = NOW()
  WHERE status = 'closed';
 
