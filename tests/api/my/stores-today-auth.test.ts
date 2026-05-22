@@ -51,8 +51,7 @@ describe('GET /api/my/stores/today — real withMySession', () => {
     const req = {
       method: 'GET',
       query: {},
-      cookies: {},
-      headers: {},
+      headers: {}, // no Cookie header — readSessionCookie returns null
     } as unknown as NextApiRequest;
     const res = makeRes();
 
@@ -62,12 +61,14 @@ describe('GET /api/my/stores/today — real withMySession', () => {
     expect(res.jsonData?.success).toBe(false);
   });
 
-  it('returns 401 when the cookie is present but malformed', async () => {
+  it('returns 401 when the cookie is present but HMAC-invalid (exercises verifyToken)', async () => {
+    // readSessionCookie reads `parse(req.headers.cookie || '')`, NOT req.cookies.
+    // The Cookie header must be a string; the value here has no HMAC suffix
+    // so verifyToken's signature-rejection branch fires.
     const req = {
       method: 'GET',
       query: {},
-      cookies: { ff_my_session: 'not-a-valid-signed-cookie' },
-      headers: {},
+      headers: { cookie: 'ff_my_session=not-a-valid-signed-cookie' },
     } as unknown as NextApiRequest;
     const res = makeRes();
 
