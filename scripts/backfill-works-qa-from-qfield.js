@@ -152,9 +152,17 @@ async function syncProject(pool, projectId) {
   return { synced, unassigned, skipped, considered: rows.length };
 }
 
+// Extract a stable "logical path" from a qfield photo key: everything after
+// `/files/` minus the version suffix. Two keys differing only in project id
+// or version (e.g. an audit-project versioned key vs a primary-project
+// unversioned twin) share the same logical path, so we can dedup by it.
+const LOGICAL_PATH_RE = `regexp_replace(k, '^.*?/files/(.*?)(/v[0-9]{14}-[a-f0-9]+)?$', '\\1')`;
+
 async function pushUnassigned(pool, projectId, poleLabel, photoKey) {
-  // Build NOT IN clause from SLOT_COLUMNS to detect "already assigned"
-  const slotCols = SLOT_COLUMNS.map(c => `COALESCE(qa.${c}, '')`).join(', ');
+  // Build the list of slot keys for the same pole as a flat array.
+  // We compare on logical_path so a key under a different qfield project
+  // (or with/without version suffix) for the same underlying photo dedups.
+  const slotColArray = `ARRAY[${SLOT_COLUMNS.map(c => `qa.${c}`).join(', ')}, NULL]`;
   const r = await pool.query(
     `UPDATE pole_qa_photos qa
      SET unassigned_photo_keys =
@@ -162,9 +170,17 @@ async function pushUnassigned(pool, projectId, poleLabel, photoKey) {
          updated_at = NOW()
      WHERE qa.project_id = $1::uuid
        AND qa.pole_label = $2
-       AND NOT ($3 = ANY(COALESCE(qa.unassigned_photo_keys, '{}'::text[])))
-       AND NOT ($3 = ANY(COALESCE(qa.main_joint_tray_keys,  '{}'::text[])))
-       AND $3 NOT IN (${slotCols})`,
+       AND NOT EXISTS (
+         SELECT 1
+         FROM unnest(
+           COALESCE(qa.unassigned_photo_keys, '{}'::text[])
+           || COALESCE(qa.main_joint_tray_keys,  '{}'::text[])
+           || ${slotColArray}
+         ) AS k
+         WHERE k IS NOT NULL AND k <> ''
+           AND ${LOGICAL_PATH_RE}
+             = regexp_replace($3, '^.*?/files/(.*?)(/v[0-9]{14}-[a-f0-9]+)?$', '\\1')
+       )`,
     [projectId, poleLabel, photoKey]
   );
   return (r.rowCount ?? 0) > 0;
