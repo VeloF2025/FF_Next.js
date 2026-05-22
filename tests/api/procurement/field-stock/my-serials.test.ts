@@ -18,9 +18,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 const { mockSql } = vi.hoisted(() => ({ mockSql: vi.fn() }));
 
 vi.mock('@/lib/db', () => ({
+  // Handler imports `{ sql }` only — pool/default kept off the mock to avoid
+  // implying the handler reaches for them.
   sql: mockSql,
-  pool: { query: mockSql },
-  default: { query: mockSql },
 }));
 
 vi.mock('@/lib/auth', () => ({

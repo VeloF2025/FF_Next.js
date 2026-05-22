@@ -39,6 +39,7 @@ vi.mock('@neondatabase/serverless', () => ({
 vi.mock('@/lib/db-pool', () => ({
   sql: mockPgSql,
   pool: { query: mockPgSql },
+  default: { query: mockPgSql },
 }));
 
 vi.mock('@/lib/auth', () => ({

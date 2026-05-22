@@ -47,10 +47,9 @@ vi.mock('@neondatabase/serverless', () => ({
 vi.mock('@/lib/db', () => ({
   // returns/index.ts (the create handler) migrated to @/lib/db. Wire its
   // tagged-template sql to the same mockSql so the existing fixture sequence
-  // covers all queries from all three handlers.
+  // covers all queries from all three handlers. (Handler imports `{ sql }`
+  // only — no pool/default reach.)
   sql: mockSql,
-  pool: { query: mockSql },
-  default: { query: mockSql },
 }));
 
 vi.mock('@/lib/auth', () => ({
@@ -371,10 +370,10 @@ describe('Returns full flow integration', () => {
         s.includes('stock_serials') && s.includes("'scrapped'")
       )).toBe(true);
 
-      // stock_movements integration is deferred to Phase 4 (see comment in
-      // accept.ts:179-188 — the original schema-mismatched INSERT was removed
-      // because it always failed silently). When Phase 4 lands, this will
-      // become `expect(movementInserts.length).toBe(2)` again.
+      // TODO(phase-4): stock_movements integration is deferred to Phase 4
+      // (see accept.ts:179-188 — the original schema-mismatched INSERT was
+      // removed because it always failed silently). When Phase 4 lands,
+      // flip this to `expect(movementInserts.length).toBe(2)`.
       const movementInserts = clientCalls.filter((s) => s.includes('stock_movements'));
       expect(movementInserts.length).toBe(0);
 
