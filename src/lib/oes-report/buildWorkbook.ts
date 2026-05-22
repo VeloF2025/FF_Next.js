@@ -6,9 +6,17 @@ import type {
   TicketMap,
   TicketRow,
 } from './queries';
+import type {
+  NotFoundRow,
+  LinkedAwaitingRow,
+  FtDisputeDefiniteRow,
+  FtDisputeLifecycleRow,
+} from './queriesV2';
 import type { DailySummary } from './dailySummaryQueries';
 import { addFtDisputeSheet } from './ftDisputeSheet';
 import { addDailySummarySheet } from './dailySummarySheet';
+import { addPpNotFoundSheet, addPpLinkedAwaitingSheet } from './ppSheetsV2';
+import { addFtDisputeDefiniteSheet, addFtDisputeLifecycleSheet } from './ftDisputeSheetsV2';
 
 const TICKET_BASE_URL = 'https://app.fibreflow.app/noc/tickets/';
 
@@ -85,15 +93,34 @@ function maxTicketsFor(
   return max;
 }
 
-export async function buildOesWorkbook(opts: {
+/** Base opts shared by both flag paths. */
+interface BuildWorkbookBaseOpts {
   allRows: AllRow[];
-  ppRows: PpRow[];
-  ftDisputeRows: FtDisputeRow[];
   dailySummary: DailySummary;
   ticketMap: TicketMap;
   reportDate: string;
-}): Promise<Buffer> {
-  const { allRows, ppRows, ftDisputeRows, dailySummary, ticketMap } = opts;
+}
+
+/** Flag-off opts (legacy 4-tab layout). */
+interface BuildWorkbookLegacyOpts extends BuildWorkbookBaseOpts {
+  lifecycleV2: false;
+  ppRows: PpRow[];
+  ftDisputeRows: FtDisputeRow[];
+}
+
+/** Flag-on opts (6-tab lifecycle layout). */
+interface BuildWorkbookV2Opts extends BuildWorkbookBaseOpts {
+  lifecycleV2: true;
+  ppNotFoundRows: NotFoundRow[];
+  ppLinkedAwaitingRows: LinkedAwaitingRow[];
+  ftDisputeDefiniteRows: FtDisputeDefiniteRow[];
+  ftDisputeLifecycleRows: FtDisputeLifecycleRow[];
+}
+
+type BuildWorkbookOpts = BuildWorkbookLegacyOpts | BuildWorkbookV2Opts;
+
+export async function buildOesWorkbook(opts: BuildWorkbookOpts): Promise<Buffer> {
+  const { allRows, dailySummary, ticketMap } = opts;
   const wb = new ExcelJS.Workbook();
   wb.creator = 'FibreFlow';
   wb.created = new Date();
@@ -163,49 +190,75 @@ export async function buildOesWorkbook(opts: {
   );
   totalRowAct.font = { bold: true };
 
-  // ── Tab 3: PP's ──────────────────────────────────────────────────────────
-  const sheetPp = wb.addWorksheet("PP's");
-  const ppHeaders = [
-    'Project', 'Serial', 'Date Registered', 'Status', 'Matched Drop',
-  ];
-  sheetPp.columns = [
-    { key: 'project',              width: 16 },
-    { key: 'serial_number',        width: 18 },
-    { key: 'date_registered',      width: 18 },
-    { key: 'resolution_status',    width: 16 },
-    { key: 'resolved_drop_number', width: 16 },
-  ];
+  // ── Tabs 3–6: flag-gated layout ─────────────────────────────────────────
+  // Flag OFF (legacy): Tab 3 = PP's, Tab 4 = FT Dispute (unchanged).
+  // Flag ON  (v2):     Tab 3 = PP — Not Found, Tab 4 = PP — Linked Awaiting,
+  //                    Tab 5 = FT Dispute — Definite, Tab 6 = FT Dispute — Lifecycle.
 
-  const maxTicketColsPp = maxTicketsFor(
-    ppRows.map(r => ({ dr: r.resolved_drop_number, serial: r.serial_number })),
-    ticketMap,
-  );
-  for (let i = 0; i < maxTicketColsPp; i++) {
-    sheetPp.getColumn(6 + i).width = 20;
+  let ppAndDisputeSheets: ExcelJS.Worksheet[];
+
+  if (!opts.lifecycleV2) {
+    // ── Flag OFF: legacy 4-tab layout ──────────────────────────────────────
+    const { ppRows, ftDisputeRows } = opts;
+
+    const sheetPp = wb.addWorksheet("PP's");
+    const ppHeaders = [
+      'Project', 'Serial', 'Date Registered', 'Status', 'Matched Drop',
+    ];
+    sheetPp.columns = [
+      { key: 'project',              width: 16 },
+      { key: 'serial_number',        width: 18 },
+      { key: 'date_registered',      width: 18 },
+      { key: 'resolution_status',    width: 16 },
+      { key: 'resolved_drop_number', width: 16 },
+    ];
+
+    const maxTicketColsPp = maxTicketsFor(
+      ppRows.map(r => ({ dr: r.resolved_drop_number, serial: r.serial_number })),
+      ticketMap,
+    );
+    for (let i = 0; i < maxTicketColsPp; i++) {
+      sheetPp.getColumn(6 + i).width = 20;
+    }
+
+    styleHeader(sheetPp.addRow(
+      maxTicketColsPp > 0
+        ? [...ppHeaders, ...Array.from({ length: maxTicketColsPp }, (_, i) => `Ticket ${i + 1}`)]
+        : ppHeaders
+    ));
+
+    for (const r of ppRows) {
+      const row = sheetPp.addRow([
+        r.project, r.serial_number, r.date_registered,
+        r.resolution_status, r.resolved_drop_number,
+      ]);
+      addTicketCells(row, 6, r.resolved_drop_number, r.serial_number, ticketMap);
+    }
+
+    const totalRowPp = sheetPp.addRow([`${ppRows.length} total`, '', '', '', '']);
+    totalRowPp.font = { bold: true };
+
+    const sheetDisp = addFtDisputeSheet(wb, ftDisputeRows, ticketMap);
+    ppAndDisputeSheets = [sheetPp, sheetDisp];
+
+  } else {
+    // ── Flag ON: 6-tab lifecycle layout ────────────────────────────────────
+    const {
+      ppNotFoundRows,
+      ppLinkedAwaitingRows,
+      ftDisputeDefiniteRows,
+      ftDisputeLifecycleRows,
+    } = opts;
+
+    const sheetNotFound   = addPpNotFoundSheet(wb, ppNotFoundRows);
+    const sheetLinked     = addPpLinkedAwaitingSheet(wb, ppLinkedAwaitingRows);
+    const sheetDefinite   = addFtDisputeDefiniteSheet(wb, ftDisputeDefiniteRows, ticketMap);
+    const sheetLifecycle  = addFtDisputeLifecycleSheet(wb, ftDisputeLifecycleRows, ticketMap);
+    ppAndDisputeSheets = [sheetNotFound, sheetLinked, sheetDefinite, sheetLifecycle];
   }
-
-  styleHeader(sheetPp.addRow(
-    maxTicketColsPp > 0
-      ? [...ppHeaders, ...Array.from({ length: maxTicketColsPp }, (_, i) => `Ticket ${i + 1}`)]
-      : ppHeaders
-  ));
-
-  for (const r of ppRows) {
-    const row = sheetPp.addRow([
-      r.project, r.serial_number, r.date_registered,
-      r.resolution_status, r.resolved_drop_number,
-    ]);
-    addTicketCells(row, 6, r.resolved_drop_number, r.serial_number, ticketMap);
-  }
-
-  const totalRowPp = sheetPp.addRow([`${ppRows.length} total`, '', '', '', '']);
-  totalRowPp.font = { bold: true };
-
-  // ── Tab 4: FT Dispute ────────────────────────────────────────────────────
-  const sheetDisp = addFtDisputeSheet(wb, ftDisputeRows, ticketMap);
 
   // ── Freeze header rows on all tabs ───────────────────────────────────────
-  for (const sheet of [sheetSummary, sheetAct, sheetPp, sheetDisp]) {
+  for (const sheet of [sheetSummary, sheetAct, ...ppAndDisputeSheets]) {
     sheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1, activeCell: 'A2' }];
   }
 

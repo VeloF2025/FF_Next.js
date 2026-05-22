@@ -5,6 +5,32 @@
  * during phased deployment.
  */
 
+// ============================================================================
+// ONT_LIFECYCLE_V2 — Task #3
+// ============================================================================
+
+/**
+ * Returns true when the ONT_LIFECYCLE_V2 feature flag is enabled.
+ *
+ * Flag is controlled exclusively by the environment variable
+ * `ONT_LIFECYCLE_V2`. Any truthy string value (`'true'`, `'1'`) enables it;
+ * anything else (including absent / `'false'` / `'0'`) leaves behavior
+ * byte-identical to the pre-375-migration code path.
+ *
+ * Default: OFF.
+ *
+ * When ON:
+ *  - `oesImportService.importPPData` does NOT demote `activated` rows to
+ *    `not_found` on FT re-list — lifecycle is one-way.
+ *  - The nightly OES workbook is extended from 4 tabs to 6 tabs:
+ *    PP — Not Found, PP — Linked Awaiting, FT Dispute — Definite,
+ *    FT Dispute — Lifecycle.
+ */
+export function isOntLifecycleV2Enabled(): boolean {
+  const val = process.env.ONT_LIFECYCLE_V2;
+  return val === 'true' || val === '1';
+}
+
 export type Project = 'Velo Test' | 'Lawley' | 'Mohadin' | 'Mamelodi' | string;
 
 export type FeatureFlag = {

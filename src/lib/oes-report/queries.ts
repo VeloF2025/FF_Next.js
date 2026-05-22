@@ -140,6 +140,8 @@ export async function loadLatestOesReportDate(): Promise<string> {
     ?? new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Johannesburg' });
 }
 
+// ONT_LIFECYCLE_V2 query functions live in queriesV2.ts — import directly from there.
+
 export async function loadTicketsForKeys(
   drNumbers: string[],
   ontSerials: string[]
