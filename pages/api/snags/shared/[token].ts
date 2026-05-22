@@ -150,7 +150,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     ticketData = await resolveToken(token);
   } catch (err) {
     log.error('Failed to resolve share token', { error: err instanceof Error ? err.message : 'Unknown', token: token.substring(0, 8) });
-    return apiResponse.internalError(res, err);
+    return apiResponse.internalError(res, err, 'Failed to load ticket details');
   }
   if (!ticketData || !ticketData.is_active) {
     return apiResponse.error(res, ErrorCode.NOT_FOUND, 'Invalid or expired share link');
@@ -403,7 +403,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.success(res, { uploaded: true, url: fileUrl, slotKey: slotKeyField });
       } catch (err) {
         log.error('Shared ticket: photo upload failed', { ticketId, error: err instanceof Error ? err.message : 'Unknown' });
-        return apiResponse.internalError(res, new Error('Photo upload failed'));
+        return apiResponse.internalError(res, err, 'Photo upload failed');
       }
     }
 
@@ -476,7 +476,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ` as Array<{ id: string; name: string; phone: string; company: string | null; was_update: boolean }>;
 
         const actor = rows[0];
-        if (!actor) return apiResponse.internalError(res, new Error('Failed to register actor'));
+        if (!actor) return apiResponse.internalError(res, new Error('Failed to register actor'), 'Could not register your identity — please try again');
 
         if (actor.was_update) {
           log.info('Shared ticket: actor session refreshed (possible identity change)', {
@@ -549,7 +549,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Invalid action');
     } catch (error) {
       log.error('Shared ticket action error', { error, ticketId, action });
-      return apiResponse.internalError(res, error);
+      return apiResponse.internalError(res, error, 'Action failed — please try again');
     }
   }
 
