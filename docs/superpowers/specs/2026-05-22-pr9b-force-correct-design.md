@@ -50,7 +50,7 @@ Today, only Hein/the DBA can remediate this state. Building a controlled, audita
 
 ```
 ┌─ Service ─────────────────────────────────────────────────────┐
-│  src/services/procurement/serialForceCorrect.ts               │
+│  src/modules/procurement/field-stock/services/serialForceCorrectService.ts               │
 │    forceCorrectSerials(params) → ForceCorrectResult           │
 │      • Each serial wrapped in its own pg txn (best-effort)    │
 │      • Uses pg.Pool via @/lib/db, NOT @neondatabase/serverless│
@@ -87,7 +87,7 @@ Today, only Hein/the DBA can remediate this state. Building a controlled, audita
 
 ## 4 — API & service contract
 
-### Service: `src/services/procurement/serialForceCorrect.ts`
+### Service: `src/modules/procurement/field-stock/services/serialForceCorrectService.ts`
 
 ```typescript
 import type { SerialStatusValue } from '@/types/procurement/stock/enums.types';
@@ -306,7 +306,7 @@ Per CLAUDE.md hard rule #4 (goal-driven verification) + Wave 2 lessons.
 
 | Layer | File | Coverage |
 |---|---|---|
-| **Service unit + integration (real Postgres)** | `tests/services/procurement/serialForceCorrect.test.ts` | Uses `tests/db/setup/seed.sql` (the seed that was repaired in Wave 2 to mirror prod's `projects.project_name`). Covers: dry-run preview, single-serial apply, batch apply, no-op detection (already-in-target-state), not-found serial, `null` vs `undefined` target semantics, audit-row JSONB shape, per-serial txn isolation (one failure ≠ batch failure), audit row written for changed rows but NOT for no-op or not-found. |
+| **Service unit + integration (real Postgres)** | `tests/db/services/field-stock/serialForceCorrect.test.ts` | Uses `tests/db/setup/seed.sql` (the seed that was repaired in Wave 2 to mirror prod's `projects.project_name`). Covers: dry-run preview, single-serial apply, batch apply, no-op detection (already-in-target-state), not-found serial, `null` vs `undefined` target semantics, audit-row JSONB shape, per-serial txn isolation (one failure ≠ batch failure), audit row written for changed rows but NOT for no-op or not-found. |
 | **API handler (mocked service)** | `tests/api/procurement/field-stock/serials/force-correct.test.ts` | Mocks `forceCorrectSerials`. Covers: method allowlist (`GET` → 405), validation errors (empty `serials`, no `target` fields, `reason` <10 chars, status not in enum, batch > 500), `withAuth` enforcement (no user → 401), permission check (denied → 403), `dryRun` defaulting to `true` when missing from body. |
 | **RBAC migration** | `tests/migrations/<version>_rbac_field_stock_force_correct.test.ts` | Apply migration to test DB → assert permission row exists with expected `resource_key`. Apply twice → assert idempotent (no error, no duplicate row). Assert super_admin grant row exists. |
 | **UI smoke (Playwright MCP)** | Browser test via `mcp__playwriter__execute` per `feedback_browser_playwright`. Two flows: (1) detail-page modal apply on a seeded test serial; (2) batch page paste 3 serials → preview → apply. Screenshots into PR body (or `page.evaluate()` DOM extraction per Wave 2 lesson #3 if `captureScreenshot` times out on dev). |
