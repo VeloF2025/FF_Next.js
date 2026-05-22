@@ -62,6 +62,20 @@ export async function setup() {
   await pool.query(dropsTrigger);
   await pool.end();
   process.env.DATABASE_URL_TEST = URL;
+  // Service-layer integration tests (tests/db/services/*) call into the
+  // shared @/lib/db pool which reads DATABASE_URL at module-load. Point it
+  // at the test container so those services hit the right DB. Existing
+  // tests/db/triggers/* + tests/db/backfill/* construct their own pg.Pool
+  // from DATABASE_URL_TEST and are unaffected.
+  //
+  // Race caveat: vitest's globalSetup runs once before workers spawn, and
+  // workers inherit `process.env` snapshotted at fork time — so any test
+  // module loaded by a worker will see this DATABASE_URL value. The risk
+  // is that another vitest invocation running in the SAME process (not the
+  // standard CLI flow, but possible under watch mode or library embedding)
+  // could observe DATABASE_URL changing mid-run. Documented for awareness;
+  // not an issue under `npm run test:db` which uses a fresh process.
+  process.env.DATABASE_URL = URL;
 }
 
 export async function teardown() {

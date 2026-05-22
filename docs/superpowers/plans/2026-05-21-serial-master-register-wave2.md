@@ -122,16 +122,31 @@ pages/api/procurement/field-stock/serials/
   search.ts                                  NEW (PR-8)  — GET search endpoint
   timeline.ts                                NEW (PR-9a) — GET timeline endpoint (FLAT, ?serialNumber=…)
 
-src/services/field-stock/serials/
-  searchSerials.ts                           NEW (PR-8)  — pg.Pool query layer (≤200 lines)
-  getSerialTimeline.ts                       NEW (PR-9a) — pg.Pool query layer (≤200 lines)
-  __tests__/searchSerials.test.ts            NEW (PR-8)  — real-DB integration test
-  __tests__/getSerialTimeline.test.ts        NEW (PR-9a) — real-DB integration test
+src/modules/procurement/field-stock/services/                  ← PR-8 Amendment 2026-05-22 (was src/services/field-stock/serials/)
+  serialSearchService.ts                     NEW (PR-8)  — pg.Pool query layer (≤200 lines)
+  serialTimelineService.ts                   NEW (PR-9a) — pg.Pool query layer (≤200 lines)
+  # Sibling to the existing serialService.ts / consumptionService.ts / locationService.ts in this dir.
+
+tests/db/services/field-stock/                                 ← PR-8 Amendment 2026-05-22 (was src/services/__tests__/)
+  searchSerials.test.ts                      NEW (PR-8)  — real-DB integration test (matches existing tests/db/triggers/ pattern)
+  getSerialTimeline.test.ts                  NEW (PR-9a) — real-DB integration test
+
+tests/api/procurement/field-stock/                             ← PR-8 Amendment 2026-05-22 (HTTP-boundary unit tests, mocked service)
+  serials-search.test.ts                     NEW (PR-8)
+  serials-timeline.test.ts                   NEW (PR-9a)
 
 pages/procurement/field-stock/serials/
   index.tsx                                  NEW (PR-8)  — search page (≤200 lines), wraps <AppLayout>
+  __tests__/index.test.tsx                   NEW (PR-8)  — page unit tests (mocked router + fetch)  ← PR-8 Amendment 2026-05-22
   [serialNumber].tsx                         NEW (PR-9a) — timeline page (≤200 lines), wraps <AppLayout>
+  __tests__/[serialNumber].test.tsx          NEW (PR-9a) — page unit tests (mocked router + fetch)
 ```
+
+**Amendment 2026-05-22 (PR-8 execution learnings — PR-9a onwards must follow):**
+1. **Service location** — read/search services for the serial register live at `src/modules/procurement/field-stock/services/*Service.ts` (sibling to existing `serialService.ts`, `consumptionService.ts`, `locationService.ts`). NOT at `src/services/field-stock/*`. This was an architectural finding in PR #1723 review-team.
+2. **Test location split** — service integration tests in `tests/db/services/field-stock/` (Wave-1 convention, matches `tests/db/triggers/`, `tests/db/backfill/`); API handler unit tests in `tests/api/procurement/field-stock/` (mocked service); page unit tests co-located in `pages/.../__tests__/` (matches `pages/api/snags/__tests__/` and similar).
+3. **Vitest config** — `vitest.db.config.ts` is standalone (no `mergeConfig` extension of `vitest.config.ts`) because the base setupFiles hardcode `DATABASE_URL` and `vi.mock('@/lib/db')`. Aliases are duplicated; keep the two configs in sync when aliases change. Ordering-pitfall comments are mirrored.
+4. **Global-setup mutation** — `tests/db/setup/global-setup.ts` sets both `DATABASE_URL_TEST` and `DATABASE_URL` so service-layer integration tests pick up the container via the shared `@/lib/db.ts` pool. Race caveat documented in the file.
 
 **Components NOT built** (originally in PR #1716, dropped by this amendment): `ReconciliationReport.tsx`, `StatusBadge.tsx`, `EventIcon.tsx`, `statusVocabulary.ts`, `eventVocabulary.ts`. Reason: each has zero consumers in the augment scope. Build them when a second real consumer materialises.
 
