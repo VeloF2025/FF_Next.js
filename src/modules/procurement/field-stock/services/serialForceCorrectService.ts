@@ -59,6 +59,25 @@ const TARGET_COLUMN_MAP: Record<keyof ForceCorrectTarget, string> = {
 const TARGET_FIELDS = Object.keys(TARGET_COLUMN_MAP) as (keyof ForceCorrectTarget)[];
 
 // ============================================================================
+// Typed snapshot helpers
+// ============================================================================
+
+/**
+ * Type-safe indexed write into a ForceCorrectSnapshot.
+ * TypeScript cannot narrow the field→value contract through a generic
+ * `keyof` loop, but the caller guarantees `value` came from the same key on
+ * the same type — so the assertion is correct and replaces the broader
+ * `Record<string, unknown>` escape hatch.
+ */
+function setSnapshotField<K extends keyof ForceCorrectSnapshot>(
+  snapshot: ForceCorrectSnapshot,
+  field: K,
+  value: ForceCorrectSnapshot[K],
+): void {
+  snapshot[field] = value;
+}
+
+// ============================================================================
 // Main export
 // ============================================================================
 
@@ -86,15 +105,15 @@ async function processOne(serialNumber: string, p: ForceCorrectParams): Promise<
   try {
     await client.query('BEGIN');
 
-    // Lock the row so concurrent force-corrects on the same serial serialize.
-    const { rows: current } = await client.query<{
+    // RowShape mirrors the AS-aliased SELECT columns below.
+    // status is narrowed to ForceCorrectStatus because the DB CHECK constraint
+    // enforces valid values — the cast is safe and correct at the boundary.
+    type RowShape = {
       id: string;
-      status: string;
-      currentLocationId: string | null;
-      allocatedToProjectId: string | null;
-      installedAtDropNumber: string | null;
-      activatedAtOltId: string | null;
-    }>(
+    } & Required<ForceCorrectSnapshot>;
+
+    // Lock the row so concurrent force-corrects on the same serial serialize.
+    const { rows: current } = await client.query<RowShape>(
       `SELECT id,
               status,
               current_location_id        AS "currentLocationId",
@@ -119,13 +138,17 @@ async function processOne(serialNumber: string, p: ForceCorrectParams): Promise<
     const after: ForceCorrectSnapshot = {};
     const changed: (keyof ForceCorrectTarget)[] = [];
 
-    for (const field of TARGET_FIELDS) {
+    // `row` is typed as RowShape (Required<ForceCorrectSnapshot> + id).
+    // setSnapshotField provides the K-bound write that TS cannot infer
+    // through a generic keyof loop — no Record<string, unknown> needed.
+    const targetKeys: ReadonlyArray<keyof ForceCorrectTarget> = TARGET_FIELDS;
+    for (const field of targetKeys) {
       if (!(field in p.target)) continue;
-      const newVal = (p.target[field] as string | null | undefined) ?? null;
-      const oldVal = (row[field] as string | null | undefined) ?? null;
+      const newVal = (p.target[field] ?? null) as ForceCorrectSnapshot[typeof field];
+      const oldVal = (row[field] ?? null) as ForceCorrectSnapshot[typeof field];
       if (oldVal !== newVal) {
-        (before as Record<string, unknown>)[field] = oldVal;
-        (after as Record<string, unknown>)[field] = newVal;
+        setSnapshotField(before, field, oldVal);
+        setSnapshotField(after, field, newVal);
         changed.push(field);
       }
     }
@@ -146,7 +169,7 @@ async function processOne(serialNumber: string, p: ForceCorrectParams): Promise<
     let i = 1;
     for (const field of changed) {
       setParts.push(`${TARGET_COLUMN_MAP[field]} = $${i++}`);
-      params.push((p.target[field] as string | null | undefined) ?? null);
+      params.push(p.target[field] ?? null);
     }
     params.push(row.id);
     await client.query(
@@ -182,7 +205,9 @@ async function processOne(serialNumber: string, p: ForceCorrectParams): Promise<
     await client.query('COMMIT');
     return { serialNumber, found: true, applied: true, before, after, changedFields: changed };
   } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
+    await client.query('ROLLBACK').catch((rbErr: unknown) => {
+      log.warn('forceCorrectSerials ROLLBACK failed', { serialNumber, rbErr }, 'serialForceCorrect');
+    });
     const msg = err instanceof Error ? err.message : String(err);
     log.error('forceCorrectSerials row failed', { serialNumber, err: msg }, 'serialForceCorrect');
     return { serialNumber, found: false, applied: false, changedFields: [], error: msg };
