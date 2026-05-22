@@ -12,6 +12,10 @@ export default defineConfig({
       '.next',
       'dist',
       '.claude/worktrees/**',
+      // tests/db/** are docker-Postgres integration tests; they run under
+      // vitest.db.config.ts. Including them here would crash collection
+      // because they throw at module load when DATABASE_URL_TEST is unset.
+      'tests/db/**',
       'src/modules/wa-monitor/tests/integration.test.ts',
       'src/lib/qfield/__tests__/gpkg-import-types.test.ts',
       // No single flat route exists for these multi-method nested handlers

@@ -6,9 +6,11 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
+import { sql as pgSql } from '@/lib/db-pool';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 import {
   checkPendingValueCap,
   PENDING_TECH_VALUE_CAP_ZAR,
@@ -23,7 +25,8 @@ const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') return handleList(req, res);
-  if (req.method === 'POST') return handleCreate(req, res);
+  // withAuth wraps the default export, so req.user is guaranteed here.
+  if (req.method === 'POST') return handleCreate(req as AuthenticatedNextApiRequest, res);
   return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
 }
 
@@ -120,8 +123,12 @@ async function handleList(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-// WORKING: Create picking with lines
-async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
+// WORKING: Create picking with lines.
+// Typed as AuthenticatedNextApiRequest so the compiler enforces that
+// withAuth has populated req.user before this handler runs. Prevents a
+// future refactor that bypasses withAuth from triggering a runtime
+// TypeError on the .user access (review-team L3).
+async function handleCreate(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   try {
     const {
       pickingType, sourceLocationId, destinationLocationId,
@@ -140,6 +147,16 @@ async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
     if (!lines || !Array.isArray(lines) || lines.length === 0) {
       return apiResponse.validationError(res, { lines: 'At least one picking line is required' });
     }
+
+    // Resolve creator staff_id from the authenticated user. Nullable — admin /
+    // system users without a staff row write NULL (matches the partial-index
+    // predicate `WHERE created_by_staff_id IS NOT NULL` from migration 371).
+    // Uses pg.Pool directly via @/lib/db-pool — new lookups should not
+    // extend the Neon-shim surface even when surrounding code still uses it.
+    const staffRows = await pgSql<{ id: string } & Record<string, unknown>>`
+      SELECT id FROM staff WHERE user_id = ${req.user.id} LIMIT 1
+    `;
+    const createdByStaffId = staffRows[0]?.id ?? null;
 
     // ── H5: Require technicianId for FIELD-DEFAULT destination ───────────────
     // Extracted to _validation.ts; see validateFieldDefaultDestination for rationale.
@@ -226,14 +243,16 @@ async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
         project_id, job_reference, job_type,
         contractor_id, contractor_name, team_name,
         technician_id, technician_name,
-        scheduled_date, status, notes
+        scheduled_date, status, notes,
+        created_by_staff_id
       ) VALUES (
         ${pickingNumber}, ${pickingType || null},
         ${sourceLocationId}, ${destinationLocationId},
         ${projectId || null}, ${jobReference || null}, ${jobType || null},
         ${contractorId || null}, ${contractorName || null}, ${teamName || null},
         ${technicianId || null}, ${technicianName || null},
-        ${scheduledDate || null}, 'draft', ${notes || null}
+        ${scheduledDate || null}, 'draft', ${notes || null},
+        ${createdByStaffId}
       )
       RETURNING *
     `;

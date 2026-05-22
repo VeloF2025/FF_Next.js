@@ -14,7 +14,6 @@
  * ⚪ UNTESTED: integration tests in Task 2.9
  */
 
-import React from 'react';
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -29,9 +28,11 @@ import {
 import type { AttendanceProfile } from '@/modules/attendance/portal/client/api';
 import { MyPortalShell } from '@/modules/attendance/portal/client/MyPortalShell';
 import { useStockSync } from '@/modules/field-stock-pwa/offline/useStockSync';
+import { useStoresTodayUnaccounted } from '@/modules/field-stock-pwa/hooks/useStoresTodayUnaccounted';
 import { isReturnCreator, isReturnInspector } from '../lib/storesRoles';
 import { AbandonedIssuesBanner } from './AbandonedIssuesBanner';
 import { AbandonedReturnsBanner } from './AbandonedReturnsBanner';
+import { StoreTile } from './StoreTile';
 
 // =============================================================================
 // Props
@@ -42,15 +43,17 @@ export interface StoresHubProps {
   onIssue: () => void;
   onReturn: () => void;
   onInspect: () => void;
+  onToday: () => void;
 }
 
 // =============================================================================
 // Component
 // =============================================================================
 
-export function StoresHub({ profile, onIssue, onReturn, onInspect }: StoresHubProps) {
+export function StoresHub({ profile, onIssue, onReturn, onInspect, onToday }: StoresHubProps) {
   const { pendingCount, abandonedIssuesCount, abandonedReturnsCount, syncing, dismissAbandoned } = useStockSync();
   const isPending = profile.accountStatus === 'pending';
+  const todayUnaccounted = useStoresTodayUnaccounted();
 
   return (
     <MyPortalShell
@@ -148,10 +151,17 @@ export function StoresHub({ profile, onIssue, onReturn, onInspect }: StoresHubPr
         <div className="col-span-2">
           <StoreTile
             icon={<LayoutDashboard className="w-5 h-5" />}
-            iconClass="bg-neutral-800 text-neutral-500"
+            iconClass="bg-indigo-500/15 text-indigo-300"
             title="Today's summary"
-            subtitle="Coming in Phase 4"
-            disabled
+            subtitle={
+              todayUnaccounted === null
+                ? 'Reconciliation for today'
+                : todayUnaccounted > 0
+                  ? `${todayUnaccounted} unaccounted`
+                  : 'All accounted for'
+            }
+            onClick={onToday}
+            badge={todayUnaccounted && todayUnaccounted > 0 ? todayUnaccounted : undefined}
             fullWidth
           />
         </div>
@@ -160,57 +170,3 @@ export function StoresHub({ profile, onIssue, onReturn, onInspect }: StoresHubPr
   );
 }
 
-// =============================================================================
-// StoreTile
-// =============================================================================
-
-interface StoreTileProps {
-  icon: React.ReactNode;
-  iconClass: string;
-  title: string;
-  subtitle: string;
-  onClick?: () => void;
-  disabled?: boolean;
-  fullWidth?: boolean;
-}
-
-function StoreTile({
-  icon,
-  iconClass,
-  title,
-  subtitle,
-  onClick,
-  disabled = false,
-  fullWidth = false,
-}: StoreTileProps) {
-  const baseClass = [
-    'rounded-2xl border border-neutral-800 bg-neutral-900 p-4 text-left',
-    'transition-colors min-h-[110px] flex flex-col gap-2',
-    fullWidth ? 'w-full' : '',
-    disabled
-      ? 'opacity-50 pointer-events-none cursor-not-allowed'
-      : 'hover:bg-neutral-800/80 active:bg-neutral-800 cursor-pointer',
-  ]
-    .filter(Boolean)
-    .join(' ');
-
-  return (
-    <button
-      type="button"
-      onClick={disabled ? undefined : onClick}
-      disabled={disabled}
-      className={baseClass}
-    >
-      <span
-        className={`flex w-10 h-10 items-center justify-center rounded-xl ${iconClass}`}
-        aria-hidden="true"
-      >
-        {icon}
-      </span>
-      <div>
-        <div className="text-sm font-semibold text-neutral-100">{title}</div>
-        <div className="text-xs text-neutral-400 mt-0.5">{subtitle}</div>
-      </div>
-    </button>
-  );
-}

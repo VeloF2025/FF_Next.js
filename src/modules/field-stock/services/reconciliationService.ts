@@ -14,6 +14,14 @@
  * - stock_serials: Serial status tracking
  * - qa_photo_reviews: Installation records with serials
  * - contractor_stock_accountability: Blocking status
+ *
+ * TODO(field-stock-pwa-phase-5): migrate off the Neon shim.
+ *   Phase 4 (PR #1730) ships a new aggregator at
+ *   src/modules/field-stock-pwa/services/storesTodayService.ts on
+ *   @/lib/db-pool. This file's Neon-shim migration was DEFERRED because
+ *   it has 3 conditional-SQL branches (lines ~94/111, 132/144, 161/177)
+ *   that need explicit query-branch rewrites before the file can switch
+ *   to pg.Pool. Touch only in a focused PR with explicit dashboard smoke.
  */
 
 import { neon, NeonQueryFunction } from '@/lib/db-neon';
