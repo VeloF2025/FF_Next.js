@@ -96,6 +96,7 @@ const StoresIndexPage: NextPage & {
       onIssue={() => void router.push('/my/stores/issue')}
       onReturn={() => void router.push('/my/stores/return')}
       onInspect={() => void router.push('/my/stores/inspect')}
+      onToday={() => void router.push('/my/stores/today')}
     />
   );
 };
