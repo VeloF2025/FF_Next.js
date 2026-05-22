@@ -24,11 +24,10 @@ Today, only Hein/the DBA can remediate this state. Building a controlled, audita
 
 ### Goals
 
-1. A trusted operator (super_admin + anyone granted a new RBAC permission) can directly set the following columns on `stock_serials`, bypassing the state machine, via a controlled UI and a single API:
+1. A trusted operator (super_admin + anyone granted a new RBAC permission) can directly set the following columns on `stock_serials`, bypassing the state machine, via a controlled UI and a single API. Column set was confirmed against the live schema 2026-05-22 (no `current_warehouse_id` column exists; project column is `allocated_to_project_id`):
    - `status`
    - `current_location_id`
-   - `current_warehouse_id`
-   - `project_id`
+   - `allocated_to_project_id`
    - `installed_at_drop_number`
    - `activated_at_olt_id`
 2. Every change writes one `stock_serial_events` row capturing user, reason, prior values, new values, and a flag distinguishing force-corrects from normal transitions.
@@ -53,7 +52,7 @@ Today, only Hein/the DBA can remediate this state. Building a controlled, audita
 │  src/modules/procurement/field-stock/services/serialForceCorrectService.ts               │
 │    forceCorrectSerials(params) → ForceCorrectResult           │
 │      • Each serial wrapped in its own pg txn (best-effort)    │
-│      • Uses pg.Pool via @/lib/db, NOT @neondatabase/serverless│
+│      • Uses pg.Pool via @/lib/db-pool (matches Wave 2 pattern)│
 │      • Writes one stock_serial_events row per changed serial  │
 └─────────────┬─────────────────────────────────────────────────┘
               │
@@ -79,7 +78,7 @@ Today, only Hein/the DBA can remediate this state. Building a controlled, audita
 ### Key design choices (and rejected alternatives)
 
 1. **One service, one API, two UIs.** The detail-page modal is the batch flow with `serials.length === 1` and the preview step skipped (the detail page already shows current state on screen).
-2. **`pg.Pool` via `@/lib/db`**, not the Neon serverless shim. Per Wave 2 lesson #4, the shim is technical debt; new code uses `pg.Pool`.
+2. **`pg.Pool` via `@/lib/db-pool`** (named `pool` import), not the Neon serverless shim. Matches Wave 2's `serialTimelineService` / `serialSearchService` convention. Per Wave 2 lesson #4, the shim is technical debt; new code uses `pg.Pool`.
 3. **Audit reuses `stock_serial_events`** with `event_type='force_corrected'`. Per Wave 2 Locked decision #8, `event_type` has no CHECK constraint, so this is a code-only change.
 4. **Per-serial atomicity.** Each serial wrapped in its own `BEGIN`/`COMMIT`. Failures do not roll back the rest. Rationale: matches how a DBA's `UPDATE WHERE` behaves and lets the operator fix only the broken rows on a second pass.
 5. **No nav link.** Admin page is URL-only by default (Locked decision #11).
@@ -90,16 +89,29 @@ Today, only Hein/the DBA can remediate this state. Building a controlled, audita
 ### Service: `src/modules/procurement/field-stock/services/serialForceCorrectService.ts`
 
 ```typescript
-import type { SerialStatusValue } from '@/types/procurement/stock/enums.types';
+// Full DB-allowed status set (stock_serials_status_check). Force-correct intentionally
+// allows the FULL set, not just the 8 values exposed by SerialStatusValue / transition.ts —
+// 'bypass the state machine' is the whole point.
+export type ForceCorrectStatus =
+  | 'available'
+  | 'reserved'
+  | 'allocated_to_project'
+  | 'in_transit'
+  | 'issued'
+  | 'installed'
+  | 'activated'
+  | 'faulty'
+  | 'in_repair'
+  | 'returned'
+  | 'scrapped';
 
 // All target fields optional — omit = don't touch that column.
 // `null` = explicitly set the column to NULL.
 // At least one target field must be present (validated at API boundary).
 export interface ForceCorrectTarget {
-  status?: SerialStatusValue;
+  status?: ForceCorrectStatus;
   currentLocationId?: string | null;
-  currentWarehouseId?: string | null;
-  projectId?: string | null;
+  allocatedToProjectId?: string | null;
   installedAtDropNumber?: string | null;
   activatedAtOltId?: string | null;
 }
@@ -142,8 +154,8 @@ export async function forceCorrectSerials(p: ForceCorrectParams): Promise<ForceC
 - **Body shape:** `ForceCorrectParams` minus `performedBy`/`performedByName` (taken from `req.user.id`/`req.user.name`).
 - **Validation (at boundary only — per CLAUDE.md hard rule):**
   - `serials`: array of strings, length 1–500, each non-empty after trim.
-  - `target`: at least one of the 6 fields present.
-  - `target.status`: if present, must be one of `available | reserved | issued | in_transit | installed | faulty | returned | scrapped`.
+  - `target`: at least one of the 5 fields present.
+  - `target.status`: if present, must be one of `available | reserved | allocated_to_project | in_transit | issued | installed | activated | faulty | in_repair | returned | scrapped` (the full DB CHECK constraint set).
   - `reason`: string, min 10 chars after trim.
   - `dryRun`: boolean. **If missing, defaults to `true`** (defensive — never accidentally commit).
 - **Response:** `apiResponse.success(res, result: ForceCorrectResult)`. Per-row errors live inside `rows[].error`. Top-level HTTP errors are reserved for validation failures (`400`), auth (`401`), and permission (`403`).
@@ -154,6 +166,7 @@ export async function forceCorrectSerials(p: ForceCorrectParams): Promise<ForceC
 - `null` vs `undefined` in `target` — `undefined` = "don't touch this column"; `null` = "explicitly set to NULL" (e.g., clear a wrongly-set `installed_at_drop_number`).
 - 500-row batch cap — bounds preview/apply latency. Raise if reality demands; better to start tight.
 - `dryRun` defaults to `true` if missing — defensive; the UI must consciously send `false` to commit.
+- 5 fields, not 6 — the spec originally listed `currentWarehouseId`, but the live `stock_serials` table has no `current_warehouse_id` column. Warehouse-level reassignment, if ever needed, would be a separate column-add migration outside this PR's scope.
 
 ## 5 — Data & audit
 
@@ -163,100 +176,110 @@ We add a new `event_type` value (`'force_corrected'`). Per Wave 2 Locked decisio
 
 ### Audit row per changed serial
 
-One `stock_serial_events` INSERT per row that actually changed (no-op rows write nothing):
+One `stock_serial_events` INSERT per row that actually changed (no-op rows write nothing). Column layout confirmed live 2026-05-22:
 
 ```sql
 INSERT INTO stock_serial_events (
   serial_id,
   event_type,        -- 'force_corrected'
-  performed_by,
-  performed_by_name,
-  reason,
-  metadata           -- JSONB
+  from_state,        -- old status (only when status changes; else NULL)
+  to_state,          -- new status (only when status changes; else NULL)
+  actor_user_id,     -- uuid of operator
+  payload,           -- JSONB (NOT NULL, default '{}')
+  occurred_at        -- NOW() (column has no default)
+  -- source_table, source_id intentionally NULL → bypasses dedupe unique index
 )
 VALUES (...);
 ```
 
-`metadata` JSONB shape:
+`payload` JSONB shape:
 
 ```json
 {
   "isForceCorrect": true,
+  "performedByName": "Hein van Vuuren",
+  "reason": "807-incident remediation 2026-05-21",
   "before": { "status": "installed", "installedAtDropNumber": "1234567" },
   "after":  { "status": "available", "installedAtDropNumber": null },
   "changedFields": ["status", "installedAtDropNumber"]
 }
 ```
 
-Rendered on the `/serials/[serialNumber]` timeline with a distinct visual treatment (icon + "Force-corrected by" label) so it is never confused with a normal state-machine transition.
+(Note: `stock_serial_events` has no dedicated `performed_by_name` or `reason` columns — both live inside `payload`. Operator `actor_user_id` is the structured FK; the display name + reason are denormalised into JSON.)
 
-### Pre-implementation probe (mandatory)
+Rendered on the `/serials/[serialNumber]` timeline with a distinct visual treatment (icon + "Force-corrected by" label, sourced from `payload.performedByName`) so it is never confused with a normal state-machine transition.
 
-Per `feedback_query_schema_before_migration` + Wave 2 lesson #1 (probe JOINed tables too), the very first execution step is:
+### Pre-implementation probe — DONE 2026-05-22
+
+Live schema confirmed against `100.96.203.105:5436`. Findings that drove the column changes captured above:
+
+- `stock_serials` has NO `current_warehouse_id` column → dropped from writable set.
+- Project FK is `allocated_to_project_id` (NOT `project_id`).
+- `stock_serial_events` columns are `actor_user_id` / `payload` / `from_state` / `to_state` / `occurred_at` (NOT `performed_by` / `performed_by_name` / `reason` / `metadata`). `payload` is JSONB NOT NULL with default `'{}'`.
+- RBAC tables are `access_permissions` (registry) + `role_permissions` (grants). There is NO `permissions` table and NO `roles` table.
+- `access_permissions.type` CHECK allows `'module' | 'page' | 'tab' | 'action'`. `'action'` is correct for the new permission.
+- `role_permissions` shape: `(role varchar(50), permission_key varchar(100), actions jsonb)`. `actions` is a JSONB blob of `{view, create, edit, delete}` booleans — NOT separate columns. Unique constraint on `(role, permission_key)`.
+- `stock_serials.status` CHECK accepts 11 values: `available | reserved | allocated_to_project | in_transit | issued | installed | activated | faulty | in_repair | returned | scrapped`.
+- MAX migration version = **377**. New migration = **378** (re-verified at Task 3 step 1 against a fresh `SELECT MAX(version) FROM migrations` to guard against parallel-session collisions).
+- DB pool: import `pool` from `@/lib/db-pool` (matches Wave 2's `serialTimelineService` / `serialSearchService` convention), not the default-export `pool` from `@/lib/db`.
+
+### RBAC migration: `scripts/migrations/sql/378_rbac_field_stock_force_correct.sql`
+
+(Version 378 is provisional — re-pick via `SELECT MAX(version) FROM migrations` immediately before the file is written, per `feedback_migration_version_collision`.)
 
 ```sql
-SELECT version FROM migrations ORDER BY version::int DESC LIMIT 5;
-\d stock_serials
-\d stock_serial_events
-\d permissions
-\d role_permissions
-\d roles
-```
-
-If the live column names differ from those assumed in this spec (likely candidates: `metadata` may be named differently; `role_permissions.can_*` columns may have a different shape), **the spec is amended before any SQL or service code is written** — same discipline as Wave 2 PR-0.
-
-### RBAC migration: `scripts/migrations/sql/<MAX+1>_rbac_field_stock_force_correct.sql`
-
-Version picked from `SELECT MAX(version) FROM migrations`, **not from `ls`** (per `feedback_migration_version_collision` — side branches apply to the shared DB).
-
-```sql
+-- Adds RBAC permission 'procurement.field-stock.force-correct' (action-type)
+-- under parent 'procurement.field-stock'. Grants edit + view to super_admin
+-- defensively (super_admin has implicit-all in some setups; explicit grant
+-- ensures the permission is honoured regardless).
 BEGIN;
 
-INSERT INTO permissions (
-  resource_type, resource_key, module, label, description, path, sort_order
-)
+-- 1. Register the permission in the access_permissions catalogue.
+INSERT INTO access_permissions (type, key, parent_key, label, description, sort_order)
 VALUES (
   'action',
   'procurement.field-stock.force-correct',
-  'procurement',
+  'procurement.field-stock',
   'Force-correct serial state',
-  'Bypass state-machine validation and directly set status/location/project on stock_serials. Writes audit-trail row to stock_serial_events.',
-  NULL,
-  NULL
+  'Bypass state-machine validation and directly set status/location/project/drop/OLT on stock_serials. Writes audit-trail row to stock_serial_events.',
+  100
 )
-ON CONFLICT (resource_key) DO NOTHING;
+ON CONFLICT (key) DO UPDATE SET
+  label = EXCLUDED.label,
+  description = EXCLUDED.description,
+  parent_key = EXCLUDED.parent_key;
 
--- Defensive explicit grant to super_admin (some setups treat super_admin
--- as implicit-all; explicit grant ensures the new permission is honoured
--- regardless of which model is in effect).
-INSERT INTO role_permissions (role_id, permission_id, can_view, can_edit, can_create, can_delete)
-SELECT r.id, p.id, true, true, true, true
-FROM roles r, permissions p
-WHERE r.name = 'super_admin'
-  AND p.resource_key = 'procurement.field-stock.force-correct'
-ON CONFLICT DO NOTHING;
+-- 2. Grant to super_admin (idempotent via unique (role, permission_key)).
+INSERT INTO role_permissions (role, permission_key, actions)
+VALUES (
+  'super_admin',
+  'procurement.field-stock.force-correct',
+  '{"view": true, "create": false, "edit": true, "delete": false}'::jsonb
+)
+ON CONFLICT (role, permission_key) DO UPDATE SET
+  actions = EXCLUDED.actions,
+  updated_at = NOW();
 
 COMMIT;
 
 -- ROLLBACK (manual, not auto-applied):
 -- BEGIN;
--- DELETE FROM role_permissions WHERE permission_id = (
---   SELECT id FROM permissions WHERE resource_key = 'procurement.field-stock.force-correct'
--- );
--- DELETE FROM permissions WHERE resource_key = 'procurement.field-stock.force-correct';
+-- DELETE FROM role_permissions WHERE permission_key = 'procurement.field-stock.force-correct';
+-- DELETE FROM access_permissions WHERE key = 'procurement.field-stock.force-correct';
 -- COMMIT;
 ```
 
-The exact column names above (`permissions.resource_key`, `role_permissions.can_*`) are inferred from `247_rbac_update_all_modules.sql`. The probe step above confirms them before this migration is written for real.
-
 ### Permission check at API
 
+Use the existing `withPermission` middleware from `@/lib/auth` (confirmed pattern in `pages/api/procurement/field-stock/serials/search.ts`):
+
 ```typescript
-const allowed = await hasPermission(req.user.id, 'procurement.field-stock.force-correct', 'edit');
-if (!allowed) return apiResponse.forbidden(res, 'force-correct permission required');
+export default withAuth(
+  withPermission('procurement.field-stock.force-correct', 'edit')(handler)
+);
 ```
 
-The exact `hasPermission` helper is discovered during implementation by inspecting `@/lib/rbac` (or wherever the existing RBAC helpers live) and the pattern already used by other gated endpoints. Whatever pattern the repo already uses wins — this spec does not invent a new RBAC API surface.
+`withPermission` calls `userHasPermission()` from `@/lib/permissions`, which queries `role_permissions.actions->>'edit'` after the parent-block cascade. Super_admin bypasses the check via an early return in the middleware (confirmed live read). No new RBAC helper is invented.
 
 ## 6 — UI
 
@@ -264,7 +287,7 @@ The exact `hasPermission` helper is discovered during implementation by inspecti
 
 File: `pages/procurement/field-stock/serials/[serialNumber].tsx`.
 
-Added: one "Force-correct state" button (visible only if the user has the new permission), opening a modal with the 6 editable fields, a current-values column, a new-values column, a required reason textarea (min 10 chars), and "Cancel" / "Apply" buttons.
+Added: one "Force-correct state" button (visible only if the user has the new permission), opening a modal with the 5 editable fields (status, currentLocationId, allocatedToProjectId, installedAtDropNumber, activatedAtOltId), a current-values column, a new-values column, a required reason textarea (min 10 chars), and "Cancel" / "Apply" buttons.
 
 On submit: POST with `serials: [serialNumber]`, `dryRun: false` → success toast → refresh timeline (the new force-correct event appears at the top).
 
@@ -282,7 +305,7 @@ File: `pages/procurement/field-stock/serials/force-correct.tsx`. Permission-gate
 
 ### Shared component
 
-A single `<ForceCorrectFields>` component at `src/components/field-stock/ForceCorrectFields.tsx`, used by both the modal (6a) and the batch page (6b). Renders the 6 editable fields + reason textarea. Props: `currentValues` (optional — supplied on detail-page modal only), `value`, `onChange`.
+A single `<ForceCorrectFields>` component at `src/components/field-stock/ForceCorrectFields.tsx`, used by both the modal (6a) and the batch page (6b). Renders the 5 editable fields + reason textarea. Props: `currentValues` (optional — supplied on detail-page modal only), `value`, `onChange`.
 
 ### UI implementation pointers
 
