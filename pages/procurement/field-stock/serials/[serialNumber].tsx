@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { GetServerSideProps, NextPage } from 'next';
 import Link from 'next/link';
 import { AppLayout } from '@/components/layout';
@@ -21,7 +21,7 @@ type FetchState =
 const SerialTimelinePage: NextPage<PageProps> = ({ serialNumber }) => {
   const [state, setState] = useState<FetchState>({ kind: 'loading' });
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     setState({ kind: 'loading' });
     const url = `/api/procurement/field-stock/serials/timeline?serialNumber=${encodeURIComponent(serialNumber)}`;
     fetch(url, { credentials: 'include' })
@@ -38,12 +38,11 @@ const SerialTimelinePage: NextPage<PageProps> = ({ serialNumber }) => {
       .catch((err: unknown) => {
         setState({ kind: 'error', message: err instanceof Error ? err.message : 'Network error' });
       });
-  };
+  }, [serialNumber]);
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serialNumber]);
+  }, [loadData]);
 
   return (
     <AppLayout>
@@ -134,6 +133,10 @@ function OkPane({
           serialNumber={serialNumber}
           currentValues={{
             status: s.status,
+            // Names exposed by SerialDetail; raw IDs aren't projected (timeline service doesn't SELECT them).
+            // Operator sees the name as a sanity check; the actual write is by ID via the API.
+            currentLocationId: s.currentLocationName ?? null,
+            allocatedToProjectId: s.allocatedProjectName ?? null,
             installedAtDropNumber: s.installedAtDropNumber,
             activatedAtOltId: s.activatedAtOltId,
           }}

@@ -24,7 +24,7 @@ export function ForceCorrectModal({
   const [submitting, setSubmitting] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  const hasFields = Object.keys(fcTarget).length > 0;
+  const hasFields = Object.values(fcTarget).some((v) => v !== undefined);
   const reasonOk = fcReason.trim().length >= 10;
   const canApply = hasFields && reasonOk && !submitting;
 

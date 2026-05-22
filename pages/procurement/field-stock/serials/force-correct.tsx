@@ -87,7 +87,7 @@ function BatchWizard() {
   const [applyResult, setApplyResult] = useState<ForceCorrectResult | null>(null);
 
   const serialLines = serialsText.split('\n').map((l) => l.trim()).filter(Boolean);
-  const hasFields = Object.keys(target).length > 0;
+  const hasFields = Object.values(target).some((v) => v !== undefined);
   const reasonOk = reason.trim().length >= 10;
   const canPreview = serialLines.length > 0 && hasFields && reasonOk && !busy;
 

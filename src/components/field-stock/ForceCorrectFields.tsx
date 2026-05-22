@@ -67,7 +67,13 @@ export function ForceCorrectFields({
   const reasonOk = reasonLen >= 10;
 
   function setStatus(s: ForceCorrectStatus | undefined) {
-    onChange({ ...value, status: s });
+    const next = { ...value };
+    if (s === undefined) {
+      delete next.status;
+    } else {
+      next.status = s;
+    }
+    onChange(next);
   }
 
   function setNullable(field: NullableField, mode: NullableMode, text?: string) {
