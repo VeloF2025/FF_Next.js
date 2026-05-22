@@ -141,22 +141,29 @@ describe('auto-sort', () => {
     expect(body.data.results[0].action).toBe('leftover');
   });
 
-  it('suggests (not auto-places) when ≥0.95 but slot already filled', async () => {
+  it('marks as leftover (not suggested) when slot is already filled — even high confidence', async () => {
+    // Filled slots must never produce an Accept badge because the Accept flow
+    // routes through move-photo whose swap overwrites the existing photo
+    // (Johan WA 2026-05-22 15:08 — "autosort overwrite fotos by die civil").
     poolMock.query.mockResolvedValueOnce({
       rows: [makePoleRow({ civil_step_03_key: 'works-qa/already/here.jpg' })],
     });
     mockedClassify.mockResolvedValueOnce({
       slot_key: 'civil_03', confidence: 0.99, reasoning: 'strong match',
     });
-    poolMock.query.mockResolvedValueOnce({ rowCount: 1 });
 
     const { req, res } = createMocks({ method: 'POST', body: { pole_id: 'pole-1' } });
     // @ts-expect-error
     await handler(req, res);
 
     const body = JSON.parse(res._getData());
-    expect(body.data.suggested).toBe(1);
+    expect(body.data.suggested).toBe(0);
     expect(body.data.auto_placed).toBe(0);
+    expect(body.data.leftover).toBe(1);
+    expect(body.data.results[0].action).toBe('leftover');
+    // No UPDATE should fire for the suggestion JSONB
+    const suggestSql = poolMock.query.mock.calls.find(c => /unassigned_suggestions/.test(String(c[0])));
+    expect(suggestSql).toBeUndefined();
   });
 
   it('returns 400 when pole_id missing', async () => {
