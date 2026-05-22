@@ -93,6 +93,11 @@ export function PhotoSlotCard({
           }}
           onDragLeave={() => setIsDragOver(false)}
           onDrop={e => {
+            // OS file-drop path (drops from the user's file manager). This is
+            // a NEW-content path, distinct from the @hello-pangea/dnd
+            // unassigned→slot move handled by the Droppable above. NEW content
+            // is still gated on `disabled` (= pole approved) — same policy as
+            // the upload button.
             if (disabled || photoKey) return;
             e.preventDefault();
             setIsDragOver(false);
