@@ -22,13 +22,19 @@ MIGRATION_DIR="${MIGRATION_DIR:-scripts/migrations/sql}"
 # Prefer MIGRATION_DATABASE_URL (direct, superuser) over DATABASE_URL (pooled, tenant).
 # Poolers like Supavisor can reject DDL or block `DROP`/`GRANT` statements —
 # migrations must hit Postgres directly.
+# `grep | head | cut | tr` returns non-zero when the var is absent in the env
+# file (no match). Under `set -euo pipefail` that kills the entire script
+# silently — masking real bugs and producing zero diagnostic output. Append
+# `|| true` so a missing var leaves the destination unset (handled below)
+# instead of aborting the deploy. Observed on production where
+# MIGRATION_DATABASE_URL lives in `.env` only, not `.env.local`.
 for env_file in .env.local .env; do
   if [[ -f "$env_file" ]]; then
     if [[ -z "${MIGRATION_URL:-}" ]]; then
-      MIGRATION_URL=$(grep -E '^MIGRATION_DATABASE_URL=' "$env_file" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"')
+      MIGRATION_URL=$(grep -E '^MIGRATION_DATABASE_URL=' "$env_file" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
     fi
     if [[ -z "${DATABASE_URL:-}" ]]; then
-      DATABASE_URL=$(grep -E '^DATABASE_URL=' "$env_file" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"')
+      DATABASE_URL=$(grep -E '^DATABASE_URL=' "$env_file" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
     fi
   fi
 done
