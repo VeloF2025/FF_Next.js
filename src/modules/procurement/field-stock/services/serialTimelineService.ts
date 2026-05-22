@@ -1,46 +1,10 @@
 /**
- * Serial-register lifecycle timeline — read-only query that combines real
- * stock_serial_events rows with pseudo entries derived from columns on
- * stock_serials. PR-0 probe found 66 events across 36,264 serials (99.82%
- * have no events), so the pseudo branches are the main signal until the
- * event stream has been backfilled.
- *
- * Sibling to serialService.ts (CRUD/lifecycle) and serialSearchService.ts
- * (master search). This file owns the per-serial timeline concern.
- *
- * Schema dependencies confirmed against prod 2026-05-22:
- *   stock_serials.previous_status        varchar(50) NULL
- *   stock_serials.status_changed_at      timestamptz NULL
- *   stock_serials.received_date          date NULL
- *   stock_serials.installed_date         timestamptz NULL
- *   stock_serials.activated_at_olt_id    text NULL
- *   stock_serial_events.actor_user_id / actor_staff_id  uuid NULL
- *   users.first_name, users.last_name
- *   staff.first_name, staff.last_name
+ * Per-serial lifecycle timeline. Combines real stock_serial_events with
+ * pseudo entries derived from stock_serials columns when no real event
+ * covers the same fact. Sibling to serialSearchService.ts.
  */
 import { pool } from '@/lib/db-pool';
-import type { TimelineEntry } from '@/types/field-stock';
-
-export interface SerialDetail {
-  id: string;
-  serialNumber: string;
-  macAddress: string | null;
-  category: string | null;
-  itemName: string | null;
-  status: string;
-  currentLocationName: string | null;
-  allocatedProjectName: string | null;
-  installedAtDropNumber: string | null;
-  installedDate: string | null;
-  receivedDate: string | null;
-  activatedAtOltId: string | null;
-}
-
-export interface TimelineResult {
-  serial: SerialDetail;
-  entries: TimelineEntry[];
-  hasRealEvents: boolean;
-}
+import type { SerialDetail, TimelineEntry, TimelineResult } from '@/types/field-stock';
 
 interface SerialRow {
   id: string;
@@ -145,21 +109,30 @@ export async function getSerialTimeline(serialNumber: string): Promise<TimelineR
     [r.id]
   );
 
-  const realEvents: TimelineEntry[] = eventsRes.rows.map((e) => ({
-    kind: 'event',
-    id: e.id,
-    eventType: e.event_type,
-    fromState: e.from_state,
-    toState: e.to_state,
-    occurredAt: toIso(e.occurred_at) ?? new Date(0).toISOString(),
-    sourceTable: e.source_table,
-    sourceId: e.source_id,
-    actorName: e.actor_name,
-    payload: e.payload ?? {},
-  }));
+  const realEvents: TimelineEntry[] = eventsRes.rows.map((e) => {
+    const occurredAt = toIso(e.occurred_at);
+    // stock_serial_events.occurred_at is NOT NULL in the schema; toIso() can
+    // only return null if the column is null, which would mean a schema
+    // regression. Fail loud instead of masking with a sentinel timestamp.
+    if (!occurredAt) {
+      throw new Error(`stock_serial_events.${e.id}.occurred_at is null`);
+    }
+    return {
+      kind: 'event',
+      id: e.id,
+      eventType: e.event_type,
+      fromState: e.from_state,
+      toState: e.to_state,
+      occurredAt,
+      sourceTable: e.source_table,
+      sourceId: e.source_id,
+      actorName: e.actor_name,
+      payload: e.payload ?? {},
+    };
+  });
 
   const realEventTypes = new Set<string>(
-    realEvents.flatMap((e) => (e.kind === 'event' ? [e.eventType] : []))
+    eventsRes.rows.map((e) => e.event_type)
   );
 
   const pseudo: TimelineEntry[] = [];
@@ -199,15 +172,18 @@ export async function getSerialTimeline(serialNumber: string): Promise<TimelineR
     r.status === 'activated' &&
     !realEventTypes.has('activated')
   ) {
-    const occurredAt =
-      toIso(r.status_changed_at) ?? toIso(r.installed_date) ?? new Date().toISOString();
-    pseudo.push({
-      kind: 'pseudo',
-      id: `pseudo-activated-${r.id}`,
-      label: 'Activated on OLT',
-      occurredAt,
-      description: `OLT ${r.activated_at_olt_id} — inferred from stock_serials.activated_at_olt_id`,
-    });
+    // Skip the pseudo entry when no reliable timestamp exists rather than
+    // emit wall-clock "now" (which would float forward on every request).
+    const occurredAt = toIso(r.status_changed_at) ?? toIso(r.installed_date);
+    if (occurredAt) {
+      pseudo.push({
+        kind: 'pseudo',
+        id: `pseudo-activated-${r.id}`,
+        label: 'Activated on OLT',
+        occurredAt,
+        description: `OLT ${r.activated_at_olt_id} — inferred from stock_serials.activated_at_olt_id`,
+      });
+    }
   }
 
   if (

@@ -21,7 +21,7 @@ INSERT INTO projects (id, name) VALUES
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT UNIQUE NOT NULL,
-  -- PR-9a probe (2026-05-22): timeline service joins users for actor name.
+  -- Prod schema: actor-name joins on stock_serial_events use first/last name.
   first_name VARCHAR(255),
   last_name VARCHAR(255)
 );
@@ -31,7 +31,7 @@ INSERT INTO users (id, email) VALUES
 CREATE TABLE staff (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   full_name TEXT NOT NULL,
-  -- PR-9a probe (2026-05-22): timeline service joins staff for actor name.
+  -- Prod schema: actor-name joins on stock_serial_events use first/last name.
   first_name VARCHAR(255),
   last_name VARCHAR(255)
 );
@@ -95,8 +95,8 @@ CREATE TABLE stock_serials (
   installed_at_drop_number VARCHAR(255),
   installed_by VARCHAR(255),
   activated_at_olt_id TEXT,
-  -- PR-9a probe (2026-05-22 against prod): timeline pseudo-entry columns.
-  -- received_date is DATE in prod; installed_date + status_changed_at are TIMESTAMPTZ.
+  -- Prod schema: lifecycle-timeline pseudo-entry columns. Types match prod
+  -- (received_date is DATE; installed_date + status_changed_at are TIMESTAMPTZ).
   received_date DATE,
   installed_date TIMESTAMPTZ,
   previous_status VARCHAR(50),

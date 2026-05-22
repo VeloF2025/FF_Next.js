@@ -31,11 +31,16 @@ const ITEM_ONT      = 'bbbbbbbb-0000-0000-0000-000000000001';
 const WAREHOUSE     = 'bbbbbbbb-0000-0000-0000-000000000002';
 const PROJECT_PR9A  = 'bbbbbbbb-0000-0000-0000-000000000003';
 
-const SN_EMPTY        = 'PR9A-SN-EMPTY-01';
-const SN_PSEUDO_ONLY  = 'PR9A-SN-PSEUDO-01';
-const SN_PSEUDO_ACT   = 'PR9A-SN-PSEUDO-ACT-01';
-const SN_STATUS_CHG   = 'PR9A-SN-STATUS-CHG-01';
-const SN_WITH_EVENTS  = 'PR9A-SN-EVT-01';
+const TEST_USER_ID  = '22222222-2222-2222-2222-222222222222';
+
+const SN_EMPTY                  = 'PR9A-SN-EMPTY-01';
+const SN_PSEUDO_ONLY            = 'PR9A-SN-PSEUDO-01';
+const SN_PSEUDO_ACT             = 'PR9A-SN-PSEUDO-ACT-01';
+const SN_STATUS_CHG             = 'PR9A-SN-STATUS-CHG-01';
+const SN_STATUS_CHG_WITH_EVT    = 'PR9A-SN-STATUS-CHG-WITH-EVT-01';
+const SN_INSTALLED_DATE_NO_FIRE = 'PR9A-SN-INST-DATE-NO-FIRE-01';
+const SN_WITH_EVENTS            = 'PR9A-SN-EVT-01';
+const SN_WITH_ACTOR             = 'PR9A-SN-ACTOR-01';
 
 const pool = new Pool({ connectionString: TEST_DB_URL });
 
@@ -126,6 +131,56 @@ beforeAll(async () => {
        ($1, 'activated',         'installed', 'activated', '2026-05-15T14:00:00Z', '{"resolution_status":"activated"}'::jsonb)`,
     [sid]
   );
+
+  // SN_STATUS_CHG_WITH_EVT — status changed AND real events exist. The
+  // "Status changed" pseudo's `realEvents.length === 0` guard must suppress
+  // it; a regression dropping that guard would emit a duplicate pseudo.
+  const sid2Res = await pool.query<{ id: string }>(
+    `INSERT INTO stock_serials
+       (stock_item_id, serial_number, status,
+        previous_status, status_changed_at)
+     VALUES ($1, $2, 'activated', 'installed', '2026-05-15T14:00:00Z')
+     RETURNING id`,
+    [ITEM_ONT, SN_STATUS_CHG_WITH_EVT]
+  );
+  await pool.query(
+    `INSERT INTO stock_serial_events
+       (serial_id, event_type, from_state, to_state, occurred_at, payload)
+     VALUES ($1, 'activated', 'installed', 'activated',
+             '2026-05-15T14:00:00Z', '{}'::jsonb)`,
+    [sid2Res.rows[0].id]
+  );
+
+  // SN_INSTALLED_DATE_NO_FIRE — installed_date set but status='available'.
+  // The "Installed at drop" pseudo gates on status IN ('installed','activated')
+  // and must not fire here; a regression widening the gate would emit it.
+  await pool.query(
+    `INSERT INTO stock_serials
+       (stock_item_id, serial_number, status, installed_date)
+     VALUES ($1, $2, 'available', '2026-05-01T08:00:00Z')`,
+    [ITEM_ONT, SN_INSTALLED_DATE_NO_FIRE]
+  );
+
+  // SN_WITH_ACTOR — event with actor_user_id pointing at the seeded test
+  // user. Exercises the COALESCE/NULLIF actor-name join.
+  await pool.query(
+    `UPDATE users SET first_name = 'Jane', last_name = 'Doe' WHERE id = $1`,
+    [TEST_USER_ID]
+  );
+  const sid3Res = await pool.query<{ id: string }>(
+    `INSERT INTO stock_serials
+       (stock_item_id, serial_number, status)
+     VALUES ($1, $2, 'activated')
+     RETURNING id`,
+    [ITEM_ONT, SN_WITH_ACTOR]
+  );
+  await pool.query(
+    `INSERT INTO stock_serial_events
+       (serial_id, event_type, from_state, to_state, occurred_at, actor_user_id, payload)
+     VALUES ($1, 'activated', 'installed', 'activated',
+             '2026-05-15T14:00:00Z', $2, '{}'::jsonb)`,
+    [sid3Res.rows[0].id, TEST_USER_ID]
+  );
 });
 
 afterAll(async () => {
@@ -138,6 +193,10 @@ afterAll(async () => {
     await pool.query(`DELETE FROM projects WHERE id = $1`, [PROJECT_PR9A]);
     await pool.query(`DELETE FROM stock_locations WHERE id = $1`, [WAREHOUSE]);
     await pool.query(`DELETE FROM stock_items WHERE id = $1`, [ITEM_ONT]);
+    await pool.query(
+      `UPDATE users SET first_name = NULL, last_name = NULL WHERE id = $1`,
+      [TEST_USER_ID]
+    );
   } finally {
     await pool.end();
   }
@@ -232,6 +291,38 @@ describe('getSerialTimeline', () => {
     for (const e of realEvents) {
       expect(typeof e.occurredAt).toBe('string');
       expect(e.occurredAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    }
+  });
+
+  it('suppresses "Status changed" pseudo when real events exist', async () => {
+    const result = await getSerialTimeline(SN_STATUS_CHG_WITH_EVT);
+    expect(result).not.toBeNull();
+    expect(result!.hasRealEvents).toBe(true);
+    const pseudoLabels = result!.entries
+      .filter((e) => e.kind === 'pseudo')
+      .map((e) => (e.kind === 'pseudo' ? e.label : ''));
+    expect(pseudoLabels).not.toContain('Status changed');
+  });
+
+  it('suppresses "Installed at drop" pseudo when status is neither installed nor activated', async () => {
+    const result = await getSerialTimeline(SN_INSTALLED_DATE_NO_FIRE);
+    expect(result).not.toBeNull();
+    const pseudoLabels = result!.entries
+      .filter((e) => e.kind === 'pseudo')
+      .map((e) => (e.kind === 'pseudo' ? e.label : ''));
+    expect(pseudoLabels).not.toContain('Installed at drop');
+    expect(result!.serial.status).toBe('available');
+  });
+
+  it('resolves actor name via users join (first_name + last_name)', async () => {
+    const result = await getSerialTimeline(SN_WITH_ACTOR);
+    expect(result).not.toBeNull();
+    const events = result!.entries.filter((e) => e.kind === 'event');
+    expect(events).toHaveLength(1);
+    const e = events[0];
+    expect(e.kind).toBe('event');
+    if (e.kind === 'event') {
+      expect(e.actorName).toBe('Jane Doe');
     }
   });
 });
