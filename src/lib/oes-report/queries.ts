@@ -140,6 +140,21 @@ export async function loadLatestOesReportDate(): Promise<string> {
     ?? new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Johannesburg' });
 }
 
+// ONT_LIFECYCLE_V2 query functions live in queriesV2.ts to keep this file ≤300 lines.
+// Import them from there when isOntLifecycleV2Enabled() === true.
+export type {
+  NotFoundRow,
+  LinkedAwaitingRow,
+  FtDisputeDefiniteRow,
+  FtDisputeLifecycleRow,
+} from './queriesV2';
+export {
+  loadPpNotFoundRows,
+  loadPpLinkedAwaitingRows,
+  loadFtDisputeDefiniteRows,
+  loadFtDisputeLifecycleRows,
+} from './queriesV2';
+
 export async function loadTicketsForKeys(
   drNumbers: string[],
   ontSerials: string[]
