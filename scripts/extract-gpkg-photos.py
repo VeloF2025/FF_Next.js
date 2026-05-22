@@ -558,10 +558,17 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                         added += 1
                 print(f"    {extra_qf}: +{added} unique files (had {len(extra_idx)})")
 
-        # Get existing photo keys in qfield_photo_validations for this project
+        # Get existing photo keys in qfield_photo_validations across the primary
+        # and every linked QField project. Without including the linked ids,
+        # photos inserted with `resolved_qf_id != qf_id` (the multi-project
+        # resolution added in this commit) would never be dedup-detected on
+        # re-run and the cron would pile up duplicates each day. There is no
+        # UNIQUE constraint on photo_key — the in-memory `existing_keys` set is
+        # the only guard.
+        dedup_project_ids = [qf_id] + linked_qf_ids
         cur.execute(
-            "SELECT photo_key FROM qfield_photo_validations WHERE project_id = %s",
-            (qf_id,),
+            "SELECT photo_key FROM qfield_photo_validations WHERE project_id = ANY(%s::uuid[])",
+            (dedup_project_ids,),
         )
         existing_keys = set(r["photo_key"] for r in cur.fetchall())
         # Build filename-based index for dedup across versioned/unversioned keys
