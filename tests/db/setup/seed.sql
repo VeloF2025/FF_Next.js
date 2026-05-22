@@ -20,14 +20,20 @@ INSERT INTO projects (id, name) VALUES
 
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email TEXT UNIQUE NOT NULL
+  email TEXT UNIQUE NOT NULL,
+  -- PR-9a probe (2026-05-22): timeline service joins users for actor name.
+  first_name VARCHAR(255),
+  last_name VARCHAR(255)
 );
 INSERT INTO users (id, email) VALUES
   ('22222222-2222-2222-2222-222222222222', 'tester@test.local');
 
 CREATE TABLE staff (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  full_name TEXT NOT NULL
+  full_name TEXT NOT NULL,
+  -- PR-9a probe (2026-05-22): timeline service joins staff for actor name.
+  first_name VARCHAR(255),
+  last_name VARCHAR(255)
 );
 INSERT INTO staff (id, full_name) VALUES
   ('33333333-3333-3333-3333-333333333333', 'Test Tech');
@@ -89,6 +95,12 @@ CREATE TABLE stock_serials (
   installed_at_drop_number VARCHAR(255),
   installed_by VARCHAR(255),
   activated_at_olt_id TEXT,
+  -- PR-9a probe (2026-05-22 against prod): timeline pseudo-entry columns.
+  -- received_date is DATE in prod; installed_date + status_changed_at are TIMESTAMPTZ.
+  received_date DATE,
+  installed_date TIMESTAMPTZ,
+  previous_status VARCHAR(50),
+  status_changed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (stock_item_id, serial_number),
