@@ -54,6 +54,6 @@ CREATE INDEX IF NOT EXISTS idx_stock_pickings_created_by_staff
 -- SECTION 3: Record migration
 -- ============================================================
 
-INSERT INTO migrations (version, name, executed_at, success)
-VALUES ('371', 'pwa_picking_staff_attribution', NOW(), true)
+INSERT INTO migrations (version, name)
+VALUES (371, 'pwa_picking_staff_attribution')
 ON CONFLICT (version) DO NOTHING;

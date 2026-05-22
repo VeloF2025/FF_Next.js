@@ -19,18 +19,13 @@ import { Loader2, AlertCircle, ChevronLeft, RefreshCw } from 'lucide-react';
 import { MyPortalShell } from '@/modules/attendance/portal/client/MyPortalShell';
 import { useStoresSession } from '@/modules/field-stock-pwa/hooks/useStoresSession';
 import { StoresTodayList } from '@/modules/field-stock-pwa/components/StoresTodayList';
-import type { StoresTodayRow } from '@/modules/field-stock-pwa/services/storesTodayService';
+import type { StoresTodayResponse } from '@/types/field-stock-pwa/storesToday';
 
 const POLL_INTERVAL_MS = 60_000;
 
-interface ApiResponse {
-  date: string;
-  rows: StoresTodayRow[];
-}
-
 interface ApiEnvelope {
   success: boolean;
-  data?: ApiResponse;
+  data?: StoresTodayResponse;
   error?: { message?: string };
 }
 
@@ -40,14 +35,27 @@ const StoresTodayPage: NextPage & {
   const router = useRouter();
   const { state, profile, error: sessionError } = useStoresSession();
 
-  const [data, setData] = useState<ApiResponse | null>(null);
+  const [data, setData] = useState<StoresTodayResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [lastFetchAt, setLastFetchAt] = useState<Date | null>(null);
 
+  // mountedRef guards every setState in fetchToday — without it the
+  // `finally { setLoading(false) }` runs after an AbortError on unmount and
+  // triggers React's "setState on unmounted component" dev warning.
+  const mountedRef = React.useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const fetchToday = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true);
-    setFetchError(null);
+    if (mountedRef.current) {
+      setLoading(true);
+      setFetchError(null);
+    }
     try {
       const res = await fetch('/api/my/stores/today', {
         credentials: 'include',
@@ -57,13 +65,14 @@ const StoresTodayPage: NextPage & {
       if (!res.ok || !json.success || !json.data) {
         throw new Error(json.error?.message ?? `HTTP ${res.status}`);
       }
+      if (!mountedRef.current) return;
       setData(json.data);
       setLastFetchAt(new Date());
     } catch (err) {
       if ((err as { name?: string }).name === 'AbortError') return;
-      setFetchError((err as Error).message);
+      if (mountedRef.current) setFetchError((err as Error).message);
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, []);
 

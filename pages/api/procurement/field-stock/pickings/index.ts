@@ -6,6 +6,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
+import { sql as pgSql } from '@/lib/db-pool';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
@@ -24,7 +25,8 @@ const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') return handleList(req, res);
-  if (req.method === 'POST') return handleCreate(req, res);
+  // withAuth wraps the default export, so req.user is guaranteed here.
+  if (req.method === 'POST') return handleCreate(req as AuthenticatedNextApiRequest, res);
   return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
 }
 
@@ -121,8 +123,12 @@ async function handleList(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-// WORKING: Create picking with lines
-async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
+// WORKING: Create picking with lines.
+// Typed as AuthenticatedNextApiRequest so the compiler enforces that
+// withAuth has populated req.user before this handler runs. Prevents a
+// future refactor that bypasses withAuth from triggering a runtime
+// TypeError on the .user access (review-team L3).
+async function handleCreate(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   try {
     const {
       pickingType, sourceLocationId, destinationLocationId,
@@ -144,12 +150,13 @@ async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
 
     // Resolve creator staff_id from the authenticated user. Nullable — admin /
     // system users without a staff row write NULL (matches the partial-index
-    // predicate `WHERE created_by_staff_id IS NOT NULL` from migration 370).
-    const authUser = (req as AuthenticatedNextApiRequest).user;
-    const staffRows = await sql`
-      SELECT id FROM staff WHERE user_id = ${authUser.id} LIMIT 1
+    // predicate `WHERE created_by_staff_id IS NOT NULL` from migration 371).
+    // Uses pg.Pool directly via @/lib/db-pool — new lookups should not
+    // extend the Neon-shim surface even when surrounding code still uses it.
+    const staffRows = await pgSql<{ id: string } & Record<string, unknown>>`
+      SELECT id FROM staff WHERE user_id = ${req.user.id} LIMIT 1
     `;
-    const createdByStaffId = (staffRows as Array<{ id: string }>)[0]?.id ?? null;
+    const createdByStaffId = staffRows[0]?.id ?? null;
 
     // ── H5: Require technicianId for FIELD-DEFAULT destination ───────────────
     // Extracted to _validation.ts; see validateFieldDefaultDestination for rationale.

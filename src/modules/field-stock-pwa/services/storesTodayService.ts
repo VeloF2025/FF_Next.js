@@ -2,6 +2,15 @@
  * Stores Today aggregator — per-technician reconciliation for the
  * /my/stores/today PWA view.
  *
+ * MODULE-TREE BOUNDARY (ADR):
+ *   PWA-scoped per-stores-user views live in src/modules/field-stock-pwa/.
+ *   Cross-contractor desktop views live in src/modules/field-stock/.
+ *   Reason: the desktop reconciliationService.ts uses the Neon shim and
+ *   has 3 conditional-SQL branches; rewriting it for this PR would risk
+ *   the existing dashboard. Splitting by surface lets the new code live
+ *   on @/lib/db-pool from day one. The deferred shim migration is
+ *   tracked at the top of reconciliationService.ts.
+ *
  * Scope: returns one row per technician that the *current* stores user
  * issued stock to today, with installed/returned counts and unaccounted
  * delta. Reads stock_pickings.created_by_staff_id (added by migration 371)
@@ -18,16 +27,9 @@
 
 import { sql } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
+import type { StoresTodayRow } from '@/types/field-stock-pwa/storesToday';
 
-export interface StoresTodayRow extends Record<string, unknown> {
-  technician_id: string;
-  technician_name: string;
-  issued_count: number;
-  issued_value_rand: number;
-  installed_count: number;
-  returned_count: number;
-  unaccounted_count: number;
-}
+export type { StoresTodayRow };
 
 /**
  * Get today's per-technician reconciliation for a specific stores user.
@@ -94,7 +96,7 @@ export async function getTodayForStoresUser(
         i.technician_id::text AS technician_id,
         COALESCE(i.technician_name, '') AS technician_name,
         i.issued_count::int AS issued_count,
-        i.issued_value_rand::float AS issued_value_rand,
+        i.issued_value_rand::numeric AS issued_value_rand,
         COALESCE(ins.installed_count, 0)::int AS installed_count,
         COALESCE(ret.returned_count, 0)::int AS returned_count,
         (i.issued_count - COALESCE(ins.installed_count, 0) - COALESCE(ret.returned_count, 0))::int AS unaccounted_count
@@ -103,7 +105,15 @@ export async function getTodayForStoresUser(
       LEFT JOIN returned_today ret ON ret.technician_id = i.technician_id
       ORDER BY unaccounted_count DESC, technician_name ASC;
     `;
-    return rows;
+    // pg-node returns NUMERIC as string to preserve precision. Parse to
+    // number at this boundary — rand values fit JS number safely up to
+    // ~9 trillion, well above any realistic daily issue value.
+    return rows.map((r) => ({
+      ...r,
+      issued_value_rand: typeof r.issued_value_rand === 'string'
+        ? Number(r.issued_value_rand)
+        : r.issued_value_rand,
+    }));
   } catch (error) {
     log.error('getTodayForStoresUser failed', { error, storesStaffId, dateSAST }, 'storesTodayService');
     throw error;
