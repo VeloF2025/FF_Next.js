@@ -35,12 +35,22 @@ const { mockSql, mockClientQuery, mockClientConnect, mockClientEnd } = vi.hoiste
 });
 
 vi.mock('@neondatabase/serverless', () => ({
+  // inspect.ts + accept.ts still use the Neon shim (sql + Client).
   neon: () => mockSql,
   Client: vi.fn().mockImplementation(() => ({
     connect: mockClientConnect,
     query: mockClientQuery,
     end: mockClientEnd,
   })),
+}));
+
+vi.mock('@/lib/db', () => ({
+  // returns/index.ts (the create handler) migrated to @/lib/db. Wire its
+  // tagged-template sql to the same mockSql so the existing fixture sequence
+  // covers all queries from all three handlers.
+  sql: mockSql,
+  pool: { query: mockSql },
+  default: { query: mockSql },
 }));
 
 vi.mock('@/lib/auth', () => ({
@@ -361,9 +371,12 @@ describe('Returns full flow integration', () => {
         s.includes('stock_serials') && s.includes("'scrapped'")
       )).toBe(true);
 
-      // stock_movements recorded for each line
+      // stock_movements integration is deferred to Phase 4 (see comment in
+      // accept.ts:179-188 — the original schema-mismatched INSERT was removed
+      // because it always failed silently). When Phase 4 lands, this will
+      // become `expect(movementInserts.length).toBe(2)` again.
       const movementInserts = clientCalls.filter((s) => s.includes('stock_movements'));
-      expect(movementInserts.length).toBe(2);
+      expect(movementInserts.length).toBe(0);
 
       // stock_return_lines marked 'processed'
       const processedUpdates = clientCalls.filter(

@@ -21,13 +21,24 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 // ── Hoisted mocks ─────────────────────────────────────────────────────────────
 
-const { mockSql } = vi.hoisted(() => ({ mockSql: vi.fn() }));
+const { mockSql, mockPgSql } = vi.hoisted(() => ({
+  mockSql: vi.fn(),
+  // mockPgSql backs the staff lookup the handler does via @/lib/db-pool
+  // (added by commit bd013bc7b — "pickings creator attribution"). Defaults
+  // to returning a real staff row so tests that don't care still pass.
+  mockPgSql: vi.fn().mockResolvedValue([{ id: 'creator-staff-uuid' }]),
+}));
 
 // The handler imports neon() and calls it immediately at module level, so we mock
 // the entire @neondatabase/serverless module and return mockSql as the tagged-
 // template sql function.
 vi.mock('@neondatabase/serverless', () => ({
   neon: () => mockSql,
+}));
+
+vi.mock('@/lib/db-pool', () => ({
+  sql: mockPgSql,
+  pool: { query: mockPgSql },
 }));
 
 vi.mock('@/lib/auth', () => ({

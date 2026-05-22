@@ -2,9 +2,9 @@
  * Integration tests for GET /api/procurement/field-stock/my-serials
  * Task B.4 — my-serials endpoint (Phase 3 return wizard scan step).
  *
- * Tests follow the mock pattern established in
- * pickings-issue-flow-integration.test.ts:
- *   - @neondatabase/serverless hoisted + mocked before handler import
+ * Mock surface:
+ *   - @/lib/db sql template tag stubbed (handler migrated off the Neon
+ *     serverless shim to the in-house pg.Pool wrapper at @/lib/db).
  *   - @/lib/auth withAuth passthrough mock
  *   - @/lib/logger silenced
  *   - user injected via req.user (withAuth stripped by mock)
@@ -17,9 +17,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 const { mockSql } = vi.hoisted(() => ({ mockSql: vi.fn() }));
 
-// The handler calls neon() at module-level, so we must mock before import.
-vi.mock('@neondatabase/serverless', () => ({
-  neon: () => mockSql,
+vi.mock('@/lib/db', () => ({
+  sql: mockSql,
+  pool: { query: mockSql },
+  default: { query: mockSql },
 }));
 
 vi.mock('@/lib/auth', () => ({
