@@ -15,6 +15,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { Pool } from 'pg';
 import { forceCorrectSerials } from '@/modules/procurement/field-stock/services/serialForceCorrectService';
+import type { ForceCorrectRowResult } from '@/types/field-stock';
 
 const TEST_DB_URL = process.env.DATABASE_URL_TEST;
 if (!TEST_DB_URL) {
@@ -352,16 +353,16 @@ describe('forceCorrectSerials', () => {
     expect(result.totalNoOp).toBe(1);
     expect(result.totalFailed).toBe(0);
 
-    const rowA = result.rows.find(r => r.serialNumber === SN_A)!;
+    const rowA = result.rows.find((r: ForceCorrectRowResult) => r.serialNumber === SN_A)!;
     expect(rowA.applied).toBe(true);
     expect(rowA.changedFields).toEqual(['status']);
 
-    const rowB = result.rows.find(r => r.serialNumber === SN_B)!;
+    const rowB = result.rows.find((r: ForceCorrectRowResult) => r.serialNumber === SN_B)!;
     expect(rowB.applied).toBe(false);
     expect(rowB.found).toBe(true);
     expect(rowB.changedFields).toHaveLength(0);
 
-    const rowNone = result.rows.find(r => r.serialNumber === 'PR9B-FC-NONEXISTENT')!;
+    const rowNone = result.rows.find((r: ForceCorrectRowResult) => r.serialNumber === 'PR9B-FC-NONEXISTENT')!;
     expect(rowNone.found).toBe(false);
     expect(rowNone.applied).toBe(false);
   });

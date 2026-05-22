@@ -112,6 +112,8 @@ async function processOne(serialNumber: string, p: ForceCorrectParams): Promise<
       return { serialNumber, found: false, applied: false, changedFields: [] };
     }
 
+    const row = current[0]!;
+
     // Diff: only include fields that are present in target AND differ from current.
     const before: ForceCorrectSnapshot = {};
     const after: ForceCorrectSnapshot = {};
@@ -120,7 +122,7 @@ async function processOne(serialNumber: string, p: ForceCorrectParams): Promise<
     for (const field of TARGET_FIELDS) {
       if (!(field in p.target)) continue;
       const newVal = (p.target[field] as string | null | undefined) ?? null;
-      const oldVal = (current[0][field] as string | null | undefined) ?? null;
+      const oldVal = (row[field] as string | null | undefined) ?? null;
       if (oldVal !== newVal) {
         (before as Record<string, unknown>)[field] = oldVal;
         (after as Record<string, unknown>)[field] = newVal;
@@ -146,7 +148,7 @@ async function processOne(serialNumber: string, p: ForceCorrectParams): Promise<
       setParts.push(`${TARGET_COLUMN_MAP[field]} = $${i++}`);
       params.push((p.target[field] as string | null | undefined) ?? null);
     }
-    params.push(current[0].id);
+    params.push(row.id);
     await client.query(
       `UPDATE stock_serials
           SET ${setParts.join(', ')}, updated_at = NOW()
@@ -162,7 +164,7 @@ async function processOne(serialNumber: string, p: ForceCorrectParams): Promise<
           actor_user_id, payload, occurred_at)
        VALUES ($1, 'force_corrected', $2, $3, $4::uuid, $5::jsonb, NOW())`,
       [
-        current[0].id,
+        row.id,
         statusChanged ? (before.status ?? null) : null,
         statusChanged ? (after.status ?? null) : null,
         p.performedBy,
