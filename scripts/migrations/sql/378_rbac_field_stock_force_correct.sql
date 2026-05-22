@@ -33,6 +33,12 @@ ON CONFLICT (key) DO UPDATE SET
 -- SECTION 2: Grant to super_admin (view + edit; no create/delete)
 -- ============================================================
 
+-- 2. Grant to super_admin (idempotent via unique (role, permission_key)).
+--    Uses DO NOTHING (not DO UPDATE SET actions = EXCLUDED.actions) because:
+--      a) super_admin bypasses withPermission() in src/lib/auth/middleware.ts —
+--         this grant is a defensive belt-and-suspenders, not load-bearing.
+--      b) A re-run must NOT silently undo a deliberate revocation made by an
+--         RBAC admin via the UI after first apply. Matches migration 369.
 INSERT INTO role_permissions (role, permission_key, actions)
 VALUES (
   'super_admin',

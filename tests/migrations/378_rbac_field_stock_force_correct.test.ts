@@ -24,8 +24,15 @@ if (!process.env.TEST_DATABASE_URL) {
 }
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 
+import { readFileSync } from 'fs';
+import path from 'path';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { Pool } from 'pg';
+
+const MIGRATION_PATH = path.resolve(
+  __dirname,
+  '../../scripts/migrations/sql/378_rbac_field_stock_force_correct.sql',
+);
 
 // Use a dedicated pool instance so the global vitest mock of @/lib/db
 // does not interfere with direct SQL queries.
@@ -77,12 +84,26 @@ describe('migration 378 — RBAC procurement.field-stock.force-correct', () => {
     expect(rows[0].description).toBeTruthy();
   });
 
-  it('is idempotent — applying twice does not duplicate the access_permissions row', async () => {
-    const rows = await sql`
+  it('is idempotent — re-applying the migration SQL does not error or duplicate rows', async () => {
+    // Re-execute the full migration SQL to genuinely exercise the ON CONFLICT
+    // paths (not just assert COUNT after a single apply).
+    const sqlText = readFileSync(MIGRATION_PATH, 'utf8');
+    await pool.query(sqlText);
+
+    // access_permissions: ON CONFLICT (key) DO UPDATE — must remain exactly 1 row.
+    const apRows = await sql`
       SELECT COUNT(*)::int AS n FROM access_permissions
       WHERE key = 'procurement.field-stock.force-correct'
     `;
-    expect(rows[0].n).toBe(1);
+    expect(apRows[0].n).toBe(1);
+
+    // role_permissions: ON CONFLICT (role, permission_key) DO NOTHING — must remain exactly 1 row.
+    const rpRows = await sql`
+      SELECT COUNT(*)::int AS n FROM role_permissions
+      WHERE role = 'super_admin'
+        AND permission_key = 'procurement.field-stock.force-correct'
+    `;
+    expect(rpRows[0].n).toBe(1);
   });
 
   it('grants super_admin view+edit and withholds create+delete', async () => {
