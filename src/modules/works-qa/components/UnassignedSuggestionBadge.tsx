@@ -41,6 +41,7 @@ export function UnassignedSuggestionBadge({ poleId, photoKey, suggestion, onAcce
       if (!res.ok) {
         const detail = await res.text().catch(() => res.statusText);
         log.error('works-qa: accept suggestion failed', { photoKey, slot: suggestion.suggested_slot, detail });
+        return;
       }
       await onAccepted();
     } catch (err) {

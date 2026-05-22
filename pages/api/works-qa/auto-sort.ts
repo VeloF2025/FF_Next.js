@@ -77,7 +77,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     let auto_placed = 0, suggested = 0, leftover = 0;
 
     for (const photo_key of photos) {
-      const { slot_key, confidence } = await classifyPhotoToSlot(photoUrl(photo_key));
+      const { slot_key, confidence, reasoning } = await classifyPhotoToSlot(photoUrl(photo_key));
 
       if (!slot_key || confidence < SUGGEST_THRESHOLD) {
         leftover++;
@@ -119,7 +119,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               meta.stepNumber,
               meta.discipline,
               confidence,
-              '',
+              reasoning,
               'auto_sort_placed',
               userEmail,
             ],
@@ -144,21 +144,32 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         continue;
       }
 
-      // Suggestion tier (≥0.6 but either <0.95 or slot already filled).
-      await pool.query(
-        `UPDATE pole_qa_photos
-         SET unassigned_suggestions = unassigned_suggestions ||
-             jsonb_build_object($1::text, jsonb_build_object(
-               'suggested_slot', $2::text,
-               'confidence', $3::numeric,
-               'generated_at', NOW()
-             )),
-             updated_at = NOW()
-         WHERE id = $4::uuid`,
-        [photo_key, slot_key, confidence, pole_id],
-      );
-      suggested++;
-      results.push({ photo_key, predicted_slot: slot_key, confidence, action: 'suggested' });
+      // Suggestion tier (≥0.6 but either <0.95 or slot already filled). Per-photo
+      // try/catch so a single UPDATE failure doesn't lose the auto-placed photos
+      // already committed in previous loop iterations — fall back to leftover.
+      try {
+        await pool.query(
+          `UPDATE pole_qa_photos
+           SET unassigned_suggestions = unassigned_suggestions ||
+               jsonb_build_object($1::text, jsonb_build_object(
+                 'suggested_slot', $2::text,
+                 'confidence', $3::numeric,
+                 'generated_at', NOW()
+               )),
+               updated_at = NOW()
+           WHERE id = $4::uuid`,
+          [photo_key, slot_key, confidence, pole_id],
+        );
+        suggested++;
+        results.push({ photo_key, predicted_slot: slot_key, confidence, action: 'suggested' });
+      } catch (err) {
+        log.error('works-qa/auto-sort: suggestion write failed', {
+          error: err instanceof Error ? err.message : String(err),
+          pole_id, photo_key, slot_key,
+        });
+        leftover++;
+        results.push({ photo_key, predicted_slot: slot_key, confidence, action: 'leftover' });
+      }
     }
 
     return apiResponse.success(res, { auto_placed, suggested, leftover, results });

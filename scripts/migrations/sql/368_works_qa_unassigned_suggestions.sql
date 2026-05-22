@@ -18,4 +18,5 @@ CREATE INDEX idx_pole_qa_photos_unassigned_suggestions
   ON pole_qa_photos USING GIN (unassigned_suggestions);
 
 INSERT INTO migrations (version, name, executed_at)
-VALUES ('368', 'works_qa_unassigned_suggestions', NOW());
+VALUES ('368', 'works_qa_unassigned_suggestions', NOW())
+ON CONFLICT (version) DO NOTHING;
