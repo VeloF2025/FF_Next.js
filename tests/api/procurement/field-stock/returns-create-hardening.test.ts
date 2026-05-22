@@ -3,8 +3,9 @@
  * Task C.1 — role gate, idempotency, server-side returned_by, input validation,
  *             generate_return_number() usage.
  *
- * Mock pattern mirrors my-serials.test.ts (commit 20e8acf72):
- *   - @neondatabase/serverless hoisted + mocked before handler import
+ * Mock surface:
+ *   - @/lib/db sql template tag stubbed (returns/index.ts migrated off the
+ *     Neon serverless shim to the in-house pg.Pool wrapper at @/lib/db).
  *   - @/lib/auth withAuth passthrough mock
  *   - @/lib/logger silenced
  *   - user injected via req.user (withAuth stripped by mock)
@@ -17,8 +18,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 const { mockSql } = vi.hoisted(() => ({ mockSql: vi.fn() }));
 
-vi.mock('@neondatabase/serverless', () => ({
-  neon: () => mockSql,
+vi.mock('@/lib/db', () => ({
+  // Handler imports `{ sql }` only.
+  sql: mockSql,
 }));
 
 vi.mock('@/lib/auth', () => ({

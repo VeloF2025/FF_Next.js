@@ -36,12 +36,23 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────────
 
-const { mockSql } = vi.hoisted(() => ({ mockSql: vi.fn() }));
+const { mockSql, mockPgSql } = vi.hoisted(() => ({
+  mockSql: vi.fn(),
+  // Staff lookup via @/lib/db-pool (commit bd013bc7b — pickings creator
+  // attribution). Default to a valid row so creator_by_staff_id resolves.
+  mockPgSql: vi.fn().mockResolvedValue([{ id: 'creator-staff-uuid' }]),
+}));
 
 // The handler imports neon() at module-level and calls it immediately, so we
 // must mock @neondatabase/serverless before the handler is imported.
 vi.mock('@neondatabase/serverless', () => ({
   neon: () => mockSql,
+}));
+
+vi.mock('@/lib/db-pool', () => ({
+  sql: mockPgSql,
+  pool: { query: mockPgSql },
+  default: { query: mockPgSql },
 }));
 
 vi.mock('@/lib/auth', () => ({
