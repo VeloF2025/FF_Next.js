@@ -2,13 +2,17 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Supersession notice:** This file replaces the previous Wave 2 plan from PR #1716 (merged 2026-05-21 21:03 SAST, branch `plan/wave2-ui`). The original plan scoped a 9-PR REBUILD of `/procurement/field-stock/*` with a `/legacy/*` re-mount pattern. A subsequent grill session on 2026-05-21 22:50 SAST surfaced that the existing UI is in active production use by procurement staff and that Wave 1's investment can be exposed via 3 net-new pages without touching any existing surface — comparable user value at one-third the PR count and a fraction of the regression risk. The augment-first decision is recorded in the locked-decisions table below. The original plan's content is preserved in git history (`git log -p docs/superpowers/plans/2026-05-21-serial-master-register-wave2.md`). The two grills crossed because the parallel-session collision check (`gh pr list --search 'wave2 in:title'`) was not run before either grill started — that's now a mandatory pre-step in §"Mandatory guardrails" below.
+> **Supersession notice:** This file replaces the previous Wave 2 plan from PR #1716 (merged 2026-05-21 21:03 SAST, branch `plan/wave2-ui`). The original plan scoped a 9-PR REBUILD of `/procurement/field-stock/*` with a `/legacy/*` re-mount pattern. A subsequent grill on 2026-05-21 22:50 SAST surfaced that the existing UI is in active production use by procurement staff and that Wave 1's investment can be exposed via 3 net-new pages without touching any existing surface — comparable user value at one-third the PR count and a fraction of the regression risk. The augment-first decision is recorded in the locked-decisions table below. The original plan's content is preserved in git history. The two grills crossed because the parallel-session collision check (`gh pr list --search 'wave2 in:title'`) was not run before either grill started — that's now a mandatory pre-step in §"Mandatory guardrails" below.
+
+> **Revision history:**
+> - 2026-05-21 22:50 SAST — first draft of the augment-first amendment.
+> - 2026-05-22 00:10 SAST — addressed blind-review findings on PR #1720: (a) flattened the nested dynamic API route per the CLAUDE.md "no nested dynamic API routes" rule, (b) wrapped both pages in `<AppLayout>`, (c) moved shared types from `src/components/field-stock/*.types.ts` to `src/types/field-stock/` so services no longer import from components, (d) restored Playwright/Claude-in-Chrome MCP browser-smoke evidence per CLAUDE.md Hard Rule 4, (e) corrected the docker-compose test harness specifics (`tests/db/setup/docker-compose.test.yml`, env var `DATABASE_URL_TEST`), (f) added UNVERIFIED markers on `stock_serials.previous_status` + `status_changed_at` column references pending the PR-0 probe, (g) added explicit "orphaned page" discovery note to §Scope, (h) added `apiResponse.internalError` to the conventions block, (i) updated memory reference. See PR #1720 review comment for the originating issue list.
 
 **Goal:** Augment the existing `/procurement/field-stock/*` admin UI with two new read-only pages — a master serial search and a serial lifecycle timeline — that expose the `stock_serials` register and `stock_serial_events` event log shipped in Wave 1.
 
-**Architecture:** Two new pages added to the existing admin surface. No changes to existing pages, routes, or APIs. New API routes follow the established `withAuth` + `apiResponse` + `pg.Pool` patterns. Components live in `src/components/field-stock/` with co-located component tests; API routes live in `pages/api/procurement/field-stock/serials/`. Tests run against real Postgres via the existing docker-compose test harness (per Wave 1's load-bearing testing change).
+**Architecture:** Two new pages added to the existing admin surface. No changes to existing pages, routes, or APIs. New API routes follow the established `withAuth` + `apiResponse` + `pg.Pool` patterns AND the CLAUDE.md "no nested dynamic API routes" rule — the timeline endpoint is FLAT (`pages/api/procurement/field-stock/serials/timeline.ts?serialNumber=…`), not `[serialNumber]/timeline.ts`. Shared types live in `src/types/field-stock/` so the service layer never imports from `src/components/`. Pages wrap in `<AppLayout>` from `@/components/layout` (matching the established pattern in `pages/procurement/field-stock/index.tsx`). Tests run against real Postgres via the Wave-1 docker-compose harness at `tests/db/setup/docker-compose.test.yml`.
 
-**Tech Stack:** Next.js Pages Router, React 18 + TypeScript, `pg.Pool` via `@/lib/db-pool` (NOT the Neon serverless shim), `withAuth` from `@/lib/auth`, `apiResponse` from `@/lib/apiResponse`, `log` from `@/lib/logger`. Tests: Vitest + @testing-library/react for components; Vitest + real Postgres for API integration tests.
+**Tech Stack:** Next.js Pages Router, React 18 + TypeScript, `pg.Pool` via `@/lib/db-pool` (NOT the Neon serverless shim), `withAuth` from `@/lib/auth`, `apiResponse` from `@/lib/apiResponse`, `log` from `@/lib/logger`. Tests: Vitest + @testing-library/react for components; Vitest + real Postgres for API integration tests via `tests/db/setup/global-setup.ts` which exports `DATABASE_URL_TEST`.
 
 **Spec reference:** `docs/superpowers/specs/2026-05-21-serial-master-register-design.md` §"UI structure" (lines 277-378) and §"Open verification items" (lines 398-410). This plan addresses only the master-search and lifecycle-timeline sections of the spec; reconciliation UI, dashboard rebuild, drill-downs, and accountability rebuild are all deferred.
 
@@ -18,9 +22,11 @@
 
 **In:**
 - **PR-0** — Probe doc capturing prod schema + row counts + index list. Committed as `docs/superpowers/probes/2026-05-21-wave2-schema-probe.md`. Non-negotiable per Wave 1's lessons (schema drift was the #1 bug source).
-- **PR-7** — Shared components: `<SerialSearch>` and `<SerialTimeline>` with unit tests. Co-located in `src/components/field-stock/`.
+- **PR-7** — Shared components: `<SerialSearch>` and `<SerialTimeline>` with unit tests. Shared types live in `src/types/field-stock/`.
 - **PR-8** — `/procurement/field-stock/serials` master search page + `GET /api/procurement/field-stock/serials/search` API.
-- **PR-9a** — `/procurement/field-stock/serials/[serial]` lifecycle timeline page + `GET /api/procurement/field-stock/serials/[serial]/timeline` API. **Read-only.**
+- **PR-9a** — `/procurement/field-stock/serials/[serialNumber]` lifecycle timeline page + `GET /api/procurement/field-stock/serials/timeline?serialNumber=…` API (FLAT route per CLAUDE.md rule). **Read-only.**
+
+**Discovery note for the orphaned pages:** Both new pages are *deliberately orphaned* in this Wave — no sidebar link, no ModuleNav tab, no breadcrumb parent is added. Reason: Locked decision #2 says we don't touch existing pages, and the navigation surface lives inside existing pages. Engineers and power users will navigate by URL during Wave 2 (Hein + procurement managers know the URL pattern). If a follow-up demand surfaces, a tiny separate PR adds the link — that PR is intentionally NOT in this plan because pre-building speculative discovery for an as-yet-unproven feature is exactly the kind of scope creep this amendment exists to prevent.
 
 **Out (deferred until proven demand):**
 - **PR-9b** — Force-correct write API. Today's evidence (the 807-false-activation incident remediated via direct SQL in <2 minutes) shows the alternative works. A UI footgun without proven user demand is over-engineering. If/when a non-DBA needs to remediate state, open a separate PR with strict RBAC + audit-trail tests.
@@ -34,6 +40,7 @@
 - Any changes to existing `/procurement/field-stock/*` pages (augment, not replace — that's the entire reason this plan supersedes the original).
 - Performance benchmarking the search endpoint (no pre-optimization). Use sensible indexes; revisit if measured slow in prod.
 - New RBAC permissions (reuse existing `procurement.field-stock` key — confirmed to exist via PR-0 probe).
+- A navigation link to the new pages (see "Discovery note" above).
 
 ---
 
@@ -50,7 +57,12 @@
 | 7 | Existing `pages/stock/portal.tsx`, `pages/procurement/field-stock/index.tsx`, and `pages/procurement/field-stock/reconciliation.tsx` MUST keep working through Wave 2. Not touched. | This session's grill |
 | 8 | `event_type` column on `stock_serial_events` has no CHECK constraint — adding a new event type is code-only (only relevant if PR-9b is ever resurrected). | Spec line 196 |
 | 9 | No migrations in this plan. PR-0 probe MUST confirm `procurement.field-stock` permission key exists; if it doesn't, the plan needs amendment. | This session's grill |
-| 10 | **Pseudo entries on the timeline.** Per PR-0 probe finding (66 events / 36,264 serials → 99.82% have no events), the timeline page derives synthetic entries from `stock_serials.received_date`, `installed_date`, `activated_at_olt_id`, and `status_changed_at` so the page is useful for every serial, not just the 0.18% with real events. | PR-0 schema probe (2026-05-21 22:55 SAST) |
+| 10 | **Pseudo entries on the timeline.** Per PR-0 probe finding (66 events / 36,264 serials → 99.82% have no events), the timeline page derives synthetic entries from `stock_serials.received_date`, `installed_date`, `activated_at_olt_id`, and `status_changed_at`. Two of those (`previous_status`, `status_changed_at`) carry UNVERIFIED markers in PR-9a's service code pending PR-0 probe confirmation. | PR-0 schema probe (2026-05-21 22:55 SAST) |
+| 11 | **No nav link to the new pages in Wave 2.** Discovery by URL only (orphaned pages). See §Scope "Discovery note". | PR #1720 review (2026-05-22) — review flagged the absence; locked decision elevates the absence from "oversight" to "intentional scope cut". |
+| 12 | **API routes follow the FLAT-route rule.** `pages/api/procurement/field-stock/serials/timeline.ts?serialNumber=<n>` — NOT `serials/[serialNumber]/timeline.ts`. CLAUDE.md "Flatten nested dynamic routes — they fail in Vercel" + "Use flattened routes (contractors-stages.ts not [id]/stages.ts)". | PR #1720 review (2026-05-22) — the first revision violated this. |
+| 13 | **Shared types live in `src/types/field-stock/`.** Components, services, API routes, and pages all import from there. Services MUST NOT depend on `src/components/*`. | PR #1720 review (2026-05-22) — first revision had services importing from components. |
+| 14 | **Pages wrap in `<AppLayout>`** from `@/components/layout` (barrel export). The existing `pages/procurement/field-stock/index.tsx` does this at line 293 — same pattern. | PR #1720 review (2026-05-22) — first revision had bare `<div>` pages. |
+| 15 | **Browser smoke uses Playwright MCP (`mcp__playwriter__execute`)** with screenshots embedded in PR body. Per `feedback_browser_playwright` and CLAUDE.md Hard Rule 4. | PR #1720 review (2026-05-22) — first revision said "manual browser smoke" without evidence. |
 
 ---
 
@@ -68,9 +80,9 @@ These MUST be true before PR-7 enters the queue. Verify in the PR description.
 
 ## Mandatory guardrails (every PR)
 
-1. **Parallel-session collision check BEFORE opening any PR** — run `gh pr list --search 'field-stock in:title' --state open` and `gh pr list --search 'serial in:title' --state open` and `gh pr list --search 'wave2 in:title' --state open`. If another open PR touches the same surface, pause and check with Hein. **This plan exists because that check failed in PR #1716's session.** See memory `feedback_parallel_session_migration_coordination`.
+1. **Parallel-session collision check BEFORE opening any PR** — run `gh pr list --search 'field-stock in:title' --state open`, `gh pr list --search 'serial in:title' --state open`, and `gh pr list --search 'wave2 in:title' --state open`. If another open PR touches the same surface, pause and check with Hein. **This plan exists because that check failed in PR #1716's session.** A new memory `feedback_parallel_session_collision_check` should be added covering all PR types (not just migrations); the existing `feedback_parallel_session_migration_coordination` is narrower and was incorrectly cited in the first revision of this plan.
 2. **Worktree workflow** — every code PR happens in `/home/hein/Workspace/FF_Next.js-wave2-pr<N>` off `origin/master`. Hook at `~/.claude/hooks/ff-next-worktree-guard.sh` enforces this. Remove worktree after merge.
-3. **Real-Postgres tests** via the docker-compose harness established in Wave 1. NO SQL mocking on backend changes.
+3. **Real-Postgres tests** via the docker-compose harness established in Wave 1: `tests/db/setup/docker-compose.test.yml` + `tests/db/setup/global-setup.ts` (sets env var `DATABASE_URL_TEST`). NO SQL mocking on backend changes.
 4. **API responses use `apiResponse` envelope** from `@/lib/apiResponse`. Standard shapes only.
 5. **Files ≤ 300 lines / components ≤ 200 lines.** Reviewer-enforced.
 6. **No new `console.log`** — use `log` from `@/lib/logger`. No empty catch blocks. 100% type coverage.
@@ -79,6 +91,10 @@ These MUST be true before PR-7 enters the queue. Verify in the PR description.
 9. **No migrations in this plan.** If a probe reveals one is needed, pick the version from `SELECT MAX(version)+1 FROM migrations` AT PUSH TIME, never branch time. See memory `feedback_migration_version_collision`.
 10. **DB access via `@/lib/db-pool` (pg.Pool).** Forbidden: `@/lib/db-neon` (Neon shim — known to break conditional SQL).
 11. **Production deploy** post-business-hours only (after 17:00 SAST), with Hein's explicit approval, via `bash scripts/deploy-local.sh production`.
+12. **API routes are FLAT** — no nested dynamic segments. Convention: `serials/timeline.ts?serialNumber=…`, not `serials/[serialNumber]/timeline.ts`. (Page routes — `pages/procurement/field-stock/serials/[serialNumber].tsx` — are fine, the rule is API-route-specific.)
+13. **Pages wrap in `<AppLayout>`** from `@/components/layout` (barrel export). Confirmed pattern: `pages/procurement/field-stock/index.tsx` wraps at line 293–349.
+14. **Shared types live in `src/types/field-stock/`** — not in `src/components/`. Services MUST NOT import from `@/components/*`.
+15. **Browser smoke uses Playwright MCP** (`mcp__playwriter__execute`) — screenshots per smoke step embedded in PR body. Per `feedback_browser_playwright` and CLAUDE.md Hard Rule 4.
 
 ---
 
@@ -86,29 +102,34 @@ These MUST be true before PR-7 enters the queue. Verify in the PR description.
 
 ```
 docs/superpowers/probes/
-  2026-05-21-wave2-schema-probe.md       NEW (PR-0)
+  2026-05-21-wave2-schema-probe.md           NEW (PR-0)
+
+src/types/field-stock/
+  index.ts                                   NEW (PR-7)  — barrel for serialFilters + timelineEntry types
+  serialFilters.ts                           NEW (PR-7)  — SerialSearchFilters
+  timelineEntry.ts                           NEW (PR-7)  — TimelineEntry
 
 src/components/field-stock/
-  SerialSearch.tsx                       NEW (PR-7)  — search box + filters (≤200 lines)
-  SerialSearch.types.ts                  NEW (PR-7)  — public prop types
-  SerialTimeline.tsx                     NEW (PR-7)  — timeline display (≤200 lines)
-  SerialTimeline.types.ts                NEW (PR-7)  — public prop types
-  __tests__/SerialSearch.test.tsx        NEW (PR-7)
-  __tests__/SerialTimeline.test.tsx      NEW (PR-7)
+  SerialSearch.tsx                           NEW (PR-7)  — search box + filters (≤200 lines)
+  SerialSearch.props.ts                      NEW (PR-7)  — SerialSearchProps (component-local; consumes shared filters from src/types/field-stock)
+  SerialTimeline.tsx                         NEW (PR-7)  — timeline display (≤200 lines)
+  SerialTimeline.props.ts                    NEW (PR-7)  — SerialTimelineProps (component-local)
+  __tests__/SerialSearch.test.tsx            NEW (PR-7)
+  __tests__/SerialTimeline.test.tsx          NEW (PR-7)
 
 pages/api/procurement/field-stock/serials/
-  search.ts                              NEW (PR-8)  — GET search endpoint
-  [serial]/timeline.ts                   NEW (PR-9a) — GET timeline endpoint
+  search.ts                                  NEW (PR-8)  — GET search endpoint
+  timeline.ts                                NEW (PR-9a) — GET timeline endpoint (FLAT, ?serialNumber=…)
 
 src/services/field-stock/serials/
-  searchSerials.ts                       NEW (PR-8)  — pg.Pool query layer (≤200 lines)
-  getSerialTimeline.ts                   NEW (PR-9a) — pg.Pool query layer (≤200 lines)
-  __tests__/searchSerials.test.ts        NEW (PR-8)  — real-DB integration test
-  __tests__/getSerialTimeline.test.ts    NEW (PR-9a) — real-DB integration test
+  searchSerials.ts                           NEW (PR-8)  — pg.Pool query layer (≤200 lines)
+  getSerialTimeline.ts                       NEW (PR-9a) — pg.Pool query layer (≤200 lines)
+  __tests__/searchSerials.test.ts            NEW (PR-8)  — real-DB integration test
+  __tests__/getSerialTimeline.test.ts        NEW (PR-9a) — real-DB integration test
 
 pages/procurement/field-stock/serials/
-  index.tsx                              NEW (PR-8)  — search page (≤200 lines)
-  [serial].tsx                           NEW (PR-9a) — timeline page (≤200 lines)
+  index.tsx                                  NEW (PR-8)  — search page (≤200 lines), wraps <AppLayout>
+  [serialNumber].tsx                         NEW (PR-9a) — timeline page (≤200 lines), wraps <AppLayout>
 ```
 
 **Components NOT built** (originally in PR #1716, dropped by this amendment): `ReconciliationReport.tsx`, `StatusBadge.tsx`, `EventIcon.tsx`, `statusVocabulary.ts`, `eventVocabulary.ts`. Reason: each has zero consumers in the augment scope. Build them when a second real consumer materialises.
@@ -122,10 +143,11 @@ pages/procurement/field-stock/serials/
 **API response envelope** (`src/lib/apiResponse.ts` — existing):
 ```typescript
 import { apiResponse } from '@/lib/apiResponse';
-return apiResponse.success(res, data);
-return apiResponse.badRequest(res, message);
-return apiResponse.notFound(res, kind, id);
-return apiResponse.methodNotAllowed(res, m, ['GET']);
+return apiResponse.success(res, data);                       // 200
+return apiResponse.badRequest(res, message);                 // 400
+return apiResponse.notFound(res, kind, id);                  // 404
+return apiResponse.methodNotAllowed(res, m, ['GET']);        // 405
+return apiResponse.internalError(res, err);                  // 500 (used in every handler's catch block)
 ```
 
 **Auth middleware** (`src/lib/auth/middleware.ts` — existing):
@@ -143,6 +165,18 @@ export default withAuth(handler);
 import { pool, sql } from '@/lib/db-pool';
 // `sql` for parameterised templates with static shape
 // `pool` for dynamic queries (built WHERE clauses, etc.)
+```
+
+**Layout wrapper** (existing barrel export):
+```typescript
+import { AppLayout } from '@/components/layout';
+export default function Page() {
+  return (
+    <AppLayout>
+      {/* page content */}
+    </AppLayout>
+  );
+}
 ```
 
 **Logger** (`@/lib/logger` — existing):
@@ -226,6 +260,8 @@ FROM stock_serials ss
 JOIN stock_items si ON si.id = ss.stock_item_id
 WHERE ss.installed_at_drop_number LIKE 'DR%MOH%' OR ss.received_reference ILIKE '%mohadin%' OR ss.received_reference ILIKE '%loeks%'
 LIMIT 5;
+\echo === Confirm pseudo-trigger columns exist (UNVERIFIED in plan) ===
+SELECT column_name FROM information_schema.columns WHERE table_name='stock_serials' AND column_name IN ('previous_status','status_changed_at') ORDER BY column_name;
 \echo === migrations max version ===
 SELECT MAX(version) FROM migrations;
 SQL
@@ -241,7 +277,8 @@ Below the raw output, write a section "Interpretation for Wave 2" answering:
 1. **Search-by-mac feasibility** — is there an index on `stock_serials.mac_address`? If not, what's the row count? Is ILIKE prefix-only acceptable (≤50ms expected at 36k rows) or do we need a CREATE INDEX migration? Recommendation default: defer index until measured slow in prod.
 2. **Timeline emptiness** — what % of serials have ≥1 event? If <5% (probe expectation: ~0.18%), the timeline MUST surface pseudo entries from `stock_serials` columns. Locked decision #10 already commits to this.
 3. **Permission key confirmation** — confirm `procurement.field-stock` exists. If not, the plan needs amendment (add a permission seed migration as a precondition).
-4. **Sample serial for validation gate** — record ONE specific real serial_number from Mohadin Loeks (or another well-known import). The Wave 2 validation gate will search this serial via the UI and assert the timeline renders correctly.
+4. **Pseudo-trigger column confirmation** — confirm `stock_serials.previous_status` AND `stock_serials.status_changed_at` exist. If either is missing, the PR-9a service code's UNVERIFIED markers need to be addressed (either by removing the corresponding pseudo entries from `getSerialTimeline`, or by adding a schema migration as a precondition).
+5. **Sample serial for validation gate** — record ONE specific real serial_number from Mohadin Loeks (or another well-known import). The Wave 2 validation gate will search this serial via the UI and assert the timeline renders correctly.
 
 - [ ] **Step 4: Commit + open PR**
 
@@ -252,8 +289,9 @@ docs(wave2): PR-0 schema probe for serial register UI augmentation
 
 Captures verbatim prod schema for stock_serials, stock_serial_events, and
 all referenced reference tables. Plus row counts by status, distinct
-event_types, item category distribution, and one Mohadin Loeks sample
-serial for the Wave 2 validation gate.
+event_types, item category distribution, pseudo-trigger column existence
+confirmation, and one Mohadin Loeks sample serial for the Wave 2
+validation gate.
 
 Per memory feedback_query_schema_before_migration — written before any
 seed, test, or column reference is committed to code. This is PR-0 of
@@ -279,24 +317,27 @@ git worktree remove /home/hein/Workspace/FF_Next.js-wave2-pr0
 
 ---
 
-## PR-7: Shared components (`<SerialSearch>` + `<SerialTimeline>`)
+## PR-7: Shared components (`<SerialSearch>` + `<SerialTimeline>`) + shared types
 
 **Reviewer:** sonnet
 **Dependencies:** PR-0 merged.
 **Rollback:** `git revert <merge-sha>` — no consumer pages yet, zero blast radius.
 
 **Files:**
+- Create: `src/types/field-stock/index.ts`
+- Create: `src/types/field-stock/serialFilters.ts`
+- Create: `src/types/field-stock/timelineEntry.ts`
 - Create: `src/components/field-stock/SerialSearch.tsx`
-- Create: `src/components/field-stock/SerialSearch.types.ts`
+- Create: `src/components/field-stock/SerialSearch.props.ts`
 - Create: `src/components/field-stock/SerialTimeline.tsx`
-- Create: `src/components/field-stock/SerialTimeline.types.ts`
+- Create: `src/components/field-stock/SerialTimeline.props.ts`
 - Create: `src/components/field-stock/__tests__/SerialSearch.test.tsx`
 - Create: `src/components/field-stock/__tests__/SerialTimeline.test.tsx`
 
 **Public API surface (locked — PR-8 and PR-9a depend on these):**
 
 ```typescript
-// SerialSearch.types.ts
+// src/types/field-stock/serialFilters.ts
 export interface SerialSearchFilters {
   q?: string;                  // prefix match on serial_number OR mac_address
   status?: string[];           // multi-select from CHECK list
@@ -308,13 +349,7 @@ export interface SerialSearchFilters {
   eventUntil?: string;         // ISO date (reserved — not wired in v1)
 }
 
-export interface SerialSearchProps {
-  initialFilters: SerialSearchFilters;
-  onFiltersChange: (filters: SerialSearchFilters) => void;
-  categories?: string[];
-}
-
-// SerialTimeline.types.ts
+// src/types/field-stock/timelineEntry.ts
 export type TimelineEntry =
   | {
       kind: 'event';
@@ -336,13 +371,27 @@ export type TimelineEntry =
       description: string;
     };
 
+// src/types/field-stock/index.ts (barrel)
+export type { SerialSearchFilters } from './serialFilters';
+export type { TimelineEntry } from './timelineEntry';
+
+// src/components/field-stock/SerialSearch.props.ts
+import type { SerialSearchFilters } from '@/types/field-stock';
+export interface SerialSearchProps {
+  initialFilters: SerialSearchFilters;
+  onFiltersChange: (filters: SerialSearchFilters) => void;
+  categories?: string[];
+}
+
+// src/components/field-stock/SerialTimeline.props.ts
+import type { TimelineEntry } from '@/types/field-stock';
 export interface SerialTimelineProps {
   entries: TimelineEntry[];   // reverse-chronological
   hasRealEvents: boolean;     // true iff any entry.kind === 'event'
 }
 ```
 
-### Task 7.1 — Worktree + collision check + types
+### Task 7.1 — Worktree + collision check + shared types
 
 - [ ] **Step 1: Worktree + collision check**
 
@@ -357,10 +406,10 @@ ln -s /home/hein/Workspace/FF_Next.js/node_modules /home/hein/Workspace/FF_Next.
 cd /home/hein/Workspace/FF_Next.js-wave2-pr7
 ```
 
-- [ ] **Step 2: Write `SerialSearch.types.ts`**
+- [ ] **Step 2: Create the shared types directory + files**
 
 ```typescript
-// src/components/field-stock/SerialSearch.types.ts
+// src/types/field-stock/serialFilters.ts
 export interface SerialSearchFilters {
   q?: string;
   status?: string[];
@@ -371,7 +420,43 @@ export interface SerialSearchFilters {
   eventSince?: string;
   eventUntil?: string;
 }
+```
 
+```typescript
+// src/types/field-stock/timelineEntry.ts
+export type TimelineEntry =
+  | {
+      kind: 'event';
+      id: string;
+      eventType: string;
+      fromState: string | null;
+      toState: string | null;
+      occurredAt: string;
+      sourceTable: string | null;
+      sourceId: string | null;
+      actorName: string | null;
+      payload: Record<string, unknown>;
+    }
+  | {
+      kind: 'pseudo';
+      id: string;
+      label: string;
+      occurredAt: string;
+      description: string;
+    };
+```
+
+```typescript
+// src/types/field-stock/index.ts
+export type { SerialSearchFilters } from './serialFilters';
+export type { TimelineEntry } from './timelineEntry';
+```
+
+- [ ] **Step 3: Component-local props**
+
+```typescript
+// src/components/field-stock/SerialSearch.props.ts
+import type { SerialSearchFilters } from '@/types/field-stock';
 export interface SerialSearchProps {
   initialFilters: SerialSearchFilters;
   onFiltersChange: (filters: SerialSearchFilters) => void;
@@ -379,11 +464,20 @@ export interface SerialSearchProps {
 }
 ```
 
-- [ ] **Step 3: Commit**
+```typescript
+// src/components/field-stock/SerialTimeline.props.ts
+import type { TimelineEntry } from '@/types/field-stock';
+export interface SerialTimelineProps {
+  entries: TimelineEntry[];
+  hasRealEvents: boolean;
+}
+```
+
+- [ ] **Step 4: Commit**
 
 ```bash
-git add src/components/field-stock/SerialSearch.types.ts
-git commit -m "feat(wave2): SerialSearch component types"
+git add src/types/field-stock/ src/components/field-stock/SerialSearch.props.ts src/components/field-stock/SerialTimeline.props.ts
+git commit -m "feat(wave2): shared field-stock types + component props (PR-7 scaffolding)"
 ```
 
 ### Task 7.2 — SerialSearch failing test (initial render)
@@ -426,12 +520,13 @@ npx vitest run src/components/field-stock/__tests__/SerialSearch.test.tsx
 ```typescript
 // src/components/field-stock/SerialSearch.tsx
 import { useState, useEffect, useRef } from 'react';
-import type { SerialSearchFilters, SerialSearchProps } from './SerialSearch.types';
+import type { SerialSearchFilters } from '@/types/field-stock';
+import type { SerialSearchProps } from './SerialSearch.props';
 
 const DEBOUNCE_MS = 300;
 
 // Mirrors stock_serials.status CHECK constraint exactly.
-// Keep in sync with PR-0 probe doc.
+// Keep in sync with PR-0 probe doc (the CHECK list is the authority).
 const STATUS_OPTIONS = [
   'available',
   'reserved',
@@ -588,40 +683,9 @@ git add src/components/field-stock/__tests__/SerialSearch.test.tsx
 git commit -m "test(wave2): SerialSearch debounce + status + category coverage"
 ```
 
-### Task 7.5 — SerialTimeline types + empty state
+### Task 7.5 — SerialTimeline empty-state failing test
 
-- [ ] **Step 1: Write types**
-
-```typescript
-// src/components/field-stock/SerialTimeline.types.ts
-export type TimelineEntry =
-  | {
-      kind: 'event';
-      id: string;
-      eventType: string;
-      fromState: string | null;
-      toState: string | null;
-      occurredAt: string;
-      sourceTable: string | null;
-      sourceId: string | null;
-      actorName: string | null;
-      payload: Record<string, unknown>;
-    }
-  | {
-      kind: 'pseudo';
-      id: string;
-      label: string;
-      occurredAt: string;
-      description: string;
-    };
-
-export interface SerialTimelineProps {
-  entries: TimelineEntry[];
-  hasRealEvents: boolean;
-}
-```
-
-- [ ] **Step 2: Failing test**
+- [ ] **Step 1: Failing test**
 
 ```typescript
 // src/components/field-stock/__tests__/SerialTimeline.test.tsx
@@ -640,7 +704,7 @@ describe('SerialTimeline', () => {
 });
 ```
 
-- [ ] **Step 3: Run, expect failure**
+- [ ] **Step 2: Run, expect failure**
 
 ```bash
 npx vitest run src/components/field-stock/__tests__/SerialTimeline.test.tsx
@@ -653,7 +717,8 @@ npx vitest run src/components/field-stock/__tests__/SerialTimeline.test.tsx
 ```typescript
 // src/components/field-stock/SerialTimeline.tsx
 import { useState } from 'react';
-import type { SerialTimelineProps, TimelineEntry } from './SerialTimeline.types';
+import type { TimelineEntry } from '@/types/field-stock';
+import type { SerialTimelineProps } from './SerialTimeline.props';
 
 export function SerialTimeline({ entries, hasRealEvents }: SerialTimelineProps) {
   if (entries.length === 0) {
@@ -736,7 +801,7 @@ npx vitest run src/components/field-stock/__tests__/SerialTimeline.test.tsx
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/components/field-stock/SerialTimeline.tsx src/components/field-stock/SerialTimeline.types.ts src/components/field-stock/__tests__/SerialTimeline.test.tsx
+git add src/components/field-stock/SerialTimeline.tsx src/components/field-stock/__tests__/SerialTimeline.test.tsx
 git commit -m "feat(wave2): SerialTimeline component with empty + event + pseudo rendering"
 ```
 
@@ -837,17 +902,19 @@ git commit -m "test(wave2): SerialTimeline event + pseudo + payload coverage"
 npm run ci:quick
 
 git push -u origin feat/wave2-pr7-shared-components
-gh pr create --base master --title "feat(wave2): PR-7 SerialSearch + SerialTimeline components" --body "## Summary
-Shared components for the Wave 2 augmentation:
+gh pr create --base master --title "feat(wave2): PR-7 SerialSearch + SerialTimeline components + shared types" --body "## Summary
+Shared components + types for the Wave 2 augmentation:
+- \\\`src/types/field-stock/\\\` — \\\`SerialSearchFilters\\\` + \\\`TimelineEntry\\\` (services/components/API routes all consume from here; services must NOT import from \\\`@/components/*\\\`)
 - \\\`<SerialSearch>\\\` — search input + debounced filter changes + status multi-select + category
 - \\\`<SerialTimeline>\\\` — reverse-chrono event log with pseudo-entry rendering for serials with no event-log entries (99%+ of prod per PR-0)
 
 ## Scope
-Library code. No consumers in this PR — PR-8 (/serials search page) and PR-9a (/serials/[serial] timeline page) consume them.
+Library code. No consumers in this PR — PR-8 (/serials search page) and PR-9a (/serials/[serialNumber] timeline page) consume them. No pages, so no \\\`<AppLayout>\\\` to wrap.
 
 ## Test plan
 - [ ] \\\`npm run ci:quick\\\` passes
 - [ ] \\\`npx vitest run src/components/field-stock\\\` all green
+- [ ] Browser smoke N/A — no pages in this PR. PR-8 and PR-9a smoke the components in their natural habitat.
 
 ## Rollback
 \\\`git revert <merge-sha>\\\` — no consumers, zero blast radius.
@@ -882,6 +949,7 @@ git worktree remove /home/hein/Workspace/FF_Next.js-wave2-pr7
 
 ```typescript
 // GET /api/procurement/field-stock/serials/search?q=&status=&category=&warehouseId=&projectId=&dropNumber=&page=&pageSize=
+// FLAT route — no nested dynamic segments. Per CLAUDE.md and Locked decision #12.
 // Response (apiResponse.success envelope):
 interface SearchResponse {
   rows: Array<{
@@ -917,13 +985,18 @@ ln -s /home/hein/Workspace/FF_Next.js/node_modules /home/hein/Workspace/FF_Next.
 cd /home/hein/Workspace/FF_Next.js-wave2-pr8
 ```
 
-- [ ] **Step 2: Locate existing docker-compose test pattern**
+- [ ] **Step 2: Boot the Wave-1 docker-compose test harness**
+
+The harness is at `tests/db/setup/docker-compose.test.yml`. Global setup at `tests/db/setup/global-setup.ts` spins it up and exports env var `DATABASE_URL_TEST`. Run:
 
 ```bash
-grep -rln "docker compose\|docker-compose\|TEST_DATABASE_URL" vitest.config.ts tests/ 2>/dev/null | head -10
-ls tests/integration tests/db 2>/dev/null
+# One-time per shell session:
+docker compose -f tests/db/setup/docker-compose.test.yml up -d
+# Then run vitest with the global-setup wired (per existing vitest config):
+npx vitest run src/services/field-stock/serials
 ```
-Follow the harness Wave 1 established. If TEST_DATABASE_URL is the convention, use it; otherwise document the harness env var in the PR description.
+
+If `vitest.config.ts` does not already register `tests/db/setup/global-setup.ts` for this path, EITHER (a) wire it as a `globalSetup` for the new test files OR (b) read `DATABASE_URL_TEST` from the env yourself. The Wave-1 harness convention is (a); follow it.
 
 - [ ] **Step 3: Write failing integration test**
 
@@ -934,8 +1007,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Pool } from 'pg';
 import { searchSerials } from '../searchSerials';
 
-const TEST_URL = process.env.TEST_DATABASE_URL;
-if (!TEST_URL) throw new Error('TEST_DATABASE_URL not set');
+const TEST_URL = process.env.DATABASE_URL_TEST;
+if (!TEST_URL) throw new Error('DATABASE_URL_TEST not set — boot tests/db/setup/docker-compose.test.yml first');
 const pool = new Pool({ connectionString: TEST_URL });
 
 const ITEM_ONT = '11111111-1111-1111-1111-111111111111';
@@ -1025,7 +1098,7 @@ describe('searchSerials', () => {
 - [ ] **Step 4: Run, expect failure**
 
 ```bash
-TEST_DATABASE_URL=<from harness> npx vitest run src/services/field-stock/serials/__tests__/searchSerials.test.ts
+npx vitest run src/services/field-stock/serials/__tests__/searchSerials.test.ts
 ```
 
 ### Task 8.2 — Implement `searchSerials`
@@ -1043,7 +1116,7 @@ Create `src/services/field-stock/serials/searchSerials.ts`:
 
 ```typescript
 import { pool } from '@/lib/db-pool';
-import type { SerialSearchFilters } from '@/components/field-stock/SerialSearch.types';
+import type { SerialSearchFilters } from '@/types/field-stock';
 
 export interface SearchPagination { page: number; pageSize: number; }
 
@@ -1166,14 +1239,14 @@ export async function searchSerials(
 - [ ] **Step 3: Run, expect PASS, commit**
 
 ```bash
-TEST_DATABASE_URL=<from harness> npx vitest run src/services/field-stock/serials/__tests__/searchSerials.test.ts
+npx vitest run src/services/field-stock/serials/__tests__/searchSerials.test.ts
 git add src/services/field-stock/serials/searchSerials.ts src/services/field-stock/serials/__tests__/searchSerials.test.ts
 git commit -m "feat(wave2): searchSerials service with real-DB integration tests + negative-case seeds"
 ```
 
 ### Task 8.3 — API route
 
-- [ ] **Step 1: Create `pages/api/procurement/field-stock/serials/search.ts`**
+- [ ] **Step 1: Create `pages/api/procurement/field-stock/serials/search.ts`** (FLAT — already a non-dynamic route, satisfies Guardrail #12)
 
 ```typescript
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -1181,7 +1254,7 @@ import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { searchSerials } from '@/services/field-stock/serials/searchSerials';
-import type { SerialSearchFilters } from '@/components/field-stock/SerialSearch.types';
+import type { SerialSearchFilters } from '@/types/field-stock';
 
 function parseFilters(query: NextApiRequest['query']): SerialSearchFilters {
   const f: SerialSearchFilters = {};
@@ -1222,7 +1295,7 @@ git add pages/api/procurement/field-stock/serials/search.ts
 git commit -m "feat(wave2): GET /api/procurement/field-stock/serials/search route"
 ```
 
-### Task 8.4 — Search page + finish PR-8
+### Task 8.4 — Search page (wrapped in `<AppLayout>`)
 
 - [ ] **Step 1: Create page**
 
@@ -1233,8 +1306,9 @@ import { useEffect, useState, useCallback } from 'react';
 import type { GetServerSideProps, NextPage } from 'next';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import { AppLayout } from '@/components/layout';
 import { SerialSearch } from '@/components/field-stock/SerialSearch';
-import type { SerialSearchFilters } from '@/components/field-stock/SerialSearch.types';
+import type { SerialSearchFilters } from '@/types/field-stock';
 
 interface ServerRow {
   id: string;
@@ -1316,51 +1390,53 @@ const SerialsSearchPage: NextPage<PageProps> = ({ initialFilters }) => {
   }, [router]);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
-      <h1 className="mb-4 text-xl font-semibold">Serial register</h1>
-      <SerialSearch initialFilters={initialFilters} onFiltersChange={onFiltersChange} />
-      {error && <div className="mt-4 rounded bg-red-950/40 p-3 text-sm text-red-200">{error}</div>}
-      <div className="mt-4 text-sm text-neutral-400">
-        {loading ? 'Loading…' : `${total} result${total === 1 ? '' : 's'}`}
-      </div>
-      <table className="mt-2 w-full text-sm">
-        <thead>
-          <tr className="text-left text-xs uppercase text-neutral-500">
-            <th className="px-2 py-1">Serial</th>
-            <th className="px-2 py-1">Category</th>
-            <th className="px-2 py-1">Status</th>
-            <th className="px-2 py-1">Location</th>
-            <th className="px-2 py-1">Project</th>
-            <th className="px-2 py-1">Last event</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.id} className="border-t border-neutral-800">
-              <td className="px-2 py-1">
-                <Link
-                  href={`/procurement/field-stock/serials/${encodeURIComponent(r.serialNumber)}`}
-                  className="text-blue-400 hover:underline"
-                >
-                  {r.serialNumber}
-                </Link>
-                {r.macAddress && <div className="text-xs text-neutral-500">{r.macAddress}</div>}
-              </td>
-              <td className="px-2 py-1">{r.category ?? '—'}</td>
-              <td className="px-2 py-1">{r.status}</td>
-              <td className="px-2 py-1">{r.currentLocationName ?? r.installedAtDropNumber ?? '—'}</td>
-              <td className="px-2 py-1">{r.allocatedProjectName ?? '—'}</td>
-              <td className="px-2 py-1">
-                {r.lastEventType ?? '—'}
-                {r.lastEventAt && (
-                  <div className="text-xs text-neutral-500">{new Date(r.lastEventAt).toISOString().slice(0, 10)}</div>
-                )}
-              </td>
+    <AppLayout>
+      <div className="mx-auto max-w-7xl px-4 py-6">
+        <h1 className="mb-4 text-xl font-semibold">Serial register</h1>
+        <SerialSearch initialFilters={initialFilters} onFiltersChange={onFiltersChange} />
+        {error && <div className="mt-4 rounded bg-red-950/40 p-3 text-sm text-red-200">{error}</div>}
+        <div className="mt-4 text-sm text-neutral-400">
+          {loading ? 'Loading…' : `${total} result${total === 1 ? '' : 's'}`}
+        </div>
+        <table className="mt-2 w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs uppercase text-neutral-500">
+              <th className="px-2 py-1">Serial</th>
+              <th className="px-2 py-1">Category</th>
+              <th className="px-2 py-1">Status</th>
+              <th className="px-2 py-1">Location</th>
+              <th className="px-2 py-1">Project</th>
+              <th className="px-2 py-1">Last event</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id} className="border-t border-neutral-800">
+                <td className="px-2 py-1">
+                  <Link
+                    href={`/procurement/field-stock/serials/${encodeURIComponent(r.serialNumber)}`}
+                    className="text-blue-400 hover:underline"
+                  >
+                    {r.serialNumber}
+                  </Link>
+                  {r.macAddress && <div className="text-xs text-neutral-500">{r.macAddress}</div>}
+                </td>
+                <td className="px-2 py-1">{r.category ?? '—'}</td>
+                <td className="px-2 py-1">{r.status}</td>
+                <td className="px-2 py-1">{r.currentLocationName ?? r.installedAtDropNumber ?? '—'}</td>
+                <td className="px-2 py-1">{r.allocatedProjectName ?? '—'}</td>
+                <td className="px-2 py-1">
+                  {r.lastEventType ?? '—'}
+                  {r.lastEventAt && (
+                    <div className="text-xs text-neutral-500">{new Date(r.lastEventAt).toISOString().slice(0, 10)}</div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </AppLayout>
   );
 };
 
@@ -1371,22 +1447,36 @@ export const getServerSideProps: GetServerSideProps<PageProps> = async (ctx) => 
 export default SerialsSearchPage;
 ```
 
-- [ ] **Step 2: Lint + commit + push + PR + review + merge + cleanup**
+- [ ] **Step 2: Lint + commit + push + PR + review + merge + cleanup (with Playwright browser smoke)**
 
 ```bash
 npm run ci:quick
 git add pages/procurement/field-stock/serials/index.tsx
-git commit -m "feat(wave2): /procurement/field-stock/serials master search page"
+git commit -m "feat(wave2): /procurement/field-stock/serials master search page (AppLayout-wrapped)"
 git push -u origin feat/wave2-pr8-serials-search
+```
+
+**Browser smoke (mandatory before PR open — per Guardrail #15):**
+1. Run dev server in worktree: `PORT=3004 npm run dev`.
+2. Drive the browser via `mcp__playwriter__execute`:
+   - Navigate to `http://localhost:3004/procurement/field-stock/serials`
+   - Screenshot 1: empty search page, AppLayout sidebar+navbar visible.
+   - Type a known serial prefix into the search input (use PR-0 probe's Mohadin sample).
+   - Screenshot 2: result row appears within 600ms, AppLayout still wrapping.
+   - Click the serial number link.
+   - Screenshot 3: 404 page (PR-9a not shipped yet) — or detail page if PR-9a already merged.
+3. Embed all three screenshots in the PR body BEFORE opening review.
+
+```bash
 gh pr create --base master --title "feat(wave2): PR-8 /serials master search + API" --body "## Summary
-- New API: GET /api/procurement/field-stock/serials/search with filter + pagination
-- New page: /procurement/field-stock/serials — searchable serial register, URL-state filters, click-through to detail
-- Service layer with real-DB integration tests + negative-case seeds
+- New API: GET /api/procurement/field-stock/serials/search with filter + pagination (FLAT route)
+- New page: /procurement/field-stock/serials — searchable serial register, URL-state filters, click-through to detail. Wraps <AppLayout>.
+- Service layer with real-DB integration tests + negative-case seeds via tests/db/setup/docker-compose.test.yml
 
 ## Test plan
 - [ ] \\\`npm run ci:quick\\\` passes
-- [ ] Integration tests: \\\`TEST_DATABASE_URL=... npx vitest run src/services/field-stock/serials\\\`
-- [ ] Manual browser smoke: open /procurement/field-stock/serials on dev, search for a known serial, verify result appears, click through to detail page (404 until PR-9a ships — expected)
+- [ ] Integration tests: \\\`docker compose -f tests/db/setup/docker-compose.test.yml up -d && npx vitest run src/services/field-stock/serials\\\`
+- [ ] Browser smoke screenshots (3 above) embedded; Playwright MCP used per Guardrail #15
 
 ## Rollback
 \\\`git revert <merge-sha>\\\` + redeploy. No DB changes.
@@ -1401,7 +1491,7 @@ git worktree remove /home/hein/Workspace/FF_Next.js-wave2-pr8
 
 ---
 
-## PR-9a: `/procurement/field-stock/serials/[serial]` lifecycle timeline (read-only)
+## PR-9a: `/procurement/field-stock/serials/[serialNumber]` lifecycle timeline (read-only)
 
 **Reviewer:** sonnet
 **Dependencies:** PR-7 merged, PR-8 merged.
@@ -1410,13 +1500,15 @@ git worktree remove /home/hein/Workspace/FF_Next.js-wave2-pr8
 **Files:**
 - Create: `src/services/field-stock/serials/getSerialTimeline.ts`
 - Create: `src/services/field-stock/serials/__tests__/getSerialTimeline.test.ts`
-- Create: `pages/api/procurement/field-stock/serials/[serial]/timeline.ts`
-- Create: `pages/procurement/field-stock/serials/[serial].tsx`
+- Create: `pages/api/procurement/field-stock/serials/timeline.ts` (FLAT — no nested dynamic)
+- Create: `pages/procurement/field-stock/serials/[serialNumber].tsx` (page-level dynamic is allowed; API-level is not)
 
 **API contract:**
 
 ```typescript
-// GET /api/procurement/field-stock/serials/:serial/timeline
+// GET /api/procurement/field-stock/serials/timeline?serialNumber=<n>
+// FLAT route per Locked decision #12. Page receives the serialNumber via route param
+// and forwards it as a query string to this flat API.
 // Response (apiResponse.success):
 interface TimelineResponse {
   serial: {
@@ -1438,7 +1530,7 @@ interface TimelineResponse {
 }
 ```
 
-**Pseudo entry derivation rules** (per locked decision #10):
+**Pseudo entry derivation rules** (per Locked decision #10):
 
 | Source on `stock_serials` | Emit pseudo when... | Label | Description |
 |---|---|---|---|
@@ -1446,6 +1538,8 @@ interface TimelineResponse {
 | `installed_date IS NOT NULL AND status IN ('installed','activated')` | No real `installed_at_drop` event exists | "Installed at drop" | `Drop ${installed_at_drop_number ?? 'unknown'} — inferred from stock_serials.installed_date` |
 | `activated_at_olt_id IS NOT NULL AND status='activated'` | No real `activated` event exists | "Activated on OLT" | `OLT ${activated_at_olt_id} — inferred from stock_serials.activated_at_olt_id` |
 | `status_changed_at IS NOT NULL AND previous_status IS NOT NULL AND previous_status != status` | No real events at all | "Status changed" | `${previous_status} → ${status}` |
+
+**UNVERIFIED columns:** `stock_serials.previous_status` and `stock_serials.status_changed_at` are referenced by the fourth pseudo rule. PR-0 probe step 2 must confirm both exist. If either is missing, the fourth pseudo rule + its test case + its code block must be removed (the other three pseudo rules use columns whose existence the Wave-1 spec already confirms).
 
 Pseudo entries emitted ONLY when no real event covers the same fact (avoid duplication).
 
@@ -1456,6 +1550,7 @@ Pseudo entries emitted ONLY when no real event covers the same fact (avoid dupli
 ```bash
 gh pr list --search 'serial in:title' --state open
 gh pr list --search 'timeline in:title' --state open
+gh pr list --search 'wave2 in:title' --state open
 git fetch origin master --quiet
 git worktree add /home/hein/Workspace/FF_Next.js-wave2-pr9a -b feat/wave2-pr9a-serial-timeline origin/master
 ln -s /home/hein/Workspace/FF_Next.js/node_modules /home/hein/Workspace/FF_Next.js-wave2-pr9a/node_modules
@@ -1471,8 +1566,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Pool } from 'pg';
 import { getSerialTimeline } from '../getSerialTimeline';
 
-const TEST_URL = process.env.TEST_DATABASE_URL;
-if (!TEST_URL) throw new Error('TEST_DATABASE_URL not set');
+const TEST_URL = process.env.DATABASE_URL_TEST;
+if (!TEST_URL) throw new Error('DATABASE_URL_TEST not set — boot tests/db/setup/docker-compose.test.yml first');
 const pool = new Pool({ connectionString: TEST_URL });
 
 const ITEM_ONT = '11111111-1111-1111-1111-111111111111';
@@ -1549,7 +1644,8 @@ describe('getSerialTimeline', () => {
 - [ ] **Step 3: Run, expect failure**
 
 ```bash
-TEST_DATABASE_URL=<from harness> npx vitest run src/services/field-stock/serials/__tests__/getSerialTimeline.test.ts
+docker compose -f tests/db/setup/docker-compose.test.yml up -d
+npx vitest run src/services/field-stock/serials/__tests__/getSerialTimeline.test.ts
 ```
 
 ### Task 9a.2 — Implement `getSerialTimeline`
@@ -1560,7 +1656,7 @@ Create `src/services/field-stock/serials/getSerialTimeline.ts`:
 
 ```typescript
 import { pool } from '@/lib/db-pool';
-import type { TimelineEntry } from '@/components/field-stock/SerialTimeline.types';
+import type { TimelineEntry } from '@/types/field-stock';
 
 export interface SerialDetail {
   id: string;
@@ -1590,6 +1686,9 @@ export async function getSerialTimeline(serialNumber: string): Promise<TimelineR
     location_name: string | null; project_name: string | null;
     drop_number: string | null; installed_date: string | null;
     received_date: string | null; activated_at_olt_id: string | null;
+    // UNVERIFIED — confirm in PR-0 probe before merging PR-9a.
+    // If either column is missing, drop both fields here AND the
+    // "Status changed" pseudo entry below.
     previous_status: string | null; status_changed_at: string | null;
   }>(
     `
@@ -1600,7 +1699,8 @@ export async function getSerialTimeline(serialNumber: string): Promise<TimelineR
       sl.name AS location_name, p.name AS project_name,
       ss.installed_at_drop_number AS drop_number,
       ss.installed_date, ss.received_date, ss.activated_at_olt_id,
-      ss.previous_status, ss.status_changed_at
+      ss.previous_status,        -- UNVERIFIED — confirm in PR-0 probe
+      ss.status_changed_at       -- UNVERIFIED — confirm in PR-0 probe
     FROM stock_serials ss
     LEFT JOIN stock_items si ON si.id = ss.stock_item_id
     LEFT JOIN stock_locations sl ON sl.id = ss.current_location_id
@@ -1685,6 +1785,8 @@ export async function getSerialTimeline(serialNumber: string): Promise<TimelineR
       description: `OLT ${r.activated_at_olt_id} — inferred from stock_serials.activated_at_olt_id`,
     });
   }
+  // UNVERIFIED branch — fires only if both previous_status and status_changed_at exist on stock_serials.
+  // PR-0 probe step 2 confirms. If either column is missing, REMOVE this branch and its corresponding test case.
   if (
     r.status_changed_at && r.previous_status &&
     r.previous_status !== r.status && realEvents.length === 0
@@ -1709,18 +1811,24 @@ export async function getSerialTimeline(serialNumber: string): Promise<TimelineR
 - [ ] **Step 2: Run, expect PASS, commit**
 
 ```bash
-TEST_DATABASE_URL=<from harness> npx vitest run src/services/field-stock/serials/__tests__/getSerialTimeline.test.ts
+npx vitest run src/services/field-stock/serials/__tests__/getSerialTimeline.test.ts
 git add src/services/field-stock/serials/getSerialTimeline.ts src/services/field-stock/serials/__tests__/getSerialTimeline.test.ts
 git commit -m "feat(wave2): getSerialTimeline service with real-DB integration tests"
 ```
 
-### Task 9a.3 — API route + detail page + finish PR-9a
+### Task 9a.3 — API route (FLAT) + detail page (`<AppLayout>`) + finish PR-9a
 
-- [ ] **Step 1: Create API route**
+- [ ] **Step 1: Create FLAT API route**
 
-Create `pages/api/procurement/field-stock/serials/[serial]/timeline.ts`:
+Create `pages/api/procurement/field-stock/serials/timeline.ts`:
 
 ```typescript
+/**
+ * GET /api/procurement/field-stock/serials/timeline?serialNumber=<n>
+ *
+ * FLAT route — no nested dynamic segments. Per CLAUDE.md "Flatten nested
+ * dynamic routes — they fail in Vercel" and Wave 2 Locked decision #12.
+ */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
@@ -1729,13 +1837,13 @@ import { getSerialTimeline } from '@/services/field-stock/serials/getSerialTimel
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['GET']);
-  const serial = req.query.serial;
-  if (typeof serial !== 'string' || serial.length === 0) {
-    return apiResponse.badRequest(res, 'serial path parameter required');
+  const serialNumber = req.query.serialNumber;
+  if (typeof serialNumber !== 'string' || serialNumber.length === 0) {
+    return apiResponse.badRequest(res, 'serialNumber query parameter required');
   }
   try {
-    const result = await getSerialTimeline(serial);
-    if (!result) return apiResponse.notFound(res, 'Serial', serial);
+    const result = await getSerialTimeline(serialNumber);
+    if (!result) return apiResponse.notFound(res, 'Serial', serialNumber);
     return apiResponse.success(res, result);
   } catch (err) {
     log.error('serial timeline failed', { err: err instanceof Error ? err.message : String(err) }, 'SerialTimelineAPI');
@@ -1746,17 +1854,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 export default withAuth(handler);
 ```
 
-- [ ] **Step 2: Create detail page**
+- [ ] **Step 2: Create detail page (page-level dynamic is fine; only API-level nesting is forbidden)**
 
-Create `pages/procurement/field-stock/serials/[serial].tsx`:
+Create `pages/procurement/field-stock/serials/[serialNumber].tsx`:
 
 ```typescript
 import { useEffect, useState } from 'react';
 import type { NextPage } from 'next';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import { AppLayout } from '@/components/layout';
 import { SerialTimeline } from '@/components/field-stock/SerialTimeline';
-import type { TimelineEntry } from '@/components/field-stock/SerialTimeline.types';
+import type { TimelineEntry } from '@/types/field-stock';
 
 interface SerialDetail {
   id: string;
@@ -1777,19 +1886,20 @@ interface PageData { serial: SerialDetail; entries: TimelineEntry[]; hasRealEven
 
 const SerialTimelinePage: NextPage = () => {
   const router = useRouter();
-  const { serial } = router.query;
+  const { serialNumber } = router.query;
   const [data, setData] = useState<PageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    if (typeof serial !== 'string') return;
+    if (typeof serialNumber !== 'string') return;
     let cancelled = false;
     setLoading(true);
     setError(null);
     setNotFound(false);
-    fetch(`/api/procurement/field-stock/serials/${encodeURIComponent(serial)}/timeline`, { credentials: 'include' })
+    const params = new URLSearchParams({ serialNumber });
+    fetch(`/api/procurement/field-stock/serials/timeline?${params}`, { credentials: 'include' })
       .then((r) => r.json().then((env) => ({ status: r.status, env })))
       .then(({ status, env }) => {
         if (cancelled) return;
@@ -1802,62 +1912,89 @@ const SerialTimelinePage: NextPage = () => {
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [serial]);
+  }, [serialNumber]);
 
-  if (loading) return <div className="mx-auto max-w-4xl px-4 py-6 text-sm text-neutral-400">Loading…</div>;
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="mx-auto max-w-4xl px-4 py-6 text-sm text-neutral-400">Loading…</div>
+      </AppLayout>
+    );
+  }
   if (notFound) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-6">
-        <Link href="/procurement/field-stock/serials" className="text-sm text-blue-400 hover:underline">← Back to search</Link>
-        <h1 className="mt-4 text-xl font-semibold">Serial not found</h1>
-        <p className="mt-2 text-sm text-neutral-400">No serial matches «{String(serial)}».</p>
-      </div>
+      <AppLayout>
+        <div className="mx-auto max-w-4xl px-4 py-6">
+          <Link href="/procurement/field-stock/serials" className="text-sm text-blue-400 hover:underline">← Back to search</Link>
+          <h1 className="mt-4 text-xl font-semibold">Serial not found</h1>
+          <p className="mt-2 text-sm text-neutral-400">No serial matches «{String(serialNumber)}».</p>
+        </div>
+      </AppLayout>
     );
   }
   if (error || !data) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-6">
-        <div className="rounded bg-red-950/40 p-3 text-sm text-red-200">{error ?? 'Unknown error'}</div>
-      </div>
+      <AppLayout>
+        <div className="mx-auto max-w-4xl px-4 py-6">
+          <div className="rounded bg-red-950/40 p-3 text-sm text-red-200">{error ?? 'Unknown error'}</div>
+        </div>
+      </AppLayout>
     );
   }
   const { serial: s, entries, hasRealEvents } = data;
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6">
-      <Link href="/procurement/field-stock/serials" className="text-sm text-blue-400 hover:underline">← Back to search</Link>
-      <header className="mt-2">
-        <h1 className="text-xl font-semibold">{s.serialNumber}</h1>
-        <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-neutral-300 sm:grid-cols-4">
-          {s.macAddress && <div><dt className="text-xs text-neutral-500">MAC</dt><dd>{s.macAddress}</dd></div>}
-          {s.category && <div><dt className="text-xs text-neutral-500">Category</dt><dd>{s.category}</dd></div>}
-          <div><dt className="text-xs text-neutral-500">Status</dt><dd>{s.status}</dd></div>
-          {s.currentLocationName && <div><dt className="text-xs text-neutral-500">Location</dt><dd>{s.currentLocationName}</dd></div>}
-          {s.allocatedProjectName && <div><dt className="text-xs text-neutral-500">Project</dt><dd>{s.allocatedProjectName}</dd></div>}
-          {s.installedAtDropNumber && <div><dt className="text-xs text-neutral-500">Drop</dt><dd>{s.installedAtDropNumber}</dd></div>}
-          {s.activatedAtOltId && <div><dt className="text-xs text-neutral-500">OLT</dt><dd>{s.activatedAtOltId}</dd></div>}
-        </dl>
-      </header>
-      <section className="mt-6">
-        <h2 className="mb-2 text-sm uppercase text-neutral-500">Lifecycle</h2>
-        <SerialTimeline entries={entries} hasRealEvents={hasRealEvents} />
-      </section>
-    </div>
+    <AppLayout>
+      <div className="mx-auto max-w-4xl px-4 py-6">
+        <Link href="/procurement/field-stock/serials" className="text-sm text-blue-400 hover:underline">← Back to search</Link>
+        <header className="mt-2">
+          <h1 className="text-xl font-semibold">{s.serialNumber}</h1>
+          <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-neutral-300 sm:grid-cols-4">
+            {s.macAddress && <div><dt className="text-xs text-neutral-500">MAC</dt><dd>{s.macAddress}</dd></div>}
+            {s.category && <div><dt className="text-xs text-neutral-500">Category</dt><dd>{s.category}</dd></div>}
+            <div><dt className="text-xs text-neutral-500">Status</dt><dd>{s.status}</dd></div>
+            {s.currentLocationName && <div><dt className="text-xs text-neutral-500">Location</dt><dd>{s.currentLocationName}</dd></div>}
+            {s.allocatedProjectName && <div><dt className="text-xs text-neutral-500">Project</dt><dd>{s.allocatedProjectName}</dd></div>}
+            {s.installedAtDropNumber && <div><dt className="text-xs text-neutral-500">Drop</dt><dd>{s.installedAtDropNumber}</dd></div>}
+            {s.activatedAtOltId && <div><dt className="text-xs text-neutral-500">OLT</dt><dd>{s.activatedAtOltId}</dd></div>}
+          </dl>
+        </header>
+        <section className="mt-6">
+          <h2 className="mb-2 text-sm uppercase text-neutral-500">Lifecycle</h2>
+          <SerialTimeline entries={entries} hasRealEvents={hasRealEvents} />
+        </section>
+      </div>
+    </AppLayout>
   );
 };
 
 export default SerialTimelinePage;
 ```
 
-- [ ] **Step 3: Lint + commit + push + PR + review + merge + cleanup**
+- [ ] **Step 3: Lint + commit + push + Playwright smoke + PR**
 
 ```bash
 npm run ci:quick
-git add pages/api/procurement/field-stock/serials/[serial]/timeline.ts pages/procurement/field-stock/serials/[serial].tsx
-git commit -m "feat(wave2): /serials/[serial] lifecycle timeline + API"
+git add pages/api/procurement/field-stock/serials/timeline.ts pages/procurement/field-stock/serials/[serialNumber].tsx
+git commit -m "feat(wave2): /serials/[serialNumber] lifecycle timeline + FLAT API"
 git push -u origin feat/wave2-pr9a-serial-timeline
-gh pr create --base master --title "feat(wave2): PR-9a /serials/[serial] lifecycle timeline (read-only)" --body "## Summary
-- New API: GET /api/procurement/field-stock/serials/:serial/timeline
-- New page: /procurement/field-stock/serials/[serial]
+```
+
+**Browser smoke (mandatory before PR open — per Guardrail #15):**
+1. Run dev server in worktree: `PORT=3004 npm run dev`.
+2. Drive the browser via `mcp__playwriter__execute`:
+   - Navigate to `http://localhost:3004/procurement/field-stock/serials`.
+   - Type the PR-0 probe's Mohadin sample serial into the search input.
+   - Screenshot 1: search result row visible.
+   - Click the serial link → navigates to `/serials/<serialNumber>`.
+   - Screenshot 2: detail page rendered with header + AppLayout sidebar visible + at least the "Received into stock" pseudo entry visible in the timeline.
+   - Navigate to `/procurement/field-stock/serials/SN-DOES-NOT-EXIST-XYZ`.
+   - Screenshot 3: "Serial not found" page rendered with "← Back to search" link.
+3. Embed all three screenshots in the PR body BEFORE opening review.
+
+```bash
+gh pr create --base master --title "feat(wave2): PR-9a /serials/[serialNumber] lifecycle timeline (read-only)" --body "## Summary
+- New FLAT API: GET /api/procurement/field-stock/serials/timeline?serialNumber=<n>
+- New page: /procurement/field-stock/serials/[serialNumber] — header + <SerialTimeline> from PR-7, wraps <AppLayout>
 - Pseudo entries derived from stock_serials.{received_date, installed_date, activated_at_olt_id, status_changed_at} when no real event covers them (per probe finding: 99%+ of serials have no events)
 
 ## Scope
@@ -1865,8 +2002,11 @@ Read-only. No force-correct (PR-9b deferred per Locked decision #4).
 
 ## Test plan
 - [ ] \\\`npm run ci:quick\\\` passes
-- [ ] Integration tests: \\\`TEST_DATABASE_URL=... npx vitest run src/services/field-stock/serials/__tests__/getSerialTimeline.test.ts\\\`
-- [ ] Manual: open /procurement/field-stock/serials, search for the Mohadin Loeks sample serial from PR-0 probe, click through, verify timeline renders with at least the received-date pseudo entry
+- [ ] Integration tests: \\\`docker compose -f tests/db/setup/docker-compose.test.yml up -d && npx vitest run src/services/field-stock/serials/__tests__/getSerialTimeline.test.ts\\\`
+- [ ] Playwright screenshots (3 above) embedded — Mohadin sample serial, detail page render, 404 page
+
+## UNVERIFIED columns
+\\\`stock_serials.previous_status\\\` + \\\`stock_serials.status_changed_at\\\` are pseudo-trigger columns referenced by the fourth pseudo rule. PR-0 probe step 2 confirms existence; if either is missing, the rule + its test + its code branch will be removed before merge.
 
 ## Rollback
 \\\`git revert <merge-sha>\\\` + redeploy. No DB changes.
@@ -1885,16 +2025,18 @@ git worktree remove /home/hein/Workspace/FF_Next.js-wave2-pr9a
 
 After all four PRs (PR-0, PR-7, PR-8, PR-9a) merge to master and deploy to production:
 
-1. Open `https://app.fibreflow.app/procurement/field-stock/serials` in a logged-in browser session.
+Use `mcp__playwriter__execute` for every step. Embed the resulting screenshots in a follow-up gate comment on this branch's last PR.
+
+1. Open `https://app.fibreflow.app/procurement/field-stock/serials` in a logged-in browser session. Verify AppLayout sidebar+navbar render. Screenshot.
 2. From the PR-0 probe doc, take the Mohadin Loeks sample serial_number.
-3. Paste it into the search input. Within ~600ms (300ms debounce + ~300ms server) the result row appears.
-4. Click the serial number. The detail page loads at `/procurement/field-stock/serials/<that-serial>`.
+3. Paste it into the search input. Within ~600ms (300ms debounce + ~300ms server) the result row appears. Screenshot.
+4. Click the serial number. The detail page loads at `/procurement/field-stock/serials/<that-serial>`. AppLayout sidebar+navbar still visible. Screenshot.
 5. Verify the header shows: MAC (if known), category, status, project name "Mohadin Loeks", drop number (if installed).
 6. Verify the timeline contains **at least** the "Received into stock" pseudo entry (the 249 Mohadin Loeks serials all have `received_date` set — see memory `project_mohadin_loeks_import`).
 7. If the serial has a real event in `stock_serial_events`, verify it renders with `event_type`, state transition chip, and timestamp.
 
-**Gate passes if:** all 7 steps succeed.
-**Gate fails if:** any step errors, the page 404s on a known-good serial, or the timeline is empty for a serial with `received_date IS NOT NULL`.
+**Gate passes if:** all 7 steps succeed AND all 3 screenshots embedded in the gate comment.
+**Gate fails if:** any step errors, the page 404s on a known-good serial, the timeline is empty for a serial with `received_date IS NOT NULL`, or AppLayout fails to render on either page.
 
 After the gate passes, Wave 2 is **done**. No further PRs ship until either (a) a user surfaces a concrete pain point that one of the deferred PRs (PR-9b, PR-10–PR-15) would solve, or (b) Hein explicitly requests one.
 
@@ -1921,26 +2063,39 @@ No DB changes in any of PR-0/PR-7/PR-8/PR-9a → no SQL rollback scripts. If a p
 - [x] Probe step (PR-0) mandatory and documented
 - [x] PR-7 covers `<SerialSearch>` + `<SerialTimeline>` per locked scope (other components dropped — listed in §"File structure")
 - [x] PR-8 covers `/serials` search page + API with pagination + negative-case test seeds
-- [x] PR-9a covers `/serials/[serial]` lifecycle page + API (read-only)
+- [x] PR-9a covers `/serials/[serialNumber]` lifecycle page + FLAT API (read-only)
 - [x] PR-9b (force-correct) explicitly deferred with rationale (Locked decision #4)
 - [x] PR-10 through PR-15 explicitly deferred with rationale (§"Out — deferred")
-- [x] Validation gate is concrete (specific serial source, specific clicks, specific assertions)
+- [x] Validation gate is concrete (specific serial source, specific clicks, specific Playwright screenshots required)
 - [x] Rollback identical across PRs (revert merge commit)
 
 **Type consistency:**
-- [x] `SerialSearchFilters` shape matches between component (PR-7), page (PR-8), and API parser (PR-8)
-- [x] `TimelineEntry` shape matches between component (PR-7), service (PR-9a), and API response (PR-9a)
+- [x] `SerialSearchFilters` defined ONCE in `src/types/field-stock/serialFilters.ts` and consumed by component, page, service, and API parser
+- [x] `TimelineEntry` defined ONCE in `src/types/field-stock/timelineEntry.ts` and consumed by component, service, and API response
+- [x] Services do NOT import from `@/components/*` (per Locked decision #13)
 - [x] `searchSerials` return type fields match what the page table consumes
 - [x] `getSerialTimeline` return type fields match what the detail page header consumes
 
 **Wave 1 lessons applied:**
 - [x] PR-0 probe is non-negotiable and runs before any code (Wave 1 schema-drift lesson)
-- [x] Integration tests against real Postgres, not mocked SQL (Wave 1 testing-strategy lesson)
+- [x] Integration tests against real Postgres via `tests/db/setup/docker-compose.test.yml` + `DATABASE_URL_TEST` env var (Wave 1 testing-strategy lesson)
 - [x] Negative-case rows in every WHERE-filter test (Wave 1 Backfill C lesson — see memory `feedback_run_backfills_through_verification_first`)
-- [x] Parallel-session collision check before each PR (Wave 1 migration collision lesson + this plan's own creation history — PR #1716 supersession)
+- [x] Parallel-session collision check before each PR (Wave 1 migration collision lesson + this plan's own creation history — PR #1716 supersession). Memory note: a new `feedback_parallel_session_collision_check` should be authored to cover non-migration PRs explicitly.
 - [x] Worktree workflow with cleanup after merge
+
+**PR #1720 review fixes:**
+- [x] HIGH 1: nested dynamic API route flattened — `serials/timeline.ts?serialNumber=…` (Locked decision #12, Guardrail #12)
+- [x] HIGH 2: both pages wrap `<AppLayout>` (Locked decision #14, Guardrail #13)
+- [x] HIGH 3: services import shared types from `@/types/field-stock`, not from components (Locked decision #13, Guardrail #14)
+- [x] HIGH 4: browser smoke uses Playwright MCP with embedded screenshots (Locked decision #15, Guardrail #15)
+- [x] MEDIUM 5: memory reference corrected; new `feedback_parallel_session_collision_check` memory recommended
+- [x] MEDIUM 6: UNVERIFIED markers on `previous_status` and `status_changed_at` references; PR-0 probe step 2 covers
+- [x] MEDIUM 7: orphaned-page discovery note added to §Scope and elevated to Locked decision #11
+- [x] MEDIUM 8: docker-compose harness specifics restored — `tests/db/setup/docker-compose.test.yml`, env var `DATABASE_URL_TEST`
+- [x] LOW 9: `apiResponse.internalError` added to the conventions block
 
 **Supersession reason:**
 - [x] Top-of-file supersession notice explains why this amends PR #1716
+- [x] Revision-history block records the PR #1720 review-driven amendments
 - [x] Locked-decisions table cites grill source for each delta from PR #1716
 - [x] File structure section explicitly lists which components from PR #1716 were dropped + why
