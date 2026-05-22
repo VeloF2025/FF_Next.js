@@ -42,6 +42,7 @@ export interface PoleQaPhoto {
 
   main_joint_tray_keys: string[];
   unassigned_photo_keys: string[];
+  unassigned_suggestions?: Record<string, { suggested_slot: string; confidence: number; generated_at?: string }>;
   vlm_results: Record<string, VlmSlotResult>;
   // Per-slot Approve / Snag decisions (migration 247). Keyed by SLOT_META.key.
   // Optional because pre-migration rows lack the column and the API may return
