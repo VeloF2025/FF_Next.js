@@ -46,6 +46,14 @@ CREATE TABLE IF NOT EXISTS works_qa_photo_key_rewrites_2026_05_22 (
   rewritten_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Clear any leftover rows from a prior aborted attempt. Without this, the
+-- next-line INSERT accumulates: each retry adds another 486 rows to the
+-- audit table, doubling the count seen by the safety guard below
+-- (486 → 972 → "more rewrites than expected") and re-blocking the migration.
+-- Observed on production 2026-05-22 (PR #1740 deploy): the runner had failed
+-- once leaving 486 rows behind; the rerun's INSERT produced 972 → guard tripped.
+TRUNCATE works_qa_photo_key_rewrites_2026_05_22;
+
 -- Identify rewrites
 WITH broken AS (
   SELECT p.id AS pole_id, p.pole_label, k AS broken_key,
