@@ -29,11 +29,11 @@ BEGIN;
 ALTER TABLE snag_reports
   ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'tqr';
 
-ALTER TABLE snag_reports
-  DROP CONSTRAINT IF EXISTS snag_reports_source_check;
-ALTER TABLE snag_reports
-  ADD CONSTRAINT snag_reports_source_check
-  CHECK (source IN ('tqr', 'works_qa'));
+-- snag_reports_source_check is owned by migration 358 (P3 scoped reports,
+-- PR #1674), which broadened the allowed values to ('tqr','works_qa','scope').
+-- The original 351 added the narrower ('tqr','works_qa') check, but on any
+-- DB where 358 already landed there are source='scope' rows that violate it.
+-- Leaving the constraint untouched here lets 358 remain the single owner.
 
 ALTER TABLE snag_reports
   ALTER COLUMN audit_date DROP NOT NULL;
