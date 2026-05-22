@@ -68,14 +68,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         });
       }
       // For status we additionally constrain to the valid enum.
-      (target as Record<string, unknown>)[key] = value;
+      // Cast target to the union of its value types (not `unknown`) so that
+      // adding a non-string field to ForceCorrectTarget later surfaces a TS error
+      // at this cast site. The intermediate step is required because
+      // noUncheckedIndexedAccess + strict collapse the LHS union to the most
+      // restrictive member (ForceCorrectStatus) when doing indexed assignment.
+      (target as Record<keyof ForceCorrectTarget, ForceCorrectTarget[keyof ForceCorrectTarget]>)[key] = value as ForceCorrectTarget[typeof key];
     }
   }
   if (Object.keys(target).length === 0) {
     return apiResponse.validationError(res, { target: 'at least one target field required' });
   }
-  if (target.status !== undefined && target.status !== null &&
-      !VALID_STATUSES.includes(target.status as ForceCorrectStatus)) {
+  if (target.status !== undefined &&
+      !VALID_STATUSES.includes(target.status)) {
     return apiResponse.validationError(res, {
       'target.status': `must be one of: ${VALID_STATUSES.join(', ')}`,
     });
