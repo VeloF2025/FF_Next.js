@@ -28,7 +28,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         si.name AS item_name, si.item_code, si.category,
         u.first_name || ' ' || u.last_name AS checked_out_by_name,
         u.email AS checked_out_by_email,
-        p.name AS project_name,
+        p.project_name AS project_name,
         CURRENT_DATE - tc.expected_return_date AS days_overdue
       FROM tool_checkouts tc
       JOIN stock_items si ON si.id = tc.stock_item_id

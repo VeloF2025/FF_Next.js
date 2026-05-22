@@ -48,7 +48,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         staff = await sql`
           SELECT
             sp.*,
-            p.name as project_name,
+            p.project_name as project_name,
             p.status as project_status,
             s.name as staff_name,
             s.email as staff_email,
@@ -66,7 +66,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         staff = await sql`
           SELECT
             sp.*,
-            p.name as project_name,
+            p.project_name as project_name,
             p.status as project_status,
             s.name as staff_name,
             s.email as staff_email,

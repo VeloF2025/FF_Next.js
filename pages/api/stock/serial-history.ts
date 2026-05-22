@@ -47,7 +47,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         tc.project_id, tc.job_site_name,
         co.first_name || ' ' || co.last_name AS checked_out_by_name,
         ci.first_name || ' ' || ci.last_name AS checked_in_by_name,
-        p.name AS project_name
+        p.project_name AS project_name
       FROM tool_checkouts tc
       JOIN users co ON co.id = tc.checked_out_by
       LEFT JOIN users ci ON ci.id = tc.checked_in_by
