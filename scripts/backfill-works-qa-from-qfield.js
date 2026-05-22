@@ -80,10 +80,17 @@ function resolveColumn(step, workType) {
 }
 
 async function syncProject(pool, projectId) {
+  // Translate qfield_photo_validations.project_id (external QField uuid stored as
+  // uuid in this column) through qfield_projects.qfield_project_id (varchar) to
+  // qfield_projects.id, then join qfield_project_links by qfield_projects.id.
+  // Without this two-hop translation, photos belonging to aliased qfield_projects
+  // rows (id != qfield_project_id) are invisible to this backfill. See
+  // sync-qfield.ts for the matching API-side translation.
   const { rows } = await pool.query(
     `SELECT q.feature_id, q.photo_key, q.checklist_step, q.work_type, q.vlm_confidence, q.vlm_feedback
      FROM qfield_photo_validations q
-     INNER JOIN qfield_project_links l ON l.qfield_project_id = q.project_id
+     INNER JOIN qfield_projects qp ON qp.qfield_project_id = q.project_id::text
+     INNER JOIN qfield_project_links l ON l.qfield_project_id = qp.id
      WHERE l.fibreflow_project_id = $1::uuid
        AND q.feature_type = 'pole'
        AND q.feature_id IS NOT NULL`,
