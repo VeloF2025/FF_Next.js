@@ -47,7 +47,10 @@ export function UnassignedBucket({
           Unassigned Photos ({photoKeys.length})
         </h3>
         <div className="flex items-center gap-2 flex-wrap">
-          {!disabled && photoKeys.length > 0 && (
+          {/* Auto-sort + Accept are cleanup actions — they move photos OUT of the
+              unassigned bucket. Allowed even on approved poles because photos
+              sitting unassigned represent work that isn't actually done yet. */}
+          {photoKeys.length > 0 && (
             <button
               type="button"
               onClick={() => void sort()}
@@ -129,7 +132,7 @@ export function UnassignedBucket({
                             />
                           </button>
 
-                          {suggestion && !disabled && (
+                          {suggestion && (
                             <UnassignedSuggestionBadge
                               poleId={poleId}
                               photoKey={key}
@@ -149,7 +152,7 @@ export function UnassignedBucket({
         )}
       </Droppable>
 
-      {suggestionEntries.length > 0 && !disabled && (
+      {suggestionEntries.length > 0 && (
         <p className="text-[10px] text-zinc-500">
           {suggestionEntries.length} suggestion{suggestionEntries.length === 1 ? '' : 's'} pending — Accept each to file.
         </p>

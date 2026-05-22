@@ -108,10 +108,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         [pole_id],
       );
     } else {
-      // Remove from unassigned array
+      // Remove from unassigned array AND drop any stale auto-sort suggestion
+      // (the photo is leaving unassigned, so its suggested-slot badge is no
+      // longer applicable — leaving it causes the "infinite loop" badge bug
+      // when swap-back puts a different photo in this slot's place).
       await client.query(
         `UPDATE pole_qa_photos
          SET unassigned_photo_keys = array_remove(unassigned_photo_keys, $1),
+             unassigned_suggestions = unassigned_suggestions - $1::text,
              updated_at = NOW()
          WHERE id = $2::uuid`,
         [photo_key, pole_id],
@@ -127,9 +131,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       );
       const displaced = dest.rows[0]?.col_val ?? null;
       if (displaced && displaced !== photo_key) {
+        // Push displaced photo back to unassigned AND clear any stale suggestion
+        // pointing at this slot (it now holds a different photo, so the
+        // displaced photo's old suggestion would mislead the next reviewer).
         await client.query(
           `UPDATE pole_qa_photos
            SET unassigned_photo_keys = array_append(unassigned_photo_keys, $1),
+               unassigned_suggestions = unassigned_suggestions - $1::text,
                updated_at = NOW()
            WHERE id = $2::uuid`,
           [displaced, pole_id],
@@ -163,7 +171,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         [photo_key, JSON.stringify(patch), pole_id],
       );
     } else {
-      // Moving to unassigned bucket
+      // Moving to unassigned bucket. Also clear any stale auto-sort suggestion
+      // for this photo — user just chose to send it back manually, so any
+      // prior "→ slot · NN%" badge should not re-appear.
       if (fromMeta && vlmResults[fromMeta.key]) {
         await client.query(
           `UPDATE pole_qa_photos SET vlm_results = vlm_results - $1 WHERE id = $2::uuid`,
@@ -173,6 +183,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       await client.query(
         `UPDATE pole_qa_photos
          SET unassigned_photo_keys = array_append(unassigned_photo_keys, $1),
+             unassigned_suggestions = unassigned_suggestions - $1::text,
              updated_at = NOW()
          WHERE id = $2::uuid`,
         [photo_key, pole_id],
