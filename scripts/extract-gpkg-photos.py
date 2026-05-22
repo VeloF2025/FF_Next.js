@@ -442,6 +442,27 @@ def minio_resolve_photo_version(qf_project_id, dcim_path):
 
 # ── Main extraction ───────────────────────────────────────────────────────────
 
+def fetch_linked_qf_project_ids(cur, ff_id, primary_qf_id):
+    """Return additional QField project UUIDs linked to this FibreFlow project
+    (excluding the primary one already being processed). Used so the script can
+    resolve photo references against ALL linked QField projects, not just the
+    hardcoded primary in PROJECTS. Without this, photos uploaded to an "audit"
+    QField project that shares a FibreFlow project with a primary "production"
+    QField project are silently skipped as `pending_upload`."""
+    cur.execute(
+        """
+        SELECT qp.qfield_project_id
+        FROM qfield_project_links qpl
+        JOIN qfield_projects qp ON qp.id = qpl.qfield_project_id
+        WHERE qpl.fibreflow_project_id = %s::uuid
+          AND qp.qfield_project_id <> %s
+          AND qp.is_active = TRUE
+        """,
+        (ff_id, primary_qf_id),
+    )
+    return [r["qfield_project_id"] for r in cur.fetchall()]
+
+
 def extract_project(conn, project_name, config, dry_run=False, force=False):
     """Extract photo references from a project's GPKG and upsert into DB."""
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -521,10 +542,33 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
         dcim_index = minio_list_dcim_directory(qf_id)
         print(f"  MinIO DCIM files found: {len(dcim_index)}")
 
-        # Get existing photo keys in qfield_photo_validations for this project
+        # Combined index across primary + every additional linked QField project.
+        # Map: filename -> (qf_id_where_found, versioned_storage_key). Primary
+        # wins on conflict so that re-runs are stable.
+        combined_dcim = {fn: (qf_id, key) for fn, key in dcim_index.items()}
+        linked_qf_ids = fetch_linked_qf_project_ids(cur, ff_id, qf_id)
+        if linked_qf_ids:
+            print(f"  Also searching {len(linked_qf_ids)} linked QField project(s): {linked_qf_ids}")
+            for extra_qf in linked_qf_ids:
+                extra_idx = minio_list_dcim_directory(extra_qf)
+                added = 0
+                for fn, key in extra_idx.items():
+                    if fn not in combined_dcim:
+                        combined_dcim[fn] = (extra_qf, key)
+                        added += 1
+                print(f"    {extra_qf}: +{added} unique files (had {len(extra_idx)})")
+
+        # Get existing photo keys in qfield_photo_validations across the primary
+        # and every linked QField project. Without including the linked ids,
+        # photos inserted with `resolved_qf_id != qf_id` (the multi-project
+        # resolution added in this commit) would never be dedup-detected on
+        # re-run and the cron would pile up duplicates each day. There is no
+        # UNIQUE constraint on photo_key — the in-memory `existing_keys` set is
+        # the only guard.
+        dedup_project_ids = [qf_id] + linked_qf_ids
         cur.execute(
-            "SELECT photo_key FROM qfield_photo_validations WHERE project_id = %s",
-            (qf_id,),
+            "SELECT photo_key FROM qfield_photo_validations WHERE project_id = ANY(%s::uuid[])",
+            (dedup_project_ids,),
         )
         existing_keys = set(r["photo_key"] for r in cur.fetchall())
         # Build filename-based index for dedup across versioned/unversioned keys
@@ -556,24 +600,27 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
         photos_skipped_missing = 0
 
         def _resolve_key(dcim_path):
-            """Return (storage_key, upload_status) for a DCIM-relative path.
+            """Return (storage_key, resolved_qf_id, upload_status) for a DCIM-relative path.
 
-            Uses the pre-fetched dcim_index for O(1) lookup instead of per-file
-            docker exec calls. Falls back to the slow individual resolution only
-            when the batch listing was empty (docker unavailable etc.).
+            Looks up the combined index across all linked QField projects (primary
+            first) so photos uploaded to an "audit" QField project linked to the
+            same FibreFlow project are resolved correctly. `resolved_qf_id` is the
+            QField project where the blob actually lives — used as the row's
+            `project_id` in qfield_photo_validations so future syncs find it.
             """
             filename = dcim_path.replace("DCIM/", "").lstrip("/")
-            if dcim_index:
-                versioned = dcim_index.get(filename)
-                if versioned:
-                    return versioned, "available"
-                # File referenced in GPKG but absent from MinIO
-                return f"projects/{qf_id}/files/{dcim_path}", "pending_upload"
-            # Batch listing failed — fall back to individual resolution
+            if combined_dcim:
+                entry = combined_dcim.get(filename)
+                if entry:
+                    resolved_qf_id, versioned = entry
+                    return versioned, resolved_qf_id, "available"
+                # File referenced in GPKG but absent from every linked MinIO bucket
+                return f"projects/{qf_id}/files/{dcim_path}", qf_id, "pending_upload"
+            # Batch listing failed — fall back to individual resolution against primary
             versioned = minio_resolve_photo_version(qf_id, dcim_path)
             if versioned:
-                return versioned, "available"
-            return f"projects/{qf_id}/files/{dcim_path}", "pending_upload"
+                return versioned, qf_id, "available"
+            return f"projects/{qf_id}/files/{dcim_path}", qf_id, "pending_upload"
 
         for row in rows:
             feature_id = row[label_col] if label_col in row.keys() else None
@@ -592,7 +639,7 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                 dcim_path = str(val).strip()
                 photos_found += 1
 
-                full_key, upload_status = _resolve_key(dcim_path)
+                full_key, resolved_qf_id, upload_status = _resolve_key(dcim_path)
 
                 if upload_status == "pending_upload":
                     print(f"    SKIP (not in MinIO): {dcim_path}")
@@ -614,7 +661,10 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                     photos_upserted += 1
                     continue
 
-                # Upsert into qfield_photo_validations
+                # Upsert into qfield_photo_validations — use resolved_qf_id so
+                # the row points at the QField project where the blob actually
+                # lives. Without this, photos hosted in an audit project would
+                # be recorded as if owned by the primary project.
                 cur.execute("""
                     INSERT INTO qfield_photo_validations
                     (id, photo_key, feature_id, feature_type, work_type, project_id,
@@ -623,7 +673,7 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                     ON CONFLICT (id) DO NOTHING
                 """, (
                     str(uuid.uuid4()), full_key, feature_id,
-                    "pole", "pole_installation", qf_id,
+                    "pole", "pole_installation", resolved_qf_id,
                     step, step_label,
                 ))
                 existing_keys.add(full_key)
@@ -641,7 +691,7 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                 dcim_path = str(val).strip()
                 photos_found += 1
 
-                full_key, upload_status = _resolve_key(dcim_path)
+                full_key, resolved_qf_id, upload_status = _resolve_key(dcim_path)
 
                 if upload_status == "pending_upload":
                     print(f"    SKIP (not in MinIO): {dcim_path}")
@@ -668,7 +718,7 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                     ON CONFLICT (id) DO NOTHING
                 """, (
                     str(uuid.uuid4()), full_key, feature_id,
-                    "pole", "pole_installation", qf_id,
+                    "pole", "pole_installation", resolved_qf_id,
                     None, None,
                 ))
                 existing_keys.add(full_key)
