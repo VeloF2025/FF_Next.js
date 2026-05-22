@@ -1,11 +1,15 @@
 -- Rollback for 375_oes_pp_data_lifecycle.sql
 --
--- Drops the lifecycle columns added by 375. Data in activated_at,
--- decommissioned_at, decommissioned_reason, and linked_via is LOST on rollback.
--- Existing resolution_status values are untouched.
+-- Drops the lifecycle columns added by 375.
+-- DATA LOSS WARNING: activated_at, decommissioned_at, decommissioned_reason,
+-- and linked_via values are PERMANENTLY LOST on rollback. resolution_status
+-- values are untouched — but activated rows will lose their activation timestamp.
+-- Backfill 3 data (activated_at on located_oes rows that were OLT-Active)
+-- is also lost and will not be re-derived until migration 375 is re-run.
 
 BEGIN;
 
+DROP INDEX IF EXISTS idx_oes_activations_lower_serial;
 DROP INDEX IF EXISTS idx_oes_pp_data_activated_live;
 
 ALTER TABLE oes_pp_data

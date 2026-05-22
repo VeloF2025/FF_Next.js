@@ -13,6 +13,101 @@ import pool from '@/lib/db';
 import { isOntLifecycleV2Enabled } from '@/lib/featureFlags';
 import type { OESRow, PPRow } from './oesExcelParser';
 
+// ============================================================================
+// PP DATA UPSERT TEMPLATES (module-level constants)
+//
+// Each template is a function that accepts the machine-generated $N placeholder
+// string (e.g. "($1,$2,$3,$4),($5,$6,$7,$8),...") and returns complete SQL.
+// Placeholders are generated in the batch loop as:
+//   `($${offset+1}, $${offset+2}, $${offset+3}::date, $${offset+4})`
+// and joined with ', '. Values array is positional and matches this pattern.
+//
+// Two separate templates ensure each code path is readable and independently
+// auditable without conditional branching inside the SQL body.
+// ============================================================================
+
+/**
+ * UPSERT_LEGACY — Flag OFF: activated rows are demoted to not_found on
+ * FT re-list. This was the behavior that caused the 211 vs 22 MOA discrepancy.
+ * Preserved verbatim so flag-off is byte-identical to pre-PR master.
+ */
+const UPSERT_LEGACY = (valuePlaceholders: string) => `
+  INSERT INTO oes_pp_data (serial_number, project, date_registered, import_batch_id)
+  VALUES ${valuePlaceholders}
+  ON CONFLICT (serial_number, project) DO UPDATE SET
+    date_registered = COALESCE(EXCLUDED.date_registered, oes_pp_data.date_registered),
+    import_batch_id = EXCLUDED.import_batch_id,
+    -- Re-entry: an activated serial reappears in PP DATA → reset for fresh
+    -- ticket lifecycle, but only clear maintenance_ticket_id when the
+    -- linked ticket is actually closed. Clearing it while the prior
+    -- ticket is still open caused daily duplicate creates (the
+    -- pp-data-tickets endpoint's eligibility query re-fires on
+    -- maintenance_ticket_id IS NULL).
+    --
+    -- PERF: the EXISTS sub-query runs once per conflicting row inside
+    -- the bulk INSERT. For our expected import sizes (≤ low thousands
+    -- of rows per chunk, with re-entries being a small fraction) this
+    -- is acceptable. If imports balloon, replace with a CTE that
+    -- pre-joins the open-ticket set once before the upsert.
+    resolution_status = CASE
+      WHEN oes_pp_data.resolution_status = 'activated' THEN 'not_found'
+      ELSE oes_pp_data.resolution_status
+    END,
+    maintenance_ticket_id = CASE
+      WHEN oes_pp_data.resolution_status = 'activated'
+           AND (
+             oes_pp_data.maintenance_ticket_id IS NULL
+             OR EXISTS (
+               SELECT 1 FROM maintenance_tickets mt
+                WHERE mt.id = oes_pp_data.maintenance_ticket_id
+                  AND mt.status IN ('resolved','closed','cancelled')
+             )
+           )
+        THEN NULL
+      ELSE oes_pp_data.maintenance_ticket_id
+    END,
+    resolved_drop_number = CASE
+      WHEN oes_pp_data.resolution_status = 'activated' THEN NULL
+      ELSE oes_pp_data.resolved_drop_number
+    END,
+    resolved_source = CASE
+      WHEN oes_pp_data.resolution_status = 'activated' THEN NULL
+      ELSE oes_pp_data.resolved_source
+    END,
+    resolved_details = CASE
+      WHEN oes_pp_data.resolution_status = 'activated' THEN NULL
+      ELSE oes_pp_data.resolved_details
+    END,
+    resolved_at = CASE
+      WHEN oes_pp_data.resolution_status = 'activated' THEN NULL
+      ELSE oes_pp_data.resolved_at
+    END,
+    updated_at = NOW()`;
+
+/**
+ * UPSERT_V2 — Flag ON (ONT_LIFECYCLE_V2): activated rows stay activated.
+ * The lifecycle is one-way: not_activated_yet → activated → decommissioned.
+ * A serial re-appearing on FT PP DATA does NOT revert its activation status —
+ * only an explicit decommission event (decommissioned_at) can do that.
+ * Activation context (resolved_drop_number / source / details / resolved_at /
+ * maintenance_ticket_id) is preserved as the record of fact.
+ */
+const UPSERT_V2 = (valuePlaceholders: string) => `
+  INSERT INTO oes_pp_data (serial_number, project, date_registered, import_batch_id)
+  VALUES ${valuePlaceholders}
+  ON CONFLICT (serial_number, project) DO UPDATE SET
+    date_registered = COALESCE(EXCLUDED.date_registered, oes_pp_data.date_registered),
+    import_batch_id = EXCLUDED.import_batch_id,
+    -- ONT_LIFECYCLE_V2: never demote activated rows. Status is immutable
+    -- once activated; only decommissioned_at can move it to terminal state.
+    resolution_status = oes_pp_data.resolution_status,
+    maintenance_ticket_id = oes_pp_data.maintenance_ticket_id,
+    resolved_drop_number = oes_pp_data.resolved_drop_number,
+    resolved_source = oes_pp_data.resolved_source,
+    resolved_details = oes_pp_data.resolved_details,
+    resolved_at = oes_pp_data.resolved_at,
+    updated_at = NOW()`;
+
 const logger = createLogger('oes/oesImportService');
 
 export interface ImportBatchResult {
@@ -250,92 +345,8 @@ export async function importPPData(ppRows: PPRow[], filename: string): Promise<v
     type ReentryRow = { drop_number: string | null; serial_number: string; project: string };
     const reentryRows: ReentryRow[] = [];
 
-    // Select the correct upsert SQL template once before the batch loop.
-    // Two separate templates keep each path readable and independently auditable.
-    // 🟢 WORKING: flag-off path is byte-identical to pre-375 behavior.
+    // Select template once; module-level UPSERT_LEGACY / UPSERT_V2 hold the SQL bodies.
     const lifecycleV2On = isOntLifecycleV2Enabled();
-
-    /**
-     * UPSERT SQL — Flag OFF (legacy): activated rows are demoted to not_found on
-     * FT re-list. This was the behavior that caused the 211 vs 22 MOA discrepancy.
-     * Preserved verbatim so flag-off is byte-identical.
-     */
-    const UPSERT_LEGACY = (placeholders: string[]) => `
-      INSERT INTO oes_pp_data (serial_number, project, date_registered, import_batch_id)
-      VALUES ${placeholders.join(', ')}
-      ON CONFLICT (serial_number, project) DO UPDATE SET
-        date_registered = COALESCE(EXCLUDED.date_registered, oes_pp_data.date_registered),
-        import_batch_id = EXCLUDED.import_batch_id,
-        -- Re-entry: an activated serial reappears in PP DATA → reset for fresh
-        -- ticket lifecycle, but only clear maintenance_ticket_id when the
-        -- linked ticket is actually closed. Clearing it while the prior
-        -- ticket is still open caused daily duplicate creates (the
-        -- pp-data-tickets endpoint's eligibility query re-fires on
-        -- maintenance_ticket_id IS NULL).
-        --
-        -- PERF: the EXISTS sub-query runs once per conflicting row inside
-        -- the bulk INSERT. For our expected import sizes (≤ low thousands
-        -- of rows per chunk, with re-entries being a small fraction) this
-        -- is acceptable. If imports balloon, replace with a CTE that
-        -- pre-joins the open-ticket set once before the upsert.
-        resolution_status = CASE
-          WHEN oes_pp_data.resolution_status = 'activated' THEN 'not_found'
-          ELSE oes_pp_data.resolution_status
-        END,
-        maintenance_ticket_id = CASE
-          WHEN oes_pp_data.resolution_status = 'activated'
-               AND (
-                 oes_pp_data.maintenance_ticket_id IS NULL
-                 OR EXISTS (
-                   SELECT 1 FROM maintenance_tickets mt
-                    WHERE mt.id = oes_pp_data.maintenance_ticket_id
-                      AND mt.status IN ('resolved','closed','cancelled')
-                 )
-               )
-            THEN NULL
-          ELSE oes_pp_data.maintenance_ticket_id
-        END,
-        resolved_drop_number = CASE
-          WHEN oes_pp_data.resolution_status = 'activated' THEN NULL
-          ELSE oes_pp_data.resolved_drop_number
-        END,
-        resolved_source = CASE
-          WHEN oes_pp_data.resolution_status = 'activated' THEN NULL
-          ELSE oes_pp_data.resolved_source
-        END,
-        resolved_details = CASE
-          WHEN oes_pp_data.resolution_status = 'activated' THEN NULL
-          ELSE oes_pp_data.resolved_details
-        END,
-        resolved_at = CASE
-          WHEN oes_pp_data.resolution_status = 'activated' THEN NULL
-          ELSE oes_pp_data.resolved_at
-        END,
-        updated_at = NOW()`;
-
-    /**
-     * UPSERT SQL — Flag ON (ONT_LIFECYCLE_V2): activated rows stay activated.
-     * The lifecycle is one-way: not_activated_yet → activated → decommissioned.
-     * A serial re-appearing on FT PP DATA does NOT revert its activation status —
-     * only an explicit decommission event (decommissioned_at) can do that.
-     * Activation context (resolved_drop_number / source / details / resolved_at /
-     * maintenance_ticket_id) is preserved as the record of fact.
-     */
-    const UPSERT_V2 = (placeholders: string[]) => `
-      INSERT INTO oes_pp_data (serial_number, project, date_registered, import_batch_id)
-      VALUES ${placeholders.join(', ')}
-      ON CONFLICT (serial_number, project) DO UPDATE SET
-        date_registered = COALESCE(EXCLUDED.date_registered, oes_pp_data.date_registered),
-        import_batch_id = EXCLUDED.import_batch_id,
-        -- ONT_LIFECYCLE_V2: never demote activated rows. Status is immutable
-        -- once activated; only decommissioned_at can move it to terminal state.
-        resolution_status = oes_pp_data.resolution_status,
-        maintenance_ticket_id = oes_pp_data.maintenance_ticket_id,
-        resolved_drop_number = oes_pp_data.resolved_drop_number,
-        resolved_source = oes_pp_data.resolved_source,
-        resolved_details = oes_pp_data.resolved_details,
-        resolved_at = oes_pp_data.resolved_at,
-        updated_at = NOW()`;
 
     const BATCH_SIZE = 500;
     for (let i = 0; i < ppRows.length; i += BATCH_SIZE) {
@@ -364,8 +375,8 @@ export async function importPPData(ppRows: PPRow[], filename: string): Promise<v
       reentryRows.push(...reentryLookup.rows);
 
       const upsertSql = lifecycleV2On
-        ? UPSERT_V2(placeholders)
-        : UPSERT_LEGACY(placeholders);
+        ? UPSERT_V2(placeholders.join(', '))
+        : UPSERT_LEGACY(placeholders.join(', '));
 
       await pool.query(upsertSql, values);
     }

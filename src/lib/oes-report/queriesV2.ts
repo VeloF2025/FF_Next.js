@@ -125,8 +125,9 @@ export async function loadPpLinkedAwaitingRows(): Promise<LinkedAwaitingRow[]> {
       ON p.project = lb.project AND p.import_batch_id = lb.bid
     WHERE (
       p.resolution_status IN ('located_oes', 'located_unified', 'located_onemap')
-      OR p.linked_via != '{}'
+      OR cardinality(p.linked_via) > 0
     )
+      AND p.resolution_status != 'not_found'
       AND p.activated_at IS NULL
     ORDER BY p.project NULLS LAST, p.date_registered NULLS LAST, p.serial_number
   `);

@@ -3,13 +3,15 @@ import {
   loadAllActivations,
   loadPpData,
   loadFtDisputeRows,
+  loadTicketsForKeys,
+  loadLatestOesReportDate,
+} from '@/lib/oes-report/queries';
+import {
   loadPpNotFoundRows,
   loadPpLinkedAwaitingRows,
   loadFtDisputeDefiniteRows,
   loadFtDisputeLifecycleRows,
-  loadTicketsForKeys,
-  loadLatestOesReportDate,
-} from '@/lib/oes-report/queries';
+} from '@/lib/oes-report/queriesV2';
 import { loadDailySummary } from '@/lib/oes-report/dailySummaryQueries';
 import { buildOesWorkbook } from '@/lib/oes-report/buildWorkbook';
 import { uploadOesReport } from '@/lib/oes-report/storage';
@@ -53,13 +55,12 @@ export async function runNightlyOesReport(opts: {
     lifecycleV2,
   }, 'OesNightlyReport');
 
-  const allRows = await loadAllActivations();
-  const dailySummary = await loadDailySummary(reportDate);
-
   if (lifecycleV2) {
     // ── V2 path: load the four split datasets in parallel ───────────────────
-    const [ppNotFoundRows, ppLinkedAwaitingRows, ftDisputeDefiniteRows, ftDisputeLifecycleRows] =
+    const [allRows, dailySummary, ppNotFoundRows, ppLinkedAwaitingRows, ftDisputeDefiniteRows, ftDisputeLifecycleRows] =
       await Promise.all([
+        loadAllActivations(),
+        loadDailySummary(reportDate),
         loadPpNotFoundRows(),
         loadPpLinkedAwaitingRows(),
         loadFtDisputeDefiniteRows(),
@@ -150,10 +151,12 @@ export async function runNightlyOesReport(opts: {
     };
   }
 
-  // ── Legacy path (flag OFF) — byte-identical to pre-375 behavior ────────────
-  const [ppRows, ftDisputeRows] = await Promise.all([
+  // ── Legacy path (flag OFF) — single Promise.all matches pre-PR master ────────
+  const [allRows, ppRows, ftDisputeRows, dailySummary] = await Promise.all([
+    loadAllActivations(),
     loadPpData(),
     loadFtDisputeRows(),
+    loadDailySummary(reportDate),
   ]);
 
   log.info('OES nightly report: data loaded', {
