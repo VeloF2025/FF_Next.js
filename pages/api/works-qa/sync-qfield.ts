@@ -110,6 +110,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ON CONFLICT (project_id, pole_label) DO NOTHING
       `, [project_id, poleLabel]);
 
+      // Dedup by logical_path (filename portion after /files/, ignoring qfield
+      // project id and version suffix). Otherwise a key under one qfield project
+      // and the same photo under another qfield project would both land in the
+      // bucket — see migration 373 for the cleanup of the original incident.
       const upd = await pool.query(`
         UPDATE pole_qa_photos qa
         SET unassigned_photo_keys =
@@ -117,20 +121,25 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             updated_at = NOW()
         WHERE qa.project_id = $1::uuid
           AND qa.pole_label = $2
-          AND NOT ($3 = ANY(COALESCE(qa.unassigned_photo_keys, '{}'::text[])))
-          AND NOT ($3 = ANY(COALESCE(qa.main_joint_tray_keys,  '{}'::text[])))
-          AND $3 NOT IN (
-            COALESCE(qa.civil_step_01_key,  ''), COALESCE(qa.civil_step_02_key,  ''),
-            COALESCE(qa.civil_step_03_key,  ''), COALESCE(qa.civil_step_04_key,  ''),
-            COALESCE(qa.civil_step_05_key,  ''), COALESCE(qa.civil_step_06_key,  ''),
-            COALESCE(qa.civil_step_07_key,  ''),
-            COALESCE(qa.optical_dome_01_key, ''), COALESCE(qa.optical_dome_02_key, ''),
-            COALESCE(qa.optical_dome_03_key, ''), COALESCE(qa.optical_dome_04_key, ''),
-            COALESCE(qa.optical_dome_05_key, ''), COALESCE(qa.optical_dome_06_key, ''),
-            COALESCE(qa.optical_dome_07_key, ''), COALESCE(qa.optical_dome_08_key, ''),
-            COALESCE(qa.main_joint_11_key,  ''), COALESCE(qa.main_joint_12_key,  ''),
-            COALESCE(qa.main_joint_13_key,  ''), COALESCE(qa.main_joint_14_key,  ''),
-            COALESCE(qa.main_joint_15_key,  ''), COALESCE(qa.main_joint_16_key,  '')
+          AND NOT EXISTS (
+            SELECT 1
+            FROM unnest(
+              COALESCE(qa.unassigned_photo_keys, '{}'::text[])
+              || COALESCE(qa.main_joint_tray_keys,  '{}'::text[])
+              || ARRAY[
+                qa.civil_step_01_key, qa.civil_step_02_key, qa.civil_step_03_key,
+                qa.civil_step_04_key, qa.civil_step_05_key, qa.civil_step_06_key,
+                qa.civil_step_07_key,
+                qa.optical_dome_01_key, qa.optical_dome_02_key, qa.optical_dome_03_key,
+                qa.optical_dome_04_key, qa.optical_dome_05_key, qa.optical_dome_06_key,
+                qa.optical_dome_07_key, qa.optical_dome_08_key,
+                qa.main_joint_11_key, qa.main_joint_12_key, qa.main_joint_13_key,
+                qa.main_joint_14_key, qa.main_joint_15_key, qa.main_joint_16_key
+              ]
+            ) AS k
+            WHERE k IS NOT NULL AND k <> ''
+              AND regexp_replace(k, '^.*?/files/(.*?)(/v[0-9]{14}-[a-f0-9]+)?$', '\\1')
+                = regexp_replace($3, '^.*?/files/(.*?)(/v[0-9]{14}-[a-f0-9]+)?$', '\\1')
           )
       `, [project_id, poleLabel, photoKey]);
       if ((upd.rowCount ?? 0) > 0) unassigned += 1;
