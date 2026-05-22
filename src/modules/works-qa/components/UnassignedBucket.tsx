@@ -1,8 +1,8 @@
 import { Droppable, Draggable } from '@hello-pangea/dnd';
 import { GripVertical, Sparkles } from 'lucide-react';
-import { photoUrl } from '../utils/photo-url';
 import { useBulkUpload, BulkUploadButton, UploadChipList } from './BulkUnassignedUpload';
 import { useAutoSort } from '../hooks/useAutoSort';
+import { UnassignedThumb } from './UnassignedThumb';
 import {
   UnassignedSuggestionBadge,
   type UnassignedSuggestion,
@@ -117,20 +117,7 @@ export function UnassignedBucket({
                             </div>
                           )}
 
-                          <button
-                            type="button"
-                            onClick={() => onView?.(i)}
-                            disabled={!onView}
-                            className="block w-full h-16 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                            aria-label="Open unassigned photo"
-                          >
-                            <img
-                              src={photoUrl(key)}
-                              alt={`Unassigned ${i + 1}`}
-                              className="w-full h-full object-cover"
-                              draggable={false}
-                            />
-                          </button>
+                          <UnassignedThumb photoKey={key} index={i} onView={onView} />
 
                           {suggestion && (
                             <UnassignedSuggestionBadge
