@@ -4,7 +4,7 @@
 
 **Goal:** Ship an admin-only force-correct write API + UI for `stock_serials` that bypasses the state-machine, with a per-row audit trail and a new RBAC permission.
 
-**Architecture:** One service (`serialForceCorrectService.ts`) + one API route (`force-correct.ts`) + two UI surfaces (detail-page modal + admin batch page) + one RBAC migration. Per-serial best-effort transactions; preview-then-confirm for batch; audit row written to existing `stock_serial_events` with `event_type='force_corrected'` (no schema migration needed for the audit table). Service uses `pg.Pool` via `@/lib/db`; API uses `withAuth + withPermission('procurement.field-stock.force-correct', 'edit')` from `@/lib/auth`.
+**Architecture:** One service (`serialForceCorrectService.ts`) + one API route (`force-correct.ts`) + two UI surfaces (detail-page modal + admin batch page) + one RBAC migration. Per-serial best-effort transactions; preview-then-confirm for batch; audit row written to existing `stock_serial_events` with `event_type='force_corrected'` (no schema migration needed for the audit table). Service imports `pool` from `@/lib/db-pool` (Wave 2 convention); API uses `withAuth + withPermission('procurement.field-stock.force-correct', 'edit')` from `@/lib/auth`.
 
 **Tech Stack:** Next.js 14 (Pages Router), TypeScript, `pg.Pool` (PostgreSQL), Supabase, Vitest, Playwright MCP, existing `<AppLayout>` + `src/components/ui/*` primitives.
 
@@ -26,14 +26,28 @@
 | `src/components/field-stock/ForceCorrectFields.tsx` | Create | Shared form: 6 editable fields + reason textarea |
 | `pages/procurement/field-stock/serials/force-correct.tsx` | Create | Admin batch page: 3-step compose → preview → result |
 | `pages/procurement/field-stock/serials/[serialNumber].tsx` | Modify | Add "Force-correct state" button + modal (gated client-side; server enforces) |
-| `scripts/migrations/sql/<MAX+1>_rbac_field_stock_force_correct.sql` | Create | Seed `procurement.field-stock.force-correct` permission + super_admin grant |
+| `scripts/migrations/sql/378_rbac_field_stock_force_correct.sql` | Create | Seed `procurement.field-stock.force-correct` permission + super_admin grant |
 | `tests/db/services/field-stock/serialForceCorrect.test.ts` | Create | Real-DB integration tests for the service |
 | `tests/api/procurement/field-stock/serials-force-correct.test.ts` | Create | API handler tests (mocked service) |
 | `tests/migrations/<MAX+1>_rbac_field_stock_force_correct.test.ts` | Create | Migration idempotency + row presence |
 
 ---
 
-## Task 1: Pre-implementation schema probe (MANDATORY — no SQL until this runs)
+## Task 1: Pre-implementation schema probe (DONE 2026-05-22 — kept for reference)
+
+**STATUS: COMPLETE.** Findings folded into the spec §5 "Pre-implementation probe — DONE 2026-05-22" block. Summary:
+
+- `stock_serials`: no `current_warehouse_id`; project FK is `allocated_to_project_id`; status CHECK has 11 values.
+- `stock_serial_events`: actor_user_id + payload JSONB + from_state/to_state/occurred_at.
+- RBAC: `access_permissions` (catalogue) + `role_permissions(role, permission_key, actions jsonb)`. No `permissions`/`roles` tables.
+- MAX migration version = 377 → new migration = 378.
+- DB pool: import `pool` from `@/lib/db-pool` (named export).
+
+Subsequent tasks use these confirmed names. No further probe steps unless a Task 12 re-check reveals MAX has advanced.
+
+---
+
+## Task 1b: Schema probe steps (skipped — see Task 1 status above)
 
 **Files:** None created. Outputs go in PR description.
 
@@ -127,18 +141,40 @@ This task only reads. No git activity. Proceed to Task 2 once results are record
 
 `src/types/field-stock/forceCorrectTarget.ts`:
 ```typescript
-import type { SerialStatusValue } from '@/types/procurement/stock/enums.types';
+/**
+ * Full set of status values the live stock_serials.status CHECK constraint accepts.
+ * Force-correct intentionally allows ALL of them, including the 3 that the
+ * 8-value SerialStatusValue / transition.ts state machine omits
+ * (allocated_to_project, activated, in_repair) — "bypass the state machine"
+ * is the whole point of this feature.
+ */
+export type ForceCorrectStatus =
+  | 'available'
+  | 'reserved'
+  | 'allocated_to_project'
+  | 'in_transit'
+  | 'issued'
+  | 'installed'
+  | 'activated'
+  | 'faulty'
+  | 'in_repair'
+  | 'returned'
+  | 'scrapped';
 
 /**
  * Force-correct target fields. All optional; omit = leave column unchanged.
  * `null` = explicitly set the column to NULL (e.g., clear a wrongly-set drop number).
  * At least one field must be present (enforced at the API boundary).
+ *
+ * The 5 columns map 1:1 to live stock_serials columns confirmed 2026-05-22:
+ *   status, current_location_id, allocated_to_project_id,
+ *   installed_at_drop_number, activated_at_olt_id.
+ * There is no current_warehouse_id column on stock_serials.
  */
 export interface ForceCorrectTarget {
-  status?: SerialStatusValue;
+  status?: ForceCorrectStatus;
   currentLocationId?: string | null;
-  currentWarehouseId?: string | null;
-  projectId?: string | null;
+  allocatedToProjectId?: string | null;
   installedAtDropNumber?: string | null;
   activatedAtOltId?: string | null;
 }
@@ -174,7 +210,7 @@ export interface ForceCorrectResult {
 
 Append to `src/types/field-stock/index.ts`:
 ```typescript
-export type { ForceCorrectTarget } from './forceCorrectTarget';
+export type { ForceCorrectStatus, ForceCorrectTarget } from './forceCorrectTarget';
 export type { ForceCorrectRowResult, ForceCorrectResult } from './forceCorrectResult';
 ```
 
@@ -197,66 +233,67 @@ git commit -m "feat(wave2): PR-9b shared types for force-correct"
 ## Task 3: RBAC migration
 
 **Files:**
-- Create: `scripts/migrations/sql/<MAX_VERSION+1>_rbac_field_stock_force_correct.sql`
-- Test: `tests/migrations/<MAX_VERSION+1>_rbac_field_stock_force_correct.test.ts`
-
-> Substitute the actual MAX_VERSION+1 from Task 1 step 2 into the filename. Below uses `999` as a placeholder — replace with the real version.
+- Create: `scripts/migrations/sql/378_rbac_field_stock_force_correct.sql`
+- Test: `tests/migrations/378_rbac_field_stock_force_correct.test.ts`
 
 - [ ] **Step 1: Re-read MAX_VERSION at the very last moment**
 
-Per `feedback_migration_version_collision`: pick the version from a fresh query right before committing the migration filename:
+Per `feedback_migration_version_collision`, re-confirm 377 is still the max immediately before writing the file:
 ```bash
-psql "$DATABASE_URL" -c "SELECT MAX(version::int) FROM migrations;"
+ssh velo@100.96.203.105 "PGPASSWORD='a23f6104debd1d3e88e8f00c0067f22f' psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -t -A -c 'SELECT MAX(version::int) FROM migrations;'"
 ```
-This guards against parallel-session collisions. If MAX has moved since Task 1, use the new MAX+1.
+Expected: `377`. If higher (parallel session landed a migration), bump filename + test filename to MAX+1.
 
 - [ ] **Step 2: Write the migration**
 
-`scripts/migrations/sql/<N>_rbac_field_stock_force_correct.sql` (substitute N from step 1; if the RBAC probe revealed different column names, substitute those too):
+`scripts/migrations/sql/378_rbac_field_stock_force_correct.sql`:
 ```sql
--- Adds RBAC permission 'procurement.field-stock.force-correct' (action-type).
--- Grants edit to super_admin defensively (super_admin already has implicit-all
--- in some setups; the explicit grant ensures the new permission is honoured
--- regardless of which model is in effect).
+-- Adds RBAC permission 'procurement.field-stock.force-correct' (action-type)
+-- under parent 'procurement.field-stock'. Grants edit + view to super_admin
+-- defensively (super_admin has implicit-all in some setups; explicit grant
+-- ensures the permission is honoured regardless).
 BEGIN;
 
-INSERT INTO permissions (
-  resource_type, resource_key, module, label, description, path, sort_order
-)
+-- 1. Register the permission in the access_permissions catalogue.
+INSERT INTO access_permissions (type, key, parent_key, label, description, sort_order)
 VALUES (
   'action',
   'procurement.field-stock.force-correct',
-  'procurement',
+  'procurement.field-stock',
   'Force-correct serial state',
-  'Bypass state-machine validation and directly set status/location/project on stock_serials. Writes audit-trail row to stock_serial_events.',
-  NULL,
-  NULL
+  'Bypass state-machine validation and directly set status/location/project/drop/OLT on stock_serials. Writes audit-trail row to stock_serial_events.',
+  100
 )
-ON CONFLICT (resource_key) DO NOTHING;
+ON CONFLICT (key) DO UPDATE SET
+  label = EXCLUDED.label,
+  description = EXCLUDED.description,
+  parent_key = EXCLUDED.parent_key;
 
-INSERT INTO role_permissions (role_id, permission_id, can_view, can_edit, can_create, can_delete)
-SELECT r.id, p.id, true, true, true, true
-FROM roles r, permissions p
-WHERE r.name = 'super_admin'
-  AND p.resource_key = 'procurement.field-stock.force-correct'
-ON CONFLICT DO NOTHING;
+-- 2. Grant to super_admin (idempotent via unique (role, permission_key)).
+INSERT INTO role_permissions (role, permission_key, actions)
+VALUES (
+  'super_admin',
+  'procurement.field-stock.force-correct',
+  '{"view": true, "create": false, "edit": true, "delete": false}'::jsonb
+)
+ON CONFLICT (role, permission_key) DO UPDATE SET
+  actions = EXCLUDED.actions,
+  updated_at = NOW();
 
 COMMIT;
 
 -- ROLLBACK (manual, not auto-applied):
 -- BEGIN;
--- DELETE FROM role_permissions WHERE permission_id = (
---   SELECT id FROM permissions WHERE resource_key = 'procurement.field-stock.force-correct'
--- );
--- DELETE FROM permissions WHERE resource_key = 'procurement.field-stock.force-correct';
+-- DELETE FROM role_permissions WHERE permission_key = 'procurement.field-stock.force-correct';
+-- DELETE FROM access_permissions WHERE key = 'procurement.field-stock.force-correct';
 -- COMMIT;
 ```
 
 - [ ] **Step 3: Write the migration test (failing first)**
 
-`tests/migrations/<N>_rbac_field_stock_force_correct.test.ts` (use the existing `358_snag_reports_scope.test.ts` as the structural template):
+`tests/migrations/378_rbac_field_stock_force_correct.test.ts` (model on the existing `tests/migrations/358_snag_reports_scope.test.ts`):
 ```typescript
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Pool } from 'pg';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -268,27 +305,28 @@ const MIGRATION_PATH = join(
   'scripts',
   'migrations',
   'sql',
-  '<N>_rbac_field_stock_force_correct.sql',
+  '378_rbac_field_stock_force_correct.sql',
 );
 
-describe('Migration <N>: RBAC force-correct permission', () => {
+describe('Migration 378: RBAC force-correct permission', () => {
   let pool: Pool;
   beforeAll(() => {
     pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
   });
+  afterAll(async () => { await pool.end(); });
 
-  it('seeds the new permission row', async () => {
+  it('seeds the new permission row in access_permissions', async () => {
     const sql = readFileSync(MIGRATION_PATH, 'utf8');
     await pool.query(sql);
     const { rows } = await pool.query(
-      `SELECT resource_key, module, resource_type FROM permissions
-       WHERE resource_key = 'procurement.field-stock.force-correct'`,
+      `SELECT key, type, parent_key, label FROM access_permissions
+       WHERE key = 'procurement.field-stock.force-correct'`,
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
-      resource_key: 'procurement.field-stock.force-correct',
-      module: 'procurement',
-      resource_type: 'action',
+      key: 'procurement.field-stock.force-correct',
+      type: 'action',
+      parent_key: 'procurement.field-stock',
     });
   });
 
@@ -296,32 +334,46 @@ describe('Migration <N>: RBAC force-correct permission', () => {
     const sql = readFileSync(MIGRATION_PATH, 'utf8');
     await pool.query(sql); // second application
     const { rows } = await pool.query(
-      `SELECT COUNT(*)::int AS n FROM permissions
-       WHERE resource_key = 'procurement.field-stock.force-correct'`,
+      `SELECT COUNT(*)::int AS n FROM access_permissions
+       WHERE key = 'procurement.field-stock.force-correct'`,
     );
     expect(rows[0].n).toBe(1);
   });
 
-  it('grants super_admin the new permission', async () => {
+  it('grants super_admin view+edit on the new permission', async () => {
     const { rows } = await pool.query(
-      `SELECT rp.can_edit FROM role_permissions rp
-       JOIN roles r ON r.id = rp.role_id
-       JOIN permissions p ON p.id = rp.permission_id
-       WHERE r.name = 'super_admin'
-         AND p.resource_key = 'procurement.field-stock.force-correct'`,
+      `SELECT actions FROM role_permissions
+       WHERE role = 'super_admin'
+         AND permission_key = 'procurement.field-stock.force-correct'`,
     );
     expect(rows).toHaveLength(1);
-    expect(rows[0].can_edit).toBe(true);
+    expect(rows[0].actions).toMatchObject({
+      view: true,
+      edit: true,
+      create: false,
+      delete: false,
+    });
   });
 });
 ```
 
-- [ ] **Step 4: Run migration test against test DB**
+- [ ] **Step 4: Apply migration against the live DB**
+
+The test above does NOT cover applying against the real Supabase instance (the test pool would only run against the test DB, which is empty for this PR — we don't have a test-DB harness wired for migrations). Instead, apply once to live and verify:
 
 ```bash
-TEST_DATABASE_URL="$DATABASE_URL" npx vitest run tests/migrations/<N>_rbac_field_stock_force_correct.test.ts
+ssh velo@100.96.203.105 "PGPASSWORD='a23f6104debd1d3e88e8f00c0067f22f' psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -f /dev/stdin" < scripts/migrations/sql/378_rbac_field_stock_force_correct.sql
+ssh velo@100.96.203.105 "PGPASSWORD='a23f6104debd1d3e88e8f00c0067f22f' psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -c \"SELECT key, type, parent_key FROM access_permissions WHERE key = 'procurement.field-stock.force-correct';\""
+ssh velo@100.96.203.105 "PGPASSWORD='a23f6104debd1d3e88e8f00c0067f22f' psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -c \"SELECT role, permission_key, actions FROM role_permissions WHERE permission_key = 'procurement.field-stock.force-correct';\""
 ```
-Expected: PASS (all 3 specs).
+Expected: one access_permissions row and one role_permissions row. Then re-apply the migration once more to confirm idempotency on live.
+
+Also record the migration in the `migrations` table (look at how `358_snag_reports_scope` was recorded — likely `INSERT INTO migrations (version, name, executed_at) VALUES ('378', '378_rbac_field_stock_force_correct', NOW())`, but confirm column names first):
+```bash
+ssh velo@100.96.203.105 "PGPASSWORD='a23f6104debd1d3e88e8f00c0067f22f' psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -c '\\d migrations'"
+ssh velo@100.96.203.105 "PGPASSWORD='a23f6104debd1d3e88e8f00c0067f22f' psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -c \"SELECT * FROM migrations WHERE version = '377';\""
+```
+Then INSERT the row for 378 matching the same shape.
 
 - [ ] **Step 5: Commit**
 
@@ -359,13 +411,31 @@ describe('forceCorrectSerials — service', () => {
   afterAll(async () => { await pool.end(); });
 
   beforeEach(async () => {
-    // Reset to a known fixture (helper TBD; for first iteration, raw INSERT here)
-    await pool.query(`DELETE FROM stock_serial_events WHERE performed_by = $1`, [TEST_USER.id]);
+    // IMPORTANT: stock_serials has FK constraints (stock_item_id NOT NULL, FK to stock_items;
+    // current_location_id FK to stock_locations) and a unique index on (stock_item_id, serial_number).
+    // stock_serial_events has FK on actor_user_id to users(id).
+    //
+    // Before writing the seed below, READ the existing pattern in
+    //   tests/db/setup/seed.sql
+    // and
+    //   tests/db/services/field-stock/searchSerials.test.ts   (Wave 2 PR-8)
+    //   tests/db/services/field-stock/getSerialTimeline.test.ts  (Wave 2 PR-9a)
+    // and reuse whatever fixtures they create (a sentinel stock_item, a sentinel user, etc).
+    // The TEST_USER.id literal above must be a UUID that already exists in users() OR be
+    // inserted as part of the fixture; FK will fail otherwise.
+    //
+    // If the existing setup does not already give us a seeded serial we can mutate
+    // freely, extend tests/db/setup/seed.sql (which Wave 2 already touched in #1738 to
+    // mirror prod's projects.project_name column).
+    await pool.query(`DELETE FROM stock_serial_events WHERE actor_user_id = $1::uuid`, [TEST_USER.id]);
     await pool.query(`
-      INSERT INTO stock_serials (id, serial_number, status, installed_at_drop_number)
-      VALUES ('11111111-1111-1111-1111-111111111111', 'TEST-SN-A', 'installed', '1234567')
-      ON CONFLICT (serial_number) DO UPDATE
-        SET status = 'installed', installed_at_drop_number = '1234567';
+      UPDATE stock_serials
+         SET status = 'installed',
+             installed_at_drop_number = '1234567',
+             current_location_id = NULL,
+             allocated_to_project_id = NULL,
+             activated_at_olt_id = NULL
+       WHERE serial_number = 'TEST-SN-A'
     `);
   });
 
@@ -412,8 +482,27 @@ Expected: FAIL with "Cannot find module '@/modules/procurement/field-stock/servi
  * Force-correct serial state — bypasses the state machine.
  * Each serial wrapped in its own pg transaction (best-effort).
  * Writes one stock_serial_events row per CHANGED serial (no-op and not-found do not write).
+ *
+ * Column mapping (live as of 2026-05-22):
+ *   ForceCorrectTarget                stock_serials column
+ *   ──────────────────────────────────────────────────────────
+ *   status                            status
+ *   currentLocationId                 current_location_id
+ *   allocatedToProjectId              allocated_to_project_id
+ *   installedAtDropNumber             installed_at_drop_number
+ *   activatedAtOltId                  activated_at_olt_id
+ *
+ * Audit row layout (stock_serial_events):
+ *   actor_user_id  ← performedBy (uuid)
+ *   from_state     ← old status (only when status changed; else NULL)
+ *   to_state       ← new status (only when status changed; else NULL)
+ *   payload        ← { isForceCorrect, performedByName, reason,
+ *                      before, after, changedFields }
+ *   occurred_at    ← NOW()
+ *   source_table / source_id intentionally NULL (bypasses the dedupe unique
+ *                  index defined on those columns).
  */
-import pool from '@/lib/db';
+import { pool } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 import type {
   ForceCorrectTarget,
@@ -425,16 +514,15 @@ export interface ForceCorrectParams {
   serials: string[];
   target: ForceCorrectTarget;
   reason: string;
-  performedBy: string;
-  performedByName: string;
+  performedBy: string;        // uuid (req.user.id)
+  performedByName: string;    // display name (req.user.name)
   dryRun: boolean;
 }
 
 const TARGET_COLUMN_MAP: Record<keyof ForceCorrectTarget, string> = {
   status: 'status',
   currentLocationId: 'current_location_id',
-  currentWarehouseId: 'current_warehouse_id',
-  projectId: 'project_id',
+  allocatedToProjectId: 'allocated_to_project_id',
   installedAtDropNumber: 'installed_at_drop_number',
   activatedAtOltId: 'activated_at_olt_id',
 };
@@ -461,12 +549,12 @@ async function processOne(serialNumber: string, p: ForceCorrectParams): Promise<
   try {
     await client.query('BEGIN');
     const { rows: current } = await client.query(
-      `SELECT status, current_location_id AS "currentLocationId",
-              current_warehouse_id AS "currentWarehouseId",
-              project_id AS "projectId",
-              installed_at_drop_number AS "installedAtDropNumber",
-              activated_at_olt_id AS "activatedAtOltId",
-              id
+      `SELECT id,
+              status,
+              current_location_id        AS "currentLocationId",
+              allocated_to_project_id    AS "allocatedToProjectId",
+              installed_at_drop_number   AS "installedAtDropNumber",
+              activated_at_olt_id        AS "activatedAtOltId"
        FROM stock_serials WHERE serial_number = $1 FOR UPDATE`,
       [serialNumber],
     );
@@ -474,16 +562,17 @@ async function processOne(serialNumber: string, p: ForceCorrectParams): Promise<
       await client.query('ROLLBACK');
       return { serialNumber, found: false, applied: false, changedFields: [] };
     }
+
     const before: Partial<ForceCorrectTarget> = {};
     const after: Partial<ForceCorrectTarget> = {};
     const changed: (keyof ForceCorrectTarget)[] = [];
     for (const field of TARGET_FIELDS) {
       if (!(field in p.target)) continue;
       const newVal = p.target[field] ?? null;
-      const oldVal = current[0][field] ?? null;
+      const oldVal = (current[0] as Record<string, unknown>)[field] ?? null;
       if (oldVal !== newVal) {
-        before[field] = oldVal as never;
-        after[field] = newVal as never;
+        (before as Record<string, unknown>)[field] = oldVal;
+        (after as Record<string, unknown>)[field] = newVal;
         changed.push(field);
       }
     }
@@ -495,7 +584,8 @@ async function processOne(serialNumber: string, p: ForceCorrectParams): Promise<
       await client.query('ROLLBACK');
       return { serialNumber, found: true, applied: false, before, after, changedFields: changed };
     }
-    // Build UPDATE
+
+    // Build UPDATE statement dynamically over the changed columns.
     const setParts: string[] = [];
     const params: unknown[] = [];
     let i = 1;
@@ -505,22 +595,34 @@ async function processOne(serialNumber: string, p: ForceCorrectParams): Promise<
     }
     params.push(current[0].id);
     await client.query(
-      `UPDATE stock_serials SET ${setParts.join(', ')}, updated_at = NOW() WHERE id = $${i}`,
+      `UPDATE stock_serials
+         SET ${setParts.join(', ')}, updated_at = NOW()
+       WHERE id = $${i}`,
       params,
     );
+
     // Audit
+    const statusChanged = changed.includes('status');
     await client.query(
       `INSERT INTO stock_serial_events
-         (serial_id, event_type, performed_by, performed_by_name, reason, metadata)
-       VALUES ($1, 'force_corrected', $2, $3, $4, $5::jsonb)`,
+         (serial_id, event_type, from_state, to_state, actor_user_id, payload, occurred_at)
+       VALUES ($1, 'force_corrected', $2, $3, $4::uuid, $5::jsonb, NOW())`,
       [
         current[0].id,
+        statusChanged ? (before.status ?? null) : null,
+        statusChanged ? (after.status ?? null) : null,
         p.performedBy,
-        p.performedByName,
-        p.reason,
-        JSON.stringify({ isForceCorrect: true, before, after, changedFields: changed }),
+        JSON.stringify({
+          isForceCorrect: true,
+          performedByName: p.performedByName,
+          reason: p.reason,
+          before,
+          after,
+          changedFields: changed,
+        }),
       ],
     );
+
     await client.query('COMMIT');
     return { serialNumber, found: true, applied: true, before, after, changedFields: changed };
   } catch (err) {
@@ -533,8 +635,6 @@ async function processOne(serialNumber: string, p: ForceCorrectParams): Promise<
   }
 }
 ```
-
-> If Task 1 step 4 revealed the audit JSON column is not `metadata`, replace `metadata` in the INSERT above with the actual column name. If `stock_serials` has no `updated_at` column, remove the `updated_at = NOW()` from the UPDATE.
 
 - [ ] **Step 4: Run test — must PASS**
 
@@ -585,7 +685,7 @@ it('dryRun=true returns before/after but writes no row and no audit', async () =
 
   const { rows: audits } = await pool.query(
     `SELECT COUNT(*)::int AS n FROM stock_serial_events
-     WHERE performed_by = $1 AND event_type = 'force_corrected'`,
+     WHERE actor_user_id = $1::uuid AND event_type = 'force_corrected'`,
     [TEST_USER.id],
   );
   expect(audits[0].n).toBe(0);
@@ -612,7 +712,7 @@ it('no-op when target equals current state — found=true, applied=false, no aud
 
   const { rows: audits } = await pool.query(
     `SELECT COUNT(*)::int AS n FROM stock_serial_events
-     WHERE performed_by = $1 AND event_type = 'force_corrected'`,
+     WHERE actor_user_id = $1::uuid AND event_type = 'force_corrected'`,
     [TEST_USER.id],
   );
   expect(audits[0].n).toBe(0);
@@ -664,10 +764,10 @@ it('clears installed_at_drop_number via explicit null and updates status atomica
 });
 ```
 
-- [ ] **Step 5: Add audit metadata shape test**
+- [ ] **Step 5: Add audit row shape test**
 
 ```typescript
-it('audit row metadata captures before/after/changedFields/isForceCorrect', async () => {
+it('audit row payload captures before/after/changedFields/isForceCorrect/reason/performedByName', async () => {
   await forceCorrectSerials({
     serials: ['TEST-SN-A'],
     target: { status: 'available' },
@@ -677,14 +777,21 @@ it('audit row metadata captures before/after/changedFields/isForceCorrect', asyn
     dryRun: false,
   });
   const { rows } = await pool.query(
-    `SELECT event_type, reason, metadata FROM stock_serial_events
-     WHERE performed_by = $1 ORDER BY created_at DESC LIMIT 1`,
+    `SELECT event_type, from_state, to_state, actor_user_id, payload
+       FROM stock_serial_events
+      WHERE actor_user_id = $1::uuid AND event_type = 'force_corrected'
+      ORDER BY occurred_at DESC LIMIT 1`,
     [TEST_USER.id],
   );
+  expect(rows).toHaveLength(1);
   expect(rows[0].event_type).toBe('force_corrected');
-  expect(rows[0].reason).toBe('audit shape test');
-  expect(rows[0].metadata).toMatchObject({
+  expect(rows[0].from_state).toBe('installed');
+  expect(rows[0].to_state).toBe('available');
+  expect(rows[0].actor_user_id).toBe(TEST_USER.id);
+  expect(rows[0].payload).toMatchObject({
     isForceCorrect: true,
+    reason: 'audit shape test',
+    performedByName: TEST_USER.name,
     before: { status: 'installed' },
     after: { status: 'available' },
     changedFields: ['status'],
@@ -715,17 +822,20 @@ git commit -m "test(wave2): PR-9b force-correct — dry-run, no-op, not-found, m
 
 - [ ] **Step 1: Add second seed serial in beforeEach**
 
-Replace the `beforeEach` block with:
+Same caveats as Task 4 step 1 apply — extend `tests/db/setup/seed.sql` to provide both `TEST-SN-A` and `TEST-SN-B` (linked to a sentinel `stock_item_id`), then the `beforeEach` only resets their mutable columns:
+
 ```typescript
 beforeEach(async () => {
-  await pool.query(`DELETE FROM stock_serial_events WHERE performed_by = $1`, [TEST_USER.id]);
+  await pool.query(`DELETE FROM stock_serial_events WHERE actor_user_id = $1::uuid`, [TEST_USER.id]);
   await pool.query(`
-    INSERT INTO stock_serials (id, serial_number, status, installed_at_drop_number)
-    VALUES
-      ('11111111-1111-1111-1111-111111111111', 'TEST-SN-A', 'installed', '1234567'),
-      ('22222222-2222-2222-2222-222222222222', 'TEST-SN-B', 'available', NULL)
-    ON CONFLICT (serial_number) DO UPDATE
-      SET status = EXCLUDED.status, installed_at_drop_number = EXCLUDED.installed_at_drop_number;
+    UPDATE stock_serials
+       SET status = 'installed', installed_at_drop_number = '1234567'
+     WHERE serial_number = 'TEST-SN-A'
+  `);
+  await pool.query(`
+    UPDATE stock_serials
+       SET status = 'available', installed_at_drop_number = NULL
+     WHERE serial_number = 'TEST-SN-B'
   `);
 });
 ```
@@ -771,7 +881,7 @@ it('per-serial txn isolation: one row writes audit, the other writes nothing', a
     `SELECT s.serial_number, COUNT(e.id)::int AS event_count
      FROM stock_serials s
      LEFT JOIN stock_serial_events e
-       ON e.serial_id = s.id AND e.performed_by = $1 AND e.event_type = 'force_corrected'
+       ON e.serial_id = s.id AND e.actor_user_id = $1::uuid AND e.event_type = 'force_corrected'
      WHERE s.serial_number IN ('TEST-SN-A', 'TEST-SN-B')
      GROUP BY s.serial_number ORDER BY s.serial_number`,
     [TEST_USER.id],
@@ -949,12 +1059,12 @@ import { forceCorrectSerials } from '@/modules/procurement/field-stock/services/
 import type { ForceCorrectTarget } from '@/types/field-stock';
 
 const VALID_STATUSES = [
-  'available', 'reserved', 'issued', 'in_transit',
-  'installed', 'faulty', 'returned', 'scrapped',
+  'available', 'reserved', 'allocated_to_project', 'in_transit', 'issued',
+  'installed', 'activated', 'faulty', 'in_repair', 'returned', 'scrapped',
 ] as const;
 const TARGET_KEYS: (keyof ForceCorrectTarget)[] = [
-  'status', 'currentLocationId', 'currentWarehouseId',
-  'projectId', 'installedAtDropNumber', 'activatedAtOltId',
+  'status', 'currentLocationId', 'allocatedToProjectId',
+  'installedAtDropNumber', 'activatedAtOltId',
 ];
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -1113,8 +1223,7 @@ export function ForceCorrectFields({ currentValues, value, reason, onChange, onR
       </FieldRow>
 
       <NullableTextRow label="Current location ID" field="currentLocationId" value={value} currentValues={currentValues} onChange={onChange} />
-      <NullableTextRow label="Current warehouse ID" field="currentWarehouseId" value={value} currentValues={currentValues} onChange={onChange} />
-      <NullableTextRow label="Project ID" field="projectId" value={value} currentValues={currentValues} onChange={onChange} />
+      <NullableTextRow label="Allocated project ID" field="allocatedToProjectId" value={value} currentValues={currentValues} onChange={onChange} />
       <NullableTextRow label="Installed at drop" field="installedAtDropNumber" value={value} currentValues={currentValues} onChange={onChange} />
       <NullableTextRow label="Activated at OLT" field="activatedAtOltId" value={value} currentValues={currentValues} onChange={onChange} />
 
@@ -1262,8 +1371,7 @@ async function handleForceCorrect() {
 const currentForFc: Partial<ForceCorrectTarget> = {
   status: serial.status,
   currentLocationId: serial.currentLocationId ?? null,
-  currentWarehouseId: serial.currentWarehouseId ?? null,
-  projectId: serial.projectId ?? null,
+  allocatedToProjectId: serial.allocatedToProjectId ?? null,
   installedAtDropNumber: serial.installedAtDropNumber ?? null,
   activatedAtOltId: serial.activatedAtOltId ?? null,
 };
