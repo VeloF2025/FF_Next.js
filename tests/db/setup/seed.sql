@@ -13,9 +13,9 @@ BEGIN;
 
 CREATE TABLE projects (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL
+  project_name TEXT NOT NULL
 );
-INSERT INTO projects (id, name) VALUES
+INSERT INTO projects (id, project_name) VALUES
   ('11111111-1111-1111-1111-111111111111', 'Test Project A');
 
 CREATE TABLE users (

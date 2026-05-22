@@ -119,7 +119,7 @@ export async function searchSerials(
     SELECT
       ss.id, ss.serial_number, ss.mac_address,
       si.category, si.name AS item_name,
-      ss.status, sl.name AS location_name, p.name AS project_name,
+      ss.status, sl.name AS location_name, p.project_name AS project_name,
       ss.installed_at_drop_number AS drop_number,
       le.event_type AS last_event_type, le.occurred_at AS last_event_at
     ${baseFrom} ${where}
