@@ -1,4 +1,4 @@
--- Rollback for scripts/migrations/sql/373_share_session_actors.sql
+-- Rollback for scripts/migrations/sql/374_share_session_actors.sql
 -- Drops the actor FK columns then the actors table.
 -- WARNING: any actor_id values stamped on steps/attachments will be lost.
 
