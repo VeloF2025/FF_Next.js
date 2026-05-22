@@ -7,6 +7,7 @@
 > **Revision history:**
 > - 2026-05-21 22:50 SAST — first draft of the augment-first amendment.
 > - 2026-05-22 00:10 SAST — addressed blind-review findings on PR #1720: (a) flattened the nested dynamic API route per the CLAUDE.md "no nested dynamic API routes" rule, (b) wrapped both pages in `<AppLayout>`, (c) moved shared types from `src/components/field-stock/*.types.ts` to `src/types/field-stock/` so services no longer import from components, (d) restored Playwright/Claude-in-Chrome MCP browser-smoke evidence per CLAUDE.md Hard Rule 4, (e) corrected the docker-compose test harness specifics (`tests/db/setup/docker-compose.test.yml`, env var `DATABASE_URL_TEST`), (f) added UNVERIFIED markers on `stock_serials.previous_status` + `status_changed_at` column references pending the PR-0 probe, (g) added explicit "orphaned page" discovery note to §Scope, (h) added `apiResponse.internalError` to the conventions block, (i) updated memory reference. See PR #1720 review comment for the originating issue list.
+> - 2026-05-22 00:30 SAST — addressed PR #1720 re-review findings (verdict: APPROVED, 1 MEDIUM + 2 LOW refinements): (j) added a second UNVERIFIED remediation pointer on the `activated` pseudo entry's `status_changed_at` fallback in `getSerialTimeline.ts` — the prior amendment guarded the "Status changed" branch but missed this fallback, (k) added "keep in sync with service type" comments to the page-local `ServerRow` and `SerialDetail` redeclarations so silent drift between page and service types is at least visible, (l) clarified Guardrail #15 — Playwright smoke applies to PRs that ship page-level UI; library-only PRs (e.g. PR-7) are exempt with rationale required in the PR body.
 
 **Goal:** Augment the existing `/procurement/field-stock/*` admin UI with two new read-only pages — a master serial search and a serial lifecycle timeline — that expose the `stock_serials` register and `stock_serial_events` event log shipped in Wave 1.
 
@@ -94,7 +95,7 @@ These MUST be true before PR-7 enters the queue. Verify in the PR description.
 12. **API routes are FLAT** — no nested dynamic segments. Convention: `serials/timeline.ts?serialNumber=…`, not `serials/[serialNumber]/timeline.ts`. (Page routes — `pages/procurement/field-stock/serials/[serialNumber].tsx` — are fine, the rule is API-route-specific.)
 13. **Pages wrap in `<AppLayout>`** from `@/components/layout` (barrel export). Confirmed pattern: `pages/procurement/field-stock/index.tsx` wraps at line 293–349.
 14. **Shared types live in `src/types/field-stock/`** — not in `src/components/`. Services MUST NOT import from `@/components/*`.
-15. **Browser smoke uses Playwright MCP** (`mcp__playwriter__execute`) — screenshots per smoke step embedded in PR body. Per `feedback_browser_playwright` and CLAUDE.md Hard Rule 4.
+15. **Browser smoke uses Playwright MCP** (`mcp__playwriter__execute`) — screenshots per smoke step embedded in PR body. Per `feedback_browser_playwright` and CLAUDE.md Hard Rule 4. **Applies to PRs that ship page-level UI.** PRs that ship library code only (e.g. PR-7's shared components — no consumer pages) are exempt; their PR body MUST state the exemption rationale explicitly so future agents don't cite the exemption to skip smoke on a PR that does ship pages.
 
 ---
 
@@ -1310,6 +1311,10 @@ import { AppLayout } from '@/components/layout';
 import { SerialSearch } from '@/components/field-stock/SerialSearch';
 import type { SerialSearchFilters } from '@/types/field-stock';
 
+// Page-local copy of the service's SerialSearchRow. Kept local because the page
+// fetches via fetch() (HTTP boundary) rather than calling searchSerials directly.
+// KEEP IN SYNC with src/services/field-stock/serials/searchSerials.ts → SerialSearchRow.
+// If drift becomes an issue, promote SerialSearchRow to src/types/field-stock/.
 interface ServerRow {
   id: string;
   serialNumber: string;
@@ -1777,6 +1782,10 @@ export async function getSerialTimeline(serialNumber: string): Promise<TimelineR
     });
   }
   if (r.activated_at_olt_id && r.status === 'activated' && !realEventTypes.has('activated')) {
+    // UNVERIFIED — uses r.status_changed_at as a timestamp fallback. If PR-0 probe
+    // reveals status_changed_at absent, change this fallback to
+    // `new Date(r.installed_date ?? new Date().toISOString())` AND remove the
+    // status_changed_at field from the SELECT / interface above.
     pseudo.push({
       kind: 'pseudo',
       id: `pseudo-activated-${r.id}`,
@@ -1867,6 +1876,10 @@ import { AppLayout } from '@/components/layout';
 import { SerialTimeline } from '@/components/field-stock/SerialTimeline';
 import type { TimelineEntry } from '@/types/field-stock';
 
+// Page-local copy of the service's SerialDetail. Kept local because the page
+// fetches via fetch() (HTTP boundary) rather than calling getSerialTimeline directly.
+// KEEP IN SYNC with src/services/field-stock/serials/getSerialTimeline.ts → SerialDetail.
+// If drift becomes an issue, promote SerialDetail to src/types/field-stock/.
 interface SerialDetail {
   id: string;
   serialNumber: string;
