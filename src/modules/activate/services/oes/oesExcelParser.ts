@@ -141,6 +141,7 @@ const PP_PROJECT_CODE_MAP: Record<string, string> = {
   'LAW': 'Lawley',
   'MOA': 'Mohadin',
   'MAM': 'Mamelodi',
+  'ETW': 'Etwatwa',
 };
 
 /** Parse PP DATA sheet from an already-loaded workbook. Returns null if not found. */
