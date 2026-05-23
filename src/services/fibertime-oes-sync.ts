@@ -1,6 +1,6 @@
 /**
  * Fibertime OES Sync Service — nightly pull from SharePoint into OES pipeline.
- * Sites: LAW, MAM, MOA, TEM, TEM-3, ETW. Final file has no numeric suffix.
+ * Sites: LAW, MAM, MOA, TEM, TEM-3, ETW-1, ETW-2. Final file has no numeric suffix.
  */
 
 import * as os from 'os';
@@ -272,17 +272,20 @@ export async function runOesSync(date?: string): Promise<SyncReport> {
     ACTIVE_SITES.map(site => syncSite(site, reportDate))
   );
 
-  // A genuinely expired cookie makes SharePoint return 403 for EVERY folder, so
-  // real expiry shows up as all sites rejecting with FibertimeAuthExpiredError.
-  // A 403 on just one folder is a per-folder permission issue (e.g. a forbidden
-  // ETW POP folder), not session death — so only abort the whole run when ALL
-  // sites fail auth. Otherwise fall through and record per-site errors.
-  const authRejections = sites.filter(
+  // Distinguish a genuine cookie expiry from a per-folder permission gap.
+  // listFolderFiles is the FIRST SharePoint call in syncSite, so a fulfilled
+  // outcome (imported / skipped / not_available) proves that listing returned
+  // 200 — i.e. the session is valid. A real expiry 403s on EVERY folder, so no
+  // site can be fulfilled. Therefore: abort only when we saw an auth rejection
+  // AND not a single site listed successfully. A 403 on one folder while others
+  // succeed (e.g. a forbidden ETW POP) is a permission gap — recorded per-site.
+  const sessionLikelyValid = sites.some(o => o.status === 'fulfilled');
+  const authRejection = sites.find(
     (o): o is PromiseRejectedResult =>
       o.status === 'rejected' && o.reason instanceof FibertimeAuthExpiredError
   );
-  if (authRejections.length === ACTIVE_SITES.length && authRejections.length > 0) {
-    throw authRejections[0]!.reason;
+  if (authRejection && !sessionLikelyValid) {
+    throw authRejection.reason;
   }
 
   const results: SiteResult[] = sites.map((outcome, idx) => {

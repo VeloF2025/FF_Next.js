@@ -1,6 +1,6 @@
 /**
  * Fibertime Offline ONT Sync Service — nightly pull from SharePoint.
- * Sites: LAW, MAM, MOA, TEM, ETW. File: offline_ont_report_{SITE}_{YYYYMMDD}.xlsx
+ * Sites: LAW, MAM, MOA, TEM, ETW-1, ETW-2. File: offline_ont_report_{SITE}_{YYYYMMDD}.xlsx
  * Uses listFolderFilesAlt (GetFolderByServerRelativeUrl) — Path API returns 403.
  * DB helpers live in fibertime-offline-db.ts.
  */
@@ -269,15 +269,18 @@ export async function runOfflineSync(date?: string): Promise<OfflineSyncReport> 
     OFFLINE_SITES.map(site => syncOfflineSite(site, reportDate))
   );
 
-  // Only abort on genuine session expiry, which makes EVERY folder 403. A 403 on
-  // one folder (e.g. a forbidden ETW POP) is a per-folder grant issue — record it
-  // per-site instead of killing the whole run. See runOesSync for rationale.
-  const authRejections = outcomes.filter(
+  // Only abort on genuine session expiry. A fulfilled outcome proves listing
+  // returned 200 (valid session); a real expiry 403s on EVERY folder so nothing
+  // is fulfilled. Abort only when an auth rejection occurred AND no site listed
+  // successfully — a lone 403 (forbidden ETW POP) is recorded per-site instead.
+  // See runOesSync for the full rationale.
+  const sessionLikelyValid = outcomes.some(o => o.status === 'fulfilled');
+  const authRejection = outcomes.find(
     (o): o is PromiseRejectedResult =>
       o.status === 'rejected' && o.reason instanceof FibertimeAuthExpiredError
   );
-  if (authRejections.length === OFFLINE_SITES.length && authRejections.length > 0) {
-    throw authRejections[0]!.reason;
+  if (authRejection && !sessionLikelyValid) {
+    throw authRejection.reason;
   }
 
   const results: OfflineSiteResult[] = outcomes.map((outcome, idx) => {
