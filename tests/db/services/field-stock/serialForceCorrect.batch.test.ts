@@ -38,18 +38,18 @@ describe('forceCorrectSerials — batch + txn isolation', () => {
     expect(result.totalNoOp).toBe(1);
     expect(result.totalFailed).toBe(0);
 
-    const rowA = result.rows.find((r: ForceCorrectRowResult) => r.serialNumber === SN_A)!;
-    expect(rowA.applied).toBe(true);
-    expect(rowA.changedFields).toEqual(['status']);
+    const rowA = result.rows.find((r: ForceCorrectRowResult) => r.serialNumber === SN_A);
+    expect(rowA?.applied).toBe(true);
+    expect(rowA?.changedFields).toEqual(['status']);
 
-    const rowB = result.rows.find((r: ForceCorrectRowResult) => r.serialNumber === SN_B)!;
-    expect(rowB.applied).toBe(false);
-    expect(rowB.found).toBe(true);
-    expect(rowB.changedFields).toHaveLength(0);
+    const rowB = result.rows.find((r: ForceCorrectRowResult) => r.serialNumber === SN_B);
+    expect(rowB?.applied).toBe(false);
+    expect(rowB?.found).toBe(true);
+    expect(rowB?.changedFields).toHaveLength(0);
 
-    const rowNone = result.rows.find((r: ForceCorrectRowResult) => r.serialNumber === 'PR9B-FC-NONEXISTENT')!;
-    expect(rowNone.found).toBe(false);
-    expect(rowNone.applied).toBe(false);
+    const rowNone = result.rows.find((r: ForceCorrectRowResult) => r.serialNumber === 'PR9B-FC-NONEXISTENT');
+    expect(rowNone?.found).toBe(false);
+    expect(rowNone?.applied).toBe(false);
   });
 
   // ─── 8. Per-serial transaction isolation ────────────────────────────────────

@@ -41,6 +41,11 @@ export const SN_B = 'PR9B-FC-B';
 
 export const pool = new Pool({ connectionString: TEST_DB_URL });
 
+// All three spec files (happy-path, edge-cases, batch) import this shared pool
+// and each registers afterAll(teardownFixtures). With threads:false they share
+// one module instance, so guard pool.end() to run exactly once.
+let poolEnded = false;
+
 // ============================================================================
 // Lifecycle functions (call from describe-scoped hooks in each spec file)
 // ============================================================================
@@ -112,7 +117,10 @@ export async function teardownFixtures(): Promise<void> {
     await pool.query(`DELETE FROM stock_locations WHERE id = $1`, [WAREHOUSE_FC]);
     await pool.query(`DELETE FROM stock_items WHERE id = $1`, [ITEM_ONT]);
   } finally {
-    await pool.end();
+    if (!poolEnded) {
+      poolEnded = true;
+      await pool.end();
+    }
   }
 }
 
