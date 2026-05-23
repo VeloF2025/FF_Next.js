@@ -178,7 +178,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
   }
 
-  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST', 'DELETE']);
+  return apiResponse.methodNotAllowed(res, req.method!, ['POST', 'DELETE']);
 }
 
 export default withAuth(withArcjetProtection(handler, aj));
