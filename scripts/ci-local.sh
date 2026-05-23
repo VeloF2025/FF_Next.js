@@ -113,6 +113,11 @@ if [ -n "$CHANGED_FILES" ]; then
   #   - `// eslint-disable-line no-console` same-line pragma
   #   - `// eslint-disable-next-line no-console` on the previous line
   # The awk keeps a sliding one-line window so it can see the prior line.
+  # `[ -f "$f" ]` returns 1 when a file in the diff was deleted; without the
+  # trailing `|| true` the loop's last exit status is non-zero, pipefail
+  # propagates it through $(), and set -e kills Gate 4 silently mid-run on
+  # deletion-only PRs. Same pattern as Gate 2's CATCH_COUNT fix above and the
+  # EMPTY_CATCH loop below.
   CONSOLE_HITS=$(echo "$CHANGED_FILES" | { grep -E '\.(ts|tsx)$' || true; } | { grep -v '.test.' || true; } | { grep -v '.spec.' || true; } | while read -r f; do
     [ -f "$f" ] && awk -v file="$f" '
       {
@@ -125,7 +130,7 @@ if [ -n "$CHANGED_FILES" ]; then
         }
         prev = line
       }
-    ' "$f"
+    ' "$f" || true
   done)
 
   if [ -n "$CONSOLE_HITS" ]; then
