@@ -1,6 +1,6 @@
 import { pool } from '@/lib/db';
 
-export const SITES = ['LAW', 'MAM', 'MOA', 'TEM', 'TEM-3'] as const;
+export const SITES = ['LAW', 'MAM', 'MOA', 'TEM', 'TEM-3', 'ETW'] as const;
 export type SiteCode = (typeof SITES)[number];
 
 const SITE_LABELS: Record<string, string> = {
@@ -9,16 +9,23 @@ const SITE_LABELS: Record<string, string> = {
   MOA: 'Mohadin',
   TEM: 'Tembisa POP 1',
   'TEM-3': 'Tembisa POP 3',
+  ETW: 'Etwatwa',
 };
 
 // Mapping from oes_pp_data.project values (post-import) to canonical site code.
-// Importer rewrites LAW/MOA/MAM via PP_PROJECT_CODE_MAP; TEM/TEM-3 stay as-is.
+// Importer rewrites LAW/MOA/MAM/ETW via PP_PROJECT_CODE_MAP; TEM/TEM-3 stay as-is.
+// Raw code keys (LAW/ETW/ETW-2/…) are kept as a defensive pass-through for rows
+// imported before the rewrite was wired (e.g. legacy ETW-2 PP entries).
 const PP_PROJECT_TO_SITE: Record<string, SiteCode> = {
   Lawley: 'LAW',
   Mamelodi: 'MAM',
   Mohadin: 'MOA',
+  Etwatwa: 'ETW',
   TEM: 'TEM',
   'TEM-3': 'TEM-3',
+  ETW: 'ETW',
+  'ETW-2': 'ETW',
+  'ETW-3': 'ETW',
 };
 
 export function siteLabel(code: string): string {

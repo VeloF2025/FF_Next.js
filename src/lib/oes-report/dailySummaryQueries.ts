@@ -16,8 +16,30 @@ export interface DailySummary {
   disputes: DailyCount[];          // activations on (day, site) whose serial is still in PP
 }
 
-// Site code lives at position 4 of 'oes_status_report_<SITE>_YYYYMMDD.xlsx'.
-const FILENAME_SITE_SQL = `split_part(b.filename, '_', 4)`;
+// Site code is derived from the import batch filename — Fibertime SP-synced
+// files follow 'oes_status_report_<SITE>_YYYYMMDD.xlsx', so the site code sits
+// at split_part position 4. Manually-uploaded consolidated files (e.g. the
+// "VELOCITY OES REPORT …" sheets) don't carry per-site info in the filename,
+// so we fall back to the team-name prefix on the activation row itself:
+// 'law20' → LAW, 'mam2' → MAM, 'moa1' → MOA, 'tem5' → TEM, 'etw1' → ETW.
+//
+// TEM-3 (Tembisa POP 3) cannot be split from TEM (POP 1) via team alone —
+// both POPs share 'tem*' teams. TEM-3 only appears when the proper per-site
+// SP-synced file is present, so it stays zero on consolidated-file fallback.
+const SITE_FROM_BATCH_OR_TEAM_SQL = `
+  COALESCE(
+    CASE WHEN split_part(b.filename, '_', 4) IN ('LAW','MAM','MOA','TEM','TEM-3','ETW')
+         THEN split_part(b.filename, '_', 4)
+         ELSE NULL END,
+    CASE UPPER(SUBSTRING(a.team FROM '^([a-zA-Z]+)'))
+      WHEN 'LAW' THEN 'LAW'
+      WHEN 'MAM' THEN 'MAM'
+      WHEN 'MOA' THEN 'MOA'
+      WHEN 'TEM' THEN 'TEM'
+      WHEN 'ETW' THEN 'ETW'
+    END
+  )
+`;
 
 function buildDays(reportDate: string): string[] {
   const days: string[] = [];
@@ -35,16 +57,15 @@ export async function loadDailySummary(reportDate: string): Promise<DailySummary
   const start = days[0]!;
   const end = days[days.length - 1]!;
 
-  // Guard against NULL filename — split_part(NULL,…) returns NULL and would
-  // silently drop activations from the daily summary.
-  const activationsRes = await pool.query<{ day: string; site: string; n: number }>(`
+  // LEFT JOIN so rows without a batch link (or with non-conforming filenames)
+  // still appear via the team-prefix fallback in SITE_FROM_BATCH_OR_TEAM_SQL.
+  const activationsRes = await pool.query<{ day: string; site: string | null; n: number }>(`
     SELECT a.activation_date::text AS day,
-           ${FILENAME_SITE_SQL} AS site,
+           ${SITE_FROM_BATCH_OR_TEAM_SQL} AS site,
            COUNT(*)::int AS n
     FROM oes_activations a
-    JOIN oes_import_batches b ON b.id = a.import_batch_id
+    LEFT JOIN oes_import_batches b ON b.id = a.import_batch_id
     WHERE a.activation_date BETWEEN $1::date AND $2::date
-      AND b.filename IS NOT NULL
     GROUP BY a.activation_date, site
   `, [start, end]);
 
@@ -80,6 +101,7 @@ export async function loadDailySummary(reportDate: string): Promise<DailySummary
                WHEN pib.filename LIKE 'oes_status_report_MOA_%' THEN 'Mohadin'
                WHEN pib.filename LIKE 'oes_status_report_TEM-3_%' THEN 'TEM-3'
                WHEN pib.filename LIKE 'oes_status_report_TEM_%' THEN 'TEM'
+               WHEN pib.filename LIKE 'oes_status_report_ETW%' THEN 'Etwatwa'
              END AS project
       FROM oes_pp_import_batches pib
       WHERE pib.filename IS NOT NULL
@@ -108,7 +130,7 @@ export async function loadDailySummary(reportDate: string): Promise<DailySummary
   // Disputes use the CURRENT PP publish (latest batch per project) as the reference
   // set — same snapshot as the FT Dispute tab, so the two stay consistent. As a
   // side-effect, historical day counts shift retroactively when FT updates the list.
-  const disputesRes = await pool.query<{ day: string; site: string; n: number }>(`
+  const disputesRes = await pool.query<{ day: string; site: string | null; n: number }>(`
     WITH latest_batch_per_project AS (
       SELECT project, MAX(import_batch_id) AS bid
       FROM oes_pp_data
@@ -123,24 +145,23 @@ export async function loadDailySummary(reportDate: string): Promise<DailySummary
       WHERE ppd.serial_number IS NOT NULL
     )
     SELECT a.activation_date::text AS day,
-           ${FILENAME_SITE_SQL} AS site,
+           ${SITE_FROM_BATCH_OR_TEAM_SQL} AS site,
            COUNT(*)::int AS n
     FROM oes_activations a
-    JOIN oes_import_batches b ON b.id = a.import_batch_id
+    LEFT JOIN oes_import_batches b ON b.id = a.import_batch_id
     WHERE a.activation_date BETWEEN $1::date AND $2::date
-      AND b.filename IS NOT NULL
       AND a.serial_number IS NOT NULL
       AND LOWER(a.serial_number) IN (SELECT serial FROM current_pp_serials)
     GROUP BY a.activation_date, site
   `, [start, end]);
 
   const toSiteCount = (
-    rows: Array<{ day: string; site: string; n: number }>
+    rows: Array<{ day: string; site: string | null; n: number }>
   ): DailyCount[] =>
     rows
       .map(r => ({
         day: r.day,
-        site: (SITES as readonly string[]).includes(r.site) ? (r.site as SiteCode) : null,
+        site: r.site && (SITES as readonly string[]).includes(r.site) ? (r.site as SiteCode) : null,
         count: r.n,
       }))
       .filter((r): r is DailyCount => r.site !== null);
