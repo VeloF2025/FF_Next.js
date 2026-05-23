@@ -101,6 +101,7 @@ export async function loadDailySummary(reportDate: string): Promise<DailySummary
                WHEN pib.filename LIKE 'oes_status_report_MOA_%' THEN 'Mohadin'
                WHEN pib.filename LIKE 'oes_status_report_TEM-3_%' THEN 'TEM-3'
                WHEN pib.filename LIKE 'oes_status_report_TEM_%' THEN 'TEM'
+               WHEN pib.filename LIKE 'oes_status_report_ETW%' THEN 'Etwatwa'
              END AS project
       FROM oes_pp_import_batches pib
       WHERE pib.filename IS NOT NULL

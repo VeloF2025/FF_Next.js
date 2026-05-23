@@ -142,6 +142,8 @@ const PP_PROJECT_CODE_MAP: Record<string, string> = {
   'MOA': 'Mohadin',
   'MAM': 'Mamelodi',
   'ETW': 'Etwatwa',
+  'ETW-2': 'Etwatwa',
+  'ETW-3': 'Etwatwa',
 };
 
 /** Parse PP DATA sheet from an already-loaded workbook. Returns null if not found. */

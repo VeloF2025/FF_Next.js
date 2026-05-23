@@ -14,6 +14,8 @@ const SITE_LABELS: Record<string, string> = {
 
 // Mapping from oes_pp_data.project values (post-import) to canonical site code.
 // Importer rewrites LAW/MOA/MAM/ETW via PP_PROJECT_CODE_MAP; TEM/TEM-3 stay as-is.
+// Raw code keys (LAW/ETW/ETW-2/…) are kept as a defensive pass-through for rows
+// imported before the rewrite was wired (e.g. legacy ETW-2 PP entries).
 const PP_PROJECT_TO_SITE: Record<string, SiteCode> = {
   Lawley: 'LAW',
   Mamelodi: 'MAM',
@@ -21,6 +23,9 @@ const PP_PROJECT_TO_SITE: Record<string, SiteCode> = {
   Etwatwa: 'ETW',
   TEM: 'TEM',
   'TEM-3': 'TEM-3',
+  ETW: 'ETW',
+  'ETW-2': 'ETW',
+  'ETW-3': 'ETW',
 };
 
 export function siteLabel(code: string): string {
