@@ -8,7 +8,7 @@
  *   - "Team Tickets" : assigned to a team the user belongs to, excluding their own
  *
  * Ticket sources aggregated:
- *   - NOC tickets           (`tickets` table)
+ *   - NOC tickets           (`maintenance_tickets` table)
  *   - H&S audits            (`hs_project_audits` — open = in_progress / requires_action)
  *   - ManCo action items    (`manco_action_items` — matched by name, best-effort)
  *
@@ -32,7 +32,6 @@ function parseArg(name: string): string | undefined {
 const ONLY_EMAIL = parseArg('only')?.toLowerCase();
 const DRY_RUN = process.argv.includes('--dry-run');
 
-import { neon } from '@neondatabase/serverless';
 import { Resend } from 'resend';
 import {
   generateMorningStandupEmail,
@@ -43,6 +42,26 @@ import {
 import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.production' });
 
+// DB driver note: post-Neon-cutover (2026-04-18) the database is self-hosted
+// Supabase. The @neondatabase/serverless `neon()` driver speaks Neon's HTTP
+// protocol, which Supabase does not — and the webpack neon-shim that rescues
+// the Next.js app does not apply to a standalone tsx script. So we use the
+// shared pg.Pool via `@/lib/db-pool`, whose `sql` export is a tagged-template
+// drop-in for neon's `sql`. It MUST be imported dynamically inside main()
+// (after dotenv runs) because src/lib/db.ts builds the pool from
+// process.env.DATABASE_URL at module load.
+
+// This is a standalone tsx cron whose output is captured to a logfile
+// (`>> /var/log/morning-standup-cron.log 2>&1`). The app logger
+// (@/lib/logger) deliberately never writes to stdout/stderr — it only
+// buffers in memory — so it would silence this job's operational trail.
+// Write to stdout/stderr directly, matching the sibling crons
+// attendance-cartrack-reconcile.ts and attendance-reconcile.ts.
+const logOut = (msg: string) => process.stdout.write(msg + '\n');
+const logErr = (msg: string) => process.stderr.write(msg + '\n');
+const fmtErr = (e: unknown) =>
+  e instanceof Error ? e.stack ?? e.message : JSON.stringify(e);
+
 const DATABASE_URL = process.env.DATABASE_URL;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app';
@@ -50,28 +69,26 @@ const FROM_ADDRESS =
   process.env.MORNING_STANDUP_FROM || 'FibreFlow Standup <standup@fibreflow.app>';
 
 if (!DATABASE_URL) {
-  console.error('DATABASE_URL not set');
+  logErr('DATABASE_URL not set');
   process.exit(1);
 }
 if (!RESEND_API_KEY) {
-  console.error('RESEND_API_KEY not set');
+  logErr('RESEND_API_KEY not set');
   process.exit(1);
 }
 
-const sql = neon(DATABASE_URL);
 const resend = new Resend(RESEND_API_KEY);
 
 // ---------- Types ----------
 
-interface UserRow {
+interface UserRow extends Record<string, unknown> {
   id: string;
   email: string;
   first_name: string | null;
   last_name: string | null;
-  display_name: string | null;
 }
 
-interface NocTicketRow {
+interface NocTicketRow extends Record<string, unknown> {
   id: string;
   ticket_uid: string;
   title: string;
@@ -83,7 +100,7 @@ interface NocTicketRow {
   created_at: string;
 }
 
-interface HsAuditRow {
+interface HsAuditRow extends Record<string, unknown> {
   id: string;
   project_id: string;
   project_name: string | null;
@@ -93,7 +110,7 @@ interface HsAuditRow {
   user_id: string | null;
 }
 
-interface MancoItemRow {
+interface MancoItemRow extends Record<string, unknown> {
   id: string;
   action_item: string;
   status: string;
@@ -103,7 +120,7 @@ interface MancoItemRow {
   created_at: string;
 }
 
-interface TeamMembershipRow {
+interface TeamMembershipRow extends Record<string, unknown> {
   user_id: string;
   team_id: string;
 }
@@ -119,7 +136,6 @@ interface Bucket {
 
 function friendlyName(u: UserRow): string {
   if (u.first_name && u.first_name.trim()) return u.first_name.trim();
-  if (u.display_name && u.display_name.trim()) return u.display_name.trim().split(' ')[0];
   return u.email.split('@')[0];
 }
 
@@ -158,8 +174,13 @@ function ensureBucket(map: Map<string, Bucket>, user: UserRow): Bucket {
 // ---------- Main ----------
 
 async function main() {
+  // Dynamic import so the pg.Pool in src/lib/db.ts initialises with the
+  // DATABASE_URL that dotenv resolved above (a static import would hoist
+  // above dotenv.config and capture an undefined connection string).
+  const { sql } = await import('../../src/lib/db-pool');
+
   const startedAt = new Date();
-  console.log(
+  logOut(
     `Starting morning standup job at ${startedAt.toISOString()}` +
       (DRY_RUN ? ' [DRY-RUN — no emails will be sent]' : '') +
       (ONLY_EMAIL ? ` [ONLY=${ONLY_EMAIL}]` : '')
@@ -167,7 +188,7 @@ async function main() {
 
   // 1. Load all active users (we need them for name lookup + recipient list)
   const users = (await sql`
-    SELECT id, email, first_name, last_name, display_name
+    SELECT id, email, first_name, last_name
     FROM users
     WHERE is_active = true AND email IS NOT NULL
   `) as UserRow[];
@@ -179,11 +200,10 @@ async function main() {
   for (const u of users) {
     const full = [u.first_name, u.last_name].filter(Boolean).join(' ').trim();
     if (full) userByName.set(normaliseName(full), u);
-    if (u.display_name) userByName.set(normaliseName(u.display_name), u);
     if (u.first_name) userByName.set(normaliseName(u.first_name), u);
   }
 
-  console.log(`Loaded ${users.length} active users`);
+  logOut(`Loaded ${users.length} active users`);
 
   // 2. Load team memberships (team_members joins to users via email)
   const memberships = (await sql`
@@ -199,7 +219,7 @@ async function main() {
     arr.push(m.user_id);
     teamToUsers.set(m.team_id, arr);
   }
-  console.log(`Loaded ${memberships.length} team memberships across ${teamToUsers.size} teams`);
+  logOut(`Loaded ${memberships.length} team memberships across ${teamToUsers.size} teams`);
 
   const buckets = new Map<string, Bucket>();
 
@@ -207,11 +227,11 @@ async function main() {
   const nocRows = (await sql`
     SELECT id::text, ticket_uid, title, status, priority, source,
            assigned_to::text, assigned_team_id::text, created_at
-    FROM tickets
+    FROM maintenance_tickets
     WHERE status IN ('open', 'assigned', 'in_progress', 'on_hold')
       AND (assigned_to IS NOT NULL OR assigned_team_id IS NOT NULL)
   `) as NocTicketRow[];
-  console.log(`Loaded ${nocRows.length} open NOC tickets with an assignee/team`);
+  logOut(`Loaded ${nocRows.length} open NOC tickets with an assignee/team`);
 
   for (const row of nocRows) {
     const ticket: StandupTicket = {
@@ -244,7 +264,7 @@ async function main() {
 
   // 4. H&S audits — open = in_progress / requires_action
   const hsRows = (await sql`
-    SELECT a.id::text, a.project_id::text, p.name AS project_name,
+    SELECT a.id::text, a.project_id::text, p.project_name AS project_name,
            a.audit_type, a.status, a.created_at,
            s.user_id::text AS user_id
     FROM hs_project_audits a
@@ -253,7 +273,7 @@ async function main() {
     WHERE a.status IN ('in_progress', 'requires_action')
       AND s.user_id IS NOT NULL
   `) as HsAuditRow[];
-  console.log(`Loaded ${hsRows.length} open H&S audits with a mapped user`);
+  logOut(`Loaded ${hsRows.length} open H&S audits with a mapped user`);
 
   for (const row of hsRows) {
     if (!row.user_id || !userById.has(row.user_id)) continue;
@@ -278,7 +298,7 @@ async function main() {
       AND fibreflow_responsible IS NOT NULL
       AND fibreflow_responsible <> ''
   `) as MancoItemRow[];
-  console.log(`Loaded ${mancoRows.length} open ManCo action items`);
+  logOut(`Loaded ${mancoRows.length} open ManCo action items`);
 
   let mancoMatched = 0;
   let mancoUnmatched = 0;
@@ -304,7 +324,7 @@ async function main() {
     };
     ensureBucket(buckets, user).mine.push(ticket);
   }
-  console.log(
+  logOut(
     `ManCo assignee match: ${mancoMatched} matched, ${mancoUnmatched} unmatched (no user found by name)`
   );
 
@@ -337,7 +357,7 @@ async function main() {
     const subject = `Morning Standup · ${bucket.mine.length} mine · ${bucket.team.length} team`;
 
     if (DRY_RUN) {
-      console.log(
+      logOut(
         `DRY-RUN ${bucket.user.email} (mine=${bucket.mine.length} team=${bucket.team.length}) subject="${subject}"`
       );
       successCount++;
@@ -352,16 +372,16 @@ async function main() {
         html,
       });
       if (result.error) {
-        console.error(`FAIL ${bucket.user.email}:`, result.error);
+        logErr(`FAIL ${bucket.user.email}: ${fmtErr(result.error)}`);
         errorCount++;
       } else {
-        console.log(
+        logOut(
           `SENT ${bucket.user.email} (mine=${bucket.mine.length} team=${bucket.team.length}) id=${result.data?.id}`
         );
         successCount++;
       }
     } catch (err) {
-      console.error(`ERROR ${bucket.user.email}:`, err);
+      logErr(`ERROR ${bucket.user.email}: ${fmtErr(err)}`);
       errorCount++;
     }
 
@@ -369,16 +389,21 @@ async function main() {
     await new Promise((r) => setTimeout(r, 120));
   }
 
-  console.log('');
-  console.log('Summary:');
-  console.log(`  Recipients with tickets : ${successCount + errorCount}`);
-  console.log(`  Sent successfully       : ${successCount}`);
-  console.log(`  Failed                  : ${errorCount}`);
-  console.log(`  Skipped (empty buckets) : ${skippedCount}`);
-  console.log('Morning standup job completed');
+  logOut('');
+  logOut('Summary:');
+  logOut(`  Recipients with tickets : ${successCount + errorCount}`);
+  logOut(`  Sent successfully       : ${successCount}`);
+  logOut(`  Failed                  : ${errorCount}`);
+  logOut(`  Skipped (empty buckets) : ${skippedCount}`);
+  logOut('Morning standup job completed');
 }
 
-main().catch((err) => {
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+// pg.Pool keeps the event loop alive after work completes, so exit explicitly
+// (matching the sibling attendance crons). All queries + email sends are
+// awaited before this resolves, so a hard exit loses nothing.
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    logErr(`Fatal error: ${fmtErr(err)}`);
+    process.exit(1);
+  });
