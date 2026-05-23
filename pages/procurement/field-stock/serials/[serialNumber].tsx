@@ -21,14 +21,15 @@ type FetchState =
 const SerialTimelinePage: NextPage<PageProps> = ({ serialNumber }) => {
   const [state, setState] = useState<FetchState>({ kind: 'loading' });
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback((signal?: AbortSignal) => {
     setState({ kind: 'loading' });
     const url = `/api/procurement/field-stock/serials/timeline?serialNumber=${encodeURIComponent(serialNumber)}`;
-    fetch(url, { credentials: 'include' })
+    fetch(url, { credentials: 'include', signal })
       .then(async (res) => {
         const env = (await res.json()) as
           | { success: true; data: TimelineResult }
           | { success: false; error?: { code?: string; message?: string } };
+        if (signal?.aborted) return;
         if (!env.success) {
           if (res.status === 404) return setState({ kind: 'not-found' });
           return setState({ kind: 'error', message: env.error?.message ?? 'Failed to load timeline' });
@@ -36,12 +37,15 @@ const SerialTimelinePage: NextPage<PageProps> = ({ serialNumber }) => {
         setState({ kind: 'ok', data: env.data });
       })
       .catch((err: unknown) => {
+        if (signal?.aborted || (err instanceof DOMException && err.name === 'AbortError')) return;
         setState({ kind: 'error', message: err instanceof Error ? err.message : 'Network error' });
       });
   }, [serialNumber]);
 
   useEffect(() => {
-    loadData();
+    const controller = new AbortController();
+    loadData(controller.signal);
+    return () => controller.abort();
   }, [loadData]);
 
   return (

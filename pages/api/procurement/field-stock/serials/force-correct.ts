@@ -23,7 +23,9 @@ const TARGET_KEYS: (keyof ForceCorrectTarget)[] = [
 ];
 
 const MAX_BATCH = 500;
+const MAX_SERIAL_LEN = 255;
 const MIN_REASON_LEN = 10;
+const MAX_REASON_LEN = 2000;
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -50,6 +52,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
   if (serials.length > MAX_BATCH) {
     return apiResponse.validationError(res, { serials: `max ${MAX_BATCH} serials per batch` });
+  }
+  if (serials.some(s => s.length > MAX_SERIAL_LEN)) {
+    return apiResponse.validationError(res, { serials: `each serial must be ≤ ${MAX_SERIAL_LEN} characters` });
   }
 
   // 2. target
@@ -90,6 +95,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
   if (reason.length < MIN_REASON_LEN) {
     return apiResponse.validationError(res, { reason: `reason must be at least ${MIN_REASON_LEN} characters` });
+  }
+  if (reason.length > MAX_REASON_LEN) {
+    return apiResponse.validationError(res, { reason: `reason must be ≤ ${MAX_REASON_LEN} characters` });
   }
 
   // 4. dryRun (default true if missing — defensive)

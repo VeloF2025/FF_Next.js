@@ -57,7 +57,11 @@ export function ForceCorrectModal({
         toast.error(json.error?.message ?? 'Force-correct failed');
         return;
       }
-      const result = json.data!;
+      if (!json.data) {
+        toast.error('API returned success without data');
+        return;
+      }
+      const result = json.data;
       if (result.totalApplied > 0) {
         toast.success(`Force-correct applied to ${serialNumber}`);
         onSuccess();

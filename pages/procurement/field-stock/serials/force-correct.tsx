@@ -104,7 +104,8 @@ function BatchWizard() {
       error?: { message?: string };
     };
     if (!json.success) throw new Error(json.error?.message ?? 'API error');
-    return json.data!;
+    if (!json.data) throw new Error('API returned success without data');
+    return json.data;
   }
 
   async function handlePreview() {

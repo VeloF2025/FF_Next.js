@@ -8,6 +8,12 @@
 -- access because force-correct is a privileged escape hatch.
 --
 -- Idempotent: both INSERTs use ON CONFLICT guards.
+--
+-- RBAC parent-cascade caveat (see feedback_rbac_parent_override_cascade):
+--   parent_key 'procurement.field-stock' is a page-type permission. If any
+--   role has the parent set to view:false, this child permission is silently
+--   blocked even when explicitly granted. Take care when seeding additional
+--   roles (e.g. procurement_manager) — confirm parent grants exist first.
 
 BEGIN;
 

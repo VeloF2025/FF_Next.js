@@ -73,6 +73,28 @@ describe('forceCorrectSerials — edge cases', () => {
     expect(db?.installed_at_drop_number).toBeNull();
   });
 
+  // ─── 5b. processOne catch branch — error result without audit write ────────
+  it('returns sanitised error row and writes NO audit on DB constraint violation', async () => {
+    // FK violation on stock_serials.current_location_id → stock_locations(id).
+    const BAD_UUID = '99999999-9999-9999-9999-999999999999';
+    const result = await forceCorrectSerials(baseParams({
+      serials: [SN_A],
+      target: { currentLocationId: BAD_UUID },
+    }));
+
+    expect(result.totalApplied).toBe(0);
+    expect(result.totalFailed).toBe(1);
+
+    const row = result.rows[0];
+    expect(row.applied).toBe(false);
+    expect(row.error).toBeDefined();
+    // Error message must NOT leak pg constraint/table names.
+    expect(row.error).not.toMatch(/fkey|constraint|stock_locations|relation/i);
+
+    // No audit row written (transaction rolled back).
+    expect(await getAuditRows(SN_A)).toHaveLength(0);
+  });
+
   // ─── 6. Audit row payload shape ──────────────────────────────────────────────
   it('writes a correctly shaped audit row to stock_serial_events', async () => {
     await forceCorrectSerials(baseParams({

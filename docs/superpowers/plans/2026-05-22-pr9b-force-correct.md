@@ -238,9 +238,11 @@ git commit -m "feat(wave2): PR-9b shared types for force-correct"
 
 - [ ] **Step 1: Re-read MAX_VERSION at the very last moment**
 
+> **Credential note:** Set `SUPABASE_DB_PASSWORD` in your shell from `.claude/credentials.local.md` before running any of the `ssh velo@…` commands below. Never inline the password in any doc, plan, handoff, or commit message.
+
 Per `feedback_migration_version_collision`, re-confirm 377 is still the max immediately before writing the file:
 ```bash
-ssh velo@100.96.203.105 "PGPASSWORD='a23f6104debd1d3e88e8f00c0067f22f' psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -t -A -c 'SELECT MAX(version::int) FROM migrations;'"
+ssh velo@100.96.203.105 "PGPASSWORD=\"$SUPABASE_DB_PASSWORD\" psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -t -A -c 'SELECT MAX(version::int) FROM migrations;'"
 ```
 Expected: `377`. If higher (parallel session landed a migration), bump filename + test filename to MAX+1.
 
@@ -362,16 +364,16 @@ describe('Migration 378: RBAC force-correct permission', () => {
 The test above does NOT cover applying against the real Supabase instance (the test pool would only run against the test DB, which is empty for this PR — we don't have a test-DB harness wired for migrations). Instead, apply once to live and verify:
 
 ```bash
-ssh velo@100.96.203.105 "PGPASSWORD='a23f6104debd1d3e88e8f00c0067f22f' psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -f /dev/stdin" < scripts/migrations/sql/378_rbac_field_stock_force_correct.sql
-ssh velo@100.96.203.105 "PGPASSWORD='a23f6104debd1d3e88e8f00c0067f22f' psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -c \"SELECT key, type, parent_key FROM access_permissions WHERE key = 'procurement.field-stock.force-correct';\""
-ssh velo@100.96.203.105 "PGPASSWORD='a23f6104debd1d3e88e8f00c0067f22f' psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -c \"SELECT role, permission_key, actions FROM role_permissions WHERE permission_key = 'procurement.field-stock.force-correct';\""
+ssh velo@100.96.203.105 "PGPASSWORD=\"$SUPABASE_DB_PASSWORD\" psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -f /dev/stdin" < scripts/migrations/sql/378_rbac_field_stock_force_correct.sql
+ssh velo@100.96.203.105 "PGPASSWORD=\"$SUPABASE_DB_PASSWORD\" psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -c \"SELECT key, type, parent_key FROM access_permissions WHERE key = 'procurement.field-stock.force-correct';\""
+ssh velo@100.96.203.105 "PGPASSWORD=\"$SUPABASE_DB_PASSWORD\" psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -c \"SELECT role, permission_key, actions FROM role_permissions WHERE permission_key = 'procurement.field-stock.force-correct';\""
 ```
 Expected: one access_permissions row and one role_permissions row. Then re-apply the migration once more to confirm idempotency on live.
 
 Also record the migration in the `migrations` table (look at how `358_snag_reports_scope` was recorded — likely `INSERT INTO migrations (version, name, executed_at) VALUES ('378', '378_rbac_field_stock_force_correct', NOW())`, but confirm column names first):
 ```bash
-ssh velo@100.96.203.105 "PGPASSWORD='a23f6104debd1d3e88e8f00c0067f22f' psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -c '\\d migrations'"
-ssh velo@100.96.203.105 "PGPASSWORD='a23f6104debd1d3e88e8f00c0067f22f' psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -c \"SELECT * FROM migrations WHERE version = '377';\""
+ssh velo@100.96.203.105 "PGPASSWORD=\"$SUPABASE_DB_PASSWORD\" psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -c '\\d migrations'"
+ssh velo@100.96.203.105 "PGPASSWORD=\"$SUPABASE_DB_PASSWORD\" psql -h localhost -p 5436 -U postgres.ironman-platform -d fibreflow -c \"SELECT * FROM migrations WHERE version = '377';\""
 ```
 Then INSERT the row for 378 matching the same shape.
 

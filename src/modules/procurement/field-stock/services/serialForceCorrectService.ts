@@ -14,6 +14,22 @@
  *   installedAtDropNumber            installed_at_drop_number
  *   activatedAtOltId                 activated_at_olt_id
  *
+ * AUDIT TABLE — why stock_serial_events (not audit_logs / field_stock_movements):
+ *   - `stock_serial_events` is the canonical per-serial event log. Populated by
+ *     DB triggers (migration 364) on picking/drops/OES/QA writes, plus direct
+ *     writes from `src/lib/serial-events.ts`. The timeline UI reads ONLY this
+ *     table (serialTimelineService.ts L103) — so any event written here shows
+ *     up in the operator's lifecycle view.
+ *   - `audit_logs` (src/services/procurement/auditService.ts) is for business
+ *     processes (RFQ approvals, supplier changes, BOQ status changes). Not
+ *     per-serial.
+ *   - `field_stock_movements` (consumptionService.ts) is a quantity-level
+ *     ledger of physical stock moves, not per-serial state.
+ *   `serialStateMachine.ts` writes to audit_logs + field_stock_movements but
+ *   NOT stock_serial_events — that's wired via the migration-364 triggers
+ *   firing on its UPDATE statements. Force-correct writes stock_serial_events
+ *   directly because triggers fire on source-table events we're bypassing.
+ *
  * Audit row layout (stock_serial_events):
  *   actor_user_id  ← performedBy (uuid)
  *   from_state     ← old status (only when status changed; else NULL)
@@ -21,6 +37,11 @@
  *   payload        ← { isForceCorrect, performedByName, reason, before, after, changedFields }
  *   occurred_at    ← NOW()
  *   source_table / source_id intentionally NULL (bypasses dedupe unique index).
+ *
+ * CONNECTION POOL — uses pg.Pool via @/lib/db-pool (NOT the @neondatabase/serverless
+ * shim used by sibling serialService.ts). pg.Pool is the canonical pool for new
+ * code per project CLAUDE.md "Tech debt — Neon serverless shim" section.
+ * Migrating serialService.ts off the shim is out of scope here.
  */
 import { pool } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
@@ -208,10 +229,22 @@ async function processOne(serialNumber: string, p: ForceCorrectParams): Promise<
     await client.query('ROLLBACK').catch((rbErr: unknown) => {
       log.warn('forceCorrectSerials ROLLBACK failed', { serialNumber, rbErr }, 'serialForceCorrect');
     });
-    const msg = err instanceof Error ? err.message : String(err);
-    log.error('forceCorrectSerials row failed', { serialNumber, err: msg }, 'serialForceCorrect');
-    return { serialNumber, found: false, applied: false, changedFields: [], error: msg };
+    const fullMsg = err instanceof Error ? err.message : String(err);
+    log.error('forceCorrectSerials row failed', { serialNumber, err: fullMsg }, 'serialForceCorrect');
+    return { serialNumber, found: false, applied: false, changedFields: [], error: sanitiseDbError(fullMsg) };
   } finally {
     client.release();
   }
+}
+
+// ============================================================================
+// Error sanitisation
+// ============================================================================
+
+/**
+ * Return a generic message to the API caller instead of raw pg errors,
+ * which can leak table/constraint/column names. Full error is logged above.
+ */
+function sanitiseDbError(_fullMsg: string): string {
+  return 'Database error processing serial; check server logs for details.';
 }

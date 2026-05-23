@@ -68,4 +68,37 @@ describe('forceCorrectSerials — batch + txn isolation', () => {
 
     expect(eventsB).toHaveLength(0);
   });
+
+  // ─── 8b. Mid-batch throw isolation — loop must keep running past errors ─────
+  it('continues processing subsequent serials after one throws on UPDATE', async () => {
+    // Both serials exist and would normally update fine. We force a DB error by
+    // pointing currentLocationId at a UUID that doesn't satisfy the FK to
+    // stock_locations. The diff loop will include the field for BOTH serials
+    // (both currently NULL), the UPDATE will throw on BOTH, and each serial's
+    // own catch block must return an error row independently — proving the
+    // outer loop is NOT a single transaction that aborts on first failure.
+    const BAD_UUID = '99999999-9999-9999-9999-999999999999';
+    const result = await forceCorrectSerials(baseParams({
+      serials: [SN_A, SN_B],
+      target: { currentLocationId: BAD_UUID },
+    }));
+
+    // Both serials were attempted and both produced an error row.
+    expect(result.totalRequested).toBe(2);
+    expect(result.totalApplied).toBe(0);
+    expect(result.totalFailed).toBe(2);
+    expect(result.rows).toHaveLength(2);
+
+    const rowA = result.rows.find((r: ForceCorrectRowResult) => r.serialNumber === SN_A);
+    const rowB = result.rows.find((r: ForceCorrectRowResult) => r.serialNumber === SN_B);
+    expect(rowA?.error).toBeDefined();
+    expect(rowB?.error).toBeDefined();
+    // Error message is sanitised — never leaks raw pg constraint names.
+    expect(rowA?.error).not.toMatch(/fkey|constraint|stock_locations/i);
+    expect(rowB?.error).not.toMatch(/fkey|constraint|stock_locations/i);
+
+    // Neither serial wrote an audit row (each transaction rolled back).
+    expect(await getAuditRows(SN_A)).toHaveLength(0);
+    expect(await getAuditRows(SN_B)).toHaveLength(0);
+  });
 });
