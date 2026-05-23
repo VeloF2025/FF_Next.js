@@ -33,7 +33,9 @@ const logger = createLogger('services:fibertime-offline-sync');
 // CONSTANTS
 // ============================================================================
 
-export const OFFLINE_SITES = ['LAW', 'MAM', 'MOA', 'TEM', 'ETW'] as const;
+// See ACTIVE_SITES in fibertime-oes-sync.ts — Etwatwa lives in readable ETW-1/
+// ETW-2 POP folders; bare ETW / ETW-3 are 403. Keys must match SITE_MAINTENANCE_TEAMS.
+export const OFFLINE_SITES = ['LAW', 'MAM', 'MOA', 'TEM', 'ETW-1', 'ETW-2'] as const;
 
 // ============================================================================
 // TYPES
@@ -267,10 +269,15 @@ export async function runOfflineSync(date?: string): Promise<OfflineSyncReport> 
     OFFLINE_SITES.map(site => syncOfflineSite(site, reportDate))
   );
 
-  for (const outcome of outcomes) {
-    if (outcome.status === 'rejected' && outcome.reason instanceof FibertimeAuthExpiredError) {
-      throw outcome.reason;
-    }
+  // Only abort on genuine session expiry, which makes EVERY folder 403. A 403 on
+  // one folder (e.g. a forbidden ETW POP) is a per-folder grant issue — record it
+  // per-site instead of killing the whole run. See runOesSync for rationale.
+  const authRejections = outcomes.filter(
+    (o): o is PromiseRejectedResult =>
+      o.status === 'rejected' && o.reason instanceof FibertimeAuthExpiredError
+  );
+  if (authRejections.length === OFFLINE_SITES.length && authRejections.length > 0) {
+    throw authRejections[0]!.reason;
   }
 
   const results: OfflineSiteResult[] = outcomes.map((outcome, idx) => {

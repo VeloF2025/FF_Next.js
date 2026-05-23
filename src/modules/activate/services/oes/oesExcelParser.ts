@@ -142,6 +142,7 @@ const PP_PROJECT_CODE_MAP: Record<string, string> = {
   'MOA': 'Mohadin',
   'MAM': 'Mamelodi',
   'ETW': 'Etwatwa',
+  'ETW-1': 'Etwatwa',
   'ETW-2': 'Etwatwa',
   'ETW-3': 'Etwatwa',
 };

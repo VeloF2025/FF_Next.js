@@ -40,7 +40,12 @@ const logger = createLogger('services:fibertime-oes-sync');
 // CONSTANTS
 // ============================================================================
 
-export const ACTIVE_SITES = ['LAW', 'MAM', 'MOA', 'TEM', 'TEM-3', 'ETW'] as const;
+// Site = SharePoint folder name under "OES Report/Sites/". Fibertime splits
+// Etwatwa into per-POP folders (ETW-1, ETW-2, …); the bare "ETW" and "ETW-3"
+// folders return 403 (no grant for reporting@), so we list only the readable
+// ETW-1/ETW-2 folders. Report-side aggregation rolls all ETW-* into one
+// "Etwatwa" row (see src/lib/oes-report/queries.ts).
+export const ACTIVE_SITES = ['LAW', 'MAM', 'MOA', 'TEM', 'TEM-3', 'ETW-1', 'ETW-2'] as const;
 export type Site = (typeof ACTIVE_SITES)[number];
 
 // ============================================================================
@@ -267,11 +272,17 @@ export async function runOesSync(date?: string): Promise<SyncReport> {
     ACTIVE_SITES.map(site => syncSite(site, reportDate))
   );
 
-  // Propagate auth expiry immediately — it affects all sites, no point continuing
-  for (const outcome of sites) {
-    if (outcome.status === 'rejected' && outcome.reason instanceof FibertimeAuthExpiredError) {
-      throw outcome.reason;
-    }
+  // A genuinely expired cookie makes SharePoint return 403 for EVERY folder, so
+  // real expiry shows up as all sites rejecting with FibertimeAuthExpiredError.
+  // A 403 on just one folder is a per-folder permission issue (e.g. a forbidden
+  // ETW POP folder), not session death — so only abort the whole run when ALL
+  // sites fail auth. Otherwise fall through and record per-site errors.
+  const authRejections = sites.filter(
+    (o): o is PromiseRejectedResult =>
+      o.status === 'rejected' && o.reason instanceof FibertimeAuthExpiredError
+  );
+  if (authRejections.length === ACTIVE_SITES.length && authRejections.length > 0) {
+    throw authRejections[0]!.reason;
   }
 
   const results: SiteResult[] = sites.map((outcome, idx) => {
