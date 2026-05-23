@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { GetServerSideProps, NextPage } from 'next';
 import Link from 'next/link';
 import { AppLayout } from '@/components/layout';
+import { ForceCorrectModal } from '@/components/field-stock/ForceCorrectModal';
+import { usePermission } from '@/hooks/usePermission';
 import type { TimelineEntry, TimelineResult } from '@/types/field-stock';
 
 interface PageProps {
@@ -14,19 +16,20 @@ type FetchState =
   | { kind: 'error'; message: string }
   | { kind: 'ok'; data: TimelineResult };
 
+// ── Page ─────────────────────────────────────────────────────────────────────
+
 const SerialTimelinePage: NextPage<PageProps> = ({ serialNumber }) => {
   const [state, setState] = useState<FetchState>({ kind: 'loading' });
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadData = useCallback((signal?: AbortSignal) => {
     setState({ kind: 'loading' });
     const url = `/api/procurement/field-stock/serials/timeline?serialNumber=${encodeURIComponent(serialNumber)}`;
-    fetch(url, { credentials: 'include' })
+    fetch(url, { credentials: 'include', signal })
       .then(async (res) => {
         const env = (await res.json()) as
           | { success: true; data: TimelineResult }
           | { success: false; error?: { code?: string; message?: string } };
-        if (cancelled) return;
+        if (signal?.aborted) return;
         if (!env.success) {
           if (res.status === 404) return setState({ kind: 'not-found' });
           return setState({ kind: 'error', message: env.error?.message ?? 'Failed to load timeline' });
@@ -34,13 +37,16 @@ const SerialTimelinePage: NextPage<PageProps> = ({ serialNumber }) => {
         setState({ kind: 'ok', data: env.data });
       })
       .catch((err: unknown) => {
-        if (cancelled) return;
+        if (signal?.aborted || (err instanceof DOMException && err.name === 'AbortError')) return;
         setState({ kind: 'error', message: err instanceof Error ? err.message : 'Network error' });
       });
-    return () => {
-      cancelled = true;
-    };
   }, [serialNumber]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    loadData(controller.signal);
+    return () => controller.abort();
+  }, [loadData]);
 
   return (
     <AppLayout>
@@ -60,16 +66,33 @@ const SerialTimelinePage: NextPage<PageProps> = ({ serialNumber }) => {
         {state.kind === 'error' && (
           <div className="rounded bg-red-950/40 p-3 text-sm text-red-200">{state.message}</div>
         )}
-        {state.kind === 'ok' && <OkPane data={state.data} />}
+        {state.kind === 'ok' && (
+          <OkPane data={state.data} serialNumber={serialNumber} onRefresh={loadData} />
+        )}
       </div>
     </AppLayout>
   );
 };
 
-function OkPane({ data }: { data: TimelineResult }) {
+// ── OkPane ────────────────────────────────────────────────────────────────────
+
+function OkPane({
+  data,
+  serialNumber,
+  onRefresh,
+}: {
+  data: TimelineResult;
+  serialNumber: string;
+  onRefresh: () => void;
+}) {
   const s = data.serial;
+  const [fcOpen, setFcOpen] = useState(false);
+  const { can } = usePermission();
+  const canForceCorrect = can('procurement.field-stock.force-correct', 'edit');
+
   return (
     <>
+      {/* Field grid */}
       <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 text-sm md:grid-cols-2">
         <Row label="Item" value={s.itemName} />
         <Row label="Category" value={s.category} />
@@ -80,6 +103,21 @@ function OkPane({ data }: { data: TimelineResult }) {
         <Row label="Installed at drop" value={s.installedAtDropNumber} mono />
         <Row label="Activated on OLT" value={s.activatedAtOltId} mono />
       </dl>
+
+      {/* Action area */}
+      {canForceCorrect && (
+        <div className="mt-5 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setFcOpen(true)}
+            className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-300 hover:bg-amber-500/20 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-colors"
+          >
+            Force-correct state
+          </button>
+        </div>
+      )}
+
+      {/* Lifecycle */}
       <h2 className="mt-6 mb-2 text-lg font-semibold">Lifecycle</h2>
       {data.entries.length === 0 ? (
         <div className="rounded bg-neutral-900 p-4 text-sm text-neutral-400">
@@ -92,12 +130,36 @@ function OkPane({ data }: { data: TimelineResult }) {
           ))}
         </ol>
       )}
+
+      {/* Force-correct modal */}
+      {fcOpen && (
+        <ForceCorrectModal
+          serialNumber={serialNumber}
+          currentValues={{
+            status: s.status,
+            // Names exposed by SerialDetail; raw IDs aren't projected (timeline service doesn't SELECT them).
+            // Operator sees the name as a sanity check; the actual write is by ID via the API.
+            currentLocationId: s.currentLocationName ?? null,
+            allocatedToProjectId: s.allocatedProjectName ?? null,
+            installedAtDropNumber: s.installedAtDropNumber,
+            activatedAtOltId: s.activatedAtOltId,
+          }}
+          onClose={() => setFcOpen(false)}
+          onSuccess={() => {
+            setFcOpen(false);
+            onRefresh();
+          }}
+        />
+      )}
     </>
   );
 }
 
+// ── Sub-components ────────────────────────────────────────────────────────────
+
 function EntryRow({ entry }: { entry: TimelineEntry }) {
-  const border = entry.kind === 'event' ? 'border-blue-500 bg-neutral-900' : 'border-amber-600 bg-neutral-900/60';
+  const border =
+    entry.kind === 'event' ? 'border-blue-500 bg-neutral-900' : 'border-amber-600 bg-neutral-900/60';
   return (
     <li className={`rounded border-l-2 px-3 py-2 text-sm ${border}`}>
       <div className="flex items-baseline justify-between gap-3">
@@ -142,6 +204,8 @@ function eventLabel(eventType: string): string {
     default:                  return eventType;
   }
 }
+
+// ── SSR ───────────────────────────────────────────────────────────────────────
 
 export const getServerSideProps: GetServerSideProps<PageProps> = async (ctx) => {
   const raw = ctx.params?.serialNumber;
