@@ -45,6 +45,7 @@
  */
 import { pool } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
+import { emitSerialEvent } from '@/lib/serial-events';
 import type {
   ForceCorrectTarget,
   ForceCorrectSnapshot,
@@ -147,12 +148,11 @@ async function processOne(serialNumber: string, p: ForceCorrectParams): Promise<
       [serialNumber],
     );
 
-    if (current.length === 0) {
+    const row = current[0];
+    if (!row) {
       await client.query('ROLLBACK');
       return { serialNumber, found: false, applied: false, changedFields: [] };
     }
-
-    const row = current[0]!;
 
     // Diff: only include fields that are present in target AND differ from current.
     const before: ForceCorrectSnapshot = {};
@@ -200,28 +200,25 @@ async function processOne(serialNumber: string, p: ForceCorrectParams): Promise<
       params,
     );
 
-    // Write audit event (source_table + source_id left NULL to bypass dedupe index).
+    // Write audit event via the canonical writer. source_table + source_id are
+    // left null so the dedupe partial index (WHERE source_id IS NOT NULL) never
+    // applies — every force-correct always records a row.
     const statusChanged = changed.includes('status');
-    await client.query(
-      `INSERT INTO stock_serial_events
-         (serial_id, event_type, from_state, to_state,
-          actor_user_id, payload, occurred_at)
-       VALUES ($1, 'force_corrected', $2, $3, $4::uuid, $5::jsonb, NOW())`,
-      [
-        row.id,
-        statusChanged ? (before.status ?? null) : null,
-        statusChanged ? (after.status ?? null) : null,
-        p.performedBy,
-        JSON.stringify({
-          isForceCorrect: true,
-          performedByName: p.performedByName,
-          reason: p.reason,
-          before,
-          after,
-          changedFields: changed,
-        }),
-      ],
-    );
+    await emitSerialEvent(client, {
+      serialId: row.id,
+      eventType: 'force_corrected',
+      fromState: statusChanged ? (before.status ?? null) : null,
+      toState: statusChanged ? (after.status ?? null) : null,
+      actorUserId: p.performedBy,
+      payload: {
+        isForceCorrect: true,
+        performedByName: p.performedByName,
+        reason: p.reason,
+        before,
+        after,
+        changedFields: changed,
+      },
+    });
 
     await client.query('COMMIT');
     return { serialNumber, found: true, applied: true, before, after, changedFields: changed };

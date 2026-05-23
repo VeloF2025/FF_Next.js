@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GetServerSideProps, NextPage } from 'next';
 import Link from 'next/link';
 import { AppLayout } from '@/components/layout';
@@ -83,12 +83,16 @@ function OkPane({
 }: {
   data: TimelineResult;
   serialNumber: string;
-  onRefresh: () => void;
+  onRefresh: (signal?: AbortSignal) => void;
 }) {
   const s = data.serial;
   const [fcOpen, setFcOpen] = useState(false);
   const { can } = usePermission();
   const canForceCorrect = can('procurement.field-stock.force-correct', 'edit');
+
+  // Abort the post-force-correct refresh fetch if the pane unmounts mid-flight.
+  const refreshController = useRef<AbortController | null>(null);
+  useEffect(() => () => refreshController.current?.abort(), []);
 
   return (
     <>
@@ -147,7 +151,10 @@ function OkPane({
           onClose={() => setFcOpen(false)}
           onSuccess={() => {
             setFcOpen(false);
-            onRefresh();
+            refreshController.current?.abort();
+            const controller = new AbortController();
+            refreshController.current = controller;
+            onRefresh(controller.signal);
           }}
         />
       )}
@@ -201,6 +208,7 @@ function eventLabel(eventType: string): string {
     case 'returned':          return 'Returned';
     case 'scrapped':          return 'Scrapped';
     case 'picking_done':      return 'Picked';
+    case 'force_corrected':   return 'Force-corrected';
     default:                  return eventType;
   }
 }
