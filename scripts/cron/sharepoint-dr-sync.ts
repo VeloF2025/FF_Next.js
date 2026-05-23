@@ -24,9 +24,14 @@ dotenv.config({ path: '.env.production' });
 // standalone tsx script. Use the shared pg.Pool via `@/lib/db-pool` (its `sql`
 // is a tagged-template drop-in), assigned to this module-level binding inside
 // main() (after dotenv) so the pool — built from process.env.DATABASE_URL at
-// db.ts module load — sees the resolved URL. Output goes to stdout/stderr
-// because @/lib/logger never writes to them (in-memory only) and would blank
-// this cron's logfile.
+// db.ts module load, which also fires a warm-up pool.connect() — sees the
+// resolved URL.
+// IMPORTANT: do NOT add a static top-level import of `@/lib/db-pool` or
+// `@/lib/db` to this file. That would evaluate the pool (and its warm-up
+// connect) before dotenv.config() runs, capturing an undefined DATABASE_URL.
+// Keep the import dynamic and inside main().
+// Output goes to stdout/stderr because @/lib/logger never writes to them
+// (in-memory only) and would blank this cron's logfile.
 const logOut = (msg: string) => process.stdout.write(msg + '\n');
 const logErr = (msg: string) => process.stderr.write(msg + '\n');
 const fmtErr = (e: unknown) =>
@@ -239,8 +244,9 @@ async function main() {
 }
 
 // main() exits explicitly in all paths above (pg.Pool would otherwise keep the
-// event loop alive); this .catch guards an unexpected rejection — e.g. the
-// dynamic db-pool import failing before the try block's handler is reached.
+// event loop alive). The dynamic db-pool import and both queries run inside
+// main()'s own try/catch, so this outer .catch is a belt-and-suspenders guard
+// for an unexpected synchronous throw escaping main().
 main().catch((error) => {
   logErr(`💥 Unhandled error: ${fmtErr(error)}`);
   process.exit(1);
