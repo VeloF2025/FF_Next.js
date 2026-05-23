@@ -18,9 +18,11 @@ export interface DailySummary {
 
 // Site code is derived from the import batch filename — Fibertime SP-synced
 // files follow 'oes_status_report_<SITE>_YYYYMMDD.xlsx', so the site code sits
-// at split_part position 4. Manually-uploaded consolidated files (e.g. the
-// "VELOCITY OES REPORT …" sheets) don't carry per-site info in the filename,
-// so we fall back to the team-name prefix on the activation row itself:
+// at split_part position 4. Etwatwa is published per-POP ('ETW-1','ETW-2',…)
+// but aggregates to a single 'ETW' site, so any 'ETW*' filename code maps to ETW.
+// Manually-uploaded consolidated files (e.g. the "VELOCITY OES REPORT …" sheets)
+// don't carry per-site info in the filename, so we fall back to the team-name
+// prefix on the activation row itself:
 // 'law20' → LAW, 'mam2' → MAM, 'moa1' → MOA, 'tem5' → TEM, 'etw1' → ETW.
 //
 // TEM-3 (Tembisa POP 3) cannot be split from TEM (POP 1) via team alone —
@@ -28,9 +30,12 @@ export interface DailySummary {
 // SP-synced file is present, so it stays zero on consolidated-file fallback.
 const SITE_FROM_BATCH_OR_TEAM_SQL = `
   COALESCE(
-    CASE WHEN split_part(b.filename, '_', 4) IN ('LAW','MAM','MOA','TEM','TEM-3','ETW')
-         THEN split_part(b.filename, '_', 4)
-         ELSE NULL END,
+    CASE
+      WHEN split_part(b.filename, '_', 4) IN ('LAW','MAM','MOA','TEM','TEM-3')
+           THEN split_part(b.filename, '_', 4)
+      WHEN split_part(b.filename, '_', 4) LIKE 'ETW%' THEN 'ETW'
+      ELSE NULL
+    END,
     CASE UPPER(SUBSTRING(a.team FROM '^([a-zA-Z]+)'))
       WHEN 'LAW' THEN 'LAW'
       WHEN 'MAM' THEN 'MAM'

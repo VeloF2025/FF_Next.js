@@ -1,6 +1,6 @@
 /**
  * Fibertime Offline ONT Sync Service — nightly pull from SharePoint.
- * Sites: LAW, MAM, MOA, TEM, ETW. File: offline_ont_report_{SITE}_{YYYYMMDD}.xlsx
+ * Sites: LAW, MAM, MOA, TEM, ETW-1, ETW-2. File: offline_ont_report_{SITE}_{YYYYMMDD}.xlsx
  * Uses listFolderFilesAlt (GetFolderByServerRelativeUrl) — Path API returns 403.
  * DB helpers live in fibertime-offline-db.ts.
  */
@@ -33,7 +33,9 @@ const logger = createLogger('services:fibertime-offline-sync');
 // CONSTANTS
 // ============================================================================
 
-export const OFFLINE_SITES = ['LAW', 'MAM', 'MOA', 'TEM', 'ETW'] as const;
+// See ACTIVE_SITES in fibertime-oes-sync.ts — Etwatwa lives in readable ETW-1/
+// ETW-2 POP folders; bare ETW / ETW-3 are 403. Keys must match SITE_MAINTENANCE_TEAMS.
+export const OFFLINE_SITES = ['LAW', 'MAM', 'MOA', 'TEM', 'ETW-1', 'ETW-2'] as const;
 
 // ============================================================================
 // TYPES
@@ -267,10 +269,18 @@ export async function runOfflineSync(date?: string): Promise<OfflineSyncReport> 
     OFFLINE_SITES.map(site => syncOfflineSite(site, reportDate))
   );
 
-  for (const outcome of outcomes) {
-    if (outcome.status === 'rejected' && outcome.reason instanceof FibertimeAuthExpiredError) {
-      throw outcome.reason;
-    }
+  // Only abort on genuine session expiry. A fulfilled outcome proves listing
+  // returned 200 (valid session); a real expiry 403s on EVERY folder so nothing
+  // is fulfilled. Abort only when an auth rejection occurred AND no site listed
+  // successfully — a lone 403 (forbidden ETW POP) is recorded per-site instead.
+  // See runOesSync for the full rationale.
+  const sessionLikelyValid = outcomes.some(o => o.status === 'fulfilled');
+  const authRejection = outcomes.find(
+    (o): o is PromiseRejectedResult =>
+      o.status === 'rejected' && o.reason instanceof FibertimeAuthExpiredError
+  );
+  if (authRejection && !sessionLikelyValid) {
+    throw authRejection.reason;
   }
 
   const results: OfflineSiteResult[] = outcomes.map((outcome, idx) => {

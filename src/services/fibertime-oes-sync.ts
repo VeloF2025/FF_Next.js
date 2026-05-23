@@ -1,6 +1,6 @@
 /**
  * Fibertime OES Sync Service — nightly pull from SharePoint into OES pipeline.
- * Sites: LAW, MAM, MOA, TEM, TEM-3, ETW. Final file has no numeric suffix.
+ * Sites: LAW, MAM, MOA, TEM, TEM-3, ETW-1, ETW-2. Final file has no numeric suffix.
  */
 
 import * as os from 'os';
@@ -40,7 +40,12 @@ const logger = createLogger('services:fibertime-oes-sync');
 // CONSTANTS
 // ============================================================================
 
-export const ACTIVE_SITES = ['LAW', 'MAM', 'MOA', 'TEM', 'TEM-3', 'ETW'] as const;
+// Site = SharePoint folder name under "OES Report/Sites/". Fibertime splits
+// Etwatwa into per-POP folders (ETW-1, ETW-2, …); the bare "ETW" and "ETW-3"
+// folders return 403 (no grant for reporting@), so we list only the readable
+// ETW-1/ETW-2 folders. Report-side aggregation rolls all ETW-* into one
+// "Etwatwa" row (see src/lib/oes-report/queries.ts).
+export const ACTIVE_SITES = ['LAW', 'MAM', 'MOA', 'TEM', 'TEM-3', 'ETW-1', 'ETW-2'] as const;
 export type Site = (typeof ACTIVE_SITES)[number];
 
 // ============================================================================
@@ -267,11 +272,20 @@ export async function runOesSync(date?: string): Promise<SyncReport> {
     ACTIVE_SITES.map(site => syncSite(site, reportDate))
   );
 
-  // Propagate auth expiry immediately — it affects all sites, no point continuing
-  for (const outcome of sites) {
-    if (outcome.status === 'rejected' && outcome.reason instanceof FibertimeAuthExpiredError) {
-      throw outcome.reason;
-    }
+  // Distinguish a genuine cookie expiry from a per-folder permission gap.
+  // listFolderFiles is the FIRST SharePoint call in syncSite, so a fulfilled
+  // outcome (imported / skipped / not_available) proves that listing returned
+  // 200 — i.e. the session is valid. A real expiry 403s on EVERY folder, so no
+  // site can be fulfilled. Therefore: abort only when we saw an auth rejection
+  // AND not a single site listed successfully. A 403 on one folder while others
+  // succeed (e.g. a forbidden ETW POP) is a permission gap — recorded per-site.
+  const sessionLikelyValid = sites.some(o => o.status === 'fulfilled');
+  const authRejection = sites.find(
+    (o): o is PromiseRejectedResult =>
+      o.status === 'rejected' && o.reason instanceof FibertimeAuthExpiredError
+  );
+  if (authRejection && !sessionLikelyValid) {
+    throw authRejection.reason;
   }
 
   const results: SiteResult[] = sites.map((outcome, idx) => {

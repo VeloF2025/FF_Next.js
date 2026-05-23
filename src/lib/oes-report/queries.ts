@@ -24,6 +24,7 @@ const PP_PROJECT_TO_SITE: Record<string, SiteCode> = {
   TEM: 'TEM',
   'TEM-3': 'TEM-3',
   ETW: 'ETW',
+  'ETW-1': 'ETW',
   'ETW-2': 'ETW',
   'ETW-3': 'ETW',
 };
