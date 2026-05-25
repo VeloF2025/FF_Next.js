@@ -1,0 +1,4 @@
+[
+  { "id": "serial-0001", "imageRef": "serial-0001.jpg", "sha256": "PLACEHOLDER_FILLED_AT_SEED_TIME", "expected": { "serial": "ALCLB491BAA2" } },
+  { "id": "serial-0002", "imageRef": "serial-0002.jpg", "sha256": "PLACEHOLDER_FILLED_AT_SEED_TIME", "expected": { "serial": "GU18W12V2510005881" } }
+]
