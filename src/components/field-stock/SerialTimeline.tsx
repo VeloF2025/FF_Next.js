@@ -2,6 +2,21 @@ import { useState } from 'react';
 import type { TimelineEntry } from '@/types/field-stock';
 import type { SerialTimelineProps } from './SerialTimeline.props';
 
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  installed_at_drop: 'Installed at drop',
+  activated: 'Activated',
+  // Non-authoritative recon: the unit's serial was read off a WhatsApp photo.
+  wa_photo_sighting: 'Seen in WhatsApp photo',
+};
+
+/** Human label for a stock_serial_events.event_type; humanizes unknown types. */
+export function eventTypeLabel(eventType: string): string {
+  return (
+    EVENT_TYPE_LABELS[eventType] ??
+    eventType.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
+  );
+}
+
 export function SerialTimeline({ entries, hasRealEvents }: SerialTimelineProps) {
   if (entries.length === 0) {
     return (
@@ -42,7 +57,7 @@ function TimelineRow({ entry }: { entry: TimelineEntry }) {
   return (
     <li className="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="font-medium text-neutral-200">{entry.eventType}</span>
+        <span className="font-medium text-neutral-200">{eventTypeLabel(entry.eventType)}</span>
         <time className="text-xs text-neutral-500" dateTime={entry.occurredAt}>
           {new Date(entry.occurredAt).toISOString().slice(0, 19).replace('T', ' ')}
         </time>

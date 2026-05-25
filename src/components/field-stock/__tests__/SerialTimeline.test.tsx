@@ -3,12 +3,24 @@
  */
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { SerialTimeline } from '../SerialTimeline';
+import { SerialTimeline, eventTypeLabel } from '../SerialTimeline';
 
 describe('SerialTimeline', () => {
   it('renders empty state when entries is empty', () => {
     render(<SerialTimeline entries={[]} hasRealEvents={false} />);
     expect(screen.getByText(/no lifecycle data recorded/i)).toBeInTheDocument();
+  });
+});
+
+describe('eventTypeLabel', () => {
+  it('maps known event types to human labels', () => {
+    expect(eventTypeLabel('wa_photo_sighting')).toBe('Seen in WhatsApp photo');
+    expect(eventTypeLabel('installed_at_drop')).toBe('Installed at drop');
+    expect(eventTypeLabel('activated')).toBe('Activated');
+  });
+
+  it('humanizes unknown event types instead of showing raw snake_case', () => {
+    expect(eventTypeLabel('returned_to_store')).toBe('Returned to store');
   });
 });
 
@@ -33,7 +45,7 @@ describe('SerialTimeline event row', () => {
         ]}
       />
     );
-    expect(screen.getByText('activated')).toBeInTheDocument();
+    expect(screen.getByText('Activated')).toBeInTheDocument();
     expect(screen.getByText(/installed → activated/i)).toBeInTheDocument();
     expect(screen.getByText(/Hein van Vuuren/i)).toBeInTheDocument();
     expect(screen.getByText(/2026-05-20 10:30/)).toBeInTheDocument();

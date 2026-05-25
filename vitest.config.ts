@@ -52,6 +52,7 @@ export default defineConfig({
       { find: '@/lib/db-neon', replacement: path.resolve(__dirname, './src/lib/db-neon') },
       { find: '@/lib/neon', replacement: path.resolve(__dirname, './src/lib/neon') },
       { find: '@/lib/db-pool', replacement: path.resolve(__dirname, './src/lib/db-pool') },
+      { find: '@/lib/serial-events', replacement: path.resolve(__dirname, './src/lib/serial-events') },
       { find: '@/lib/vlm', replacement: path.resolve(__dirname, './src/lib/vlm') },
       { find: '@/lib/arcjet', replacement: path.resolve(__dirname, './src/lib/arcjet') },
       { find: '@/lib/email', replacement: path.resolve(__dirname, './src/lib/email') },
