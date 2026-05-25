@@ -19,7 +19,7 @@ export function useSerialReconciliation(): UseSerialReconciliationReturn {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/procurement/field-stock/serial-reconciliation', { credentials: 'include' });
+      const res = await fetch('/api/procurement/field-stock/serial-drift', { credentials: 'include' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const result = await res.json();
       if (!result.success) throw new Error(result.error?.message || 'Failed to load reconciliation');

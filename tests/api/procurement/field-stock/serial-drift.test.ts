@@ -31,7 +31,7 @@ function makeReq(method: string): NextApiRequest {
 }
 async function loadHandler() {
   vi.resetModules();
-  return (await import('../../../../pages/api/procurement/field-stock/serial-reconciliation')).default;
+  return (await import('../../../../pages/api/procurement/field-stock/serial-drift')).default;
 }
 
 describe('GET /api/procurement/field-stock/serial-reconciliation', () => {
@@ -74,9 +74,9 @@ describe('GET /api/procurement/field-stock/serial-reconciliation', () => {
     await handler(makeReq('GET'), res);
     expect(res.statusCode).toBe(500);
     expect(log.error).toHaveBeenCalledWith(
-      'Serial reconciliation API error',
+      'Serial drift API error',
       expect.objectContaining({ error: expect.any(Error) }),
-      'field-stock/serial-reconciliation',
+      'field-stock/serial-drift',
     );
   });
 });

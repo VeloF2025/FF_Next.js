@@ -1,5 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { parseChecks } from '@/modules/procurement/field-stock/services/reconcileChecks';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const { readFileSyncMock } = vi.hoisted(() => ({ readFileSyncMock: vi.fn() }));
+vi.mock('node:fs', () => ({ readFileSync: readFileSyncMock }));
+
+import { parseChecks, loadReconcileChecks } from '@/modules/procurement/field-stock/services/reconcileChecks';
 
 describe('parseChecks', () => {
   it('parses name, tolerance and SQL from an annotated block', () => {
@@ -37,5 +41,27 @@ SELECT COUNT(*) AS drift_count FROM b;`;
 -- Tolerance: 0
 -- no sql here`;
     expect(parseChecks(src)).toEqual([]);
+  });
+});
+
+describe('loadReconcileChecks', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('reads and parses the on-disk SQL into check specs', () => {
+    readFileSyncMock.mockReturnValue(`-- @name a
+-- Tolerance: 0
+SELECT COUNT(*) AS drift_count FROM a;`);
+    const checks = loadReconcileChecks();
+    expect(checks).toEqual([{ name: 'a', tolerance: 0, sql: 'SELECT COUNT(*) AS drift_count FROM a;' }]);
+  });
+
+  it('throws when the file yields zero checks (never returns an empty gate)', () => {
+    readFileSyncMock.mockReturnValue('-- just a header comment, no checks');
+    expect(() => loadReconcileChecks()).toThrow(/No reconcile checks parsed/);
+  });
+
+  it('propagates a file-read failure rather than swallowing it', () => {
+    readFileSyncMock.mockImplementation(() => { throw new Error('ENOENT'); });
+    expect(() => loadReconcileChecks()).toThrow('ENOENT');
   });
 });
