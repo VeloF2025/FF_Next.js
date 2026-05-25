@@ -45,6 +45,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       } catch (err) {
         const locErr = err as Error & { code?: string };
         if (locErr.code === 'LOCATION_NOT_EMPTY') {
+          log.warn('Location delete rejected: location still holds stock', { locationId, reason: locErr.message }, 'field-stock/locations/[id]');
           return apiResponse.badRequest(res, locErr.message);
         }
         throw err;
