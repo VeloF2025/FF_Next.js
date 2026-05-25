@@ -8,7 +8,6 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout';
 
 import {
-  FieldStockDashboard,
   LocationList,
   CreateLocationModal,
   SerialScanner,
@@ -41,6 +40,7 @@ import {
 } from 'lucide-react';
 import { FaultReportList } from '@/modules/procurement/field-stock/components/faults';
 import { AdjustmentPanel } from '@/modules/procurement/field-stock/components/adjustments';
+import { DashboardV2Body } from '@/components/field-stock/dashboard-v2/DashboardV2Body';
 
 type TabType = 'dashboard' | 'locations' | 'serials' | 'consumptions' | 'pickings' | 'returns' | 'accountability' | 'faults' | 'adjustments';
 
@@ -245,7 +245,7 @@ export default function FieldStockPage() {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <FieldStockDashboard onNavigate={(tab) => setActiveTab(tab as TabType)} />;
+        return <DashboardV2Body onNavigate={(tab) => setActiveTab(tab as TabType)} />;
       case 'locations':
         return <LocationsTab />;
       case 'serials':
@@ -285,7 +285,7 @@ export default function FieldStockPage() {
       case 'adjustments':
         return <AdjustmentPanel />;
       default:
-        return <FieldStockDashboard onNavigate={(tab) => setActiveTab(tab as TabType)} />;
+        return <DashboardV2Body onNavigate={(tab) => setActiveTab(tab as TabType)} />;
     }
   };
 

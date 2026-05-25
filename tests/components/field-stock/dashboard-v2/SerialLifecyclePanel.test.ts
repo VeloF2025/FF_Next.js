@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { activatedSharePct } from '@/components/field-stock/dashboard-v2/SerialLifecyclePanel';
+import { activatedSharePct } from '@/components/field-stock/dashboard-v2/serialLifecycle.utils';
 
 describe('activatedSharePct', () => {
   it('returns 0 when installed and activated are both 0 (no divide-by-zero)', () => {
