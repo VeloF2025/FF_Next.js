@@ -26,6 +26,35 @@ export function normalizeForCompare(serial: string): string {
 }
 
 /**
+ * Resolve a serial field that may contain a GS1 2D DataMatrix dump.
+ *
+ * When a technician scans the wrong barcode, the field holds the full
+ * DataMatrix payload (e.g. "[)>1P3TN…ALCLB48DE9FE18V…") with the real serial
+ * embedded and no delimiter — so it cannot be regex-extracted reliably (the
+ * serial is followed by more alphanumeric field data). If the dump contains the
+ * VLM-read serial as a substring, that serial is the real value: surface it so
+ * the message shows the clean serial and does not fire a false MISMATCH alert.
+ * With no clean serial and no VLM anchor, the raw value is returned unchanged.
+ */
+export function resolveScannedSerial(
+  raw: string | null,
+  vlmSerial: string | null,
+  isCleanSerial: (s: string | null) => boolean
+): string | null {
+  if (!raw) return raw;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (isCleanSerial(trimmed)) return normalizeForCompare(trimmed);
+  // Only anchor on a VLM read that is itself a valid serial — a short/partial
+  // read must never substring-match unrelated characters inside the dump. The
+  // caller passes null when the VLM confidence is below the trust threshold.
+  if (vlmSerial && isCleanSerial(vlmSerial) && normalizeForCompare(trimmed).includes(normalizeForCompare(vlmSerial))) {
+    return normalizeForCompare(vlmSerial);
+  }
+  return trimmed;
+}
+
+/**
  * Build serial warning lines for ack messages.
  *
  * Shared by generateAckMessage() and generateResubmissionAckMessage().
@@ -46,17 +75,25 @@ function buildSerialWarningLines(
   const trustOntVlm = vlmResult && ontConfidence >= MIN_VLM_CONFIDENCE;
   const trustUpsVlm = vlmResult && upsConfidence >= MIN_VLM_CONFIDENCE;
 
+  // Resolve GS1 2D DataMatrix dumps scanned into the serial fields down to the
+  // real embedded serial (anchored on the VLM read) so they don't fire false
+  // MISMATCH alerts or display unreadable barcode payloads.
+  // Anchor only on a trusted (≥95% confidence) VLM read, per the module rule
+  // that sub-threshold reads must not be treated as reliable.
+  const ont = resolveScannedSerial(ontSerial, trustOntVlm ? (vlmResult?.ontSerial ?? null) : null, looksLikeOntSerial);
+  const ups = resolveScannedSerial(upsSerial, trustUpsVlm ? (vlmResult?.upsSerial ?? null) : null, looksLikeGizzuSerial);
+
   // --- ONT Serial ---
-  if (ontSerial) {
-    if (trustOntVlm && vlmResult?.ontSerial && normalizeForCompare(ontSerial) !== normalizeForCompare(vlmResult.ontSerial)) {
+  if (ont) {
+    if (trustOntVlm && vlmResult?.ontSerial && normalizeForCompare(ont) !== normalizeForCompare(vlmResult.ontSerial)) {
       lines.push(`🟡 *ONT Serial MISMATCH:*`);
-      lines.push(`   1Map: ${ontSerial}`);
+      lines.push(`   1Map: ${ont}`);
       lines.push(`   Sticker: ${vlmResult.ontSerial}`);
       lines.push(`   ⚠️ *Please double-check in 1Map*`);
     } else if (trustOntVlm && vlmResult?.ontSerial) {
-      lines.push(`🔌 ONT Serial: ${ontSerial} ✅`);
+      lines.push(`🔌 ONT Serial: ${ont} ✅`);
     } else {
-      lines.push(`🔌 ONT Serial: ${ontSerial}`);
+      lines.push(`🔌 ONT Serial: ${ont}`);
       lines.push(`   📷 Please double-check ONT serial`);
     }
   } else {
@@ -70,21 +107,21 @@ function buildSerialWarningLines(
   // ONT duplicate warning
   if (duplicates.ontDuplicates.length > 0) {
     const drList = duplicates.ontDuplicates.map(d => d.drop_number).join(', ');
-    lines.push(`🔴 *ONT Serial ${ontSerial} already used on ${drList}!*`);
+    lines.push(`🔴 *ONT Serial ${ont} already used on ${drList}!*`);
     lines.push(`   ⚠️ *Please verify this is the correct serial*`);
   }
 
   // --- UPS Serial ---
-  if (upsSerial) {
-    if (trustUpsVlm && vlmResult?.upsSerial && normalizeForCompare(upsSerial) !== normalizeForCompare(vlmResult.upsSerial)) {
+  if (ups) {
+    if (trustUpsVlm && vlmResult?.upsSerial && normalizeForCompare(ups) !== normalizeForCompare(vlmResult.upsSerial)) {
       lines.push(`🟡 *UPS Serial MISMATCH:*`);
-      lines.push(`   1Map: ${upsSerial}`);
+      lines.push(`   1Map: ${ups}`);
       lines.push(`   Sticker: ${vlmResult.upsSerial}`);
       lines.push(`   ⚠️ *Please double-check in 1Map*`);
     } else if (trustUpsVlm && vlmResult?.upsSerial) {
-      lines.push(`🔋 UPS Serial: ${upsSerial} ✅`);
+      lines.push(`🔋 UPS Serial: ${ups} ✅`);
     } else {
-      lines.push(`🔋 UPS Serial: ${upsSerial}`);
+      lines.push(`🔋 UPS Serial: ${ups}`);
       lines.push(`   📷 Please double-check UPS serial`);
     }
   } else {
@@ -98,7 +135,7 @@ function buildSerialWarningLines(
   // UPS duplicate warning
   if (duplicates.upsDuplicates.length > 0) {
     const drList = duplicates.upsDuplicates.map(d => d.drop_number).join(', ');
-    lines.push(`🔴 *UPS Serial ${upsSerial} already used on ${drList}!*`);
+    lines.push(`🔴 *UPS Serial ${ups} already used on ${drList}!*`);
     lines.push(`   ⚠️ *Please verify this is the correct serial*`);
   }
 
