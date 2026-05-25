@@ -9,3 +9,4 @@ export type {
   ContractorExposureRow,
 } from './dashboardV2';
 export type { ReconciliationCheckResult, ReconciliationSummary } from './serialReconciliation';
+export type { WarehouseHolding, ProjectHolding } from './serialHoldings';
