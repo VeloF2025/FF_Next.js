@@ -38,6 +38,15 @@ describe('resolveScannedSerial', () => {
     expect(resolveScannedSerial(GS1_DUMP, null, looksLikeOntSerial)).toBe(GS1_DUMP);
   });
 
+  it('ignores a short / non-serial VLM anchor (no spurious substring match)', () => {
+    // 'ALCL' appears inside the dump but is not a valid serial — must not anchor.
+    expect(resolveScannedSerial(GS1_DUMP, 'ALCL', looksLikeOntSerial)).toBe(GS1_DUMP);
+  });
+
+  it('returns null for a whitespace-only field (treated as not scanned)', () => {
+    expect(resolveScannedSerial('   ', 'ALCLB48DE9FE', looksLikeOntSerial)).toBeNull();
+  });
+
   it('resolves a UPS serial field using the Gizzu check', () => {
     const upsDump = 'NOISE-GU18W12V2509031056-TRAILER';
     expect(resolveScannedSerial(upsDump, 'GU18W12V2509031056', looksLikeGizzuSerial)).toBe(

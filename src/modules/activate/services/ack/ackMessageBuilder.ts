@@ -43,11 +43,15 @@ export function resolveScannedSerial(
 ): string | null {
   if (!raw) return raw;
   const trimmed = raw.trim();
-  if (isCleanSerial(trimmed)) return trimmed;
-  if (vlmSerial && normalizeForCompare(trimmed).includes(normalizeForCompare(vlmSerial))) {
-    return vlmSerial;
+  if (!trimmed) return null;
+  if (isCleanSerial(trimmed)) return normalizeForCompare(trimmed);
+  // Only anchor on a VLM read that is itself a valid serial — a short/partial
+  // read must never substring-match unrelated characters inside the dump. The
+  // caller passes null when the VLM confidence is below the trust threshold.
+  if (vlmSerial && isCleanSerial(vlmSerial) && normalizeForCompare(trimmed).includes(normalizeForCompare(vlmSerial))) {
+    return normalizeForCompare(vlmSerial);
   }
-  return raw;
+  return trimmed;
 }
 
 /**
@@ -74,8 +78,10 @@ function buildSerialWarningLines(
   // Resolve GS1 2D DataMatrix dumps scanned into the serial fields down to the
   // real embedded serial (anchored on the VLM read) so they don't fire false
   // MISMATCH alerts or display unreadable barcode payloads.
-  const ont = resolveScannedSerial(ontSerial, vlmResult?.ontSerial ?? null, looksLikeOntSerial);
-  const ups = resolveScannedSerial(upsSerial, vlmResult?.upsSerial ?? null, looksLikeGizzuSerial);
+  // Anchor only on a trusted (≥95% confidence) VLM read, per the module rule
+  // that sub-threshold reads must not be treated as reliable.
+  const ont = resolveScannedSerial(ontSerial, trustOntVlm ? (vlmResult?.ontSerial ?? null) : null, looksLikeOntSerial);
+  const ups = resolveScannedSerial(upsSerial, trustUpsVlm ? (vlmResult?.upsSerial ?? null) : null, looksLikeGizzuSerial);
 
   // --- ONT Serial ---
   if (ont) {
