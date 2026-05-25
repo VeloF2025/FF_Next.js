@@ -125,6 +125,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
             confidence: Math.max(ontConf, upsConf),
             ontConfidence: ontConf,
             upsConfidence: upsConf,
+            ontFromBarcode: extraction.bestOnt?.fromBarcode ?? false,
           };
           logger.info(`VLM serial extraction completed for ${dropNumber}`, {
             ontExtracted: vlmResult.ontSerial,

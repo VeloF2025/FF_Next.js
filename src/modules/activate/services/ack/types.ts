@@ -50,6 +50,10 @@ export interface VlmSerialResult {
   confidence: number;
   ontConfidence?: number;
   upsConfidence?: number;
+  // True when the ONT serial was read from a decoded barcode (reliable). When
+  // false/absent the read is VLM OCR, which is ~89% false-positive on ONT hex
+  // labels, so an ONT/1Map conflict is shown as a soft prompt, not a MISMATCH.
+  ontFromBarcode?: boolean;
 }
 
 export interface AckResult {
