@@ -6,7 +6,7 @@
 
 **Architecture:** One generic engine (loads cases → calls the live VLM endpoint → runs the pack's scorer → aggregates → stores) plus pluggable per-use-case packs implementing a small `VlmTestPack` interface. This plan delivers the engine, the result store (`vlm_bench_runs` table), the `serials` pack on golden data, and a CLI with `run` + `coverage`. Live/HITL sampling, drift alerting, the other six packs, and the model-selection/prompt-A/B consumers are Plans 2–4.
 
-**Tech Stack:** TypeScript, run on velo via `npx tsx`. DB via `pg.Pool` through `@/lib/db-pool` (NOT `neon()` — it can't reach Supabase post-cutover). VLM via `@/lib/vlm` (`VLM_CHAT_ENDPOINT`, `VLM_MODELS_ENDPOINT`, `VLM_MODEL`). Tests via the repo's existing Jest setup. Output via `process.stdout` (the `@/lib/logger` is silent under plain Node/tsx).
+**Tech Stack:** TypeScript, run on velo via `npx tsx` (tsx resolves the `@/` tsconfig path alias — existing repo scripts rely on this). DB via `pg.Pool` through `@/lib/db-pool` (NOT `neon()` — it can't reach Supabase post-cutover). VLM via `@/lib/vlm` (`VLM_CHAT_ENDPOINT`, `VLM_MODELS_ENDPOINT`, `VLM_MODEL`). **Tests via `vitest`** (NOT jest — the repo uses vitest; default `vitest.config.ts` globs `**/*.test.ts` and aliases `@/lib/vlm` + `@/lib/db-pool`). Test files live outside `src/`, so they import the bench code with **relative paths** (the `@/` alias only reaches `src/`/`lib/`). Output via `process.stdout` (the `@/lib/logger` is silent under plain Node/tsx).
 
 **Spec:** `docs/superpowers/specs/2026-05-25-vlm-benchmark-design.md`
 
@@ -146,7 +146,7 @@ git commit -m "feat(vlm-bench): shared engine types"
 
 ```ts
 // tests/unit/vlm-bench/scoring-text.test.ts
-import { normalizeExact, charErrorRate } from '@/../scripts/vlm-bench/scoring/text';
+import { normalizeExact, charErrorRate } from '../../../scripts/vlm-bench/scoring/text';
 
 describe('normalizeExact', () => {
   it('uppercases, strips spaces/punctuation', () => {
@@ -169,7 +169,7 @@ describe('charErrorRate', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx jest tests/unit/vlm-bench/scoring-text.test.ts`
+Run: `npx vitest run tests/unit/vlm-bench/scoring-text.test.ts`
 Expected: FAIL — cannot find module `scoring/text`.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -203,7 +203,7 @@ export function charErrorRate(expected: string, actual: string): number {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npx jest tests/unit/vlm-bench/scoring-text.test.ts`
+Run: `npx vitest run tests/unit/vlm-bench/scoring-text.test.ts`
 Expected: PASS (4 assertions).
 
 - [ ] **Step 5: Commit**
@@ -237,7 +237,7 @@ git commit -m "feat(vlm-bench): text scorers (normalizeExact, charErrorRate) + t
 
 ```ts
 // tests/unit/vlm-bench/serials-pack.test.ts
-import { serialsPack } from '@/../scripts/vlm-bench/packs/serials';
+import { serialsPack } from '../../../scripts/vlm-bench/packs/serials';
 
 describe('serialsPack.score', () => {
   it('passes on exact match after normalisation', () => {
@@ -265,7 +265,7 @@ describe('serialsPack.buildPrompt', () => {
 
 - [ ] **Step 3: Run test to verify it fails**
 
-Run: `npx jest tests/unit/vlm-bench/serials-pack.test.ts`
+Run: `npx vitest run tests/unit/vlm-bench/serials-pack.test.ts`
 Expected: FAIL — cannot find module `packs/serials`.
 
 - [ ] **Step 4: Write the implementation**
@@ -325,7 +325,7 @@ export const serialsPack: VlmTestPack = {
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `npx jest tests/unit/vlm-bench/serials-pack.test.ts`
+Run: `npx vitest run tests/unit/vlm-bench/serials-pack.test.ts`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
@@ -403,8 +403,8 @@ git commit -m "feat(vlm-bench): VLM caller + health check"
 
 ```ts
 // tests/unit/vlm-bench/runner.test.ts
-import { runPack } from '@/../scripts/vlm-bench/engine/runner';
-import type { VlmTestPack } from '@/../scripts/vlm-bench/types';
+import { runPack } from '../../../scripts/vlm-bench/engine/runner';
+import type { VlmTestPack } from '../../../scripts/vlm-bench/types';
 
 const fakePack: VlmTestPack = {
   id: 'fake',
@@ -447,7 +447,7 @@ describe('runPack', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx jest tests/unit/vlm-bench/runner.test.ts`
+Run: `npx vitest run tests/unit/vlm-bench/runner.test.ts`
 Expected: FAIL — cannot find module `engine/runner`.
 
 - [ ] **Step 3: Write the runner**
@@ -487,7 +487,7 @@ export async function runPack(
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npx jest tests/unit/vlm-bench/runner.test.ts`
+Run: `npx vitest run tests/unit/vlm-bench/runner.test.ts`
 Expected: PASS (both tests).
 
 - [ ] **Step 5: Commit**
@@ -748,7 +748,7 @@ git commit -m "feat(vlm-bench): CLI run + coverage commands"
 
 - [ ] **Step 1: Run the whole bench unit suite**
 
-Run: `npx jest tests/unit/vlm-bench/`
+Run: `npx vitest run tests/unit/vlm-bench/`
 Expected: all tests PASS (scoring-text, serials-pack, runner).
 
 - [ ] **Step 2: Write the README**
