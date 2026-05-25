@@ -264,6 +264,11 @@ export async function updateLocation(
       params.push(input.name);
     }
 
+    if (input.parentId !== undefined) {
+      setClauses.push(`parent_id = $${paramIndex++}`);
+      params.push(input.parentId || null);
+    }
+
     if (input.address !== undefined) {
       setClauses.push(`address = $${paramIndex++}`);
       params.push(input.address);

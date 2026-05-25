@@ -427,6 +427,7 @@ export interface CreateLocationInput {
 }
 
 export interface UpdateLocationInput {
+  parentId?: string;
   name?: string;
   address?: string;
   coordinates?: { lat: number; lng: number };
