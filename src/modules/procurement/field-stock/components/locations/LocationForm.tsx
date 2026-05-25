@@ -2,19 +2,8 @@
 
 import { useMemo } from 'react';
 import { useLocations } from '../../hooks';
-import type { CreateLocationInput, LocationType, StockLocation } from '../../types';
-
-export interface LocationFormValue {
-  name: string;
-  code: string;
-  locationType: LocationType;
-  address: string;
-  lat: string;            // kept as string for controlled inputs; parsed on submit
-  lng: string;
-  parentId: string;       // '' = no parent
-  assignedToName: string;
-  assignedToPhone: string;
-}
+import type { LocationType, StockLocation } from '../../types';
+import { generateCode, type LocationFormValue } from './locationForm.utils';
 
 interface LocationFormProps {
   value: LocationFormValue;
@@ -36,13 +25,6 @@ const inputCls =
   'w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50';
 const labelCls = 'block text-sm font-medium text-[var(--ff-text-secondary)] mb-1';
 
-export function generateCode(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return '';
-  if (words.length === 1) return words[0]!.substring(0, 8).toUpperCase();
-  return words.map((w) => w.substring(0, 4)).join('-').substring(0, 15).toUpperCase();
-}
-
 export function LocationForm({ value, onChange, mode, selfId }: LocationFormProps) {
   // Parent options: warehouses + site stores (a hub or another store can be a parent).
   const { locations } = useLocations({
@@ -50,6 +32,7 @@ export function LocationForm({ value, onChange, mode, selfId }: LocationFormProp
     autoFetch: true,
   });
 
+  // Only hub/store types can be parents; vans, customers, scrap/adjust are leaf nodes.
   const parentOptions = useMemo(
     () =>
       locations.filter(
@@ -69,6 +52,12 @@ export function LocationForm({ value, onChange, mode, selfId }: LocationFormProp
       set({ name });
     }
   };
+
+  // In edit mode the (disabled) select must still show a hidden persisted type
+  // (e.g. technician) that isn't in the creatable list.
+  const typeOptions = LOCATION_TYPES.some((t) => t.value === value.locationType)
+    ? LOCATION_TYPES
+    : [...LOCATION_TYPES, { value: value.locationType, label: value.locationType }];
 
   return (
     <div className="space-y-4">
@@ -107,7 +96,7 @@ export function LocationForm({ value, onChange, mode, selfId }: LocationFormProp
             disabled={mode === 'edit'}
             className={inputCls + (mode === 'edit' ? ' opacity-60 cursor-not-allowed' : '')}
           >
-            {LOCATION_TYPES.map((t) => (
+            {typeOptions.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
             ))}
           </select>
@@ -145,6 +134,7 @@ export function LocationForm({ value, onChange, mode, selfId }: LocationFormProp
           <label className={labelCls}>Latitude <span className="text-xs text-[var(--ff-text-tertiary)]">(optional)</span></label>
           <input
             type="number" step="any" inputMode="decimal"
+            min={-90} max={90}
             value={value.lat}
             onChange={(e) => set({ lat: e.target.value })}
             placeholder="-25.7896"
@@ -155,6 +145,7 @@ export function LocationForm({ value, onChange, mode, selfId }: LocationFormProp
           <label className={labelCls}>Longitude <span className="text-xs text-[var(--ff-text-tertiary)]">(optional)</span></label>
           <input
             type="number" step="any" inputMode="decimal"
+            min={-180} max={180}
             value={value.lng}
             onChange={(e) => set({ lng: e.target.value })}
             placeholder="28.2768"
@@ -163,7 +154,7 @@ export function LocationForm({ value, onChange, mode, selfId }: LocationFormProp
         </div>
       </div>
 
-      {value.locationType === 'site_store' && (
+      {(value.locationType === 'site_store' || value.locationType === 'technician') && (
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>Assigned To</label>
@@ -192,26 +183,3 @@ export function LocationForm({ value, onChange, mode, selfId }: LocationFormProp
     </div>
   );
 }
-
-/** Build a CreateLocationInput from form state (coords parsed, blanks dropped). */
-export function toCreateInput(v: LocationFormValue): CreateLocationInput {
-  const lat = parseFloat(v.lat);
-  const lng = parseFloat(v.lng);
-  const coordinates =
-    Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : undefined;
-  return {
-    name: v.name.trim(),
-    code: v.code.trim().toUpperCase(),
-    locationType: v.locationType,
-    address: v.address.trim() || undefined,
-    coordinates,
-    parentId: v.parentId || undefined,
-    assignedToName: v.assignedToName.trim() || undefined,
-    assignedToPhone: v.assignedToPhone.trim() || undefined,
-  };
-}
-
-export const EMPTY_LOCATION_FORM: LocationFormValue = {
-  name: '', code: '', locationType: 'warehouse', address: '',
-  lat: '', lng: '', parentId: '', assignedToName: '', assignedToPhone: '',
-};
