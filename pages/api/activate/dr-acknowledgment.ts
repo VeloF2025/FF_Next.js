@@ -35,6 +35,8 @@ import {
 } from '@/modules/activate/services/ack/drStatusService';
 import type { AckResult, DuplicateSerialResult, VlmSerialResult, WAPhotoCheck } from '@/modules/activate/services/ack/types';
 import { extractWaPhotoSerials, waitForWaPhotos } from '@/modules/activate/services/serialVerificationService';
+import { recordUpsPhotoSighting } from '@/modules/activate/services/upsSightingService';
+import { pool } from '@/lib/db-pool';
 
 const logger = createLogger('api/activate/dr-acknowledgment');
 const BRIDGE_SECRET = process.env.WA_BRIDGE_SECRET;
@@ -217,6 +219,20 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         duplicates
       );
       await updateOneMapStatus(dropNumber, 'found', ontSerial, upsSerial);
+    }
+
+    // Non-authoritative UPS recon: when the photo VLM read maps to a known stock
+    // unit, record a lifecycle sighting so the unit can be traced later. This is
+    // RECON only (wrong photos get posted) — it never touches ups_serial_scanned.
+    // Best-effort: recordUpsPhotoSighting swallows its own errors.
+    if (found && vlmResult?.upsSerial) {
+      await recordUpsPhotoSighting(pool, {
+        dropNumber,
+        upsSerial: vlmResult.upsSerial,
+        // Must be the UPS-specific confidence — never fall back to the overall
+        // (max ONT/UPS) confidence, which would let an ONT read clear the gate.
+        confidence: vlmResult.upsConfidence ?? 0,
+      });
     }
 
     const duration = Date.now() - startTime;

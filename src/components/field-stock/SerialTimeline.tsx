@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { TimelineEntry } from '@/types/field-stock';
 import type { SerialTimelineProps } from './SerialTimeline.props';
+import { eventTypeLabel } from './eventTypeLabel';
 
 export function SerialTimeline({ entries, hasRealEvents }: SerialTimelineProps) {
   if (entries.length === 0) {
@@ -42,7 +43,7 @@ function TimelineRow({ entry }: { entry: TimelineEntry }) {
   return (
     <li className="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="font-medium text-neutral-200">{entry.eventType}</span>
+        <span className="font-medium text-neutral-200">{eventTypeLabel(entry.eventType)}</span>
         <time className="text-xs text-neutral-500" dateTime={entry.occurredAt}>
           {new Date(entry.occurredAt).toISOString().slice(0, 19).replace('T', ' ')}
         </time>
