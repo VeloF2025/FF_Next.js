@@ -8,3 +8,4 @@ export type {
   StockValueByLocationRow,
   ContractorExposureRow,
 } from './dashboardV2';
+export type { ReconciliationCheckResult, ReconciliationSummary } from './serialReconciliation';

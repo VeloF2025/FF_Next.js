@@ -10,41 +10,11 @@
  *   DATABASE_URL=... npx tsx scripts/reconcile-serials.ts
  *   npm run reconcile:serials
  */
-import * as path from 'node:path';
-import * as fs from 'node:fs';
 import { Pool } from 'pg';
 import { log } from '../src/lib/logger';
-
-interface CheckSpec {
-  name: string;
-  tolerance: number;
-  sql: string;
-}
-
-function parseChecks(source: string): CheckSpec[] {
-  const blocks = source.split(/(?=--\s*@name\s)/);
-  const checks: CheckSpec[] = [];
-
-  for (const block of blocks) {
-    const nameMatch = block.match(/--\s*@name\s+(\S+)/);
-    if (!nameMatch) continue;
-
-    const name = nameMatch[1];
-
-    const tolMatch = block.match(/--\s*Tolerance:\s*(\d+)/);
-    const tolerance = tolMatch ? parseInt(tolMatch[1], 10) : 0;
-
-    // Extract the SQL statement (everything after the comment lines).
-    const sqlMatch = block.match(/SELECT[\s\S]+?;/);
-    if (!sqlMatch) {
-      log.warn('reconcile-serials: no SQL found in block', { name });
-      continue;
-    }
-    checks.push({ name, tolerance, sql: sqlMatch[0].trim() });
-  }
-
-  return checks;
-}
+import { parseChecks, type CheckSpec } from '../src/modules/procurement/field-stock/services/reconcileChecks';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 
 interface CheckResult {
   name: string;
