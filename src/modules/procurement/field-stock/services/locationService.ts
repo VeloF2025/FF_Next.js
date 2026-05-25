@@ -16,6 +16,32 @@ import type {
 
 const sql = neon(process.env.DATABASE_URL!);
 
+export interface LocationDeletionCheck {
+  deletable: boolean;
+  reason?: string;
+}
+
+/**
+ * Pure rule: a location may only be soft-deleted when it holds no stock.
+ * Defensive: any non-positive-finite on-hand other than exactly 0 is blocked.
+ */
+export function checkLocationDeletable(stockOnHand: number): LocationDeletionCheck {
+  if (!Number.isFinite(stockOnHand) || stockOnHand !== 0) {
+    if (stockOnHand > 0) {
+      return {
+        deletable: false,
+        reason: `Cannot delete: ${stockOnHand} unit(s) of stock still held at this location. Move or consume the stock first.`,
+      };
+    }
+    // NaN or negative → unknown state, refuse rather than risk losing a record with stock.
+    return {
+      deletable: false,
+      reason: 'Cannot delete: stock level for this location could not be confirmed.',
+    };
+  }
+  return { deletable: true };
+}
+
 /**
  * Get all locations with optional filters
  */
@@ -238,6 +264,11 @@ export async function updateLocation(
       params.push(input.name);
     }
 
+    if (input.parentId !== undefined) {
+      setClauses.push(`parent_id = $${paramIndex++}`);
+      params.push(input.parentId || null);
+    }
+
     if (input.address !== undefined) {
       setClauses.push(`address = $${paramIndex++}`);
       params.push(input.address);
@@ -313,9 +344,21 @@ export async function updateLocation(
 
 /**
  * Delete a location (soft delete by setting is_active = false)
+ * Blocks deletion if the location still holds stock.
  */
 export async function deleteLocation(id: string): Promise<void> {
   try {
+    // NOTE: on-hand is read from stock_quants, which the GRN flow does not yet
+    // populate (Sprint A — ledger consolidation). Until Sprint A lands this guard
+    // is effectively permissive for GRN-received stock; the rule is correct, its
+    // data source becomes authoritative once GRN writes stock_quants.
+    const onHand = await getLocationStockCount(id);
+    const check = checkLocationDeletable(onHand);
+    if (!check.deletable) {
+      const err = new Error(check.reason) as Error & { code?: string };
+      err.code = 'LOCATION_NOT_EMPTY';
+      throw err;
+    }
     await sql`
       UPDATE stock_locations
       SET is_active = false, updated_at = NOW()
@@ -323,6 +366,9 @@ export async function deleteLocation(id: string): Promise<void> {
     `;
     log.info(`Deleted location: ${id}`, undefined, 'locationService');
   } catch (error) {
+    if ((error as { code?: string }).code === 'LOCATION_NOT_EMPTY') {
+      throw error; // expected business-rule rejection — not an error to log
+    }
     log.error('Failed to delete location', { error }, 'locationService');
     throw error;
   }
