@@ -19,6 +19,9 @@ describe('checkLocationDeletable', () => {
   });
 
   it('blocks deletion when fractional stock remains', () => {
-    expect(checkLocationDeletable(0.001).deletable).toBe(false);
+    const r = checkLocationDeletable(0.001);
+    expect(r.deletable).toBe(false);
+    expect(r.reason).toMatch(/0\.001/);
+    expect(r.reason).toMatch(/stock/i);
   });
 });

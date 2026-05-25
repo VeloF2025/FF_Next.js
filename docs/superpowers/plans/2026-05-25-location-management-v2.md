@@ -721,7 +721,7 @@ cd /home/hein/Workspace/FF_Next.js-wt/stock-locations-custody && git add src/mod
 
 Run (uses the env password — do not hard-code it in the file):
 ```bash
-PGPASSWORD="$FF_PGPASSWORD" psql -h 100.96.203.105 -p 5436 -U postgres.ironman-platform -d fibreflow -At -c "SELECT MAX(version) FROM migrations;"
+PGPASSWORD="$FF_PGPASSWORD" psql "$DATABASE_URL" -At -c "SELECT MAX(version) FROM migrations;"
 ```
 Use `<max>+1` as the numeric prefix. (Set `FF_PGPASSWORD` from `.claude/credentials.local.md` in your shell first; do not write it into any file.)
 
@@ -741,14 +741,14 @@ WHERE NOT EXISTS (
 
 - [ ] **Step 3: Verify the live schema accepts these columns BEFORE running**
 
-Run: `PGPASSWORD="$FF_PGPASSWORD" psql -h 100.96.203.105 -p 5436 -U postgres.ironman-platform -d fibreflow -c "\d stock_locations"`
+Run: `PGPASSWORD="$FF_PGPASSWORD" psql "$DATABASE_URL" -c "\d stock_locations"`
 Expected: confirms `code, name, location_type, address, is_active, is_virtual` columns exist (they do per the audit). Only run the migration through the project migration runner — do not hand-edit the DB.
 
 - [ ] **Step 4: Apply via the migration runner, then confirm**
 
 Apply using the repo's standard migration runner (the same one that records into `migrations`). Then:
 
-Run: `PGPASSWORD="$FF_PGPASSWORD" psql -h 100.96.203.105 -p 5436 -U postgres.ironman-platform -d fibreflow -At -c "SELECT code, name, location_type FROM stock_locations WHERE code='DC-GARST';"`
+Run: `PGPASSWORD="$FF_PGPASSWORD" psql "$DATABASE_URL" -At -c "SELECT code, name, location_type FROM stock_locations WHERE code='DC-GARST';"`
 Expected: `DC-GARST|Garstfontein DC|warehouse`
 
 - [ ] **Step 5: Commit**

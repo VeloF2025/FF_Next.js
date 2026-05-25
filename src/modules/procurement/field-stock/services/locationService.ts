@@ -348,6 +348,10 @@ export async function updateLocation(
  */
 export async function deleteLocation(id: string): Promise<void> {
   try {
+    // NOTE: on-hand is read from stock_quants, which the GRN flow does not yet
+    // populate (Sprint A — ledger consolidation). Until Sprint A lands this guard
+    // is effectively permissive for GRN-received stock; the rule is correct, its
+    // data source becomes authoritative once GRN writes stock_quants.
     const onHand = await getLocationStockCount(id);
     const check = checkLocationDeletable(onHand);
     if (!check.deletable) {
