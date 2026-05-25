@@ -49,6 +49,8 @@ const locationTypeColors: Record<LocationType, string> = {
   adjustment: 'bg-secondary text-gray-800 dark:bg-gray-700 dark:text-gray-300',
 };
 
+const HIDDEN_ADMIN_TYPES: LocationType[] = ['technician', 'scrap', 'adjustment'];
+
 export function LocationList({
   onSelectLocation,
   selectedLocationId,
@@ -68,6 +70,10 @@ export function LocationList({
     },
     autoFetch: true,
   });
+
+  const visibleLocations = locations.filter(
+    (l) => !HIDDEN_ADMIN_TYPES.includes(l.locationType) && !l.isVirtual,
+  );
 
   const handleSearch = (value: string) => {
     setSearch(value);
@@ -150,19 +156,21 @@ export function LocationList({
             >
               All Types
             </button>
-            {Object.entries(locationTypeLabels).map(([type, label]) => (
-              <button
-                key={type}
-                onClick={() => handleTypeFilter(type as LocationType)}
-                className={`rounded-full px-3 py-1 text-sm font-medium ${
-                  typeFilter === type
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-card text-muted-foreground hover:bg-secondary dark:text-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+            {Object.entries(locationTypeLabels)
+              .filter(([type]) => !HIDDEN_ADMIN_TYPES.includes(type as LocationType))
+              .map(([type, label]) => (
+                <button
+                  key={type}
+                  onClick={() => handleTypeFilter(type as LocationType)}
+                  className={`rounded-full px-3 py-1 text-sm font-medium ${
+                    typeFilter === type
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-card text-muted-foreground hover:bg-secondary dark:text-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
           </div>
         </div>
       )}
@@ -171,7 +179,7 @@ export function LocationList({
       {loading && <LoadingSpinner className="h-32" label="" />}
 
       {/* Location List */}
-      {!loading && locations.length === 0 && (
+      {!loading && visibleLocations.length === 0 && (
         <div className="rounded-lg border border-border bg-background p-8 text-center dark:border-gray-700 dark:bg-gray-800">
           <MapPin className="mx-auto h-12 w-12 text-gray-400" />
           <p className="mt-2 text-muted-foreground">No locations found</p>
@@ -181,9 +189,9 @@ export function LocationList({
         </div>
       )}
 
-      {!loading && locations.length > 0 && (
+      {!loading && visibleLocations.length > 0 && (
         <div className="divide-y divide-gray-200 rounded-lg border border-border bg-white dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800">
-          {locations.map((location) => (
+          {visibleLocations.map((location) => (
             <div
               key={location.id}
               className={`flex w-full items-center justify-between p-4 transition-colors hover:bg-accent ${
