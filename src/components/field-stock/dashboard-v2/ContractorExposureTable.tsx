@@ -25,8 +25,8 @@ export function ContractorExposureTable({ summary }: { summary: DashboardV2Summa
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--ff-border-light)]">
-              {top.map((c) => (
-                <tr key={c.name}>
+              {top.map((c, i) => (
+                <tr key={`${c.name}-${i}`}>
                   <td className="px-2 py-2 text-[var(--ff-text-primary)]">{c.name}</td>
                   <td className="px-2 py-2 text-right text-[var(--ff-text-primary)]">{formatCurrency(c.heldValue)}</td>
                   <td className="px-2 py-2 text-right font-medium text-[var(--ff-text-primary)]">{formatCurrency(c.unaccountedValue)}</td>

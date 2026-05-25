@@ -5,7 +5,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, withPermission } from '@/lib/auth';
 import { getDashboardV2Summary } from '@/modules/procurement/field-stock/services/dashboardV2Service';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -21,4 +21,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withPermission('procurement.field-stock', 'view')(handler));

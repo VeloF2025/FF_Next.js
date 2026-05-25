@@ -1,8 +1,9 @@
+import type { ReactNode } from 'react';
 import { Banknote, AlertTriangle, ScanLine, Hourglass } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatCurrency';
 import type { DashboardV2Summary } from '@/types/field-stock';
 
-interface KpiCardProps { label: string; value: string; icon: React.ReactNode; accent: string; }
+interface KpiCardProps { label: string; value: string; icon: ReactNode; accent: string; }
 
 function KpiCard({ label, value, icon, accent }: KpiCardProps) {
   return (

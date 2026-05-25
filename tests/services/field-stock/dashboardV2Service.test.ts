@@ -55,4 +55,38 @@ describe('getDashboardV2Summary', () => {
       serialsIssuedNotInstalled: 5,
     });
   });
+
+  it('returns safe zero defaults when all four queries return empty arrays', async () => {
+    sqlMock
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    const result = await getDashboardV2Summary();
+    expect(result.stockValue.total).toBe(0);
+    expect(result.stockValue.byLocation).toEqual([]);
+    expect(result.contractorExposure.totalHeldValue).toBe(0);
+    expect(result.contractorExposure.blockedCount).toBe(0);
+    expect(result.contractorExposure.top).toEqual([]);
+    expect(result.serialsLifecycle.byStatus).toEqual({});
+    expect(result.serialsLifecycle.installed).toBe(0);
+    expect(result.serialsLifecycle.activated).toBe(0);
+    expect(result.ageing.stagnantStockCount).toBe(0);
+    expect(result.ageing.stagnantStockValue).toBe(0);
+    expect(result.ageing.serialsIssuedNotInstalled).toBe(0);
+  });
+
+  it('caps the contractor top list at 10', async () => {
+    const many = Array.from({ length: 13 }, (_, i) => ({
+      name: `C${i}`, held_value: '0', unaccounted_value: String(13 - i), is_blocked: false, pending_recovery: '0',
+    }));
+    sqlMock
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(many)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ stagnant_count: '0', stagnant_value: '0', issued_not_installed: '0' }]);
+    const result = await getDashboardV2Summary();
+    expect(result.contractorExposure.top).toHaveLength(10);
+    expect(result.contractorExposure.top[0].name).toBe('C0');
+  });
 });

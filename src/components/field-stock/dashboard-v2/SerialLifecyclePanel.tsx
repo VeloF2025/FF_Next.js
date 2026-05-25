@@ -1,6 +1,12 @@
 import Link from 'next/link';
 import type { DashboardV2Summary } from '@/types/field-stock';
 
+/** Bounded activation share: activated / (installed + activated), as an integer %. 0 when neither present. */
+export function activatedSharePct(installed: number, activated: number): number {
+  const denom = installed + activated;
+  return denom > 0 ? Math.round((activated / denom) * 100) : 0;
+}
+
 const STATUS_ORDER = [
   'available', 'reserved', 'allocated_to_project', 'in_transit', 'issued',
   'installed', 'activated', 'faulty', 'in_repair', 'returned', 'scrapped',
@@ -10,8 +16,7 @@ export function SerialLifecyclePanel({ summary }: { summary: DashboardV2Summary 
   const { byStatus, installed, activated, recentlyInstalled, recentlyActivated } = summary.serialsLifecycle;
   // True install→activate funnel needs event history (deferred). Using current-status
   // counts, express the bounded share of installed-or-activated serials that are activated.
-  const activationDenom = installed + activated;
-  const activationRate = activationDenom > 0 ? Math.round((activated / activationDenom) * 100) : 0;
+  const activationRate = activatedSharePct(installed, activated);
   return (
     <section className="rounded-xl border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] p-5">
       <h2 className="mb-4 text-lg font-semibold text-[var(--ff-text-primary)]">Serial lifecycle</h2>
