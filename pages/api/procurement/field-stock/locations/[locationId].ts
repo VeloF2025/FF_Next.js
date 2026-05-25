@@ -39,8 +39,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     if (req.method === 'DELETE') {
-      await deleteLocation(locationId);
-      return apiResponse.success(res, { message: 'Location deleted successfully' });
+      try {
+        await deleteLocation(locationId);
+        return apiResponse.success(res, { message: 'Location deleted successfully' });
+      } catch (err) {
+        if ((err as { code?: string }).code === 'LOCATION_NOT_EMPTY') {
+          return apiResponse.validationError(res, { stock: (err as Error).message });
+        }
+        throw err;
+      }
     }
 
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PUT', 'DELETE']);
