@@ -9,7 +9,6 @@ import { AppLayout } from '@/components/layout';
 
 import {
   LocationList,
-  CreateLocationModal,
   SerialScanner,
   PickingList,
   CreatePickingForm,
@@ -17,6 +16,8 @@ import {
   CreateReturnModal,
   ContractorAccountabilityList,
 } from '@/modules/procurement/field-stock/components';
+import { LocationFormModal } from '@/modules/procurement/field-stock/components/locations/LocationFormModal';
+import type { StockLocation } from '@/modules/procurement/field-stock/types';
 import {
   useReturns,
   useContractorAccountability,
@@ -108,17 +109,32 @@ const tabs: TabConfig[] = [
   },
 ];
 
-/** Locations tab with create modal */
+/** Locations tab with create/edit modals */
 function LocationsTab() {
+  const { createLocation, updateLocation } = useLocations({ autoFetch: false });
   const [showCreate, setShowCreate] = useState(false);
-  const { createLocation } = useLocations({ autoFetch: false });
+  const [editLocation, setEditLocation] = useState<StockLocation | null>(null);
+
   return (
     <>
-      <LocationList onCreateClick={() => setShowCreate(true)} />
-      <CreateLocationModal
+      <LocationList
+        onCreateClick={() => setShowCreate(true)}
+        onEditLocation={(loc) => setEditLocation(loc)}
+      />
+      <LocationFormModal
         isOpen={showCreate}
+        mode="create"
         onClose={() => setShowCreate(false)}
-        onCreated={async (input) => { await createLocation(input); }}
+        onCreate={async (input) => { await createLocation(input); }}
+        onUpdate={async () => { /* unused in create mode */ }}
+      />
+      <LocationFormModal
+        isOpen={!!editLocation}
+        mode="edit"
+        location={editLocation}
+        onClose={() => setEditLocation(null)}
+        onCreate={async () => { /* unused in edit mode */ }}
+        onUpdate={async (id, input) => { await updateLocation(id, input); }}
       />
     </>
   );
