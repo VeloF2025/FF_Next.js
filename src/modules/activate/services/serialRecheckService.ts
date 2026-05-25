@@ -240,8 +240,12 @@ export async function runSerialRecheck(
   try {
     await recordVlmCorrection({
       module: 'activate',
-      analysisType: 'wa_serial_recheck',
-      sourceId: dropNumber,
+      // UPS rechecks get their own bucket so accuracy stats / few-shot don't
+      // mix with ONT. ONT rechecks stay under wa_serial_recheck.
+      // 'both' runs the UPS extractor (hasUpsMismatch branch), so it's a UPS recheck.
+      analysisType: serialType === 'ont' ? 'wa_serial_recheck' : 'ups_serial',
+      // NB: source_id is a UUID column — dropNumber ('DR…') would throw and be
+      // swallowed (this is why the bucket was empty). Drop number lives in context.
       sourceTable: 'dr_photo_unified_reviews',
       photoUrl,
       vlmExtractedValue: firstPassSerial || '',

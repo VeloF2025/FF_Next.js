@@ -419,9 +419,27 @@ export async function extractUpsSerialRecheck(
     const preprocessed = await preprocessForVlm(base64, 'UPS recheck');
     base64 = preprocessed.base64;
 
+    // Inject HITL few-shot examples from past UPS corrections (non-blocking on failure)
+    let upsPrompt = UPS_RECHECK_PROMPT;
+    try {
+      const examples = await getVlmFewShotExamples({
+        module: 'activate',
+        analysisType: 'ups_serial',
+        maxExamples: 3,
+        prioritizeCanonical: true,
+      });
+      const fewShotSection = buildVlmFewShotPrompt(examples);
+      if (fewShotSection) {
+        upsPrompt = `${fewShotSection}\n\n${UPS_RECHECK_PROMPT}`;
+        vlmLogger.info(`Injecting ${examples.length} few-shot examples for ups_serial`);
+      }
+    } catch (fewShotError) {
+      vlmLogger.warn(`Few-shot retrieval failed for ups_serial (continuing without): ${fewShotError}`);
+    }
+
     const result = await callVlmExtraction<{
       upsSerial: { found: boolean; serial: string | null; confidence: number };
-    }>(base64, UPS_RECHECK_PROMPT, 'UPS serial recheck');
+    }>(base64, upsPrompt, 'UPS serial recheck');
 
     if (!result.success || !result.data) {
       return { success: false, serial: null, confidence: 0, error: result.error };
