@@ -86,7 +86,7 @@ function buildSerialWarningLines(
   // --- ONT Serial ---
   if (ont) {
     if (trustOntVlm && vlmResult?.ontSerial && normalizeForCompare(ont) !== normalizeForCompare(vlmResult.ontSerial)) {
-      if (vlmResult.ontFromBarcode) {
+      if (vlmResult.ontFromBarcode ?? false) {
         // Photo serial came from a DECODED barcode → reliable. A conflict means
         // 1Map is genuinely wrong: keep the assertive MISMATCH alert.
         lines.push(`🟡 *ONT Serial MISMATCH:*`);
@@ -96,9 +96,10 @@ function buildSerialWarningLines(
       } else {
         // VLM-OCR read only (barcode did not scan). VLM is ~89% false-positive on
         // tiny ONT hex labels, so do NOT assert 1Map is wrong — surface the photo
-        // read as a soft prompt the tech can sanity-check.
+        // read as a soft prompt the tech can sanity-check. The 🔍 marker keeps this
+        // distinct from the "no trusted VLM read" fallback (📷) below.
         lines.push(`🔌 ONT Serial: ${ont}`);
-        lines.push(`   📷 Photo may read ${vlmResult.ontSerial} — please double-check`);
+        lines.push(`   🔍 Photo may read ${vlmResult.ontSerial} — please double-check`);
       }
     } else if (trustOntVlm && vlmResult?.ontSerial) {
       lines.push(`🔌 ONT Serial: ${ont} ✅`);

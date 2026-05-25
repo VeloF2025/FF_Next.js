@@ -112,7 +112,7 @@ describe('generateAckMessage — ONT ack-softening (barcode vs VLM-only)', () =>
     expect(msg).not.toContain('🟡 *ONT Serial MISMATCH:*'); // no false alarm
     expect(msg).not.toContain('Please double-check in 1Map'); // does not assert 1Map is wrong
     expect(msg).toContain(`🔌 ONT Serial: ${ONEMAP_ONT}`);
-    expect(msg).toContain(`Photo may read ${STICKER_ONT} — please double-check`);
+    expect(msg).toContain(`🔍 Photo may read ${STICKER_ONT} — please double-check`);
   });
 
   it('treats absent ontFromBarcode as VLM-only (soft)', () => {
@@ -122,7 +122,7 @@ describe('generateAckMessage — ONT ack-softening (barcode vs VLM-only)', () =>
       { ontSerial: STICKER_ONT, upsSerial: null, confidence: 0.97, ontConfidence: 0.97 }
     ).message;
     expect(msg).not.toContain('🟡 *ONT Serial MISMATCH:*');
-    expect(msg).toContain(`Photo may read ${STICKER_ONT} — please double-check`);
+    expect(msg).toContain(`🔍 Photo may read ${STICKER_ONT} — please double-check`);
   });
 
   it('leaves the UPS MISMATCH assertive (UPS reads are trusted, not softened)', () => {
