@@ -69,7 +69,7 @@ interface VerificationDetail {
 export interface WaPhotoExtractionResult {
   dropNumber: string;
   photosProcessed: number;
-  bestOnt: { serial: string; confidence: number } | null;
+  bestOnt: { serial: string; confidence: number; fromBarcode: boolean } | null;
   bestUps: { serial: string; confidence: number } | null;
   results: Array<{
     photoId: string;
@@ -326,7 +326,7 @@ export async function extractWaPhotoSerials(
   const onemapUps = currentData[0]?.ups_serial_scanned || null;
 
   const results: WaPhotoExtractionResult['results'] = [];
-  let bestOnt: { serial: string; confidence: number } | null = null;
+  let bestOnt: { serial: string; confidence: number; fromBarcode: boolean } | null = null;
   let bestUps: { serial: string; confidence: number } | null = null;
 
   for (const photo of photos) {
@@ -373,7 +373,7 @@ export async function extractWaPhotoSerials(
       const ontConf = extraction.ontConfidence ?? extraction.confidence;
       const upsConf = extraction.upsConfidence ?? extraction.confidence;
       if (extraction.ontSerial && ontConf > (bestOnt?.confidence || 0)) {
-        bestOnt = { serial: extraction.ontSerial, confidence: ontConf };
+        bestOnt = { serial: extraction.ontSerial, confidence: ontConf, fromBarcode: extraction.ontFromBarcode };
       }
       if (extraction.upsSerial && upsConf > (bestUps?.confidence || 0)) {
         bestUps = { serial: extraction.upsSerial, confidence: upsConf };

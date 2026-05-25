@@ -38,6 +38,10 @@ export interface WaPhotoExtractionResult {
   confidence: number;
   ontConfidence: number;
   upsConfidence: number;
+  // True when the ONT serial came from a decoded barcode (reliable); false when
+  // it fell back to VLM OCR (unreliable on tiny ONT hex labels). Drives whether
+  // an ONT/1Map conflict fires a hard MISMATCH or a soft double-check prompt.
+  ontFromBarcode: boolean;
   processingTimeMs: number;
   error?: string;
 }
@@ -244,6 +248,7 @@ export async function extractSerialsFromWaPhoto(
         confidence: ontFromBarcode ? 0.95 : 0,
         ontConfidence: ontFromBarcode ? 0.95 : 0,
         upsConfidence: 0,
+        ontFromBarcode: !!ontFromBarcode,
         processingTimeMs,
         error: result.error || 'VLM extraction failed',
       };
@@ -342,6 +347,7 @@ export async function extractSerialsFromWaPhoto(
       confidence: overallConfidence,
       ontConfidence,
       upsConfidence,
+      ontFromBarcode: !!ontFromBarcode,
       processingTimeMs,
     };
   } catch (error) {
@@ -359,6 +365,7 @@ export async function extractSerialsFromWaPhoto(
       confidence: 0,
       ontConfidence: 0,
       upsConfidence: 0,
+      ontFromBarcode: false,
       processingTimeMs: Date.now() - startTime,
       error: message,
     };
