@@ -37,8 +37,8 @@ START_TIME=$(date +%s)
 # 2026-05-19: raised 74→75 catches — olt-report/reporting.ts + wa-monitor-sync-sharepoint*.ts contain pre-existing silent catches not tracked at baseline; verified via git stash (count is 75 without any field-stock-pwa changes).
 # 2026-05-20: raised 183→185 warnings — P3 scoped-snag-reports adds new test files using the established `(req: any, res: any)` withAuth mock pattern + one react-refresh warning on LegacySnagReportCard.tsx (helpers co-located with the row component). Test-file `any` casts in this codebase predate P3.
 # 2026-05-21: raised 75→76 catches — origin/master already at 76 before this branch (olt-report/reporting.ts:166, date-parse fallback for CSV export); verified by counting on a clean checkout of origin/master HEAD. Not introduced by feat/wa-dr-ticket-linking — my new files have 0 silent catches.
-# 2026-05-25: raised 185→186 warnings — origin/master already at 186 before this branch. PR-10 (#1762, dashboard-v2) landed a react-refresh/only-export-components warning on SerialLifecyclePanel.tsx (the tested pure fn `activatedSharePct` is co-located with the component) without bumping the baseline; same co-located-helper class as the 2026-05-20 LegacySnagReportCard entry. Verified SerialLifecyclePanel.tsx is byte-identical to origin/master (empty git diff) — not introduced by the v2-promotion branch.
-MAX_LINT_WARNINGS=186
+# 2026-05-25: held at 185 — origin/master actually emits 186 (PR-10 #1762 left a react-refresh/only-export-components warning on SerialLifecyclePanel.tsx that was never accounted for in the baseline). Rather than ratchet up, this branch removes the warning at source: the pure fn `activatedSharePct` moved to serialLifecycle.utils.ts so the component module exports only components. Net lint count returns to 185.
+MAX_LINT_WARNINGS=185
 MAX_LINT_ERRORS=0
 MAX_SILENT_CATCHES=76
 

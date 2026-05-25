@@ -1,11 +1,6 @@
 import Link from 'next/link';
 import type { DashboardV2Summary } from '@/types/field-stock';
-
-/** Bounded activation share: activated / (installed + activated), as an integer %. 0 when neither present. */
-export function activatedSharePct(installed: number, activated: number): number {
-  const denom = installed + activated;
-  return denom > 0 ? Math.round((activated / denom) * 100) : 0;
-}
+import { activatedSharePct } from './serialLifecycle.utils';
 
 const STATUS_ORDER = [
   'available', 'reserved', 'allocated_to_project', 'in_transit', 'issued',

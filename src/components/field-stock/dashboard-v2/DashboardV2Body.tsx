@@ -11,8 +11,14 @@ import { StockValueByLocation } from './StockValueByLocation';
 import { ContractorExposureTable } from './ContractorExposureTable';
 import { SerialLifecyclePanel } from './SerialLifecyclePanel';
 import { AgeingPanel } from './AgeingPanel';
+import { DashboardV2QuickActions } from './DashboardV2QuickActions';
 
-export function DashboardV2Body() {
+interface DashboardV2BodyProps {
+  /** When supplied (tabbed page context), renders quick-action shortcuts that switch tabs. */
+  onNavigate?: (tab: string) => void;
+}
+
+export function DashboardV2Body({ onNavigate }: DashboardV2BodyProps = {}) {
   const { summary, loading, error, refresh } = useDashboardV2();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -45,6 +51,7 @@ export function DashboardV2Body() {
       )}
       {summary && (
         <>
+          {onNavigate && <DashboardV2QuickActions onNavigate={onNavigate} />}
           <KpiHeroRow summary={summary} />
           <div className="grid gap-6 lg:grid-cols-2">
             <StockValueByLocation summary={summary} />

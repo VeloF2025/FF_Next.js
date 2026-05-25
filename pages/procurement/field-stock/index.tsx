@@ -245,7 +245,7 @@ export default function FieldStockPage() {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <DashboardV2Body />;
+        return <DashboardV2Body onNavigate={(tab) => setActiveTab(tab as TabType)} />;
       case 'locations':
         return <LocationsTab />;
       case 'serials':
@@ -285,7 +285,7 @@ export default function FieldStockPage() {
       case 'adjustments':
         return <AdjustmentPanel />;
       default:
-        return <DashboardV2Body />;
+        return <DashboardV2Body onNavigate={(tab) => setActiveTab(tab as TabType)} />;
     }
   };
 
