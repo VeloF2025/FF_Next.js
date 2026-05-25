@@ -63,6 +63,7 @@ interface Location {
   id: string;
   name: string;
   locationType: string;
+  isVirtual?: boolean;
 }
 
 export default function NewGRNPage() {
@@ -136,9 +137,11 @@ export default function NewGRNPage() {
 
         const locationsData = await locationsRes.json();
         if (locationsData.success) {
-          // Filter for warehouse type locations
+          // Filter for real warehouse locations; exclude virtual bins (e.g. Faulty
+          // Equipment Bin) — you can't receive a delivery into a virtual location.
           const warehouses = (locationsData.data || []).filter(
-            (l: Location) => l.locationType === 'warehouse' || l.locationType === 'internal'
+            (l: Location) =>
+              (l.locationType === 'warehouse' || l.locationType === 'internal') && !l.isVirtual
           );
           setLocations(warehouses);
         }

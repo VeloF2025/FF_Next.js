@@ -33,11 +33,13 @@ export function LocationForm({ value, onChange, mode, selfId }: LocationFormProp
   });
 
   // Only hub/store types can be parents; vans, customers, scrap/adjust are leaf nodes.
+  // Virtual locations (e.g. Faulty Equipment Bin) are never valid parents.
   const parentOptions = useMemo(
     () =>
       locations.filter(
         (l: StockLocation) =>
           (l.locationType === 'warehouse' || l.locationType === 'site_store') &&
+          !l.isVirtual &&
           l.id !== selfId,
       ),
     [locations, selfId],
