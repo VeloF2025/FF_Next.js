@@ -17,4 +17,8 @@ describe('checkLocationDeletable', () => {
     expect(checkLocationDeletable(Number.NaN).deletable).toBe(false);
     expect(checkLocationDeletable(-1).deletable).toBe(false);
   });
+
+  it('blocks deletion when fractional stock remains', () => {
+    expect(checkLocationDeletable(0.001).deletable).toBe(false);
+  });
 });

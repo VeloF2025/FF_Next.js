@@ -43,8 +43,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         await deleteLocation(locationId);
         return apiResponse.success(res, { message: 'Location deleted successfully' });
       } catch (err) {
-        if ((err as { code?: string }).code === 'LOCATION_NOT_EMPTY') {
-          return apiResponse.validationError(res, { stock: (err as Error).message });
+        const locErr = err as Error & { code?: string };
+        if (locErr.code === 'LOCATION_NOT_EMPTY') {
+          return apiResponse.badRequest(res, locErr.message);
         }
         throw err;
       }

@@ -357,6 +357,9 @@ export async function deleteLocation(id: string): Promise<void> {
     `;
     log.info(`Deleted location: ${id}`, undefined, 'locationService');
   } catch (error) {
+    if ((error as { code?: string }).code === 'LOCATION_NOT_EMPTY') {
+      throw error; // expected business-rule rejection — not an error to log
+    }
     log.error('Failed to delete location', { error }, 'locationService');
     throw error;
   }
