@@ -229,7 +229,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       await recordUpsPhotoSighting(pool, {
         dropNumber,
         upsSerial: vlmResult.upsSerial,
-        confidence: vlmResult.upsConfidence ?? vlmResult.confidence,
+        // Must be the UPS-specific confidence — never fall back to the overall
+        // (max ONT/UPS) confidence, which would let an ONT read clear the gate.
+        confidence: vlmResult.upsConfidence ?? 0,
       });
     }
 

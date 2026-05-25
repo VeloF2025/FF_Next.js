@@ -3,7 +3,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { SerialTimeline, eventTypeLabel } from '../SerialTimeline';
+import { SerialTimeline } from '../SerialTimeline';
+import { eventTypeLabel } from '../eventTypeLabel';
 
 describe('SerialTimeline', () => {
   it('renders empty state when entries is empty', () => {
