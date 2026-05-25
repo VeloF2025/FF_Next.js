@@ -3,7 +3,7 @@
  * Unit tests for GS1 DataMatrix dump resolution in ack serial fields.
  */
 import { describe, it, expect } from 'vitest';
-import { resolveScannedSerial } from '../ackMessageBuilder';
+import { resolveScannedSerial, generateAckMessage } from '../ackMessageBuilder';
 import {
   looksLikeOntSerial,
   looksLikeGizzuSerial,
@@ -52,5 +52,33 @@ describe('resolveScannedSerial', () => {
     expect(resolveScannedSerial(upsDump, 'GU18W12V2509031056', looksLikeGizzuSerial)).toBe(
       'GU18W12V2509031056'
     );
+  });
+});
+
+describe('generateAckMessage — VLM confidence gate for GS1 resolution', () => {
+  // A GS1 dump in the ONT field whose embedded serial (ALCLB48DE9FE) is a valid
+  // serial. Resolution must happen ONLY when the VLM read is trusted (>=95%).
+  const ackArgs = (confidence: number) =>
+    generateAckMessage(
+      'DR1234567',
+      true,
+      3,
+      GS1_DUMP, // ontSerial (the raw dump)
+      null, // upsSerial
+      { hasPhoto: true, photoCount: 1 },
+      { ontSerial: 'ALCLB48DE9FE', upsSerial: null, confidence, ontConfidence: confidence }
+    ).message;
+
+  it('does NOT resolve/extract at 0.94 confidence (raw dump preserved, no false ✅)', () => {
+    const msg = ackArgs(0.94);
+    expect(msg).toContain('[)>'); // raw dump still shown — sub-threshold read not trusted
+    expect(msg).not.toContain('🟡 *ONT Serial MISMATCH:*'); // and no false mismatch fired
+  });
+
+  it('resolves to the clean embedded serial at 0.96 confidence (no dump shown)', () => {
+    const msg = ackArgs(0.96);
+    expect(msg).toContain('ALCLB48DE9FE');
+    expect(msg).not.toContain('[)>'); // dump collapsed to the embedded serial
+    expect(msg).not.toContain('🟡 *ONT Serial MISMATCH:*'); // and it's treated as a match
   });
 });
