@@ -2,15 +2,18 @@
  * Serial Recheck Batch Service
  *
  * Silent, unattended adjudication of recent ONT/UPS serial mismatches for the
- * nightly recheck cron. Forward-looking: only processes drops from the last N
- * days. Does NOT send WhatsApp (unlike runSerialRecheck) — it corrects internal
- * records, harvests few-shot examples, and queues the ambiguous tail.
+ * nightly recheck cron. Forward-looking: only processes drops submitted in the
+ * last N days, and each UPS drop is rechecked at most once (guarded by
+ * serial_recheck_log). Does NOT send WhatsApp (unlike runSerialRecheck) — it
+ * corrects internal records, harvests few-shot, and queues the ambiguous tail.
  *
  * - ONT: OES is the source of truth. 1Map ≠ OES → set ONT = OES (audited);
- *   record the WA VLM read as a few-shot error if it also differed.
+ *   record the WA VLM read as a few-shot error if it also differed from OES.
  * - UPS: no oracle. Re-extract via VLM 2nd-pass. Auto-correct ONLY when both
  *   passes agree AND the stored 1Map value is not a valid Gizzu serial (the
  *   slam-dunk rule). Well-formed-vs-well-formed conflicts are queued for vision.
+ *   No few-shot is recorded on a UPS auto-correct: there the VLM was RIGHT and
+ *   1Map was wrong, so there is no VLM error to learn from.
  *
  * Status: WORKING  NLNH Confidence: HIGH (logic), MEDIUM (live volume untested)
  */
@@ -53,24 +56,43 @@ export function decideUpsAction(
 }
 
 function norm(s: string | null): string | null {
-  return s ? s.trim().toUpperCase() : s;
+  return s ? s.trim().toUpperCase() : null;
 }
 
 function photoUrl(localPath: string): string {
   return `${VPS_PHOTO_BASE}${localPath.replace(DOCKER_PHOTO_PREFIX, '/photos/')}`;
 }
 
-async function logChange(
-  drop: string, type: 'ont_serial' | 'ups_serial', oldV: string | null, newV: string,
-  reason: string
+/**
+ * Apply a serial correction + its audit row atomically (single transaction),
+ * so a failed UPDATE can never leave an orphan "corrected" audit entry.
+ */
+async function correctSerial(
+  drop: string, kind: 'ont' | 'ups', oldV: string | null, newV: string, reason: string
 ): Promise<void> {
-  await pool.query(
-    `INSERT INTO serial_change_history
-       (id, drop_number, change_type, old_value, new_value, change_source, change_reason, actor, metadata, detected_at, created_at)
-     VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, 'serial-recheck-cron', $7, NOW(), NOW())`,
-    [drop, type, oldV, newV, type === 'ont_serial' ? 'onemap_sync' : 'wa_photo_vlm', reason,
-     JSON.stringify({ source: 'serial_recheck_cron' })]
-  );
+  const changeSource = kind === 'ont' ? 'onemap_sync' : 'wa_photo_vlm';
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      kind === 'ont'
+        ? `UPDATE dr_photo_unified_reviews SET ont_serial_scanned = $2, updated_at = NOW() WHERE drop_number = $1`
+        : `UPDATE dr_photo_unified_reviews SET ups_serial_scanned = $2, updated_at = NOW() WHERE drop_number = $1`,
+      [drop, newV]
+    );
+    await client.query(
+      `INSERT INTO serial_change_history
+         (id, drop_number, change_type, old_value, new_value, change_source, change_reason, actor, metadata, detected_at, created_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, 'serial-recheck-cron', $7, NOW(), NOW())`,
+      [drop, `${kind}_serial`, oldV, newV, changeSource, reason, JSON.stringify({ source: 'serial_recheck_cron' })]
+    );
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 /** ONT: 1Map ≠ OES → OES wins (OES is source of truth). No VLM call needed. */
@@ -83,7 +105,7 @@ async function adjudicateOnt(lookbackDays: number, summary: BatchSummary): Promi
               WHERE p.drop_number = r.drop_number AND p.vlm_ont_serial IS NOT NULL AND p.vlm_confidence >= 0.95
               ORDER BY p.vlm_confidence DESC, p.id LIMIT 1) AS vlm
      FROM dr_photo_unified_reviews r
-     WHERE COALESCE(r.submitted_date::timestamp, r.created_at) >= NOW() - ($1 || ' days')::interval
+     WHERE COALESCE(r.submitted_date::timestamp, r.created_at) >= NOW() - make_interval(days => $1::int)
        AND r.ont_serial_scanned IS NOT NULL AND r.ont_serial_scanned <> ''
        AND r.oes_serial IS NOT NULL AND r.oes_serial <> ''
        AND UPPER(TRIM(r.ont_serial_scanned)) <> UPPER(TRIM(r.oes_serial))`,
@@ -93,12 +115,8 @@ async function adjudicateOnt(lookbackDays: number, summary: BatchSummary): Promi
     summary.ontChecked++;
     if (!looksLikeOntSerial(row.oes)) continue; // OES itself malformed → leave
     try {
-      await logChange(row.drop_number, 'ont_serial', row.onemap, row.oes,
+      await correctSerial(row.drop_number, 'ont', row.onemap, row.oes,
         'Recheck cron: 1Map ONT differed from OES (source of truth); corrected to OES');
-      await pool.query(
-        `UPDATE dr_photo_unified_reviews SET ont_serial_scanned = $2, updated_at = NOW() WHERE drop_number = $1`,
-        [row.drop_number, row.oes]
-      );
       summary.ontCorrected++;
       // The WA VLM read was wrong if it differed from OES → harvest few-shot.
       if (row.vlm && row.vlm !== row.oes) {
@@ -116,7 +134,7 @@ async function adjudicateOnt(lookbackDays: number, summary: BatchSummary): Promi
   }
 }
 
-/** UPS: no oracle → VLM 2nd-pass + slam-dunk rule; queue ambiguous. */
+/** UPS: no oracle → VLM 2nd-pass + slam-dunk rule; queue ambiguous. Once per drop. */
 async function adjudicateUps(lookbackDays: number, limit: number, summary: BatchSummary): Promise<void> {
   const { rows } = await pool.query(
     `WITH best AS (
@@ -128,9 +146,12 @@ async function adjudicateUps(lookbackDays: number, limit: number, summary: Batch
      SELECT b.drop_number, b.vlm, b.local_path, UPPER(TRIM(r.ups_serial_scanned)) AS onemap
      FROM best b
      JOIN dr_photo_unified_reviews r ON r.drop_number = b.drop_number
-     WHERE COALESCE(r.submitted_date::timestamp, r.created_at) >= NOW() - ($1 || ' days')::interval
+     WHERE COALESCE(r.submitted_date::timestamp, r.created_at) >= NOW() - make_interval(days => $1::int)
        AND r.ups_serial_scanned IS NOT NULL AND r.ups_serial_scanned <> ''
        AND b.vlm <> UPPER(TRIM(r.ups_serial_scanned))
+       AND NOT EXISTS (
+         SELECT 1 FROM serial_recheck_log l
+         WHERE l.drop_number = b.drop_number AND l.serial_type = 'ups')
      LIMIT $2`,
     [lookbackDays, limit]
   );
@@ -143,27 +164,19 @@ async function adjudicateUps(lookbackDays: number, limit: number, summary: Batch
 
       await pool.query(
         `INSERT INTO serial_recheck_log
-           (drop_number, triggered_by, serial_type, first_pass_serial, second_pass_serial,
-            second_pass_confidence, outcome, onemap_serial)
-         VALUES ($1, 'auto', 'ups', $2, $3, $4, $5, $6)`,
-        [row.drop_number, row.vlm, pass2, recheck.confidence || null,
+           (drop_number, triggered_by, rechecker_user_id, serial_type, first_pass_serial,
+            second_pass_serial, second_pass_confidence, outcome, onemap_serial)
+         VALUES ($1, 'auto', NULL, 'ups', $2, $3, $4, $5, $6)`,
+        [row.drop_number, row.vlm, pass2, recheck.confidence ?? null,
          action === 'correct' ? 'correction' : action === 'queue' ? 'verify' : 'unclear', row.onemap]
       );
 
       if (action === 'correct') {
-        await logChange(row.drop_number, 'ups_serial', row.onemap, row.vlm,
+        // VLM was right, 1Map was invalid → correct the record. No few-shot:
+        // there is no VLM error to learn from here.
+        await correctSerial(row.drop_number, 'ups', row.onemap, row.vlm,
           'Recheck cron: 1Map UPS invalid; VLM 2-pass agreed on valid serial');
-        await pool.query(
-          `UPDATE dr_photo_unified_reviews SET ups_serial_scanned = $2, updated_at = NOW() WHERE drop_number = $1`,
-          [row.drop_number, row.vlm]
-        );
         summary.upsCorrected++;
-        await recordVlmCorrection({
-          module: 'activate', analysisType: 'ups_serial', sourceTable: 'wa_photos',
-          vlmExtractedValue: row.onemap, correctedValue: row.vlm,
-          correctionReason: 'other', correctionNotes: 'Recheck cron: 1Map held invalid UPS value',
-          context: { dropNumber: row.drop_number, source: 'serial_recheck_cron' },
-        });
       } else if (action === 'queue') {
         summary.upsQueued++; // left for the vision pass via serial_recheck_log outcome='verify'
       }
