@@ -43,24 +43,22 @@ drill-downs + cross-links** — all four, in one PR.
 
 **New flat API:** `pages/api/procurement/field-stock/dashboard-v2.ts`
 - Flat route (locked #12), `withAuth` with `ff_auth_token` (locked #6).
-- Built on `pg.Pool` via `@/lib/db` — deliberately NOT the legacy `neon()` shim
-  the old `dashboard.ts` uses (avoids the serverless-shim tech debt;
+- Built on `pg.Pool` via the neon-compatible `sql` tagged template from
+  `@/lib/db-pool` — deliberately NOT the legacy `neon()` shim the old
+  `dashboard.ts` uses (avoids the serverless-shim tech debt;
   `project_neon_serverless_debt`).
-- Returns a **superset** of the existing dashboard summary plus the four new
-  groups. The existing dashboard.ts is left as-is.
+- Returns **only the four new groups** (NOT a superset of the old summary —
+  YAGNI: the v2 page renders only these four, and "live serials" is derived from
+  `serialsLifecycle`). The existing `dashboard.ts` is left as-is and remains the
+  data source for the old page.
+- Thin handler delegating to a `dashboardV2Service.getDashboardV2Summary()` so
+  the SQL shaping logic is unit-testable independent of the HTTP boundary
+  (mirrors the existing serials/search service+handler split).
 
-### Response shape (new groups)
+### Response shape
 
 ```ts
 interface DashboardV2Summary {
-  // --- carried over from the existing dashboard summary ---
-  locations: { total: number; byType: Record<string, number> };
-  items: { total: number; byCategory: Record<string, number> };
-  serials: { total: number; byStatus: Record<string, number>; recentlyInstalled: number };
-  consumptions: { today: number; thisWeek: number; unverified: number };
-  alerts: { lowStock: number; pendingReturns: number; blockedContractors: number };
-
-  // --- new in v2 ---
   stockValue: {
     total: number;
     byLocation: { name: string; type: string; value: number; itemCount: number }[];
@@ -100,8 +98,14 @@ interface DashboardV2Summary {
 - **Ageing:** `stock_quants.last_movement_date`; `stock_serials.status` +
   `status_changed_at`.
 
-Queries run in parallel via `Promise.all`. Numeric columns cast to `Number()` on
-the way out. Null-safe throughout.
+Each group is **one** SQL query; the four run in parallel via `Promise.all`
+(deterministic call order, so the service is unit-testable by queueing four
+mocked `sql` resolutions). Numeric columns cast to `Number()` on the way out.
+Null-safe throughout. The KPI hero "Live serials" figure is the sum of
+`serialsLifecycle.byStatus` values — no separate query.
+
+**Service file:** `src/modules/procurement/field-stock/services/dashboardV2Service.ts`
+exporting `getDashboardV2Summary(): Promise<DashboardV2Summary>`.
 
 ## Page Composition
 
