@@ -8,7 +8,10 @@ const STATUS_ORDER = [
 
 export function SerialLifecyclePanel({ summary }: { summary: DashboardV2Summary }) {
   const { byStatus, installed, activated, recentlyInstalled, recentlyActivated } = summary.serialsLifecycle;
-  const activationRate = installed > 0 ? Math.round((activated / installed) * 100) : 0;
+  // True install→activate funnel needs event history (deferred). Using current-status
+  // counts, express the bounded share of installed-or-activated serials that are activated.
+  const activationDenom = installed + activated;
+  const activationRate = activationDenom > 0 ? Math.round((activated / activationDenom) * 100) : 0;
   return (
     <section className="rounded-xl border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] p-5">
       <h2 className="mb-4 text-lg font-semibold text-[var(--ff-text-primary)]">Serial lifecycle</h2>
@@ -23,7 +26,7 @@ export function SerialLifecyclePanel({ summary }: { summary: DashboardV2Summary 
       <div className="grid gap-4 sm:grid-cols-3 border-t border-[var(--ff-border-light)] pt-4">
         <div><p className="text-sm text-[var(--ff-text-secondary)]">Installed (7d)</p><p className="text-2xl font-bold text-[var(--ff-text-primary)]">{recentlyInstalled}</p></div>
         <div><p className="text-sm text-[var(--ff-text-secondary)]">Activated (7d)</p><p className="text-2xl font-bold text-[var(--ff-text-primary)]">{recentlyActivated}</p></div>
-        <div><p className="text-sm text-[var(--ff-text-secondary)]">Install→activate</p><p className="text-2xl font-bold text-[var(--ff-text-primary)]">{activationRate}%</p></div>
+        <div><p className="text-sm text-[var(--ff-text-secondary)]" title="Share of currently installed-or-activated serials that are activated; the full install→activate funnel needs event history">Activated share</p><p className="text-2xl font-bold text-[var(--ff-text-primary)]">{activationRate}%</p></div>
       </div>
     </section>
   );
