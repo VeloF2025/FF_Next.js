@@ -209,6 +209,7 @@ function eventLabel(eventType: string): string {
     case 'scrapped':          return 'Scrapped';
     case 'picking_done':      return 'Picked';
     case 'force_corrected':   return 'Force-corrected';
+    case 'wa_photo_sighting': return 'Seen in WhatsApp photo';
     default:                  return eventType;
   }
 }
