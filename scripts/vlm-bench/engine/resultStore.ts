@@ -9,10 +9,10 @@ import type { RunResult } from '../types';
 export async function storeRun(r: RunResult): Promise<number> {
   const { query } = await import('@/lib/db-pool');
   const summaries = r.packs.map(({ cases: _cases, ...summary }) => summary);
-  const rows = await query<{ id: number }>(
+  const rows = (await query(
     `INSERT INTO vlm_bench_runs (mode, model, git_sha, status, started_at, pack_scores, live_snapshot)
      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
     [r.mode, r.model, r.gitSha, r.status, r.startedAt, JSON.stringify(summaries), null],
-  );
+  )) as Array<{ id: number }>;
   return rows[0].id;
 }
