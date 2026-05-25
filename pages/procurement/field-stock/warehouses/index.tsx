@@ -17,6 +17,11 @@ const WarehouseHoldingsPage: NextPage = () => {
         const res = await fetch('/api/procurement/field-stock/serials/warehouses', {
           credentials: 'include',
         });
+        if (cancelled) return;
+        if (!res.ok) {
+          setError(`HTTP ${res.status}`);
+          return;
+        }
         const env = (await res.json()) as
           | { success: true; data: { rows: WarehouseHolding[] } }
           | { success: false; error?: { message?: string } };

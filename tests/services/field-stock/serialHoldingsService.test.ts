@@ -10,8 +10,6 @@ vi.mock('@/lib/db-pool', () => ({ pool: { query: queryMock } }));
 import {
   listWarehousesWithSerials,
   listProjectsWithSerials,
-  getWarehouseName,
-  getProjectName,
 } from '@/modules/procurement/field-stock/services/serialHoldingsService';
 
 describe('serialHoldingsService', () => {
@@ -41,23 +39,8 @@ describe('serialHoldingsService', () => {
     expect(rows).toEqual([{ id: 'p1', projectName: 'Lawley', serialCount: 40 }]);
   });
 
-  it('returns the warehouse name when found', async () => {
-    queryMock.mockResolvedValueOnce({ rows: [{ name: 'Main WH' }] });
-    expect(await getWarehouseName('w1')).toBe('Main WH');
-  });
-
-  it('returns null when the warehouse id is unknown', async () => {
+  it('returns an empty array when no entity holds serials', async () => {
     queryMock.mockResolvedValueOnce({ rows: [] });
-    expect(await getWarehouseName('nope')).toBeNull();
-  });
-
-  it('returns the project name when found', async () => {
-    queryMock.mockResolvedValueOnce({ rows: [{ project_name: 'Lawley' }] });
-    expect(await getProjectName('p1')).toBe('Lawley');
-  });
-
-  it('returns null when the project id is unknown', async () => {
-    queryMock.mockResolvedValueOnce({ rows: [] });
-    expect(await getProjectName('nope')).toBeNull();
+    expect(await listWarehousesWithSerials()).toEqual([]);
   });
 });

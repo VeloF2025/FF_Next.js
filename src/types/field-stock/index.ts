@@ -10,3 +10,4 @@ export type {
 } from './dashboardV2';
 export type { ReconciliationCheckResult, ReconciliationSummary } from './serialReconciliation';
 export type { WarehouseHolding, ProjectHolding } from './serialHoldings';
+export type { SerialSearchRowView } from './serialSearchRow';

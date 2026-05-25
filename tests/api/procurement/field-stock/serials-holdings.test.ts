@@ -79,6 +79,14 @@ describe('GET /api/procurement/field-stock/serials/warehouses', () => {
     expect(res.statusCode).toBe(500);
     expect(res.jsonData).toMatchObject({ success: false });
   });
+
+  it('returns 200 with an empty rows array when nothing holds serials', async () => {
+    listWarehousesMock.mockResolvedValueOnce([]);
+    const res = makeRes();
+    await warehousesHandler(makeReq('GET'), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.jsonData).toMatchObject({ success: true, data: { rows: [] } });
+  });
 });
 
 describe('GET /api/procurement/field-stock/serials/projects', () => {
@@ -99,10 +107,11 @@ describe('GET /api/procurement/field-stock/serials/projects', () => {
     expect(listProjectsMock).not.toHaveBeenCalled();
   });
 
-  it('returns 500 when the service throws', async () => {
+  it('returns 500 with a success:false body when the service throws', async () => {
     listProjectsMock.mockRejectedValueOnce(new Error('db down'));
     const res = makeRes();
     await projectsHandler(makeReq('GET'), res);
     expect(res.statusCode).toBe(500);
+    expect(res.jsonData).toMatchObject({ success: false });
   });
 });

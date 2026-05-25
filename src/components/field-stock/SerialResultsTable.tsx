@@ -1,25 +1,5 @@
 import Link from 'next/link';
-
-/**
- * Row shape returned by the /serials/search API (JSON boundary).
- * KEEP IN SYNC with serialSearchService.ts → SerialSearchRow. Mirrored here
- * (rather than imported from the service) because the page fetches over HTTP,
- * not via a direct service call. The legacy serials/index.tsx keeps its own
- * local copy; this is the shared one used by the drill-down pages.
- */
-export interface SerialSearchRowView {
-  id: string;
-  serialNumber: string;
-  macAddress: string | null;
-  category: string | null;
-  itemName: string | null;
-  status: string;
-  currentLocationName: string | null;
-  allocatedProjectName: string | null;
-  installedAtDropNumber: string | null;
-  lastEventType: string | null;
-  lastEventAt: string | null;
-}
+import type { SerialSearchRowView } from '@/types/field-stock';
 
 interface SerialResultsTableProps {
   rows: SerialSearchRowView[];

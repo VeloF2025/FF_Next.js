@@ -17,6 +17,11 @@ const ProjectHoldingsPage: NextPage = () => {
         const res = await fetch('/api/procurement/field-stock/serials/projects', {
           credentials: 'include',
         });
+        if (cancelled) return;
+        if (!res.ok) {
+          setError(`HTTP ${res.status}`);
+          return;
+        }
         const env = (await res.json()) as
           | { success: true; data: { rows: ProjectHolding[] } }
           | { success: false; error?: { message?: string } };

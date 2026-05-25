@@ -22,4 +22,14 @@ describe('HoldingsTable', () => {
     expect(screen.getByText('No projects.')).toBeInTheDocument();
     expect(screen.getByText('0 projects')).toBeInTheDocument();
   });
+
+  it('shows the error banner when error is set', () => {
+    render(<HoldingsTable rows={[]} loading={false} error="db down" entityHeader="Warehouse" emptyLabel="none" />);
+    expect(screen.getByText('db down')).toBeInTheDocument();
+  });
+
+  it('shows Loading… instead of a count while loading', () => {
+    render(<HoldingsTable rows={[]} loading error={null} entityHeader="Warehouse" emptyLabel="none" />);
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
+  });
 });

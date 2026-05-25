@@ -6,8 +6,7 @@
  * match these filters", this one answers "which warehouses / projects
  * currently hold serials, and how many". The per-entity serial lists
  * themselves are served by serialSearchService via the warehouseId /
- * projectId filters — these functions only feed the landing list pages and
- * resolve a single entity name for the drill-down sticky header.
+ * projectId filters — these functions only feed the landing list pages.
  *
  * Column references mirror the live searchSerials() query:
  *   stock_serials.current_location_id  → stock_locations(id, name, code, location_type)
@@ -75,22 +74,4 @@ export async function listProjectsWithSerials(): Promise<ProjectHolding[]> {
     projectName: r.project_name,
     serialCount: parseInt(r.serial_count, 10),
   }));
-}
-
-/** Resolve a single warehouse name. Returns null when the id is unknown. */
-export async function getWarehouseName(id: string): Promise<string | null> {
-  const res = await pool.query<{ name: string }>(
-    `SELECT name FROM stock_locations WHERE id = $1`,
-    [id]
-  );
-  return res.rows[0]?.name ?? null;
-}
-
-/** Resolve a single project name. Returns null when the id is unknown. */
-export async function getProjectName(id: string): Promise<string | null> {
-  const res = await pool.query<{ project_name: string }>(
-    `SELECT project_name FROM projects WHERE id = $1`,
-    [id]
-  );
-  return res.rows[0]?.project_name ?? null;
 }

@@ -1,20 +1,37 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { SerialSearch } from '@/components/field-stock/SerialSearch';
 import { SerialResultsTable } from '@/components/field-stock/SerialResultsTable';
 import { useSerialSearch } from '@/modules/procurement/field-stock/hooks/useSerialSearch';
-import type { SerialSearchFilters } from '@/types/field-stock';
+import type { SerialSearchFilters, SerialSearchRowView } from '@/types/field-stock';
 
 interface SerialDrilldownViewProps {
-  /** Entity name shown in the sticky header (warehouse or project name). */
-  heading: string;
   /** Small label above the heading, e.g. "Warehouse" / "Project". */
   kicker: string;
+  /**
+   * Which result-row field carries this entity's display name. The name is
+   * derived from the (already-authenticated) search response rather than a
+   * server-side DB read, so no entity data leaks pre-auth.
+   */
+  nameField: 'currentLocationName' | 'allocatedProjectName';
+  /** Shown until a name is resolved from results (the entity id). */
+  fallbackHeading: string;
   /** Fixed filter baked into every search — warehouseId or projectId. */
   fixedFilter: Pick<SerialSearchFilters, 'warehouseId' | 'projectId'>;
   /** Back-link target (the landing list page). */
   backHref: string;
   backLabel: string;
+}
+
+/** Reads the entity name off the first result row that carries it. */
+function nameFromRows(
+  rows: SerialSearchRowView[],
+  field: SerialDrilldownViewProps['nameField']
+): string | null {
+  for (const r of rows) {
+    if (r[field]) return r[field];
+  }
+  return null;
 }
 
 /**
@@ -24,8 +41,9 @@ interface SerialDrilldownViewProps {
  * same <SerialSearch> chrome as the master register.
  */
 export function SerialDrilldownView({
-  heading,
   kicker,
+  nameField,
+  fallbackHeading,
   fixedFilter,
   backHref,
   backLabel,
@@ -36,6 +54,16 @@ export function SerialDrilldownView({
   // Fixed filter wins — the user cannot widen past this warehouse/project.
   const filters: SerialSearchFilters = { ...userFilters, ...fixedFilter };
   const { rows, total, loading, error } = useSerialSearch(filters);
+
+  // Resolve the entity name from results and keep it once seen, so applying a
+  // filter that returns zero rows doesn't blank the heading.
+  const [resolvedName, setResolvedName] = useState<string | null>(null);
+  useEffect(() => {
+    const name = nameFromRows(rows, nameField);
+    if (name) setResolvedName(name);
+  }, [rows, nameField]);
+
+  const heading = resolvedName ?? fallbackHeading;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">

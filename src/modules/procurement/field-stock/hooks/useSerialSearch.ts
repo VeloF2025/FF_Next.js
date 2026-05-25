@@ -9,8 +9,14 @@
  */
 import { useEffect, useState } from 'react';
 import { log } from '@/lib/logger';
-import type { SerialSearchFilters } from '@/types/field-stock';
-import type { SerialSearchRowView } from '@/components/field-stock/SerialResultsTable';
+import type { SerialSearchFilters, SerialSearchRowView } from '@/types/field-stock';
+
+/**
+ * Drill-down pages show a single warehouse/project, so we pull the largest
+ * page the search API allows (its hard cap) rather than the default 50. Full
+ * pagination is a separate follow-up if a single entity exceeds this.
+ */
+const DRILLDOWN_PAGE_SIZE = 200;
 
 interface UseSerialSearchReturn {
   rows: SerialSearchRowView[];
@@ -37,7 +43,10 @@ export function useSerialSearch(filters: SerialSearchFilters): UseSerialSearchRe
   const [error, setError] = useState<string | null>(null);
 
   // Serialise filters so the effect re-runs on value changes, not identity.
-  const queryString = new URLSearchParams(filtersToQuery(filters)).toString();
+  const queryString = new URLSearchParams({
+    ...filtersToQuery(filters),
+    pageSize: String(DRILLDOWN_PAGE_SIZE),
+  }).toString();
 
   useEffect(() => {
     let cancelled = false;
@@ -49,6 +58,10 @@ export function useSerialSearch(filters: SerialSearchFilters): UseSerialSearchRe
           `/api/procurement/field-stock/serials/search?${queryString}`,
           { credentials: 'include' }
         );
+        if (!res.ok) {
+          if (!cancelled) setError(`HTTP ${res.status}`);
+          return;
+        }
         const env = (await res.json()) as
           | { success: true; data: { rows: SerialSearchRowView[]; total: number } }
           | { success: false; error?: { message?: string } };

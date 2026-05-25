@@ -1,7 +1,8 @@
 /** Tests for SerialResultsTable — count label, serial link, empty state. */
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { SerialResultsTable, type SerialSearchRowView } from '@/components/field-stock/SerialResultsTable';
+import { SerialResultsTable } from '@/components/field-stock/SerialResultsTable';
+import type { SerialSearchRowView } from '@/types/field-stock';
 
 const ROW: SerialSearchRowView = {
   id: 'r1', serialNumber: 'ALCLB4-001', macAddress: 'AA:BB', category: 'ONT', itemName: 'ONT',
