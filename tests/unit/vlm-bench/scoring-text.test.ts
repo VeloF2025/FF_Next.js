@@ -5,6 +5,16 @@ describe('normalizeExact', () => {
   it('uppercases, strips spaces/punctuation', () => {
     expect(normalizeExact(' alclb-491 baa2 ')).toBe('ALCLB491BAA2');
   });
+  it('returns empty string for empty input', () => {
+    expect(normalizeExact('')).toBe('');
+  });
+  it('returns empty string for null/undefined input (guard)', () => {
+    expect(normalizeExact(null as unknown as string)).toBe('');
+    expect(normalizeExact(undefined as unknown as string)).toBe('');
+  });
+  it('is idempotent on already-normalised input', () => {
+    expect(normalizeExact('ALCLB491BAA2')).toBe('ALCLB491BAA2');
+  });
 });
 
 describe('charErrorRate', () => {
@@ -16,5 +26,11 @@ describe('charErrorRate', () => {
   });
   it('counts a dropped char', () => {
     expect(charErrorRate('ABCDEF', 'ABCDE')).toBeCloseTo(1 / 6, 5);
+  });
+  it('is 1 when actual is empty but expected is not (blank VLM response)', () => {
+    expect(charErrorRate('ABCDEF', '')).toBe(1);
+  });
+  it('is 0 when both are empty', () => {
+    expect(charErrorRate('', '')).toBe(0);
   });
 });

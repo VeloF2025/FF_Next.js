@@ -2,7 +2,7 @@
   {
     "id": "serial-0001",
     "imageRef": "serial-0001.jpg",
-    "sha256": "4a62ed6c46dc05655fd3c90ca000d4bdb642f7818f68157645b55b1335f51902",
+    "sha256": "96581434cbe2b22bea5f7c0f3695b8ff15fe44ea3342adbebc4dc5eef79fbad2",
     "expected": {
       "serial": "ALCLB463FE25"
     }
@@ -10,7 +10,7 @@
   {
     "id": "serial-0002",
     "imageRef": "serial-0002.jpg",
-    "sha256": "22857cd8a7f5e610b5ecbeb9dbf19f26bf42ed6c4c30333a64c2c69709639acd",
+    "sha256": "fe3cab2b1a66f720f6e4c35e249e533e43b2408ff0fd55dc512f917611cf9c01",
     "expected": {
       "serial": "ALCLB477C5B8"
     }

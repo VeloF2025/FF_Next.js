@@ -18,7 +18,7 @@ export async function runPack(
       const s = pack.score(c.expected, actual);
       scores.push({ caseId: c.id, pass: s.pass, score: s.score, detail: s.detail });
     } catch (e) {
-      scores.push({ caseId: c.id, pass: false, score: 0, error: (e as Error).message });
+      scores.push({ caseId: c.id, pass: false, score: 0, error: e instanceof Error ? e.message : String(e) });
     }
   }
   const scored = scores.filter((s) => !s.error);

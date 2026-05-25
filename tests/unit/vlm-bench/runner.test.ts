@@ -39,4 +39,22 @@ describe('runPack', () => {
     expect(result.scored).toBe(1);
     expect(result.scorePct).toBe(100); // the one scored case passed
   });
+
+  it('returns scorePct 0 (no NaN) when every case errors', async () => {
+    const result = await runPack(fakePack, 'golden', { goldenRoot: '/tmp' }, async () => {
+      throw new Error('VLM down');
+    });
+    expect(result.errors).toBe(2);
+    expect(result.scored).toBe(0);
+    expect(result.passed).toBe(0);
+    expect(result.scorePct).toBe(0);
+  });
+
+  it('records a non-Error throw as a string message (no "undefined")', async () => {
+    const result = await runPack(fakePack, 'golden', { goldenRoot: '/tmp' }, async () => {
+      throw 'raw string failure';
+    });
+    expect(result.errors).toBe(2);
+    expect(result.cases[0].error).toBe('raw string failure');
+  });
 });
