@@ -38,13 +38,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-NEON_DATABASE_URL = os.environ.get(
-    'NEON_DATABASE_URL',
-    'postgresql://fibreflow_user:ff_x8Km2pQr9vLn@localhost:5437/fibreflow'
-)
+# Secrets come from the environment only — no hardcoded defaults in the repo.
+# The nightly wrapper (nightly-oes-qfield-sync.sh) exports these from the prod .env;
+# for manual runs, export NEON_DATABASE_URL and QFIELD_PASSWORD first.
+NEON_DATABASE_URL = os.environ.get('NEON_DATABASE_URL')
 
-QFIELD_USERNAME = os.environ.get('QFIELD_USERNAME', 'admin')
-QFIELD_PASSWORD = os.environ.get('QFIELD_PASSWORD', 'VF-qfield-2026!')
+QFIELD_USERNAME = os.environ.get('QFIELD_USERNAME', 'admin')  # not a secret
+QFIELD_PASSWORD = os.environ.get('QFIELD_PASSWORD')
 QFIELD_FALLBACK_PROJECT_ID = os.environ.get('QFIELD_PROJECT_ID', 'af058301-32d1-4bca-84f9-83b899fcbb34')
 QFIELD_API_URL = os.environ.get('QFIELD_API_URL', 'https://qfield.fibreflow.app/api/v1/')
 
@@ -652,6 +652,13 @@ def main():
     parser.add_argument('--full', action='store_true', help='Full sync')
     parser.add_argument('--report-date', type=str, help='Report date YYYY-MM-DD')
     args = parser.parse_args()
+
+    missing = [n for n, v in (('NEON_DATABASE_URL', NEON_DATABASE_URL),
+                              ('QFIELD_PASSWORD', QFIELD_PASSWORD)) if not v]
+    if missing:
+        logger.error(f"Missing required env var(s): {', '.join(missing)}. "
+                     "Export them (the nightly wrapper sources them from the prod .env).")
+        sys.exit(1)
 
     report_date = parse_report_date(args.report_date)
 
