@@ -113,47 +113,33 @@ const SQL_DEBIT_CUSTODY =
 
 /**
  * Issue movement: location → holder.
- *
- * Uses INSERT ... SELECT * FROM (VALUES (...)) AS v(cols) so that the literal
- * 'issue' appears in the VALUES tuple before the column alias `to_holder_id`
- * in the alias list, satisfying test regex:
- *   /INSERT INTO field_stock_movements[\s\S]*'issue'[\s\S]*to_holder_id/i
- *
  * Params: $1=stock_item_id, $2=from_location_id, $3=to_holder_id,
  *         $4=quantity, $5=unit_cost, $6=reference, $7=performed_by
  */
 const SQL_MOVEMENT_ISSUE =
   `INSERT INTO field_stock_movements ` +
-  `SELECT * FROM (VALUES (gen_random_uuid(), $1::uuid, 'issue'::text, $2::uuid, $4::numeric, $5::numeric, COALESCE($5::numeric,0)*$4::numeric, $6::text, $7::text, NOW(), NOW(), $3::uuid)) ` +
-  `AS v(id, stock_item_id, movement_type, from_location_id, quantity, unit_cost, total_cost, reference, performed_by, performed_at, created_at, to_holder_id)`;
+  `(id, stock_item_id, movement_type, from_location_id, to_holder_id, quantity, unit_cost, total_cost, reference, performed_by, performed_at, created_at) ` +
+  `VALUES (gen_random_uuid(), $1, 'issue', $2, $3, $4, $5, COALESCE($5,0)*$4, $6, $7, NOW(), NOW())`;
 
 /**
  * Consumption movement: from holder, no to-side.
- *
- * Literal 'consumption' in VALUES before column alias `from_holder_id`:
- *   /INSERT INTO field_stock_movements[\s\S]*'consumption'[\s\S]*from_holder_id/i
- *
  * Params: $1=stock_item_id, $2=from_holder_id,
  *         $3=quantity, $4=unit_cost, $5=reference, $6=performed_by
  */
 const SQL_MOVEMENT_CONSUMPTION =
   `INSERT INTO field_stock_movements ` +
-  `SELECT * FROM (VALUES (gen_random_uuid(), $1::uuid, 'consumption'::text, $3::numeric, $4::numeric, COALESCE($4::numeric,0)*$3::numeric, $5::text, $6::text, NOW(), NOW(), $2::uuid)) ` +
-  `AS v(id, stock_item_id, movement_type, quantity, unit_cost, total_cost, reference, performed_by, performed_at, created_at, from_holder_id)`;
+  `(id, stock_item_id, movement_type, from_holder_id, quantity, unit_cost, total_cost, reference, performed_by, performed_at, created_at) ` +
+  `VALUES (gen_random_uuid(), $1, 'consumption', $2, $3, $4, COALESCE($4,0)*$3, $5, $6, NOW(), NOW())`;
 
 /**
  * Return movement: holder → location.
- *
- * Literal 'return' in VALUES before aliases `from_holder_id` then `to_location_id`:
- *   /INSERT INTO field_stock_movements[\s\S]*'return'[\s\S]*from_holder_id[\s\S]*to_location_id/i
- *
  * Params: $1=stock_item_id, $2=from_holder_id, $3=to_location_id,
  *         $4=quantity, $5=unit_cost, $6=reference, $7=performed_by
  */
 const SQL_MOVEMENT_RETURN =
   `INSERT INTO field_stock_movements ` +
-  `SELECT * FROM (VALUES (gen_random_uuid(), $1::uuid, 'return'::text, $4::numeric, $5::numeric, COALESCE($5::numeric,0)*$4::numeric, $6::text, $7::text, NOW(), NOW(), $2::uuid, $3::uuid)) ` +
-  `AS v(id, stock_item_id, movement_type, quantity, unit_cost, total_cost, reference, performed_by, performed_at, created_at, from_holder_id, to_location_id)`;
+  `(id, stock_item_id, movement_type, from_holder_id, to_location_id, quantity, unit_cost, total_cost, reference, performed_by, performed_at, created_at) ` +
+  `VALUES (gen_random_uuid(), $1, 'return', $2, $3, $4, $5, COALESCE($5,0)*$4, $6, $7, NOW(), NOW())`;
 
 // ============================================================================
 // Public API
