@@ -42,7 +42,7 @@ export function KanbanColumn({ status, tickets, totalCount, isDraggingOver, isUp
   return (
     <div
       className={`
-        flex flex-col min-w-[280px] max-w-[320px] h-full
+        flex flex-col w-full min-w-0 h-full
         bg-[var(--ff-bg-secondary)] rounded-xl border-2
         transition-all duration-200 ease-out
         ${isDraggingOver
@@ -52,15 +52,16 @@ export function KanbanColumn({ status, tickets, totalCount, isDraggingOver, isUp
       `}
     >
       {/* Column Header */}
-      <div className="flex items-center justify-between p-3 border-b border-[var(--ff-border-light)]">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2 p-2 border-b border-[var(--ff-border-light)]">
+        <div className="flex items-center gap-1.5 min-w-0">
           <span
             className={`
-              px-3 py-1.5 text-xs font-semibold rounded-lg
+              px-2 py-1 text-[11px] font-semibold rounded-lg truncate
               ${config.bgColor} ${config.color}
               transition-transform duration-150
               ${isDraggingOver ? 'scale-105' : ''}
             `}
+            title={config.label}
           >
             {config.label}
           </span>
@@ -83,7 +84,7 @@ export function KanbanColumn({ status, tickets, totalCount, isDraggingOver, isUp
       </div>
 
       {/* Cards Container */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-2">
+      <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5">
         {/* Empty state */}
         {tickets.length === 0 && (
           <div

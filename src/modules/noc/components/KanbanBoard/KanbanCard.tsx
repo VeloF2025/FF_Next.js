@@ -81,7 +81,7 @@ export function KanbanCard({ ticket, isDragging, onQuickMove, canMoveForward, ca
     <div
       onClick={handleClick}
       className={`
-        group relative p-3 bg-[var(--ff-bg-secondary)] rounded-lg border
+        group relative p-2 bg-[var(--ff-bg-secondary)] rounded-lg border min-w-0
         cursor-grab active:cursor-grabbing select-none
         transition-all duration-150 ease-out
         ${isDragging
@@ -95,7 +95,7 @@ export function KanbanCard({ ticket, isDragging, onQuickMove, canMoveForward, ca
         <div
           data-quick-move
           className={`
-            absolute -right-1 top-1/2 -translate-y-1/2 flex flex-col gap-1
+            absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-1
             opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-10
             ${isDragging ? 'hidden' : ''}
           `}
@@ -128,9 +128,9 @@ export function KanbanCard({ ticket, isDragging, onQuickMove, canMoveForward, ca
       )}
 
       {/* Header: UID, T1 category, discipline, Priority */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-mono text-[var(--ff-text-muted)]">
+      <div className="flex items-start justify-between gap-2 mb-1.5 min-w-0">
+        <div className="flex items-center gap-1 flex-wrap min-w-0">
+          <span className="text-[10px] font-mono text-[var(--ff-text-muted)] truncate max-w-full">
             {ticket.ticket_uid}
           </span>
           {/* T1 label from discipline fallback */}
@@ -152,7 +152,7 @@ export function KanbanCard({ ticket, isDragging, onQuickMove, canMoveForward, ca
         </div>
         <span
           className={`
-            px-2 py-0.5 text-[10px] font-semibold rounded-full
+            px-1.5 py-0.5 text-[10px] font-semibold rounded-full shrink-0
             ${priorityStyle.bg} ${priorityStyle.text} border ${priorityStyle.border}
           `}
         >
@@ -161,22 +161,22 @@ export function KanbanCard({ ticket, isDragging, onQuickMove, canMoveForward, ca
       </div>
 
       {/* Title */}
-      <h4 className="text-sm font-medium text-[var(--ff-text-primary)] mb-2 line-clamp-2 group-hover:text-blue-400 transition-colors">
+      <h4 className="text-xs font-medium text-[var(--ff-text-primary)] mb-1.5 line-clamp-2 break-words group-hover:text-blue-400 transition-colors">
         {ticket.title}
       </h4>
 
       {/* DR Number and Asset */}
-      <div className="flex flex-wrap gap-2 mb-2">
+      <div className="flex flex-wrap gap-1.5 mb-1.5 min-w-0">
         {ticket.dr_number && (
-          <div className="flex items-center gap-1 text-xs text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)] px-2 py-0.5 rounded">
+          <div className="flex items-center gap-1 min-w-0 text-[11px] text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)] px-1.5 py-0.5 rounded">
             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             </svg>
-            {ticket.dr_number}
+            <span className="truncate">{ticket.dr_number}</span>
           </div>
         )}
         {ticket.asset_id && (
-          <div className="flex items-center gap-1 text-xs text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)] px-2 py-0.5 rounded">
+          <div className="flex items-center gap-1 min-w-0 text-[11px] text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)] px-1.5 py-0.5 rounded">
             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
@@ -186,36 +186,36 @@ export function KanbanCard({ ticket, isDragging, onQuickMove, canMoveForward, ca
       </div>
 
       {/* Footer: Assignee, Time in Status, Created */}
-      <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--ff-border-light)]">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-1.5 mt-1.5 pt-1.5 border-t border-[var(--ff-border-light)] min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
           {ticket.assigned_to ? (
-            <div className="flex items-center gap-1.5">
-              <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+            <div className="flex items-center gap-1 min-w-0">
+              <div className="w-5 h-5 shrink-0 rounded-full bg-blue-500 flex items-center justify-center">
                 <span className="text-[10px] text-white font-medium">
                   {ticket.assigned_user?.name?.charAt(0) || 'U'}
                 </span>
               </div>
-              <span className="text-xs text-[var(--ff-text-secondary)] truncate max-w-[70px]">
+              <span className="text-[11px] text-[var(--ff-text-secondary)] truncate max-w-[56px]">
                 {ticket.assigned_user?.name || 'Assigned'}
               </span>
             </div>
           ) : ticket.assigned_team_id ? (
-            <div className="flex items-center gap-1.5">
-              <div className="w-5 h-5 rounded-full bg-purple-500 flex items-center justify-center">
+            <div className="flex items-center gap-1 min-w-0">
+              <div className="w-5 h-5 shrink-0 rounded-full bg-purple-500 flex items-center justify-center">
                 <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </div>
-              <span className="text-xs text-[var(--ff-text-secondary)] truncate max-w-[70px]">
+              <span className="text-[11px] text-[var(--ff-text-secondary)] truncate max-w-[56px]">
                 {ticket.assigned_team_name || 'Team'}
               </span>
             </div>
           ) : (
-            <span className="text-xs text-[var(--ff-text-muted)] italic">Unassigned</span>
+            <span className="text-[11px] text-[var(--ff-text-muted)] italic truncate">Unassigned</span>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 shrink-0">
           <span className="text-[10px] text-[var(--ff-text-muted)] bg-[var(--ff-bg-tertiary)] px-1.5 py-0.5 rounded" title="Time in current status">
             {getTimeInStatus()}
           </span>
