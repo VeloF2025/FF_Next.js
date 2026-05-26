@@ -47,7 +47,7 @@ export function buildSeedPlan(
 export interface SeedRunResult { dryRun: boolean; rows: SeedRow[]; gaps: SeedGap[]; committed: number; }
 
 /** Build the product map: odoo product_id -> FF stock_items.id (key: odoo_product_id). */
-async function loadProductMap(): Promise<Map<number, string>> {
+export async function loadProductMap(): Promise<Map<number, string>> {
   const rows = await query<{ id: string; odoo_product_id: number }>(
     'SELECT id, odoo_product_id FROM stock_items WHERE odoo_product_id IS NOT NULL',
   );
@@ -59,7 +59,7 @@ async function loadProductMap(): Promise<Map<number, string>> {
  * a dry run) persist it into odoo_location_mappings. Resolution path:
  * Odoo complete_name -> FF code (pure map) -> stock_locations.id.
  */
-async function loadAndPersistLocationMap(
+export async function loadAndPersistLocationMap(
   client: OdooClient, dryRun: boolean,
 ): Promise<Map<number, string>> {
   const odooLocs = await client.getStockLocations({
