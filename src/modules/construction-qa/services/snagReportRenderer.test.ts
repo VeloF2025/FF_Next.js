@@ -24,6 +24,7 @@ const meta: SnagReportMeta = {
   toDate: '2026-05-20',
   severities: ['critical', 'major', 'minor'],
   categories: ['photo_quality', 'pole_quality'],
+  discipline: 'all',
   generatedAt: '2026-05-20T02:30:00Z',
   generatedBy: 'Hein van Vuuren',
 };
@@ -97,5 +98,18 @@ describe('renderScopeSnagReportHtml', () => {
     const html = await renderScopeSnagReportHtml(meta, rows);
     expect(html).toContain('class="logo-mark"');
     expect(html).not.toContain('class="logo-img"');
+  });
+
+  it('prefixes the title with the discipline (Civil / Optical), none for All', async () => {
+    const civil = await renderScopeSnagReportHtml({ ...meta, discipline: 'civil' }, rows);
+    expect(civil).toContain('Civil Snag Report — Lawley');
+
+    const optical = await renderScopeSnagReportHtml({ ...meta, discipline: 'optical' }, rows);
+    expect(optical).toContain('Optical Snag Report — Lawley');
+
+    const all = await renderScopeSnagReportHtml({ ...meta, discipline: 'all' }, rows);
+    expect(all).toContain('Snag Report — Lawley');
+    expect(all).not.toContain('Civil Snag Report');
+    expect(all).not.toContain('Optical Snag Report');
   });
 });

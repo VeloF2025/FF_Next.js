@@ -11,6 +11,7 @@ const meta: SnagReportMeta = {
   fromDate: '2026-04-20', toDate: '2026-05-20',
   severities: ['critical', 'major', 'minor'],
   categories: ['pole_quality'],
+  discipline: 'all',
   generatedAt: '2026-05-20T02:30:00Z',
   generatedBy: 'test',
 };

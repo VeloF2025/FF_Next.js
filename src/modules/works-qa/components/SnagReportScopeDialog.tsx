@@ -132,7 +132,7 @@ export function SnagReportScopeDialog({ open, projectId, defaultCtx, onClose }: 
         </div>
 
         {result ? (
-          <ResultPanel result={result} onClose={onClose} />
+          <ResultPanel result={result} discipline={form.discipline} onClose={onClose} />
         ) : (
           <ScopeForm
             form={form}
