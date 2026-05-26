@@ -1,278 +1,148 @@
-/**
- * GRN Confirm API - Confirms a GRN and updates stock
- *
- * POST /api/procurement/grn-confirm
- *
- * This endpoint:
- * 1. Validates the GRN is in draft/receiving status
- * 2. Creates a stock_movement record (source_type='fibreflow')
- * 3. Creates stock_movement_items for each GRN item
- * 4. Updates stock_items.qty_available for each accepted item
- * 5. Updates the GRN status to 'received'
- */
-
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
-import { createLoggedSql, logUpdate } from '@/lib/db-logger';
+import { query, queryOne, transaction } from '@/lib/db-pool';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { createAuditLog } from '@/services/procurement/auditService';
 import { postGRNToGL } from '@/modules/accounting/services/glIntegrationHooks';
+import { postGrnReceiptLines, type GrnLine } from '@/services/procurement/postGrnReceipt';
 
-const sql = createLoggedSql(process.env.DATABASE_URL!);
+interface ConfirmRequest { grnId: string; notes?: string; }
 
-interface ConfirmRequest {
-  grnId: string;
-  notes?: string;
-}
-
-export default withAuth(withErrorHandler(async (
-  req: NextApiRequest,
-  res: NextApiResponse
-) => {
-  if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
-  }
+export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
+  if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
 
   const userId = (req as AuthenticatedNextApiRequest).user.id;
   const { grnId, notes } = req.body as ConfirmRequest;
-
-  if (!grnId) {
-    return apiResponse.validationError(res, { grnId: 'GRN ID is required' });
-  }
+  if (!grnId) return apiResponse.validationError(res, { grnId: 'GRN ID is required' });
 
   try {
-    // 1. Get the GRN with its items
-    const [grn] = await sql`
-      SELECT
-        grn.id, grn.grn_number, grn.status, grn.supplier_id, grn.warehouse_id,
-        grn.purchase_order_id,
-        COALESCE(s.company_name, s.name) as supplier_name,
-        sl.name as warehouse_name
-      FROM goods_receipt_notes grn
-      LEFT JOIN suppliers s ON grn.supplier_id = s.id
-      LEFT JOIN stock_locations sl ON grn.warehouse_id = sl.id
-      WHERE grn.id = ${grnId}
-    `;
+    const grn = await queryOne<{
+      id: string; grn_number: string; status: string; supplier_id: string;
+      warehouse_id: string; purchase_order_id: string | null;
+      supplier_name: string; warehouse_name: string;
+    }>(
+      `SELECT grn.id, grn.grn_number, grn.status, grn.supplier_id, grn.warehouse_id, grn.purchase_order_id,
+              COALESCE(s.company_name, s.name) AS supplier_name, sl.name AS warehouse_name
+         FROM goods_receipt_notes grn
+         LEFT JOIN suppliers s ON grn.supplier_id = s.id
+         LEFT JOIN stock_locations sl ON grn.warehouse_id = sl.id
+        WHERE grn.id = $1`, [grnId]);
 
-    if (!grn) {
-      return apiResponse.notFound(res, 'Goods Receipt Note', grnId);
-    }
+    if (!grn) return apiResponse.notFound(res, 'Goods Receipt Note', grnId);
 
-    // 2. Check status - only draft or receiving can be confirmed
     if (!['draft', 'receiving'].includes(grn.status)) {
       return apiResponse.badRequest(
         res,
-        `Cannot confirm GRN in '${grn.status}' status. Only draft or receiving GRNs can be confirmed.`
+        `Cannot confirm GRN in '${grn.status}' status. Only draft or receiving GRNs can be confirmed.`,
       );
     }
+    if (!grn.warehouse_id) return apiResponse.badRequest(res, 'GRN has no destination warehouse');
 
-    // 3. Get GRN items
-    const grnItems = await sql`
-      SELECT
-        id, grn_id, po_item_id, stock_item_id, item_code, item_description,
-        quantity_received, quantity_rejected, uom, unit_cost, total_cost,
-        serial_numbers, lot_number, inspection_status
-      FROM goods_receipt_items
-      WHERE grn_id = ${grnId}
-    `;
+    const grnItems = await query<{
+      stock_item_id: string | null; quantity_received: number; quantity_rejected: number;
+      lot_number: string | null; item_code: string | null; item_description: string | null;
+      uom: string | null; unit_cost: number | null; serial_numbers: unknown; total_cost: number | null;
+    }>(
+      `SELECT stock_item_id, quantity_received, quantity_rejected, lot_number, item_code, item_description,
+              uom, unit_cost, serial_numbers, total_cost
+         FROM goods_receipt_items WHERE grn_id = $1`, [grnId]);
 
-    if (grnItems.length === 0) {
-      return apiResponse.badRequest(res, 'GRN has no items to receive');
-    }
+    if (grnItems.length === 0) return apiResponse.badRequest(res, 'GRN has no items to receive');
 
-    // 4. Create stock_movement record
-    const movementRows = await sql`
-      INSERT INTO stock_movements (
-        id,
-        project_id,
-        movement_type,
-        reference_number,
-        reference_type,
-        reference_id,
-        from_location,
-        to_location,
-        status,
-        movement_date,
-        confirmed_at,
-        requested_by,
-        processed_by,
-        notes,
-        source_type
-      ) VALUES (
-        gen_random_uuid(),
-        'fibreflow',
-        'GRN',
-        ${grn.grn_number},
-        'goods_receipt_note',
-        ${grnId},
-        ${grn.supplier_name || 'Supplier'},
-        ${grn.warehouse_name || 'Warehouse'},
-        'completed',
-        NOW(),
-        NOW(),
-        ${userId || 'system'},
-        ${userId || 'system'},
-        ${notes || `GRN confirmed: ${grn.grn_number}`},
-        'fibreflow'
-      )
-      RETURNING id, reference_number, movement_type
-    `;
-    const movement = movementRows[0]!;
+    const vendors = await queryOne<{ id: string }>(
+      "SELECT id FROM stock_locations WHERE code = 'VENDORS' LIMIT 1",
+    );
+    // VENDORS is the virtual location representing external suppliers (migration 382)
+    if (!vendors) return apiResponse.badRequest(res, 'VENDORS location missing — run migration 382');
 
-    log.info('Created stock movement for GRN', {
-      movementId: movement.id,
-      grnNumber: grn.grn_number,
-      module: 'procurement:grn-confirm',
-    });
+    const lines: GrnLine[] = grnItems.map((i) => ({
+      stockItemId: i.stock_item_id ?? '',
+      quantityReceived: Number(i.quantity_received || 0),
+      quantityRejected: Number(i.quantity_rejected || 0),
+      lotNumber: i.lot_number,
+    }));
 
-    // 5. Create stock_movement_items and update stock quantities
-    let totalQuantityReceived = 0;
-    let itemsProcessed = 0;
+    const { movementId, totalAccepted } = await transaction(async (txn) => {
+      const mvRows = await txn.query<{ id: string }>(
+        `INSERT INTO stock_movements (id, project_id, movement_type, reference_number, reference_type, reference_id,
+            from_location, to_location, status, movement_date, confirmed_at, requested_by, processed_by, notes, source_type)
+         VALUES (gen_random_uuid(), 'fibreflow', 'GRN', $1, 'goods_receipt_note', $2, $3, $4, 'completed', NOW(), NOW(), $5, $5, $6, 'fibreflow')
+         RETURNING id`,
+        [
+          grn.grn_number, grnId,
+          grn.supplier_name || 'Supplier', grn.warehouse_name || 'Warehouse',
+          userId || 'system', notes || `GRN confirmed: ${grn.grn_number}`,
+        ],
+      );
+      const mv = mvRows[0];
+      if (!mv) throw new Error('stock_movements insert returned no row');
 
-    for (const item of grnItems) {
-      const quantityReceived = Number(item.quantity_received || 0);
-      const quantityRejected = Number(item.quantity_rejected || 0);
-      const quantityAccepted = quantityReceived - quantityRejected;
-
-      if (quantityAccepted <= 0) {
-        continue; // Skip items with no accepted quantity
+      // Document-detail line items (consumed by stock/index.ts, movementReversalService,
+      // stockMovementSync) — preserved additively alongside the location-aware ledger postings.
+      for (const it of grnItems) {
+        const accepted = Number(it.quantity_received || 0) - Number(it.quantity_rejected || 0);
+        if (accepted <= 0) continue;
+        await txn.query(
+          `INSERT INTO stock_movement_items (id, stock_movement_id, project_id, item_code, description,
+             planned_quantity, actual_quantity, uom, unit_cost, total_cost, serial_numbers, lot_numbers, item_status)
+           VALUES (gen_random_uuid(), $1, 'fibreflow', $2, $3, $4, $5, $6, $7, $8, $9, $10, 'received')`,
+          [
+            mv.id, it.item_code || '', it.item_description || '', Number(it.quantity_received || 0), accepted,
+            it.uom || 'EA', it.unit_cost || 0, (Number(it.unit_cost || 0) * accepted), it.serial_numbers ?? null,
+            it.lot_number ? JSON.stringify([it.lot_number]) : null,
+          ],
+        );
       }
 
-      // Insert movement item
-      await sql`
-        INSERT INTO stock_movement_items (
-          id,
-          stock_movement_id,
-          project_id,
-          item_code,
-          description,
-          planned_quantity,
-          actual_quantity,
-          uom,
-          unit_cost,
-          total_cost,
-          serial_numbers,
-          lot_numbers,
-          item_status
-        ) VALUES (
-          gen_random_uuid(),
-          ${movement.id},
-          'fibreflow',
-          ${item.item_code || ''},
-          ${item.item_description || ''},
-          ${quantityReceived},
-          ${quantityAccepted},
-          ${item.uom || 'EA'},
-          ${item.unit_cost || 0},
-          ${(item.unit_cost || 0) * quantityAccepted},
-          ${item.serial_numbers || null},
-          ${item.lot_number ? JSON.stringify([item.lot_number]) : null},
-          'received'
-        )
-      `;
+      const totalAccepted = await postGrnReceiptLines(txn, {
+        lines,
+        destinationLocationId: grn.warehouse_id,
+        vendorsLocationId: vendors.id,
+      });
 
-      // Update stock_items quantity if stock_item_id is provided
-      if (item.stock_item_id) {
-        await sql`
-          UPDATE stock_items
-          SET
-            qty_available = COALESCE(qty_available, 0) + ${quantityAccepted},
-            updated_at = NOW()
-          WHERE id = ${item.stock_item_id}
-        `;
+      await txn.query(
+        `UPDATE goods_receipt_notes SET status = 'completed', total_quantity_received = $2,
+            verified_by = $3, verified_at = NOW(), updated_at = NOW() WHERE id = $1`,
+        [grnId, totalAccepted, userId || 'system'],
+      );
 
-        log.debug('Updated stock item quantity', {
-          stockItemId: item.stock_item_id,
-          quantityAdded: quantityAccepted,
-          module: 'procurement:grn-confirm',
-        });
-      } else if (item.item_code) {
-        // Try to find and update by item_code
-        await sql`
-          UPDATE stock_items
-          SET
-            qty_available = COALESCE(qty_available, 0) + ${quantityAccepted},
-            updated_at = NOW()
-          WHERE item_code = ${item.item_code}
-        `;
-      }
-
-      totalQuantityReceived += quantityAccepted;
-      itemsProcessed++;
-    }
-
-    // 6. Update GRN status to 'completed'
-    const updatedGrnRows = await sql`
-      UPDATE goods_receipt_notes
-      SET
-        status = 'completed',
-        total_quantity_received = ${totalQuantityReceived},
-        verified_by = ${userId || 'system'},
-        verified_at = NOW(),
-        updated_at = NOW()
-      WHERE id = ${grnId}
-      RETURNING id, grn_number, status
-    `;
-    const updatedGrn = updatedGrnRows[0]!;
-
-    logUpdate('goods_receipt_note', grnId, {
-      status: 'completed',
-      total_quantity_received: totalQuantityReceived,
-      movement_id: movement.id,
+      return { movementId: mv.id, totalAccepted };
     });
 
+    // fire-and-forget: audit write must not block or fail the confirmed response (matches prior behavior)
     createAuditLog({
-      entityType: 'goods_receipt',
-      entityId: grnId,
-      action: 'update',
-      performedBy: userId,
-      newValues: { status: 'completed', totalQuantityReceived, movementId: movement.id },
+      entityType: 'goods_receipt', entityId: grnId, action: 'update', performedBy: userId,
+      newValues: { status: 'completed', totalQuantityReceived: totalAccepted, movementId },
     });
 
-    // 7. GL integration: DR Materials, CR AP
-    const grnTotalValue = grnItems.reduce((sum: number, item: Record<string, unknown>) =>
-      sum + Number(item.total_cost || 0), 0);
+    const grnTotalValue = grnItems.reduce((s, i) => s + Number(i.total_cost || 0), 0);
     if (grnTotalValue > 0) {
       const poProjectId = grn.purchase_order_id
-        ? (await sql`SELECT project_id FROM purchase_orders WHERE id = ${grn.purchase_order_id}`)?.[0]?.project_id
+        ? (await queryOne<{ project_id: string }>(
+            'SELECT project_id FROM purchase_orders WHERE id = $1',
+            [grn.purchase_order_id],
+          ))?.project_id ?? null
         : null;
-      await postGRNToGL(grnId, grnTotalValue, poProjectId || null, userId, grn.grn_number);
+      await postGRNToGL(grnId, grnTotalValue, poProjectId, userId, grn.grn_number);
     }
 
     log.info('GRN confirmed successfully', {
-      grnId,
-      grnNumber: grn.grn_number,
-      movementId: movement.id,
-      itemsProcessed,
-      totalQuantityReceived,
-      module: 'procurement:grn-confirm',
+      grnId, grnNumber: grn.grn_number, movementId, totalAccepted, module: 'procurement:grn-confirm',
     });
 
     return apiResponse.success(res, {
       message: 'GRN confirmed successfully',
-      grn: {
-        id: updatedGrn.id,
-        grnNumber: updatedGrn.grn_number,
-        status: updatedGrn.status,
-      },
-      movement: {
-        id: movement.id,
-        referenceNumber: movement.reference_number,
-        type: movement.movement_type,
-      },
+      grn: { id: grn.id, grnNumber: grn.grn_number, status: 'completed' },
+      movement: { id: movementId, referenceNumber: grn.grn_number, type: 'GRN' },
       summary: {
-        itemsProcessed,
-        totalQuantityReceived,
+        itemsProcessed: lines.filter((l) => l.stockItemId && (l.quantityReceived - l.quantityRejected) > 0).length,
+        totalQuantityReceived: totalAccepted,
       },
     });
   } catch (error) {
-    log.error('Failed to confirm GRN', {
-      grnId,
-      error,
-      module: 'procurement:grn-confirm',
-    });
+    log.error('Failed to confirm GRN', { grnId, error, module: 'procurement:grn-confirm' });
     return apiResponse.databaseError(res, error, 'Failed to confirm GRN');
   }
 }));
