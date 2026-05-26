@@ -55,7 +55,8 @@ handleMessage()
   ├── groupType == "pre_provision" / "civil" / "optical"
   │     ├── processDropNumbers()  → DR still extracted, QA review + photo stored
   │     ├── (NO ACK — see allowlist below)
-  │     └── civil/optical also → forwardToFieldOpsAPI() (photo_base64)
+  │     ├── civil/optical only → forwardToFieldOpsAPI() (photo_base64)
+  │     └── pre_provision → DR capture only (no field-ops forward)
   │
   └── groupType == "admin"
         ├── processDropNumbers()  → DR still extracted + stored if a DR appears
@@ -79,13 +80,14 @@ This deliberately captures DRs/ONT serials that surface in *any* monitored group
 row so the data feeds DR history and ONT lifecycle — but **no "Received!" ACK reply is
 sent** outside the 10 `dr_submission` activation feeds. (Before this date the gate was
 `!= "pre_provision"`, which leaked ACKs into civil/optical/admin groups whenever a DR was
-posted there.) `maintenance` returns early in `processDropNumbers()` so it neither stores
-nor ACKs.
+posted there.) For `maintenance`, only `processDropNumbers()` returns early — so no DR is
+captured and no ACK is sent — but the message is still forwarded to the maintenance API
+via `forwardToMaintenanceAPI()`.
 
 **Source-group traceability:** `createQAPhotoReview()` writes `qa_photo_reviews.wa_group_jid =
 chatJID` on every new capture, and the resubmission UPDATE path backfills it
-(`COALESCE(NULLIF(wa_group_jid,''), $chatJID)`) plus records the source group in the
-comment trail — so you can tell which group each DR sighting came from.
+(`COALESCE(NULLIF(wa_group_jid,''), $3)`, where `$3` is `chatJID`) plus records the source
+group in the comment trail — so you can tell which group each DR sighting came from.
 
 ## Maintenance API Authentication
 
