@@ -495,9 +495,9 @@ main().catch((e) => { console.error('Seed failed:', e.message); process.exit(1);
 - [ ] **Step 4: Add Odoo env keys to `.env.local`** (local only; gitignored — edit via your editor, not committed)
 
 ```
-ODOO_URL=https://velocityfibre.odoo.com
-ODOO_DB=velocityfibre
-ODOO_USERNAME=jacques@velocityfibre.co.za
+ODOO_URL=https://<your-odoo-instance>.odoo.com
+ODOO_DB=<odoo-db-name>
+ODOO_USERNAME=<odoo-user@example.com>
 ODOO_PASSWORD=<the Odoo password — from password manager, NOT committed>
 ```
 

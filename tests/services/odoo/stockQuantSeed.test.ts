@@ -29,4 +29,8 @@ describe('buildSeedPlan', () => {
     expect(plan.rows).toEqual([]);
     expect(plan.gaps).toEqual([{ kind: 'location', odooId: 77, name: 'Partners/Customers', quantity: 5, product: 'CAB-144F' }]);
   });
+
+  it('returns an empty plan for empty input', () => {
+    expect(buildSeedPlan([], productMap, locationMap)).toEqual({ rows: [], gaps: [] });
+  });
 });

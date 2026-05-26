@@ -19,4 +19,25 @@ describe('diffOdooVsFf', () => {
     expect(r.drift[0]).toMatchObject({ odooQty: 50, ffQty: 30, delta: -20 });
     expect(r.drift[1]).toMatchObject({ odooQty: 10, ffQty: 0, delta: -10 });
   });
+
+  it('reports FF-only surplus (Odoo zero) as positive-delta drift', () => {
+    const odoo: OdooAgg[] = [{ stockItemId: 'a', locationId: 'L1', name: 'A@L1', quantity: 10 }];
+    const ff: FfQuant[] = [
+      { stockItemId: 'a', locationId: 'L1', quantity: 10 },
+      { stockItemId: 'x', locationId: 'L9', quantity: 7 },
+    ];
+    const r = diffOdooVsFf(odoo, ff);
+    expect(r.matches).toBe(1);
+    expect(r.drift).toHaveLength(1);
+    expect(r.drift[0]).toMatchObject({ stockItemId: 'x', locationId: 'L9', odooQty: 0, ffQty: 7, delta: 7 });
+  });
+
+  it('treats sub-0.001 differences as matches', () => {
+    const r = diffOdooVsFf(
+      [{ stockItemId: 'a', locationId: 'L1', name: 'A', quantity: 100.0005 }],
+      [{ stockItemId: 'a', locationId: 'L1', quantity: 100 }],
+    );
+    expect(r.matches).toBe(1);
+    expect(r.drift).toHaveLength(0);
+  });
 });

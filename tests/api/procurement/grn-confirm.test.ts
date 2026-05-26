@@ -66,4 +66,43 @@ describe('POST /api/procurement/grn-confirm', () => {
     expect(dbPool.transaction).not.toHaveBeenCalled();
     expect((res as { _status?: number })._status).toBe(400);
   });
+
+  it('returns 404 when the GRN does not exist', async () => {
+    (dbPool.queryOne as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+    const req = { method: 'POST', body: { grnId: 'missing' }, query: {}, headers: {}, user: { id: 'u' } } as unknown as NextApiRequest;
+    const res = makeRes();
+    await handler(req, res);
+    expect(dbPool.transaction).not.toHaveBeenCalled();
+    expect((res as { _status?: number })._status).toBe(404);
+  });
+
+  it('returns 400 when the GRN has no items', async () => {
+    (dbPool.queryOne as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ id: 'g1', status: 'draft', warehouse_id: 'loc-dc', grn_number: 'GRN-1' });
+    (dbPool.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    const req = { method: 'POST', body: { grnId: 'g1' }, query: {}, headers: {}, user: { id: 'u' } } as unknown as NextApiRequest;
+    const res = makeRes();
+    await handler(req, res);
+    expect(dbPool.transaction).not.toHaveBeenCalled();
+    expect((res as { _status?: number })._status).toBe(400);
+  });
+
+  it('returns 400 when the VENDORS location is missing', async () => {
+    (dbPool.queryOne as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ id: 'g1', status: 'draft', warehouse_id: 'loc-dc', grn_number: 'GRN-1' })
+      .mockResolvedValueOnce(null);
+    (dbPool.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce([{ stock_item_id: 'item-1', quantity_received: 1, quantity_rejected: 0, lot_number: null, total_cost: 0 }]);
+    const req = { method: 'POST', body: { grnId: 'g1' }, query: {}, headers: {}, user: { id: 'u' } } as unknown as NextApiRequest;
+    const res = makeRes();
+    await handler(req, res);
+    expect(dbPool.transaction).not.toHaveBeenCalled();
+    expect((res as { _status?: number })._status).toBe(400);
+  });
+
+  it('rejects a missing grnId without hitting the DB', async () => {
+    const req = { method: 'POST', body: {}, query: {}, headers: {}, user: { id: 'u' } } as unknown as NextApiRequest;
+    const res = makeRes();
+    await handler(req, res);
+    expect(dbPool.transaction).not.toHaveBeenCalled();
+    expect((res as { _status?: number })._status).toBeGreaterThanOrEqual(400);
+  });
 });

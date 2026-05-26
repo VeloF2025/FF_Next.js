@@ -39,4 +39,31 @@ describe('postGrnReceiptLines', () => {
     expect(total).toBe(0);
     expect(txn.calls).toHaveLength(0);
   });
+
+  it('posts each accepted line for multi-line input and sums the total', async () => {
+    const txn = fakeTxn();
+    const total = await postGrnReceiptLines(txn as never, {
+      lines: [line(), line({ stockItemId: 'item-2', quantityReceived: 5, quantityRejected: 0 })],
+      destinationLocationId: 'loc-dc', vendorsLocationId: 'loc-vend',
+    });
+    expect(total).toBe(13); // 8 + 5
+    expect(txn.calls).toHaveLength(6); // 3 statements x 2 lines
+  });
+
+  it('skips a line with an empty stockItemId (no writes)', async () => {
+    const txn = fakeTxn();
+    const total = await postGrnReceiptLines(txn as never, {
+      lines: [line({ stockItemId: '' })], destinationLocationId: 'loc-dc', vendorsLocationId: 'loc-vend',
+    });
+    expect(total).toBe(0);
+    expect(txn.calls).toHaveLength(0);
+  });
+
+  it('passes the lot number to the quant upsert', async () => {
+    const txn = fakeTxn();
+    await postGrnReceiptLines(txn as never, {
+      lines: [line({ lotNumber: 'LOT-123' })], destinationLocationId: 'loc-dc', vendorsLocationId: 'loc-vend',
+    });
+    expect(txn.calls[0].params).toContain('LOT-123');
+  });
 });

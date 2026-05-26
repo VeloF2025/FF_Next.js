@@ -1,4 +1,5 @@
 import { query } from '@/lib/db-pool';
+import { log } from '@/lib/logger';
 import type { OdooClient } from '../odooClient';
 import { loadProductMap, loadAndPersistLocationMap } from './stockQuantSeed';
 
@@ -9,13 +10,21 @@ export interface ReconcileResult { matches: number; drift: DriftRow[]; }
 
 /** Pure: compare Odoo-aggregated on-hand to FibreFlow stock_quants per (item, location). delta = ff - odoo. */
 export function diffOdooVsFf(odoo: OdooAgg[], ff: FfQuant[]): ReconcileResult {
-  const ffMap = new Map(ff.map((q) => [`${q.stockItemId}|${q.locationId}`, q.quantity]));
+  const odooMap = new Map(odoo.map((o) => [`${o.stockItemId}|${o.locationId}`, o]));
+  const ffMap = new Map(ff.map((q) => [`${q.stockItemId}|${q.locationId}`, q]));
+  const keys = new Set<string>([...odooMap.keys(), ...ffMap.keys()]);
   let matches = 0;
   const drift: DriftRow[] = [];
-  for (const o of odoo) {
-    const ffQty = ffMap.get(`${o.stockItemId}|${o.locationId}`) ?? 0;
-    if (Math.abs(o.quantity - ffQty) < 0.001) { matches++; continue; }
-    drift.push({ name: o.name, stockItemId: o.stockItemId, locationId: o.locationId, odooQty: o.quantity, ffQty, delta: ffQty - o.quantity });
+  for (const key of keys) {
+    const o = odooMap.get(key);
+    const f = ffMap.get(key);
+    const odooQty = o?.quantity ?? 0;
+    const ffQty = f?.quantity ?? 0;
+    if (Math.abs(odooQty - ffQty) < 0.001) { matches++; continue; }
+    const src = o ?? f;
+    if (!src) continue; // unreachable: key always comes from the union
+    const name = o?.name ?? `(FF-only) item ${src.stockItemId} @ ${src.locationId}`;
+    drift.push({ name, stockItemId: src.stockItemId, locationId: src.locationId, odooQty, ffQty, delta: ffQty - odooQty });
   }
   drift.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
   return { matches, drift };
@@ -33,6 +42,7 @@ export async function reconcileStockQuantsVsOdoo(client: OdooClient): Promise<Re
     client.getInternalStockQuants({ limit: 5000 }),
   ]);
   const productMap = await loadProductMap(quants);
+  if (quants.length >= 5000) log.warn('Odoo quant fetch hit the 5000 limit — reconcile may be incomplete', { module: 'odoo:stockQuantReconcile' });
 
   const aggMap = new Map<string, OdooAgg>();
   for (const q of quants) {

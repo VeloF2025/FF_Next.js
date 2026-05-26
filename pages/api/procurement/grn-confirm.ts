@@ -57,6 +57,9 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
     // VENDORS is the virtual location representing external suppliers (migration 382)
     if (!vendors) return apiResponse.badRequest(res, 'VENDORS location missing — run migration 382');
 
+    // Lines without a stock_item_id are skipped by postGrnReceiptLines (the ledger keys on
+    // stock_item_id). The legacy qty_available-by-item_code fallback is intentionally dropped:
+    // location-aware quants/movements require a real stock_items row.
     const lines: GrnLine[] = grnItems.map((i) => ({
       stockItemId: i.stock_item_id ?? '',
       quantityReceived: Number(i.quantity_received || 0),

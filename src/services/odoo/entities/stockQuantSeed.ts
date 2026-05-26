@@ -134,6 +134,9 @@ export async function seedStockQuantsFromOdoo(
   const vendorsId = await getVendorsLocationId();
   let committed = 0;
   await transaction(async (txn) => {
+    // Idempotent opening seed: clear prior opening movements so re-runs don't duplicate them
+    // (the quant upsert is an absolute overwrite; the movement ledger must be replaced, not appended).
+    await txn.query(`DELETE FROM field_stock_movements WHERE reference = 'ODOO_OPENING'`);
     for (const r of rows) {
       await txn.query(
         `INSERT INTO stock_quants (id, stock_item_id, location_id, quantity, created_at, updated_at)
