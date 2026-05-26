@@ -3,9 +3,10 @@ import useSWR from 'swr';
 export interface PoleSnag {
   id: string;
   pole_qa_photo_id: string;
-  slot_key: string;
+  /** Null for pole-level snags raised via the planted-check / "other issue" buttons. */
+  slot_key: string | null;
   slot_photo_key: string | null;
-  discipline: 'civil' | 'dome' | 'main_joint';
+  discipline: 'civil' | 'dome' | 'main_joint' | null;
   description: string;
   severity: 'minor' | 'major' | 'critical';
   status: string;

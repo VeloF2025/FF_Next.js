@@ -72,16 +72,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   const fromDate = body.from_date ?? isoMinus(30);
   const toDate = body.to_date ?? isoMinus(0);
   const severities = body.severities ?? ['minor', 'major', 'critical'];
-  const categories = body.categories ?? null;
 
   // Coerce undefined OR empty array to null so Postgres can apply IS NULL
   // checks. The dialog sends [] for non-active scope dimensions (e.g. when
   // scope=zone it sends pons:[] / poles:[]) — without this coercion the
   // `${arr}::int[] IS NULL` branch is false and `= ANY('{}'::int[])` matches
-  // zero rows, silently filtering out every snag.
+  // zero rows, silently filtering out every snag. Categories behave the same:
+  // an empty selection means "all categories", not "match the empty set".
   const zones: number[] | null = body.zones && body.zones.length > 0 ? body.zones : null;
   const pons: number[] | null = body.pons && body.pons.length > 0 ? body.pons : null;
   const poles: string[] | null = body.poles && body.poles.length > 0 ? body.poles : null;
+  const categories: string[] | null = body.categories && body.categories.length > 0 ? body.categories : null;
 
   // ── 1. Fetch snags matching scope ──────────────────────────────────────────
 
@@ -137,7 +138,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     fromDate,
     toDate,
     severities,
-    categories: categories ?? ['photo_quality', 'pole_quality', 'verification', 'other'],
+    // When no category filter was applied, label the report with the categories
+    // actually present in the result set rather than a fixed (and stale) list.
+    categories: categories ?? Array.from(new Set(rows.map(r => r.category).filter(Boolean))),
     generatedAt: today.toISOString(),
     generatedBy,
   };

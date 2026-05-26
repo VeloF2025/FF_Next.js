@@ -53,6 +53,8 @@ export interface ScopeFormProps {
   form: ReturnType<typeof useReportScopeForm>;
   allZones: number[];
   allPons: number[];
+  /** Distinct snag categories present for the project (from the options API). */
+  allCategories: string[];
   polesText: string;
   setPolesText: (v: string) => void;
   busy: boolean;
@@ -63,7 +65,7 @@ export interface ScopeFormProps {
 
 /** Zone / PON / pole scope selection form with date range and filter chips. */
 export function ScopeForm({
-  form, allZones, allPons, polesText, setPolesText,
+  form, allZones, allPons, allCategories, polesText, setPolesText,
   busy, error, onClose, onSubmit,
 }: ScopeFormProps) {
   return (
@@ -117,11 +119,14 @@ export function ScopeForm({
         label="Severity" options={['minor', 'major', 'critical']}
         selected={form.severities} onChange={form.setSeverities} disabled={busy}
       />
-      <ScopeChipPicker<string>
-        label="Category"
-        options={['photo_quality', 'pole_quality', 'verification', 'other']}
-        selected={form.categories} onChange={form.setCategories} disabled={busy}
-      />
+      {/* Options are the project's real snag categories; none selected = all. */}
+      {allCategories.length > 0 && (
+        <ScopeChipPicker<string>
+          label="Category (all if none selected)"
+          options={allCategories}
+          selected={form.categories} onChange={form.setCategories} disabled={busy}
+        />
+      )}
 
       {error && <div className="text-rose-400 text-sm" role="alert">{error}</div>}
 

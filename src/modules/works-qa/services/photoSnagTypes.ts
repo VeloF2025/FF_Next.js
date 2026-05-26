@@ -14,9 +14,10 @@ export type SlotApprovals = Record<string, SlotApproval>;
 export interface PhotoSnagRow {
   id: string;
   pole_qa_photo_id: string;
-  slot_key: string;
+  /** Null for pole-level snags (planted-check / "other issue") that target no photo slot. */
+  slot_key: string | null;
   slot_photo_key: string | null;
-  discipline: 'civil' | 'dome' | 'main_joint';
+  discipline: 'civil' | 'dome' | 'main_joint' | null;
   description: string;
   severity: SnagSeverity;
   status: string;

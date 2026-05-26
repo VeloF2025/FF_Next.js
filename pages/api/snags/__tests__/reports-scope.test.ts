@@ -303,4 +303,37 @@ describe('POST /api/snags/reports-scope', () => {
 
     expect(res._getStatusCode()).toBe(201);
   });
+
+  it('treats an empty categories[] as "all categories", not the empty set', async () => {
+    // Regression: the report dialog now sends categories:[] to mean "no category
+    // narrowing". Without the empty→null coercion, `s.category = ANY('{}')`
+    // matched zero rows and every report 400'd "No snags match". (The original
+    // failure was worse: the chips hardcoded photo_quality/pole_quality/… which
+    // matched no real snags at all — real categories are quality/Workmanship.)
+    const candidate = (await realSql`
+      SELECT COALESCE(pqa.zone_no, pl.zone_no, dr.zone_no) AS zone_no
+      FROM   snags s
+      LEFT   JOIN pole_qa_photos pqa ON pqa.id = s.pole_qa_photo_id
+      LEFT   JOIN poles          pl  ON pl.id  = s.pole_ids[1]
+      LEFT   JOIN drops          dr  ON dr.id  = s.drop_id
+      WHERE  s.project_id = ${projectId}
+        AND  COALESCE(pqa.zone_no, pl.zone_no, dr.zone_no) IS NOT NULL
+      LIMIT  1
+    `) as Array<{ zone_no: number }>;
+
+    if (candidate.length === 0) return;
+
+    const { req, res } = createMocks({
+      method: 'POST',
+      body: {
+        project_id: projectId,
+        scope: 'zone',
+        zones: [candidate[0]!.zone_no],
+        categories: [],
+      },
+    });
+    await handler(req as never, res as never);
+
+    expect(res._getStatusCode()).toBe(201);
+  });
 });

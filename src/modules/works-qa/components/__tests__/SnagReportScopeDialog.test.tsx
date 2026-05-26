@@ -92,6 +92,26 @@ describe('SnagReportScopeDialog', () => {
     expect(screen.getByRole('link', { name: /Download Excel/i })).toHaveAttribute('href', '/api/snags/reports-scope-xlsx?id=r1');
   });
 
+  it('renders Category chips from the options API (real data, not a hardcoded list)', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('zone-pon-options')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ data: { zones: [24], pons: [], categories: ['quality', 'verification'] } }),
+        });
+      }
+      return Promise.resolve({ ok: false, json: async () => ({}) });
+    });
+
+    render(<SnagReportScopeDialog open projectId="p1" defaultCtx={{ zone_no: 24 }} onClose={() => {}} />, { wrapper });
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'quality' })).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'verification' })).toBeInTheDocument();
+    // The stale hardcoded categories must NOT appear.
+    expect(screen.queryByRole('button', { name: 'photo_quality' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'pole_quality' })).not.toBeInTheDocument();
+  });
+
   it('renders inline error on HTTP failure', async () => {
     fetchMock.mockImplementation((url: string) => {
       if (typeof url === 'string' && url.includes('zone-pon-options')) {

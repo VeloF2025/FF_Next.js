@@ -89,6 +89,51 @@ describe('useReportScopeForm', () => {
       expect(body.to_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(body.severities).toEqual(['minor', 'major', 'critical']);
     });
+
+    it('defaults categories to empty ("all categories") — never the stale hardcoded list', () => {
+      const { result } = renderHook(() => useReportScopeForm({ zone_no: 24 }));
+      expect(result.current.categories).toEqual([]);
+    });
+
+    // Regression: picking zone 34 then switching to PON scope used to AND the
+    // stray zone into the query, dropping every snag whose zone differed
+    // (PON 267 lives in zone 24). Only the active scope dimension is sent.
+    it('sends only PONs (not the stray zone) when scope=pon', () => {
+      const { result } = renderHook(() => useReportScopeForm({}));
+      act(() => {
+        result.current.setProjectId('p1');
+        result.current.setScope('pon');
+        result.current.setZones([34]);
+        result.current.setPons([267]);
+      });
+      const body = result.current.toSubmitBody();
+      expect(body).toMatchObject({ scope: 'pon', zones: [], pons: [267], poles: [] });
+    });
+
+    it('sends only zones when scope=zone', () => {
+      const { result } = renderHook(() => useReportScopeForm({}));
+      act(() => {
+        result.current.setProjectId('p1');
+        result.current.setScope('zone');
+        result.current.setZones([24]);
+        result.current.setPons([267]);
+        result.current.setPoles(['LAW.P.X001']);
+      });
+      const body = result.current.toSubmitBody();
+      expect(body).toMatchObject({ scope: 'zone', zones: [24], pons: [], poles: [] });
+    });
+
+    it('sends only poles when scope=pole', () => {
+      const { result } = renderHook(() => useReportScopeForm({}));
+      act(() => {
+        result.current.setProjectId('p1');
+        result.current.setScope('pole');
+        result.current.setZones([24]);
+        result.current.setPoles(['LAW.P.X001']);
+      });
+      const body = result.current.toSubmitBody();
+      expect(body).toMatchObject({ scope: 'pole', zones: [], pons: [], poles: ['LAW.P.X001'] });
+    });
   });
 
   describe('default date range', () => {
