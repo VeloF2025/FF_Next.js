@@ -6,7 +6,6 @@
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { query } from './db';
-import { syncTechnicianHolder } from './stockHolderService';
 import type {
   StockLocation,
   CreateLocationInput,
@@ -407,64 +406,6 @@ export async function getTechnicianLocations(): Promise<StockLocation[]> {
     return results as StockLocation[];
   } catch (error) {
     log.error('Failed to get technician locations', { error }, 'locationService');
-    throw error;
-  }
-}
-
-/**
- * Get or create a technician's van stock location
- */
-export async function getOrCreateTechnicianLocation(
-  technicianId: string,
-  technicianName: string,
-  technicianPhone?: string
-): Promise<StockLocation> {
-  try {
-    // Check if location exists
-    const existing = await sql`
-      SELECT
-        id,
-        parent_id as "parentId",
-        code,
-        name,
-        location_type as "locationType",
-        address,
-        coordinates,
-        assigned_to_id as "assignedToId",
-        assigned_to_name as "assignedToName",
-        assigned_to_phone as "assignedToPhone",
-        project_id as "projectId",
-        is_active as "isActive",
-        is_virtual as "isVirtual",
-        created_at as "createdAt",
-        updated_at as "updatedAt",
-        created_by as "createdBy"
-      FROM stock_locations
-      WHERE location_type = 'technician'
-        AND assigned_to_id = ${technicianId}
-      LIMIT 1
-    `;
-
-    const location =
-      existing.length > 0
-        ? (existing[0] as StockLocation)
-        : await createLocation({
-            code: `TECH-${technicianId.slice(0, 8).toUpperCase()}`,
-            name: `${technicianName}'s Van Stock`,
-            locationType: 'technician',
-            assignedToId: technicianId,
-            assignedToName: technicianName,
-            assignedToPhone: technicianPhone,
-            isVirtual: true,
-          });
-
-    // Sprint C dual-write: keep the stock_holders registry live. Best-effort —
-    // a holder-sync failure must never break technician-location provisioning.
-    await syncTechnicianHolder(technicianId, technicianName, technicianPhone);
-
-    return location;
-  } catch (error) {
-    log.error('Failed to get or create technician location', { error }, 'locationService');
     throw error;
   }
 }

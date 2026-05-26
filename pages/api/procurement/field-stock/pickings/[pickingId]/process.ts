@@ -1,252 +1,275 @@
 /**
  * Process Picking API
  * POST /api/procurement/field-stock/pickings/[pickingId]/process
- * Execute the picking - move stock between locations
  *
- * Fix VF-20260331-048: Added stock availability validation and explicit
- * transaction wrapping to prevent silent stock quant drift.
+ * Fix VF-20260331-048: stock availability validation + explicit transaction.
+ * Sprint D: issue pickings post into holder custody via postIssueToHolderWith.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { transaction } from '@/lib/db-pool';
+import type { TxnClient } from '@/lib/db-pool';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import { createAuditLog } from '@/services/procurement/auditService';
-
-const sql = neon(process.env.DATABASE_URL!);
+import { postIssueToHolderWith } from '@/modules/procurement/field-stock/services/custodyService';
+import {
+  getHolderById,
+  getOrCreateStaffHolder,
+  getOrCreateContractorHolder,
+} from '@/modules/procurement/field-stock/services/stockHolderService';
 
 interface PickingLine {
   id: string;
   stock_item_id: string;
   planned_quantity: number;
   serial_ids?: string[];
+  lot_number?: string | null;
+  unit_cost?: number | null;
 }
 
-interface StockQuantRow {
+interface StockQuantRow extends Record<string, unknown> {
   quantity: number;
 }
 
-/** Verify every picking line has sufficient stock at the source location. */
+interface Picking {
+  id: string;
+  picking_number: string;
+  picking_type: string;
+  source_location_id: string;
+  destination_location_id: string;
+  status: string;
+  holder_id: string | null;
+  technician_id: string | null;
+  technician_name: string | null;
+  contractor_id: string | null;
+  contractor_name: string | null;
+  signed_by: string | null;
+  lines: PickingLine[];
+}
+
+/** Verify every picking line has sufficient stock at source (runs inside txn with FOR UPDATE). */
 async function validateStockAvailability(
+  txn: TxnClient,
   lines: PickingLine[],
-  sourceLocationId: string
+  sourceLocationId: string,
 ): Promise<{ valid: true } | { valid: false; errors: Record<string, string> }> {
   const errors: Record<string, string> = {};
-
   for (const line of lines) {
     if (!line || !line.stock_item_id) continue;
-
-    // 🟢 WORKING: SELECT with FOR UPDATE to lock the row inside the transaction
-    const quants = (await sql`
-      SELECT quantity
-      FROM stock_quants
-      WHERE stock_item_id = ${line.stock_item_id}
-        AND location_id = ${sourceLocationId}
-      FOR UPDATE
-    `) as StockQuantRow[];
-
+    const quants = await txn.query<StockQuantRow>(
+      `SELECT quantity FROM stock_quants WHERE stock_item_id = $1 AND location_id = $2 FOR UPDATE`,
+      [line.stock_item_id, sourceLocationId],
+    );
     if (quants.length === 0) {
-      errors[line.stock_item_id] =
-        `No stock record found for item ${line.stock_item_id} at source location ${sourceLocationId}`;
+      errors[line.stock_item_id] = `No stock record for item ${line.stock_item_id} at source ${sourceLocationId}`;
       continue;
     }
-
     const available = Number(quants[0]!.quantity);
     if (available < line.planned_quantity) {
       errors[line.stock_item_id] =
-        `Insufficient stock for item ${line.stock_item_id}: required ${line.planned_quantity}, available ${available}`;
+        `Insufficient stock for ${line.stock_item_id}: required ${line.planned_quantity}, available ${available}`;
     }
   }
-
-  if (Object.keys(errors).length > 0) {
-    return { valid: false, errors };
-  }
-  return { valid: true };
+  return Object.keys(errors).length > 0 ? { valid: false, errors } : { valid: true };
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { pickingId } = req.query;
-
   if (typeof pickingId !== 'string') {
     return apiResponse.validationError(res, { pickingId: 'Picking ID is required' });
   }
-
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
-  // 🟢 WORKING: Explicit transaction — BEGIN before any mutations
-  await sql`BEGIN`;
-
+  let finalPicking: unknown;
   try {
-    // Get picking with lines — inside the transaction for consistent read
-    const existing = await sql`
-      SELECT
-        p.*,
-        json_agg(
-          json_build_object(
-            'id', pl.id,
-            'stock_item_id', pl.stock_item_id,
-            'planned_quantity', pl.planned_quantity,
-            'serial_ids', pl.serial_ids
-          )
-        ) as lines
-      FROM stock_pickings p
-      LEFT JOIN stock_picking_lines pl ON pl.picking_id = p.id
-      WHERE p.id = ${pickingId}
-      GROUP BY p.id
-    `;
+    finalPicking = await transaction(async (txn) => {
+      // Fetch picking + lines inside txn for consistent read
+      const rows = await txn.query<Record<string, unknown>>(
+        `SELECT p.id, p.picking_number, p.picking_type,
+                p.source_location_id, p.destination_location_id,
+                p.status, p.holder_id,
+                p.technician_id, p.technician_name,
+                p.contractor_id, p.contractor_name,
+                p.signed_by,
+                json_agg(json_build_object(
+                  'id', pl.id, 'stock_item_id', pl.stock_item_id,
+                  'planned_quantity', pl.planned_quantity, 'serial_ids', pl.serial_ids,
+                  'lot_number', pl.lot_number, 'unit_cost', pl.unit_cost
+                )) AS lines
+         FROM stock_pickings p
+         LEFT JOIN stock_picking_lines pl ON pl.picking_id = p.id
+         WHERE p.id = $1 GROUP BY p.id`,
+        [pickingId],
+      );
 
-    const picking = existing[0];
-    if (!picking) {
-      await sql`ROLLBACK`;
-      return apiResponse.notFound(res, 'Picking', pickingId);
-    }
+      const picking = rows[0] as Picking | undefined;
+      if (!picking) throw Object.assign(new Error('PICKING_NOT_FOUND'), { pickingId });
+      if (picking.status !== 'confirmed') {
+        throw Object.assign(new Error('PICKING_INVALID_STATUS'), { currentStatus: picking.status });
+      }
 
-    if (picking.status !== 'confirmed') {
-      await sql`ROLLBACK`;
-      return apiResponse.validationError(res, {
-        status: `Cannot process picking with status "${picking.status}". Only confirmed pickings can be processed.`,
-      });
-    }
+      const { picking_type: pickingType, source_location_id: sourceLocationId,
+              destination_location_id: destinationLocationId } = picking;
+      const lines: PickingLine[] = (picking.lines ?? []).filter((l) => l && l.stock_item_id);
 
-    const sourceLocationId = picking.source_location_id as string;
-    const destinationLocationId = picking.destination_location_id as string;
-    const pickingType = picking.picking_type as string;
-    const lines: PickingLine[] = (picking.lines as PickingLine[]) || [];
+      // Availability check (FOR UPDATE inside txn)
+      const avail = await validateStockAvailability(txn, lines, sourceLocationId);
+      if (!avail.valid) {
+        throw Object.assign(new Error('INSUFFICIENT_STOCK'), { stockErrors: avail.errors });
+      }
 
-    // Filter out null/invalid lines before validation
-    const validLines = lines.filter((l) => l && l.stock_item_id);
+      // Status guard: prevents double-processing
+      await txn.query(
+        `UPDATE stock_pickings SET status = 'processing', updated_at = NOW() WHERE id = $1`,
+        [pickingId],
+      );
 
-    // 🟢 WORKING: Stock availability check — runs inside transaction with FOR UPDATE
-    const availabilityCheck = await validateStockAvailability(validLines, sourceLocationId);
-    if (!availabilityCheck.valid) {
-      await sql`ROLLBACK`;
-      log.warn('Stock transfer blocked: insufficient stock', {
-        pickingId,
-        errors: availabilityCheck.errors,
-      }, 'field-stock');
-      return apiResponse.validationError(res, availabilityCheck.errors);
-    }
+      // Resolve recipient holder ONCE (issue pickings only)
+      let toHolderId: string | null = null;
+      if (pickingType === 'issue') {
+        let holder;
+        if (picking.holder_id) {
+          holder = await getHolderById(picking.holder_id);
+          if (!holder) throw new Error(`Issue picking holder_id ${picking.holder_id} not found in stock_holders`);
+        } else if (picking.technician_id) {
+          holder = await getOrCreateStaffHolder(picking.technician_id, picking.technician_name ?? 'technician');
+        } else if (picking.contractor_id) {
+          holder = await getOrCreateContractorHolder(picking.contractor_id, picking.contractor_name ?? 'contractor');
+        } else {
+          throw new Error(
+            `Issue picking ${picking.picking_number} has no holder_id, technician_id, or contractor_id`,
+          );
+        }
+        toHolderId = holder.id;
+      }
 
-    // Mark as processing — status guard prevents double-processing
-    await sql`
-      UPDATE stock_pickings
-      SET status = 'processing', updated_at = NOW()
-      WHERE id = ${pickingId}
-    `;
+      if (pickingType === 'issue' && toHolderId !== null) {
+        // Issue path — custody service handles: debit stock_quants, credit stock_custody,
+        // insert field_stock_movements 'issue' row. No manual duplication.
+        await postIssueToHolderWith(txn, {
+          lines: lines.map((l) => ({
+            stockItemId: l.stock_item_id,
+            quantity: Number(l.planned_quantity),
+            lotNumber: l.lot_number ?? null,
+            unitCost: l.unit_cost ?? null,
+          })),
+          sourceLocationId,
+          toHolderId,
+          reference: picking.picking_number,
+          performedBy: picking.signed_by ?? undefined,
+        });
 
-    // Process each picking line — decrease source, increase/upsert destination
-    for (const line of validLines) {
-      // Decrease source quant — row guaranteed to exist (validated above)
-      await sql`
-        UPDATE stock_quants
-        SET
-          quantity = quantity - ${line.planned_quantity},
-          last_movement_date = NOW(),
-          updated_at = NOW()
-        WHERE stock_item_id = ${line.stock_item_id}
-          AND location_id = ${sourceLocationId}
-      `;
+        // Serials: carry holder_id, clear current_location_id
+        const allSerialIds = lines.flatMap((l) => l.serial_ids ?? []);
+        if (allSerialIds.length > 0) {
+          await txn.query(
+            `UPDATE stock_serials SET holder_id = $1, current_location_id = NULL,
+             status = 'issued', updated_at = NOW() WHERE id = ANY($2::uuid[])`,
+            [toHolderId, allSerialIds],
+          );
+        }
 
-      // Increase or create destination quant
-      await sql`
-        INSERT INTO stock_quants (stock_item_id, location_id, quantity, last_movement_date)
-        VALUES (${line.stock_item_id}, ${destinationLocationId}, ${line.planned_quantity}, NOW())
-        ON CONFLICT (stock_item_id, location_id, lot_number)
-        DO UPDATE SET
-          quantity = stock_quants.quantity + ${line.planned_quantity},
-          last_movement_date = NOW(),
-          updated_at = NOW()
-      `;
+        // Persist holder_id on picking if not already set
+        await txn.query(
+          `UPDATE stock_pickings SET holder_id = $1, updated_at = NOW() WHERE id = $2 AND holder_id IS NULL`,
+          [toHolderId, pickingId],
+        );
 
-      // Update serial records if applicable
-      if (Array.isArray(line.serial_ids)) {
-        const newStatus = pickingType === 'issue' ? 'issued' : 'available';
-        for (const serialId of line.serial_ids) {
-          await sql`
-            UPDATE stock_serials
-            SET
-              current_location_id = ${destinationLocationId},
-              status = ${newStatus},
-              updated_at = NOW()
-            WHERE id = ${serialId}
-          `;
+        // Legacy stock_movements audit insert (feeds stock movement-history view)
+        for (const line of lines) {
+          await txn.query(
+            `INSERT INTO stock_movements (picking_id, stock_item_id, movement_type,
+               from_location_id, to_location_id, quantity, performed_at)
+             VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+            [pickingId, line.stock_item_id, pickingType, sourceLocationId, destinationLocationId, line.planned_quantity],
+          );
+        }
+      } else {
+        // Non-issue path (transfer, scrap, receipt, return) — original behavior
+        for (const line of lines) {
+          await txn.query(
+            `UPDATE stock_quants SET quantity = quantity - $1,
+             last_movement_date = NOW(), updated_at = NOW()
+             WHERE stock_item_id = $2 AND location_id = $3`,
+            [line.planned_quantity, line.stock_item_id, sourceLocationId],
+          );
+          await txn.query(
+            `INSERT INTO stock_quants (stock_item_id, location_id, quantity, last_movement_date)
+             VALUES ($1, $2, $3, NOW())
+             ON CONFLICT (stock_item_id, location_id, lot_number)
+             DO UPDATE SET quantity = stock_quants.quantity + $3,
+               last_movement_date = NOW(), updated_at = NOW()`,
+            [line.stock_item_id, destinationLocationId, line.planned_quantity],
+          );
+          if (Array.isArray(line.serial_ids) && line.serial_ids.length > 0) {
+            await txn.query(
+              `UPDATE stock_serials SET current_location_id = $1, status = 'available', updated_at = NOW()
+               WHERE id = ANY($2::uuid[])`,
+              [destinationLocationId, line.serial_ids],
+            );
+          }
+          await txn.query(
+            `INSERT INTO stock_movements (picking_id, stock_item_id, movement_type,
+               from_location_id, to_location_id, quantity, performed_at)
+             VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+            [pickingId, line.stock_item_id, pickingType, sourceLocationId, destinationLocationId, line.planned_quantity],
+          );
         }
       }
 
-      // Record the movement for audit trail
-      await sql`
-        INSERT INTO stock_movements (
-          picking_id,
-          stock_item_id,
-          movement_type,
-          from_location_id,
-          to_location_id,
-          quantity,
-          performed_at
-        ) VALUES (
-          ${pickingId},
-          ${line.stock_item_id},
-          ${pickingType},
-          ${sourceLocationId},
-          ${destinationLocationId},
-          ${line.planned_quantity},
-          NOW()
-        )
-      `;
+      // Mark all lines done
+      for (const line of lines) {
+        await txn.query(
+          `UPDATE stock_picking_lines SET status = 'done', actual_quantity = planned_quantity WHERE id = $1`,
+          [line.id],
+        );
+      }
 
-      // Mark line as done with actual quantity
-      await sql`
-        UPDATE stock_picking_lines
-        SET
-          status = 'done',
-          actual_quantity = planned_quantity
-        WHERE id = ${line.id}
-      `;
-    }
+      // Finalise picking
+      const updated = await txn.query<Record<string, unknown>>(
+        `UPDATE stock_pickings SET status = 'done', effective_date = NOW(), updated_at = NOW()
+         WHERE id = $1 RETURNING *`,
+        [pickingId],
+      );
 
-    // Finalise picking
-    const result = await sql`
-      UPDATE stock_pickings
-      SET
-        status = 'done',
-        effective_date = NOW(),
-        updated_at = NOW()
-      WHERE id = ${pickingId}
-      RETURNING *
-    `;
-
-    await sql`COMMIT`;
-
-    log.info('Picking processed successfully', { pickingId, linesProcessed: validLines.length }, 'field-stock');
-
-    createAuditLog({
-      entityType: 'picking',
-      entityId: pickingId,
-      action: 'update',
-      performedBy: 'system',
-      newValues: { status: 'done', linesProcessed: validLines.length },
+      return { picking: updated[0], linesProcessed: lines.length };
     });
-
-    return apiResponse.success(res, result[0]);
   } catch (error: unknown) {
-    // Roll back the entire transaction — no partial stock mutations persist
-    await sql`ROLLBACK`.catch((rollbackErr: unknown) =>
-      log.warn('Rollback failed after picking process error', {
-        rollbackError: rollbackErr instanceof Error ? rollbackErr.message : 'unknown',
-        pickingId,
-      }, 'field-stock')
-    );
-
+    if (error instanceof Error) {
+      if (error.message === 'PICKING_NOT_FOUND') return apiResponse.notFound(res, 'Picking', pickingId);
+      if (error.message === 'PICKING_INVALID_STATUS') {
+        const e = error as Error & { currentStatus?: string };
+        return apiResponse.validationError(res, {
+          status: `Cannot process picking with status "${e.currentStatus ?? 'unknown'}". Only confirmed pickings can be processed.`,
+        });
+      }
+      if (error.message === 'INSUFFICIENT_STOCK') {
+        const e = error as Error & { stockErrors?: Record<string, string> };
+        log.warn('Stock transfer blocked: insufficient stock', { pickingId, errors: e.stockErrors }, 'field-stock');
+        return apiResponse.validationError(res, e.stockErrors ?? {});
+      }
+    }
     log.error('Error processing picking', {
       error: error instanceof Error ? error.message : String(error),
       pickingId,
     }, 'field-stock');
-
     return apiResponse.internalError(res, error);
   }
+
+  const { picking, linesProcessed } = finalPicking as { picking: unknown; linesProcessed: number };
+  log.info('Picking processed successfully', { pickingId, linesProcessed }, 'field-stock');
+  createAuditLog({
+    entityType: 'picking',
+    entityId: pickingId,
+    action: 'update',
+    performedBy: 'system',
+    newValues: { status: 'done', linesProcessed },
+  });
+  return apiResponse.success(res, picking);
 }
 
 export default withAuth(handler);

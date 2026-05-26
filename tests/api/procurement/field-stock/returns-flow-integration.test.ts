@@ -2,24 +2,14 @@
  * Integration tests — full return → inspect → accept lifecycle
  * Task G.1 — chains all three endpoints with shared state via mocked SQL.
  *
- * Infrastructure: mocked SQL (vi.hoisted + @neondatabase/serverless mock).
- * This is intentionally more thorough than the per-endpoint hardening tests:
- * we thread one logical return through all three handlers and assert cross-handler
- * side effects (status transitions, SQL call ordering, rollback contract).
+ * Infrastructure after FIX 2:
+ *   - POST /returns       → uses @/lib/db `sql` tagged template (mockDbSql)
+ *   - POST /inspect       → uses @neondatabase/serverless neon() (mockNeonSql)
+ *   - POST /accept        → uses @/lib/db-pool query/queryOne (mockQueryOne/mockQuery)
+ *                           and transaction() (mockTransaction / mockTxnQuery)
  *
- * Handler notes (from reading the source):
- *   - POST /returns       → uses neon() tag fn (mockSql)
- *   - POST /inspect       → uses neon() tag fn (mockSql)
- *   - POST /accept        → uses BOTH neon() tag fn (mockSql for reads)
- *                           AND new Client() for the atomic transaction (mockClientQuery)
- *
- * Each handler module-imports neon() at file scope, so all three share the
- * same mockSql spy if the mock is hoisted before any import.
- *
- * Known status-code quirk (mirrors pickings-issue-flow-integration.test.ts):
- *   POST /returns calls res.status(201) then apiResponse.created(), which works
- *   correctly — apiResponse.created() sets 201 itself. Status will be 201.
- *   POST /inspect and POST /accept call apiResponse.success() which sets 200.
+ * Each neon() caller imports it at module scope, so the neon mock needs to be
+ * hoisted before any handler imports.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -27,29 +17,53 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 // ── Hoisted mocks (must precede all imports) ───────────────────────────────────
 
-const { mockSql, mockClientQuery, mockClientConnect, mockClientEnd } = vi.hoisted(() => {
-  const mockClientQuery = vi.fn();
-  const mockClientConnect = vi.fn().mockResolvedValue(undefined);
-  const mockClientEnd = vi.fn().mockResolvedValue(undefined);
-  return { mockSql: vi.fn(), mockClientQuery, mockClientConnect, mockClientEnd };
+const { mockNeonSql, mockQuery, mockQueryOne, mockTxnQuery, mockTransaction } = vi.hoisted(() => {
+  const mockNeonSql = vi.fn();
+  const mockQuery = vi.fn().mockResolvedValue([]);
+  const mockQueryOne = vi.fn().mockResolvedValue(null);
+  const mockTxnQuery = vi.fn().mockResolvedValue([]);
+
+  const mockTransaction = vi.fn().mockImplementation(
+    async (cb: (txn: { query: typeof mockTxnQuery; queryOne: typeof mockTxnQuery }) => Promise<unknown>) => {
+      mockTxnQuery('BEGIN');
+      try {
+        const result = await cb({ query: mockTxnQuery, queryOne: mockTxnQuery });
+        mockTxnQuery('COMMIT');
+        return result;
+      } catch (err) {
+        mockTxnQuery('ROLLBACK');
+        throw err;
+      }
+    }
+  );
+
+  return { mockNeonSql, mockQuery, mockQueryOne, mockTxnQuery, mockTransaction };
 });
 
+// inspect.ts still uses the Neon shim — mock @neondatabase/serverless for it
 vi.mock('@neondatabase/serverless', () => ({
-  // inspect.ts + accept.ts still use the Neon shim (sql + Client).
-  neon: () => mockSql,
-  Client: vi.fn().mockImplementation(() => ({
-    connect: mockClientConnect,
-    query: mockClientQuery,
-    end: mockClientEnd,
-  })),
+  neon: () => mockNeonSql,
 }));
 
+// returns/index.ts (create handler) uses @/lib/db { sql }
 vi.mock('@/lib/db', () => ({
-  // returns/index.ts (the create handler) migrated to @/lib/db. Wire its
-  // tagged-template sql to the same mockSql so the existing fixture sequence
-  // covers all queries from all three handlers. (Handler imports `{ sql }`
-  // only — no pool/default reach.)
-  sql: mockSql,
+  sql: mockNeonSql,
+}));
+
+// accept.ts uses @/lib/db-pool
+vi.mock('@/lib/db-pool', () => ({
+  query: mockQuery,
+  queryOne: mockQueryOne,
+  transaction: mockTransaction,
+  pool: {},
+  default: {},
+}));
+
+// stockHolderService uses @/lib/db-pool under the hood;
+// mock it directly so accept.ts's pre-transaction holder resolution works
+vi.mock('@/modules/procurement/field-stock/services/stockHolderService', () => ({
+  getOrCreateStaffHolder: vi.fn().mockResolvedValue({ id: 'holder-tech-uuid' }),
+  getOrCreateContractorHolder: vi.fn().mockResolvedValue({ id: 'holder-contractor-uuid' }),
 }));
 
 vi.mock('@/lib/auth', () => ({
@@ -123,8 +137,9 @@ function makeRes(): Partial<NextApiResponse> & { _status: number; _json: unknown
 
 // ── Mock sequence helpers ──────────────────────────────────────────────────────
 
+/** Neon sql mocks — used by create (via @/lib/db sql) and inspect (via @neondatabase/serverless) */
 function mockTechStaff() {
-  mockSql.mockResolvedValueOnce([{
+  mockNeonSql.mockResolvedValueOnce([{
     id: TECH_STAFF_ID,
     role: 'technician',
     first_name: 'Alice',
@@ -134,7 +149,7 @@ function mockTechStaff() {
 }
 
 function mockStoresStaff() {
-  mockSql.mockResolvedValueOnce([{
+  mockNeonSql.mockResolvedValueOnce([{
     id: STORES_STAFF_ID,
     role: 'stores',
     first_name: 'Bob',
@@ -144,7 +159,7 @@ function mockStoresStaff() {
 }
 
 function mockDriverStaff() {
-  mockSql.mockResolvedValueOnce([{
+  mockNeonSql.mockResolvedValueOnce([{
     id: 'staff-driver-uuid',
     role: 'driver',
     first_name: 'Dave',
@@ -155,20 +170,20 @@ function mockDriverStaff() {
 
 function mockCreateReturn() {
   // 1. generate_return_number()
-  mockSql.mockResolvedValueOnce([{ num: 'RET-202605-00001' }]);
+  mockNeonSql.mockResolvedValueOnce([{ num: 'RET-202605-00001' }]);
   // 2. INSERT stock_returns RETURNING *
-  mockSql.mockResolvedValueOnce([{
+  mockNeonSql.mockResolvedValueOnce([{
     id: RETURN_ID,
     return_number: 'RET-202605-00001',
     status: 'pending',
     returned_by_id: TECH_STAFF_ID,
   }]);
   // 3. INSERT line 1
-  mockSql.mockResolvedValueOnce([]);
+  mockNeonSql.mockResolvedValueOnce([]);
   // 4. INSERT line 2
-  mockSql.mockResolvedValueOnce([]);
+  mockNeonSql.mockResolvedValueOnce([]);
   // 5. SELECT full return with lines
-  mockSql.mockResolvedValueOnce([{
+  mockNeonSql.mockResolvedValueOnce([{
     id: RETURN_ID,
     return_number: 'RET-202605-00001',
     status: 'pending',
@@ -182,15 +197,15 @@ function mockCreateReturn() {
 
 function mockInspectReturn() {
   // 1. Check current status
-  mockSql.mockResolvedValueOnce([{ id: RETURN_ID, status: 'pending' }]);
+  mockNeonSql.mockResolvedValueOnce([{ id: RETURN_ID, status: 'pending' }]);
   // 2. UPDATE stock_returns SET status='inspected'
-  mockSql.mockResolvedValueOnce([]);
+  mockNeonSql.mockResolvedValueOnce([]);
   // 3. UPDATE line 1 disposition
-  mockSql.mockResolvedValueOnce([]);
+  mockNeonSql.mockResolvedValueOnce([]);
   // 4. UPDATE line 2 disposition
-  mockSql.mockResolvedValueOnce([]);
+  mockNeonSql.mockResolvedValueOnce([]);
   // 5. SELECT full return
-  mockSql.mockResolvedValueOnce([{
+  mockNeonSql.mockResolvedValueOnce([{
     id: RETURN_ID,
     return_number: 'RET-202605-00001',
     status: 'inspected',
@@ -202,46 +217,68 @@ function mockInspectReturn() {
   }]);
 }
 
+/**
+ * Accept handler reads via db-pool queryOne (not neon).
+ * queryOne calls in order: 1. staff lookup, 2. return record, 3. final fetch.
+ */
 function mockAcceptReturn() {
-  // neon sql calls (pre-transaction):
-  // 1. GET return with lines (sql tag fn)
-  mockSql.mockResolvedValueOnce([{
+  // 1. Staff lookup (stores role)
+  mockQueryOne.mockResolvedValueOnce({
+    id: STORES_STAFF_ID,
+    role: 'stores',
+    auth_role: 'staff',
+  });
+  // 2. GET return with lines
+  mockQueryOne.mockResolvedValueOnce({
     id: RETURN_ID,
     status: 'inspected',
     return_to_location_id: WAREHOUSE_LOCATION_ID,
+    returned_by_id: TECH_STAFF_ID,
+    returned_by_name: 'Alice Techie',
+    contractor_id: null,
+    return_number: 'RET-202605-00001',
+    inspected_by: null,
     lines: [
       { id: LINE_1_ID, stock_item_id: 'item-ont-uuid', serial_id: SERIAL_1_ID, quantity: 1, disposition: 'restock' },
       { id: LINE_2_ID, stock_item_id: 'item-ont-uuid', serial_id: SERIAL_2_ID, quantity: 1, disposition: 'scrap' },
     ],
-  }]);
-  // 2. Final SELECT after commit
-  mockSql.mockResolvedValueOnce([{
+  });
+  // 3. Final SELECT after transaction
+  mockQueryOne.mockResolvedValueOnce({
     id: RETURN_ID,
     return_number: 'RET-202605-00001',
     status: 'restocked',
-  }]);
+  });
 
-  // Client transaction: all queries succeed
-  mockClientQuery.mockResolvedValue({ rows: [] });
+  // All txn queries succeed
+  mockTxnQuery.mockResolvedValue([]);
 }
 
 // ── Test suites ────────────────────────────────────────────────────────────────
 
 describe('Returns full flow integration', () => {
   beforeEach(() => {
-    // mockSql.mockReset() clears both call history AND queued mockResolvedValueOnce items
-    // for the SQL tag fn — prevents unconsumed queue items from a failing test bleeding
-    // into the next test.
-    // We use targeted .mockReset() on the fns we queue, NOT vi.resetAllMocks(), because
-    // vi.resetAllMocks() also resets the Client constructor mockImplementation from the
-    // vi.mock factory and that would cause the accept handler to fail.
-    mockSql.mockReset();
-    mockClientQuery.mockReset();
-    mockClientConnect.mockReset();
-    mockClientEnd.mockReset();
-    // Re-apply defaults that the vi.mock factory normally provides
-    mockClientConnect.mockResolvedValue(undefined);
-    mockClientEnd.mockResolvedValue(undefined);
+    mockNeonSql.mockReset();
+    mockQuery.mockReset();
+    mockQueryOne.mockReset();
+    mockTxnQuery.mockReset();
+    mockTransaction.mockReset();
+
+    // Re-apply defaults after clearAllMocks
+    mockTxnQuery.mockResolvedValue([]);
+    mockTransaction.mockImplementation(
+      async (cb: (txn: { query: typeof mockTxnQuery; queryOne: typeof mockTxnQuery }) => Promise<unknown>) => {
+        mockTxnQuery('BEGIN');
+        try {
+          const result = await cb({ query: mockTxnQuery, queryOne: mockTxnQuery });
+          mockTxnQuery('COMMIT');
+          return result;
+        } catch (err) {
+          mockTxnQuery('ROLLBACK');
+          throw err;
+        }
+      }
+    );
   });
 
   // ── Happy path ───────────────────────────────────────────────────────────────
@@ -289,13 +326,9 @@ describe('Returns full flow integration', () => {
       expect(createBody.data.returned_by_id).toBe(TECH_STAFF_ID);
 
       // ── Act 2: storeman inspects with mixed dispositions ──────────────────────
-      // Targeted reset: clear call history + queued values without touching Client mock impl
-      mockSql.mockReset();
-      mockClientQuery.mockReset();
-      mockClientConnect.mockReset();
-      mockClientEnd.mockReset();
-      mockClientConnect.mockResolvedValue(undefined);
-      mockClientEnd.mockResolvedValue(undefined);
+      mockNeonSql.mockReset();
+      mockTxnQuery.mockReset();
+      mockTxnQuery.mockResolvedValue([]);
 
       mockStoresStaff();
       mockInspectReturn();
@@ -321,22 +354,18 @@ describe('Returns full flow integration', () => {
       expect(inspectBody.data.status).toBe('inspected');
 
       // Verify SQL updated lines to 'inspected' status
-      const inspectCallStrings = mockSql.mock.calls.map((call) => {
+      const inspectCallStrings = mockNeonSql.mock.calls.map((call) => {
         const parts = call[0] as TemplateStringsArray;
         return Array.isArray(parts) ? parts.join('') : String(call[0]);
       });
       expect(inspectCallStrings.some((s) => s.includes("status = 'inspected'"))).toBe(true);
 
       // ── Act 3: storeman accepts — mixed restock + scrap ───────────────────────
-      // Targeted reset: clear call history + queued values without touching Client mock impl
-      mockSql.mockReset();
-      mockClientQuery.mockReset();
-      mockClientConnect.mockReset();
-      mockClientEnd.mockReset();
-      mockClientConnect.mockResolvedValue(undefined);
-      mockClientEnd.mockResolvedValue(undefined);
+      mockNeonSql.mockReset();
+      mockQueryOne.mockReset();
+      mockTxnQuery.mockReset();
+      mockTxnQuery.mockResolvedValue([]);
 
-      mockStoresStaff();
       mockAcceptReturn();
 
       const acceptReq = makeReq({
@@ -354,38 +383,42 @@ describe('Returns full flow integration', () => {
       expect(acceptBody.data.status).toBe('restocked');
 
       // Verify atomic transaction structure
-      const clientCalls = mockClientQuery.mock.calls.map((c) => c[0] as string);
-      expect(clientCalls[0]).toBe('BEGIN');
-      expect(clientCalls.some((s) => s === 'COMMIT')).toBe(true);
-      expect(clientCalls.some((s) => s === 'ROLLBACK')).toBe(false);
+      const txnCalls = mockTxnQuery.mock.calls.map((c) => c[0] as string);
+      expect(txnCalls[0]).toBe('BEGIN');
+      expect(txnCalls.some((s) => s === 'COMMIT')).toBe(true);
+      expect(txnCalls.some((s) => s === 'ROLLBACK')).toBe(false);
 
-      // Restock branch: INSERT stock_quants and UPDATE stock_serials status='available'
-      expect(clientCalls.some((s) => s.includes('stock_quants') && s.includes('INSERT'))).toBe(true);
-      expect(clientCalls.some((s) =>
-        s.includes('stock_serials') && s.includes("'available'")
+      // Restock branch with resolved holder: custody debit (stock_custody)
+      // and field_stock_movements 'return' row via postReturnFromHolderWith
+      expect(txnCalls.some((s) => typeof s === 'string' && s.includes('stock_custody'))).toBe(true);
+      expect(txnCalls.some((s) =>
+        typeof s === 'string' && s.includes('field_stock_movements') && s.includes("'return'")
+      )).toBe(true);
+
+      // UPDATE stock_serials: restock sets status='available', holder_id=NULL
+      expect(txnCalls.some((s) =>
+        typeof s === 'string' && s.includes('stock_serials') && s.includes("'available'")
       )).toBe(true);
 
       // Scrap branch: UPDATE stock_serials status='scrapped'
-      expect(clientCalls.some((s) =>
-        s.includes('stock_serials') && s.includes("'scrapped'")
+      expect(txnCalls.some((s) =>
+        typeof s === 'string' && s.includes('stock_serials') && s.includes("'scrapped'")
       )).toBe(true);
 
-      // TODO(phase-4): stock_movements integration is deferred to Phase 4
-      // (see accept.ts:179-188 — the original schema-mismatched INSERT was
-      // removed because it always failed silently). When Phase 4 lands,
-      // flip this to `expect(movementInserts.length).toBe(2)`.
-      const movementInserts = clientCalls.filter((s) => s.includes('stock_movements'));
-      expect(movementInserts.length).toBe(0);
+      // serial UPDATE must clear holder_id
+      expect(txnCalls.some((s) =>
+        typeof s === 'string' && s.includes('stock_serials') && s.includes('holder_id = NULL')
+      )).toBe(true);
 
-      // stock_return_lines marked 'processed'
-      const processedUpdates = clientCalls.filter(
-        (s) => s.includes('stock_return_lines') && s.includes("'processed'")
+      // stock_return_lines marked 'processed' — one per line
+      const processedUpdates = txnCalls.filter(
+        (s) => typeof s === 'string' && s.includes('stock_return_lines') && s.includes("'processed'")
       );
       expect(processedUpdates.length).toBe(2);
 
       // stock_returns marked 'restocked'
-      expect(clientCalls.some(
-        (s) => s.includes('stock_returns') && s.includes("'restocked'")
+      expect(txnCalls.some(
+        (s) => typeof s === 'string' && s.includes('stock_returns') && s.includes("'restocked'")
       )).toBe(true);
     });
   });
@@ -399,20 +432,20 @@ describe('Returns full flow integration', () => {
       // First call — creates the return (single line body)
       mockTechStaff();
       // Idempotency check: no existing row found
-      mockSql.mockResolvedValueOnce([]);
+      mockNeonSql.mockResolvedValueOnce([]);
       // generate_return_number
-      mockSql.mockResolvedValueOnce([{ num: 'RET-202605-00001' }]);
+      mockNeonSql.mockResolvedValueOnce([{ num: 'RET-202605-00001' }]);
       // INSERT stock_returns RETURNING *
-      mockSql.mockResolvedValueOnce([{
+      mockNeonSql.mockResolvedValueOnce([{
         id: RETURN_ID,
         return_number: 'RET-202605-00001',
         status: 'pending',
         returned_by_id: TECH_STAFF_ID,
       }]);
       // INSERT single line
-      mockSql.mockResolvedValueOnce([]);
+      mockNeonSql.mockResolvedValueOnce([]);
       // SELECT full return
-      mockSql.mockResolvedValueOnce([{
+      mockNeonSql.mockResolvedValueOnce([{
         id: RETURN_ID,
         return_number: 'RET-202605-00001',
         status: 'pending',
@@ -444,17 +477,12 @@ describe('Returns full flow integration', () => {
       const createdId = firstBody.data.id;
       const createdNumber = firstBody.data.return_number;
 
-      // Second call — targeted reset to clear queued values without touching Client mock impl
-      mockSql.mockReset();
-      mockClientQuery.mockReset();
-      mockClientConnect.mockReset();
-      mockClientEnd.mockReset();
-      mockClientConnect.mockResolvedValue(undefined);
-      mockClientEnd.mockResolvedValue(undefined);
+      // Second call — reset only neon sql
+      mockNeonSql.mockReset();
 
       mockTechStaff();
       // Idempotency check: existing row found
-      mockSql.mockResolvedValueOnce([{
+      mockNeonSql.mockResolvedValueOnce([{
         id: createdId,
         return_number: createdNumber,
         status: 'pending',
@@ -487,7 +515,7 @@ describe('Returns full flow integration', () => {
       expect(secondBody.data.return_number).toBe(createdNumber);
 
       // Only 2 SQL calls on the second request: staff lookup + idempotency check (no INSERT)
-      expect(mockSql).toHaveBeenCalledTimes(2);
+      expect(mockNeonSql).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -496,7 +524,7 @@ describe('Returns full flow integration', () => {
   describe('Authorisation', () => {
     it('POST /returns rejects user with no staff link → 403', async () => {
       // Staff lookup returns empty
-      mockSql.mockResolvedValueOnce([]);
+      mockNeonSql.mockResolvedValueOnce([]);
 
       const req = makeReq({
         body: {
@@ -536,7 +564,7 @@ describe('Returns full flow integration', () => {
 
     it('POST /returns/[id]/inspect rejects technician → 403', async () => {
       // Technician is not in RETURN_INSPECTOR_ROLES
-      mockSql.mockResolvedValueOnce([{
+      mockNeonSql.mockResolvedValueOnce([{
         id: TECH_STAFF_ID,
         role: 'technician',
         first_name: 'Alice',
@@ -563,15 +591,16 @@ describe('Returns full flow integration', () => {
       expect(body.error.message).toMatch(/insufficient role/i);
 
       // No DB writes: only the staff lookup SQL was called
-      expect(mockSql).toHaveBeenCalledTimes(1);
+      expect(mockNeonSql).toHaveBeenCalledTimes(1);
     });
 
     it('POST /returns/[id]/accept rejects technician → 403', async () => {
-      mockSql.mockResolvedValueOnce([{
+      // accept.ts now uses queryOne for staff lookup
+      mockQueryOne.mockResolvedValueOnce({
         id: TECH_STAFF_ID,
         role: 'technician',
         auth_role: 'staff',
-      }]);
+      });
 
       const req = makeReq({
         query: { returnId: RETURN_ID },
@@ -588,7 +617,7 @@ describe('Returns full flow integration', () => {
       expect(body.error.message).toMatch(/insufficient role/i);
 
       // No transaction started
-      expect(mockClientConnect).not.toHaveBeenCalled();
+      expect(mockTransaction).not.toHaveBeenCalled();
     });
   });
 
@@ -620,7 +649,7 @@ describe('Returns full flow integration', () => {
       expect(body.error.details).toHaveProperty('returnReason');
 
       // Validation fires before any INSERT
-      const callStrings = mockSql.mock.calls.map((c) => String((c[0] as TemplateStringsArray)?.[0] ?? '').trim());
+      const callStrings = mockNeonSql.mock.calls.map((c) => String((c[0] as TemplateStringsArray)?.[0] ?? '').trim());
       expect(callStrings.some((s) => s.startsWith('INSERT'))).toBe(false);
     });
 
@@ -648,7 +677,7 @@ describe('Returns full flow integration', () => {
       expect(body.error.details[LINE_1_ID]).toMatch(/delete/i);
 
       // No DB writes: only staff lookup, validation aborts before any UPDATE
-      expect(mockSql).toHaveBeenCalledTimes(1);
+      expect(mockNeonSql).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -656,23 +685,28 @@ describe('Returns full flow integration', () => {
 
   describe('Atomic accept', () => {
     it('rolls back all changes if one line update fails', async () => {
-      mockStoresStaff();
+      // accept.ts staff lookup + return record via queryOne
+      mockQueryOne
+        .mockResolvedValueOnce({ id: STORES_STAFF_ID, role: 'stores', auth_role: 'staff' })
+        .mockResolvedValueOnce({
+          id: RETURN_ID,
+          status: 'inspected',
+          return_to_location_id: WAREHOUSE_LOCATION_ID,
+          returned_by_id: TECH_STAFF_ID,
+          returned_by_name: 'Alice Tech',
+          contractor_id: null,
+          return_number: 'RET-202605-00001',
+          inspected_by: null,
+          lines: [
+            { id: LINE_1_ID, stock_item_id: 'item-ont-uuid', serial_id: SERIAL_1_ID, quantity: 1, disposition: 'restock' },
+            { id: LINE_2_ID, stock_item_id: 'item-ont-uuid', serial_id: SERIAL_2_ID, quantity: 1, disposition: 'scrap' },
+          ],
+        });
 
-      // GET return with 2 lines
-      mockSql.mockResolvedValueOnce([{
-        id: RETURN_ID,
-        status: 'inspected',
-        return_to_location_id: WAREHOUSE_LOCATION_ID,
-        lines: [
-          { id: LINE_1_ID, stock_item_id: 'item-ont-uuid', serial_id: SERIAL_1_ID, quantity: 1, disposition: 'restock' },
-          { id: LINE_2_ID, stock_item_id: 'item-ont-uuid', serial_id: SERIAL_2_ID, quantity: 1, disposition: 'scrap' },
-        ],
-      }]);
-
-      // Client: BEGIN succeeds, then INSERT stock_quants for line 1 throws (simulates constraint violation)
-      mockClientQuery
-        .mockResolvedValueOnce({ rows: [] })              // BEGIN
-        .mockRejectedValueOnce(new Error('constraint violation: stock_quants_pkey')); // INSERT stock_quants (line 1)
+      // BEGIN succeeds, then first line's custody SQL throws (constraint violation)
+      mockTxnQuery
+        .mockResolvedValueOnce([])                              // BEGIN
+        .mockRejectedValueOnce(new Error('constraint violation: stock_custody_unique'));  // custody debit
 
       const req = makeReq({
         query: { returnId: RETURN_ID },
@@ -687,22 +721,19 @@ describe('Returns full flow integration', () => {
       expect(res._status).toBe(500);
 
       // ROLLBACK must have been called (the contract — real DB enforces the actual undo)
-      const clientCalls = mockClientQuery.mock.calls.map((c) => c[0] as string);
-      expect(clientCalls.some((s) => s === 'ROLLBACK')).toBe(true);
+      const txnCalls = mockTxnQuery.mock.calls.map((c) => c[0] as string);
+      expect(txnCalls.some((s) => s === 'ROLLBACK')).toBe(true);
 
       // COMMIT must NOT have been called
-      expect(clientCalls.some((s) => s === 'COMMIT')).toBe(false);
-
-      // client.end() must be called (finally block always runs)
-      expect(mockClientEnd).toHaveBeenCalled();
+      expect(txnCalls.some((s) => s === 'COMMIT')).toBe(false);
 
       // No stock_returns status='restocked' update
-      expect(clientCalls.some(
+      expect(txnCalls.some(
         (s) => typeof s === 'string' && s.includes('stock_returns') && s.includes("'restocked'")
       )).toBe(false);
 
       // No stock_return_lines status='processed' update (never reached after first line failed)
-      expect(clientCalls.some(
+      expect(txnCalls.some(
         (s) => typeof s === 'string' && s.includes('stock_return_lines') && s.includes("'processed'")
       )).toBe(false);
     });

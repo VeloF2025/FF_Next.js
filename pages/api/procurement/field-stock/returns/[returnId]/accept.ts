@@ -3,21 +3,31 @@
  * POST /api/procurement/field-stock/returns/[returnId]/accept
  * Accept inspected return and restock items
  *
- * Note on transactions: the @neondatabase/serverless shim routes each sql``
- * call through a pg.Pool — each call gets its own connection. True transactional
- * isolation requires a dedicated client. We use pg.Client via the shim's
- * re-exported Client to wrap the accept body in an explicit transaction.
+ * Sprint D: returnable disposition now calls postReturnFromHolderWith which
+ * debits stock_custody for the identified holder and credits stock_quants at
+ * the return-to location in a single atomic movement.  All dispositions clear
+ * stock_serials.holder_id so no stale holder reference survives acceptance.
+ *
+ * Null-holder fallback: when neither returned_by_id nor contractor_id resolves
+ * a holder the old manual quant credit is used instead, so returns without an
+ * identified holder continue to work correctly.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon, Client } from '@neondatabase/serverless';
+import { queryOne, transaction } from '@/lib/db-pool';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { createAuditLog } from '@/services/procurement/auditService';
 import { isReturnInspector } from '@/modules/field-stock-pwa/lib/storesRoles';
-
-const sql = neon(process.env.DATABASE_URL!);
+import {
+  postReturnFromHolderWith,
+  type CustodyLine,
+} from '@/modules/procurement/field-stock/services/custodyService';
+import {
+  getOrCreateStaffHolder,
+  getOrCreateContractorHolder,
+} from '@/modules/procurement/field-stock/services/stockHolderService';
 
 interface ReturnLine {
   id: string;
@@ -45,14 +55,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.unauthorized(res, 'User session required');
     }
 
-    const staffRows = await sql`
-      SELECT s.id, s.role, u.role AS auth_role
-      FROM staff s
-      JOIN users u ON u.id = s.user_id
-      WHERE u.id = ${userId}
-      LIMIT 1
-    `;
-    const staffRow = staffRows[0];
+    const staffRow = await queryOne<{ id: string; role: string; auth_role: string }>(
+      `SELECT s.id, s.role, u.role AS auth_role
+       FROM staff s
+       JOIN users u ON u.id = s.user_id
+       WHERE u.id = $1
+       LIMIT 1`,
+      [userId]
+    );
 
     if (!staffRow) {
       return apiResponse.forbidden(res, 'No staff record linked to user');
@@ -67,8 +77,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // ── Get return with lines ──────────────────────────────────────────────────
-    const existing = await sql`
-      SELECT
+    const returnRecord = await queryOne(
+      `SELECT
         r.*,
         json_agg(
           json_build_object(
@@ -79,13 +89,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             'disposition', rl.disposition
           )
         ) as lines
-      FROM stock_returns r
-      LEFT JOIN stock_return_lines rl ON rl.return_id = r.id
-      WHERE r.id = ${returnId}
-      GROUP BY r.id
-    `;
-
-    const returnRecord = existing[0];
+       FROM stock_returns r
+       LEFT JOIN stock_return_lines rl ON rl.return_id = r.id
+       WHERE r.id = $1
+       GROUP BY r.id`,
+      [returnId]
+    );
     if (!returnRecord) {
       return apiResponse.notFound(res, 'Return', returnId);
     }
@@ -99,96 +108,102 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const returnToLocationId = returnRecord.return_to_location_id as string;
     const lines: ReturnLine[] = (returnRecord.lines as ReturnLine[]) || [];
 
-    // ── Atomic transaction: BEGIN/COMMIT/ROLLBACK ──────────────────────────────
-    // The neon shim re-exports pg.Client; use a dedicated connection for the
-    // transaction so BEGIN and COMMIT are on the same connection.
-    const connectionString = process.env.DATABASE_URL!;
-    // Match the SSL handling used by the neon shim's Pool — bare new Client()
-    // defaults to SSL on, which fails on self-hosted Supabase (localhost:5437,
-    // no sslmode=require in DATABASE_URL). The shim treats absence of
-    // sslmode=require as "no SSL"; mirror that here.
-    const useSSL = connectionString.includes('sslmode=require');
-    const client = new Client({
-      connectionString,
-      ssl: useSSL ? { rejectUnauthorized: false } : false,
-    });
-    await client.connect();
+    // ── Resolve returning holder ONCE (before entering the transaction) ────────
+    // getOrCreateStaff/ContractorHolder use the pool directly — safe outside txn.
+    let fromHolderId: string | null = null;
 
+    if (returnRecord.returned_by_id) {
+      const holder = await getOrCreateStaffHolder(
+        returnRecord.returned_by_id as string,
+        (returnRecord.returned_by_name as string | null) ?? 'staff',
+      );
+      fromHolderId = holder.id;
+    } else if (returnRecord.contractor_id) {
+      const holder = await getOrCreateContractorHolder(
+        returnRecord.contractor_id as string,
+        (returnRecord.contractor_name as string | null) ?? 'contractor',
+      );
+      fromHolderId = holder.id;
+    } else {
+      log.warn('returns.accept.no_holder_resolved', { returnId }, 'field-stock');
+    }
+
+    // ── Atomic transaction: all line mutations + status update ─────────────────
     let linesProcessed = 0;
 
-    try {
-      await client.query('BEGIN');
-
+    await transaction(async (txn) => {
       for (const line of lines) {
         if (!line || !line.stock_item_id) continue;
 
         const disposition = line.disposition || 'restock';
 
         if (disposition === 'supplier_return') {
-          await client.query('ROLLBACK');
           log.error('returns.accept.supplier_return_not_supported', { returnId, lineId: line.id }, 'field-stock');
-          return apiResponse.validationError(res, {
-            disposition: 'supplier_return is not yet supported. Re-inspect with restock/repair/scrap.',
-          });
+          throw new Error('supplier_return is not yet supported. Re-inspect with restock/repair/scrap.');
         }
 
         if (disposition === 'restock') {
-          // Add back to destination quant
-          // The stock_quants unique index is on
-          //   (stock_item_id, location_id, COALESCE(lot_number, ''))
-          // so the ON CONFLICT target MUST match that expression — using the
-          // bare 3-column form throws "no unique or exclusion constraint matching".
-          await client.query(
-            `INSERT INTO stock_quants (stock_item_id, location_id, quantity, last_movement_date)
-             VALUES ($1, $2, $3, NOW())
-             ON CONFLICT (stock_item_id, location_id, (COALESCE(lot_number, ''::varchar)))
-             DO UPDATE SET
-               quantity = stock_quants.quantity + $3,
-               last_movement_date = NOW(),
-               updated_at = NOW()`,
-            [line.stock_item_id, returnToLocationId, line.quantity]
-          );
+          if (fromHolderId) {
+            // Custody-aware path: debit holder custody + credit warehouse quant +
+            // insert field_stock_movements 'return' row — all via postReturnFromHolderWith.
+            const custodyLine: CustodyLine = {
+              stockItemId: line.stock_item_id,
+              quantity: Number(line.quantity ?? 1),
+              lotNumber: null,
+              unitCost: null,
+            };
+            await postReturnFromHolderWith(txn, {
+              lines: [custodyLine],
+              fromHolderId,
+              toLocationId: returnToLocationId,
+              reference: returnRecord.return_number as string | undefined,
+              performedBy: (returnRecord.inspected_by as string | null) ?? undefined,
+            });
+          } else {
+            // Null-holder fallback: no custody debit, credit warehouse quant directly.
+            // The stock_quants unique index is on
+            //   (stock_item_id, location_id, COALESCE(lot_number, ''))
+            await txn.query(
+              `INSERT INTO stock_quants (stock_item_id, location_id, quantity, last_movement_date)
+               VALUES ($1, $2, $3, NOW())
+               ON CONFLICT (stock_item_id, location_id, (COALESCE(lot_number, ''::varchar)))
+               DO UPDATE SET
+                 quantity = stock_quants.quantity + $3,
+                 last_movement_date = NOW(),
+                 updated_at = NOW()`,
+              [line.stock_item_id, returnToLocationId, line.quantity]
+            );
+          }
 
-          // Update serial if applicable
+          // Update serial: return to warehouse location, clear holder.
           if (line.serial_id) {
-            await client.query(
+            await txn.query(
               `UPDATE stock_serials
-               SET current_location_id = $1, status = 'available', updated_at = NOW()
+               SET current_location_id = $1, holder_id = NULL, status = 'available', updated_at = NOW()
                WHERE id = $2`,
               [returnToLocationId, line.serial_id]
             );
           }
         } else if (disposition === 'scrap') {
-          // Mark serial as scrapped
+          // TODO(sprintD-fast-follow): custody debit for scrap dispositions pending business rule
           if (line.serial_id) {
-            await client.query(
-              `UPDATE stock_serials SET status = 'scrapped', updated_at = NOW() WHERE id = $1`,
+            await txn.query(
+              `UPDATE stock_serials SET status = 'scrapped', holder_id = NULL, updated_at = NOW() WHERE id = $1`,
               [line.serial_id]
             );
           }
         } else if (disposition === 'repair') {
-          // Mark serial as faulty (awaiting repair)
+          // TODO(sprintD-fast-follow): custody debit for faulty/repair dispositions pending business rule
           if (line.serial_id) {
-            await client.query(
-              `UPDATE stock_serials SET status = 'faulty', updated_at = NOW() WHERE id = $1`,
+            await txn.query(
+              `UPDATE stock_serials SET status = 'faulty', holder_id = NULL, updated_at = NOW() WHERE id = $1`,
               [line.serial_id]
             );
           }
         }
 
-        // Audit trail: stock_movements integration deferred to Phase 4.
-        // The actual stock_movements schema is project-based with required
-        // project_id / movement_type / reference_number / movement_date columns
-        // and string from_location/to_location — different from what this
-        // handler was originally written against. The INSERT here always
-        // failed silently in earlier code paths. Restock-line accountability
-        // is captured by stock_serials.status, stock_quants.quantity, and
-        // stock_return_lines.status/disposition (all updated atomically above),
-        // so removing the broken insert lets the load-bearing transaction
-        // complete. Proper audit integration tracked for Phase 4.
-
         // Mark line as processed
-        await client.query(
+        await txn.query(
           `UPDATE stock_return_lines SET status = 'processed' WHERE id = $1`,
           [line.id]
         );
@@ -197,24 +212,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
 
       // Update return status to restocked
-      await client.query(
+      await txn.query(
         `UPDATE stock_returns SET status = 'restocked', updated_at = NOW() WHERE id = $1`,
         [returnId]
       );
-
-      await client.query('COMMIT');
-    } catch (txError: unknown) {
-      await client.query('ROLLBACK');
-      log.error('returns.accept.partial_failure', { error: txError, returnId }, 'field-stock');
-      return apiResponse.internalError(res, txError);
-    } finally {
-      await client.end();
-    }
+    });
 
     // ── Fetch final state ──────────────────────────────────────────────────────
-    const result = await sql`
-      SELECT * FROM stock_returns WHERE id = ${returnId}
-    `;
+    const result = await queryOne(
+      `SELECT * FROM stock_returns WHERE id = $1`,
+      [returnId]
+    );
 
     log.info('returns.accept', { returnId, staffId, linesProcessed });
 
@@ -226,8 +234,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       newValues: { status: 'restocked', linesProcessed },
     });
 
-    return apiResponse.success(res, result[0]);
+    return apiResponse.success(res, result);
   } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg.includes('supplier_return is not yet supported')) {
+      return apiResponse.validationError(res, { disposition: msg });
+    }
     log.error('Error accepting return', { error, returnId }, 'field-stock');
     return apiResponse.internalError(res, error);
   }
