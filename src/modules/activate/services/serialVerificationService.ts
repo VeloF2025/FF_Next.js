@@ -18,7 +18,7 @@ import { neon } from '@/lib/db-neon';
 import { log, createLogger } from '@/lib/logger';
 import { extractSerialsFromWaPhoto } from '@/modules/activate/services/vlmExtractionService';
 import { logActivity, logWaPhotoVlmProcessed } from '@/modules/activate/services/activityLogService';
-import { classifyOntMismatch, type OntFallbackResult } from '@/modules/activate/services/ontMismatchFallback';
+import { classifyOntMismatch, applyOntFallbackToBadge, type OntFallbackResult } from '@/modules/activate/services/ontMismatchFallback';
 
 // Component logger
 const logger = createLogger('SerialVerification');
@@ -152,7 +152,8 @@ export async function computeSerialVerification(dropNumber: string): Promise<Ser
     ),
     onemap_data AS (
       SELECT ont_serial_scanned as ont, ups_serial_scanned as ups,
-             vlm_dr_number_step9 as ph_bl_dr, vlm_ont_serial_step9 as ph_bl_ont
+             vlm_dr_number_step9 as ph_bl_dr, vlm_ont_serial_step9 as ph_bl_ont,
+             oes_serial as row_oes_serial
       FROM dr_photo_unified_reviews
       WHERE drop_number = ${dropNumber}
       LIMIT 1
@@ -173,6 +174,7 @@ export async function computeSerialVerification(dropNumber: string): Promise<Ser
       (SELECT ups FROM onemap_data) as onemap_ups,
       (SELECT ph_bl_dr FROM onemap_data) as ph_bl_dr,
       (SELECT ph_bl_ont FROM onemap_data) as ph_bl_ont,
+      (SELECT row_oes_serial FROM onemap_data) as row_oes_serial,
       (SELECT ont FROM wa_photo_data) as wa_ont,
       (SELECT ups FROM wa_photo_data) as wa_ups,
       (SELECT vlm_confidence FROM wa_photo_data) as wa_confidence
@@ -226,16 +228,17 @@ export async function computeSerialVerification(dropNumber: string): Promise<Ser
       dr9: (row.ph_bl_dr as string | null) ?? null,
       ont9: (row.ph_bl_ont as string | null) ?? null,
       onemap: (row.onemap_ont as string | null) ?? null,
-      oes: (row.oes_ont as string | null) ?? null,
+      // Use the denormalised oes_serial (same field the recheck cron + backtest
+      // treat as the ONT source of truth), not the oes_activations CTE value.
+      oes: (row.row_oes_serial as string | null) ?? null,
     });
-    // OES confirms 1Map → suppress the false alarm (only safe to upgrade when UPS
-    // isn't itself mismatched). Otherwise keep the warning but use the precise label.
-    if (ontFallback.outcome === 'confirmed_oes' && upsVerification.status !== 'mismatch') {
-      overallStatus = ontFallback.status;
-      badgeLabel = ontFallback.label;
-    } else if (overallStatus === 'warning' && ontFallback.outcome !== 'none') {
-      badgeLabel = ontFallback.label;
-    }
+    const refined = applyOntFallbackToBadge(
+      { overallStatus, badgeLabel },
+      ontFallback,
+      upsVerification.status === 'mismatch',
+    );
+    overallStatus = refined.overallStatus;
+    badgeLabel = refined.badgeLabel;
   }
 
   return {

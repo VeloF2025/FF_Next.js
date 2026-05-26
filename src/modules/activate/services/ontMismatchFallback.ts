@@ -46,7 +46,10 @@ export interface OntFallbackInput {
   oes: string | null;
 }
 
-const norm = (s: string | null): string | null => (s ? s.trim().toUpperCase() : null);
+const norm = (s: string | null): string | null => {
+  const t = s?.trim().toUpperCase();
+  return t ? t : null; // empty-after-trim is treated as no data
+};
 
 /**
  * Reclassify an ONT mismatch. Call only when the ONT verification is already a
@@ -102,4 +105,36 @@ export function classifyOntMismatch(input: OntFallbackInput): OntFallbackResult 
   }
 
   return { outcome: 'none', status: 'warning', label: 'Serial Mismatch', detail: '' };
+}
+
+export interface BadgeState {
+  overallStatus: VerificationStatus;
+  badgeLabel: string;
+}
+
+/**
+ * Apply an ONT-mismatch fallback to the already-computed badge.
+ *
+ * Only ever refines a `warning` badge — never downgrades a gold/silver/bronze one
+ * (a verified UPS must keep its badge even if the ONT photo read is an OES-confirmed
+ * false alarm). When the ONT is an OES-confirmed false alarm AND UPS is not itself
+ * mismatched, the warning is suppressed to bronze. If UPS IS genuinely mismatched,
+ * the badge stays a warning with the generic label (UPS is the real problem — we must
+ * not relabel it "Serial Confirmed"). Other actionable outcomes keep the warning but
+ * surface the precise ONT label.
+ */
+export function applyOntFallbackToBadge(
+  current: BadgeState,
+  fallback: OntFallbackResult,
+  upsMismatched: boolean,
+): BadgeState {
+  if (current.overallStatus !== 'warning') return current;
+
+  if (fallback.outcome === 'confirmed_oes') {
+    return upsMismatched ? current : { overallStatus: 'bronze', badgeLabel: fallback.label };
+  }
+  if (fallback.outcome !== 'none') {
+    return { overallStatus: 'warning', badgeLabel: fallback.label };
+  }
+  return current;
 }

@@ -3,7 +3,7 @@
  * Includes the three real adjudicated cases from the 2026-05-26 audit.
  */
 import { describe, it, expect } from 'vitest';
-import { classifyOntMismatch } from '../ontMismatchFallback';
+import { classifyOntMismatch, applyOntFallbackToBadge, type OntFallbackResult } from '../ontMismatchFallback';
 
 describe('classifyOntMismatch', () => {
   it('suppresses as confirmed_oes when OES confirms 1Map (VLM is the outlier)', () => {
@@ -73,5 +73,42 @@ describe('classifyOntMismatch', () => {
       dropNumber: 'DR1744823', dr9: 'DR1744819', ont9: 'ALCLB48EAE0B', onemap: 'ALCLB48E9992', oes: null,
     });
     expect(r.outcome).toBe('wrong_photo');
+  });
+});
+
+describe('applyOntFallbackToBadge', () => {
+  const fb = (outcome: OntFallbackResult['outcome']): OntFallbackResult => ({
+    outcome, status: outcome === 'confirmed_oes' ? 'bronze' : 'warning',
+    label: outcome === 'confirmed_oes' ? 'Serial Confirmed (OES)' : 'Serial Mismatch — x', detail: '',
+  });
+
+  it('suppresses a warning to bronze when confirmed_oes and UPS not mismatched', () => {
+    const r = applyOntFallbackToBadge({ overallStatus: 'warning', badgeLabel: 'Serial Mismatch' }, fb('confirmed_oes'), false);
+    expect(r).toEqual({ overallStatus: 'bronze', badgeLabel: 'Serial Confirmed (OES)' });
+  });
+
+  it('does NOT downgrade a silver badge (verified UPS) even on confirmed_oes', () => {
+    const r = applyOntFallbackToBadge({ overallStatus: 'silver', badgeLabel: 'Serial Verified' }, fb('confirmed_oes'), false);
+    expect(r).toEqual({ overallStatus: 'silver', badgeLabel: 'Serial Verified' });
+  });
+
+  it('does NOT downgrade gold', () => {
+    const r = applyOntFallbackToBadge({ overallStatus: 'gold', badgeLabel: '4-Way Verified' }, fb('wrong_photo'), false);
+    expect(r.overallStatus).toBe('gold');
+  });
+
+  it('keeps warning + generic label when confirmed_oes but UPS is genuinely mismatched', () => {
+    const r = applyOntFallbackToBadge({ overallStatus: 'warning', badgeLabel: 'Serial Mismatch' }, fb('confirmed_oes'), true);
+    expect(r).toEqual({ overallStatus: 'warning', badgeLabel: 'Serial Mismatch' }); // not relabelled "Confirmed"
+  });
+
+  it('relabels a warning with the precise ONT label for wrong_photo / needs_human', () => {
+    const r = applyOntFallbackToBadge({ overallStatus: 'warning', badgeLabel: 'Serial Mismatch' }, fb('wrong_photo'), true);
+    expect(r).toEqual({ overallStatus: 'warning', badgeLabel: 'Serial Mismatch — x' });
+  });
+
+  it('leaves the badge untouched when outcome is none', () => {
+    const r = applyOntFallbackToBadge({ overallStatus: 'warning', badgeLabel: 'Serial Mismatch' }, fb('none'), false);
+    expect(r).toEqual({ overallStatus: 'warning', badgeLabel: 'Serial Mismatch' });
   });
 });
