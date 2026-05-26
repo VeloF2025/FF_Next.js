@@ -65,12 +65,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     }
 
     if (!stepParam) {
-      return apiResponse.error(res, 'VALIDATION_ERROR' as never, 'Missing step parameter');
+      return apiResponse.badRequest(res, 'Missing step parameter');
     }
 
     const step = parseInt(String(stepParam), 10);
     if (isNaN(step) || step < 1 || step > 10) {
-      return apiResponse.error(res, 'VALIDATION_ERROR' as never, 'Step must be between 1 and 10');
+      return apiResponse.badRequest(res, 'Step must be between 1 and 10');
     }
 
     const result = await pool.query<{

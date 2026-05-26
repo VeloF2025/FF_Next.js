@@ -24,7 +24,7 @@ const BRIDGE_SECRET = process.env.WA_BRIDGE_SECRET;
 
 interface RetryResult {
   dropNumber: string;
-  source: 'failed' | 'bad_categorized' | 'post_qa_error';
+  source: 'failed' | 'bad_categorized';
   success: boolean;
   message: string;
 }
@@ -86,60 +86,12 @@ export default async function handler(
       [MAX_RETRY_ATTEMPTS, limit]
     );
 
-    // 3. Find DRs with status='categorized' but SOME photos have Error results
-    //    These have partial failures — VLM succeeded on some photos but timed out on others.
-    //    They are excluded from query 2 (which requires ALL to be errors) but are still broken.
-    const partialErrorResult = await pool.query(
-      `SELECT dr.drop_number
-       FROM dr_photo_unified_reviews dr
-       WHERE dr.vlm_categorization_status = 'categorized'
-         AND dr.vlm_categorization_results IS NOT NULL
-         AND dr.auto_qa_processed = false
-         AND (dr.human_review_status IS NULL OR dr.human_review_status != 'completed')
-         AND (dr.vlm_retry_count IS NULL OR dr.vlm_retry_count < $1)
-         AND EXISTS (
-           SELECT 1 FROM jsonb_array_elements(dr.vlm_categorization_results) elem
-           WHERE elem->>'vlm_predicted_category' = 'Error'
-         )
-         AND EXISTS (
-           SELECT 1 FROM jsonb_array_elements(dr.vlm_categorization_results) elem
-           WHERE (elem->>'vlm_predicted_step')::int != 0
-             AND elem->>'vlm_predicted_category' != 'Error'
-         )
-       ORDER BY dr.updated_at ASC
-       LIMIT $2`,
-      [MAX_RETRY_ATTEMPTS, limit]
-    );
-
-    // 4. Find DRs already auto-QA processed but with Error photos still in vlm results.
-    //    These had partial VLM failures that auto-QA ran through anyway (using what it had).
-    //    The HITL reviewer sees these as "Discard 0% confidence" photos that should be valid.
-    //    Reset them so re-categorization and auto-QA run again.
-    const postQaErrorResult = await pool.query(
-      `SELECT dr.drop_number
-       FROM dr_photo_unified_reviews dr
-       WHERE dr.vlm_categorization_status = 'categorized'
-         AND dr.auto_qa_processed = true
-         AND dr.feedback_sent = false
-         AND (dr.human_review_status IS NULL OR dr.human_review_status != 'completed')
-         AND (dr.vlm_retry_count IS NULL OR dr.vlm_retry_count < $1)
-         AND EXISTS (
-           SELECT 1 FROM jsonb_array_elements(dr.vlm_categorization_results) elem
-           WHERE elem->>'vlm_predicted_category' = 'Error'
-         )
-       ORDER BY dr.updated_at ASC
-       LIMIT $2`,
-      [MAX_RETRY_ATTEMPTS, limit]
-    );
-
     const failedDRs = failedResult.rows.map((r) => ({ drop_number: r.drop_number, source: 'failed' as const }));
     const badDRs = badCategorizedResult.rows.map((r) => ({ drop_number: r.drop_number, source: 'bad_categorized' as const }));
-    const partialDRs = partialErrorResult.rows.map((r) => ({ drop_number: r.drop_number, source: 'bad_categorized' as const }));
-    const postQaDRs = postQaErrorResult.rows.map((r) => ({ drop_number: r.drop_number, source: 'post_qa_error' as const }));
 
     // Deduplicate
     const seen = new Set<string>();
-    const allDRs = [...failedDRs, ...badDRs, ...partialDRs, ...postQaDRs].filter((dr) => {
+    const allDRs = [...failedDRs, ...badDRs].filter((dr) => {
       if (seen.has(dr.drop_number)) return false;
       seen.add(dr.drop_number);
       return true;
@@ -156,26 +108,19 @@ export default async function handler(
       });
     }
 
-    log.info(`Found ${failedDRs.length} failed + ${badDRs.length} all-error + ${partialDRs.length} partial-error + ${postQaDRs.length} post-qa-error DRs to retry`);
+    log.info(`Found ${failedDRs.length} failed + ${badDRs.length} bad-categorized DRs to retry`);
 
     const results: RetryResult[] = [];
 
     for (const dr of allDRs) {
       try {
-        // Reset to 'processing' state.
-        // For post_qa_error DRs also clear auto_qa state so auto-QA reruns after fresh categorization.
-        const resetCols = dr.source === 'post_qa_error'
-          ? `vlm_categorization_status = 'processing',
-             vlm_retry_count = COALESCE(vlm_retry_count, 0) + 1,
-             auto_qa_processed = false,
-             auto_qa_results = NULL,
-             human_review_status = NULL,
-             updated_at = NOW()`
-          : `vlm_categorization_status = 'processing',
-             vlm_retry_count = COALESCE(vlm_retry_count, 0) + 1,
-             updated_at = NOW()`;
+        // Reset to 'processing' state
         await pool.query(
-          `UPDATE dr_photo_unified_reviews SET ${resetCols} WHERE drop_number = $1`,
+          `UPDATE dr_photo_unified_reviews
+           SET vlm_categorization_status = 'processing',
+               vlm_retry_count = COALESCE(vlm_retry_count, 0) + 1,
+               updated_at = NOW()
+           WHERE drop_number = $1`,
           [dr.drop_number]
         );
 

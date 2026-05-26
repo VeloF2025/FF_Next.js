@@ -88,7 +88,7 @@ export const VLM_TIMEOUT_DOCUMENT = 90_000;
 export const VLM_MAX_TOKENS_DEFAULT = 1000;
 
 /** Max tokens for photo categorization (needs structured JSON for batches) */
-export const VLM_MAX_TOKENS_CATEGORIZATION = 6000;
+export const VLM_MAX_TOKENS_CATEGORIZATION = 4000;
 
 /** Max tokens for QA validation */
 export const VLM_MAX_TOKENS_QA = 2000;
