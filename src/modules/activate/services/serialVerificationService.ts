@@ -18,6 +18,7 @@ import { neon } from '@/lib/db-neon';
 import { log, createLogger } from '@/lib/logger';
 import { extractSerialsFromWaPhoto } from '@/modules/activate/services/vlmExtractionService';
 import { logActivity, logWaPhotoVlmProcessed } from '@/modules/activate/services/activityLogService';
+import { classifyOntMismatch, type OntFallbackResult } from '@/modules/activate/services/ontMismatchFallback';
 
 // Component logger
 const logger = createLogger('SerialVerification');
@@ -57,6 +58,8 @@ export interface SerialVerificationResult {
   upsVerification: VerificationDetail;
   overallStatus: 'gold' | 'silver' | 'bronze' | 'warning' | 'none';
   badgeLabel: string;
+  /** ph_bl fallback reclassification of an ONT mismatch (undefined when ONT is not a mismatch). */
+  ontFallback?: OntFallbackResult;
 }
 
 interface VerificationDetail {
@@ -148,7 +151,8 @@ export async function computeSerialVerification(dropNumber: string): Promise<Ser
       LIMIT 1
     ),
     onemap_data AS (
-      SELECT ont_serial_scanned as ont, ups_serial_scanned as ups
+      SELECT ont_serial_scanned as ont, ups_serial_scanned as ups,
+             vlm_dr_number_step9 as ph_bl_dr, vlm_ont_serial_step9 as ph_bl_ont
       FROM dr_photo_unified_reviews
       WHERE drop_number = ${dropNumber}
       LIMIT 1
@@ -167,6 +171,8 @@ export async function computeSerialVerification(dropNumber: string): Promise<Ser
       (SELECT ont FROM offline_data) as offline_ont,
       (SELECT ont FROM onemap_data) as onemap_ont,
       (SELECT ups FROM onemap_data) as onemap_ups,
+      (SELECT ph_bl_dr FROM onemap_data) as ph_bl_dr,
+      (SELECT ph_bl_ont FROM onemap_data) as ph_bl_ont,
       (SELECT ont FROM wa_photo_data) as wa_ont,
       (SELECT ups FROM wa_photo_data) as wa_ups,
       (SELECT vlm_confidence FROM wa_photo_data) as wa_confidence
@@ -209,8 +215,32 @@ export async function computeSerialVerification(dropNumber: string): Promise<Ser
     badgeLabel = 'Serial Mismatch';
   }
 
+  // Fallback: an ONT mismatch is ~99% a VLM misread or a misattached photo, not a
+  // real 1Map error. Reclassify it using the ph_bl (Green Lights & DR Label) photo
+  // extraction + OES, so the badge stops crying wolf and the genuine-error/needs-
+  // human tail is flagged distinctly. Never auto-writes a serial.
+  let ontFallback: OntFallbackResult | undefined;
+  if (ontVerification.status === 'mismatch') {
+    ontFallback = classifyOntMismatch({
+      dropNumber,
+      dr9: (row.ph_bl_dr as string | null) ?? null,
+      ont9: (row.ph_bl_ont as string | null) ?? null,
+      onemap: (row.onemap_ont as string | null) ?? null,
+      oes: (row.oes_ont as string | null) ?? null,
+    });
+    // OES confirms 1Map → suppress the false alarm (only safe to upgrade when UPS
+    // isn't itself mismatched). Otherwise keep the warning but use the precise label.
+    if (ontFallback.outcome === 'confirmed_oes' && upsVerification.status !== 'mismatch') {
+      overallStatus = ontFallback.status;
+      badgeLabel = ontFallback.label;
+    } else if (overallStatus === 'warning' && ontFallback.outcome !== 'none') {
+      badgeLabel = ontFallback.label;
+    }
+  }
+
   return {
     dropNumber,
+    ontFallback,
     ont: {
       oes: row.oes_ont || null,
       offline: row.offline_ont || null,
@@ -249,6 +279,7 @@ export async function computeAndPersistVerification(dropNumber: string): Promise
             ups: verification.ups,
             ontVerification: verification.ontVerification,
             upsVerification: verification.upsVerification,
+            ontFallback: verification.ontFallback ?? null,
           })},
           serial_verification_computed_at = NOW()
       WHERE drop_number = ${dropNumber}
