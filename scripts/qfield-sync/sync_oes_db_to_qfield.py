@@ -2,22 +2,17 @@
 """
 Sync OES activation data from FibreFlow (Neon) to QFieldCloud.
 
-Updated version with TWO layers:
-- OES Actual (blue) - where technician activated (from OES Excel GPS)
-- Planned (green) - where drop was planned (from drops table)
+Data is split by FibreFlow project and synced to the correct QField project
+via qfield_project_links. FT_Master_Progress gets all projects combined.
 
-This allows visual comparison of discrepancies between planned and actual locations.
-
-Features:
-- Filters out coordinates outside South Africa bounds
-- Creates date-based layers: OES DD-MM-YY Actual, OES DD-MM-YY Planned
-- Shows DR numbers as labels
+Two layers per QField project, written to a single stable-named GPKG ("OES FF.gpkg")
+that is overwritten in place every run (no dated files — those rotted the .qgs):
+- OES FF Activated (cerise pink) - activated DRs for that project
+- OES FF Remaining (orange) - unactivated drops for that project
+The report date is stamped into each layer's description, not its name/filename.
 
 Usage:
     python3 sync_oes_db_to_qfield.py [--full] [--report-date YYYY-MM-DD]
-
-Author: Hein/Claude Code
-Date: 2026-01-24
 """
 
 import os
@@ -33,7 +28,6 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import List, Tuple, Optional, Dict
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
@@ -44,20 +38,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Environment variables with defaults
 NEON_DATABASE_URL = os.environ.get(
     'NEON_DATABASE_URL',
-    'process.env.DATABASE_URL'
+    'postgresql://fibreflow_user:ff_x8Km2pQr9vLn@localhost:5437/fibreflow'
 )
 
 QFIELD_USERNAME = os.environ.get('QFIELD_USERNAME', 'admin')
-QFIELD_PASSWORD = os.environ.get('QFIELD_PASSWORD', '0203')
-QFIELD_PROJECT_ID = os.environ.get('QFIELD_PROJECT_ID', 'e849b878-f8a8-4f84-a3f1-9fbd051686c0')
+QFIELD_PASSWORD = os.environ.get('QFIELD_PASSWORD', 'VF-qfield-2026!')
+QFIELD_FALLBACK_PROJECT_ID = os.environ.get('QFIELD_PROJECT_ID', 'af058301-32d1-4bca-84f9-83b899fcbb34')
 QFIELD_API_URL = os.environ.get('QFIELD_API_URL', 'https://qfield.fibreflow.app/api/v1/')
 
 OUTPUT_DIR = '/tmp/qfield_oes_sync'
 
-# South Africa bounds for filtering bad GPS data
 SA_BOUNDS = {
     'min_lat': -35.0,
     'max_lat': -22.0,
@@ -66,17 +58,58 @@ SA_BOUNDS = {
 }
 
 
+def fetch_sync_targets() -> List[Dict]:
+    """
+    Fetch sync targets: each QField project and its linked FF project IDs.
+    Returns list of dicts: {qfield_project_id, qfield_name, ff_project_ids}
+    """
+    import psycopg2
+    try:
+        conn = psycopg2.connect(NEON_DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT
+                qp.qfield_project_id,
+                qp.name,
+                ARRAY_AGG(qpl.fibreflow_project_id::text) AS ff_project_ids
+            FROM qfield_projects qp
+            INNER JOIN qfield_project_links qpl ON qpl.qfield_project_id = qp.id
+            WHERE qp.is_active = true
+              AND qp.sync_enabled = true
+            GROUP BY qp.qfield_project_id, qp.name, qp.is_default
+            ORDER BY qp.is_default DESC, qp.name
+        """)
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        if rows:
+            targets = [
+                {
+                    'qfield_project_id': r[0],
+                    'qfield_name': r[1],
+                    'ff_project_ids': r[2],
+                }
+                for r in rows
+            ]
+            logger.info(f"Found {len(targets)} sync targets from qfield_project_links")
+            for t in targets:
+                logger.info(f"  {t['qfield_name']} -> {len(t['ff_project_ids'])} FF project(s)")
+            return targets
+    except Exception as e:
+        logger.warning(f"Failed to query sync targets: {e}")
+
+    logger.info(f"Using fallback project ID: {QFIELD_FALLBACK_PROJECT_ID}")
+    return [{'qfield_project_id': QFIELD_FALLBACK_PROJECT_ID, 'qfield_name': 'Fallback', 'ff_project_ids': []}]
+
+
 def is_valid_sa_coordinate(lat: float, lon: float) -> bool:
-    """Check if coordinates are within South Africa bounds."""
     return (SA_BOUNDS['min_lat'] <= lat <= SA_BOUNDS['max_lat'] and
             SA_BOUNDS['min_lon'] <= lon <= SA_BOUNDS['max_lon'])
 
 
 def parse_report_date(date_str: Optional[str]) -> datetime:
-    """Parse report date string (YYYY-MM-DD) or return today."""
     if not date_str:
         return datetime.now()
-
     try:
         return datetime.strptime(date_str, "%Y-%m-%d")
     except ValueError:
@@ -85,22 +118,18 @@ def parse_report_date(date_str: Optional[str]) -> datetime:
 
 
 def create_gpkg_point(lon: float, lat: float) -> bytes:
-    """Create GeoPackage point geometry (WKB with GPKG header)."""
     header = b'GP'
     header += struct.pack('<B', 0)
     header += struct.pack('<B', 1)
     header += struct.pack('<i', 4326)
-
     wkb = struct.pack('<B', 1)
     wkb += struct.pack('<I', 1)
     wkb += struct.pack('<d', lon)
     wkb += struct.pack('<d', lat)
-
     return header + wkb
 
 
 def add_pole_nr_labeling(maplayer):
-    """Add labeling configuration to show 'Pole Nr' field as labels."""
     existing_labeling = maplayer.find("labeling")
     if existing_labeling is not None:
         maplayer.remove(existing_labeling)
@@ -148,12 +177,10 @@ def add_pole_nr_labeling(maplayer):
     rendering.set("obstacle", "1")
     rendering.set("obstacleFactor", "1")
 
-    logger.info("Added 'Pole Nr' labeling configuration")
     return labeling
 
 
 def set_renderer(maplayer, color: str = "0,100,255,255"):
-    """Set simple single-symbol renderer with specified color (RGBA)."""
     existing_renderer = maplayer.find("renderer-v2")
     if existing_renderer is not None:
         maplayer.remove(existing_renderer)
@@ -164,7 +191,6 @@ def set_renderer(maplayer, color: str = "0,100,255,255"):
     renderer.set("enableorderby", "0")
 
     symbols = ET.SubElement(renderer, "symbols")
-
     symbol = ET.SubElement(symbols, "symbol")
     symbol.set("type", "marker")
     symbol.set("name", "0")
@@ -180,113 +206,114 @@ def set_renderer(maplayer, color: str = "0,100,255,255"):
     props = ET.SubElement(layer_el, "Option")
     props.set("type", "Map")
 
-    color_opt = ET.SubElement(props, "Option")
-    color_opt.set("type", "QString")
-    color_opt.set("name", "color")
-    color_opt.set("value", color)
-
-    shape_opt = ET.SubElement(props, "Option")
-    shape_opt.set("type", "QString")
-    shape_opt.set("name", "name")
-    shape_opt.set("value", "circle")
-
-    size_opt = ET.SubElement(props, "Option")
-    size_opt.set("type", "QString")
-    size_opt.set("name", "size")
-    size_opt.set("value", "3")
-
-    size_unit = ET.SubElement(props, "Option")
-    size_unit.set("type", "QString")
-    size_unit.set("name", "size_unit")
-    size_unit.set("value", "MM")
+    for name, value in [("color", color), ("name", "circle"), ("size", "1.5"), ("size_unit", "MM")]:
+        opt = ET.SubElement(props, "Option")
+        opt.set("type", "QString")
+        opt.set("name", name)
+        opt.set("value", value)
 
     return renderer
 
 
-def fetch_oes_data() -> Dict[str, List[Tuple]]:
+def fetch_oes_data_by_project() -> Dict[str, Dict[str, List[Tuple]]]:
     """
-    Fetch OES data with both actual and planned coordinates.
-    Returns dict with 'actual' and 'planned' lists.
+    Fetch OES data grouped by FF project_id.
+    Returns: {project_id: {'activated': [(dr, lat, lon), ...], 'remaining': [(dr, lat, lon), ...]}}
     """
-    try:
-        import psycopg2
-    except ImportError:
-        logger.error("psycopg2 not installed")
-        sys.exit(1)
+    import psycopg2
 
     logger.info("Connecting to Neon database...")
     conn = psycopg2.connect(NEON_DATABASE_URL)
     cursor = conn.cursor()
 
-    # Fetch OES actual coordinates (from Excel GPS)
-    logger.info("Fetching OES actual coordinates...")
+    # Fetch all activated DRs with project_id
+    logger.info("Fetching all activated DRs grouped by project...")
     cursor.execute("""
-        SELECT drop_number, oes_latitude, oes_longitude
-        FROM v_qfield_oes_activations
-        WHERE oes_latitude IS NOT NULL
-          AND oes_longitude IS NOT NULL
-          AND oes_latitude != 0
-          AND oes_longitude != 0
-        ORDER BY drop_number
+        SELECT oes.drop_number,
+               CAST(COALESCE(NULLIF(d.latitude, 0), oes.latitude) AS FLOAT) as lat,
+               CAST(COALESCE(NULLIF(d.longitude, 0), oes.longitude) AS FLOAT) as lon,
+               d.project_id::text
+        FROM oes_activations oes
+        INNER JOIN drops d ON oes.drop_id = d.id
+        WHERE COALESCE(NULLIF(d.latitude, 0), oes.latitude) IS NOT NULL
+          AND COALESCE(NULLIF(d.longitude, 0), oes.longitude) IS NOT NULL
+        ORDER BY oes.drop_number
     """)
-    actual_raw = cursor.fetchall()
+    all_raw = cursor.fetchall()
 
-    # Filter to SA bounds
-    actual = [(dr, lat, lon) for dr, lat, lon in actual_raw
-              if is_valid_sa_coordinate(lat, lon)]
-    filtered_actual = len(actual_raw) - len(actual)
-    logger.info(f"Fetched {len(actual)} actual records ({filtered_actual} filtered outside SA)")
+    by_project: Dict[str, Dict[str, List[Tuple]]] = {}
 
-    # Fetch Planned coordinates (from drops table)
-    logger.info("Fetching planned coordinates...")
+    for dr, lat, lon, pid in all_raw:
+        if not is_valid_sa_coordinate(lat, lon):
+            continue
+        if pid not in by_project:
+            by_project[pid] = {'activated': [], 'remaining': []}
+        by_project[pid]['activated'].append((dr, lat, lon))
+
+    activated_total = sum(len(v['activated']) for v in by_project.values())
+    logger.info(f"Fetched {activated_total} activated DRs across {len(by_project)} projects")
+
+    # Fetch remaining DRs with project_id
+    logger.info("Fetching remaining unactivated DRs grouped by project...")
     cursor.execute("""
-        SELECT drop_number, planned_latitude, planned_longitude
-        FROM v_qfield_oes_activations
-        WHERE planned_latitude IS NOT NULL
-          AND planned_longitude IS NOT NULL
-          AND planned_latitude != 0
-          AND planned_longitude != 0
-        ORDER BY drop_number
+        SELECT d.drop_number,
+               CAST(d.latitude AS FLOAT) as lat,
+               CAST(d.longitude AS FLOAT) as lon,
+               d.project_id::text
+        FROM drops d
+        WHERE NOT EXISTS (
+            SELECT 1 FROM oes_activations oes WHERE oes.drop_id = d.id
+        )
+          AND d.latitude IS NOT NULL
+          AND d.longitude IS NOT NULL
+          AND d.latitude != 0
+          AND d.longitude != 0
+        ORDER BY d.drop_number
     """)
-    planned_raw = cursor.fetchall()
+    remaining_raw = cursor.fetchall()
 
-    # Filter to SA bounds
-    planned = [(dr, lat, lon) for dr, lat, lon in planned_raw
-               if is_valid_sa_coordinate(lat, lon)]
-    filtered_planned = len(planned_raw) - len(planned)
-    logger.info(f"Fetched {len(planned)} planned records ({filtered_planned} filtered outside SA)")
+    for dr, lat, lon, pid in remaining_raw:
+        if not is_valid_sa_coordinate(lat, lon):
+            continue
+        if pid not in by_project:
+            by_project[pid] = {'activated': [], 'remaining': []}
+        by_project[pid]['remaining'].append((dr, lat, lon))
+
+    remaining_total = sum(len(v['remaining']) for v in by_project.values())
+    logger.info(f"Fetched {remaining_total} remaining DRs across {len(by_project)} projects")
 
     cursor.close()
     conn.close()
 
-    return {'actual': actual, 'planned': planned}
+    return by_project
 
 
-def create_gpkg_with_two_tables(data: Dict[str, List[Tuple]], output_dir: str, report_date: datetime) -> Tuple[str, str, str, str, str]:
-    """
-    Create GeoPackage with two tables: actual and planned.
+def create_gpkg(records_activated: List[Tuple], records_remaining: List[Tuple],
+                output_dir: str, report_date: datetime) -> Tuple[str, str, str, str, str]:
+    """Create GeoPackage with two tables for a specific set of records."""
+    date_str = report_date.strftime("%d%m%Y")
+    # Stable, non-dated names: the overlay overwrites the same GPKG/layers in place
+    # each run instead of creating a new dated file daily. Dated files rotted the
+    # .qgs (old GPKGs got emptied while layer refs lingered) and broke QFieldCloud
+    # packaging. The report date is preserved in the layer description below, not the
+    # filename or layer id, so it can never produce a dangling reference.
+    gpkg_filename = "OES FF.gpkg"
 
-    Returns: (gpkg_filename, actual_table, actual_layer_name, planned_table, planned_layer_name)
-    """
-    date_str = report_date.strftime("%d-%m-%y")
-    gpkg_filename = f"OES {date_str}.gpkg"
-
-    actual_table = f"oes_{report_date.strftime('%d%m%y')}_actual"
-    planned_table = f"oes_{report_date.strftime('%d%m%y')}_planned"
-    actual_layer_name = f"OES {date_str} Actual"
-    planned_layer_name = f"OES {date_str} Planned"
+    all_table = "oes_ff_all"
+    remaining_table = "ff_remaining"
+    all_layer_name = "OES FF Activated"
+    remaining_layer_name = "OES FF Remaining"
 
     gpkg_path = os.path.join(output_dir, gpkg_filename)
 
     if os.path.exists(gpkg_path):
         os.remove(gpkg_path)
 
-    logger.info(f"Creating {gpkg_filename} with tables {actual_table} and {planned_table}")
+    logger.info(f"Creating {gpkg_filename}: {len(records_activated)} activated, {len(records_remaining)} remaining")
 
     conn = sqlite3.connect(gpkg_path)
     cur = conn.cursor()
 
-    # GeoPackage metadata tables
     cur.execute("""CREATE TABLE gpkg_spatial_ref_sys (
         srs_name TEXT, srs_id INTEGER PRIMARY KEY, organization TEXT,
         organization_coordsys_id INTEGER, definition TEXT, description TEXT)""")
@@ -301,9 +328,7 @@ def create_gpkg_with_two_tables(data: Dict[str, List[Tuple]], output_dir: str, r
         table_name TEXT, column_name TEXT, geometry_type_name TEXT,
         srs_id INTEGER, z INTEGER, m INTEGER)""")
 
-    # Create both tables
-    for table_name, records, label in [(actual_table, data['actual'], 'Actual'),
-                                        (planned_table, data['planned'], 'Planned')]:
+    for table_name, records in [(all_table, records_activated), (remaining_table, records_remaining)]:
         cur.execute(f'''CREATE TABLE "{table_name}" (
             fid INTEGER PRIMARY KEY AUTOINCREMENT,
             geom BLOB,
@@ -313,8 +338,9 @@ def create_gpkg_with_two_tables(data: Dict[str, List[Tuple]], output_dir: str, r
             lon REAL
         )''')
 
-        cur.execute("INSERT INTO gpkg_contents VALUES (?, 'features', ?, '', datetime('now'), NULL, NULL, NULL, NULL, 4326)",
-                    (table_name, table_name))
+        _desc = f"OES activation overlay — updated {date_str}"
+        cur.execute("INSERT INTO gpkg_contents VALUES (?, 'features', ?, ?, datetime('now'), NULL, NULL, NULL, NULL, 4326)",
+                    (table_name, table_name, _desc))
         cur.execute("INSERT INTO gpkg_geometry_columns VALUES (?, 'geom', 'POINT', 4326, 0, 0)", (table_name,))
 
         for drop_number, lat, lon in records:
@@ -322,19 +348,17 @@ def create_gpkg_with_two_tables(data: Dict[str, List[Tuple]], output_dir: str, r
             cur.execute(f'INSERT INTO "{table_name}" (geom, "Pole Nr", "Vlook", lat, lon) VALUES (?, ?, ?, ?, ?)',
                        (geom, drop_number, drop_number, float(lat), float(lon)))
 
-        logger.info(f"Inserted {len(records)} records into {table_name} ({label})")
-
     conn.commit()
     conn.close()
 
-    return gpkg_filename, actual_table, actual_layer_name, planned_table, planned_layer_name
+    return gpkg_filename, all_table, all_layer_name, remaining_table, remaining_layer_name
 
 
 def update_qgs_with_layers(client, project_id: str, gpkg_filename: str,
-                           actual_table: str, actual_layer_name: str,
-                           planned_table: str, planned_layer_name: str,
+                           all_table: str, all_layer_name: str,
+                           remaining_table: str, remaining_layer_name: str,
                            output_dir: str) -> str:
-    """Download .qgs, add both layers inside "OES Report" group."""
+    """Download .qgs, add both layers inside 'OES Report' group."""
     from qfieldcloud_sdk import sdk
 
     files = client.list_remote_files(project_id)
@@ -364,7 +388,6 @@ def update_qgs_with_layers(client, project_id: str, gpkg_filename: str,
     tree = ET.parse(qgs_path)
     root = tree.getroot()
 
-    # Find or create "OES Report" group
     layer_tree = root.find(".//layer-tree-group")
     oes_group = None
     for group in layer_tree.findall("layer-tree-group"):
@@ -382,14 +405,12 @@ def update_qgs_with_layers(client, project_id: str, gpkg_filename: str,
 
     projectlayers = root.find(".//projectlayers")
 
-    # Find template layer
     template_maplayer = None
     for ml in projectlayers.findall("maplayer"):
         ln_el = ml.find("layername")
         if ln_el is not None and "OES" in ln_el.text and ("All" in ln_el.text or "Actual" in ln_el.text):
             if ml.find("extent") is not None:
                 template_maplayer = ml
-                logger.info(f"Found OES template layer: {ln_el.text}")
                 break
 
     if template_maplayer is None:
@@ -398,32 +419,101 @@ def update_qgs_with_layers(client, project_id: str, gpkg_filename: str,
             if ln_el is not None and ln_el.text in ["PONs", "POP", "PONs_1"]:
                 if ml.find("extent") is not None:
                     template_maplayer = ml
-                    logger.info(f"Using fallback template layer: {ln_el.text}")
                     break
 
-    # Add both layers
+    # Clean ALL legacy dated OES/FF layers from previous syncs (prevent accumulation).
+    # Match on the datasource FILE ref (drift-proof) as well as the display name:
+    # historical layer names drifted (e.g. "FF Remaining DR's 25052026 " with an
+    # apostrophe + trailing space) and evaded name-only regexes, so a ref to a deleted
+    # dated GPKG lingered and broke QFieldCloud packaging. The new stable layers
+    # ("OES FF Activated"/"OES FF Remaining") carry no digits, so they survive cleanup
+    # and are overwritten in place by the per-display-name dedupe in the add loop below.
+    import re as _re
+    _file_pat = _re.compile(r'OES FF \d{8}\.gpkg')          # dated gpkg file ref in datasource
+    _name_pats = [
+        _re.compile(r'OES FF \d{8}'),                        # OES FF DDMMYYYY [All]
+        _re.compile(r"FF Remaining DR'?s?\s*\d{8}"),         # FF Remaining DR(s|'s) DDMMYYYY (+stray space)
+        _re.compile(r'OES \d{2}-\d{2}-\d{2}'),               # OES DD-MM-YY (very old)
+        _re.compile(r'Remaining_connections_'),
+        _re.compile(r'ONT_Status_'),
+    ]
+
+    def _is_old_name(s):
+        return any(p.search(s or '') for p in _name_pats)
+
+    def _is_old_src(s):
+        return bool(_file_pat.search(s or ''))
+
+    _removed = 0
+    # 1) projectlayers/maplayer: remove stale, collecting their ids for tree/order cleanup
+    _stale_ids = set()
+    for maplayer in list(projectlayers):
+        ln = maplayer.find('layername')
+        ds = maplayer.find('datasource')
+        idel = maplayer.find('id')
+        name = ln.text if ln is not None else ''
+        src = ds.text if ds is not None else ''
+        if _is_old_name(name) or _is_old_src(src):
+            if idel is not None and idel.text:
+                _stale_ids.add(idel.text)
+            if maplayer.get('id'):
+                _stale_ids.add(maplayer.get('id'))
+            projectlayers.remove(maplayer)
+            _removed += 1
+    # 2) layer-tree-layer anywhere (recursive), by name / source / stale id
+    for parent in root.iter():
+        for ltl in list(parent):
+            if ltl.tag == 'layer-tree-layer' and (
+                _is_old_name(ltl.get('name')) or _is_old_src(ltl.get('source'))
+                or ltl.get('id') in _stale_ids
+            ):
+                parent.remove(ltl)
+                _removed += 1
+    # 3) custom-order entries referencing removed layers
+    for co in root.iter('custom-order'):
+        for item in list(co):
+            if (item.text or '') in _stale_ids:
+                co.remove(item)
+                _removed += 1
+    # 4) <legend> section (recursive legendgroup/legendlayer by name)
+    legend = root.find('.//legend')
+    if legend is not None:
+        def _clean_legend(node):
+            nonlocal _removed
+            for child in list(node):
+                if child.tag == 'legendlayer' and _is_old_name(child.get('name')):
+                    node.remove(child)
+                    _removed += 1
+                elif child.tag == 'legendgroup':
+                    if _is_old_name(child.get('name')):
+                        node.remove(child)
+                        _removed += 1
+                    else:
+                        _clean_legend(child)
+        _clean_legend(legend)
+    if _removed:
+        logger.info(f"Cleaned {_removed} legacy OES layer references from .qgs")
+
+    # Remaining FIRST so it renders below; Activated LAST so it renders on top.
+    # Both use insert(0, ...) so last-inserted = topmost in QField layer tree.
     layers_config = [
-        (actual_table, actual_layer_name, "0,100,255,255"),   # Blue for actual
-        (planned_table, planned_layer_name, "0,200,0,255"),   # Green for planned
+        (remaining_table, remaining_layer_name, "255,165,0,255"),
+        (all_table, all_layer_name, "222,49,99,255"),
     ]
 
     for table_name, layer_display_name, color in layers_config:
         datasource = f"./{gpkg_filename}|layername={table_name}"
         layer_id = f"{table_name}_{str(uuid.uuid4()).replace('-', '_')}"
 
-        # Remove existing layer with same name
         for ltl in list(oes_group):
             if ltl.get("name") == layer_display_name:
                 oes_group.remove(ltl)
-                logger.info(f"Removed existing layer: {layer_display_name}")
 
-        # Remove from projectlayers too
         for maplayer in list(projectlayers):
             layername = maplayer.find("layername")
             if layername is not None and layername.text == layer_display_name:
                 projectlayers.remove(maplayer)
 
-        # Add layer-tree-layer
         new_ltl = ET.Element("layer-tree-layer")
         new_ltl.set("id", layer_id)
         new_ltl.set("name", layer_display_name)
@@ -434,7 +524,6 @@ def update_qgs_with_layers(client, project_id: str, gpkg_filename: str,
         new_ltl.set("legend_exp", "")
         oes_group.insert(0, new_ltl)
 
-        # Create maplayer
         if template_maplayer is not None:
             maplayer = copy.deepcopy(template_maplayer)
             maplayer.set("id", layer_id)
@@ -448,9 +537,7 @@ def update_qgs_with_layers(client, project_id: str, gpkg_filename: str,
             if ln_el is not None:
                 ln_el.text = layer_display_name
             projectlayers.append(maplayer)
-            logger.info(f"Cloned maplayer for {layer_display_name}")
         else:
-            logger.warning(f"No template - creating minimal maplayer for {layer_display_name}")
             maplayer = ET.SubElement(projectlayers, "maplayer")
             maplayer.set("id", layer_id)
             maplayer.set("geometry", "Point")
@@ -463,10 +550,8 @@ def update_qgs_with_layers(client, project_id: str, gpkg_filename: str,
             prov = ET.SubElement(maplayer, "provider")
             prov.text = "ogr"
 
-        # Add labeling and renderer
         add_pole_nr_labeling(maplayer)
         set_renderer(maplayer, color)
-        logger.info(f"Set {color.split(',')[1]}% green renderer for {layer_display_name}")
 
     tree.write(qgs_path, encoding="UTF-8", xml_declaration=True)
     logger.info(f"Updated {qgs_name} with both layers")
@@ -475,18 +560,31 @@ def update_qgs_with_layers(client, project_id: str, gpkg_filename: str,
 
 
 def upload_to_qfieldcloud(output_dir: str, gpkg_filename: str,
-                          actual_table: str, actual_layer_name: str,
-                          planned_table: str, planned_layer_name: str):
-    """Upload files and trigger jobs."""
+                          all_table: str, all_layer_name: str,
+                          remaining_table: str, remaining_layer_name: str,
+                          project_id: str):
+    """Upload files and trigger jobs for a single project."""
     from qfieldcloud_sdk import sdk
 
-    logger.info("Connecting to QFieldCloud...")
+    logger.info(f"Connecting to QFieldCloud (project {project_id})...")
     client = sdk.Client(QFIELD_API_URL)
     client.login(QFIELD_USERNAME, QFIELD_PASSWORD)
 
-    project_id = QFIELD_PROJECT_ID
+    # Delete old OES gpkg files from QFieldCloud before uploading new one
+    try:
+        remote_files = client.list_remote_files(project_id)
+        for rf in remote_files:
+            rname = rf.get('name', '')
+            if (rname.endswith('.gpkg') or rname.endswith('.geojson')) and rname != gpkg_filename:
+                if 'OES' in rname or 'oes_' in rname or 'Remaining' in rname or 'ONT_Status' in rname:
+                    try:
+                        client.delete_files(project_id, glob_patterns=[rname])
+                        logger.info(f"  Deleted old file: {rname}")
+                    except Exception as e:
+                        logger.warning(f"  Could not delete {rname}: {e}")
+    except Exception as e:
+        logger.warning(f"Could not clean old files: {e}")
 
-    # Upload gpkg
     logger.info(f"Uploading {gpkg_filename}...")
     result = list(client.upload_files(
         project_id=project_id,
@@ -497,10 +595,9 @@ def upload_to_qfieldcloud(output_dir: str, gpkg_filename: str,
     for r in result:
         logger.info(f"  {r.get('name')} - {r.get('status')}")
 
-    # Update .qgs
     qgs_path = update_qgs_with_layers(client, project_id, gpkg_filename,
-                                       actual_table, actual_layer_name,
-                                       planned_table, planned_layer_name,
+                                       all_table, all_layer_name,
+                                       remaining_table, remaining_layer_name,
                                        output_dir)
 
     if qgs_path:
@@ -547,60 +644,103 @@ def upload_to_qfieldcloud(output_dir: str, gpkg_filename: str,
                 return False
             break
 
-    outputs = status.get('feedback', {}).get('outputs', {})
-    layers = outputs.get('qgis_layers_data', {}).get('layers_by_id', {})
-    logger.info("Packaged layers:")
-    for lid, linfo in layers.items():
-        name = linfo.get('name', '?')
-        valid = linfo.get('is_valid', '?')
-        if 'OES' in name:
-            logger.info(f"  {name} - valid: {valid}")
-
     return True
 
 
 def main():
-    """Main sync function."""
-    parser = argparse.ArgumentParser(description='Sync OES data to QFieldCloud')
+    parser = argparse.ArgumentParser(description='Sync OES data to QFieldCloud (project-split)')
     parser.add_argument('--full', action='store_true', help='Full sync')
     parser.add_argument('--report-date', type=str, help='Report date YYYY-MM-DD')
     args = parser.parse_args()
 
     report_date = parse_report_date(args.report_date)
 
-    logger.info("=" * 50)
-    logger.info("OES to QFieldCloud Sync (Actual + Planned)")
+    logger.info("=" * 60)
+    logger.info("OES to QFieldCloud Sync (PROJECT-SPLIT)")
     logger.info(f"Report Date: {report_date.strftime('%Y-%m-%d')}")
-    logger.info("=" * 50)
+    logger.info("=" * 60)
 
     import shutil
     if os.path.exists(OUTPUT_DIR):
-        shutil.rmtree(OUTPUT_DIR)
+        shutil.rmtree(OUTPUT_DIR, ignore_errors=True)
+        # If rmtree failed (cross-user permissions), try subprocess
+        if os.path.exists(OUTPUT_DIR):
+            import subprocess
+            subprocess.run(['rm', '-rf', OUTPUT_DIR], check=False)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # Fetch data (both actual and planned)
-    data = fetch_oes_data()
-    if not data['actual'] and not data['planned']:
+    # Fetch sync targets (QField project -> FF project IDs mapping)
+    sync_targets = fetch_sync_targets()
+    if not sync_targets:
+        logger.error("No sync targets found")
+        sys.exit(1)
+
+    # Fetch ALL OES data grouped by FF project
+    data_by_project = fetch_oes_data_by_project()
+    if not data_by_project:
         logger.warning("No records to sync")
         return
 
-    # Create gpkg with both tables
-    gpkg_filename, actual_table, actual_layer_name, planned_table, planned_layer_name = \
-        create_gpkg_with_two_tables(data, OUTPUT_DIR, report_date)
+    success_count = 0
+    fail_count = 0
 
-    # Upload and trigger
-    success = upload_to_qfieldcloud(OUTPUT_DIR, gpkg_filename,
-                                     actual_table, actual_layer_name,
-                                     planned_table, planned_layer_name)
+    for target in sync_targets:
+        qf_pid = target['qfield_project_id']
+        qf_name = target['qfield_name']
+        ff_pids = target['ff_project_ids']
 
-    if success:
-        logger.info("=" * 50)
-        logger.info(f"SUCCESS: {len(data['actual'])} actual + {len(data['planned'])} planned records synced")
-        logger.info(f"  {actual_layer_name} (blue) - where technician was")
-        logger.info(f"  {planned_layer_name} (green) - where drop was planned")
-        logger.info("=" * 50)
-    else:
-        logger.error("Sync failed")
+        logger.info("-" * 60)
+        logger.info(f"Syncing to {qf_name} ({qf_pid})")
+        logger.info(f"  Linked FF projects: {ff_pids}")
+
+        # Collect records for this target's linked FF projects
+        activated = []
+        remaining = []
+        for ff_pid in ff_pids:
+            proj_data = data_by_project.get(ff_pid, {})
+            activated.extend(proj_data.get('activated', []))
+            remaining.extend(proj_data.get('remaining', []))
+
+        logger.info(f"  {len(activated)} activated + {len(remaining)} remaining DRs")
+
+        if not activated and not remaining:
+            logger.info(f"  Skipping {qf_name} — no data for linked projects")
+            continue
+
+        # Create project-specific GPKG
+        project_dir = os.path.join(OUTPUT_DIR, qf_pid.replace('-', '_'))
+        if os.path.exists(project_dir):
+            shutil.rmtree(project_dir)
+        os.makedirs(project_dir, exist_ok=True)
+
+        gpkg_filename, all_table, all_layer_name, remaining_table, remaining_layer_name = \
+            create_gpkg(activated, remaining, project_dir, report_date)
+
+        try:
+            ok = upload_to_qfieldcloud(project_dir, gpkg_filename,
+                                        all_table, all_layer_name,
+                                        remaining_table, remaining_layer_name,
+                                        project_id=qf_pid)
+            if ok:
+                success_count += 1
+                logger.info(f"SUCCESS: {qf_name}")
+            else:
+                fail_count += 1
+                logger.error(f"FAILED: {qf_name}")
+        except Exception as e:
+            fail_count += 1
+            logger.error(f"FAILED: {qf_name}: {e}")
+
+    total_activated = sum(len(v.get('activated', [])) for v in data_by_project.values())
+    total_remaining = sum(len(v.get('remaining', [])) for v in data_by_project.values())
+
+    logger.info("=" * 60)
+    logger.info(f"DONE: {success_count}/{len(sync_targets)} projects synced successfully")
+    logger.info(f"  {total_activated} activated + {total_remaining} remaining DRs total")
+    logger.info("=" * 60)
+
+    if fail_count > 0 and success_count == 0:
+        logger.error("All syncs failed")
         sys.exit(1)
 
 
