@@ -86,23 +86,26 @@ export async function upsertStaffHolderWith(
   exec: HolderExecutor, staffId: string, name: string, phone?: string,
 ): Promise<StockHolder> {
   const row = await exec.queryOne(STAFF_UPSERT, [staffId, name, phone ?? null]);
-  return rowToHolder(row as Record<string, unknown>);
+  if (!row) throw new Error(`stock_holders staff upsert returned no row for staffId=${staffId}`);
+  return rowToHolder(row);
 }
 
 export async function upsertContractorHolderWith(
   exec: HolderExecutor, contractorId: string, name: string,
 ): Promise<StockHolder> {
   const row = await exec.queryOne(CONTRACTOR_UPSERT, [contractorId, name]);
-  return rowToHolder(row as Record<string, unknown>);
+  if (!row) throw new Error(`stock_holders contractor upsert returned no row for contractorId=${contractorId}`);
+  return rowToHolder(row);
 }
 
 export async function getOrCreateExternalHolderWith(
   exec: HolderExecutor, name: string, phone?: string, email?: string,
 ): Promise<StockHolder> {
   const found = await exec.queryOne(EXTERNAL_FIND, [name, phone ?? null]);
-  if (found) return rowToHolder(found as Record<string, unknown>);
+  if (found) return rowToHolder(found);
   const created = await exec.queryOne(EXTERNAL_INSERT, [name, phone ?? null, email ?? null]);
-  return rowToHolder(created as Record<string, unknown>);
+  if (!created) throw new Error(`stock_holders external insert returned no row for name=${name}`);
+  return rowToHolder(created);
 }
 
 /** Best-effort: a holder-sync failure must never break the caller (location creation). */
@@ -127,7 +130,7 @@ export const getOrCreateContractorHolder = (contractorId: string, name: string) 
   upsertContractorHolderWith(poolExec, contractorId, name);
 
 export const getOrCreateExternalHolder = (name: string, phone?: string, email?: string) =>
-  transaction((txn) => getOrCreateExternalHolderWith(txn as HolderExecutor, name, phone, email));
+  transaction((txn) => getOrCreateExternalHolderWith(txn, name, phone, email));
 
 export const syncTechnicianHolder = (staffId: string, name: string, phone?: string) =>
   syncTechnicianHolderWith(poolExec, staffId, name, phone);

@@ -48,6 +48,12 @@ describe('upsertStaffHolderWith', () => {
     expect(exec.calls[0].params).toEqual(['s1', 'Tech One', '0810000000']);
     expect(h.staffId).toBe('s1');
   });
+
+  it('passes null (not undefined) for phone when omitted', async () => {
+    const exec = fakeExec([dbRow()]);
+    await upsertStaffHolderWith(exec, 's1', 'Tech One');
+    expect(exec.calls[0].params).toEqual(['s1', 'Tech One', null]);
+  });
 });
 
 describe('upsertContractorHolderWith', () => {
@@ -93,5 +99,18 @@ describe('syncTechnicianHolderWith (best-effort)', () => {
       queryOne: vi.fn(async () => { throw new Error('db down'); }),
     };
     await expect(syncTechnicianHolderWith(exec, 's1', 'Tech One')).resolves.toBeUndefined();
+  });
+
+  it('logs (does not silently swallow) when the upsert fails', async () => {
+    const { log } = await import('@/lib/logger');
+    const spy = vi.spyOn(log, 'error').mockImplementation(() => {});
+    const exec: HolderExecutor = {
+      query: vi.fn(async () => { throw new Error('db down'); }),
+      queryOne: vi.fn(async () => { throw new Error('db down'); }),
+    };
+    await syncTechnicianHolderWith(exec, 's1', 'Tech One');
+    expect(spy).toHaveBeenCalled();
+    expect(spy.mock.calls[0]).toEqual(expect.arrayContaining([expect.objectContaining({ staffId: 's1' })]));
+    spy.mockRestore();
   });
 });
