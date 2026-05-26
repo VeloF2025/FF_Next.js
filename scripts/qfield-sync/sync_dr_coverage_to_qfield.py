@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 NEON_DATABASE_URL = os.environ.get('NEON_DATABASE_URL', '')
 QFIELD_USERNAME = os.environ.get('QFIELD_USERNAME', 'admin')
-QFIELD_PASSWORD = os.environ.get('QFIELD_PASSWORD', 'VF-qfield-2026!')
+QFIELD_PASSWORD = os.environ.get('QFIELD_PASSWORD')  # env only — no secret in repo
 QFIELD_API_URL = os.environ.get('QFIELD_API_URL', 'https://qfield.fibreflow.app/api/v1/')
 QFIELD_FALLBACK_PROJECT_ID = os.environ.get('QFIELD_PROJECT_ID', 'e849b878-f8a8-4f84-a3f1-9fbd051686c0')
 
@@ -747,6 +747,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dry-run', action='store_true')
     args = parser.parse_args()
+
+    missing = [n for n, v in (('NEON_DATABASE_URL', NEON_DATABASE_URL),
+                              ('QFIELD_PASSWORD', QFIELD_PASSWORD)) if not v]
+    if missing:
+        logger.error(f"Missing required env var(s): {', '.join(missing)}. "
+                     "Export them (the nightly wrapper sources them from the prod .env).")
+        sys.exit(1)
 
     logger.info('=' * 60)
     logger.info('DR Coverage Sync → QFieldCloud (all projects)')
