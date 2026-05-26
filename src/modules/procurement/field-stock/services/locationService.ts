@@ -6,6 +6,7 @@
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { query } from './db';
+import { syncTechnicianHolder } from './stockHolderService';
 import type {
   StockLocation,
   CreateLocationInput,
@@ -444,21 +445,24 @@ export async function getOrCreateTechnicianLocation(
       LIMIT 1
     `;
 
-    if (existing.length > 0) {
-      return existing[0] as StockLocation;
-    }
+    const location =
+      existing.length > 0
+        ? (existing[0] as StockLocation)
+        : await createLocation({
+            code: `TECH-${technicianId.slice(0, 8).toUpperCase()}`,
+            name: `${technicianName}'s Van Stock`,
+            locationType: 'technician',
+            assignedToId: technicianId,
+            assignedToName: technicianName,
+            assignedToPhone: technicianPhone,
+            isVirtual: true,
+          });
 
-    // Create new technician location
-    const code = `TECH-${technicianId.slice(0, 8).toUpperCase()}`;
-    return await createLocation({
-      code,
-      name: `${technicianName}'s Van Stock`,
-      locationType: 'technician',
-      assignedToId: technicianId,
-      assignedToName: technicianName,
-      assignedToPhone: technicianPhone,
-      isVirtual: true,
-    });
+    // Sprint C dual-write: keep the stock_holders registry live. Best-effort —
+    // a holder-sync failure must never break technician-location provisioning.
+    await syncTechnicianHolder(technicianId, technicianName, technicianPhone);
+
+    return location;
   } catch (error) {
     log.error('Failed to get or create technician location', { error }, 'locationService');
     throw error;
