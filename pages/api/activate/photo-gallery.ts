@@ -12,20 +12,8 @@ import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { pool } from '@/lib/db';
 import { log } from '@/lib/logger';
-
-export interface GalleryPhoto {
-  drNumber: string;
-  filename: string;
-  url: string;
-  confidence: number;
-  originalType: string | null;
-}
-
-export interface GalleryStepData {
-  step: number;
-  count: number;
-  photos: GalleryPhoto[];
-}
+// Shared shape — single source of truth used by the gallery UI components too.
+import type { GalleryPhoto, GalleryStepData } from '@/modules/activate/components/photo-gallery/types';
 
 async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method !== 'GET') {
