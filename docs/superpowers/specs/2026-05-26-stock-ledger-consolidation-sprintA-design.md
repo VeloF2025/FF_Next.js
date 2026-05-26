@@ -97,8 +97,8 @@ Five units, each independently understandable and testable.
 
 ## 6. Odoo → FibreFlow mapping
 
-- **Product:** Odoo `product.product.name` → FibreFlow `stock_items.item_code` (exact). Verified 139/140; the 1 miss ("Vendor Labour") is a non-stock service → skipped and reported.
-- **Location:** explicit code map (Odoo `complete_name` token → FibreFlow `code`). Resolve the **`WH/Stock` → `WH-WH` vs `WH-MAIN` ambiguity** during the dry-run review with Hein. Non-physical Odoo internal locations (Transit/Output/Input/Vendors, if any of the 16) are excluded and listed.
+- **Product:** primary key **`stock_items.odoo_product_id`** (populated 280/298; the robust existing key), with `item_code = product.name` as fallback. Verified by name 139/140; the 1 miss ("Vendor Labour") is a non-stock service → skipped and reported. *(Refined during planning — the existing `odoo_product_id` column is more robust than name-matching.)*
+- **Location:** populate the existing **`odoo_location_mappings`** table (the root-cause fix for the historical 1-location collapse — `stock_locations.odoo_location_id` does not exist and the table was empty, so the prior sync fell back to a single default warehouse). A pure name→code function (Odoo `complete_name` token → FibreFlow `code`) drives it; integer Odoo location IDs resolved at runtime. Resolve the **`WH/Stock` → `WH-WH` vs `WH-MAIN` ambiguity** during the dry-run review with Hein. Non-physical Odoo internal locations are excluded and listed.
 - **Quantity:** Odoo `quantity` (on-hand) per line → `stock_quants.quantity`. (Odoo `reserved_quantity` not seeded in Sprint A.)
 
 ---
