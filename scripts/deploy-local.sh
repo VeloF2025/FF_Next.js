@@ -156,9 +156,11 @@ sudo -u velo bash -c "cd $DIR && git checkout -- node_modules 2>/dev/null || tru
 sudo -u velo bash -c "cd $DIR && git fetch origin && git checkout $BRANCH && git pull origin $BRANCH" \
   || error "git pull failed for $DIR (dirty tree or network) — aborting before any build/restart"
 NEW_COMMIT=$(sudo -u velo bash -c "cd $DIR && git rev-parse --short HEAD")
-EXPECTED_COMMIT=$(sudo -u velo bash -c "cd $DIR && git rev-parse --short origin/$BRANCH")
-if [[ "$NEW_COMMIT" != "$EXPECTED_COMMIT" ]]; then
-  error "Post-pull HEAD ($NEW_COMMIT) != origin/$BRANCH ($EXPECTED_COMMIT) — pull did not land, aborting"
+# Compare FULL SHAs (two independent --short calls can pick different prefix lengths).
+NEW_SHA=$(sudo -u velo bash -c "cd $DIR && git rev-parse HEAD")
+EXPECTED_SHA=$(sudo -u velo bash -c "cd $DIR && git rev-parse origin/$BRANCH")
+if [[ "$NEW_SHA" != "$EXPECTED_SHA" ]]; then
+  error "Post-pull HEAD ($NEW_COMMIT) != origin/$BRANCH — pull did not land, aborting"
 fi
 log "Commit: $CURRENT_COMMIT -> $NEW_COMMIT"
 
