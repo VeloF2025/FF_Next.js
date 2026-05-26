@@ -14,8 +14,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
-import { transaction } from '@/lib/db-pool';
+import { queryOne, transaction } from '@/lib/db-pool';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
@@ -29,8 +28,6 @@ import {
   getOrCreateStaffHolder,
   getOrCreateContractorHolder,
 } from '@/modules/procurement/field-stock/services/stockHolderService';
-
-const sql = neon(process.env.DATABASE_URL!);
 
 interface ReturnLine {
   id: string;
@@ -58,14 +55,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.unauthorized(res, 'User session required');
     }
 
-    const staffRows = await sql`
-      SELECT s.id, s.role, u.role AS auth_role
-      FROM staff s
-      JOIN users u ON u.id = s.user_id
-      WHERE u.id = ${userId}
-      LIMIT 1
-    `;
-    const staffRow = staffRows[0];
+    const staffRow = await queryOne<{ id: string; role: string; auth_role: string }>(
+      `SELECT s.id, s.role, u.role AS auth_role
+       FROM staff s
+       JOIN users u ON u.id = s.user_id
+       WHERE u.id = $1
+       LIMIT 1`,
+      [userId]
+    );
 
     if (!staffRow) {
       return apiResponse.forbidden(res, 'No staff record linked to user');
@@ -80,8 +77,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // ── Get return with lines ──────────────────────────────────────────────────
-    const existing = await sql`
-      SELECT
+    const returnRecord = await queryOne(
+      `SELECT
         r.*,
         json_agg(
           json_build_object(
@@ -92,13 +89,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             'disposition', rl.disposition
           )
         ) as lines
-      FROM stock_returns r
-      LEFT JOIN stock_return_lines rl ON rl.return_id = r.id
-      WHERE r.id = ${returnId}
-      GROUP BY r.id
-    `;
-
-    const returnRecord = existing[0];
+       FROM stock_returns r
+       LEFT JOIN stock_return_lines rl ON rl.return_id = r.id
+       WHERE r.id = $1
+       GROUP BY r.id`,
+      [returnId]
+    );
     if (!returnRecord) {
       return apiResponse.notFound(res, 'Return', returnId);
     }
@@ -223,9 +219,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
     // ── Fetch final state ──────────────────────────────────────────────────────
-    const result = await sql`
-      SELECT * FROM stock_returns WHERE id = ${returnId}
-    `;
+    const result = await queryOne(
+      `SELECT * FROM stock_returns WHERE id = $1`,
+      [returnId]
+    );
 
     log.info('returns.accept', { returnId, staffId, linesProcessed });
 
@@ -237,7 +234,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       newValues: { status: 'restocked', linesProcessed },
     });
 
-    return apiResponse.success(res, result[0]);
+    return apiResponse.success(res, result);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     if (msg.includes('supplier_return is not yet supported')) {

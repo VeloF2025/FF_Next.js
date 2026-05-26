@@ -194,7 +194,7 @@ function AccountabilityTabContent() {
   const { holders, loading, refetch } = useHolderAccountability({ autoFetch: true });
 
   async function handleBlock(holderId: string, reason: string) {
-    await fetch(
+    const res = await fetch(
       `/api/procurement/field-stock/accountability/holders/${holderId}/block`,
       {
         method: 'POST',
@@ -202,14 +202,24 @@ function AccountabilityTabContent() {
         body: JSON.stringify({ reason: reason || undefined }),
       }
     );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: { message: 'Failed to block holder' } })) as { error?: { message?: string } };
+      window.alert(err?.error?.message ?? 'Failed to block holder');
+      return;
+    }
     await refetch();
   }
 
   async function handleUnblock(holderId: string) {
-    await fetch(
+    const res = await fetch(
       `/api/procurement/field-stock/accountability/holders/${holderId}/unblock`,
       { method: 'POST' }
     );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: { message: 'Failed to unblock holder' } })) as { error?: { message?: string } };
+      window.alert(err?.error?.message ?? 'Failed to unblock holder');
+      return;
+    }
     await refetch();
   }
 
