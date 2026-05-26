@@ -48,6 +48,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'id query parameter is required');
   }
 
+  // Discipline is not persisted on snag_reports; the result panel passes the
+  // same value it used for the PDF so the Excel matches. Defaults to 'all'.
+  const discipline =
+    req.query.discipline === 'civil' || req.query.discipline === 'optical'
+      ? req.query.discipline
+      : 'all';
+
   // ── Fetch report metadata ─────────────────────────────────────────────────
 
   const reportRows = (await sql`
@@ -92,6 +99,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     toDate:       r.scope_to_date,
     severities:   r.scope_severities ?? [],
     categories:   r.scope_categories ?? [],
+    discipline,
     generatedAt:  r.generated_at.toISOString(),
     generatedBy:  r.generated_by ?? 'system',
   };
@@ -103,6 +111,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     zones:       zones.length ? zones : null,
     pons:        pons.length  ? pons  : null,
     poles:       poles.length ? poles : null,
+    discipline,
     from_date:   r.scope_from_date,
     to_date:     r.scope_to_date,
     severities:  r.scope_severities ?? [],

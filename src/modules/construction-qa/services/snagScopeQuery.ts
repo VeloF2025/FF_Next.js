@@ -7,7 +7,7 @@
  */
 
 import { sql } from '@/lib/db-pool';
-import type { SnagReportScopeRow } from './snagReportRenderer';
+import type { SnagReportScopeRow, ReportDiscipline } from './snagReportRenderer';
 
 export interface ScopeQueryParams {
   project_id: string;
@@ -18,6 +18,7 @@ export interface ScopeQueryParams {
   to_date:   string;        // ISO YYYY-MM-DD inclusive
   severities: string[];
   categories: string[] | null; // NULL → all categories
+  discipline: ReportDiscipline; // 'civil' | 'optical' | 'all'
 }
 
 /**
@@ -27,7 +28,7 @@ export interface ScopeQueryParams {
 export async function runSnagScopeQuery(
   params: ScopeQueryParams,
 ): Promise<SnagReportScopeRow[]> {
-  const { project_id, zones, pons, poles, from_date, to_date, severities, categories } = params;
+  const { project_id, zones, pons, poles, from_date, to_date, severities, categories, discipline } = params;
 
   // Location columns are resolved across three sources so the query covers
   // BOTH Works QA snags (linked via pole_qa_photo_id → pole_qa_photos) AND
@@ -73,6 +74,20 @@ export async function runSnagScopeQuery(
       AND  s.created_at <  (${to_date}::date + INTERVAL '1 day')
       AND  s.severity = ANY(${severities}::text[])
       AND  (${categories}::text[] IS NULL OR s.category = ANY(${categories}::text[]))
+      -- Discipline filter (Works QA report split). 'all' = no filter.
+      -- Civil  = civil-photo snags + pole-level snags (planted-check / "other
+      --          issue", which are works_qa rows with a NULL discipline).
+      -- Optical = dome (optical) + main-joint (fibre closure) photo snags.
+      -- TQR audit imports (source='tqr', NULL discipline) are intentionally
+      -- excluded from both and only appear under 'all'.
+      AND  (
+            ${discipline} = 'all'
+        OR  (${discipline} = 'civil'
+              AND (s.discipline = 'civil'
+                   OR (s.source = 'works_qa' AND s.discipline IS NULL)))
+        OR  (${discipline} = 'optical'
+              AND s.discipline IN ('dome', 'main_joint'))
+      )
     ORDER  BY
       COALESCE(pqa.zone_no, pl.zone_no, dr.zone_no)                NULLS LAST,
       COALESCE(pqa.pon_no,  pl.pon_no,  dr.pon_no)                 NULLS LAST,

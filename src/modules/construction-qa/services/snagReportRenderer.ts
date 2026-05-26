@@ -17,6 +17,9 @@ import { log } from '@/lib/logger';
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
+/** Works QA report split: civil-only, optical-only, or every discipline. */
+export type ReportDiscipline = 'civil' | 'optical' | 'all';
+
 export interface SnagReportMeta {
   reportNumber: string;   // e.g. SCOPE-LAWL-20260520-001
   projectName: string;
@@ -28,6 +31,7 @@ export interface SnagReportMeta {
   toDate: string;         // ISO YYYY-MM-DD
   severities: string[];
   categories: string[];
+  discipline: ReportDiscipline; // 'civil' | 'optical' | 'all'
   generatedAt: string;    // ISO datetime
   generatedBy: string;    // human display name
   logoUrl?: string;       // VF logo as a data URI (puppeteer-safe) or path (in-app preview)
@@ -150,8 +154,13 @@ export async function renderScopeSnagReportHtml(
 
   // ── Assemble ReportData ────────────────────────────────────────────────────
 
+  const disciplineLabel =
+    meta.discipline === 'civil' ? 'Civil ' :
+    meta.discipline === 'optical' ? 'Optical ' :
+    '';
+
   const data: ReportData = {
-    title: `Snag Report — ${meta.projectName}`,
+    title: `${disciplineLabel}Snag Report — ${meta.projectName}`,
     subtitle: pastTenseSubtitle(meta, rows.length),
     reportId: meta.reportNumber,
     dateRange: `${meta.fromDate} → ${meta.toDate}`,

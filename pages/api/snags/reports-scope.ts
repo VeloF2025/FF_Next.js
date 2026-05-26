@@ -35,6 +35,7 @@ interface ScopeBody {
   to_date?: string;
   severities?: ('minor' | 'major' | 'critical')[];
   categories?: string[];
+  discipline?: 'civil' | 'optical' | 'all';
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -106,6 +107,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   const pons: number[] | null = body.pons && body.pons.length > 0 ? body.pons : null;
   const poles: string[] | null = body.poles && body.poles.length > 0 ? body.poles : null;
   const categories: string[] | null = body.categories && body.categories.length > 0 ? body.categories : null;
+  const discipline = body.discipline === 'civil' || body.discipline === 'optical' ? body.discipline : 'all';
 
   // ── 1. Fetch snags matching scope ──────────────────────────────────────────
 
@@ -114,6 +116,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     zones,
     pons,
     poles,
+    discipline,
     from_date: fromDate,
     to_date: toDate,
     severities,
@@ -164,6 +167,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     // When no category filter was applied, label the report with the categories
     // actually present in the result set rather than a fixed (and stale) list.
     categories: categories ?? Array.from(new Set(rows.map(r => r.category).filter(Boolean))),
+    discipline,
     generatedAt: today.toISOString(),
     generatedBy,
     logoUrl: vfLogoDataUri(),

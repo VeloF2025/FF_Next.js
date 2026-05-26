@@ -99,6 +99,7 @@ export function buildScopeSnagWorkbook(
   // ── Sheet 3: Scope ────────────────────────────────────────────────────────
 
   const scopeData: Array<{ label: string; value: string }> = [
+    { label: 'discipline', value: meta.discipline },
     { label: 'zones',      value: meta.zones.join(', ') },
     { label: 'pons',       value: meta.pons.join(', ') },
     { label: 'poles',      value: meta.poles.join(', ') },

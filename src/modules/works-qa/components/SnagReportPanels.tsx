@@ -3,7 +3,7 @@
  *
  * Split out to keep the dialog file under the 200-line hard limit.
  */
-import { type ScopeKind, type useReportScopeForm } from '../hooks/useReportScopeForm';
+import { type ScopeKind, type ReportDiscipline, type useReportScopeForm } from '../hooks/useReportScopeForm';
 import { ScopeChipPicker } from './ScopeChipPicker';
 
 /** Shape of a successfully generated report. */
@@ -14,7 +14,15 @@ export interface ReportResult {
 }
 
 /** Immutable success panel shown after report generation completes. */
-export function ResultPanel({ result, onClose }: { result: ReportResult; onClose: () => void }) {
+export function ResultPanel(
+  { result, discipline, onClose }:
+  { result: ReportResult; discipline: ReportDiscipline; onClose: () => void },
+) {
+  // Discipline is not persisted on the report row, so pass it to the xlsx regen
+  // so the Excel matches the PDF that was just generated.
+  const xlsxHref =
+    `/api/snags/reports-scope-xlsx?id=${result.id}` +
+    (discipline !== 'all' ? `&discipline=${discipline}` : '');
   return (
     <div className="space-y-4">
       <div className="bg-emerald-950 border border-emerald-700 rounded p-4">
@@ -31,7 +39,7 @@ export function ResultPanel({ result, onClose }: { result: ReportResult; onClose
           Open PDF
         </a>
         <a
-          href={`/api/snags/reports-scope-xlsx?id=${result.id}`}
+          href={xlsxHref}
           className="px-4 py-2 bg-slate-700 text-white rounded hover:bg-slate-600"
         >
           Download Excel
@@ -68,8 +76,27 @@ export function ScopeForm({
   form, allZones, allPons, allCategories, polesText, setPolesText,
   busy, error, onClose, onSubmit,
 }: ScopeFormProps) {
+  const DISCIPLINE_LABELS: Record<ReportDiscipline, string> = {
+    civil: 'Civil', optical: 'Optical', all: 'All',
+  };
   return (
     <div className="space-y-3">
+      <div>
+        <div className="text-sm font-medium text-slate-200 mb-1">Report type</div>
+        <div className="flex gap-3">
+          {(['civil', 'optical', 'all'] as ReportDiscipline[]).map(d => (
+            <label key={d} className="flex items-center gap-1 text-sm text-slate-300 cursor-pointer">
+              <input type="radio" name="discipline" value={d} checked={form.discipline === d}
+                onChange={() => form.setDiscipline(d)} disabled={busy} />
+              {DISCIPLINE_LABELS[d]}
+            </label>
+          ))}
+        </div>
+        <div className="text-xs text-slate-500 mt-1">
+          Civil = civil photos + pole snags · Optical = dome &amp; main-joint photos
+        </div>
+      </div>
+
       <div>
         <div className="text-sm font-medium text-slate-200 mb-1">Scope</div>
         <div className="flex gap-3">

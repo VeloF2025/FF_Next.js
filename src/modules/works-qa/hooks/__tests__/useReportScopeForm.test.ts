@@ -95,6 +95,17 @@ describe('useReportScopeForm', () => {
       expect(result.current.categories).toEqual([]);
     });
 
+    it('defaults discipline to "all" and carries the chosen discipline into the body', () => {
+      const { result } = renderHook(() => useReportScopeForm({ zone_no: 24 }));
+      expect(result.current.discipline).toBe('all');
+      expect(result.current.toSubmitBody().discipline).toBe('all');
+      act(() => {
+        result.current.setProjectId('p1');
+        result.current.setDiscipline('optical');
+      });
+      expect(result.current.toSubmitBody().discipline).toBe('optical');
+    });
+
     // Regression: picking zone 34 then switching to PON scope used to AND the
     // stray zone into the query, dropping every snag whose zone differed
     // (PON 267 lives in zone 24). Only the active scope dimension is sent.

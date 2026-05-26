@@ -8,6 +8,13 @@
 import { useMemo, useState } from 'react';
 
 export type ScopeKind = 'pole' | 'pon' | 'zone';
+/**
+ * Works QA report split: civil-only, optical-only, or every discipline.
+ * Declared client-side to avoid importing server modules into the bundle.
+ * MUST stay in sync with ReportDiscipline in
+ * src/modules/construction-qa/services/snagReportRenderer.ts.
+ */
+export type ReportDiscipline = 'civil' | 'optical' | 'all';
 
 export interface UrlContext {
   zone_no?: number;
@@ -26,6 +33,7 @@ export interface ScopeSubmitBody {
   to_date: string;
   severities: string[];
   categories: string[];
+  discipline: ReportDiscipline;
 }
 
 function defaultScope(ctx: UrlContext): ScopeKind {
@@ -47,6 +55,8 @@ export function useReportScopeForm(ctx: UrlContext) {
   const [fromDate, setFromDate]   = useState<string>(isoMinusDays(30));
   const [toDate, setToDate]       = useState<string>(isoMinusDays(0));
   const [severities, setSeverities] = useState<string[]>(['minor', 'major', 'critical']);
+  // Works QA report split. 'all' preserves the original (every-discipline) report.
+  const [discipline, setDiscipline] = useState<ReportDiscipline>('all');
   // Empty = "all categories" (the API coerces [] → no category filter). Chip
   // options are loaded dynamically from the project's real snag categories, so
   // we cannot seed a meaningful default here — and seeding the old hardcoded
@@ -78,6 +88,7 @@ export function useReportScopeForm(ctx: UrlContext) {
     to_date: toDate,
     severities,
     categories,
+    discipline,
   });
 
   return useMemo(
@@ -91,10 +102,11 @@ export function useReportScopeForm(ctx: UrlContext) {
       toDate, setToDate,
       severities, setSeverities,
       categories, setCategories,
+      discipline, setDiscipline,
       validate,
       toSubmitBody,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [projectId, scope, zones, pons, poles, fromDate, toDate, severities, categories],
+    [projectId, scope, zones, pons, poles, fromDate, toDate, severities, categories, discipline],
   );
 }
