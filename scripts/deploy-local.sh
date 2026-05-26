@@ -144,10 +144,22 @@ fi
 # --- Step 2: Pull latest code ---
 log "Pulling $BRANCH..."
 CURRENT_COMMIT=$(sudo -u velo bash -c "cd $DIR && git rev-parse --short HEAD")
-# Reset package-lock.json before pull — npm install regenerates it which blocks the next git pull
+# Reset files a prior local `npm ci`/build regenerates that would otherwise block
+# the pull with a dirty working tree:
+#   - package-lock.json (npm install rewrites it)
+#   - node_modules — committed as a symlink to the workspace; a real dir left by a
+#     previous npm ci shows as a deletion and blocks `git pull` (observed on prod
+#     2026-05-26). `git checkout --` cleanly restores the symlink; npm ci rebuilds
+#     node_modules after the pull.
 sudo -u velo bash -c "cd $DIR && git checkout -- package-lock.json 2>/dev/null || true"
-sudo -u velo bash -c "cd $DIR && git fetch origin && git checkout $BRANCH && git pull origin $BRANCH"
+sudo -u velo bash -c "cd $DIR && git checkout -- node_modules 2>/dev/null || true"
+sudo -u velo bash -c "cd $DIR && git fetch origin && git checkout $BRANCH && git pull origin $BRANCH" \
+  || error "git pull failed for $DIR (dirty tree or network) — aborting before any build/restart"
 NEW_COMMIT=$(sudo -u velo bash -c "cd $DIR && git rev-parse --short HEAD")
+EXPECTED_COMMIT=$(sudo -u velo bash -c "cd $DIR && git rev-parse --short origin/$BRANCH")
+if [[ "$NEW_COMMIT" != "$EXPECTED_COMMIT" ]]; then
+  error "Post-pull HEAD ($NEW_COMMIT) != origin/$BRANCH ($EXPECTED_COMMIT) — pull did not land, aborting"
+fi
 log "Commit: $CURRENT_COMMIT -> $NEW_COMMIT"
 
 # --- Release tagging for Sentry/Bugsink (BL-54) ---
