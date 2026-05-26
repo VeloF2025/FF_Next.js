@@ -26,6 +26,7 @@ interface Props {
 interface ZonePonResponse {
   zones: number[];
   pons: { zone_no: number; pon_no: number }[];
+  categories: string[];
 }
 
 const fetcher = async <T,>(url: string): Promise<T> => {
@@ -61,6 +62,7 @@ export function SnagReportScopeDialog({ open, projectId, defaultCtx, onClose }: 
   );
 
   const allZones = opts?.zones ?? [];
+  const allCategories = opts?.categories ?? [];
   // Filter PONs to those belonging to any selected zone (or show all when no zones selected)
   const allPons =
     form.zones.length === 0
@@ -136,6 +138,7 @@ export function SnagReportScopeDialog({ open, projectId, defaultCtx, onClose }: 
             form={form}
             allZones={allZones}
             allPons={allPons}
+            allCategories={allCategories}
             polesText={polesText}
             setPolesText={setPolesText}
             busy={busy}

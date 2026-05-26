@@ -1,7 +1,9 @@
 /**
  * Zone/PON Options API
  * GET /api/snags/zone-pon-options?projectId=<id>
- * Returns distinct zone_no + pon_no pairs for cascading filter dropdowns.
+ * Returns distinct zone_no + pon_no pairs for cascading filter dropdowns,
+ * plus the distinct snag categories actually present for the project so the
+ * report dialog's category chips reflect real data instead of a hardcoded list.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -21,7 +23,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const { projectId } = req.query;
 
     if (!projectId || typeof projectId !== 'string') {
-      return apiResponse.success(res, { zones: [], pons: [] });
+      return apiResponse.success(res, { zones: [], pons: [], categories: [] });
     }
 
     type RawRow = { zone_no: string | null; pon_no: string | null };
@@ -55,7 +57,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const zones = Array.from(zoneSet).sort((a, b) => a - b);
 
-    return apiResponse.success(res, { zones, pons });
+    // Distinct categories actually stored for this project's snags. Drives the
+    // report dialog's Category chips so the filter can never drift from the data
+    // (the previous hardcoded list — photo_quality/pole_quality/… — matched no rows).
+    const catRows = await sql`
+      SELECT DISTINCT category
+      FROM snags
+      WHERE project_id = ${projectId} AND category IS NOT NULL
+      ORDER BY category ASC
+    ` as { category: string }[];
+    const categories = catRows.map(r => r.category);
+
+    return apiResponse.success(res, { zones, pons, categories });
   } catch (error) {
     log.error('Zone-PON options API error', { error });
     return apiResponse.internalError(res, error);

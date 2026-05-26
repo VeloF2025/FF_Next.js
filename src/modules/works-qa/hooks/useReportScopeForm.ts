@@ -47,12 +47,11 @@ export function useReportScopeForm(ctx: UrlContext) {
   const [fromDate, setFromDate]   = useState<string>(isoMinusDays(30));
   const [toDate, setToDate]       = useState<string>(isoMinusDays(0));
   const [severities, setSeverities] = useState<string[]>(['minor', 'major', 'critical']);
-  const [categories, setCategories] = useState<string[]>([
-    'photo_quality',
-    'pole_quality',
-    'verification',
-    'other',
-  ]);
+  // Empty = "all categories" (the API coerces [] → no category filter). Chip
+  // options are loaded dynamically from the project's real snag categories, so
+  // we cannot seed a meaningful default here — and seeding the old hardcoded
+  // list (photo_quality/…) matched no rows and broke every report.
+  const [categories, setCategories] = useState<string[]>([]);
 
   const validate = (): string | null => {
     if (!projectId)                            return 'projectId is required';
@@ -63,12 +62,18 @@ export function useReportScopeForm(ctx: UrlContext) {
     return null;
   };
 
+  // Only the dimension matching the active scope is sent as a filter. In PON or
+  // pole scope the Zones picker is merely a client-side aid to narrow the PON
+  // list — sending those zones too would AND them in and silently drop every
+  // snag whose zone differs (e.g. PON 267 lives in zone 24, so picking zone 34
+  // + PON 267 matched nothing). Non-scope dimensions go out as [] → the API
+  // coerces them to "no filter".
   const toSubmitBody = (): ScopeSubmitBody => ({
     project_id: projectId!,
     scope,
-    zones,
-    pons,
-    poles,
+    zones: scope === 'zone' ? zones : [],
+    pons:  scope === 'pon'  ? pons  : [],
+    poles: scope === 'pole' ? poles : [],
     from_date: fromDate,
     to_date: toDate,
     severities,

@@ -211,17 +211,22 @@ export async function resolvePhotoSnag(input: ResolvePhotoSnagInput): Promise<{ 
   const snag = snagRows[0];
   if (!snag) throw new Error(`works-qa snag not found: ${input.snagId}`);
 
-  const updatedApproval: SlotApproval = {
-    decision: 'approved',
-    by: input.resolvedBy,
-    at: new Date().toISOString(),
-  };
-  await pool.query(
-    `UPDATE pole_qa_photos
-        SET slot_approvals = slot_approvals || jsonb_build_object($2::text, $3::jsonb)
-      WHERE id = $1`,
-    [snag.pole_qa_photo_id, snag.slot_key, JSON.stringify(updatedApproval)]
-  );
+  // Pole-level snags (planted-check / "other issue") have no slot_key, so there
+  // is no slot_approvals entry to flip back — and jsonb_build_object() rejects a
+  // null key. Only update the per-slot approval map when this snag targets a slot.
+  if (snag.slot_key) {
+    const updatedApproval: SlotApproval = {
+      decision: 'approved',
+      by: input.resolvedBy,
+      at: new Date().toISOString(),
+    };
+    await pool.query(
+      `UPDATE pole_qa_photos
+          SET slot_approvals = slot_approvals || jsonb_build_object($2::text, $3::jsonb)
+        WHERE id = $1`,
+      [snag.pole_qa_photo_id, snag.slot_key, JSON.stringify(updatedApproval)]
+    );
+  }
 
   let ticketResolved = false;
   if (input.closeTicket && snag.noc_ticket_id) {

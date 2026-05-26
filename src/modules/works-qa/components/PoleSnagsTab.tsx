@@ -16,8 +16,8 @@ async function resolveSnag(snagId: string, closeTicket: boolean): Promise<Resolv
     body: JSON.stringify({ snag_id: snagId, close_ticket: closeTicket }),
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({})) as { error?: { message?: string } };
-    return { ok: false, error: body.error?.message ?? `HTTP ${res.status}` };
+    const body = await res.json().catch(() => null) as { error?: { message?: string } } | null;
+    return { ok: false, error: body?.error?.message ?? `HTTP ${res.status}` };
   }
   const body = await res.json() as { data?: { ticket_resolved?: boolean } };
   return { ok: true, ticketResolved: body.data?.ticket_resolved };
@@ -50,7 +50,8 @@ function SnagRow({ snag, onResolved }: { snag: PoleSnag; onResolved: () => void 
     <div className={`border border-zinc-800 rounded p-2 flex flex-col gap-1 ${isOpen ? '' : 'opacity-60'}`}>
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium text-zinc-200">
-          {snag.slot_key.replace(/_/g, ' ')}
+          {/* Pole-level snags (planted-check / "other issue") have no slot_key. */}
+          {snag.slot_key ? snag.slot_key.replace(/_/g, ' ') : 'Pole-level'}
         </span>
         <span className={`text-[10px] uppercase tracking-wider ${SEVERITY_CLASS[snag.severity] ?? 'text-zinc-400'}`}>
           {snag.severity}
@@ -83,8 +84,8 @@ function SnagRow({ snag, onResolved }: { snag: PoleSnag; onResolved: () => void 
 async function generateSnagReport(poleId: string): Promise<{ ok: boolean; error?: string }> {
   const res = await fetch(`/api/works-qa/pole-snag-report?pole_id=${poleId}`);
   if (!res.ok) {
-    const body = await res.json().catch(() => ({})) as { error?: { message?: string } };
-    return { ok: false, error: body.error?.message ?? `HTTP ${res.status}` };
+    const body = await res.json().catch(() => null) as { error?: { message?: string } } | null;
+    return { ok: false, error: body?.error?.message ?? `HTTP ${res.status}` };
   }
   return { ok: true };
 }
