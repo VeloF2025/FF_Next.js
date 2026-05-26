@@ -19,9 +19,7 @@ const TOKEN_TO_CODE: Record<string, string> = {
   IP: 'WH-IP',
   TAV: 'WH-TAV',
   TBL: 'WH-TBL',
-  // NOTE: 'WH' (Odoo "WH/Stock") is intentionally NOT auto-mapped — it is
-  // ambiguous between WH-WH and WH-MAIN and must be resolved in the dry-run
-  // review. Add it here once confirmed.
+  WH: 'WH-MAIN', // Odoo default warehouse "WH/Stock" = FibreFlow Main Warehouse (confirmed)
 };
 
 export function odooLocationToFfCode(completeName: string): string | null {

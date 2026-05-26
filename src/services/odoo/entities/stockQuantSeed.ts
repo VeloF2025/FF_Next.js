@@ -46,12 +46,27 @@ export function buildSeedPlan(
 
 export interface SeedRunResult { dryRun: boolean; rows: SeedRow[]; gaps: SeedGap[]; committed: number; }
 
-/** Build the product map: odoo product_id -> FF stock_items.id (key: odoo_product_id). */
-export async function loadProductMap(): Promise<Map<number, string>> {
-  const rows = await query<{ id: string; odoo_product_id: number }>(
-    'SELECT id, odoo_product_id FROM stock_items WHERE odoo_product_id IS NOT NULL',
+/**
+ * Build odoo product_id -> FF stock_items.id, keyed primarily on odoo_product_id
+ * and falling back to item_code = Odoo product name (covers null/stale odoo_product_id).
+ */
+export async function loadProductMap(quants: OdooStockQuant[]): Promise<Map<number, string>> {
+  const rows = await query<{ id: string; odoo_product_id: number | null; item_code: string | null }>(
+    'SELECT id, odoo_product_id, item_code FROM stock_items',
   );
-  return new Map(rows.map((r) => [Number(r.odoo_product_id), String(r.id)]));
+  const byOdooId = new Map<number, string>();
+  const byItemCode = new Map<string, string>();
+  for (const r of rows) {
+    if (r.odoo_product_id != null) byOdooId.set(Number(r.odoo_product_id), String(r.id));
+    if (r.item_code) byItemCode.set(r.item_code, String(r.id));
+  }
+  const map = new Map<number, string>();
+  for (const q of quants) {
+    const [oid, oname] = q.product_id;
+    const ffId = byOdooId.get(oid) ?? byItemCode.get(oname);
+    if (ffId) map.set(oid, ffId);
+  }
+  return map;
 }
 
 /**
@@ -106,12 +121,12 @@ export async function seedStockQuantsFromOdoo(
   client: OdooClient, opts: { dryRun: boolean },
 ): Promise<SeedRunResult> {
   const { dryRun } = opts;
-  const [productMap, locationMap, quants] = await Promise.all([
-    loadProductMap(),
+  const [locationMap, quants] = await Promise.all([
     loadAndPersistLocationMap(client, dryRun),
     client.getInternalStockQuants({ limit: 5000 }),
   ]);
   if (quants.length >= 5000) console.warn(`WARNING: Odoo quant fetch hit the 5000 limit — results may be truncated.`);
+  const productMap = await loadProductMap(quants);
   const { rows, gaps } = buildSeedPlan(quants, productMap, locationMap);
   if (dryRun) return { dryRun, rows, gaps, committed: 0 };
 

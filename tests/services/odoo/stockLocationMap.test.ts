@@ -30,6 +30,7 @@ describe('odooLocationToFfCode', () => {
     ['IP/Stock', 'WH-IP'],
     ['TAV/Stock', 'WH-TAV'],
     ['TBL/Stock', 'WH-TBL'],
+    ['WH/Stock', 'WH-MAIN'],
   ])('maps %s -> %s', (name, code) => {
     expect(odooLocationToFfCode(name)).toBe(code);
   });

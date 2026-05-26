@@ -28,11 +28,11 @@ export function diffOdooVsFf(odoo: OdooAgg[], ff: FfQuant[]): ReconcileResult {
  * Unmapped products/locations are excluded from the comparison.
  */
 export async function reconcileStockQuantsVsOdoo(client: OdooClient): Promise<ReconcileResult> {
-  const [productMap, locationMap, quants] = await Promise.all([
-    loadProductMap(),
+  const [locationMap, quants] = await Promise.all([
     loadAndPersistLocationMap(client, true), // dryRun=true => no writes
     client.getInternalStockQuants({ limit: 5000 }),
   ]);
+  const productMap = await loadProductMap(quants);
 
   const aggMap = new Map<string, OdooAgg>();
   for (const q of quants) {
