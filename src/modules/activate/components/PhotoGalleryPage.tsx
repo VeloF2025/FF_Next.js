@@ -12,6 +12,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { CheckCircle2, XCircle, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
+import { log } from '@/lib/logger';
 
 const STEP_LABELS: Record<number, string> = {
   1: 'House Photo',
@@ -50,10 +51,11 @@ export default function PhotoGalleryPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [viewMode, setViewMode] = useState<'grid' | 'single'>('grid');
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState<string | null>(null);
 
   // Load step counts on mount
   useEffect(() => {
-    fetch('/api/activate/photo-gallery?all=true')
+    fetch('/api/activate/photo-gallery?all=true', { credentials: 'include' })
       .then((r) => r.json())
       .then((data) => {
         if (data.success && data.data?.counts) {
@@ -64,7 +66,9 @@ export default function PhotoGalleryPage() {
           setStepCounts(counts);
         }
       })
-      .catch(() => {/* ignore */});
+      .catch((err) => {
+        log.warn('Failed to load photo gallery step counts', { error: err instanceof Error ? err.message : String(err) }, 'PhotoGalleryPage');
+      });
   }, []);
 
   // Load photos when step changes
@@ -73,14 +77,18 @@ export default function PhotoGalleryPage() {
     setPhotos([]);
     setCurrentIndex(0);
     setImageErrors({});
+    setError(null);
     try {
-      const res = await fetch(`/api/activate/photo-gallery?step=${step}&limit=60`);
+      const res = await fetch(`/api/activate/photo-gallery?step=${step}&limit=60`, { credentials: 'include' });
       const data = await res.json();
       if (data.success && data.data?.photos) {
         setPhotos(data.data.photos);
+      } else {
+        setError(data.error?.message ?? 'Failed to load photos for this step.');
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      log.error('Failed to load photo gallery photos', { step, error: err instanceof Error ? err.message : String(err) }, 'PhotoGalleryPage');
+      setError('Could not load photos. Check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -231,6 +239,11 @@ export default function PhotoGalleryPage() {
           {loading ? (
             <div className="flex h-64 items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+            </div>
+          ) : error ? (
+            <div className="flex h-64 flex-col items-center justify-center gap-2 text-red-400">
+              <XCircle className="h-8 w-8" />
+              <span>{error}</span>
             </div>
           ) : photos.length === 0 ? (
             <div className="flex h-64 items-center justify-center text-gray-500">

@@ -37,7 +37,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     const limitParam = req.query['limit'];
     const allSteps = req.query['all'] === 'true';
 
-    const limit = Math.min(parseInt(String(limitParam ?? '60'), 10), 100);
+    const parsedLimit = parseInt(String(limitParam ?? '60'), 10);
+    const limit = Number.isNaN(parsedLimit) ? 60 : Math.min(Math.max(parsedLimit, 1), 100);
 
     if (allSteps) {
       // Return counts per step for the overview
@@ -76,7 +77,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     const result = await pool.query<{
       drop_number: string;
       filename: string;
-      confidence: string;
+      confidence: number;
       original_type: string | null;
     }>(
       `
@@ -105,13 +106,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       [step, limit]
     );
 
-    const appBase = process.env.NEXT_PUBLIC_APP_URL ?? 'https://dev.fibreflow.app';
-
     const photos: GalleryPhoto[] = result.rows.map((row) => ({
       drNumber: row.drop_number,
       filename: row.filename,
-      url: `${appBase}/api/activate/photo/${row.drop_number}/${row.filename}`,
-      confidence: parseFloat(row.confidence ?? '0'),
+      // Relative URL: the browser resolves it against the current origin, so the
+      // prod gallery serves prod photos and dev serves dev — no cross-env dependency.
+      url: `/api/activate/photo/${row.drop_number}/${row.filename}`,
+      confidence: row.confidence ?? 0,
       originalType: row.original_type,
     }));
 
