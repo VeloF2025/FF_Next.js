@@ -1,5 +1,6 @@
 import type { OdooStockQuant } from '../odooClient';
 import { transaction, query } from '@/lib/db-pool';
+import { log } from '@/lib/logger';
 import type { OdooClient } from '../odooClient';
 import { odooLocationToFfCode } from '../stockLocationMap';
 
@@ -125,7 +126,7 @@ export async function seedStockQuantsFromOdoo(
     loadAndPersistLocationMap(client, dryRun),
     client.getInternalStockQuants({ limit: 5000 }),
   ]);
-  if (quants.length >= 5000) console.warn(`WARNING: Odoo quant fetch hit the 5000 limit — results may be truncated.`);
+  if (quants.length >= 5000) log.warn('Odoo quant fetch hit the 5000 limit — results may be truncated', { module: 'odoo:stockQuantSeed' });
   const productMap = await loadProductMap(quants);
   const { rows, gaps } = buildSeedPlan(quants, productMap, locationMap);
   if (dryRun) return { dryRun, rows, gaps, committed: 0 };

@@ -2,15 +2,20 @@
 import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
+// CLI output goes to stdout/stderr directly: @/lib/logger is silent under Node/tsx,
+// and console.* is banned by the lint gate.
+const out = (s = '') => process.stdout.write(s + '\n');
+const err = (s = '') => process.stderr.write(s + '\n');
+
 function cfg(k: string): string {
   const v = process.env[k];
-  if (!v) { console.error(`Missing env ${k}`); process.exit(1); }
+  if (!v) { err(`Missing env ${k}`); process.exit(1); }
   return v;
 }
 
 async function main() {
   const commit = process.argv.includes('--commit');
-  console.log(`\n=== ODOO -> stock_quants SEED — ${commit ? 'COMMIT' : 'DRY RUN'} ===\n`);
+  out(`\n=== ODOO -> stock_quants SEED — ${commit ? 'COMMIT' : 'DRY RUN'} ===\n`);
 
   // Dynamic imports AFTER dotenv so db-pool binds the loaded DATABASE_URL.
   const { OdooClient } = await import('../src/services/odoo/odooClient');
@@ -21,7 +26,7 @@ async function main() {
     username: cfg('ODOO_USERNAME'), password: cfg('ODOO_PASSWORD'),
   });
   const conn = await client.testConnection();
-  if (!conn.success) { console.error('Odoo connect failed:', conn.message); process.exit(1); }
+  if (!conn.success) { err(`Odoo connect failed: ${conn.message}`); process.exit(1); }
 
   const res = await seedStockQuantsFromOdoo(client, { dryRun: !commit });
 
@@ -32,13 +37,14 @@ async function main() {
   const byLoc = res.rows.reduce<Record<string, number>>((a, r) => {
     a[r.locationId] = (a[r.locationId] || 0) + r.quantity; return a;
   }, {});
-  console.log(`Seed rows: ${res.rows.length}  | total qty: ${Math.round(res.rows.reduce((s, r) => s + r.quantity, 0))}`);
-  console.log('By location:');
-  Object.entries(byLoc).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => console.log(`  ${codeById.get(k) ?? k} = ${Math.round(v)}`));
+  out(`Seed rows: ${res.rows.length}  | total qty: ${Math.round(res.rows.reduce((s, r) => s + r.quantity, 0))}`);
+  out('By location:');
+  Object.entries(byLoc).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => out(`  ${codeById.get(k) ?? k} = ${Math.round(v)}`));
   if (res.gaps.length) {
-    console.log(`\nGAPS (${res.gaps.length}) — NOT seeded:`);
-    res.gaps.forEach((g) => console.log(`  [${g.kind}] ${g.name} (odoo ${g.odooId}) qty ${g.quantity}`));
+    out(`\nGAPS (${res.gaps.length}) — NOT seeded:`);
+    res.gaps.forEach((g) => out(`  [${g.kind}] ${g.name} (odoo ${g.odooId}) qty ${g.quantity}`));
   }
-  console.log(commit ? `\nCOMMITTED ${res.committed} quant rows.` : '\nDRY RUN — nothing written.');
+  out(commit ? `\nCOMMITTED ${res.committed} quant rows.` : '\nDRY RUN — nothing written.');
 }
-main().catch((e) => { console.error('Seed failed:', e.message); process.exit(1); });
+// process.exit(0) is required: db-pool's pg.Pool keeps the event loop alive otherwise.
+main().then(() => process.exit(0)).catch((e) => { err(`Seed failed: ${e.message}`); process.exit(1); });
