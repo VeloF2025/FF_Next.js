@@ -8,7 +8,12 @@
 import { useMemo, useState } from 'react';
 
 export type ScopeKind = 'pole' | 'pon' | 'zone';
-/** Works QA report split: civil-only, optical-only, or every discipline. */
+/**
+ * Works QA report split: civil-only, optical-only, or every discipline.
+ * Declared client-side to avoid importing server modules into the bundle.
+ * MUST stay in sync with ReportDiscipline in
+ * src/modules/construction-qa/services/snagReportRenderer.ts.
+ */
 export type ReportDiscipline = 'civil' | 'optical' | 'all';
 
 export interface UrlContext {
