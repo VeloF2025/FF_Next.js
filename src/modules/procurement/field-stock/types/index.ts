@@ -505,6 +505,8 @@ export interface RecordConsumptionInput {
   consumedById?: string;
   consumedByName?: string;
   consumedFromLocationId: string;
+  /** Explicit stock_holders.id. If omitted, resolved from consumedById (staff lookup). */
+  holderId?: string;
   gpsLat?: number;
   gpsLng?: number;
   notes?: string;
