@@ -29,6 +29,38 @@ export interface HolderAccountability {
   recovered_amount: number;
 }
 
+/** Postgres numeric columns arrive as strings over JSON; coerce to real numbers. */
+const num = (v: unknown): number => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
+function toHolderAccountability(r: Record<string, unknown>): HolderAccountability {
+  return {
+    holder_id: String(r.holder_id),
+    holder_type: r.holder_type as HolderAccountability['holder_type'],
+    staff_id: (r.staff_id as string) ?? null,
+    contractor_id: (r.contractor_id as string) ?? null,
+    name: String(r.name),
+    is_active: Boolean(r.is_active),
+    issued_count: num(r.issued_count),
+    issued_value: num(r.issued_value),
+    consumed_count: num(r.consumed_count),
+    consumed_value: num(r.consumed_value),
+    returned_count: num(r.returned_count),
+    returned_value: num(r.returned_value),
+    held_count: num(r.held_count),
+    held_value: num(r.held_value),
+    unaccounted_count: num(r.unaccounted_count),
+    is_blocked: Boolean(r.is_blocked),
+    blocked_reason: (r.blocked_reason as string) ?? null,
+    blocked_at: (r.blocked_at as string) ?? null,
+    blocked_by: (r.blocked_by as string) ?? null,
+    pending_recovery_amount: num(r.pending_recovery_amount),
+    recovered_amount: num(r.recovered_amount),
+  };
+}
+
 interface UseHolderAccountabilityOptions {
   isBlocked?: boolean;
   hasUnaccounted?: boolean;
@@ -63,7 +95,8 @@ export function useHolderAccountability(
       );
       if (!response.ok) throw new Error('Failed to fetch holder accountability records');
       const result = await response.json();
-      setHolders(result.data || []);
+      const rows = (result.data as Record<string, unknown>[]) || [];
+      setHolders(rows.map(toHolderAccountability));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       setError(message);
