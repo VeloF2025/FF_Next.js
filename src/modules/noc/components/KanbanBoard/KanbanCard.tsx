@@ -130,7 +130,7 @@ export function KanbanCard({ ticket, isDragging, onQuickMove, canMoveForward, ca
       {/* Header: UID, T1 category, discipline, Priority */}
       <div className="flex items-start justify-between gap-2 mb-1.5 min-w-0">
         <div className="flex items-center gap-1 flex-wrap min-w-0">
-          <span className="text-[10px] font-mono text-[var(--ff-text-muted)] truncate max-w-full">
+          <span className="text-[10px] font-mono text-[var(--ff-text-muted)] truncate max-w-full" title={ticket.ticket_uid}>
             {ticket.ticket_uid}
           </span>
           {/* T1 label from discipline fallback */}
