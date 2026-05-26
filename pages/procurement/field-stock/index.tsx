@@ -14,17 +14,17 @@ import {
   CreatePickingForm,
   ReturnList,
   CreateReturnModal,
-  ContractorAccountabilityList,
 } from '@/modules/procurement/field-stock/components';
+import { HolderAccountabilityList } from '@/modules/procurement/field-stock/components/accountability/HolderAccountabilityList';
 import { LocationFormModal } from '@/modules/procurement/field-stock/components/locations/LocationFormModal';
 import type { StockLocation } from '@/modules/procurement/field-stock/types';
 import {
   useReturns,
-  useContractorAccountability,
   useLocations,
   useStockItems,
   useConsumptions,
 } from '@/modules/procurement/field-stock/hooks';
+import { useHolderAccountability } from '@/modules/procurement/field-stock/hooks/useHolderAccountability';
 import {
   LayoutDashboard,
   MapPin,
@@ -189,10 +189,38 @@ function ReturnsTabContent() {
   );
 }
 
-/** Accountability tab */
+/** Accountability tab — holder-centric (Sprint D custody model) */
 function AccountabilityTabContent() {
-  const { contractors, loading } = useContractorAccountability({ autoFetch: true });
-  return <ContractorAccountabilityList contractors={contractors} loading={loading} />;
+  const { holders, loading, refetch } = useHolderAccountability({ autoFetch: true });
+
+  async function handleBlock(holderId: string, reason: string) {
+    await fetch(
+      `/api/procurement/field-stock/accountability/holders/${holderId}/block`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason || undefined }),
+      }
+    );
+    await refetch();
+  }
+
+  async function handleUnblock(holderId: string) {
+    await fetch(
+      `/api/procurement/field-stock/accountability/holders/${holderId}/unblock`,
+      { method: 'POST' }
+    );
+    await refetch();
+  }
+
+  return (
+    <HolderAccountabilityList
+      holders={holders}
+      loading={loading}
+      onBlock={handleBlock}
+      onUnblock={handleUnblock}
+    />
+  );
 }
 
 /** Consumptions tab with recent list */
