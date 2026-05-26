@@ -30,6 +30,7 @@ export interface SnagReportMeta {
   categories: string[];
   generatedAt: string;    // ISO datetime
   generatedBy: string;    // human display name
+  logoUrl?: string;       // VF logo as a data URI (puppeteer-safe) or path (in-app preview)
 }
 
 export interface SnagReportScopeRow {
@@ -157,6 +158,7 @@ export async function renderScopeSnagReportHtml(
     generatedBy: meta.generatedBy,
     generatedAt: meta.generatedAt,
     companyName: 'Velocity Fibre',
+    logoUrl: meta.logoUrl,
     kpis: [
       { label: 'Total snags', value: String(rows.length),          accent: KPI_ACCENT.total },
       { label: 'Critical',    value: String(bySev.critical ?? 0),  accent: KPI_ACCENT.critical },

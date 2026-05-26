@@ -8,6 +8,8 @@
  * Permission: construction-qa.snags.reports (create action).
  */
 
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { sql, transaction } from '@/lib/db-pool';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
@@ -40,6 +42,27 @@ interface ScopeBody {
 /** Returns an ISO date string N days before now. */
 function isoMinus(days: number): string {
   return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+}
+
+/**
+ * Velocity Fibre logo as a base64 data URI for the PDF header.
+ * Puppeteer renders via setContent() with no base URL, so a relative path
+ * would not resolve — the logo must be inlined. Read once and cached.
+ * The transparent SVG mark sits cleanly on the report's dark header band.
+ */
+let vfLogoCache: string | null | undefined;
+function vfLogoDataUri(): string | undefined {
+  if (vfLogoCache !== undefined) return vfLogoCache ?? undefined;
+  try {
+    const svg = readFileSync(join(process.cwd(), 'public/assets/vf/vf-logo.svg'));
+    vfLogoCache = `data:image/svg+xml;base64,${svg.toString('base64')}`;
+  } catch (err) {
+    log.error('reports-scope.logo_load_failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    vfLogoCache = null;
+  }
+  return vfLogoCache ?? undefined;
 }
 
 /** Returns a validation error message or null when the body is valid. */
@@ -143,6 +166,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     categories: categories ?? Array.from(new Set(rows.map(r => r.category).filter(Boolean))),
     generatedAt: today.toISOString(),
     generatedBy,
+    logoUrl: vfLogoDataUri(),
   };
 
   log.info('reports-scope.rendering', { reportNumber, rowCount: rows.length });

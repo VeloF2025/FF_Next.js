@@ -85,4 +85,17 @@ describe('renderScopeSnagReportHtml', () => {
     expect(html).toMatch(/Total snags[\s\S]*?0/);
     expect(html).toContain('Lawley');
   });
+
+  it('renders the VF logo <img> when meta.logoUrl is provided', async () => {
+    const logoUrl = 'data:image/svg+xml;base64,QUJD';
+    const html = await renderScopeSnagReportHtml({ ...meta, logoUrl }, rows);
+    expect(html).toContain(`src="${logoUrl}"`);
+    expect(html).toContain('class="logo-img"');
+  });
+
+  it('falls back to the text logo mark when no logoUrl is set', async () => {
+    const html = await renderScopeSnagReportHtml(meta, rows);
+    expect(html).toContain('class="logo-mark"');
+    expect(html).not.toContain('class="logo-img"');
+  });
 });
