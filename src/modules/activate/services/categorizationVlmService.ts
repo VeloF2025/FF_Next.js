@@ -11,6 +11,8 @@
  *  - ./categorizationPrompt         — buildCategorizationPrompt
  *  - ./categorizationImageFetcher   — fetchImageAsBase64, resolveImageUrl
  *  - ./categorizationVlmClient      — callVlmForCategorization
+ *  - ./categorizationExampleLoader  — loadFewShotExamples, loadPositiveExamples,
+ *                                     loadGalleryExamples
  */
 
 import { log } from '@/lib/logger';
@@ -24,6 +26,7 @@ import { callVlmForCategorization } from './categorizationVlmClient';
 import {
   loadFewShotExamples,
   loadPositiveExamples,
+  loadGalleryExamples,
 } from './categorizationExampleLoader';
 
 export { CategorizationError } from './categorizationError';
@@ -52,8 +55,11 @@ export async function categorizePhotos(
     'CategorizationVlm',
   );
 
+  // HITL example sources are loaded once per DR (not per batch) and reused
+  // across every batch's prompt. Each loader fails open (returns []/'').
   const fewShotExamples = await loadFewShotExamples(drNumber);
   const positiveExamples = await loadPositiveExamples(drNumber);
+  const gallerySection = await loadGalleryExamples();
 
   for (let i = 0; i < photos.length; i += batchSize) {
     const batch = photos.slice(i, i + batchSize);
@@ -92,6 +98,7 @@ export async function categorizePhotos(
         base64Images,
         fewShotExamples,
         positiveExamples,
+        gallerySection,
       );
 
       for (const cat of vlmResponse.categorizations) {

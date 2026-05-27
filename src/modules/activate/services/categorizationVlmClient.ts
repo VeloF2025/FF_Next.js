@@ -34,12 +34,14 @@ export async function callVlmForCategorization(
   base64Images: string[],
   fewShotExamples?: FewShotExample[],
   positiveExamples?: PositiveExample[],
+  gallerySection?: string,
 ): Promise<VlmBatchCategorizationResponse> {
   const prompt = buildCategorizationPrompt(
     photos.length,
     drNumber,
     fewShotExamples,
     positiveExamples,
+    gallerySection,
   );
 
   const requestBody = {

@@ -38,6 +38,8 @@ export const STEP_LABELS: Record<number, string> = {
   8: 'Final Installation',
   9: 'Green Lights',
   10: 'Signature',
+  11: 'Dome Joint Open',
+  12: 'Dome Joint Closed',
 };
 
 /** Stable key for a photo's decision, unique across DRs. */

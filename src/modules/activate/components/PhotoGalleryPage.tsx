@@ -4,13 +4,15 @@
  * Photo Gallery — Criteria Review
  *
  * Shows accepted photos (from PASS DRs) grouped by step.
- * QA manager reviews each photo and marks it as a GOOD example.
- * Marked photos become few-shot criteria examples for the PhotoGuide PWA VLM.
+ * QA manager reviews each photo and marks it as a GOOD or BAD example, then
+ * saves the decisions to the VLM pipeline (vlm_corrections + visual examples)
+ * so they become few-shot criteria for the PhotoGuide PWA VLM.
  *
  * Orchestrator: owns state + data loading and delegates rendering to
- * GalleryStepSidebar / PhotoGridView / PhotoSingleView.
+ * GalleryStepSidebar / PhotoGridView / PhotoSingleView. Save lifecycle lives in
+ * usePhotoGallerySave to keep this file under the 200-line component limit.
  *
- * URL: /activate/photo-gallery
+ * URL: /system/vlm-learning/photo-gallery (legacy /activate/photo-gallery redirects here)
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -21,6 +23,7 @@ import { GalleryStepSidebar } from './photo-gallery/GalleryStepSidebar';
 import { PhotoGridView } from './photo-gallery/PhotoGridView';
 import { PhotoSingleView } from './photo-gallery/PhotoSingleView';
 import { GalleryPhoto, PhotoDecision, StepCount, STEP_LABELS, photoKey } from './photo-gallery/types';
+import { usePhotoGallerySave } from './photo-gallery/usePhotoGallerySave';
 
 export default function PhotoGalleryPage() {
   const [activeStep, setActiveStep] = useState(1);
@@ -32,6 +35,12 @@ export default function PhotoGalleryPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'single'>('grid');
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+
+  const { saving, saveResult, saveError, unsavedCount, save } = usePhotoGallerySave({
+    photos,
+    decisions,
+    activeStep,
+  });
 
   // Load step counts on mount. Counts are a secondary sidebar concern, so a
   // failure here is logged (not silently dropped) — the per-step load below
@@ -119,6 +128,11 @@ export default function PhotoGalleryPage() {
         goodCount={goodCount}
         badCount={badCount}
         onCopyResults={copyResults}
+        unsavedCount={unsavedCount}
+        saving={saving}
+        saveResult={saveResult}
+        saveError={saveError}
+        onSaveDecisions={() => void save()}
       />
 
       <div className="flex h-[calc(100vh-73px)]">

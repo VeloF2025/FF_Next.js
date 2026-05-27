@@ -13,11 +13,13 @@
  */
 
 import { log } from '@/lib/logger';
+import { pool } from '@/lib/db';
 import { fetchPhotoAsBase64 } from './photoFetchService';
 import {
   QUALITY_CHECK_STEPS,
   STEP_CRITERIA,
   buildMessageContent,
+  type GalleryExamples,
   type QualityCheckStep,
 } from './stepQualityCriteria';
 import {
@@ -45,9 +47,70 @@ function errMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+/**
+ * Per-step gallery visual examples, base64-encoded. Loaded at most once per
+ * step per validation run (see GalleryCache) — checkOnePhoto runs per photo, so
+ * without the cache the same step's examples would be re-queried and re-fetched
+ * for every photo of that step.
+ */
+type GalleryCache = Map<number, GalleryExamples | undefined>;
+
+async function loadGalleryExamplesForStep(step: number): Promise<GalleryExamples | undefined> {
+  try {
+    const { rows } = await pool.query<{ photo_url: string; label: string }>(
+      `SELECT photo_url, label
+       FROM vlm_visual_photo_examples
+       WHERE step_number = $1
+       ORDER BY saved_at DESC
+       LIMIT 6`,
+      [step]
+    );
+    const positiveRows = rows.filter((r) => r.label === 'positive');
+    const negativeRows = rows.filter((r) => r.label === 'negative');
+    if (positiveRows.length === 0 && negativeRows.length === 0) return undefined;
+
+    // Fetch all gallery URLs as base64 in parallel (non-fatal on individual failures)
+    const toBase64 = async (url: string): Promise<string | null> => {
+      try {
+        return await fetchPhotoAsBase64(url);
+      } catch (fetchErr) {
+        log.warn('[StepQualityValidation] Failed to fetch gallery example as base64', {
+          url,
+          err: fetchErr instanceof Error ? fetchErr.message : String(fetchErr),
+        }, MODULE);
+        return null;
+      }
+    };
+
+    const [positiveResults, negativeResults] = await Promise.all([
+      Promise.all(positiveRows.map((r) => toBase64(r.photo_url))),
+      Promise.all(negativeRows.map((r) => toBase64(r.photo_url))),
+    ]);
+
+    return {
+      positiveBase64: positiveResults.filter((b): b is string => b !== null),
+      negativeBase64: negativeResults.filter((b): b is string => b !== null),
+    };
+  } catch (err) {
+    log.warn('[StepQualityValidation] Failed to load gallery visual examples', { err }, MODULE);
+    return undefined;
+  }
+}
+
+async function getCachedGalleryExamples(
+  cache: GalleryCache,
+  step: number
+): Promise<GalleryExamples | undefined> {
+  if (cache.has(step)) return cache.get(step);
+  const examples = await loadGalleryExamplesForStep(step);
+  cache.set(step, examples);
+  return examples;
+}
+
 async function checkOnePhoto(
   drNumber: string,
-  photo: { filename: string; url: string; step: number }
+  photo: { filename: string; url: string; step: number },
+  galleryCache: GalleryCache
 ): Promise<StepQualityCheckResult> {
   const step = photo.step as QualityCheckStep;
   const criteria = STEP_CRITERIA[step];
@@ -67,7 +130,10 @@ async function checkOnePhoto(
     return { filename: photo.filename, step, passes: true, failReason: null, checkFailed: true };
   }
 
-  const { content: messageContent, usedFewShot } = buildMessageContent(step, newPhotoBase64);
+  // Gallery-curated visual examples for this step (cached per validation run).
+  const galleryExamples = await getCachedGalleryExamples(galleryCache, step);
+
+  const { content: messageContent, usedFewShot } = buildMessageContent(step, newPhotoBase64, galleryExamples);
 
   const requestBody = {
     model: VLM_CATEGORIZATION_MODEL,
@@ -170,10 +236,13 @@ export async function validateStepQuality(
     MODULE
   );
 
+  // Gallery examples are loaded at most once per step across the whole run.
+  const galleryCache: GalleryCache = new Map();
+
   const CONCURRENCY = 2;
   for (let i = 0; i < photos.length; i += CONCURRENCY) {
     const batch = photos.slice(i, i + CONCURRENCY);
-    const batchResults = await Promise.all(batch.map((p) => checkOnePhoto(drNumber, p)));
+    const batchResults = await Promise.all(batch.map((p) => checkOnePhoto(drNumber, p, galleryCache)));
     for (const r of batchResults) {
       results.set(r.filename, r);
     }

@@ -8,6 +8,7 @@
  */
 
 import { log } from '@/lib/logger';
+import { pool } from '@/lib/db';
 import {
   FewShotExample,
   getRelevantExamples,
@@ -16,6 +17,13 @@ import {
   getPositiveExamples,
   hasConfirmedCorrect,
 } from '@/modules/qa-learning';
+
+interface GalleryCorrectionRow {
+  vlm_extracted_value: string;
+  corrected_value: string;
+  correction_notes: string | null;
+  is_canonical: boolean;
+}
 
 export async function loadFewShotExamples(drNumber: string): Promise<FewShotExample[]> {
   try {
@@ -134,5 +142,65 @@ export async function loadPositiveExamples(drNumber: string): Promise<PositiveEx
       'CategorizationVlm',
     );
     return [];
+  }
+}
+
+/**
+ * Load gallery-curated categorization corrections and render them as a prompt
+ * section. These are good/bad examples a reviewer hand-picked in the VLM
+ * Learning photo gallery (persisted to `vlm_corrections`). Gallery examples are
+ * global (not DR-scoped) and capped so the prompt cannot grow unbounded.
+ *
+ * Returns '' when there are no examples or the query fails — categorization
+ * must never break because gallery sourcing did.
+ */
+export async function loadGalleryExamples(): Promise<string> {
+  try {
+    const { rows } = await pool.query<GalleryCorrectionRow>(
+      `SELECT vlm_extracted_value, corrected_value, correction_notes, is_canonical
+         FROM vlm_corrections
+        WHERE module = 'activate'
+          AND analysis_type = 'photo_categorization'
+        ORDER BY is_canonical DESC, priority DESC, created_at DESC
+        LIMIT 8`,
+    );
+
+    if (rows.length === 0) return '';
+
+    const goodRows = rows.filter((r: GalleryCorrectionRow) => r.corrected_value !== 'reject');
+    const badRows = rows.filter((r: GalleryCorrectionRow) => r.corrected_value === 'reject');
+    const lines: string[] = ['\n### GALLERY-CURATED EXAMPLES:'];
+
+    if (goodRows.length > 0) {
+      lines.push('\nConfirmed ACCEPTABLE photos (prioritise accepting these):');
+      goodRows.slice(0, 4).forEach((r: GalleryCorrectionRow) => {
+        lines.push(`✅ ACCEPT photos for ${r.vlm_extracted_value}`);
+        if (r.correction_notes) lines.push(`   (${r.correction_notes})`);
+      });
+    }
+    if (badRows.length > 0) {
+      lines.push('\nConfirmed REJECT photos (do not accept photos like these):');
+      badRows.slice(0, 4).forEach((r: GalleryCorrectionRow) => {
+        lines.push(`❌ REJECT photos for ${r.vlm_extracted_value}`);
+        if (r.correction_notes) lines.push(`   (${r.correction_notes})`);
+      });
+    }
+
+    log.info(
+      'Gallery-curated categorization examples loaded',
+      { action: 'galleryExamplesLoaded', good: goodRows.length, bad: badRows.length },
+      'CategorizationVlm',
+    );
+    return lines.join('\n');
+  } catch (error) {
+    log.warn(
+      'Gallery example loading failed — continuing without it',
+      {
+        action: 'galleryExamplesLoadFailed',
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'CategorizationVlm',
+    );
+    return '';
   }
 }

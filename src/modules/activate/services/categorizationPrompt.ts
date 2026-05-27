@@ -23,12 +23,14 @@ import { QA_PHOTO_CRITERIA } from './qaPhotoCriteria';
  * @param drNumber        DR number for context.
  * @param fewShotExamples Optional HITL correction examples to inject.
  * @param positiveExamples Optional confirmed-correct examples for positive reinforcement.
+ * @param gallerySection   Optional pre-rendered gallery-curated examples block.
  */
 export function buildCategorizationPrompt(
   photoCount: number,
   drNumber: string,
   fewShotExamples?: FewShotExample[],
-  positiveExamples?: PositiveExample[]
+  positiveExamples?: PositiveExample[],
+  gallerySection?: string
 ): string {
   let prompt = `You are an expert fiber optic installation photo categorizer for ${drNumber}.
 
@@ -94,6 +96,10 @@ DO still classify when the installation subject is clearly visible:
 
   if (positiveExamples && positiveExamples.length > 0) {
     prompt += buildPositiveExamplesPromptSection(positiveExamples);
+  }
+
+  if (gallerySection) {
+    prompt += gallerySection;
   }
 
   prompt += `
