@@ -13,11 +13,13 @@
  */
 
 import { log } from '@/lib/logger';
+import { pool } from '@/lib/db';
 import { fetchPhotoAsBase64 } from './photoFetchService';
 import {
   QUALITY_CHECK_STEPS,
   STEP_CRITERIA,
   buildMessageContent,
+  type GalleryExamples,
   type QualityCheckStep,
 } from './stepQualityCriteria';
 import {
@@ -67,7 +69,49 @@ async function checkOnePhoto(
     return { filename: photo.filename, step, passes: true, failReason: null, checkFailed: true };
   }
 
-  const { content: messageContent, usedFewShot } = buildMessageContent(step, newPhotoBase64);
+  // Load gallery-curated visual examples for this step
+  let galleryExamples: GalleryExamples | undefined;
+  try {
+    const { rows } = await pool.query<{ photo_url: string; label: string }>(
+      `SELECT photo_url, label
+       FROM vlm_visual_photo_examples
+       WHERE step_number = $1
+       ORDER BY saved_at DESC
+       LIMIT 6`,
+      [step]
+    );
+    const positiveRows = rows.filter((r) => r.label === 'positive');
+    const negativeRows = rows.filter((r) => r.label === 'negative');
+
+    if (positiveRows.length > 0 || negativeRows.length > 0) {
+      // Fetch all gallery URLs as base64 in parallel (non-fatal on individual failures)
+      const toBase64 = async (url: string): Promise<string | null> => {
+        try {
+          return await fetchPhotoAsBase64(url);
+        } catch (fetchErr) {
+          log.warn('[StepQualityValidation] Failed to fetch gallery example as base64', {
+            url,
+            err: fetchErr instanceof Error ? fetchErr.message : String(fetchErr),
+          }, MODULE);
+          return null;
+        }
+      };
+
+      const [positiveResults, negativeResults] = await Promise.all([
+        Promise.all(positiveRows.map((r) => toBase64(r.photo_url))),
+        Promise.all(negativeRows.map((r) => toBase64(r.photo_url))),
+      ]);
+
+      galleryExamples = {
+        positiveBase64: positiveResults.filter((b): b is string => b !== null),
+        negativeBase64: negativeResults.filter((b): b is string => b !== null),
+      };
+    }
+  } catch (err) {
+    log.warn('[StepQualityValidation] Failed to load gallery visual examples', { err }, MODULE);
+  }
+
+  const { content: messageContent, usedFewShot } = buildMessageContent(step, newPhotoBase64, galleryExamples);
 
   const requestBody = {
     model: VLM_CATEGORIZATION_MODEL,

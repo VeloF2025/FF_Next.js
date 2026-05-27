@@ -88,21 +88,33 @@ export interface BuiltPrompt {
   usedFewShot: boolean;
 }
 
+export interface GalleryExamples {
+  positiveBase64: string[];
+  negativeBase64: string[];
+}
+
 /**
  * Build the VLM message content for a step quality check.
  * Returns the content array plus a flag indicating whether visual few-shot
  * references were attached (used for logging only).
+ *
+ * @param galleryExamples - Optional gallery-curated examples fetched from
+ *   vlm_visual_photo_examples. Injected after the static filesystem references.
  */
 export function buildMessageContent(
   step: QualityCheckStep,
-  newPhotoBase64: string
+  newPhotoBase64: string,
+  galleryExamples?: GalleryExamples
 ): BuiltPrompt {
   const criteria = STEP_CRITERIA[step];
   const refs = loadStepReferences(step);
   const content: VlmContentPart[] = [];
-  const usedFewShot = !!(refs && (refs.correct.length > 0 || refs.incorrect.length > 0));
+  const hasGallery =
+    (galleryExamples?.positiveBase64.length ?? 0) > 0 ||
+    (galleryExamples?.negativeBase64.length ?? 0) > 0;
+  const usedFewShot = !!(refs && (refs.correct.length > 0 || refs.incorrect.length > 0)) || hasGallery;
 
-  if (usedFewShot && refs) {
+  if (usedFewShot && (refs || hasGallery)) {
     content.push({
       type: 'text',
       text: `You are performing a quality check on a photo classified as "${criteria.label}" for a fiber optic installation.
@@ -110,7 +122,8 @@ export function buildMessageContent(
 I will first show you REFERENCE EXAMPLES from our QA team, then ask you to evaluate a NEW photo.`,
     });
 
-    if (refs.correct.length > 0) {
+    // Static filesystem reference examples (existing behaviour)
+    if (refs && refs.correct.length > 0) {
       content.push({
         type: 'text',
         text: `CORRECT EXAMPLE${refs.correct.length > 1 ? 'S' : ''} — These are passing "${criteria.label}" photos:`,
@@ -123,7 +136,7 @@ I will first show you REFERENCE EXAMPLES from our QA team, then ask you to evalu
       }
     }
 
-    if (refs.incorrect.length > 0) {
+    if (refs && refs.incorrect.length > 0) {
       content.push({
         type: 'text',
         text: `INCORRECT EXAMPLE${refs.incorrect.length > 1 ? 'S' : ''} — These are FAILING "${criteria.label}" photos and why:`,
@@ -136,6 +149,33 @@ I will first show you REFERENCE EXAMPLES from our QA team, then ask you to evalu
         content.push({
           type: 'text',
           text: `↑ INCORRECT because: ${ref.reason}`,
+        });
+      }
+    }
+
+    // Gallery-curated visual examples from vlm_visual_photo_examples
+    if (galleryExamples && galleryExamples.positiveBase64.length > 0) {
+      content.push({
+        type: 'text',
+        text: `GALLERY GOOD EXAMPLE${galleryExamples.positiveBase64.length > 1 ? 'S' : ''} — Approved by QA as passing "${criteria.label}" photos:`,
+      });
+      for (const b64 of galleryExamples.positiveBase64) {
+        content.push({
+          type: 'image_url',
+          image_url: { url: `data:image/jpeg;base64,${b64}` },
+        });
+      }
+    }
+
+    if (galleryExamples && galleryExamples.negativeBase64.length > 0) {
+      content.push({
+        type: 'text',
+        text: `GALLERY REJECT EXAMPLE${galleryExamples.negativeBase64.length > 1 ? 'S' : ''} — Rejected by QA as failing "${criteria.label}" photos:`,
+      });
+      for (const b64 of galleryExamples.negativeBase64) {
+        content.push({
+          type: 'image_url',
+          image_url: { url: `data:image/jpeg;base64,${b64}` },
         });
       }
     }
