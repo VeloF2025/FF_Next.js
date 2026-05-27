@@ -327,14 +327,14 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
       {/* Kanban Columns */}
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="flex-1 overflow-x-auto pb-4">
-          <div className="flex gap-4 h-[calc(100vh-280px)] min-h-[500px]">
+          <div className="grid gap-3 h-[calc(100vh-280px)] min-h-[500px]" style={{ gridTemplateColumns: `repeat(${visibleColumns.length}, minmax(180px, 300px))` }}>
             {visibleColumns.map(({ status }, colIndex) => (
               <Droppable key={status} droppableId={status}>
                 {(provided, snapshot) => (
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className="h-full"
+                    className="h-full min-w-0"
                   >
                     <KanbanColumn
                       status={status}
