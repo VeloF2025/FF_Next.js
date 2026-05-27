@@ -177,18 +177,20 @@ async function waitForOtp(triggerTime: Date): Promise<string> {
  */
 async function gotoWithRetry(page: Page, url: string, attempts = 4): Promise<void> {
   for (let attempt = 1; attempt <= attempts; attempt++) {
+    const isLastAttempt = attempt === attempts;
+    let failure: string | null = null;
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
       if (!page.url().startsWith('chrome-error://')) return;
-      log('WARN', 'Navigation landed on chrome-error page, retrying', { attempt, url: page.url() });
+      failure = `landed on chrome-error page (${page.url()})`;
     } catch (err) {
-      log('WARN', 'Navigation failed, retrying', { attempt, error: String(err).split('\n')[0] });
-      if (attempt === attempts) throw err;
+      failure = String(err).split('\n')[0];
     }
-    if (attempt === attempts) {
-      throw new Error(`Navigation to ${url} failed after ${attempts} attempts (last url: ${page.url()})`);
+    if (isLastAttempt) {
+      throw new Error(`Navigation to ${url} failed after ${attempts} attempts: ${failure}`);
     }
-    await new Promise(r => setTimeout(r, 3_000));
+    log('WARN', 'Navigation failed, retrying', { attempt, failure });
+    await new Promise<void>(resolve => setTimeout(resolve, 3_000));
   }
 }
 
