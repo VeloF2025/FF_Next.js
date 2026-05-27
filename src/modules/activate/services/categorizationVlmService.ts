@@ -11,6 +11,7 @@
  */
 
 import { log } from '@/lib/logger';
+import { pool } from '@/lib/db';
 import {
   VlmCategorizationResult,
   VlmBatchCategorizationResponse,
@@ -249,9 +250,10 @@ async function callVlmForCategorization(
   photos: Array<{ filename: string; url: string; original_type: string | null }>,
   base64Images: string[],
   fewShotExamples?: FewShotExample[],
-  positiveExamples?: PositiveExample[]
+  positiveExamples?: PositiveExample[],
+  gallerySectionText?: string
 ): Promise<VlmBatchCategorizationResponse> {
-  const prompt = buildCategorizationPrompt(photos.length, drNumber, fewShotExamples, positiveExamples);
+  const prompt = buildCategorizationPrompt(photos.length, drNumber, fewShotExamples, positiveExamples) + (gallerySectionText ?? '');
 
   const requestBody = {
     model: VLM_CATEGORIZATION_MODEL,
@@ -465,6 +467,48 @@ export async function categorizePhotos(
     }, 'CategorizationVlm');
   }
 
+  // Supplement with gallery-curated corrections from vlm_corrections
+  let gallerySectionText = '';
+  try {
+    const { rows: galleryRows } = await pool.query<{
+      vlm_extracted_value: string;
+      corrected_value: string;
+      correction_notes: string | null;
+      is_canonical: boolean;
+    }>(
+      `SELECT vlm_extracted_value, corrected_value, correction_notes, is_canonical
+       FROM vlm_corrections
+       WHERE module = 'activate'
+         AND analysis_type = 'photo_categorization'
+       ORDER BY is_canonical DESC, priority DESC, created_at DESC
+       LIMIT 8`
+    );
+
+    if (galleryRows.length > 0) {
+      const goodRows = galleryRows.filter((r) => r.corrected_value !== 'reject');
+      const badRows  = galleryRows.filter((r) => r.corrected_value === 'reject');
+      const lines: string[] = ['\n### GALLERY-CURATED EXAMPLES:'];
+
+      if (goodRows.length > 0) {
+        lines.push('\nConfirmed ACCEPTABLE photos (prioritise accepting these):');
+        goodRows.slice(0, 4).forEach((r) => {
+          lines.push(`✅ ACCEPT photos for ${r.vlm_extracted_value}`);
+          if (r.correction_notes) lines.push(`   (${r.correction_notes})`);
+        });
+      }
+      if (badRows.length > 0) {
+        lines.push('\nConfirmed REJECT photos (do not accept photos like these):');
+        badRows.slice(0, 4).forEach((r) => {
+          lines.push(`❌ REJECT photos for ${r.vlm_extracted_value}`);
+          if (r.correction_notes) lines.push(`   (${r.correction_notes})`);
+        });
+      }
+      gallerySectionText = lines.join('\n');
+    }
+  } catch (err) {
+    log.warn('[CategorizationVlm] Failed to load gallery corrections — continuing without them', { err });
+  }
+
   // Process in batches
   for (let i = 0; i < photos.length; i += batchSize) {
     const batch = photos.slice(i, i + batchSize);
@@ -513,7 +557,8 @@ export async function categorizePhotos(
         validPhotos,
         base64Images,
         fewShotExamples,
-        positiveExamples
+        positiveExamples,
+        gallerySectionText
       );
 
       // Map VLM response to results
