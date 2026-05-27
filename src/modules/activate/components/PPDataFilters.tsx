@@ -1,8 +1,14 @@
+/**
+ * PPDataFilters — single filter bar row styled to match OltInvestigateTab's filter bar.
+ * LEFT: delegated to PPFilterControls. RIGHT: action buttons.
+ */
+
 'use client';
 
 import { useRef, type ChangeEvent } from 'react';
-import { Search, XCircle, Download, Upload } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Download, RefreshCw, Upload, Ticket, XCircle, Search } from 'lucide-react';
+import { InlineSpinner } from '@/components/ui/LoadingSpinner';
+import { PPFilterControls } from './PPFilterControls';
 
 interface PPDataFiltersProps {
   projects: string[];
@@ -22,16 +28,25 @@ interface PPDataFiltersProps {
   onDateToChange: (val: string) => void;
   filterPon: string;
   onPonChange: (val: string) => void;
+  // Action props
+  total: number;
+  selectedCount: number;
   onExport: () => void;
   onImportOlt: (file: File) => void;
   isImportingOlt: boolean;
+  onResolveAll: () => void;
+  isResolving: boolean;
+  isLookupRunning: boolean;
+  unticketedCount: number;
+  onSelectAllUnticketed: () => void;
+  isSelectingAllUnticketed: boolean;
+  onCreateTickets: () => void;
+  onClearSelection: () => void;
+  onRefresh: () => void;
 }
 
-const PON_OPTIONS = Array.from({ length: 16 }, (_, i) => i + 1);
-
 export function PPDataFilters({
-  projects,
-  searchText, onSearchChange,
+  projects, searchText, onSearchChange,
   filterProject, onProjectChange,
   filterStatus, onStatusChange,
   filterPriority, onPriorityChange,
@@ -39,159 +54,97 @@ export function PPDataFilters({
   filterDateFrom, onDateFromChange,
   filterDateTo, onDateToChange,
   filterPon, onPonChange,
-  onExport,
-  onImportOlt,
-  isImportingOlt,
+  total, selectedCount,
+  onExport, onImportOlt, isImportingOlt,
+  onResolveAll, isResolving, isLookupRunning,
+  unticketedCount, onSelectAllUnticketed, isSelectingAllUnticketed,
+  onCreateTickets, onClearSelection, onRefresh,
 }: PPDataFiltersProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) {
-      onImportOlt(file);
-      // Reset so same file can be re-imported
-      e.target.value = '';
-    }
+    if (file) { onImportOlt(file); e.target.value = ''; }
   }
 
   return (
-    <div className="bg-[var(--ff-bg-primary)] px-4 py-3 border-b border-[var(--ff-border-light)] flex flex-wrap gap-3 items-center">
-      <div className="relative">
-        <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--ff-text-tertiary)]" />
-        <input
-          type="text"
-          value={searchText}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search serial, DR, ticket..."
-          className="pl-8 pr-3 py-1.5 rounded bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]
-                     text-[var(--ff-text-primary)] text-sm w-56 placeholder:text-[var(--ff-text-tertiary)]"
-        />
-        {searchText && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onSearchChange('')}
-            className="absolute right-2 top-1/2 -translate-y-1/2"
-            aria-label="Clear search"
+    <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--ff-border-light)] gap-3 flex-wrap">
+      <PPFilterControls
+        projects={projects}
+        searchText={searchText} onSearchChange={onSearchChange}
+        filterProject={filterProject} onProjectChange={onProjectChange}
+        filterStatus={filterStatus} onStatusChange={onStatusChange}
+        filterPriority={filterPriority} onPriorityChange={onPriorityChange}
+        filterAging={filterAging} onAgingChange={onAgingChange}
+        filterDateFrom={filterDateFrom} onDateFromChange={onDateFromChange}
+        filterDateTo={filterDateTo} onDateToChange={onDateToChange}
+        filterPon={filterPon} onPonChange={onPonChange}
+      />
+
+      {/* RIGHT: action buttons */}
+      <div className="flex items-center gap-2 shrink-0 flex-wrap">
+        <button
+          onClick={onExport} disabled={total === 0}
+          className="px-3 py-1.5 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)]
+                     text-xs rounded hover:border-[var(--ff-accent)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+        >
+          <Download className="w-3 h-3" /> Export Excel ({total})
+        </button>
+
+        <button
+          onClick={onResolveAll} disabled={isResolving || isLookupRunning}
+          className="px-3 py-1.5 bg-[var(--ff-accent)] text-white text-xs rounded hover:bg-[var(--ff-accent)]/80 disabled:opacity-50 flex items-center gap-1.5"
+        >
+          {isResolving ? <><InlineSpinner size="sm" /> Resolving...</>
+            : isLookupRunning ? <><InlineSpinner size="sm" /> 1Map Searching...</>
+            : <><Search className="w-3 h-3" /> Resolve All</>}
+        </button>
+
+        {unticketedCount > 0 && (
+          <button
+            onClick={onSelectAllUnticketed} disabled={isSelectingAllUnticketed}
+            className="px-3 py-1.5 bg-amber-600 text-white text-xs rounded hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
           >
-            <XCircle className="w-3.5 h-3.5" />
-          </Button>
+            {isSelectingAllUnticketed ? <><InlineSpinner size="sm" /> Loading...</>
+              : <><Ticket className="w-3 h-3" /> Ticket All Unticketed ({unticketedCount})</>}
+          </button>
         )}
-      </div>
-      <select
-        value={filterProject}
-        onChange={(e) => onProjectChange(e.target.value)}
-        className="px-3 py-1.5 rounded bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]
-                   text-[var(--ff-text-primary)] text-sm"
-      >
-        <option value="">All Projects</option>
-        {projects.map((p) => (
-          <option key={p} value={p}>{p}</option>
-        ))}
-      </select>
-      <select
-        value={filterStatus}
-        onChange={(e) => onStatusChange(e.target.value)}
-        className="px-3 py-1.5 rounded bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]
-                   text-[var(--ff-text-primary)] text-sm"
-      >
-        <option value="">All Statuses</option>
-        <option value="unticketed">Unticketed</option>
-        <option value="not_found">Not Found</option>
-        <option value="located_oes">Found (OES)</option>
-        <option value="located_unified">Found (Unified)</option>
-        <option value="located_onemap">Found (OneMap)</option>
-        <option value="located_1map">Found (1Map)</option>
-        <option value="located_local">Found (Local)</option>
-        <option value="activated">Activated</option>
-      </select>
-      <select
-        value={filterPon}
-        onChange={(e) => onPonChange(e.target.value)}
-        className={`px-3 py-1.5 rounded border text-sm ${
-          filterPon
-            ? 'bg-indigo-900/20 border-indigo-600 text-indigo-300'
-            : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-primary)]'
-        }`}
-      >
-        <option value="">All PONs</option>
-        {PON_OPTIONS.map(n => (
-          <option key={n} value={String(n)}>PON {n}</option>
-        ))}
-      </select>
-      <select
-        value={filterPriority}
-        onChange={(e) => onPriorityChange(e.target.value)}
-        className="px-3 py-1.5 rounded bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]
-                   text-[var(--ff-text-primary)] text-sm"
-      >
-        <option value="">All Priorities</option>
-        <option value="normal">Normal</option>
-        <option value="high">High</option>
-      </select>
-      <select
-        value={filterAging}
-        onChange={(e) => onAgingChange(e.target.value)}
-        className={`px-3 py-1.5 rounded border text-sm ${
-          filterAging
-            ? 'bg-red-900/20 border-red-700 text-red-300'
-            : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-primary)]'
-        }`}
-      >
-        <option value="">Ticket Age</option>
-        <option value="recent">Recent (0-6 days)</option>
-        <option value="7days">7 Days (7-13 days)</option>
-        <option value="14days">14+ Days</option>
-      </select>
-      <div className="flex items-center gap-1.5">
-        <label className="text-xs text-[var(--ff-text-tertiary)]">From</label>
-        <input
-          type="date"
-          value={filterDateFrom}
-          onChange={(e) => onDateFromChange(e.target.value)}
-          className="px-2 py-1.5 rounded bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]
-                     text-[var(--ff-text-primary)] text-sm"
-        />
-        <label className="text-xs text-[var(--ff-text-tertiary)]">To</label>
-        <input
-          type="date"
-          value={filterDateTo}
-          onChange={(e) => onDateToChange(e.target.value)}
-          className="px-2 py-1.5 rounded bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]
-                     text-[var(--ff-text-primary)] text-sm"
-        />
-        {(filterDateFrom || filterDateTo) && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => { onDateFromChange(''); onDateToChange(''); }}
-            title="Clear dates"
-          >
-            <XCircle className="w-4 h-4" />
-          </Button>
+
+        {selectedCount > 0 && (
+          <>
+            <button
+              onClick={onCreateTickets}
+              className="px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700 flex items-center gap-1.5"
+            >
+              <Ticket className="w-3 h-3" /> Create {selectedCount} Ticket{selectedCount !== 1 ? 's' : ''}
+            </button>
+            <button
+              onClick={onClearSelection}
+              className="px-3 py-1.5 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] border border-[var(--ff-border-light)]
+                         text-xs rounded hover:border-[var(--ff-accent)] flex items-center gap-1.5"
+            >
+              <XCircle className="w-3 h-3" /> Clear
+            </button>
+          </>
         )}
-      </div>
-      <div className="ml-auto flex items-center gap-2">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".xlsx,.xls"
-          className="hidden"
-          onChange={handleFileChange}
-        />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isImportingOlt}
+
+        <button
+          onClick={onRefresh}
+          className="p-1.5 text-[var(--ff-text-secondary)] hover:text-[var(--ff-accent)] transition-colors"
+          title="Refresh data" aria-label="Refresh PP data"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
+
+        <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
+        <button
+          onClick={() => fileInputRef.current?.click()} disabled={isImportingOlt}
+          className="px-3 py-1.5 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] border border-[var(--ff-border-light)]
+                     text-xs rounded hover:border-[var(--ff-accent)] disabled:opacity-50 flex items-center gap-1.5"
           title="Import Velocity PPs Excel to populate OLT port data"
         >
-          <Upload className="w-3.5 h-3.5" />
-          {isImportingOlt ? 'Importing...' : 'Import OLT Data'}
-        </Button>
-        <Button variant="secondary" size="sm" onClick={onExport}>
-          <Download className="w-3.5 h-3.5" /> Export Excel
-        </Button>
+          {isImportingOlt ? <><InlineSpinner size="sm" /> Importing...</> : <><Upload className="w-3 h-3" /> Import OLT Data</>}
+        </button>
       </div>
     </div>
   );

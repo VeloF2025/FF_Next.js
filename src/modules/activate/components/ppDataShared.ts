@@ -34,14 +34,18 @@ export interface PPRecord {
 
 export type PPCardCategory = 'total' | 'activated' | 'located' | 'not_found' | 'ticketed';
 
+/**
+ * Dark-theme-only status badge classes using /20 bg + /400 text pattern.
+ * No `dark:` split — this app is always dark.
+ */
 export const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }> = {
-  not_found:       { bg: 'bg-amber-100 dark:bg-amber-900/30',   text: 'text-amber-800 dark:text-amber-300',   label: 'Not Found' },
-  located_oes:     { bg: 'bg-blue-100 dark:bg-blue-900/30',     text: 'text-blue-800 dark:text-blue-300',     label: 'Found (OES)' },
-  located_unified: { bg: 'bg-indigo-100 dark:bg-indigo-900/30', text: 'text-indigo-800 dark:text-indigo-300', label: 'Found (Unified)' },
-  located_onemap:  { bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-800 dark:text-purple-300', label: 'Found (OneMap)' },
-  located_1map:    { bg: 'bg-teal-100 dark:bg-teal-900/30',     text: 'text-teal-800 dark:text-teal-300',     label: 'Found (1Map)' },
-  located_local:   { bg: 'bg-cyan-100 dark:bg-cyan-900/30',     text: 'text-cyan-800 dark:text-cyan-300',     label: 'Found (Local)' },
-  activated:       { bg: 'bg-green-100 dark:bg-green-900/30',   text: 'text-green-800 dark:text-green-300',   label: 'Activated' },
+  not_found:       { bg: 'bg-amber-500/20',  text: 'text-amber-400',  label: 'Not Found' },
+  located_oes:     { bg: 'bg-blue-500/20',   text: 'text-blue-400',   label: 'Found (OES)' },
+  located_unified: { bg: 'bg-blue-500/20',   text: 'text-blue-400',   label: 'Found (Unified)' },
+  located_onemap:  { bg: 'bg-purple-500/20', text: 'text-purple-400', label: 'Found (OneMap)' },
+  located_1map:    { bg: 'bg-teal-500/20',   text: 'text-teal-400',   label: 'Found (1Map)' },
+  located_local:   { bg: 'bg-cyan-500/20',   text: 'text-cyan-400',   label: 'Found (Local)' },
+  activated:       { bg: 'bg-green-500/20',  text: 'text-green-400',  label: 'Activated' },
 };
 
 export function daysAgo(dateStr: string | null): number | null {

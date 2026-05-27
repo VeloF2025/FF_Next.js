@@ -20,8 +20,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { getOrCreateShareUrls } from '@/modules/noc/services/ticketShareLinks';
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app';
+import { gpsCoordinates, gpsMapsUrl, internalTicketUrl, setLinkCell } from '@/lib/excel/ticketLinkCells';
 
 type QueryParam = string | string[] | undefined;
 type SqlParam = string | string[];
@@ -166,17 +165,6 @@ const GPS_COL = 8; // "GPS coordinates" → Google Maps
 const TICKET_COL = 10; // "Ticket" → internal ticket page
 const TICKET_LINK_COL = 11; // "Ticket Link" → public shareable page
 
-// Excel's default hyperlink look: blue + underlined.
-const LINK_FONT: Partial<ExcelJS.Font> = { color: { argb: 'FF2563EB' }, underline: true };
-
-function gpsCoordinates(lat: number | string | null, lng: number | string | null): string {
-  return lat != null && lng != null ? `${lat}, ${lng}` : '';
-}
-
-function gpsMapsUrl(lat: number | string | null, lng: number | string | null): string | null {
-  return lat != null && lng != null ? `https://www.google.com/maps?q=${lat},${lng}` : null;
-}
-
 async function toExcel(rows: OltExportRow[], filters: Record<string, string>): Promise<Buffer> {
   const headers = [
     'DR Number',
@@ -249,22 +237,16 @@ async function toExcel(rows: OltExportRow[], filters: Record<string, string>): P
 
     // Ticket → internal FibreFlow ticket page (sign-in required)
     if (row.ticket_id && row.ticket_uid) {
-      const cell = added.getCell(TICKET_COL);
-      cell.value = { text: row.ticket_uid, hyperlink: `${APP_URL}/noc/tickets/${row.ticket_id}`, tooltip: 'Open ticket in FibreFlow (sign-in required)' };
-      cell.font = LINK_FONT;
+      setLinkCell(added.getCell(TICKET_COL), row.ticket_uid, internalTicketUrl(row.ticket_id), 'Open ticket in FibreFlow (sign-in required)');
     }
     // Ticket Link → public shareable page
     if (row.ticket_link) {
-      const cell = added.getCell(TICKET_LINK_COL);
-      cell.value = { text: row.ticket_link, hyperlink: row.ticket_link, tooltip: 'Open shareable ticket link' };
-      cell.font = LINK_FONT;
+      setLinkCell(added.getCell(TICKET_LINK_COL), row.ticket_link, row.ticket_link, 'Open shareable ticket link');
     }
     // GPS coordinates → Google Maps
     const mapsUrl = gpsMapsUrl(row.latitude, row.longitude);
     if (mapsUrl) {
-      const cell = added.getCell(GPS_COL);
-      cell.value = { text: gpsCoordinates(row.latitude, row.longitude), hyperlink: mapsUrl, tooltip: 'Open in Google Maps' };
-      cell.font = LINK_FONT;
+      setLinkCell(added.getCell(GPS_COL), gpsCoordinates(row.latitude, row.longitude), mapsUrl, 'Open in Google Maps');
     }
   }
 

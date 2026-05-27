@@ -1165,6 +1165,8 @@ export interface OfflineDeviceRecord {
   longitude: number | null;
   /** ONT serial recorded in 1Map (from dr_photo_unified_reviews) */
   onemap_serial: string | null;
+  /** NOC ticket id, when a ticket exists for this DR (for internal ticket links) */
+  ticket_id: string | null;
   /** NOC ticket UID, when a ticket exists for this DR */
   ticket_uid: string | null;
   /** Public shareable NOC ticket link — only present when already shared */

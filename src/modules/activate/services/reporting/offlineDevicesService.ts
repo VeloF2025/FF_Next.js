@@ -258,6 +258,7 @@ export async function getOfflineDevicesReport(
       latitude: row.latitude != null ? Number(row.latitude) : null,
       longitude: row.longitude != null ? Number(row.longitude) : null,
       onemap_serial: row.onemap_serial ?? null,
+      ticket_id: row.ticket_id ?? null,
       ticket_uid: row.ticket_uid ?? null,
       ticket_link: row.ticket_id ? shareUrls.get(row.ticket_id) ?? null : null,
     }));

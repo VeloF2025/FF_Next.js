@@ -13,11 +13,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { withAuth, withRole } from '@/lib/auth';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import pool from '@/lib/db';
 import { getOrCreateShareUrls } from '@/modules/noc/services/ticketShareLinks';
+import { gpsCoordinates, applyTicketRowLinks } from '@/lib/excel/ticketLinkCells';
 
 async function handler(
   req: NextApiRequest,
@@ -329,60 +330,70 @@ async function handler(
       activated: 'Activated',
     };
 
-    const rows = dataResult.rows.map(r => ({
-      'Serial Number': r.serial_number,
-      'Project': r.project,
-      'PP Date': r.date_registered ? new Date(r.date_registered).toLocaleDateString() : '',
-      'Status': STATUS_LABELS[r.resolution_status] || r.resolution_status,
-      'Resolved DR': r.resolved_drop_number || '',
-      'Zone': r.zone_no ?? '',
-      'PON': r.pon_no ?? '',
-      'Pole': r.pole_number || '',
-      'GPS Coordinates':
-        r.latitude != null && r.longitude != null ? `${r.latitude}, ${r.longitude}` : '',
-      'Source': r.resolved_source || '',
-      'Located Date': r.first_resolved_at ? new Date(r.first_resolved_at).toLocaleDateString() : '',
-      'Resolved At': r.resolved_at ? new Date(r.resolved_at).toLocaleString() : '',
-      'Install Team': r.oes_team || '',
-      'Activation Date': r.activation_date ? new Date(r.activation_date).toLocaleDateString() : '',
-      'WA Technician': r.wa_name
-        ? `${r.wa_name}${r.technician_source === 'eod' ? ' (EOD)' : ''}`
-        : '',
-      'Technician Source': r.technician_source || '',
-      'WA Phone': r.wa_phone || '',
-      'WA Team': r.wa_team || '',
-      'Priority': r.ticket_priority ? (r.ticket_priority === 'high' ? 'High' : 'Normal') : '',
-      'Ticket Number': r.ticket_uid || '',
-      'Ticket Link': r.ticket_id ? ppShareUrls.get(r.ticket_id) ?? '' : '',
-      'OLT Address': r.olt_address || '',
-      'OLT Port': r.olt_port || '',
-      'OLT PON': r.olt_pon ?? '',
-      'OLT LT': r.olt_lt ?? '',
-      'OLT ONT Pos': r.olt_ont_pos ?? '',
-    }));
+    // 1-based worksheet column positions for the clickable link cells.
+    const PP_GPS_COL = 9;
+    const PP_TICKET_COL = 20;
+    const PP_TICKET_LINK_COL = 21;
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(rows);
-
-    // Set column widths
-    ws['!cols'] = [
-      { wch: 20 }, // Serial Number
-      { wch: 12 }, // Project
-      { wch: 14 }, // Date Registered
-      { wch: 14 }, // Status
-      { wch: 14 }, // Resolved DR
-      { wch: 22 }, // Source
-      { wch: 20 }, // Resolved At
+    const headers = [
+      'Serial Number', 'Project', 'PP Date', 'Status', 'Resolved DR', 'Zone', 'PON', 'Pole',
+      'GPS Coordinates', 'Source', 'Located Date', 'Resolved At', 'Install Team', 'Activation Date',
+      'WA Technician', 'Technician Source', 'WA Phone', 'WA Team', 'Priority', 'Ticket Number',
+      'Ticket Link', 'OLT Address', 'OLT Port', 'OLT PON', 'OLT LT', 'OLT ONT Pos',
     ];
+    const fmtDate = (v: unknown) => (v ? new Date(v as string).toISOString().slice(0, 10) : '');
+    const fmtDateTime = (v: unknown) => (v ? new Date(v as string).toISOString().replace('T', ' ').slice(0, 19) : '');
 
     const sheetName = status
       ? `PP Data - ${STATUS_LABELS[status] || status}`
       : project
         ? `PP Data - ${project}`
         : 'PP Data';
-    XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31));
 
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet(sheetName.substring(0, 31));
+    sheet.columns = headers.map((header) => ({ header, width: Math.max(12, Math.min(40, header.length + 4)) }));
+    sheet.getRow(1).font = { bold: true };
+
+    for (const r of dataResult.rows) {
+      const ticketLink = r.ticket_id ? ppShareUrls.get(r.ticket_id) ?? '' : '';
+      const added = sheet.addRow([
+        r.serial_number,
+        r.project,
+        fmtDate(r.date_registered),
+        STATUS_LABELS[r.resolution_status] || r.resolution_status,
+        r.resolved_drop_number || '',
+        r.zone_no ?? '',
+        r.pon_no ?? '',
+        r.pole_number || '',
+        gpsCoordinates(r.latitude, r.longitude),
+        r.resolved_source || '',
+        fmtDate(r.first_resolved_at),
+        fmtDateTime(r.resolved_at),
+        r.oes_team || '',
+        fmtDate(r.activation_date),
+        r.wa_name ? `${r.wa_name}${r.technician_source === 'eod' ? ' (EOD)' : ''}` : '',
+        r.technician_source || '',
+        r.wa_phone || '',
+        r.wa_team || '',
+        r.ticket_priority ? (r.ticket_priority === 'high' ? 'High' : 'Normal') : '',
+        r.ticket_uid || '',
+        ticketLink,
+        r.olt_address || '',
+        r.olt_port || '',
+        r.olt_pon ?? '',
+        r.olt_lt ?? '',
+        r.olt_ont_pos ?? '',
+      ]);
+
+      applyTicketRowLinks(added, {
+        ticketCol: PP_TICKET_COL, ticketId: r.ticket_id, ticketUid: r.ticket_uid,
+        ticketLinkCol: PP_TICKET_LINK_COL, ticketLink,
+        gpsCol: PP_GPS_COL, lat: r.latitude, lng: r.longitude,
+      });
+    }
+
+    const buf = (await workbook.xlsx.writeBuffer()) as unknown as Buffer;
 
     const fileParts = ['PP_Data'];
     if (project) fileParts.push(project);

@@ -21,14 +21,14 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import ExcelJS from 'exceljs';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { getOrCreateShareUrls } from '@/modules/noc/services/ticketShareLinks';
+import { gpsCoordinates, applyTicketRowLinks } from '@/lib/excel/ticketLinkCells';
 import type {
-  SerialMismatchReportResponse,
-  SerialMismatchRecord,
   SerialMismatchSummary,
   MismatchStatus,
   MismatchResolution,
@@ -302,43 +302,53 @@ async function handler(
     `);
     const availableTeams = teamsResult.rows.map(r => String(r.team));
 
-    // Handle CSV export
+    // Handle Excel export — Ticket / Ticket Link / GPS as clickable hyperlinks
     if (format === 'csv') {
       // Raw rows carry pole/GPS/ticket_uid not present on the typed record
       const rawById = new Map(recordsResult.rows.map((row) => [String(row.id), row]));
       // Shareable NOC links for every linked ticket (batched, mints if missing)
       const shareUrls = await getOrCreateShareUrls(records.map((r) => r.ticket_id));
-      const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
-      const csvRows = [
-        ['DR Number', 'Zone', 'PON', 'Pole', 'GPS Coordinates', 'Team', 'Original Serial', 'Current Serial', '1Map Serial', 'Status', 'Ticket Number', 'Ticket Link', 'Days Offline', 'Down Reason', 'Activation Date'].join(','),
-        ...records.map((r) => {
-          const raw = rawById.get(r.id);
-          const lat = raw?.latitude;
-          const lng = raw?.longitude;
-          return [
-            r.drop_number,
-            r.zone ?? '',
-            r.pon ?? '',
-            raw?.pole_number ?? '',
-            q(lat != null && lng != null ? `${lat}, ${lng}` : ''),
-            r.installation_team ?? 'Unknown',
-            r.expected_serial,
-            r.current_serial,
-            r.serial_comparison?.onemap ?? '',
-            r.status,
-            raw?.ticket_uid ?? '',
-            r.ticket_id ? shareUrls.get(r.ticket_id) ?? '' : '',
-            r.days_offline,
-            q(r.down_reason ?? ''),
-            r.activation_date ?? '',
-          ].join(',');
-        }),
-      ];
+      // 1-based link-cell columns: GPS=5, Ticket Number=11, Ticket Link=12.
+      const headers = ['DR Number', 'Zone', 'PON', 'Pole', 'GPS Coordinates', 'Team', 'Original Serial', 'Current Serial', '1Map Serial', 'Status', 'Ticket Number', 'Ticket Link', 'Days Offline', 'Down Reason', 'Activation Date'];
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Serial Mismatches');
+      sheet.columns = headers.map((header) => ({ header, width: Math.max(12, Math.min(40, header.length + 4)) }));
+      sheet.getRow(1).font = { bold: true };
 
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename=serial-mismatches-${new Date().toISOString().split('T')[0]}.csv`);
-      return res.status(200).send(csvRows.join('\n'));
+      for (const r of records) {
+        const raw = rawById.get(r.id);
+        const lat = raw?.latitude;
+        const lng = raw?.longitude;
+        const ticketLink = r.ticket_id ? shareUrls.get(r.ticket_id) ?? '' : '';
+        const added = sheet.addRow([
+          r.drop_number,
+          r.zone ?? '',
+          r.pon ?? '',
+          raw?.pole_number ?? '',
+          gpsCoordinates(lat, lng),
+          r.installation_team ?? 'Unknown',
+          r.expected_serial,
+          r.current_serial,
+          r.serial_comparison?.onemap ?? '',
+          r.status,
+          raw?.ticket_uid ?? '',
+          ticketLink,
+          r.days_offline,
+          r.down_reason ?? '',
+          r.activation_date ?? '',
+        ]);
+        applyTicketRowLinks(added, {
+          ticketCol: 11, ticketId: r.ticket_id, ticketUid: raw?.ticket_uid,
+          ticketLinkCol: 12, ticketLink,
+          gpsCol: 5, lat, lng,
+        });
+      }
+
+      const buffer = (await workbook.xlsx.writeBuffer()) as unknown as Buffer;
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=serial-mismatches-${new Date().toISOString().split('T')[0]}.xlsx`);
+      return res.status(200).send(buffer);
     }
 
     const response = {

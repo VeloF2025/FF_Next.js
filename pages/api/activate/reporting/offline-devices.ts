@@ -18,11 +18,13 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import ExcelJS from 'exceljs';
 import { getOfflineDevicesReport } from '@/modules/activate/services/reportingService';
 import type { OfflineMatchStatus } from '@/modules/activate/types/reporting.types';
 import { log } from '@/lib/logger';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
+import { gpsCoordinates, applyTicketRowLinks } from '@/lib/excel/ticketLinkCells';
 
 async function handler(
   req: NextApiRequest,
@@ -88,7 +90,8 @@ async function handler(
       : 100;
     const wantsCsv = (Array.isArray(req.query.format) ? req.query.format[0] : req.query.format) === 'csv';
 
-    // CSV export: all filtered rows, minting share links on demand (server-side only).
+    // Excel export: all filtered rows, minting share links on demand (server-side only).
+    // Ticket / Ticket Link / GPS render as blue + underlined clickable hyperlinks.
     if (wantsCsv) {
       const report = await getOfflineDevicesReport(dateFromStr as string, dateToStr as string, {
         project: projectStr,
@@ -101,35 +104,45 @@ async function handler(
         mintShareLinks: true,
       });
 
-      const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-      const header = ['DR Number', 'Serial', '1Map Serial', 'Zone', 'PON', 'Address', 'Pole', 'GPS Coordinates', 'Down Reason', 'Days Offline', 'Bucket', 'Match Status', 'Serial Mismatch', 'Report Date', 'Ticket Number', 'Ticket Link'];
-      const lines = [
-        header.join(','),
-        ...report.records.map((r) => [
-          q(r.drop_number),
-          q(r.serial_number),
-          q(r.onemap_serial),
-          q(r.zone),
-          q(r.planned_pon),
-          q(r.address),
-          q(r.pole_number),
-          q(r.latitude != null && r.longitude != null ? `${r.latitude}, ${r.longitude}` : ''),
-          q(r.last_down_reason),
-          r.days_since_last_inform,
-          q(r.offline_bucket),
-          q(r.match_status),
-          r.serial_mismatch ? 'Yes' : 'No',
-          q(r.report_date),
-          q(r.ticket_uid),
-          q(r.ticket_link),
-        ].join(',')),
-      ];
+      // 1-based link-cell columns: GPS=8, Ticket Number=15, Ticket Link=16.
+      const headers = ['DR Number', 'Serial', '1Map Serial', 'Zone', 'PON', 'Address', 'Pole', 'GPS Coordinates', 'Down Reason', 'Days Offline', 'Bucket', 'Match Status', 'Serial Mismatch', 'Report Date', 'Ticket Number', 'Ticket Link'];
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Offline Devices');
+      sheet.columns = headers.map((header) => ({ header, width: Math.max(12, Math.min(40, header.length + 4)) }));
+      sheet.getRow(1).font = { bold: true };
 
+      for (const r of report.records) {
+        const added = sheet.addRow([
+          r.drop_number,
+          r.serial_number ?? '',
+          r.onemap_serial ?? '',
+          r.zone ?? '',
+          r.planned_pon ?? '',
+          r.address ?? '',
+          r.pole_number ?? '',
+          gpsCoordinates(r.latitude, r.longitude),
+          r.last_down_reason ?? '',
+          r.days_since_last_inform,
+          r.offline_bucket ?? '',
+          r.match_status ?? '',
+          r.serial_mismatch ? 'Yes' : 'No',
+          r.report_date ?? '',
+          r.ticket_uid ?? '',
+          r.ticket_link ?? '',
+        ]);
+        applyTicketRowLinks(added, {
+          ticketCol: 15, ticketId: r.ticket_id, ticketUid: r.ticket_uid,
+          ticketLinkCol: 16, ticketLink: r.ticket_link,
+          gpsCol: 8, lat: r.latitude, lng: r.longitude,
+        });
+      }
+
+      const buffer = (await workbook.xlsx.writeBuffer()) as unknown as Buffer;
       const today = new Date().toISOString().split('T')[0];
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="offline-devices-${today}.csv"`);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="offline-devices-${today}.xlsx"`);
       res.setHeader('X-Export-Count', String(report.records.length));
-      return res.status(200).send(lines.join('\n'));
+      return res.status(200).send(buffer);
     }
 
     log.info('Fetching offline devices report', {

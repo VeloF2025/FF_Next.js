@@ -16,11 +16,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { withAuth, withRole } from '@/lib/auth';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { getOrCreateShareUrls } from '@/modules/noc/services/ticketShareLinks';
+import { applyTicketRowLinks } from '@/lib/excel/ticketLinkCells';
 
 interface ExportRow {
   drop_number: string;
@@ -35,7 +36,10 @@ interface ExportRow {
   pon: string | number | null;
   pole: string | null;
   gps: string;
+  latitude: number | string | null;
+  longitude: number | string | null;
   // NOC ticket + shareable link
+  ticket_id: string | null;
   ticket_uid: string | null;
   ticket_link: string | null;
   // Step details
@@ -100,10 +104,15 @@ function isComplete(row: any): boolean {
   );
 }
 
+// 1-based worksheet column positions for the clickable link cells.
+const GPS_COL = 25; // "GPS Coordinates" → Google Maps
+const TICKET_COL = 31; // "Ticket Number" → internal ticket page
+const TICKET_LINK_COL = 32; // "Ticket Link" → public shareable page
+
 /**
- * Convert rows to Excel workbook
+ * Convert rows to Excel workbook (ExcelJS so link cells render blue + underlined).
  */
-function toExcel(rows: ExportRow[]): Buffer {
+async function toExcel(rows: ExportRow[]): Promise<Buffer> {
   // Define column headers
   const headers = [
     'DR Number',
@@ -176,51 +185,31 @@ function toExcel(rows: ExportRow[]): Buffer {
     row.ticket_link || '',
   ]);
 
-  // Create worksheet
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
-
-  // Set column widths
-  ws['!cols'] = [
-    { wch: 12 }, // DR Number
-    { wch: 10 }, // Project
-    { wch: 12 }, // Submitted Date
-    { wch: 8 }, // Photo Count
-    { wch: 10 }, // Steps Completed
-    { wch: 10 }, // Is Complete
-    { wch: 8 }, // Steps 1-10
-    { wch: 8 },
-    { wch: 8 },
-    { wch: 8 },
-    { wch: 8 },
-    { wch: 8 },
-    { wch: 8 },
-    { wch: 8 },
-    { wch: 8 },
-    { wch: 8 },
-    { wch: 12 }, // VLM Status
-    { wch: 10 }, // Feedback Sent
-    { wch: 18 }, // ONT Serial
-    { wch: 18 }, // UPS Serial
-    { wch: 18 }, // 1Map Serial
-    { wch: 8 }, // Zone
-    { wch: 8 }, // PON
-    { wch: 14 }, // Pole
-    { wch: 22 }, // GPS Coordinates
-    { wch: 15 }, // Sender Phone
-    { wch: 15 }, // Sender Name
-    { wch: 15 }, // Assigned Agent
-    { wch: 12 }, // Activation Date
-    { wch: 10 }, // Activated
-    { wch: 16 }, // Ticket Number
-    { wch: 48 }, // Ticket Link
+  // Column widths (index-aligned with `headers`); narrow step columns preserved.
+  const widths = [
+    12, 10, 12, 8, 10, 10, // DR..Is Complete
+    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, // Steps 1-10
+    12, 10, 18, 18, 18, 8, 8, 14, 22, // VLM..GPS
+    15, 15, 15, 12, 10, 16, 48, // Sender Phone..Ticket Link
   ];
 
-  // Create workbook
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Activate Export');
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Activate Export');
+  sheet.columns = headers.map((header, i) => ({ header, width: widths[i] ?? 12 }));
+  sheet.getRow(1).font = { bold: true };
 
-  // Write to buffer
-  return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+  data.forEach((values, i) => {
+    const row = rows[i] as ExportRow;
+    const added = sheet.addRow(values);
+    applyTicketRowLinks(added, {
+      ticketCol: TICKET_COL, ticketId: row.ticket_id, ticketUid: row.ticket_uid,
+      ticketLinkCol: TICKET_LINK_COL, ticketLink: row.ticket_link,
+      gpsCol: GPS_COL, lat: row.latitude, lng: row.longitude,
+    });
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return buffer as unknown as Buffer;
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -413,7 +402,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Return as Excel file download (default)
-    const excel = toExcel(rows);
+    const excel = await toExcel(rows);
     // Build descriptive filename with active filters
     const filenameParts: string[] = ['activate-export'];
     if (project && project !== 'all') filenameParts.push(String(project).replace(/\s+/g, '-'));

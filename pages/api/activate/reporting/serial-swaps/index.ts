@@ -15,11 +15,13 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import ExcelJS from 'exceljs';
 import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { getOrCreateShareUrls } from '@/modules/noc/services/ticketShareLinks';
+import { gpsCoordinates, applyTicketRowLinks } from '@/lib/excel/ticketLinkCells';
 import type {
   SerialSwapReportResponse,
   SerialSwapRecord,
@@ -229,43 +231,53 @@ async function handler(
       days_pending: Math.floor(Number(row.days_pending) || 0),
     }));
 
-    // Handle CSV export
+    // Handle Excel export — Ticket / Ticket Link / GPS as clickable hyperlinks
     if (format === 'csv') {
       // Raw rows carry 1Map serial / pole / GPS / ticket not on the typed record
       const rawByDrop = new Map(recordsResult.rows.map((row) => [String(row.drop_number), row]));
       // Shareable NOC links for every linked ticket (batched, mints if missing)
       const shareUrls = await getOrCreateShareUrls(recordsResult.rows.map((r) => r.ticket_id));
-      const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
-      const csvRows = [
-        ['DR Number', 'Project', '1Map Serial', 'Zone', 'PON', 'Pole', 'GPS Coordinates', 'ONT Serial', 'UPS Serial', 'Swap Details', 'Status', 'Ticket Number', 'Ticket Link', 'Detected At', 'Days Pending'].join(','),
-        ...records.map((r) => {
-          const raw = rawByDrop.get(r.drop_number);
-          const lat = raw?.latitude;
-          const lng = raw?.longitude;
-          return [
-            r.drop_number,
-            r.project || '',
-            raw?.onemap_serial || '',
-            r.zone_no ?? '',
-            r.pon_no ?? '',
-            raw?.pole_number ?? '',
-            q(lat != null && lng != null ? `${lat}, ${lng}` : ''),
-            r.ont_serial || '',
-            r.ups_serial || '',
-            q(r.swap_details || ''),
-            r.swap_status,
-            raw?.ticket_uid ?? '',
-            raw?.ticket_id ? shareUrls.get(raw.ticket_id) ?? '' : '',
-            r.detected_at?.split('T')[0] || '',
-            r.days_pending,
-          ].join(',');
-        }),
-      ];
+      // 1-based link-cell columns: GPS=7, Ticket Number=12, Ticket Link=13.
+      const headers = ['DR Number', 'Project', '1Map Serial', 'Zone', 'PON', 'Pole', 'GPS Coordinates', 'ONT Serial', 'UPS Serial', 'Swap Details', 'Status', 'Ticket Number', 'Ticket Link', 'Detected At', 'Days Pending'];
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Serial Swaps');
+      sheet.columns = headers.map((header) => ({ header, width: Math.max(12, Math.min(40, header.length + 4)) }));
+      sheet.getRow(1).font = { bold: true };
 
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename=serial-swaps-${dateFrom}-to-${dateTo}.csv`);
-      return res.status(200).send(csvRows.join('\n'));
+      for (const r of records) {
+        const raw = rawByDrop.get(r.drop_number);
+        const lat = raw?.latitude;
+        const lng = raw?.longitude;
+        const ticketLink = raw?.ticket_id ? shareUrls.get(raw.ticket_id) ?? '' : '';
+        const added = sheet.addRow([
+          r.drop_number,
+          r.project || '',
+          raw?.onemap_serial || '',
+          r.zone_no ?? '',
+          r.pon_no ?? '',
+          raw?.pole_number ?? '',
+          gpsCoordinates(lat, lng),
+          r.ont_serial || '',
+          r.ups_serial || '',
+          r.swap_details || '',
+          r.swap_status,
+          raw?.ticket_uid ?? '',
+          ticketLink,
+          r.detected_at?.split('T')[0] || '',
+          r.days_pending,
+        ]);
+        applyTicketRowLinks(added, {
+          ticketCol: 12, ticketId: raw?.ticket_id, ticketUid: raw?.ticket_uid,
+          ticketLinkCol: 13, ticketLink,
+          gpsCol: 7, lat, lng,
+        });
+      }
+
+      const buffer = (await workbook.xlsx.writeBuffer()) as unknown as Buffer;
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=serial-swaps-${dateFrom}-to-${dateTo}.xlsx`);
+      return res.status(200).send(buffer);
     }
 
     const response: SerialSwapReportResponse = {

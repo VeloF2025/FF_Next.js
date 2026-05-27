@@ -1,9 +1,15 @@
+/**
+ * CreatePPTicketsModal — bulk NOC ticket creation for selected PP records.
+ * Groups records by project, auto-resolves teams via project assignments.
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
 import { TeamSelector } from '@/modules/noc/components/Assignment/TeamSelector';
 import { Button } from '@/components/ui/button';
+import { log } from '@/lib/logger';
 import { groupRecordsByProject, resolveTeamForProject } from '@/modules/activate/services/ticketBatchService';
 import type { ProjectTeamAssignment } from '@/modules/noc/types/team';
 
@@ -19,13 +25,7 @@ export interface PPTicketBatch {
 
 interface CreatePPTicketsModalProps {
   selectedRecords: PPRecord[];
-  onConfirm: (params: {
-    ticket_type: string;
-    ticket_category: string;
-    priority: string;
-    notes: string;
-    batches: PPTicketBatch[];
-  }) => void;
+  onConfirm: (params: { ticket_type: string; ticket_category: string; priority: string; notes: string; batches: PPTicketBatch[] }) => void;
   onClose: () => void;
   loading: boolean;
 }
@@ -40,69 +40,47 @@ const TICKET_CATEGORIES = [
 ];
 
 const PRIORITIES = [
-  { value: 'low', label: 'Low' },
-  { value: 'normal', label: 'Normal' },
-  { value: 'high', label: 'High' },
-  { value: 'urgent', label: 'Urgent' },
+  { value: 'low', label: 'Low' }, { value: 'normal', label: 'Normal' },
+  { value: 'high', label: 'High' }, { value: 'urgent', label: 'Urgent' },
 ];
 
-export function CreatePPTicketsModal({
-  selectedRecords,
-  onConfirm,
-  onClose,
-  loading,
-}: CreatePPTicketsModalProps) {
+const FIELD_CLASS = 'w-full px-3 py-2 rounded bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm';
+const LABEL_CLASS = 'block text-sm font-medium text-[var(--ff-text-secondary)] mb-1';
+
+export function CreatePPTicketsModal({ selectedRecords, onConfirm, onClose, loading }: CreatePPTicketsModalProps) {
   const [ticketCategory, setTicketCategory] = useState('pre_provision');
   const [priority, setPriority] = useState('normal');
   const [notes, setNotes] = useState('');
   const [assignments, setAssignments] = useState<ProjectTeamAssignment[]>([]);
   const [batches, setBatches] = useState<PPTicketBatch[]>([]);
 
-  // Load project-team assignments once
   useEffect(() => {
     fetch('/api/noc/teams?dropdown=true')
       .then(r => r.json())
       .then(d => {
         const teams = d.data ?? [];
-        const allAssignments: ProjectTeamAssignment[] = teams.flatMap(
-          (t: { project_assignments?: ProjectTeamAssignment[] }) => t.project_assignments ?? []
-        );
-        setAssignments(allAssignments);
+        setAssignments(teams.flatMap((t: { project_assignments?: ProjectTeamAssignment[] }) => t.project_assignments ?? []));
       })
-      .catch(() => {});
+      .catch((err: unknown) => log.error('Failed to load teams', { err }, 'CreatePPTicketsModal'));
   }, []);
 
-  // Recompute batches when records or assignments change
   useEffect(() => {
     const groups = groupRecordsByProject(selectedRecords);
     const newBatches: PPTicketBatch[] = [];
     for (const [project, ids] of groups) {
       const resolved = resolveTeamForProject(project, assignments);
-      newBatches.push({
-        project,
-        pp_data_ids: ids,
-        assigned_team_id: resolved?.team_id,
-        team_name: resolved?.team_name,
-        has_team: !!resolved,
-      });
+      newBatches.push({ project, pp_data_ids: ids, assigned_team_id: resolved?.team_id, team_name: resolved?.team_name, has_team: !!resolved });
     }
     setBatches(newBatches);
   }, [selectedRecords, assignments]);
 
   const handleNotesChange = (value: string) => {
     setNotes(value);
-    const trimmed = value.trim();
-    if (!trimmed || trimmed === 'No information on 1Map') {
-      setPriority('normal');
-    } else {
-      setPriority('high');
-    }
+    setPriority(!value.trim() || value.trim() === 'No information on 1Map' ? 'normal' : 'high');
   };
 
   const handleTeamOverride = (project: string, teamId: string | null) => {
-    setBatches(prev => prev.map(b =>
-      b.project === project ? { ...b, assigned_team_id: teamId ?? undefined } : b
-    ));
+    setBatches(prev => prev.map(b => b.project === project ? { ...b, assigned_team_id: teamId ?? undefined } : b));
   };
 
   const totalCount = selectedRecords.length;
@@ -114,58 +92,34 @@ export function CreatePPTicketsModal({
       <div className="bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Create NOC Tickets</h3>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
-            <X className="w-5 h-5" />
-          </Button>
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close"><X className="w-5 h-5" /></Button>
         </div>
-
         <p className="text-sm text-[var(--ff-text-secondary)]">
           Creating tickets for <strong>{totalCount}</strong> selected PP record{totalCount !== 1 ? 's' : ''}.
         </p>
-
         <div className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Ticket Type</label>
-            <select
-              value={ticketCategory}
-              onChange={(e) => setTicketCategory(e.target.value)}
-              className="w-full px-3 py-2 rounded bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm"
-            >
-              {TICKET_CATEGORIES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            <label className={LABEL_CLASS}>Ticket Type</label>
+            <select value={ticketCategory} onChange={e => setTicketCategory(e.target.value)} className={FIELD_CLASS}>
+              {TICKET_CATEGORIES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Priority</label>
-            <select
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-              className="w-full px-3 py-2 rounded bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm"
-            >
-              {PRIORITIES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            <label className={LABEL_CLASS}>Priority</label>
+            <select value={priority} onChange={e => setPriority(e.target.value)} className={FIELD_CLASS}>
+              {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-              Notes <span className="text-[var(--ff-text-tertiary)]">(optional)</span>
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => handleNotesChange(e.target.value)}
-              placeholder="Additional notes for the tickets..."
-              rows={3}
-              className="w-full px-3 py-2 rounded bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm resize-none"
-            />
+            <label className={LABEL_CLASS}>Notes <span className="text-[var(--ff-text-tertiary)]">(optional)</span></label>
+            <textarea value={notes} onChange={e => handleNotesChange(e.target.value)}
+              placeholder="Additional notes for the tickets..." rows={3}
+              className={`${FIELD_CLASS} resize-none`} />
           </div>
-
-          {/* Batch summary */}
           <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-2">
-              {isMixed ? `${batches.length} batches will be created` : 'Assign Team'}
-            </label>
+            <label className={LABEL_CLASS}>{isMixed ? `${batches.length} batches will be created` : 'Assign Team'}</label>
             <div className="space-y-2">
-              {batches.map((batch) => (
+              {batches.map(batch => (
                 <div key={batch.project} className="rounded border border-[var(--ff-border-light)] p-3 bg-[var(--ff-bg-secondary)]">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-[var(--ff-text-primary)]">
@@ -177,12 +131,7 @@ export function CreatePPTicketsModal({
                       </span>
                     )}
                   </div>
-                  <TeamSelector
-                    value={batch.assigned_team_id ?? null}
-                    onChange={(teamId) => handleTeamOverride(batch.project, teamId)}
-                    placeholder={batch.team_name ?? 'Select team...'}
-                    compact
-                  />
+                  <TeamSelector value={batch.assigned_team_id ?? null} onChange={teamId => handleTeamOverride(batch.project, teamId)} placeholder={batch.team_name ?? 'Select team...'} compact />
                 </div>
               ))}
             </div>
@@ -193,21 +142,9 @@ export function CreatePPTicketsModal({
             )}
           </div>
         </div>
-
         <div className="flex justify-end gap-3 pt-2">
           <Button variant="secondary" onClick={onClose} disabled={loading}>Cancel</Button>
-          <Button
-            variant="primary"
-            onClick={() => onConfirm({
-              ticket_type: 'activations',
-              ticket_category: ticketCategory,
-              priority,
-              notes,
-              batches,
-            })}
-            disabled={loading}
-            loading={loading}
-          >
+          <Button variant="primary" onClick={() => onConfirm({ ticket_type: 'activations', ticket_category: ticketCategory, priority, notes, batches })} disabled={loading} loading={loading}>
             {loading ? 'Creating...' : `Create ${totalCount} Ticket${totalCount !== 1 ? 's' : ''}`}
           </Button>
         </div>

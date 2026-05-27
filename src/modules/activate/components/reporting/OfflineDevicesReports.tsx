@@ -132,7 +132,7 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `offline-devices${filterSuffix}-${filters.dateFrom}-to-${filters.dateTo}.csv`;
+      a.download = `offline-devices${filterSuffix}-${filters.dateFrom}-to-${filters.dateTo}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
