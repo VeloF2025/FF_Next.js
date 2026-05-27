@@ -26,7 +26,13 @@ async function fetchSummary(filters?: TicketFilters): Promise<TicketSummaryData>
     if (filters.priority) params.append('priority', String(filters.priority));
     if (filters.source) params.append('source', String(filters.source));
     if (filters.assigned_to) params.append('assigned_to', filters.assigned_to);
-    if (filters.assigned_team_id) params.append('assigned_team_id', filters.assigned_team_id);
+    // assigned_team_id can be a single team ID or an array of team IDs
+    if (filters.assigned_team_id) {
+      const teamIds = Array.isArray(filters.assigned_team_id)
+        ? filters.assigned_team_id
+        : [filters.assigned_team_id];
+      teamIds.forEach((id) => params.append('assigned_team_id', id));
+    }
     if (filters.project_id) params.append('project_id', filters.project_id);
     if (filters.dr_number) params.append('dr_number', filters.dr_number);
     if (filters.qa_ready !== undefined) params.append('qa_ready', String(filters.qa_ready));

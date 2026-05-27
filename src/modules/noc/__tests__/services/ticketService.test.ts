@@ -764,8 +764,13 @@ describe('Ticket Service - CRUD Operations', () => {
       const result = await updateTicket(ticketId, updatePayload);
 
       expect(queryOne).toHaveBeenCalled();
-      const callArgs = vi.mocked(queryOne).mock.calls[0];
-      expect(callArgs[0]).toContain('updated_at = NOW()');
+      // A status change triggers a transition pre-SELECT before the UPDATE, so
+      // assert against the UPDATE statement specifically rather than calls[0].
+      const updateCall = vi.mocked(queryOne).mock.calls.find(
+        (c) => typeof c[0] === 'string' && (c[0] as string).includes('UPDATE maintenance_tickets')
+      );
+      expect(updateCall).toBeDefined();
+      expect(updateCall?.[0]).toContain('updated_at = NOW()');
       expect(result.updated_at).toBeDefined();
     });
   });
