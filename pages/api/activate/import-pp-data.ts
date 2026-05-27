@@ -396,8 +396,9 @@ async function handler(
     const buf = (await workbook.xlsx.writeBuffer()) as unknown as Buffer;
 
     const fileParts = ['PP_Data'];
-    if (project) fileParts.push(project);
-    if (status) fileParts.push(status);
+    // Sanitize query-derived parts so they can't inject into the Content-Disposition header.
+    if (project) fileParts.push(project.replace(/[^a-zA-Z0-9_-]/g, '_'));
+    if (status) fileParts.push(status.replace(/[^a-zA-Z0-9_-]/g, '_'));
     fileParts.push(new Date().toISOString().substring(0, 10));
     const filename = `${fileParts.join('_')}.xlsx`;
 

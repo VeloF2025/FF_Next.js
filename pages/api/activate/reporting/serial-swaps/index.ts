@@ -276,7 +276,9 @@ async function handler(
 
       const buffer = (await workbook.xlsx.writeBuffer()) as unknown as Buffer;
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename=serial-swaps-${dateFrom}-to-${dateTo}.xlsx`);
+      const safeFrom = String(dateFrom).replace(/[^0-9-]/g, '');
+      const safeTo = String(dateTo).replace(/[^0-9-]/g, '');
+      res.setHeader('Content-Disposition', `attachment; filename=serial-swaps-${safeFrom}-to-${safeTo}.xlsx`);
       return res.status(200).send(buffer);
     }
 

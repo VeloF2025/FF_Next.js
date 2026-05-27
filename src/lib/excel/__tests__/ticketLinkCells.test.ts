@@ -19,6 +19,9 @@ describe('gpsCoordinates', () => {
     expect(gpsCoordinates(-26.1, null)).toBe('');
     expect(gpsCoordinates(undefined, undefined)).toBe('');
   });
+  it('treats 0 as a valid coordinate (!= null, not falsy)', () => {
+    expect(gpsCoordinates(0, 0)).toBe('0, 0');
+  });
 });
 
 describe('gpsMapsUrl', () => {
@@ -28,6 +31,9 @@ describe('gpsMapsUrl', () => {
   it('returns null when either coordinate is missing', () => {
     expect(gpsMapsUrl(null, 28.2)).toBeNull();
     expect(gpsMapsUrl(-26.1, undefined)).toBeNull();
+  });
+  it('treats 0 as a valid coordinate', () => {
+    expect(gpsMapsUrl(0, 0)).toBe('https://www.google.com/maps?q=0,0');
   });
 });
 
@@ -79,6 +85,15 @@ describe('applyTicketRowLinks', () => {
     expect((row.getCell(1).value as { text: string }).text).toBe('TKT-1');
     expect((row.getCell(2).value as { hyperlink: string }).hyperlink).toBe('https://app/snag/resolve/tok');
     expect((row.getCell(3).value as { hyperlink: string }).hyperlink).toBe('https://www.google.com/maps?q=-26.1,28.2');
+    expect((row.getCell(3).value as { text: string }).text).toBe('-26.1, 28.2');
+  });
+
+  it('leaves the ticket cell plain when ticketId is present but ticketUid is null', () => {
+    const ws = new ExcelJS.Workbook().addWorksheet('t');
+    const row = ws.addRow(['plain']);
+    applyTicketRowLinks(row, { ticketCol: 1, ticketId: 'id-1', ticketUid: null });
+    expect(row.getCell(1).value).toBe('plain');
+    expect(row.getCell(1).font).toBeUndefined();
   });
 
   it('leaves cells untouched when data is missing', () => {

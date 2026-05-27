@@ -155,10 +155,10 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
             variant="primary"
             size="sm"
             onClick={() => { void handleExport(); }}
-            title={`Export ${selectedZone || selectedBucket || selectedMatchStatus || serialMismatchOnly ? 'filtered' : 'all'} offline devices to CSV`}
+            title={`Export ${selectedZone || selectedBucket || selectedMatchStatus || serialMismatchOnly ? 'filtered' : 'all'} offline devices to Excel`}
           >
             <Download className="h-4 w-4" />
-            Export {selectedMatchStatus ? selectedMatchStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : serialMismatchOnly ? 'Mismatches' : 'All'} CSV
+            Export {selectedMatchStatus ? selectedMatchStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : serialMismatchOnly ? 'Mismatches' : 'All'} Excel
           </Button>
         )}
       </div>

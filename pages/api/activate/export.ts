@@ -414,7 +414,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (dateTo) filenameParts.push(`to-${dateTo}`);
     filenameParts.push(`${rows.length}-records`);
     if (filenameParts.length === 2) filenameParts.splice(1, 0, 'all'); // 'all' before count
-    const filename = `${filenameParts.join('-')}.xlsx`;
+    // Strip CR/LF/quotes so query-derived parts can't inject into the header.
+    const filename = `${filenameParts.join('-')}.xlsx`.replace(/[\r\n"]/g, '');
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

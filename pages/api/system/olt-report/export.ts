@@ -20,7 +20,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { getOrCreateShareUrls } from '@/modules/noc/services/ticketShareLinks';
-import { gpsCoordinates, gpsMapsUrl, internalTicketUrl, setLinkCell } from '@/lib/excel/ticketLinkCells';
+import { gpsCoordinates, applyTicketRowLinks } from '@/lib/excel/ticketLinkCells';
 
 type QueryParam = string | string[] | undefined;
 type SqlParam = string | string[];
@@ -235,19 +235,12 @@ async function toExcel(rows: OltExportRow[], filters: Record<string, string>): P
       row.has_ups_swap ? 'Yes' : 'No',
     ]);
 
-    // Ticket → internal FibreFlow ticket page (sign-in required)
-    if (row.ticket_id && row.ticket_uid) {
-      setLinkCell(added.getCell(TICKET_COL), row.ticket_uid, internalTicketUrl(row.ticket_id), 'Open ticket in FibreFlow (sign-in required)');
-    }
-    // Ticket Link → public shareable page
-    if (row.ticket_link) {
-      setLinkCell(added.getCell(TICKET_LINK_COL), row.ticket_link, row.ticket_link, 'Open shareable ticket link');
-    }
-    // GPS coordinates → Google Maps
-    const mapsUrl = gpsMapsUrl(row.latitude, row.longitude);
-    if (mapsUrl) {
-      setLinkCell(added.getCell(GPS_COL), gpsCoordinates(row.latitude, row.longitude), mapsUrl, 'Open in Google Maps');
-    }
+    // Ticket → internal page, Ticket Link → public share page, GPS → Google Maps
+    applyTicketRowLinks(added, {
+      ticketCol: TICKET_COL, ticketId: row.ticket_id, ticketUid: row.ticket_uid,
+      ticketLinkCol: TICKET_LINK_COL, ticketLink: row.ticket_link,
+      gpsCol: GPS_COL, lat: row.latitude, lng: row.longitude,
+    });
   }
 
   const filterSheet = workbook.addWorksheet('Filters');

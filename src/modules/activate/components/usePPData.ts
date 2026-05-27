@@ -191,7 +191,7 @@ export function usePPData(): { state: PPDataState; actions: PPDataActions } {
         setShowTicketModal(false); setSelectedIds([]);
         await fetchRecords(); await fetchStats();
       } else { toast.error(data.error?.message || 'Failed to create tickets'); }
-    } catch { toast.error('Failed to create tickets'); }
+    } catch (err) { log.error('Failed to create tickets', { err }, 'usePPData'); toast.error('Failed to create tickets'); }
     finally { setCreatingTickets(false); }
   };
 
@@ -206,7 +206,7 @@ export function usePPData(): { state: PPDataState; actions: PPDataActions } {
         setSelectedIds(ids); setFilterStatus('unticketed'); setPage(1);
         toast.success(`Selected ${ids.length} unticketed records`);
       }
-    } catch { toast.error('Failed to fetch unticketed records'); }
+    } catch (err) { log.error('Failed to fetch unticketed records', { err }, 'usePPData'); toast.error('Failed to fetch unticketed records'); }
     finally { setSelectingAllUnticketed(false); }
   };
 
