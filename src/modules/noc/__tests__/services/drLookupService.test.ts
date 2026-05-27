@@ -143,6 +143,42 @@ describe('DR Lookup Service', () => {
       expect(result.data?.zone_number).toBeNull();
       expect(result.data?.project_id).toBe('proj-uuid-456');
     });
+
+    it('should return a legacy onemap.drops match (null municipality/cable/ont_serial)', async () => {
+      // The legacy onemap CTE arm hardcodes municipality/cable_type/cable_length/
+      // ont_serial as NULL, so a fallback match must surface those as null while
+      // still returning the core drop + project fields.
+      const drNumber = 'DR-2018-LEGACY';
+      vi.mocked(queryOne).mockResolvedValueOnce(
+        makeRow({
+          dr_number: drNumber,
+          pole_number: 'LEGACY-POLE-7',
+          project_id: 'legacy-proj-uuid-789',
+          pon_code: '3',
+          zone_code: '4',
+          project_name: 'Legacy OneMap Project',
+          project_code: 'LEG-2018',
+          municipality: null,
+          cable_type: null,
+          cable_length: null,
+          ont_serial: null,
+        })
+      );
+
+      const result = await lookupDR(drNumber);
+
+      expect(result.success).toBe(true);
+      expect(result.data?.dr_number).toBe(drNumber);
+      expect(result.data?.pole_number).toBe('LEGACY-POLE-7');
+      expect(result.data?.pon_number).toBe(3);
+      expect(result.data?.zone_number).toBe(4);
+      expect(result.data?.project_id).toBe('legacy-proj-uuid-789');
+      expect(result.data?.project_name).toBe('Legacy OneMap Project');
+      expect(result.data?.municipality).toBeNull();
+      expect(result.data?.cable_type).toBeNull();
+      expect(result.data?.cable_length).toBeNull();
+      expect(result.data?.ont_serial).toBeNull();
+    });
   });
 
   describe('lookupDR - Invalid DR Number', () => {

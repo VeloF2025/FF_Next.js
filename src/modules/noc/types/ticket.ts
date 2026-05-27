@@ -26,7 +26,7 @@ export interface DRLookupData {
   cable_type: string | null;
   cable_length: string | null;
   status: string | null;
-  ont_serial?: string | null;
+  ont_serial: string | null;
 }
 
 export interface DRLookupResult {
