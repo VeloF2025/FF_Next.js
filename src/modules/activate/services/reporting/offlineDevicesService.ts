@@ -204,6 +204,7 @@ export async function getOfflineDevicesReport(
         od.installation_date,
         od.revenue_30day_avg
       FROM offline_devices od
+      -- 1:1 join — dr_photo_unified_reviews.drop_number is UNIQUE, so no row inflation
       LEFT JOIN dr_photo_unified_reviews r ON r.drop_number = od.drop_number
       LEFT JOIN LATERAL (
         SELECT id, ticket_uid

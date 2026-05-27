@@ -190,7 +190,11 @@ async function handler(
         mt.ticket_uid,
         EXTRACT(EPOCH FROM (NOW() - u.serial_swap_detected_at)) / 86400 as days_pending
       FROM dr_photo_unified_reviews u
-      LEFT JOIN drops d ON u.drop_number = d.drop_number
+      LEFT JOIN (
+        SELECT DISTINCT ON (drop_number) drop_number, zone_no, pon_no, pole_number, latitude, longitude
+        FROM drops
+        ORDER BY drop_number, updated_at DESC NULLS LAST
+      ) d ON u.drop_number = d.drop_number
       LEFT JOIN qa_photo_reviews q ON u.drop_number = q.drop_number
       LEFT JOIN LATERAL (
         SELECT id, ticket_uid
