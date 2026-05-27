@@ -10,7 +10,7 @@
  * URL: /activate/photo-gallery
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   CheckCircle2, XCircle, ChevronLeft, ChevronRight,
   Loader2, RefreshCw, Save,
@@ -166,19 +166,6 @@ export default function PhotoGalleryPage() {
     }
   };
 
-  const copyResults = () => {
-    const lines = [
-      `Step ${activeStep}: ${STEP_LABELS[activeStep]}`,
-      `Total reviewed: ${photos.length} | Good: ${goodCount} | Bad: ${badCount} | Undecided: ${undecidedCount}`,
-      '',
-      '=== GOOD EXAMPLES ===',
-      ...goodPhotos.map((p) => `  ${p.drNumber}/${p.filename} (conf: ${(p.confidence * 100).toFixed(0)}%)`),
-      '',
-      '=== BAD EXAMPLES ===',
-      ...badPhotos.map((p) => `  ${p.drNumber}/${p.filename} (conf: ${(p.confidence * 100).toFixed(0)}%)`),
-    ];
-    void navigator.clipboard.writeText(lines.join('\n'));
-  };
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
