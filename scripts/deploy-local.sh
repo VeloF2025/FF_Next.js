@@ -52,7 +52,9 @@ done
 # --- Time gate ---
 is_business_hours() {
   local hour day_of_week
-  hour=$(TZ=$TIMEZONE date +%H)
+  # Force base-10: date +%H yields zero-padded "08"/"09", which arithmetic
+  # contexts parse as invalid octal ("[[: 08: value too great for base").
+  hour=$((10#$(TZ=$TIMEZONE date +%H)))
   day_of_week=$(TZ=$TIMEZONE date +%u)
   [[ "$day_of_week" -le 5 && "$hour" -ge 8 && "$hour" -lt 17 ]]
 }
