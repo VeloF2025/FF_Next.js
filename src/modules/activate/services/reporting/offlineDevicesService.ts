@@ -4,7 +4,7 @@
 
 import { log } from '@/lib/logger';
 import { pool } from './_shared';
-import { getShareUrls } from '@/modules/noc/services/ticketShareLinks';
+import { getShareUrls, getOrCreateShareUrls } from '@/modules/noc/services/ticketShareLinks';
 import type {
   OfflineDevicesReportResponse,
   OfflineDeviceRecord,
@@ -27,6 +27,10 @@ export async function getOfflineDevicesReport(
     lastDownReason?: string;
     page?: number;
     pageSize?: number;
+    /** Export mode: return all filtered rows (skip pagination). */
+    noPaging?: boolean;
+    /** Mint a share token for tickets that lack one (export only — never on list loads). */
+    mintShareLinks?: boolean;
   } = {}
 ): Promise<OfflineDevicesReportResponse> {
   try {
@@ -39,6 +43,8 @@ export async function getOfflineDevicesReport(
       lastDownReason,
       page = 1,
       pageSize = 100,
+      noPaging = false,
+      mintShareLinks = false,
     } = options;
 
     log.info('Getting offline devices report', {
@@ -215,13 +221,16 @@ export async function getOfflineDevicesReport(
       ) mt ON true
       WHERE ${whereClause}
       ORDER BY od.days_since_last_inform DESC, od.drop_number
-      LIMIT $${paramIdx} OFFSET $${paramIdx + 1}
+      ${noPaging ? '' : `LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`}
       `,
-      [...params, pageSize, offset]
+      noPaging ? params : [...params, pageSize, offset]
     );
 
-    // Read-only existing share links (list endpoint must not mint tokens on every page load)
-    const shareUrls = await getShareUrls(recordsResult.rows.map((r) => r.ticket_id));
+    // Export mints links on demand; the paginated list view only surfaces pre-existing ones.
+    const ticketIds = recordsResult.rows.map((r) => r.ticket_id);
+    const shareUrls = mintShareLinks
+      ? await getOrCreateShareUrls(ticketIds)
+      : await getShareUrls(ticketIds);
 
     const records: OfflineDeviceRecord[] = recordsResult.rows.map((row) => ({
       id: row.id,

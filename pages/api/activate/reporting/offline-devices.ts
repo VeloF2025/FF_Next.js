@@ -86,6 +86,51 @@ async function handler(
     const pageSizeNum = pageSize
       ? Math.min(parseInt(Array.isArray(pageSize) ? (pageSize[0] ?? '100') : pageSize, 10), 500)
       : 100;
+    const wantsCsv = (Array.isArray(req.query.format) ? req.query.format[0] : req.query.format) === 'csv';
+
+    // CSV export: all filtered rows, minting share links on demand (server-side only).
+    if (wantsCsv) {
+      const report = await getOfflineDevicesReport(dateFromStr as string, dateToStr as string, {
+        project: projectStr,
+        zone: zoneStr,
+        offlineBucket: offlineBucketStr,
+        matchStatus: matchStatusStr,
+        serialMismatchOnly: serialMismatchOnlyBool,
+        lastDownReason: lastDownReasonStr,
+        noPaging: true,
+        mintShareLinks: true,
+      });
+
+      const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const header = ['DR Number', 'Serial', '1Map Serial', 'Zone', 'PON', 'Address', 'Pole', 'GPS Coordinates', 'Down Reason', 'Days Offline', 'Bucket', 'Match Status', 'Serial Mismatch', 'Report Date', 'Ticket Number', 'Ticket Link'];
+      const lines = [
+        header.join(','),
+        ...report.records.map((r) => [
+          r.drop_number,
+          r.serial_number ?? '',
+          r.onemap_serial ?? '',
+          r.zone ?? '',
+          r.planned_pon ?? '',
+          q(r.address ?? ''),
+          r.pole_number ?? '',
+          q(r.latitude != null && r.longitude != null ? `${r.latitude}, ${r.longitude}` : ''),
+          q(r.last_down_reason ?? ''),
+          r.days_since_last_inform,
+          r.offline_bucket,
+          r.match_status,
+          r.serial_mismatch ? 'Yes' : 'No',
+          r.report_date,
+          r.ticket_uid ?? '',
+          r.ticket_link ?? '',
+        ].join(',')),
+      ];
+
+      const today = new Date().toISOString().split('T')[0];
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="offline-devices-${today}.csv"`);
+      res.setHeader('X-Export-Count', String(report.records.length));
+      return res.status(200).send(lines.join('\n'));
+    }
 
     log.info('Fetching offline devices report', {
       dateFrom: dateFromStr,

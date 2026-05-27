@@ -102,66 +102,43 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
     setPage(1);
   }, [selectedZone, selectedBucket, selectedMatchStatus, selectedReason, serialMismatchOnly]);
 
-  // Export handler
-  const handleExport = useCallback(() => {
+  // Export handler — server-side CSV so ticket links are minted on demand and
+  // ALL filtered rows are exported (not just the current page).
+  const handleExport = useCallback(async () => {
     if (!data) return;
+    try {
+      const params = new URLSearchParams();
+      params.set('dateFrom', filters.dateFrom);
+      params.set('dateTo', filters.dateTo);
+      if (filters.project) params.set('project', filters.project);
+      if (selectedZone) params.set('zone', selectedZone);
+      if (selectedBucket) params.set('offlineBucket', selectedBucket);
+      if (selectedMatchStatus) params.set('matchStatus', selectedMatchStatus);
+      if (selectedReason) params.set('lastDownReason', selectedReason);
+      if (serialMismatchOnly) params.set('serialMismatchOnly', 'true');
+      params.set('format', 'csv');
 
-    const headers = [
-      'DR Number',
-      'Serial',
-      '1Map Serial',
-      'Zone',
-      'PON',
-      'Address',
-      'Pole',
-      'GPS Coordinates',
-      'Down Reason',
-      'Days Offline',
-      'Bucket',
-      'Match Status',
-      'Serial Mismatch',
-      'Report Date',
-      'Ticket Number',
-      'Ticket Link',
-    ];
+      const res = await fetch(`/api/activate/reporting/offline-devices?${params}`);
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
 
-    const csvCell = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const filterParts: string[] = [];
+      if (selectedZone) filterParts.push(`zone${selectedZone}`);
+      if (selectedBucket) filterParts.push(selectedBucket.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, ''));
+      if (selectedMatchStatus) filterParts.push(selectedMatchStatus);
+      if (serialMismatchOnly) filterParts.push('mismatches');
+      const filterSuffix = filterParts.length > 0 ? `-${filterParts.join('-')}` : '-all';
 
-    const rows = data.records.map((r) => [
-      r.drop_number,
-      r.serial_number,
-      r.onemap_serial || '',
-      r.zone || '',
-      r.planned_pon || '',
-      csvCell(r.address || ''),
-      r.pole_number || '',
-      csvCell(r.latitude != null && r.longitude != null ? `${r.latitude}, ${r.longitude}` : ''),
-      r.last_down_reason,
-      r.days_since_last_inform,
-      r.offline_bucket,
-      r.match_status,
-      r.serial_mismatch ? 'Yes' : 'No',
-      r.report_date,
-      r.ticket_uid || '',
-      r.ticket_link || '',
-    ]);
-
-    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    // Build descriptive filename with active filters
-    const filterParts: string[] = [];
-    if (selectedZone) filterParts.push(`zone${selectedZone}`);
-    if (selectedBucket) filterParts.push(selectedBucket.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, ''));
-    if (selectedMatchStatus) filterParts.push(selectedMatchStatus);
-    if (serialMismatchOnly) filterParts.push('mismatches');
-    const filterSuffix = filterParts.length > 0 ? `-${filterParts.join('-')}` : '-all';
-    a.download = `offline-devices${filterSuffix}-${filters.dateFrom}-to-${filters.dateTo}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [data, filters, selectedZone, selectedBucket, selectedMatchStatus, serialMismatchOnly]);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `offline-devices${filterSuffix}-${filters.dateFrom}-to-${filters.dateTo}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError('Export failed');
+    }
+  }, [data, filters, selectedZone, selectedBucket, selectedMatchStatus, selectedReason, serialMismatchOnly]);
 
   const totalPages = data ? Math.ceil(data.total_count / pageSize) : 0;
 
@@ -177,7 +154,7 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
           <Button
             variant="primary"
             size="sm"
-            onClick={handleExport}
+            onClick={() => { void handleExport(); }}
             title={`Export ${selectedZone || selectedBucket || selectedMatchStatus || serialMismatchOnly ? 'filtered' : 'all'} offline devices to CSV`}
           >
             <Download className="h-4 w-4" />
