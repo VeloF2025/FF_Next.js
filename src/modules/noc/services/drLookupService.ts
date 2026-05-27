@@ -56,7 +56,10 @@ export async function lookupDR(drNumber: string): Promise<DRLookupResult> {
 
     logger.info('Looking up DR number in SOW module', { drNumber: trimmedDR });
 
-    // Query onemap.drops table for DR details (with project join)
+    // Query the current FibreFlow drops table first, with legacy onemap.drops
+    // as fallback. New QField/OES drops (e.g. DR2598903) are stored in
+    // public.drops and never appear in onemap.drops, which caused valid DRs to
+    // be reported as missing in the NOC create-ticket form.
     const drData = await queryOne<{
       dr_number: string;
       pole_number: string | null;
@@ -69,22 +72,77 @@ export async function lookupDR(drNumber: string): Promise<DRLookupResult> {
       current_status: string | null;
       project_name: string | null;
       project_code: string | null;
+      municipality: string | null;
+      cable_type: string | null;
+      cable_length: string | null;
+      ont_serial: string | null;
     }>(
-      `SELECT
-        d.dr_number,
-        d.pole_number,
-        d.project_id::text as project_id,
-        d.pon_code,
-        d.zone_code,
-        NULLIF(d.address, 'NULL') as address,
-        d.latitude::float as latitude,
-        d.longitude::float as longitude,
-        d.current_status,
-        p.project_name,
-        p.project_code
-      FROM onemap.drops d
-      LEFT JOIN onemap.projects p ON d.project_id = p.id
-      WHERE UPPER(d.dr_number) = UPPER($1)`,
+      `WITH public_drop AS (
+        SELECT
+          d.drop_number AS dr_number,
+          d.pole_number,
+          d.project_id::text AS project_id,
+          d.pon_no::text AS pon_code,
+          d.zone_no::text AS zone_code,
+          NULLIF(d.address, 'NULL') AS address,
+          d.latitude::float AS latitude,
+          d.longitude::float AS longitude,
+          d.status AS current_status,
+          COALESCE(p.project_name, d.site_submitted_project) AS project_name,
+          p.project_code,
+          d.municipality,
+          d.cable_type,
+          d.cable_length,
+          d.ont_serial,
+          1 AS source_priority
+        FROM public.drops d
+        LEFT JOIN public.projects p ON d.project_id = p.id
+        WHERE UPPER(d.drop_number) = UPPER($1)
+      ), legacy_onemap_drop AS (
+        SELECT
+          d.dr_number,
+          d.pole_number,
+          d.project_id::text AS project_id,
+          d.pon_code,
+          d.zone_code,
+          NULLIF(d.address, 'NULL') AS address,
+          d.latitude::float AS latitude,
+          d.longitude::float AS longitude,
+          d.current_status,
+          p.project_name,
+          p.project_code,
+          NULL::text AS municipality,
+          NULL::text AS cable_type,
+          NULL::text AS cable_length,
+          NULL::text AS ont_serial,
+          2 AS source_priority
+        FROM onemap.drops d
+        LEFT JOIN onemap.projects p ON d.project_id = p.id
+        WHERE UPPER(d.dr_number) = UPPER($1)
+      )
+      SELECT
+        dr_number,
+        pole_number,
+        project_id,
+        pon_code,
+        zone_code,
+        address,
+        latitude,
+        longitude,
+        current_status,
+        project_name,
+        project_code,
+        municipality,
+        cable_type,
+        cable_length,
+        ont_serial
+      FROM (
+        SELECT * FROM public_drop
+        UNION ALL
+        SELECT * FROM legacy_onemap_drop
+      ) drops
+      ORDER BY source_priority
+      LIMIT 1`,
       [trimmedDR]
     );
 
@@ -114,10 +172,11 @@ export async function lookupDR(drNumber: string): Promise<DRLookupResult> {
       address: drData.address,
       latitude: drData.latitude,
       longitude: drData.longitude,
-      municipality: null, // Not in onemap schema
-      cable_type: null,   // Not in onemap schema
-      cable_length: null, // Not in onemap schema
-      status: drData.current_status
+      municipality: drData.municipality,
+      cable_type: drData.cable_type,
+      cable_length: drData.cable_length,
+      status: drData.current_status,
+      ont_serial: drData.ont_serial
     };
 
     logger.debug('DR lookup successful', {

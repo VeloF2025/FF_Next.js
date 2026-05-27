@@ -177,6 +177,7 @@ const initialFormData: TicketFormData = {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^[+]?[\d\s-()]{7,20}$/;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function validateFormData(data: TicketFormData, mediaFiles: File[]): TicketFormErrors {
   const errors: TicketFormErrors = {};
@@ -348,6 +349,7 @@ export function useTicketForm(): UseTicketFormResult {
         address: result.address || '',
         latitude: result.latitude?.toString() || '',
         longitude: result.longitude?.toString() || '',
+        ont_serial: result.ont_serial || '',
       });
     }
   }, [drLookupHook, setFields]);
@@ -403,7 +405,7 @@ export function useTicketForm(): UseTicketFormResult {
     if (formData.dr_number.trim()) {
       payload.dr_number = formData.dr_number.trim();
     }
-    if (formData.project_id) {
+    if (formData.project_id && UUID_REGEX.test(formData.project_id)) {
       payload.project_id = formData.project_id;
     }
     if (formData.zone_id) {
@@ -417,6 +419,9 @@ export function useTicketForm(): UseTicketFormResult {
     }
     if (formData.address.trim()) {
       payload.address = formData.address.trim();
+    }
+    if (formData.ont_serial.trim()) {
+      payload.ont_serial = formData.ont_serial.trim();
     }
     if (formData.assigned_to) {
       payload.assigned_to = formData.assigned_to;
